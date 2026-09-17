@@ -40,6 +40,8 @@ export interface SystemInfo {
   cpuCount: number
   totalMemory: number
   userName: string
+  /** Account display name when the platform exposes one. */
+  fullName?: string
   homeDir: string
 }
 

@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# Run the hermes-os-bridge plugin tests with the Hermes runtime's Python so the plugin is
-# exercised against the same interpreter and dependencies the gateway loads it with.
+# Run the hermes-os-bridge plugin tests.
+# Prefers the Hermes runtime's venv when it has pytest (same interpreter the gateway loads the plugin
+# with); otherwise runs in an ephemeral uv environment so the user's Hermes venv is never modified.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 PY="${HERMES_OS_PYTHON:-$HERMES_HOME/hermes-agent/venv/bin/python}"
 
-if [[ ! -x "$PY" ]]; then
-  echo "test-bridge: no Hermes venv python at $PY (set HERMES_OS_PYTHON)" >&2
-  exit 1
+cd "$ROOT/plugins/tests"
+
+if [[ -x "$PY" ]] && "$PY" -c "import pytest" >/dev/null 2>&1; then
+  exec "$PY" -m pytest -q "$@"
 fi
 
-cd "$ROOT/plugins/hermes-os-bridge"
-exec "$PY" -m pytest -q "$@"
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --no-project --python 3.11 --with pytest --with pyyaml python -m pytest -q "$@"
+fi
+
+echo "test-bridge: need either pytest in $PY or uv on PATH" >&2
+exit 1

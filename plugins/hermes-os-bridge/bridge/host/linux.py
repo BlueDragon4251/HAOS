@@ -1,0 +1,66 @@
+"""Linux host adapter: typed stub. See docs/ROADMAP.md (``xdg-open``, ``ps``, ``ss``, ``fd``/``locate``,
+``gio trash``)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Literal, Sequence
+
+from .base import AppInfo, FileSearch, FoundFile, HostAdapter, HostNotSupported, PortListener, ProcessRow
+
+_MESSAGE = "The Hermes OS system bridge does not support Linux yet."
+
+
+class LinuxHost(HostAdapter):
+    platform = "linux"
+
+    def available(self) -> bool:
+        return False
+
+    def system_info(self) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def list_processes(self, sort: Literal["cpu", "memory"], limit: int) -> list[ProcessRow]:
+        raise HostNotSupported(_MESSAGE)
+
+    def find_processes(self, name: str, limit: int) -> list[ProcessRow]:
+        raise HostNotSupported(_MESSAGE)
+
+    def listeners_on_port(self, port: int) -> list[PortListener]:
+        raise HostNotSupported(_MESSAGE)
+
+    def disk_usage(self, path: Path, depth: int, limit: int, timeout: float) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def find_files(self, query: FileSearch) -> list[FoundFile]:
+        raise HostNotSupported(_MESSAGE)
+
+    def installed_apps(self) -> list[AppInfo]:
+        raise HostNotSupported(_MESSAGE)
+
+    def running_apps(self) -> list[AppInfo]:
+        raise HostNotSupported(_MESSAGE)
+
+    def open_app(self, name: str, args: Sequence[str] = ()) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def open_url(self, url: str, app: str | None = None) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def open_path(self, path: Path, app: str | None = None) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def reveal(self, path: Path) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def quit_app(self, name: str, force: bool) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def kill(self, pid: int, force: bool) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def trash(self, paths: Sequence[Path]) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def notify(self, title: str, body: str) -> None:
+        raise HostNotSupported(_MESSAGE)

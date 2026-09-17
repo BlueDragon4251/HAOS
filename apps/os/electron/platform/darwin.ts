@@ -118,7 +118,7 @@ export class DarwinPlatform implements HostPlatform {
   private appsCache: { at: number; apps: InstalledApp[] } | null = null
 
   async systemInfo(): Promise<SystemInfo> {
-    const [name, version] = await Promise.all([run('sw_vers', ['-productName']), run('sw_vers', ['-productVersion'])])
+    const [name, version, fullName] = await Promise.all([run('sw_vers', ['-productName']), run('sw_vers', ['-productVersion']), run('id', ['-F'])])
     const cpus = os.cpus()
 
     return {
@@ -131,6 +131,7 @@ export class DarwinPlatform implements HostPlatform {
       cpuCount: cpus.length,
       totalMemory: os.totalmem(),
       userName: os.userInfo().username,
+      fullName: fullName.stdout.trim() || undefined,
       homeDir: os.homedir()
     }
   }

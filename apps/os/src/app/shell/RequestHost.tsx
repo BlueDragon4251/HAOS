@@ -44,15 +44,23 @@ function RequestCard({ entry }: { entry: PendingRequest }) {
 
 const CHOICE_LABEL: Record<ApprovalChoice, string> = { once: 'Allow once', session: 'Allow this session', always: 'Always allow', deny: 'Deny' }
 
+/** Upstream labels plugin-gated approvals `<tool> (plugin approval rule)`; the tool name is what the user needs. */
+const PLUGIN_RULE_RE = /^<([a-z0-9_]+)> \(plugin approval rule\)$/i
+/** Bridge actions that must never be pre-authorised; the plugin already rotates their rule key, this hides the misleading button. */
+const BRIDGE_DESTRUCTIVE = new Set(['system_kill_process'])
+const DESTRUCTIVE_SUMMARY_RE = /^(trash|force quit|force kill|terminate|quit)\b/i
+
 function ApprovalCard({ id, params }: { id: string; params: ApprovalRequestParams }) {
-  const isBridge = Boolean(params.tool_name) && (params.command ?? '').includes('plugin approval rule')
+  const bridgeTool = PLUGIN_RULE_RE.exec(params.command ?? '')?.[1] ?? null
+  const toolName = params.tool_name ?? bridgeTool
+  const destructive = Boolean(bridgeTool) && (BRIDGE_DESTRUCTIVE.has(bridgeTool!) || DESTRUCTIVE_SUMMARY_RE.test(params.description ?? ''))
   const choices = (params.choices?.length ? params.choices : (['once', 'deny'] as ApprovalChoice[])).filter(choice => {
     if (choice === 'always') {
-      return params.allow_permanent !== false
+      return params.allow_permanent !== false && !destructive
     }
 
     if (choice === 'session') {
-      return params.allow_session !== false
+      return params.allow_session !== false && !destructive
     }
 
     return true
@@ -66,13 +74,13 @@ function ApprovalCard({ id, params }: { id: string; params: ApprovalRequestParam
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[13px] font-medium">
-            Hermes is asking for permission
-            {params.tool_name && <Badge tone="accent">{params.tool_name}</Badge>}
+            {bridgeTool ? 'Hermes wants to act on this Mac' : 'Hermes is asking for permission'}
+            {toolName && <Badge tone={destructive ? 'danger' : 'accent'}>{toolName.replace(/^system_/, '').replace(/_/g, ' ')}</Badge>}
           </div>
           {params.description && <div className="mt-1 text-[12.5px] text-fg-2">{params.description}</div>}
         </div>
       </div>
-      {params.command && !isBridge && (
+      {params.command && !bridgeTool && (
         <pre className="selectable max-h-40 overflow-auto rounded-md bg-surface px-3 py-2 font-mono text-[12px] leading-relaxed text-fg hairline whitespace-pre-wrap">{params.command}</pre>
       )}
       <div className="flex flex-wrap justify-end gap-2">

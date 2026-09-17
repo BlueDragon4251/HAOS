@@ -36,17 +36,32 @@ fi
 ln -s "$ROOT/plugins/hermes-os-bridge" "$link"
 
 echo "==> Verifying Hermes runtime"
-if [[ -n "${HERMES_OS_HERMES_ROOT:-}" ]]; then
+HERMES_CMD=()
+if [[ -n "${HERMES_OS_HERMES_ROOT:-}" && -x "$HERMES_OS_HERMES_ROOT/venv/bin/python" ]]; then
   echo "    HERMES_OS_HERMES_ROOT=$HERMES_OS_HERMES_ROOT"
+  HERMES_CMD=("$HERMES_OS_HERMES_ROOT/venv/bin/python" -m hermes_cli.main)
 elif [[ -x "$HERMES_HOME/hermes-agent/venv/bin/python" ]]; then
   echo "    managed install: $HERMES_HOME/hermes-agent"
-  "$HERMES_HOME/hermes-agent/venv/bin/python" -c "import hermes_cli.main" \
-    && echo "    hermes_cli importable"
+  HERMES_CMD=("$HERMES_HOME/hermes-agent/venv/bin/python" -m hermes_cli.main)
 elif command -v hermes >/dev/null 2>&1; then
   echo "    hermes on PATH: $(command -v hermes)"
+  HERMES_CMD=(hermes)
 else
   echo "    WARNING: no Hermes runtime found. Install with:" >&2
   echo "      curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash" >&2
+fi
+
+if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
+  echo "==> Enabling the system bridge plugin and its toolset"
+  # User plugins are opt-in (plugins.enabled) and a saved platform toolset list is authoritative, so
+  # both must be recorded. The override prompt is answered "no" (stdin closed): the bridge never
+  # replaces built-in tools.
+  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" plugins enable hermes-os-bridge </dev/null >/dev/null 2>&1 || true)
+  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" tools enable hermes_os </dev/null 2>&1 | tail -1 || true)
+  # Upstream defers plugin tools behind its tool-search bridge; with the system tools hidden the
+  # agent falls back to shell commands. Keep them direct (Settings -> Permissions can flip it back).
+  echo "    tools.tool_search.enabled = off (system tools stay directly callable)"
+  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" config set tools.tool_search.enabled off </dev/null >/dev/null 2>&1 || true)
 fi
 
 echo "==> Done. Start Hermes OS with: npm run dev"

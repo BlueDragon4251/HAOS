@@ -32,7 +32,7 @@ export function HomeSurface() {
   const online = connection === 'open'
   const running = Object.values(agents).filter(a => a.status === 'running' || a.status === 'queued')
   const upcoming = (jobs.data ?? []).filter(job => job.enabled !== false && job.state !== 'completed').slice(0, 4)
-  const firstName = info?.userName ? info.userName.split(/[._\-\s]/)[0] : ''
+  const firstName = (info?.fullName || info?.userName || '').split(/[._\-\s]/)[0]
   const greeting = `${greetingFor(now)}${firstName ? `, ${firstName.charAt(0).toUpperCase()}${firstName.slice(1)}` : ''}`
 
   const submit = async (text: string) => {

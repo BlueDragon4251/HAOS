@@ -273,9 +273,15 @@ export function reduceChatEvent(state: ChatState, event: GatewayEvent): ChatStat
       return { ...state, streaming: true }
     case 'message.delta':
       return onDelta(state, event.payload as StreamDeltaPayload, 'text')
-    case 'thinking.delta':
     case 'reasoning.delta':
       return onDelta(state, event.payload as StreamDeltaPayload, 'reasoning')
+    case 'thinking.delta': {
+      // Not reasoning content: the agent's live activity line (spinner faces, "waiting on the
+      // provider" notices). An empty text clears it.
+      const text = (event.payload as StreamDeltaPayload | undefined)?.text ?? ''
+
+      return text.trim() ? { ...state, status: { kind: 'thinking', text: text.replace(/^[^\p{L}\p{N}]+/u, '').trim() || text } } : { ...state, status: undefined }
+    }
     case 'message.interim': {
       const payload = event.payload as { text: string; already_streamed: boolean } | undefined
 

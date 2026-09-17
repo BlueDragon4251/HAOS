@@ -142,6 +142,38 @@ function ModelSettings() {
   )
 }
 
+/** `tools.tool_search.enabled`: upstream defers plugin tools behind a search bridge; "off" keeps the system tools directly callable. */
+function DirectToolsRow() {
+  const connection = useStore($connection)
+  const setting = useBackendData(() => gatewayRequest('config.get', { key: 'tools.tool_search.enabled' }), [], { enabled: connection === 'open' })
+  const [busy, setBusy] = useState(false)
+  const direct = String(setting.data?.value ?? 'auto').toLowerCase() === 'off'
+
+  const toggle = async (next: boolean) => {
+    setBusy(true)
+
+    try {
+      await gatewayRequest('config.set', { key: 'tools.tool_search.enabled', value: next ? 'off' : 'auto' })
+      notify({ title: next ? 'System tools are direct' : 'System tools are deferred', body: 'Restart Hermes for running sessions to pick this up.', level: 'success' })
+      setting.reload()
+    } catch (error) {
+      notify({ title: 'Could not change setting', body: error instanceof Error ? error.message : String(error), level: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Row
+      title="Direct system tools"
+      description="Keep the Hermes OS tools in every session's tool list so Hermes reaches for them first. Off defers them behind Hermes's tool search (fewer prompt tokens, but the agent tends to fall back to shell commands)."
+    >
+      <Switch checked={direct} onChange={next => void toggle(next)} label="Direct system tools" />
+      {busy && <span className="text-[11px] text-fg-4">saving</span>}
+    </Row>
+  )
+}
+
 function PermissionSettings() {
   const policy = useLocalData(() => window.hermesOS.bridge.readPolicy())
   const audit = useLocalData(() => window.hermesOS.bridge.readAudit(200))
@@ -180,6 +212,9 @@ function PermissionSettings() {
         </>
       }
     >
+      <div className="mb-6 max-w-5xl divide-y divide-hairline">
+        <DirectToolsRow />
+      </div>
       <div className="grid max-w-5xl grid-cols-2 gap-8">
         <section className="flex flex-col gap-2">
           <div className="text-[12px] text-fg-3">

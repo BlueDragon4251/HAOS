@@ -51,6 +51,34 @@ The session token stays in the main process. The renderer receives a WebSocket U
 and a `rest(method, path, body)` capability for everything else. A compromised renderer cannot
 mint arbitrary authenticated requests outside the exposed capability.
 
+## ADR-009: Answer both request contracts (server requests and legacy events)
+
+The pinned upstream snapshot delivers `approval` / `clarify` / `sudo` / `secret` as server-to-client
+JSON-RPC requests. The runtime most users have installed today (0.21.0) still emits them as
+`<kind>.request` events answered through `<kind>.respond` RPCs. Hermes OS folds the legacy shape
+into the same `ServerRequest` object (`apps/os/src/lib/legacy-requests.ts`), so cards and stores
+have one code path and an older runtime keeps working until `hermes update` moves it forward.
+The fallback is narrow, named, and covered by unit tests, as upstream's compatibility rule asks.
+
+## ADR-010: System tools stay directly callable
+
+Upstream defers plugin and MCP tools behind its Tool Search bridge (`tool_search` /
+`tool_describe` / `tool_call`) to protect the prompt budget. Deferred, the model reliably fell back
+to `terminal` for tasks the bridge handles better (a `find` over three folders instead of a
+Spotlight screenshot query). There is no per-plugin "keep direct" knob upstream, so bootstrap sets
+`tools.tool_search.enabled: off` and Settings exposes the switch. Cost: ~5k prompt tokens for the
+eight schemas, cache-stable across a conversation. Proposed upstream: let a plugin manifest declare
+`direct_toolsets`, or extend `_DIRECT_SURFACE_TOOLSETS` with session-source-gated toolsets.
+
+## ADR-011: Backend is spawned with HERMES_DESKTOP=1
+
+Upstream keys three behaviours on this flag: the loopback token-auth exemption when a public
+dashboard URL is configured, the in-process cron ticker (no gateway is running), and orphan
+reaping of backends the app previously spawned. Hermes OS owns its backend exactly the way Hermes
+Desktop does, so it sets the flag (plus `HERMES_OS=1` for its own consumers). Session platform is
+still taken from `source: "hermes_os"`, never from this env var, in line with upstream's
+"surface capability is a property of the session" rule.
+
 ## ADR-008: Platform abstraction in two places
 
 Machine facts and actions used by the shell (installed apps, system stats, open/reveal) go through

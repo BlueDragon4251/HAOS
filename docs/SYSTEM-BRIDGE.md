@@ -34,6 +34,14 @@ Confirmation goes through upstream's `tools.approval.request_tool_approval`, whi
 renders as its approval card. `approvals.mode: off` and yolo mode are honoured exactly as they are
 for shell commands, because it is the same gate.
 
+## Enabling
+
+`scripts/bootstrap.sh` links the plugin into `$HERMES_HOME/plugins/hermes-os-bridge`, then runs
+`hermes plugins enable hermes-os-bridge`, `hermes tools enable hermes_os` (a saved platform toolset
+list is authoritative upstream), and `hermes config set tools.tool_search.enabled off` so the tools
+are directly callable rather than deferred behind Hermes's tool-search bridge (see
+`DECISIONS.md`, ADR-010). Settings -> Permissions exposes the last switch.
+
 ## Protected paths
 
 Operations that would read or modify these locations are refused before any approval prompt:
