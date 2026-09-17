@@ -9,6 +9,18 @@
 
 ## Alpha 0.2
 
+Borrowed from the field (see `LANDSCAPE.md` for the source of each):
+
+- Crash and error capture handed to Hermes with a `diagnose-crash` skill (Omarchy).
+- Whole-environment themes driven by Hermes skins; agent-authored themes (Omarchy).
+- Agent Task Manager: per-session resources, tokens, approvals, stop (OpenNeo).
+- Live "Hermes is acting" banner with Interrupt during GUI automation (SomaOS).
+- `hermes-os-tailor` skill so Hermes can reconfigure Hermes OS itself (Omarchy).
+- `system_shortcut` tool over macOS Shortcuts / App Intents (Apple).
+
+Also planned:
+
+
 - Client-side bridge execution for remote/cloud backends (needs a generic plugin server-request
   hook upstream; proposal to be opened against `tui_gateway/contracts/server_requests.py`).
 - Projects: bind sessions to folders, open project workspaces from Home.
