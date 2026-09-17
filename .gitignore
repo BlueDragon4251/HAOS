@@ -1,0 +1,22 @@
+# Dependencies.
+node_modules/
+
+# Build output.
+dist/
+release/
+*.tsbuildinfo
+
+# Upstream snapshot is fetched by scripts/sync-upstream.sh, pinned by upstream/UPSTREAM.lock.
+upstream/hermes-agent/
+
+# Python.
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# OS / editor.
+.DS_Store
+*.log
+.env
+.env.*

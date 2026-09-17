@@ -1,0 +1,59 @@
+import { useState } from 'react'
+import type { BackendState } from '../../../shared/ipc.ts'
+import { BrandMark } from '../../components/brand-mark.tsx'
+import { Button } from '../../components/ui/button.tsx'
+import { Spinner } from '../../components/ui/primitives.tsx'
+
+const PHASE_COPY: Record<BackendState['phase'], string> = {
+  idle: 'Preparing',
+  resolving: 'Locating your Hermes runtime',
+  starting: 'Starting Hermes',
+  ready: 'Ready',
+  restarting: 'Restarting Hermes',
+  failed: 'Hermes could not start',
+  stopped: 'Hermes stopped'
+}
+
+export function BootScreen({ state }: { state: BackendState }) {
+  const [showLog, setShowLog] = useState(false)
+  const failed = state.phase === 'failed'
+
+  return (
+    <div className="drag-region absolute inset-0 z-(--z-boot) flex flex-col items-center justify-center bg-bg animate-fade-in">
+      <div className="no-drag flex w-[440px] flex-col items-center gap-6 text-center">
+        <BrandMark size={44} />
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[22px] font-medium tracking-tight">Hermes OS</div>
+          <div className="flex items-center justify-center gap-2 text-[13px] text-fg-2">
+            {!failed && <Spinner />}
+            <span>{PHASE_COPY[state.phase]}</span>
+          </div>
+          {state.runtime && !failed && <div className="text-[12px] text-fg-3">{state.runtime.label}</div>}
+        </div>
+
+        {failed && (
+          <div className="flex w-full flex-col gap-3">
+            <div className="selectable rounded-md bg-danger/10 px-3 py-2 text-left text-[12px] text-danger">{state.error}</div>
+            <div className="flex justify-center gap-2">
+              <Button variant="primary" onClick={() => void window.hermesOS.backend.restart()}>
+                Try again
+              </Button>
+              <Button variant="ghost" onClick={() => setShowLog(v => !v)}>
+                {showLog ? 'Hide log' : 'Show log'}
+              </Button>
+              <Button variant="ghost" onClick={() => void window.hermesOS.window.quit()}>
+                Quit
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showLog && (
+          <pre className="selectable max-h-56 w-full overflow-auto rounded-md bg-surface p-3 text-left font-mono text-[11px] leading-relaxed text-fg-2 hairline">
+            {state.logTail.slice(-80).join('\n') || 'No output yet.'}
+          </pre>
+        )}
+      </div>
+    </div>
+  )
+}

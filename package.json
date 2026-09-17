@@ -1,0 +1,25 @@
+{
+  "name": "hermes-os",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Hermes OS: an agent-native desktop environment powered by Hermes Agent.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "sync-upstream": "bash scripts/sync-upstream.sh",
+    "dev": "npm run dev --workspace apps/os",
+    "build": "npm run build --workspace apps/os",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:bridge": "bash scripts/test-bridge.sh",
+    "dist:mac": "npm run dist:mac --workspace apps/os"
+  }
+}

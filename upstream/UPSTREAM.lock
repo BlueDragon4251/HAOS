@@ -1,0 +1,6 @@
+# Pinned upstream Hermes Agent revision consumed by Hermes OS.
+# Only apps/shared/src is compiled into Hermes OS; the Python runtime comes from the user's
+# Hermes install ($HERMES_HOME/hermes-agent) and is updated with `hermes update`.
+# Bump: edit the sha, run `npm run sync-upstream`, then `npm run typecheck`.
+repo=NousResearch/hermes-agent
+sha=251e5f7c0a067239655f3421812ab7492a206065

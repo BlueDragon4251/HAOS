@@ -1,0 +1,19 @@
+{
+  "name": "@hermes-os/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hermes gateway client for Hermes OS: re-exports the upstream apps/shared JSON-RPC client and generated wire contract, plus thin REST helpers.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./rest": "./src/rest.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

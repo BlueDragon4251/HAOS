@@ -1,0 +1,43 @@
+// Bundle the Electron main process (ESM) and the preload script (CJS, sandbox-compatible).
+import { build } from 'esbuild'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+const root = path.resolve(here, '..')
+const dev = process.argv.includes('--dev')
+
+const common = {
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  sourcemap: dev ? 'inline' : true,
+  minify: false,
+  logLevel: 'info',
+  define: {
+    'process.env.HERMES_OS_BUILD_MODE': JSON.stringify(dev ? 'development' : 'production')
+  }
+}
+
+await build({
+  ...common,
+  entryPoints: [path.join(root, 'electron/main.ts')],
+  outfile: path.join(root, 'dist/electron/main.mjs'),
+  format: 'esm',
+  // Native module and Electron stay external; everything else is inlined.
+  external: ['electron', 'node-pty'],
+  banner: {
+    js: [
+      "import { createRequire as __hermesCreateRequire } from 'node:module';",
+      'const require = __hermesCreateRequire(import.meta.url);'
+    ].join('\n')
+  }
+})
+
+await build({
+  ...common,
+  entryPoints: [path.join(root, 'preload/index.ts')],
+  outfile: path.join(root, 'dist/electron/preload.cjs'),
+  format: 'cjs',
+  external: ['electron']
+})
