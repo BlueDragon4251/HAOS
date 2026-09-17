@@ -7,11 +7,24 @@ import { $prefs, $windowState } from '../../store/backend.ts'
  * Canvas 2D at reduced resolution, ~30fps, paused when the window is blurred or motion is reduced.
  * A user image (prefs.wallpaper) replaces it.
  */
+const FRAME_MS = 1000 / 30
+
+// Animation phase lives outside the component so remounts, focus changes and HMR continue the
+// same motion instead of snapping to a new random pattern.
+let phase = Math.random() * 1000
+
 export function Wallpaper() {
   const prefs = useStore($prefs)
   const win = useStore($windowState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pausedRef = useRef(false)
   const custom = prefs.wallpaper
+
+  // Pausing must not restart the draw loop, otherwise a stale loop can survive cleanup and
+  // alternate frames with the new one (visible as flicker).
+  useEffect(() => {
+    pausedRef.current = !win.focused
+  }, [win.focused])
 
   useEffect(() => {
     if (custom) {
@@ -33,7 +46,8 @@ export function Wallpaper() {
     const reduce = prefs.reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0
     let last = 0
-    let t = Math.random() * 1000
+    let lastDraw = 0
+    let disposed = false
     const scale = 0.5
 
     const resize = () => {
@@ -58,7 +72,8 @@ export function Wallpaper() {
       const h = canvas.height
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0
       last = now
-      t += dt
+      phase += dt
+      const t = phase
 
       const base = ctx.createRadialGradient(w * 0.5, h * 0.5, h * 0.05, w * 0.5, h * 0.5, Math.max(w, h) * 0.8)
       base.addColorStop(0, '#1240c8')
@@ -124,23 +139,41 @@ export function Wallpaper() {
     }
 
     const loop = (now: number) => {
-      draw(now)
-
-      if (!reduce) {
-        raf = window.setTimeout(() => requestAnimationFrame(loop), 33) as unknown as number
+      if (disposed) {
+        return
       }
+
+      // Single rAF chain throttled to ~30fps: even pacing, and always cancellable.
+      if (!pausedRef.current && now - lastDraw >= FRAME_MS - 1) {
+        lastDraw = now
+        draw(now)
+      } else if (pausedRef.current) {
+        // Keep the clock from accumulating while paused so resume does not jump.
+        last = now
+      }
+
+      raf = requestAnimationFrame(loop)
+    }
+
+    const onResize = () => {
+      resize()
+      draw(performance.now())
     }
 
     resize()
-    window.addEventListener('resize', resize)
-    requestAnimationFrame(loop)
+    draw(performance.now())
+    window.addEventListener('resize', onResize)
+
+    if (!reduce) {
+      raf = requestAnimationFrame(loop)
+    }
 
     return () => {
-      window.removeEventListener('resize', resize)
-      clearTimeout(raf)
+      disposed = true
+      window.removeEventListener('resize', onResize)
+      cancelAnimationFrame(raf)
     }
-    // Repaint when the window regains focus so a paused wallpaper picks up again.
-  }, [custom, prefs.reduceMotion, win.focused])
+  }, [custom, prefs.reduceMotion])
 
   if (custom) {
     return <div className="absolute inset-0 z-(--z-wallpaper) bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(custom)})` }} />
