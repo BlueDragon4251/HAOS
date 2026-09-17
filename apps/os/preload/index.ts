@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import {
   type AuditEntry,
   type BackendState,
@@ -75,7 +75,15 @@ const api = {
     trash: (targets: string[]): Promise<void> => ipcRenderer.invoke(IPC.fsTrash, targets),
     exportPdf: (html: string, suggestedName: string): Promise<string | null> => ipcRenderer.invoke(IPC.fsExportPdf, html, suggestedName),
     pickFiles: (options?: { directory?: boolean; multiple?: boolean }): Promise<string[]> => ipcRenderer.invoke(IPC.fsPickFiles, options ?? {}),
-    dirSize: (target: string): Promise<{ bytes: number; files: number; complete: boolean }> => ipcRenderer.invoke(IPC.fsDirSize, target)
+    dirSize: (target: string): Promise<{ bytes: number; files: number; complete: boolean }> => ipcRenderer.invoke(IPC.fsDirSize, target),
+    /** Absolute path of a File dropped from Finder (Electron removed File.path). */
+    pathForFile: (file: File): string => {
+      try {
+        return webUtils.getPathForFile(file)
+      } catch {
+        return ''
+      }
+    }
   },
   calendar: {
     today: (): Promise<CalendarResult> => ipcRenderer.invoke(IPC.calendarToday)

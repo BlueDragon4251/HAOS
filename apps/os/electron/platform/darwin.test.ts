@@ -13,6 +13,8 @@ describe('darwin parsers', () => {
     const disks = parseDf(df)
     expect(disks.map(d => d.mount)).toEqual(['/', '/Volumes/Backup Drive'])
     expect(disks[1]).toMatchObject({ total: 2000 * 1024, used: 500 * 1024, free: 1500 * 1024 })
+    // Root: APFS "Used" (400) is only the system volume; usage is derived from what is still available.
+    expect(disks[0]).toMatchObject({ total: 1000 * 1024, used: 400 * 1024, free: 600 * 1024 })
   })
 
   it('reads battery percentage and charging state', () => {

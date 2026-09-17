@@ -24,7 +24,7 @@ export function PageHeader({ icon, title, subtitle, actions, className }: { icon
   )
 }
 
-export function GlassCard({ children, className, selected, interactive, onClick, as = 'div' }: { children: React.ReactNode; className?: string; selected?: boolean; interactive?: boolean; onClick?: () => void; as?: 'div' | 'button' }) {
+export function GlassCard({ children, className, selected, interactive, onClick, as = 'div', ...rest }: { children: React.ReactNode; className?: string; selected?: boolean; interactive?: boolean; onClick?: () => void; as?: 'div' | 'button' } & Omit<React.HTMLAttributes<HTMLElement>, 'onClick' | 'className' | 'children'>) {
   const Comp = as as 'div'
 
   return (
@@ -32,6 +32,7 @@ export function GlassCard({ children, className, selected, interactive, onClick,
       onClick={onClick}
       className={cn('glass-card rounded-xl text-left', interactive && 'glass-card-hover cursor-pointer', selected && 'glass-card-selected', className)}
       {...(as === 'button' ? { type: 'button' } : {})}
+      {...(rest as React.HTMLAttributes<HTMLDivElement>)}
     >
       {children}
     </Comp>

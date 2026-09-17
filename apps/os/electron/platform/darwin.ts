@@ -136,8 +136,10 @@ export function parseDf(text: string): DiskUsage[] {
 
     const mount = parts.slice(5).join(' ')
     const total = Number(parts[1]) * 1024
-    const used = Number(parts[2]) * 1024
     const free = Number(parts[3]) * 1024
+    // APFS: "Used" on `/` counts only the sealed system volume; the container's real usage is
+    // total minus the space still available to it.
+    const used = Math.max(0, total - free)
 
     if (!Number.isFinite(total) || total <= 0) {
       continue

@@ -392,6 +392,46 @@ textarea {
   margin-right: 0.4em;
 }
 
+/* Markdown on a white document card (artifact pane, mission preview). */
+.prose-light,
+.prose-light h1,
+.prose-light h2,
+.prose-light h3,
+.prose-light h4,
+.prose-light p,
+.prose-light li,
+.prose-light th,
+.prose-light td {
+  color: #0f172a;
+}
+.prose-light li::marker {
+  color: #2f7dff;
+}
+.prose-light a {
+  color: #1d4ed8;
+  text-decoration-color: rgba(29, 78, 216, 0.4);
+}
+.prose-light code {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+.prose-light pre {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+}
+.prose-light blockquote {
+  border-left-color: rgba(15, 23, 42, 0.2);
+  color: #334155;
+}
+.prose-light th,
+.prose-light td {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+.prose-light hr {
+  background: rgba(15, 23, 42, 0.12);
+}
+
 /* Document-style rendering for the artifact pane. */
 .prose-document {
   font-size: 14px;

@@ -159,6 +159,20 @@ const FRIENDLY_TOOL: Record<string, string> = {
 }
 
 export function bindMissionEvents(): () => void {
+  const offChats = $chats.subscribe(chats => {
+    for (const chat of Object.values(chats)) {
+      seedArtifactsFromChat(chat)
+    }
+  })
+  const offEvents = bindGatewayMissionEvents()
+
+  return () => {
+    offChats()
+    offEvents()
+  }
+}
+
+function bindGatewayMissionEvents(): () => void {
   return onAnyGatewayEvent((event: GatewayEvent) => {
     const sid = event.session_id
 
@@ -221,6 +235,43 @@ export function bindMissionEvents(): () => void {
         break
     }
   })
+}
+
+const seeded = new Set<string>()
+
+/** Rebuild a hydrated session's artifacts from its transcript tool rows (resume / history). */
+function seedArtifactsFromChat(chat: ChatState): void {
+  const sessionId = chat.sessionId
+
+  if (seeded.has(sessionId) || $artifacts.get()[sessionId]?.length) {
+    return
+  }
+
+  seeded.add(sessionId)
+  const found: Artifact[] = []
+
+  for (const row of chat.messages) {
+    if (row.role !== 'tool' || !ARTIFACT_TOOLS.has(row.name)) {
+      continue
+    }
+
+    const ts = row.ts
+
+    for (const p of extractPaths(row.args)) {
+      const name = p.split('/').filter(Boolean).pop() ?? p
+      const existing = found.find(a => a.path === p)
+
+      if (existing) {
+        existing.ts = Math.max(existing.ts, ts)
+      } else {
+        found.push({ path: p, name, sessionId, tool: row.name, ts, kind: /\.[a-z0-9]{1,6}$/i.test(name) ? 'file' : 'folder' })
+      }
+    }
+  }
+
+  if (found.length) {
+    $artifacts.setKey(sessionId, found.sort((a, b) => b.ts - a.ts).slice(0, 40))
+  }
 }
 
 export function markReviewed(missionId: string): void {
