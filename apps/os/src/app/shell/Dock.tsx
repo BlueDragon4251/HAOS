@@ -1,8 +1,9 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { InstalledApp } from '../../../shared/ipc.ts'
 import { AppGlyph, HermesAvatar } from '../../components/app-icon.tsx'
 import { cn } from '../../lib/cn.ts'
+import { reducedMotion } from '../../lib/motion.ts'
 import { notify } from '../../store/notifications.ts'
 import { $applicationsOpen } from '../../store/surface.ts'
 import { $windows, focusWindow, MAIN_WINDOW_ID, showPage } from '../../store/windows.ts'
@@ -81,18 +82,48 @@ export function Dock() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apps, iconFor, main?.phase])
 
+  const barRef = useRef<HTMLDivElement>(null)
+
+  // Magnification: every icon reads the cursor's distance from its centre and scales with a smooth falloff,
+  // so neighbours swell with the hovered icon like macOS. Written straight to CSS variables to skip React renders.
+  const onMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const bar = barRef.current
+
+    if (!bar || reducedMotion()) {
+      return
+    }
+
+    const x = event.clientX
+
+    for (const el of bar.querySelectorAll<HTMLElement>('.dock-item')) {
+      const rect = el.getBoundingClientRect()
+      const distance = Math.abs(x - (rect.left + rect.width / 2))
+      const influence = Math.max(0, 1 - distance / MAGNIFY_RADIUS)
+      const scale = 1 + MAGNIFY_MAX * influence * influence * (3 - 2 * influence)
+      el.style.setProperty('--dock-scale', scale.toFixed(3))
+    }
+  }
+
+  const onLeave = () => {
+    for (const el of barRef.current?.querySelectorAll<HTMLElement>('.dock-item') ?? []) {
+      el.style.setProperty('--dock-scale', '1')
+    }
+  }
+
   return (
     <nav className="pointer-events-none absolute inset-x-0 bottom-0 z-(--z-dock) flex h-(--dock-h) items-end justify-center pb-3" aria-label="Dock">
-      <div className="glass pointer-events-auto flex items-end gap-2 rounded-2xl px-3 py-2">
+      <div ref={barRef} className="glass pointer-events-auto flex items-end gap-2 rounded-2xl px-3 py-2" onMouseMove={onMove} onMouseLeave={onLeave}>
         {items.map(item => (
           <button
             key={item.id}
             type="button"
             aria-label={item.label}
-            title={item.label}
             onClick={item.onClick}
-            className={cn('group relative flex flex-col items-center transition-transform duration-150 ease-out hover:-translate-y-1.5 hover:scale-[1.1] active:scale-95', bouncing === item.id && 'dock-bounce')}
+            className={cn('dock-item group relative flex flex-col items-center active:brightness-90', bouncing === item.id && 'dock-bounce')}
           >
+            <span className="dock-label float pointer-events-none absolute -top-9 left-1/2 rounded-md px-2 py-1 text-[11.5px] font-medium whitespace-nowrap text-fg opacity-0">
+              {item.label}
+            </span>
             {item.render()}
             <span className={cn('mt-1 size-1 rounded-full transition-opacity', item.running ? 'bg-fg opacity-90' : 'opacity-0')} />
           </button>
@@ -101,6 +132,9 @@ export function Dock() {
     </nav>
   )
 }
+
+const MAGNIFY_RADIUS = 110
+const MAGNIFY_MAX = 0.42
 
 function NativeIcon({ src, fallback }: { src?: string; fallback: 'files' | 'grid' }) {
   const [failed, setFailed] = useState(false)

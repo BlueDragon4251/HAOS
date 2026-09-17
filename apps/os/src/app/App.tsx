@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { afterExit, motion } from '../lib/motion.ts'
 import { $backend } from '../store/backend.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../store/surface.ts'
 import { $focusedWindowId, closeWindow, MAIN_WINDOW_ID, minimizeWindow, openApp } from '../store/windows.ts'
@@ -65,11 +66,38 @@ export function App() {
   }, [])
 
   const bootOnly = backend.phase === 'idle' || backend.phase === 'resolving' || (backend.phase === 'starting' && backend.attempt === 0) || backend.phase === 'failed'
+  const bootVisible = useExitTransition(bootOnly, motion.slow + 120)
 
   return (
     <div className="h-full w-full bg-bg text-fg">
       <Desktop />
-      {bootOnly && <BootScreen state={backend} />}
+      {bootVisible && <BootScreen state={backend} leaving={!bootOnly} />}
     </div>
   )
+}
+
+/** Keep `true` for `ms` after `open` turns false so an exit animation can play (skipped under reduced motion). */
+function useExitTransition(open: boolean, ms: number): boolean {
+  const [visible, setVisible] = useState(open)
+
+  useEffect(() => {
+    if (open) {
+      setVisible(true)
+
+      return
+    }
+
+    let cancelled = false
+    afterExit(() => {
+      if (!cancelled) {
+        setVisible(false)
+      }
+    }, ms)
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, ms])
+
+  return visible
 }

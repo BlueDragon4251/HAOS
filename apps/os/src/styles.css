@@ -519,6 +519,46 @@ textarea {
   }
 }
 
+/* Boot screen hands off to the desktop: backdrop dissolves while the card lifts away. */
+.boot-leave {
+  animation: boot-out 440ms var(--ease-out) both;
+}
+@keyframes boot-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.boot-card-leave {
+  animation: boot-card-out 360ms var(--ease-out) both;
+}
+@keyframes boot-card-out {
+  to {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+}
+
+/* Dock icons scale from `--dock-scale` (set per icon from cursor distance); the dock bar itself stays put. */
+.dock-item {
+  --dock-scale: 1;
+  transform: translateY(calc((1 - var(--dock-scale)) * 22px)) scale(var(--dock-scale));
+  transform-origin: bottom center;
+  transition: transform 90ms var(--ease-out);
+  will-change: transform;
+}
+.dock-item.dock-bounce {
+  animation: dock-bounce 420ms var(--ease-out);
+}
+.dock-label {
+  transform: translateX(-50%) translateY(4px);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.dock-item:hover .dock-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .dock-bounce {
   animation: dock-bounce 420ms var(--ease-out);
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { BackendState } from '../../../shared/ipc.ts'
 import { HermesAvatar } from '../../components/app-icon.tsx'
+import { cn } from '../../lib/cn.ts'
 import { Button } from '../../components/ui/button.tsx'
 import { Spinner } from '../../components/ui/primitives.tsx'
 
@@ -14,13 +15,17 @@ const PHASE_COPY: Record<BackendState['phase'], string> = {
   stopped: 'Hermes stopped'
 }
 
-export function BootScreen({ state }: { state: BackendState }) {
+export function BootScreen({ state, leaving = false }: { state: BackendState; leaving?: boolean }) {
   const [showLog, setShowLog] = useState(false)
   const failed = state.phase === 'failed'
 
   return (
-    <div className="drag-region absolute inset-0 z-(--z-boot) flex flex-col items-center justify-center animate-fade-in" style={{ background: 'radial-gradient(circle at 50% 45%, #1240c8 0%, #0a2a96 45%, #04113f 100%)' }}>
-      <div className="no-drag glass flex w-[440px] flex-col items-center gap-6 rounded-2xl px-8 py-10 text-center">
+    <div
+      className={cn('drag-region absolute inset-0 z-(--z-boot) flex flex-col items-center justify-center', leaving ? 'boot-leave pointer-events-none' : 'animate-fade-in')}
+      style={{ background: 'radial-gradient(circle at 50% 45%, #1240c8 0%, #0a2a96 45%, #04113f 100%)' }}
+      aria-hidden={leaving}
+    >
+      <div className={cn('no-drag glass flex w-[440px] flex-col items-center gap-6 rounded-2xl px-8 py-10 text-center', leaving && 'boot-card-leave')}>
         <HermesAvatar size={64} rounded={16} />
         <div className="flex flex-col gap-1.5">
           <div className="text-[22px] font-medium tracking-tight">Hermes OS</div>
