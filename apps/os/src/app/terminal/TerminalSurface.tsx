@@ -13,12 +13,12 @@ interface Tab {
 }
 
 const THEME = {
-  background: '#0c0e12',
-  foreground: '#e6e8eb',
-  cursor: '#e6b84a',
-  cursorAccent: '#0c0e12',
-  selectionBackground: 'rgba(230, 184, 74, 0.25)',
-  black: '#1a1d24',
+  background: '#050f33',
+  foreground: '#e9eefb',
+  cursor: '#5296ff',
+  cursorAccent: '#050f33',
+  selectionBackground: 'rgba(82, 150, 255, 0.3)',
+  black: '#101a3f',
   red: '#e5645b',
   green: '#5fc98a',
   yellow: '#e3a54a',
@@ -190,5 +190,5 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
     }
   }, [active])
 
-  return <div ref={host} className={cn('absolute inset-x-3 inset-y-0 bottom-3 overflow-hidden rounded-lg bg-bg-elevated hairline', !active && 'invisible')} />
+  return <div ref={host} className={cn('absolute inset-x-3 inset-y-0 bottom-3 overflow-hidden rounded-lg hairline', !active && 'invisible')} style={{ background: '#050f33' }} />
 }

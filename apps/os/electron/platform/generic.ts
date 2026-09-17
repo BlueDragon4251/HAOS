@@ -1,5 +1,5 @@
 import os from 'node:os'
-import type { InstalledApp, ProcessInfo, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { type EditorTarget, type HostPlatform, HostNotSupported } from './types.ts'
 
 /**
@@ -55,5 +55,21 @@ export class GenericPlatform implements HostPlatform {
 
   async openIn(target: EditorTarget): Promise<void> {
     throw new HostNotSupported(`openIn(${target})`)
+  }
+
+  async networkStatus(): Promise<NetworkStatus> {
+    return { online: true }
+  }
+
+  async calendarToday(): Promise<CalendarResult> {
+    return { status: 'unavailable', events: [] }
+  }
+
+  async recentFiles(): Promise<RecentFile[]> {
+    return []
+  }
+
+  async thumbnail(): Promise<Buffer | null> {
+    return null
   }
 }

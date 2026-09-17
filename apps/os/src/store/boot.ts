@@ -2,6 +2,7 @@ import { bindAgentEvents } from './agents.ts'
 import { bindBackendStores } from './backend.ts'
 import { bindChatEvents, resetChats } from './chat.ts'
 import { $connectionEpoch, bindGatewayToBackend } from './gateway.ts'
+import { bindMissionEvents } from './missions.ts'
 import { bindNotificationEvents } from './notifications.ts'
 import { bindServerRequests } from './requests.ts'
 import { refreshSessions } from './sessions.ts'
@@ -23,6 +24,7 @@ export function bootRenderer(): void {
   bindServerRequests()
   bindNotificationEvents()
   bindAgentEvents()
+  bindMissionEvents()
 
   let lastEpoch = 0
   $connectionEpoch.subscribe(epoch => {

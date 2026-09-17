@@ -67,7 +67,7 @@ function registerCoreIpc(): void {
     (): EnvInfo => ({ platform: process.platform, hermesHome: hermesHome(), homeDir: os.homedir(), version: app.getVersion(), isDev })
   )
 
-  registerFsIpc()
+  registerFsIpc(() => mainWindow)
   registerAppsIpc()
   registerBridgeIpc()
   registerSystemIpc(() => BrowserWindow.getAllWindows())

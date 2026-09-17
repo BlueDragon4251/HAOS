@@ -6,7 +6,15 @@ import { hermesOsDataDir } from './paths.ts'
 const DEFAULTS: HermesOSPrefs = {
   fullscreenOnLaunch: true,
   reduceMotion: false,
-  accent: 'gold'
+  accent: 'blue',
+  theme: 'ocean',
+  spaces: [
+    { id: 'personal', name: 'Personal', color: '#4d92ff' },
+    { id: 'work', name: 'Work', color: '#36e6a6' },
+    { id: 'ideas', name: 'Ideas', color: '#b47cff' }
+  ],
+  activeSpace: 'personal',
+  favorites: []
 }
 
 function prefsFile(): string {
@@ -15,9 +23,12 @@ function prefsFile(): string {
 
 export function readPrefs(): HermesOSPrefs {
   try {
-    const parsed = JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) as Partial<HermesOSPrefs>
+    const parsed = JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) as Omit<Partial<HermesOSPrefs>, 'accent'> & { accent?: string }
+    // Accent names from the first alpha.
+    const legacy: Record<string, HermesOSPrefs['accent']> = { gold: 'blue', jade: 'violet', blue: 'blue', ice: 'ice', violet: 'violet' }
+    const accent = parsed.accent ? legacy[parsed.accent] : undefined
 
-    return { ...DEFAULTS, ...parsed }
+    return { ...DEFAULTS, ...parsed, accent: (accent as HermesOSPrefs['accent']) ?? DEFAULTS.accent, spaces: parsed.spaces?.length ? parsed.spaces : DEFAULTS.spaces }
   } catch {
     return { ...DEFAULTS }
   }

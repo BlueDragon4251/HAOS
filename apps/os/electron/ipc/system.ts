@@ -37,6 +37,8 @@ export function registerSystemIpc(getWindows: () => BrowserWindow[]): void {
   }
 
   ipcMain.handle(IPC.systemInfo, () => platform.systemInfo())
+  ipcMain.handle(IPC.systemNetwork, () => platform.networkStatus())
+  ipcMain.handle(IPC.calendarToday, () => platform.calendarToday())
   ipcMain.handle(IPC.systemStats, () => platform.sampleStats())
   ipcMain.handle(IPC.systemProcesses, (_event, sort: 'cpu' | 'memory', limit: number) =>
     platform.listProcesses(sort === 'memory' ? 'memory' : 'cpu', Math.max(1, Math.min(200, Number(limit) || 25)))

@@ -16,7 +16,7 @@ export function Toasts() {
   return (
     <div className="pointer-events-none absolute top-11 right-3 z-(--z-overlay) flex w-80 flex-col gap-2">
       {toasts.map(toast => (
-        <div key={toast.id} className="float pointer-events-auto flex items-start gap-2.5 rounded-md px-3 py-2.5 animate-rise">
+        <div key={toast.id} className="float pointer-events-auto flex items-start gap-2.5 rounded-xl px-3 py-2.5 animate-rise">
           <Dot tone={TONE[toast.level]} className="mt-1.5" />
           <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { if (toast.surface) { showSurface(toast.surface) } dismissToast(toast.id) }}>
             <div className="truncate text-[12.5px] font-medium text-fg">{toast.title}</div>

@@ -20,9 +20,9 @@ export function RequestHost() {
   const [current, ...rest] = pending
 
   return (
-    <div className="pointer-events-none absolute right-4 bottom-4 z-(--z-request) flex w-[420px] flex-col items-stretch gap-2">
+    <div className="pointer-events-none absolute right-5 bottom-[92px] z-(--z-request) flex w-[420px] flex-col items-stretch gap-2">
       {rest.length > 0 && <div className="pointer-events-auto self-end text-[11px] text-fg-3">{rest.length} more waiting</div>}
-      <div className="float pointer-events-auto rounded-lg p-4 animate-rise">
+      <div className="float pointer-events-auto rounded-2xl p-4 animate-rise">
         <RequestCard entry={current} />
       </div>
     </div>

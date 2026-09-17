@@ -3,7 +3,8 @@ import { $connection, gatewayRequest } from './gateway.ts'
 import { $notifications } from './notifications.ts'
 import { $pendingRequests, resolveRequest } from './requests.ts'
 import { $sessions } from './sessions.ts'
-import { $surface, showSurface } from './surface.ts'
+import { showSurface } from './surface.ts'
+import { $page, $windows, openApp, showPage } from './windows.ts'
 
 /** Installed only in development builds (see boot.ts). */
 export function installDebugHook(): void {
@@ -16,10 +17,13 @@ export function installDebugHook(): void {
       interruptChat,
       gatewayRequest,
       showSurface,
+      showPage,
+      openApp,
       resolveRequest,
       state: () => ({
         connection: $connection.get(),
-        surface: $surface.get(),
+        page: $page.get(),
+        windows: Object.values($windows.get()).map(w => ({ id: w.id, appId: w.appId, phase: w.phase, bounds: w.bounds, maximized: w.maximized })),
         activeChatId: $activeChatId.get(),
         activeChat: $activeChat.get(),
         chats: $chats.get(),

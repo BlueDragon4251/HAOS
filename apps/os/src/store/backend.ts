@@ -5,10 +5,19 @@ import type { BackendState, EnvInfo, HermesOSPrefs, WindowState } from '../../sh
 export const $backend = atom<BackendState>({ phase: 'idle', attempt: 0, logTail: [] })
 export const $windowState = atom<WindowState>({ fullscreen: false, focused: true })
 export const $env = atom<EnvInfo | null>(null)
-export const $prefs = atom<HermesOSPrefs>({ fullscreenOnLaunch: true, reduceMotion: false, accent: 'gold' })
+export const $prefs = atom<HermesOSPrefs>({
+  fullscreenOnLaunch: true,
+  reduceMotion: false,
+  accent: 'blue',
+  theme: 'ocean',
+  spaces: [{ id: 'personal', name: 'Personal', color: '#4d92ff' }],
+  activeSpace: 'personal',
+  favorites: []
+})
 
 export function applyPrefsToDocument(prefs: HermesOSPrefs): void {
   document.documentElement.dataset.accent = prefs.accent
+  document.documentElement.dataset.theme = prefs.theme
   document.documentElement.dataset.reduceMotion = String(prefs.reduceMotion)
 }
 

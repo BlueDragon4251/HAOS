@@ -1,8 +1,9 @@
 import crypto from 'node:crypto'
+import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { BatteryStatus, DiskUsage, InstalledApp, ProcessInfo, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { BatteryStatus, CalendarEvent, CalendarResult, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { hermesOsDataDir } from '../paths.ts'
 import { run } from './exec.ts'
 import { type EditorTarget, type HostPlatform } from './types.ts'
@@ -13,6 +14,83 @@ interface CpuSample {
   idle: number
   total: number
 }
+
+async function mapPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let index = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const item = items[index++]
+      await fn(item)
+    }
+  })
+  await Promise.all(workers)
+}
+
+async function readPlistKeys(plist: string, keys: string[]): Promise<Record<string, string | undefined>> {
+  const out: Record<string, string | undefined> = {}
+  const result = await run('plutil', ['-convert', 'json', '-o', '-', plist], 5000)
+
+  if (result.code === 0) {
+    try {
+      const parsed = JSON.parse(result.stdout) as Record<string, unknown>
+
+      for (const key of keys) {
+        out[key] = typeof parsed[key] === 'string' ? (parsed[key] as string) : undefined
+      }
+    } catch {
+      // Malformed plist: leave undefined.
+    }
+  }
+
+  return out
+}
+
+/** Runs inside `osascript -l JavaScript`; prints one JSON document. */
+const CALENDAR_JXA = String.raw`
+ObjC.import('EventKit');
+ObjC.import('Foundation');
+function out(o){ return JSON.stringify(o); }
+var store = $.EKEventStore.alloc.init;
+var status = $.EKEventStore.authorizationStatusForEntityType($.EKEntityTypeEvent);
+// 0 notDetermined, 1 restricted, 2 denied, 3 fullAccess (authorized), 4 writeOnly
+if (status === 0) {
+  var done = false; var granted = false;
+  var sel = store.respondsToSelector('requestFullAccessToEventsWithCompletion:');
+  var handler = function(g, e){ granted = g; done = true; };
+  if (sel) { store.requestFullAccessToEventsWithCompletion(handler); } else { store.requestAccessToEntityTypeCompletion($.EKEntityTypeEvent, handler); }
+  var deadline = Date.now() + 60000;
+  while (!done && Date.now() < deadline) { $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1)); }
+  status = $.EKEventStore.authorizationStatusForEntityType($.EKEntityTypeEvent);
+}
+if (status === 1) { out({status:'restricted', events:[]}); }
+else if (status === 2) { out({status:'denied', events:[]}); }
+else if (status === 0) { out({status:'not-determined', events:[]}); }
+else {
+  var cal = $.NSCalendar.currentCalendar;
+  var start = cal.startOfDayForDate($.NSDate.date);
+  var end = start.dateByAddingTimeInterval(86400);
+  var pred = store.predicateForEventsWithStartDateEndDateCalendars(start, end, $());
+  var events = store.eventsMatchingPredicate(pred);
+  var list = [];
+  var n = events.count;
+  for (var i = 0; i < n; i++) {
+    var ev = events.objectAtIndex(i);
+    var loc = ev.location; var notes = ev.notes; var url = ev.URL;
+    list.push({
+      id: ObjC.unwrap(ev.eventIdentifier),
+      title: ObjC.unwrap(ev.title) || 'Untitled',
+      start: Math.round(ev.startDate.timeIntervalSince1970 * 1000),
+      end: Math.round(ev.endDate.timeIntervalSince1970 * 1000),
+      allDay: !!ev.isAllDay,
+      location: loc.isNil() ? undefined : ObjC.unwrap(loc),
+      notes: notes.isNil() ? undefined : String(ObjC.unwrap(notes)).slice(0, 400),
+      calendar: ObjC.unwrap(ev.calendar.title),
+      url: url.isNil() ? undefined : ObjC.unwrap(url.absoluteString)
+    });
+  }
+  out({status:'authorized', events:list});
+}
+`
 
 function cpuSample(): CpuSample {
   let idle = 0
@@ -200,9 +278,123 @@ export class DarwinPlatform implements HostPlatform {
     }
 
     const apps = [...found.values()].sort((a, b) => a.name.localeCompare(b.name))
+    // Categories come from Info.plist; read them in a bounded pool so a cold start stays quick.
+    await mapPool(apps, 8, async app => {
+      const info = await readPlistKeys(path.join(app.path, 'Contents', 'Info.plist'), ['CFBundleIdentifier', 'LSApplicationCategoryType'])
+      app.bundleId = info.CFBundleIdentifier
+      app.category = info.LSApplicationCategoryType
+    })
     this.appsCache = { at: Date.now(), apps }
 
     return apps
+  }
+
+  async networkStatus(): Promise<NetworkStatus> {
+    const route = await run('route', ['-n', 'get', 'default'], 4000)
+    const iface = /interface:\s*(\S+)/.exec(route.stdout)?.[1]
+    const ipv4 = iface ? (await run('ipconfig', ['getifaddr', iface], 4000)).stdout.trim() || undefined : undefined
+    const airport = await run('system_profiler', ['SPAirPortDataType', '-json'], 15_000)
+    let wifi: NetworkStatus['wifi']
+
+    try {
+      const interfaces = (JSON.parse(airport.stdout).SPAirPortDataType?.[0]?.spairport_airport_interfaces ?? []) as Array<Record<string, unknown>>
+      const station = interfaces.find(e => !String(e._name ?? '').startsWith('awdl'))
+
+      if (station) {
+        const net = (station.spairport_current_network_information ?? {}) as Record<string, unknown>
+        const ssid = typeof net._name === 'string' && !net._name.includes('redacted') ? net._name : undefined
+        wifi = { connected: String(station.spairport_status_information ?? '').endsWith('connected'), ssid, interface: String(station._name ?? '') }
+      }
+    } catch {
+      wifi = undefined
+    }
+
+    return { online: Boolean(iface), defaultInterface: iface, ipv4, wifi }
+  }
+
+  /**
+   * EventKit through JXA: no compile step, prompts for Calendar access on first use, and reports the
+   * authorization state honestly so the UI can show "Grant access" instead of an empty day.
+   */
+  async calendarToday(): Promise<CalendarResult> {
+    const result = await run('osascript', ['-l', 'JavaScript', '-e', CALENDAR_JXA], 25_000)
+
+    if (result.code !== 0) {
+      return { status: 'unavailable', events: [], error: result.stderr.trim() || 'osascript failed' }
+    }
+
+    try {
+      const parsed = JSON.parse(result.stdout.trim()) as { status: CalendarResult['status']; events?: CalendarEvent[]; error?: string }
+
+      return { status: parsed.status, events: (parsed.events ?? []).sort((a, b) => a.start - b.start), error: parsed.error }
+    } catch (error) {
+      return { status: 'unavailable', events: [], error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  async recentFiles(limit: number): Promise<RecentFile[]> {
+    const home = os.homedir()
+    const scopes = ['Desktop', 'Documents', 'Downloads', 'Projects', 'Apps', 'Developer'].map(d => path.join(home, d)).filter(d => fsSync.existsSync(d))
+    const query = 'kMDItemLastUsedDate >= $time.today(-14) && kMDItemContentTypeTree != "public.folder" && kMDItemFSName != ".DS_Store"'
+    const result = await run('mdfind', [...scopes.flatMap(s => ['-onlyin', s]), query], 15_000)
+    const paths = result.stdout.split('\n').filter(Boolean).slice(0, 400)
+    const rows: RecentFile[] = []
+
+    await mapPool(paths, 16, async file => {
+      try {
+        const stat = await fs.stat(file)
+        const used = await run('mdls', ['-name', 'kMDItemLastUsedDate', '-raw', file], 4000)
+        const usedAt = Date.parse(used.stdout.trim().replace(' +0000', 'Z').replace(' ', 'T')) || stat.atimeMs
+        rows.push({ path: file, name: path.basename(file), extension: path.extname(file).toLowerCase(), size: stat.size, modifiedAt: stat.mtimeMs, lastUsedAt: usedAt, kind: stat.isDirectory() ? 'directory' : 'file' })
+      } catch {
+        // Vanished between mdfind and stat.
+      }
+    })
+    rows.sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+
+    return rows.slice(0, limit)
+  }
+
+  async thumbnail(filePath: string, size: number): Promise<Buffer | null> {
+    const cacheDir = path.join(hermesOsDataDir(), 'cache', 'thumbs')
+    let stamp = ''
+
+    try {
+      stamp = String((await fs.stat(filePath)).mtimeMs)
+    } catch {
+      return null
+    }
+
+    const cacheFile = path.join(cacheDir, `${crypto.createHash('sha1').update(`${filePath}|${stamp}|${size}`).digest('hex')}.png`)
+
+    try {
+      return await fs.readFile(cacheFile)
+    } catch {
+      // Not cached.
+    }
+
+    await fs.mkdir(cacheDir, { recursive: true })
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'hermes-os-thumb-'))
+
+    try {
+      const ql = await run('qlmanage', ['-t', '-s', String(size), '-o', tmpDir, filePath], 20_000)
+
+      if (ql.code !== 0) {
+        return null
+      }
+
+      const produced = (await fs.readdir(tmpDir)).find(n => n.endsWith('.png'))
+
+      if (!produced) {
+        return null
+      }
+
+      await fs.copyFile(path.join(tmpDir, produced), cacheFile)
+
+      return fs.readFile(cacheFile)
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
   }
 
   /**

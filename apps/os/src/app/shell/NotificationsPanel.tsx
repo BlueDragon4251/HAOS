@@ -36,7 +36,7 @@ export function NotificationsPanel() {
   return (
     <>
       <button type="button" aria-label="Close notifications" className="absolute inset-0 z-(--z-panel)" onClick={() => $notificationsOpen.set(false)} />
-      <aside className="float absolute top-10 right-3 z-(--z-overlay) flex h-[min(70vh,640px)] w-[360px] flex-col rounded-lg animate-rise">
+      <aside className="float absolute top-10 right-3 z-(--z-overlay) flex h-[min(70vh,640px)] w-[360px] flex-col rounded-2xl animate-rise">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="text-[13px] font-medium">Notifications</div>
           <Button variant="ghost" size="sm" onClick={clearNotifications} disabled={items.length === 0}>

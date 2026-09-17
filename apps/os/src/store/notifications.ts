@@ -1,5 +1,5 @@
 import { atom } from 'nanostores'
-import type { SurfaceId } from '../app/surfaces.ts'
+import type { SurfaceId } from './surface.ts'
 import { $windowState } from './backend.ts'
 import { onGatewayEvent } from './gateway.ts'
 

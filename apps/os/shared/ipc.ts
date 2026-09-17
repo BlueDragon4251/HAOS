@@ -85,6 +85,48 @@ export interface InstalledApp {
   name: string
   path: string
   bundleId?: string
+  /** LSApplicationCategoryType, e.g. public.app-category.developer-tools. */
+  category?: string
+}
+
+export interface NetworkStatus {
+  online: boolean
+  defaultInterface?: string
+  ipv4?: string
+  wifi?: { connected: boolean; ssid?: string; interface?: string }
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  start: number
+  end: number
+  allDay: boolean
+  location?: string
+  notes?: string
+  calendar?: string
+  url?: string
+}
+
+export interface CalendarResult {
+  status: 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'unavailable'
+  events: CalendarEvent[]
+  error?: string
+}
+
+export interface RecentFile {
+  path: string
+  name: string
+  extension: string
+  size: number
+  modifiedAt: number
+  lastUsedAt: number
+  kind: 'file' | 'directory'
+}
+
+export interface ImageInfo {
+  width: number
+  height: number
 }
 
 export interface DirEntry {
@@ -119,11 +161,26 @@ export interface TerminalHandle {
   shell: string
 }
 
+export interface SpaceDef {
+  id: string
+  name: string
+  color: string
+  cwd?: string
+}
+
 export interface HermesOSPrefs {
   fullscreenOnLaunch: boolean
   reduceMotion: boolean
-  accent: 'gold' | 'ice' | 'jade'
+  accent: 'blue' | 'ice' | 'violet'
+  theme: 'ocean' | 'graphite'
+  /** Absolute path or file:// URL of a custom wallpaper image. */
+  wallpaper?: string
   defaultCwd?: string
+  spaces: SpaceDef[]
+  activeSpace: string
+  favorites: string[]
+  /** Persisted window bounds per app id. */
+  windowBounds?: Record<string, { x: number; y: number; width: number; height: number }>
 }
 
 export interface AuditEntry {
@@ -175,6 +232,19 @@ export const IPC = {
   fsReveal: 'hermes-os:fs:reveal',
   fsOpenPath: 'hermes-os:fs:open-path',
   fsOpenIn: 'hermes-os:fs:open-in',
+  fsRecent: 'hermes-os:fs:recent',
+  fsThumbnail: 'hermes-os:fs:thumbnail',
+  fsImageInfo: 'hermes-os:fs:image-info',
+  fsWriteText: 'hermes-os:fs:write-text',
+  fsMkdir: 'hermes-os:fs:mkdir',
+  fsRename: 'hermes-os:fs:rename',
+  fsTrash: 'hermes-os:fs:trash',
+  fsExportPdf: 'hermes-os:fs:export-pdf',
+  fsPickFiles: 'hermes-os:fs:pick-files',
+  fsDirSize: 'hermes-os:fs:dir-size',
+
+  systemNetwork: 'hermes-os:system:network',
+  calendarToday: 'hermes-os:calendar:today',
 
   terminalCreate: 'hermes-os:terminal:create',
   terminalWrite: 'hermes-os:terminal:write',

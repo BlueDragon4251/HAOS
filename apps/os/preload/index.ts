@@ -2,13 +2,17 @@ import { contextBridge, ipcRenderer } from 'electron'
 import {
   type AuditEntry,
   type BackendState,
+  type CalendarResult,
   type DirEntry,
   type EnvInfo,
   type FilePreview,
   type HermesOSPrefs,
+  type ImageInfo,
   type InstalledApp,
   IPC,
+  type NetworkStatus,
   type ProcessInfo,
+  type RecentFile,
   type RestRequest,
   type SystemInfo,
   type SystemStats,
@@ -39,6 +43,7 @@ const api = {
     info: (): Promise<SystemInfo> => ipcRenderer.invoke(IPC.systemInfo),
     stats: (): Promise<SystemStats> => ipcRenderer.invoke(IPC.systemStats),
     processes: (sort: 'cpu' | 'memory', limit: number): Promise<ProcessInfo[]> => ipcRenderer.invoke(IPC.systemProcesses, sort, limit),
+    network: (): Promise<NetworkStatus> => ipcRenderer.invoke(IPC.systemNetwork),
     subscribeStats: (listener: (stats: SystemStats) => void): Unsubscribe => {
       const off = subscribe(IPC.systemStatsPush, listener)
       void ipcRenderer.invoke(IPC.systemStatsSubscribe, true)
@@ -60,7 +65,20 @@ const api = {
     readFile: (target: string): Promise<FilePreview> => ipcRenderer.invoke(IPC.fsReadFile, target),
     reveal: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsReveal, target),
     openPath: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenPath, target),
-    openIn: (editor: 'vscode' | 'cursor' | 'finder' | 'terminal', target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenIn, editor, target)
+    openIn: (editor: 'vscode' | 'cursor' | 'finder' | 'terminal', target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenIn, editor, target),
+    recent: (limit = 30): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.fsRecent, limit),
+    thumbnail: (target: string, size = 512): Promise<string | null> => ipcRenderer.invoke(IPC.fsThumbnail, target, size),
+    imageInfo: (target: string): Promise<ImageInfo | null> => ipcRenderer.invoke(IPC.fsImageInfo, target),
+    writeText: (target: string, content: string): Promise<void> => ipcRenderer.invoke(IPC.fsWriteText, target, content),
+    mkdir: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsMkdir, target),
+    rename: (from: string, to: string): Promise<void> => ipcRenderer.invoke(IPC.fsRename, from, to),
+    trash: (targets: string[]): Promise<void> => ipcRenderer.invoke(IPC.fsTrash, targets),
+    exportPdf: (html: string, suggestedName: string): Promise<string | null> => ipcRenderer.invoke(IPC.fsExportPdf, html, suggestedName),
+    pickFiles: (options?: { directory?: boolean; multiple?: boolean }): Promise<string[]> => ipcRenderer.invoke(IPC.fsPickFiles, options ?? {}),
+    dirSize: (target: string): Promise<{ bytes: number; files: number; complete: boolean }> => ipcRenderer.invoke(IPC.fsDirSize, target)
+  },
+  calendar: {
+    today: (): Promise<CalendarResult> => ipcRenderer.invoke(IPC.calendarToday)
   },
   terminal: {
     create: (options: TerminalCreateOptions): Promise<TerminalHandle> => ipcRenderer.invoke(IPC.terminalCreate, options),

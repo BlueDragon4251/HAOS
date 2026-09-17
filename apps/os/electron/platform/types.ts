@@ -1,4 +1,4 @@
-import type { InstalledApp, ProcessInfo, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 
 export type EditorTarget = 'vscode' | 'cursor' | 'finder' | 'terminal'
 
@@ -14,6 +14,13 @@ export interface HostPlatform {
   /** PNG bytes for an application's icon, or null when none can be produced. */
   appIcon(appPath: string): Promise<Buffer | null>
   openIn(target: EditorTarget, targetPath: string): Promise<void>
+  networkStatus(): Promise<NetworkStatus>
+  /** Today's calendar events (with the permission state), or `unavailable` on platforms without a bridge. */
+  calendarToday(): Promise<CalendarResult>
+  /** Recently used documents under the user's folders. */
+  recentFiles(limit: number): Promise<RecentFile[]>
+  /** PNG thumbnail bytes for any file (QuickLook on macOS), or null. */
+  thumbnail(filePath: string, size: number): Promise<Buffer | null>
 }
 
 export class HostNotSupported extends Error {

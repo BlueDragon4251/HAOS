@@ -1,8 +1,9 @@
-import { ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { type DirEntry, type FilePreview, IPC } from '../../shared/ipc.ts'
+import { run } from '../platform/exec.ts'
 import { type EditorTarget, hostPlatform } from '../platform/index.ts'
 
 const TEXT_LIMIT = 2 * 1024 * 1024
@@ -123,8 +124,146 @@ async function readFile(target: string): Promise<FilePreview> {
   }
 }
 
-export function registerFsIpc(): void {
+/** Paths the shell may write to directly (user-initiated edits). Everything else goes through the audited bridge. */
+function assertWritable(target: string): string {
+  const file = normalizeUserPath(target)
+  const home = os.homedir()
+  const protectedRoots = [path.join(home, '.ssh'), path.join(home, 'Library', 'Keychains'), '/System', '/usr', '/bin', '/sbin', '/private/etc', '/Library']
+
+  if (!file.startsWith(home + path.sep) && !file.startsWith('/tmp/') && !file.startsWith('/private/tmp/')) {
+    throw new Error('Hermes OS only edits files inside your home folder')
+  }
+
+  if (protectedRoots.some(root => file === root || file.startsWith(root + path.sep))) {
+    throw new Error(`${file} is a protected location`)
+  }
+
+  return file
+}
+
+async function dirSize(target: string, budgetMs = 4000): Promise<{ bytes: number; files: number; complete: boolean }> {
+  const root = normalizeUserPath(target)
+  const deadline = Date.now() + budgetMs
+  let bytes = 0
+  let files = 0
+  let complete = true
+  const stack = [root]
+
+  while (stack.length) {
+    if (Date.now() > deadline) {
+      complete = false
+      break
+    }
+
+    const dir = stack.pop()!
+    let entries: import('node:fs').Dirent[] = []
+
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+
+      if (entry.isDirectory()) {
+        stack.push(full)
+      } else if (entry.isFile()) {
+        try {
+          bytes += (await fs.stat(full)).size
+          files++
+        } catch {
+          // Skip unreadable.
+        }
+      }
+    }
+  }
+
+  return { bytes, files, complete }
+}
+
+export function registerFsIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.fsHome, () => os.homedir())
+  ipcMain.handle(IPC.fsRecent, (_event, limit: number) => hostPlatform().recentFiles(Math.max(1, Math.min(200, Number(limit) || 30))))
+  ipcMain.handle(IPC.fsThumbnail, async (_event, target: string, size: number) => {
+    const png = await hostPlatform().thumbnail(normalizeUserPath(target), Math.max(64, Math.min(1024, Number(size) || 512)))
+
+    return png ? `data:image/png;base64,${png.toString('base64')}` : null
+  })
+  ipcMain.handle(IPC.fsImageInfo, async (_event, target: string) => {
+    const file = normalizeUserPath(target)
+    const result = await run('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', file], 5000)
+    const width = Number(/pixelWidth:\s*(\d+)/.exec(result.stdout)?.[1])
+    const height = Number(/pixelHeight:\s*(\d+)/.exec(result.stdout)?.[1])
+
+    return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : null
+  })
+  ipcMain.handle(IPC.fsWriteText, async (_event, target: string, content: string) => {
+    const file = assertWritable(target)
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(file, String(content), 'utf8')
+  })
+  ipcMain.handle(IPC.fsMkdir, async (_event, target: string) => {
+    await fs.mkdir(assertWritable(target), { recursive: true })
+  })
+  ipcMain.handle(IPC.fsRename, async (_event, from: string, to: string) => {
+    const source = assertWritable(from)
+    const dest = assertWritable(to)
+
+    try {
+      await fs.access(dest)
+      throw new Error(`${dest} already exists`)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error
+      }
+    }
+
+    await fs.rename(source, dest)
+  })
+  ipcMain.handle(IPC.fsTrash, async (_event, targets: string[]) => {
+    for (const target of targets) {
+      await shell.trashItem(assertWritable(target))
+    }
+  })
+  ipcMain.handle(IPC.fsExportPdf, async (_event, html: string, suggestedName: string) => {
+    const win = getWindow()
+
+    if (!win) {
+      throw new Error('no window')
+    }
+
+    const picked = await dialog.showSaveDialog(win, { defaultPath: path.join(os.homedir(), 'Documents', suggestedName.endsWith('.pdf') ? suggestedName : `${suggestedName}.pdf`), filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+
+    if (picked.canceled || !picked.filePath) {
+      return null
+    }
+
+    const printer = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } })
+
+    try {
+      await printer.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(String(html))}`)
+      const pdf = await printer.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } })
+      await fs.writeFile(assertWritable(picked.filePath), pdf)
+
+      return picked.filePath
+    } finally {
+      printer.destroy()
+    }
+  })
+  ipcMain.handle(IPC.fsPickFiles, async (_event, options: { directory?: boolean; multiple?: boolean } = {}) => {
+    const win = getWindow()
+
+    if (!win) {
+      return []
+    }
+
+    const result = await dialog.showOpenDialog(win, { properties: [options.directory ? 'openDirectory' : 'openFile', ...(options.multiple ? ['multiSelections' as const] : [])] })
+
+    return result.canceled ? [] : result.filePaths
+  })
+  ipcMain.handle(IPC.fsDirSize, (_event, target: string) => dirSize(target))
   ipcMain.handle(IPC.fsReadDir, (_event, target: string) => readDir(target))
   ipcMain.handle(IPC.fsReadFile, (_event, target: string) => readFile(target))
   ipcMain.handle(IPC.fsReveal, (_event, target: string) => {

@@ -59,14 +59,14 @@ function GeneralSettings() {
         </Row>
         <Row title="Accent" description="The single accent colour used across the environment.">
           <div className="flex gap-1.5">
-            {(['gold', 'ice', 'jade'] as const).map(accent => (
+            {(['blue', 'ice', 'violet'] as const).map(accent => (
               <button
                 key={accent}
                 type="button"
                 aria-label={accent}
                 onClick={() => void updatePrefs({ accent })}
                 className={cn('size-6 rounded-full transition-transform', prefs.accent === accent ? 'scale-110 shadow-[0_0_0_2px_var(--color-bg),0_0_0_3.5px_var(--color-fg-3)]' : 'opacity-70 hover:opacity-100')}
-                style={{ background: accent === 'gold' ? '#e6b84a' : accent === 'ice' ? '#7cc4ff' : '#6fd2a8' }}
+                style={{ background: accent === 'blue' ? '#2f7dff' : accent === 'ice' ? '#4cc2ff' : '#7c6cff' }}
               />
             ))}
           </div>
