@@ -112,3 +112,41 @@ def test_parse_ps_and_lsof(plugin):
     listeners = darwin.parse_lsof(lsof, 3000)
     assert [l.pid for l in listeners] == [512], "one row per pid even with dual-stack sockets"
     assert listeners[0].protocol == "tcp"
+
+
+def test_parse_network_and_bluetooth_and_volume(plugin):
+    darwin = _mod(plugin, "host.darwin")
+    ports = darwin.parse_hardware_ports("Hardware Port: Wi-Fi\nDevice: en0\nEthernet Address: aa:bb\n\nHardware Port: Thunderbolt 1\nDevice: en1\nEthernet Address: cc:dd\n")
+    assert [p["device"] for p in ports] == ["en0", "en1"] and ports[0]["name"] == "Wi-Fi"
+    airport = json.dumps({"SPAirPortDataType": [{"spairport_airport_interfaces": [
+        {"_name": "en0", "spairport_status_information": "spairport_status_connected",
+         "spairport_current_network_information": {"_name": "<redacted>", "spairport_network_phymode": "802.11ax", "spairport_network_rate": 34}},
+        {"_name": "awdl0"}]}]})
+    wifi = darwin.parse_airport(airport)
+    assert wifi["connected"] is True and wifi["ssid"] is None and wifi["phy_mode"] == "802.11ax"
+    bt = darwin.parse_bluetooth(json.dumps({"SPBluetoothDataType": [{"controller_properties": {"controller_state": "attrib_on"}, "device_connected": [{"AirPods": {}}], "device_not_connected": [{"Mouse": {}}]}]}))
+    assert bt == {"powered_on": True, "connected": ["AirPods"], "paired": ["Mouse"]}
+    assert darwin.parse_volume_settings("output volume:30, input volume:57, alert volume:100, output muted:false") == {"output_volume": 30, "input_volume": 57, "alert_volume": 100, "muted": False}
+
+
+def test_copy_is_a_mutate_operation_that_does_not_overwrite(plugin, tmp_path, monkeypatch):
+    tools = _mod(plugin, "tools")
+    perm = _mod(plugin, "permissions")
+    monkeypatch.setattr(perm, "_confirm", lambda *a, **k: perm.Decision(True, "approved"))
+    src = tmp_path / "a.txt"
+    src.write_text("hello")
+    result = json.loads(tools.handle_system_files({"action": "copy", "path": str(src), "to": str(tmp_path / "b.txt")}))
+    assert result["success"] and (tmp_path / "b.txt").read_text() == "hello" and src.exists()
+    again = json.loads(tools.handle_system_files({"action": "copy", "path": str(src), "to": str(tmp_path / "b.txt")}))
+    assert not again["success"] and "already exists" in again["error"]
+
+
+def test_settings_pane_lookup_is_forgiving(plugin):
+    darwin = _mod(plugin, "host.darwin")
+    assert darwin.SETTINGS_PANES["privacy_and_security"].startswith("com.apple.settings.PrivacySecurity")
+    assert "screen_recording" in darwin.SETTINGS_PANES
+
+
+def test_system_control_refuses_empty_notify(plugin):
+    tools = _mod(plugin, "tools")
+    assert not json.loads(tools.handle_system_control({"action": "notify"}))["success"]

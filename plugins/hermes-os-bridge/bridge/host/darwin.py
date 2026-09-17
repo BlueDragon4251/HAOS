@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import plistlib
 import re
@@ -108,6 +109,134 @@ def parse_lsof(text: str, port: int) -> list[PortListener]:
         seen.add(key)
         out.append(PortListener(pid=pid, command=parts[0], user=parts[2], port=port, protocol=parts[7].lower()))
     return out
+
+
+SETTINGS_PANES: dict[str, str] = {
+    "general": "com.apple.systempreferences.GeneralSettings",
+    "appearance": "com.apple.Appearance-Settings.extension",
+    "accessibility": "com.apple.Accessibility-Settings.extension",
+    "control_center": "com.apple.ControlCenter-Settings.extension",
+    "desktop_and_dock": "com.apple.Desktop-Settings.extension",
+    "displays": "com.apple.Displays-Settings.extension",
+    "wallpaper": "com.apple.Wallpaper-Settings.extension",
+    "screen_saver": "com.apple.ScreenSaver-Settings.extension",
+    "battery": "com.apple.Battery-Settings.extension",
+    "lock_screen": "com.apple.Lock-Screen-Settings.extension",
+    "privacy_and_security": "com.apple.settings.PrivacySecurity.extension",
+    "privacy": "com.apple.settings.PrivacySecurity.extension",
+    "security": "com.apple.settings.PrivacySecurity.extension",
+    "screen_recording": "com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture",
+    "accessibility_privacy": "com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility",
+    "automation": "com.apple.settings.PrivacySecurity.extension?Privacy_Automation",
+    "full_disk_access": "com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles",
+    "microphone": "com.apple.settings.PrivacySecurity.extension?Privacy_Microphone",
+    "input_monitoring": "com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent",
+    "touch_id": "com.apple.Touch-ID-Settings.extension",
+    "users_and_groups": "com.apple.Users-Groups-Settings.extension",
+    "passwords": "com.apple.Passwords-Settings.extension",
+    "internet_accounts": "com.apple.Internet-Accounts-Settings.extension",
+    "wifi": "com.apple.wifi-settings-extension",
+    "bluetooth": "com.apple.BluetoothSettings",
+    "network": "com.apple.Network-Settings.extension",
+    "notifications": "com.apple.Notifications-Settings.extension",
+    "sound": "com.apple.Sound-Settings.extension",
+    "focus": "com.apple.Focus-Settings.extension",
+    "screen_time": "com.apple.Screen-Time-Settings.extension",
+    "keyboard": "com.apple.Keyboard-Settings.extension",
+    "trackpad": "com.apple.Trackpad-Settings.extension",
+    "mouse": "com.apple.Mouse-Settings.extension",
+    "printers": "com.apple.Print-Scan-Settings.extension",
+    "software_update": "com.apple.Software-Update-Settings.extension",
+    "storage": "com.apple.settings.Storage",
+    "date_and_time": "com.apple.Date-Time-Settings.extension",
+    "sharing": "com.apple.Sharing-Settings.extension",
+    "siri": "com.apple.Siri-Settings.extension",
+    "login_items": "com.apple.LoginItems-Settings.extension",
+    "extensions": "com.apple.ExtensionsPreferences",
+    "game_center": "com.apple.Game-Center-Settings.extension",
+}
+
+
+def parse_hardware_ports(text: str) -> list[dict[str, str]]:
+    """``networksetup -listallhardwareports`` blocks -> [{name, device, mac}]."""
+    ports: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.startswith("Hardware Port:"):
+            current = {"name": line.split(":", 1)[1].strip()}
+        elif line.startswith("Device:") and current:
+            current["device"] = line.split(":", 1)[1].strip()
+        elif line.startswith("Ethernet Address:") and current:
+            current["mac"] = line.split(":", 1)[1].strip()
+            if "device" in current:
+                ports.append(current)
+            current = {}
+    return ports
+
+
+def parse_airport(json_text: str) -> dict[str, Any] | None:
+    """``system_profiler SPAirPortDataType -json`` -> the station interface's connection summary."""
+    try:
+        data = json.loads(json_text or "{}")
+        interfaces = data["SPAirPortDataType"][0]["spairport_airport_interfaces"]
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+    for entry in interfaces:
+        if entry.get("_name", "").startswith("awdl"):
+            continue
+        status = str(entry.get("spairport_status_information", ""))
+        net = entry.get("spairport_current_network_information") or {}
+        ssid = net.get("_name")
+        return {
+            "interface": entry.get("_name"),
+            "connected": status.endswith("connected"),
+            "ssid": None if not ssid or "redacted" in str(ssid) else ssid,
+            "phy_mode": net.get("spairport_network_phymode"),
+            "channel": net.get("spairport_network_channel"),
+            "rate_mbps": net.get("spairport_network_rate"),
+            "signal_noise": net.get("spairport_signal_noise"),
+            "security": (net.get("spairport_security_mode") or "").replace("spairport_security_mode_", "") or None,
+        }
+    return None
+
+
+def parse_bluetooth(json_text: str) -> dict[str, Any]:
+    """``system_profiler SPBluetoothDataType -json`` -> power + connected / paired device names."""
+    try:
+        data = json.loads(json_text or "{}")["SPBluetoothDataType"][0]
+    except (KeyError, IndexError, TypeError, ValueError):
+        return {"powered_on": None, "connected": [], "paired": []}
+    state = str((data.get("controller_properties") or {}).get("controller_state", ""))
+    names = lambda key: [name for item in (data.get(key) or []) for name in item.keys()]  # noqa: E731
+    return {"powered_on": state.endswith("on") if state else None, "connected": names("device_connected"), "paired": names("device_not_connected")}
+
+
+def parse_volume_settings(text: str) -> dict[str, Any]:
+    """``get volume settings`` -> {output_volume, input_volume, alert_volume, muted}."""
+    out: dict[str, Any] = {}
+    for key, label in (("output_volume", "output volume"), ("input_volume", "input volume"), ("alert_volume", "alert volume")):
+        match = re.search(rf"{label}:(\d+)", text)
+        out[key] = int(match[1]) if match else None
+    muted = re.search(r"output muted:(true|false)", text)
+    out["muted"] = muted[1] == "true" if muted else None
+    return out
+
+
+def parse_displays(json_text: str) -> list[dict[str, Any]]:
+    try:
+        gpus = json.loads(json_text or "{}")["SPDisplaysDataType"]
+    except (KeyError, TypeError, ValueError):
+        return []
+    displays = []
+    for gpu in gpus:
+        for disp in gpu.get("spdisplays_ndrvs") or []:
+            displays.append({
+                "name": disp.get("_name"),
+                "resolution": disp.get("_spdisplays_resolution") or disp.get("spdisplays_resolution"),
+                "main": str(disp.get("spdisplays_main", "")).endswith("yes"),
+                "connection": (disp.get("spdisplays_connection_type") or "").replace("spdisplays_", "") or None,
+            })
+    return displays
 
 
 def parse_du(text: str) -> list[tuple[int, str]]:
@@ -310,6 +439,98 @@ class DarwinHost(HostAdapter):
             result = run(["osascript", "-e", f'tell application "{_applescript_string(label)}" to quit'], timeout=20)
         if not result.ok and result.code != 1:
             raise RuntimeError(result.stderr.strip() or f"could not quit {label}")
+
+    # --- system state (read) -----------------------------------------------------------------
+    def network_status(self) -> dict[str, Any]:
+        default = run(["route", "-n", "get", "default"], timeout=5).stdout
+        iface = (re.search(r"interface:\s*(\S+)", default) or [None, None])[1]
+        gateway = (re.search(r"gateway:\s*(\S+)", default) or [None, None])[1]
+        ports = parse_hardware_ports(run(["networksetup", "-listallhardwareports"], timeout=10).stdout)
+        interfaces = []
+        for port in ports:
+            addr = run(["ipconfig", "getifaddr", port["device"]], timeout=5).stdout.strip()
+            if addr or port["device"] == iface:
+                interfaces.append({**port, "ipv4": addr or None, "default_route": port["device"] == iface})
+        wifi = parse_airport(run(["system_profiler", "SPAirPortDataType", "-json"], timeout=20).stdout)
+        dns = sorted({m for m in re.findall(r"nameserver\[\d+\]\s*:\s*(\S+)", run(["scutil", "--dns"], timeout=5).stdout)})
+        return {
+            "online": bool(iface), "default_interface": iface, "gateway": gateway, "dns": dns[:6],
+            "interfaces": interfaces, "wifi": wifi,
+            "note": "macOS hides the Wi-Fi network name unless Location Services is granted to the process." if wifi and wifi.get("connected") and not wifi.get("ssid") else None,
+        }
+
+    def bluetooth_status(self) -> dict[str, Any]:
+        return parse_bluetooth(run(["system_profiler", "SPBluetoothDataType", "-json"], timeout=20).stdout)
+
+    def audio_status(self) -> dict[str, Any]:
+        out = run(["osascript", "-e", "get volume settings"], timeout=10).stdout
+        return parse_volume_settings(out)
+
+    def appearance_status(self) -> dict[str, Any]:
+        style = run(["defaults", "read", "-g", "AppleInterfaceStyle"], timeout=5)
+        dark = style.ok and "dark" in style.stdout.lower()
+        displays = run(["system_profiler", "SPDisplaysDataType", "-json"], timeout=20).stdout
+        return {"dark_mode": dark, "displays": parse_displays(displays)}
+
+    def system_logs(self, minutes: int, level: str, process: str | None, limit: int) -> list[str]:
+        predicates = {"error": "messageType == 16", "fault": "messageType == 17", "any": None}
+        clauses = [predicates.get(level, "messageType == 16")]
+        if process:
+            clauses.append(f'process == "{_applescript_string(process)}"')
+        predicate = " AND ".join(c for c in clauses if c)
+        argv = ["log", "show", "--last", f"{minutes}m", "--style", "compact"]
+        if predicate:
+            argv += ["--predicate", predicate]
+        result = run(argv, timeout=60)
+        lines = [ln for ln in result.stdout.splitlines() if ln.strip() and not ln.startswith(("Filtering", "Timestamp"))]
+        return lines[-limit:]
+
+    # --- system control ----------------------------------------------------------------------
+    def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:
+        if percent is not None:
+            run(["osascript", "-e", f"set volume output volume {max(0, min(100, int(percent)))}"], timeout=10)
+        if muted is not None:
+            run(["osascript", "-e", f"set volume output muted {'true' if muted else 'false'}"], timeout=10)
+        return self.audio_status()
+
+    def set_dark_mode(self, enabled: bool) -> None:
+        result = run(["osascript", "-e", f'tell application "System Events" to tell appearance preferences to set dark mode to {"true" if enabled else "false"}'], timeout=15)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not change appearance (grant Automation permission to Hermes OS for System Events)")
+
+    def open_settings(self, pane: str) -> str:
+        key = pane.strip().lower().replace(" ", "_").replace("&", "and")
+        target = SETTINGS_PANES.get(key)
+        if target is None:
+            for name, value in SETTINGS_PANES.items():
+                if key in name:
+                    target = value
+                    break
+        if target is None:
+            raise ValueError(f"unknown settings pane '{pane}'. Known: {', '.join(sorted(SETTINGS_PANES))}")
+        result = run(["open", f"x-apple.systempreferences:{target}"], timeout=15)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not open System Settings")
+        return target
+
+    def lock_screen(self) -> None:
+        result = run(["osascript", "-e", 'tell application "System Events" to keystroke "q" using {command down, control down}'], timeout=10)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not lock the screen (grant Accessibility permission)")
+
+    def sleep_display(self) -> None:
+        result = run(["pmset", "displaysleepnow"], timeout=10)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not sleep the display")
+
+    def set_wifi_power(self, enabled: bool) -> None:
+        ports = parse_hardware_ports(run(["networksetup", "-listallhardwareports"], timeout=10).stdout)
+        wifi = next((p for p in ports if "wi-fi" in p["name"].lower() or "airport" in p["name"].lower()), None)
+        if not wifi:
+            raise RuntimeError("no Wi-Fi interface found")
+        result = run(["networksetup", "-setairportpower", wifi["device"], "on" if enabled else "off"], timeout=15)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not change Wi-Fi power")
 
     # --- destructive ------------------------------------------------------------------------
     def kill(self, pid: int, force: bool) -> None:

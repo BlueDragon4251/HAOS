@@ -56,6 +56,39 @@ class WindowsHost(HostAdapter):
     def quit_app(self, name: str, force: bool) -> None:
         raise HostNotSupported(_MESSAGE)
 
+    def network_status(self) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def bluetooth_status(self) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def audio_status(self) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def appearance_status(self) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def system_logs(self, minutes: int, level: str, process: str | None, limit: int) -> list[str]:
+        raise HostNotSupported(_MESSAGE)
+
+    def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:
+        raise HostNotSupported(_MESSAGE)
+
+    def set_dark_mode(self, enabled: bool) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def open_settings(self, pane: str) -> str:
+        raise HostNotSupported(_MESSAGE)
+
+    def lock_screen(self) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def sleep_display(self) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def set_wifi_power(self, enabled: bool) -> None:
+        raise HostNotSupported(_MESSAGE)
+
     def kill(self, pid: int, force: bool) -> None:
         raise HostNotSupported(_MESSAGE)
 

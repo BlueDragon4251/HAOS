@@ -29,6 +29,15 @@ and render as clean cards in the shell.
 | "Create a folder for this project" | `system_files` action=mkdir path=~/Projects/<name> |
 | "Organise these files" | list the directory, propose groupings, then `system_files` action=batch dry_run=true to show the plan, then apply after the user agrees |
 | "Which apps are open?" | `system_apps` action=running |
+| "Copy this file to…" | `system_files` action=copy |
+| "Am I on Wi-Fi? What's my IP?" | `system_network` action=status |
+| "Is Bluetooth on? What's connected?" | `system_network` action=bluetooth |
+| "Set the volume to 30%" / "Mute" | `system_control` action=set_volume |
+| "Turn on dark mode" / "Is dark mode on?" | `system_control` action=set_dark_mode / action=appearance |
+| "Open Privacy & Security settings" | `system_control` action=open_settings pane=privacy_and_security |
+| "Send me a notification" | `system_control` action=notify |
+| "Lock the screen" / "Sleep the display" | `system_control` action=lock_screen / sleep_display |
+| "Show recent system errors" | `system_logs` level=error minutes=10 |
 | "Start my development environment" | `system_open` the editor on the project, `system_open` the browser on the dev URL, and use the `terminal` tool for `npm run dev` or the project's start command |
 
 ## Norms

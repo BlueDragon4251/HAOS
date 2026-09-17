@@ -291,13 +291,14 @@ EDITOR_APPS = {"vscode": "Visual Studio Code", "code": "Visual Studio Code", "cu
 
 SYSTEM_OPEN_SCHEMA = _schema(
     "system_open",
-    "Open things for the user. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=vscode|cursor|xcode|zed|terminal), e.g. 'open this repo in VS Code'. Runs immediately; every call is audited.",
+    "Open things for the user. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=vscode|cursor|xcode|zed|terminal), e.g. 'open this repo in VS Code'; target=settings opens a System Settings pane (pane=privacy_and_security, wifi, bluetooth, sound, displays, notifications, screen_recording, accessibility_privacy, automation, ...). Runs immediately; every call is audited.",
     {
-        "target": _enum("app", "url", "path", "reveal", "editor"),
+        "target": _enum("app", "url", "path", "reveal", "editor", "settings"),
         "app": _desc(_STR, "Application name (for target=app, or the app to open a url/path with)."),
         "url": _desc(_STR, "For target=url."),
         "path": _desc(_STR, "For target=path / reveal / editor. Supports ~."),
         "editor": _enum("vscode", "cursor", "xcode", "zed", "terminal", "iterm", description="For target=editor (default vscode)."),
+        "pane": _desc(_STR, "For target=settings: the System Settings pane name."),
         "args": {"type": "array", "items": _STR, "description": "For target=app: extra launch arguments."},
     },
     required=("target",),
@@ -313,8 +314,13 @@ def handle_system_open(args: dict[str, Any], **_: Any) -> str:
             return fail("app is required for target=app")
         extra = [str(a) for a in (args.get("args") or [])]
         return _guarded("system_open", Tier.ACT, "app", f"open {name}", args, (), lambda: (adapter.open_app(name, extra), {"opened": name})[1])
+    if target == "settings":
+        pane = str(args.get("pane") or "general")
+        return _guarded("system_open", Tier.ACT, "settings", f"open System Settings > {pane}", args, (), lambda: {"pane": pane, "opened": adapter.open_settings(pane)})
     if target == "url":
         url = str(args.get("url") or "").strip()
+        if url.lower().startswith("x-apple.systempreferences:"):
+            return _guarded("system_open", Tier.ACT, "settings", f"open System Settings ({url})", args, (), lambda: (adapter.open_url(url), {"opened": url})[1])
         if not url.lower().startswith(("http://", "https://", "mailto:", "file://")):
             return fail("url must start with http://, https://, mailto: or file://")
         app = args.get("app") or None
@@ -411,16 +417,16 @@ def handle_system_kill_process(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_FILES_SCHEMA = _schema(
     "system_files",
-    "Organise files and folders on this Mac. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan; the user confirms mutating actions once per batch.",
+    "Organise files and folders on this Mac. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan; the user confirms mutating actions once per batch. Use the write_file tool to create file contents.",
     {
-        "action": _enum("mkdir", "move", "trash", "batch"),
-        "path": _desc(_STR, "Target path for mkdir/move/trash."),
-        "to": _desc(_STR, "Destination for move (a folder, or the new full path)."),
+        "action": _enum("mkdir", "move", "copy", "trash", "batch"),
+        "path": _desc(_STR, "Target path for mkdir/move/copy/trash."),
+        "to": _desc(_STR, "Destination for move/copy (a folder, or the new full path)."),
         "paths": {"type": "array", "items": _STR, "description": "For trash: several items."},
         "operations": {
             "type": "array",
             "description": "For batch: ordered operations.",
-            "items": {"type": "object", "properties": {"op": _enum("mkdir", "move", "trash"), "path": _STR, "to": _STR}, "required": ["op", "path"]},
+            "items": {"type": "object", "properties": {"op": _enum("mkdir", "move", "copy", "trash"), "path": _STR, "to": _STR}, "required": ["op", "path"]},
         },
         "dry_run": _desc(_BOOL, "Only describe what would happen."),
     },
@@ -439,6 +445,8 @@ class FileOp:
             return f"create folder {self.path}"
         if self.op == "move":
             return f"move {self.path} -> {self.to}"
+        if self.op == "copy":
+            return f"copy {self.path} -> {self.to}"
         return f"trash {self.path}"
 
     def touched(self) -> list[Path]:
@@ -454,17 +462,17 @@ def plan_operations(args: dict[str, Any]) -> list[FileOp]:
             if not isinstance(raw, dict):
                 continue
             op = str(raw.get("op") or "")
-            if op not in ("mkdir", "move", "trash") or not raw.get("path"):
+            if op not in ("mkdir", "move", "copy", "trash") or not raw.get("path"):
                 raise ValueError(f"invalid operation {raw}")
             ops.append(FileOp(op, expand(str(raw["path"])), expand(str(raw["to"])) if raw.get("to") else None))
     elif action == "mkdir":
         if not args.get("path"):
             raise ValueError("path is required")
         ops.append(FileOp("mkdir", expand(str(args["path"]))))
-    elif action == "move":
+    elif action in ("move", "copy"):
         if not args.get("path") or not args.get("to"):
-            raise ValueError("path and to are required for move")
-        ops.append(FileOp("move", expand(str(args["path"])), expand(str(args["to"]))))
+            raise ValueError(f"path and to are required for {action}")
+        ops.append(FileOp(action, expand(str(args["path"])), expand(str(args["to"]))))
     elif action == "trash":
         raw_paths = list(args.get("paths") or ([] if not args.get("path") else [args["path"]]))
         if not raw_paths:
@@ -473,8 +481,8 @@ def plan_operations(args: dict[str, Any]) -> list[FileOp]:
     else:
         raise ValueError(f"unknown action '{action}'")
     for op in ops:
-        if op.op == "move" and op.to is None:
-            raise ValueError(f"move of {op.path} needs 'to'")
+        if op.op in ("move", "copy") and op.to is None:
+            raise ValueError(f"{op.op} of {op.path} needs 'to'")
     return ops
 
 
@@ -493,7 +501,7 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
     plan = [op.describe() for op in ops]
     problems: list[str] = []
     for op in ops:
-        if op.op in ("move", "trash") and not op.path.exists():
+        if op.op in ("move", "copy", "trash") and not op.path.exists():
             problems.append(f"{op.path} does not exist")
         if op.op == "mkdir" and op.path.exists() and not op.path.is_dir():
             problems.append(f"{op.path} exists and is not a folder")
@@ -516,6 +524,15 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
                     raise FileExistsError(f"{target} already exists; not overwriting")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(op.path), str(target))
+            elif op.op == "copy":
+                target = _resolve_move_target(op.path, op.to)  # type: ignore[arg-type]
+                if target.exists():
+                    raise FileExistsError(f"{target} already exists; not overwriting")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if op.path.is_dir():
+                    shutil.copytree(str(op.path), str(target))
+                else:
+                    shutil.copy2(str(op.path), str(target))
             elif op.op == "trash":
                 adapter.trash([op.path])
             done.append(op.describe())
@@ -526,8 +543,114 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
+# system_network
+# ---------------------------------------------------------------------------------------------
+
+SYSTEM_NETWORK_SCHEMA = _schema(
+    "system_network",
+    "Connectivity on this Mac. action=status: online/offline, default interface, gateway, DNS, each active interface with its IPv4, and the Wi-Fi link (connected, channel, rate, signal; macOS hides the network name unless Location Services is granted). action=bluetooth: power state, connected and paired devices. Read-only.",
+    {"action": _enum("status", "bluetooth", description="Default status.")},
+)
+
+
+def handle_system_network(args: dict[str, Any], **_: Any) -> str:
+    action = str(args.get("action") or "status")
+
+    def execute() -> dict[str, Any]:
+        if action == "bluetooth":
+            return {"bluetooth": host().bluetooth_status()}
+        return host().network_status()
+
+    return _read("system_network", action, args, execute)
+
+
+# ---------------------------------------------------------------------------------------------
+# system_control
+# ---------------------------------------------------------------------------------------------
+
+SYSTEM_CONTROL_SCHEMA = _schema(
+    "system_control",
+    "Read or change device settings. Reads: audio (output/input/alert volume, mute), appearance (dark mode, displays). Actions: set_volume (percent and/or muted), set_dark_mode (enabled), notify (title, body: a macOS notification), open_settings (pane, e.g. privacy_and_security, screen_recording, wifi, bluetooth, sound, displays, notifications), sleep_display, lock_screen, set_wifi (enabled). Actions run immediately and are audited; set_wifi asks first.",
+    {
+        "action": _enum("audio", "appearance", "set_volume", "set_dark_mode", "notify", "open_settings", "sleep_display", "lock_screen", "set_wifi"),
+        "percent": _desc(_INT, "For set_volume: 0-100."),
+        "muted": _desc(_BOOL, "For set_volume."),
+        "enabled": _desc(_BOOL, "For set_dark_mode / set_wifi."),
+        "title": _desc(_STR, "For notify."),
+        "body": _desc(_STR, "For notify."),
+        "pane": _desc(_STR, "For open_settings: a System Settings pane name."),
+    },
+    required=("action",),
+)
+
+
+def handle_system_control(args: dict[str, Any], **_: Any) -> str:
+    action = str(args.get("action") or "")
+    adapter = host()
+    if action == "audio":
+        return _read("system_control", action, args, lambda: {"audio": adapter.audio_status()})
+    if action == "appearance":
+        return _read("system_control", action, args, lambda: adapter.appearance_status())
+    if action == "set_volume":
+        percent = args.get("percent")
+        muted = args.get("muted")
+        if percent is None and muted is None:
+            return fail("set_volume needs percent and/or muted")
+        parts = [f"volume {int(percent)}%" if percent is not None else "", ("mute" if muted else "unmute") if muted is not None else ""]
+        summary = "set " + " and ".join(p for p in parts if p)
+        return _guarded("system_control", Tier.ACT, action, summary, args, (), lambda: {"audio": adapter.set_volume(int(percent) if percent is not None else None, bool(muted) if muted is not None else None)})
+    if action == "set_dark_mode":
+        enabled = bool(args.get("enabled", True))
+        return _guarded("system_control", Tier.ACT, action, f"turn dark mode {'on' if enabled else 'off'}", args, (), lambda: (adapter.set_dark_mode(enabled), {"dark_mode": enabled})[1])
+    if action == "notify":
+        title = str(args.get("title") or "Hermes")
+        body = str(args.get("body") or "")
+        if not body:
+            return fail("notify needs body")
+        return _guarded("system_control", Tier.ACT, action, f"notify: {title}", args, (), lambda: (adapter.notify(title, body), {"notified": True})[1])
+    if action == "open_settings":
+        pane = str(args.get("pane") or "general")
+        return _guarded("system_control", Tier.ACT, action, f"open System Settings > {pane}", args, (), lambda: {"opened": adapter.open_settings(pane)})
+    if action == "sleep_display":
+        return _guarded("system_control", Tier.ACT, action, "put the display to sleep", args, (), lambda: (adapter.sleep_display(), {"display": "sleeping"})[1])
+    if action == "lock_screen":
+        return _guarded("system_control", Tier.ACT, action, "lock the screen", args, (), lambda: (adapter.lock_screen(), {"locked": True})[1])
+    if action == "set_wifi":
+        enabled = bool(args.get("enabled", True))
+        return _guarded("system_control", Tier.MUTATE, action, f"turn Wi-Fi {'on' if enabled else 'off'}", args, (), lambda: (adapter.set_wifi_power(enabled), {"wifi": enabled})[1])
+    return fail(f"unknown action '{action}'")
+
+
+# ---------------------------------------------------------------------------------------------
+# system_logs
+# ---------------------------------------------------------------------------------------------
+
+SYSTEM_LOGS_SCHEMA = _schema(
+    "system_logs",
+    "Read the unified system log (diagnostics). minutes (default 10, max 240), level error|fault|any (default error), optional process name filter, limit (default 40, max 200). Returns the most recent matching lines, compact style. Read-only; can take several seconds.",
+    {
+        "minutes": _INT,
+        "level": _enum("error", "fault", "any"),
+        "process": _desc(_STR, "Only lines from this process (e.g. WindowServer, kernel)."),
+        "limit": _INT,
+    },
+)
+
+
+def handle_system_logs(args: dict[str, Any], **_: Any) -> str:
+    minutes = _int(args, "minutes", 10, 1, 240)
+    limit = _int(args, "limit", 40, 1, 200)
+    level = str(args.get("level") or "error")
+    process = (args.get("process") or None) and str(args["process"])
+    return _read("system_logs", level, args, lambda: {"minutes": minutes, "level": level, "process": process, "lines": host().system_logs(minutes, level, process, limit)})
+
+
+# ---------------------------------------------------------------------------------------------
 
 TOOL_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec("system_network", SYSTEM_NETWORK_SCHEMA, handle_system_network, "📶"),
+    ToolSpec("system_control", SYSTEM_CONTROL_SCHEMA, handle_system_control, "🎛️"),
+    ToolSpec("system_logs", SYSTEM_LOGS_SCHEMA, handle_system_logs, "📜"),
     ToolSpec("system_info", SYSTEM_INFO_SCHEMA, handle_system_info, "🖥️"),
     ToolSpec("system_processes", SYSTEM_PROCESSES_SCHEMA, handle_system_processes, "📈"),
     ToolSpec("system_disk_usage", SYSTEM_DISK_USAGE_SCHEMA, handle_system_disk_usage, "💽"),

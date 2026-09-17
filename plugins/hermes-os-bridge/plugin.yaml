@@ -9,6 +9,9 @@ platforms:
   - linux
   - windows
 provides_tools:
+  - system_network
+  - system_control
+  - system_logs
   - system_info
   - system_processes
   - system_disk_usage
