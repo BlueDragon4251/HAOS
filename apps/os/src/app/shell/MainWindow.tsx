@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { type ComponentType, Suspense, lazy } from 'react'
+import { SurfaceErrorBoundary } from '../../components/error-boundary.tsx'
 import { $page } from '../../store/windows.ts'
 import type { PageId } from '../apps.ts'
 import { Sidebar } from './Sidebar.tsx'
@@ -14,6 +15,17 @@ const PAGE_VIEW: Record<PageId, ComponentType> = {
   automations: lazy(() => import('../automations/AutomationsPage.tsx').then(m => ({ default: m.AutomationsPage }))),
   connections: lazy(() => import('../connections/ConnectionsPage.tsx').then(m => ({ default: m.ConnectionsPage }))),
   settings: lazy(() => import('../settings/SettingsPage.tsx').then(m => ({ default: m.SettingsPage })))
+}
+
+const PAGE_LABEL: Record<PageId, string> = {
+  overview: 'Overview',
+  hermes: 'Hermes',
+  missions: 'Missions',
+  memory: 'Memory',
+  files: 'Files',
+  automations: 'Automations',
+  connections: 'Connections',
+  settings: 'Settings'
 }
 
 const visited = new Set<PageId>(['overview'])
@@ -34,9 +46,11 @@ export function MainWindow() {
 
             return (
               <div key={id} className={active ? 'page-enter absolute inset-0' : 'absolute inset-0'} style={active ? undefined : { visibility: 'hidden', pointerEvents: 'none' }} aria-hidden={!active}>
-                <Suspense fallback={<PageSkeleton />}>
-                  <View />
-                </Suspense>
+                <SurfaceErrorBoundary label={PAGE_LABEL[id]}>
+                  <Suspense fallback={<PageSkeleton />}>
+                    <View />
+                  </Suspense>
+                </SurfaceErrorBoundary>
               </div>
             )
           })}

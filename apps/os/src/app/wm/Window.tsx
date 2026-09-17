@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { memo, useCallback, useEffect, useRef } from 'react'
+import { SurfaceErrorBoundary } from '../../components/error-boundary.tsx'
 import { cn } from '../../lib/cn.ts'
 import { $focusedWindowId, closeWindow, focusWindow, MAIN_WINDOW_ID, minimizeWindow, type OSWindow, setBounds, toggleMaximize } from '../../store/windows.ts'
 
@@ -140,7 +141,9 @@ export const Window = memo(function Window({ win, children, chrome = true }: { w
           <div className="w-[62px]" />
         </div>
       )}
-      <div className="relative min-h-0 flex-1">{children}</div>
+      <div className="relative min-h-0 flex-1">
+        <SurfaceErrorBoundary label={win.title}>{children}</SurfaceErrorBoundary>
+      </div>
       {!win.maximized &&
         EDGES.map(edge => <div key={edge} className={cn('absolute z-10', EDGE_CLASS[edge])} onPointerDown={event => startGesture(event, 'resize', edge)} />)}
     </div>
