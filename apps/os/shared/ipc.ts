@@ -181,6 +181,8 @@ export interface HermesOSPrefs {
   favorites: string[]
   /** Persisted window bounds per app id. */
   windowBounds?: Record<string, { x: number; y: number; width: number; height: number }>
+  /** Main-window sidebar: expanded width in px and whether it is collapsed to icons. */
+  sidebar?: { width: number; collapsed: boolean }
 }
 
 export interface AuditEntry {

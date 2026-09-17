@@ -570,6 +570,54 @@ textarea {
   100% { transform: translateY(0); }
 }
 
+/* Sidebar: hover labels for the collapsed rail and the resize handle's hairline. */
+.side-tip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 20;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-fg);
+  background: rgba(10, 28, 90, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 8px 24px rgba(0, 10, 60, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.side-item:hover .side-tip,
+.side-item:focus-visible .side-tip {
+  opacity: 1;
+  transform: translate(0, -50%);
+  transition-delay: 160ms;
+}
+.side-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 120ms var(--ease-out);
+}
+.side-handle:hover::after {
+  opacity: 0.55;
+  transition-delay: 120ms;
+}
+.side-handle.is-dragging::after {
+  opacity: 0.9;
+}
+
 .shimmer {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.04) 100%);
   background-size: 200% 100%;
