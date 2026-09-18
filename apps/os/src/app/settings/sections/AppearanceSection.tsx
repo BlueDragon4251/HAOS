@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconDroplet, IconPhoto, IconSparkles, IconSunMoon } from '@tabler/icons-react'
+import { IconDroplet, IconLayoutBottombar, IconPhoto, IconSparkles, IconSunMoon } from '@tabler/icons-react'
 import { Chips, GlassButton, Toggle } from '../../../components/ui/glass.tsx'
 import { cn } from '../../../lib/cn.ts'
 import { $prefs, updatePrefs } from '../../../store/backend.ts'
@@ -80,6 +80,12 @@ export function AppearanceSection() {
           <GlassButton size="sm" onClick={() => void chooseWallpaper()} aria-label="Choose wallpaper image">
             Choose image…
           </GlassButton>
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title="Dock">
+        <SettingsRow icon={<IconLayoutBottombar />} label="Automatically hide the Dock" description="The Dock slides away and returns when the cursor reaches the bottom edge." keywords="dock autohide hide show">
+          <Toggle checked={prefs.dockAutoHide !== false} onChange={next => void save({ dockAutoHide: next })} label="Automatically hide the Dock" />
         </SettingsRow>
       </SettingsGroup>
 

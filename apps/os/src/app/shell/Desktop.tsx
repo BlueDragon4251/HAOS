@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { lazy, Suspense, useEffect } from 'react'
 import { $applicationsOpen, $commandBarOpen } from '../../store/surface.ts'
-import { $windows, ensureMainWindow, MAIN_WINDOW_ID, type OSWindow, relayoutOnResize } from '../../store/windows.ts'
+import { $prefs } from '../../store/backend.ts'
+import { $windows, dockAutoHides, ensureMainWindow, MAIN_WINDOW_ID, type OSWindow, relayoutOnResize } from '../../store/windows.ts'
 import { Window } from '../wm/Window.tsx'
 import { CommandBar } from './CommandBar.tsx'
 import { Dock } from './Dock.tsx'
@@ -40,8 +41,21 @@ export function Desktop() {
     ensureMainWindow()
     const onResize = () => relayoutOnResize()
     window.addEventListener('resize', onResize)
+    // Toggling Dock auto-hide changes the desktop area, so windows re-flow like on a resize.
+    let lastAutoHide = dockAutoHides()
+    const offPrefs = $prefs.subscribe(() => {
+      const next = dockAutoHides()
 
-    return () => window.removeEventListener('resize', onResize)
+      if (next !== lastAutoHide) {
+        lastAutoHide = next
+        relayoutOnResize()
+      }
+    })
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      offPrefs()
+    }
   }, [])
 
   return (

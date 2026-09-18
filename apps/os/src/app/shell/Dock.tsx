@@ -4,6 +4,7 @@ import type { InstalledApp } from '../../../shared/ipc.ts'
 import { AppGlyph, HermesAvatar } from '../../components/app-icon.tsx'
 import { cn } from '../../lib/cn.ts'
 import { reducedMotion } from '../../lib/motion.ts'
+import { $prefs } from '../../store/backend.ts'
 import { notify } from '../../store/notifications.ts'
 import { $applicationsOpen } from '../../store/surface.ts'
 import { $windows, focusWindow, MAIN_WINDOW_ID, showPage } from '../../store/windows.ts'
@@ -27,8 +28,11 @@ const PINNED_NATIVE: { label: string; names: string[] }[] = [
 
 export function Dock() {
   const windows = useStore($windows)
+  const prefs = useStore($prefs)
   const { apps, iconFor } = useNativeApps()
   const [bouncing, setBouncing] = useState<string | null>(null)
+  const autoHide = prefs.dockAutoHide !== false
+  const revealed = useDockReveal(autoHide)
 
   const main = windows[MAIN_WINDOW_ID]
   const openHermes = () => {
@@ -110,9 +114,20 @@ export function Dock() {
     }
   }
 
+  const hidden = autoHide && !revealed
+
   return (
-    <nav className="pointer-events-none absolute inset-x-0 bottom-0 z-(--z-dock) flex h-(--dock-h) items-end justify-center pb-3" aria-label="Dock">
-      <div ref={barRef} className="glass pointer-events-auto flex items-end gap-2 rounded-2xl px-3 py-2" onMouseMove={onMove} onMouseLeave={onLeave}>
+    <nav className="pointer-events-none absolute inset-x-0 bottom-0 z-(--z-dock) flex h-(--dock-h) items-end justify-center pb-3" aria-label="Dock" data-hidden={hidden || undefined}>
+      {/* Invisible strip along the bottom edge that wakes the Dock, like macOS. */}
+      {autoHide && <div data-dock-trigger className="pointer-events-auto absolute inset-x-0 bottom-0 h-1.5" aria-hidden="true" />}
+      <div
+        ref={barRef}
+        data-dock-bar
+        className={cn('glass dock-bar pointer-events-auto flex items-end gap-2 rounded-2xl px-3 py-2', hidden && 'dock-bar-hidden')}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        aria-hidden={hidden}
+      >
         {items.map(item => (
           <button
             key={item.id}
@@ -135,6 +150,94 @@ export function Dock() {
 
 const MAGNIFY_RADIUS = 110
 const MAGNIFY_MAX = 0.42
+
+/** Cursor must rest on the bottom edge this long before the Dock rises (filters accidental brushes). */
+const REVEAL_DELAY = 140
+/** Grace period after the cursor leaves the Dock before it slides away. */
+const HIDE_DELAY = 420
+/** Shown briefly at boot so the user learns where it lives. */
+const INTRO_VISIBLE = 1800
+
+/**
+ * macOS-style auto-hide: the Dock is revealed while the cursor is on the bottom edge or over the bar,
+ * and slides away shortly after it leaves. Keyboard focus inside the Dock also keeps it up.
+ */
+function useDockReveal(enabled: boolean): boolean {
+  const [revealed, setRevealed] = useState(true)
+
+  useEffect(() => {
+    if (!enabled) {
+      setRevealed(true)
+
+      return
+    }
+
+    let showTimer = 0
+    let hideTimer = 0
+    let over = false
+
+    const show = () => {
+      window.clearTimeout(hideTimer)
+
+      if (!showTimer) {
+        showTimer = window.setTimeout(() => {
+          showTimer = 0
+          setRevealed(true)
+        }, REVEAL_DELAY)
+      }
+    }
+
+    const hide = () => {
+      window.clearTimeout(showTimer)
+      showTimer = 0
+      window.clearTimeout(hideTimer)
+      hideTimer = window.setTimeout(() => setRevealed(false), HIDE_DELAY)
+    }
+
+    const onMove = (event: MouseEvent) => {
+      const target = event.target
+      const inDock = target instanceof Element && Boolean(target.closest('[data-dock-bar], [data-dock-trigger]'))
+      const atEdge = event.clientY >= window.innerHeight - 2
+
+      if (inDock || atEdge) {
+        if (!over) {
+          over = true
+          show()
+        }
+      } else if (over) {
+        over = false
+        hide()
+      }
+    }
+
+    const onLeaveWindow = () => {
+      over = false
+      hide()
+    }
+
+    const onFocusIn = (event: FocusEvent) => {
+      if ((event.target as Element | null)?.closest('[data-dock-bar]')) {
+        window.clearTimeout(hideTimer)
+        setRevealed(true)
+      }
+    }
+
+    hideTimer = window.setTimeout(() => setRevealed(false), INTRO_VISIBLE)
+    window.addEventListener('mousemove', onMove, { passive: true })
+    document.addEventListener('mouseleave', onLeaveWindow)
+    document.addEventListener('focusin', onFocusIn)
+
+    return () => {
+      window.clearTimeout(showTimer)
+      window.clearTimeout(hideTimer)
+      window.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseleave', onLeaveWindow)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [enabled])
+
+  return revealed
+}
 
 function NativeIcon({ src, fallback }: { src?: string; fallback: 'files' | 'grid' }) {
   const [failed, setFailed] = useState(false)

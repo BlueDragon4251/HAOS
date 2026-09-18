@@ -47,8 +47,15 @@ const MENUBAR = 30
 const DOCK = 78
 const MARGIN = 14
 
+export function dockAutoHides(): boolean {
+  return $prefs.get().dockAutoHide !== false
+}
+
 export function desktopArea(): Bounds {
-  return { x: MARGIN, y: MENUBAR + MARGIN, width: window.innerWidth - MARGIN * 2, height: window.innerHeight - MENUBAR - DOCK - MARGIN }
+  // An auto-hiding Dock gives its strip back to windows, like macOS.
+  const dock = dockAutoHides() ? MARGIN : DOCK
+
+  return { x: MARGIN, y: MENUBAR + MARGIN, width: window.innerWidth - MARGIN * 2, height: window.innerHeight - MENUBAR - dock - MARGIN }
 }
 
 function clamp(bounds: Bounds): Bounds {

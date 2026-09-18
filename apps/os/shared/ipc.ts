@@ -183,6 +183,8 @@ export interface HermesOSPrefs {
   windowBounds?: Record<string, { x: number; y: number; width: number; height: number }>
   /** Main-window sidebar: expanded width in px and whether it is collapsed to icons. */
   sidebar?: { width: number; collapsed: boolean }
+  /** Slide the Dock off-screen until the cursor reaches the bottom edge (default on). */
+  dockAutoHide?: boolean
 }
 
 export interface AuditEntry {
