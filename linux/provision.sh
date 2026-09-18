@@ -54,6 +54,8 @@ PACKAGES=(
   # Tools the Linux HostAdapter / HostPlatform shell out to.
   xdg-utils glib2 plocate fd-find librsvg2-tools libnotify iproute procps-ng util-linux
   grim python3-pyyaml socat
+  # Phase 2 services: OCR, Flatpak software, boot splash.
+  tesseract tesseract-langpack-eng flatpak plymouth plymouth-scripts plymouth-plugin-script
   # Rescue terminal shown by hermes-os-session when the shell is not built.
   foot
   # A browser, a file manager and an editor so the Dock and `system_open` have real targets.
@@ -81,8 +83,27 @@ install -m 0755 "$PAYLOAD/session/hermes-os-session" /usr/local/bin/hermes-os-se
 install -m 0755 "$PAYLOAD/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
 install -m 0755 "$PAYLOAD/bin/hermes-os" /usr/local/bin/hermes-os
 # niri config for the session user (managed copy; local.kdl is the user's).
-sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri"
+sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri" "$HERMES_UID_HOME/.config/swaylock"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
+install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/swaylock.conf" "$HERMES_UID_HOME/.config/swaylock/config"
+
+# ---------------------------------------------------------------------------------------------
+step "Boot splash (Plymouth) and Flathub"
+if command -v plymouth-set-default-theme >/dev/null; then
+  install -d /usr/share/plymouth/themes/hermes-os
+  install -m 0644 "$PAYLOAD"/plymouth/hermes-os/* /usr/share/plymouth/themes/hermes-os/
+  if [[ "$(plymouth-set-default-theme 2>/dev/null)" != "hermes-os" ]]; then
+    # -R rebuilds the initramfs so the splash is available at boot (takes a minute).
+    plymouth-set-default-theme -R hermes-os || echo "WARNING: could not set the Plymouth theme"
+    # Show the splash instead of the console on boot.
+    if command -v grubby >/dev/null; then
+      grubby --update-kernel=ALL --args="rhgb quiet" || true
+    fi
+  fi
+fi
+if command -v flatpak >/dev/null; then
+  flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+fi
 install -d /usr/share/wayland-sessions
 install -m 0644 "$PAYLOAD/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
 install -d /etc/greetd

@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, ipcMain, screen, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC, type ShellCommand, type ShellSurface, type WmAction } from '../../shared/ipc.ts'
@@ -34,6 +34,7 @@ export class PanelShell {
   private readonly windows = new Map<ShellSurface, BrowserWindow>()
   private readonly pending = new Map<ShellSurface, ShellCommand[]>()
   private readonly loaded = new Set<ShellSurface>()
+  private readonly webApps = new Map<string, BrowserWindow>()
 
   constructor(private readonly onMainCreated: (win: BrowserWindow) => void) {}
 
@@ -118,6 +119,52 @@ export class PanelShell {
     if (win && !win.isDestroyed()) {
       win.close()
     }
+  }
+
+  /**
+   * Web apps: a frameless window showing one site (installed through `hermes-os install webapp`).
+   * Titled with the app's name so niri, the dock and the menu bar treat it as its own app.
+   */
+  openWebApp(url: string, name: string, slug: string): void {
+    const existing = this.webApps.get(slug)
+
+    if (existing && !existing.isDestroyed()) {
+      existing.show()
+      existing.focus()
+
+      return
+    }
+
+    const origin = new URL(url).origin
+    const win = new BrowserWindow({
+      width: 1100,
+      height: 760,
+      frame: false,
+      title: name,
+      backgroundColor: '#ffffff',
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: false }
+    })
+    win.on('page-title-updated', event => event.preventDefault())
+    // Same-site links stay inside the app; everything else goes to the default browser.
+    win.webContents.setWindowOpenHandler(({ url: target }) => {
+      if (target.startsWith(origin)) {
+        void win.loadURL(target)
+      } else if (/^https?:/i.test(target)) {
+        void shell.openExternal(target)
+      }
+
+      return { action: 'deny' }
+    })
+    win.webContents.on('will-navigate', (event, target) => {
+      if (!target.startsWith(origin) && /^https?:/i.test(target)) {
+        event.preventDefault()
+        void shell.openExternal(target)
+      }
+    })
+    win.on('closed', () => this.webApps.delete(slug))
+    this.webApps.set(slug, win)
+    void win.loadURL(url)
+    log('shell', `opened web app ${name} (${url})`)
   }
 
   /** Deliver a command to a surface, opening it first when needed. */

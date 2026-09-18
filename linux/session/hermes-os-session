@@ -26,6 +26,28 @@ dbus-update-activation-environment --systemd "${SESSION_VARS[@]}" 2>/dev/null ||
 systemctl --user start pipewire.socket pipewire-pulse.socket wireplumber.service 2>/dev/null || true
 systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
 
+# System services that belong to the session (panels mode only; cage has no room for them):
+# clipboard history, idle lock and display power, all as transient user units so they die with us.
+if [[ "$HERMES_OS_SHELL_MODE" == "panels" ]]; then
+  start_service() {
+    local unit="$1"
+    shift
+    systemctl --user stop "$unit" 2>/dev/null || true
+    systemd-run --user --quiet --collect --unit="$unit" --setenv=WAYLAND_DISPLAY="$WAYLAND_DISPLAY" --setenv=NIRI_SOCKET="${NIRI_SOCKET:-}" "$@" 2>/dev/null || true
+  }
+  if command -v cliphist >/dev/null && command -v wl-paste >/dev/null; then
+    start_service hermes-os-clipboard-text wl-paste --type text --watch cliphist store
+    start_service hermes-os-clipboard-image wl-paste --type image --watch cliphist store
+  fi
+  if command -v swayidle >/dev/null; then
+    start_service hermes-os-idle swayidle -w \
+      timeout "${HERMES_OS_LOCK_AFTER:-600}" 'hermes-os lock' \
+      timeout "${HERMES_OS_SCREEN_OFF_AFTER:-900}" 'niri msg action power-off-monitors' \
+      resume 'niri msg action power-on-monitors' \
+      before-sleep 'hermes-os lock'
+  fi
+fi
+
 APP="${HERMES_OS_APP:-$HOME/Hermes-OS/apps/os}"
 # npm workspaces hoist Electron to the repo root; a standalone checkout keeps it under apps/os.
 ELECTRON="${HERMES_OS_ELECTRON:-}"

@@ -12,7 +12,9 @@ import { hermesHome, isDev } from './paths.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
 import { ControlSocket } from './shell/control-socket.ts'
 import { shellMode } from './shell/mode.ts'
+import { NotificationDaemon } from './shell/notification-daemon.ts'
 import { PanelShell } from './shell/panels.ts'
+import { registerServiceIpc } from './shell/services.ts'
 import { WallpaperService } from './shell/wallpaper.ts'
 import { createMainWindow } from './window.ts'
 
@@ -21,8 +23,18 @@ let mainWindow: BrowserWindow | null = null
 const mode = shellMode()
 // Panels mode (niri): several surface windows, compositor state mirror, control socket for hotkeys.
 const panels = mode === 'panels' ? new PanelShell(win => attachMainWindow(win)) : null
-const control = panels ? new ControlSocket(panels) : null
 const wallpaper = panels ? new WallpaperService(panels) : null
+const control = panels
+  ? new ControlSocket(panels, next => {
+      wallpaper?.apply(next.wallpaper)
+
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(IPC.prefsChanged, next)
+      }
+    })
+  : null
+// Serves org.freedesktop.Notifications so other apps' notifications reach the shell.
+const notifications = panels ? new NotificationDaemon(panels) : null
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -94,6 +106,7 @@ function registerCoreIpc(): void {
   registerFsIpc(() => mainWindow)
   registerAppsIpc()
   registerBridgeIpc()
+  registerServiceIpc()
   registerSystemIpc(() => BrowserWindow.getAllWindows())
   registerTerminalIpc(() => mainWindow)
 }
@@ -116,6 +129,7 @@ function attachMainWindow(win: BrowserWindow): void {
 function createWindow(): void {
   if (panels) {
     panels.start()
+    void notifications?.start()
     control?.start()
     wallpaper?.start(readPrefs().wallpaper)
 
@@ -176,6 +190,7 @@ app.on('before-quit', event => {
   globalShortcut.unregisterAll()
   control?.stop()
   wallpaper?.stop()
+  notifications?.stop()
   panels?.stop()
   void backend.stop().finally(() => app.quit())
 })

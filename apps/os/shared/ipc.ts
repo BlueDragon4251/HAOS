@@ -352,5 +352,46 @@ export const IPC = {
   shellWallpaperFrame: 'hermes-os:shell:wallpaper-frame',
   wmGetState: 'hermes-os:wm:get-state',
   wmState: 'hermes-os:wm:state',
-  wmAction: 'hermes-os:wm:action'
+  wmAction: 'hermes-os:wm:action',
+
+  // Phase 2: system services reachable from any surface.
+  /** Run a `hermes-os` CLI command (install, reminder, notice, ocr, …); resolves with its output. */
+  shellHermesOs: 'hermes-os:shell:hermes-os',
+  /** Power actions: suspend | reboot | poweroff | logout | lock. */
+  shellPower: 'hermes-os:shell:power',
+  /** Clipboard history (cliphist): list entries / paste one back to the clipboard. */
+  clipboardHistory: 'hermes-os:clipboard:history',
+  clipboardPaste: 'hermes-os:clipboard:paste',
+  /** Desktop notifications from other apps (org.freedesktop.Notifications), pushed to the Hermes window. */
+  notificationsIncoming: 'hermes-os:notifications:incoming',
+  notificationsAction: 'hermes-os:notifications:action'
 } as const
+
+export type PowerAction = 'suspend' | 'reboot' | 'poweroff' | 'logout' | 'lock'
+
+export interface ClipboardEntry {
+  id: string
+  /** Text preview (binary entries show a type label such as "[[ binary data 12 KiB png ]]"). */
+  preview: string
+}
+
+/** A notification received from another application through the freedesktop D-Bus service. */
+export interface IncomingNotification {
+  id: number
+  appName: string
+  summary: string
+  body: string
+  /** Icon name or path as sent by the app, if any. */
+  icon?: string
+  /** Pairs of [actionKey, label]; the renderer reports a chosen key through `notificationsAction`. */
+  actions: Array<[string, string]>
+  urgency: 'low' | 'normal' | 'critical'
+  /** Milliseconds; -1 lets the shell decide. */
+  expireTimeout: number
+}
+
+export interface HermesOsResult {
+  code: number
+  stdout: string
+  stderr: string
+}

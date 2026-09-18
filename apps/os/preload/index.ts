@@ -3,6 +3,10 @@ import {
   type AuditEntry,
   type BackendState,
   type CalendarResult,
+  type ClipboardEntry,
+  type HermesOsResult,
+  type IncomingNotification,
+  type PowerAction,
   type DirEntry,
   type EnvInfo,
   type FilePreview,
@@ -141,7 +145,20 @@ const api = {
     /** Ask main to resize this surface window (overlays size to their content). */
     resize: (width: number, height: number): Promise<void> => ipcRenderer.invoke(IPC.shellResize, width, height),
     /** Wallpaper surface only: hand a rendered PNG frame to main for swaybg. */
-    wallpaperFrame: (dataUrl: string): Promise<void> => ipcRenderer.invoke(IPC.shellWallpaperFrame, dataUrl)
+    wallpaperFrame: (dataUrl: string): Promise<void> => ipcRenderer.invoke(IPC.shellWallpaperFrame, dataUrl),
+    /** Run a `hermes-os` CLI command from the shell (Linux; rejects elsewhere). */
+    hermesOs: (args: string[]): Promise<HermesOsResult> => ipcRenderer.invoke(IPC.shellHermesOs, args),
+    /** Suspend, reboot, power off, log out, or lock. */
+    power: (action: PowerAction): Promise<void> => ipcRenderer.invoke(IPC.shellPower, action)
+  },
+  clipboard: {
+    history: (limit = 50): Promise<ClipboardEntry[]> => ipcRenderer.invoke(IPC.clipboardHistory, limit),
+    paste: (id: string): Promise<void> => ipcRenderer.invoke(IPC.clipboardPaste, id)
+  },
+  desktopNotifications: {
+    onIncoming: (listener: (notification: IncomingNotification) => void): Unsubscribe => subscribe(IPC.notificationsIncoming, listener),
+    /** Report that the user invoked an action (or 'default' for a click) on a notification. */
+    action: (id: number, actionKey: string): Promise<void> => ipcRenderer.invoke(IPC.notificationsAction, id, actionKey)
   },
   wm: {
     getState: (): Promise<WmState> => ipcRenderer.invoke(IPC.wmGetState),

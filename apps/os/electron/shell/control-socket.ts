@@ -1,9 +1,10 @@
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import type { ShellCommand } from '../../shared/ipc.ts'
+import type { HermesOSPrefs, ShellCommand } from '../../shared/ipc.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
+import { writePrefs } from '../prefs.ts'
 import type { PanelShell } from './panels.ts'
 
 interface ControlRequest {
@@ -22,7 +23,11 @@ const OVERLAY_MODES = new Set(['ask', 'command', 'applications', 'menu', 'power'
 export class ControlSocket {
   private server: net.Server | null = null
 
-  constructor(private readonly shell: PanelShell) {}
+  constructor(
+    private readonly shell: PanelShell,
+    /** Called after the CLI changes preferences so windows and the wallpaper follow. */
+    private readonly onPrefsChanged?: (prefs: HermesOSPrefs) => void
+  ) {}
 
   get socketPath(): string {
     const runtime = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`
@@ -168,6 +173,36 @@ export class ControlSocket {
         this.shell.relay('main', { type: 'notify', args })
 
         return { ok: true }
+      }
+      case 'webapp': {
+        const [url, name, slug] = args
+
+        if (!url || !/^https?:\/\//i.test(url) || !name) {
+          return { ok: false, error: 'webapp needs an http(s) url and a name' }
+        }
+
+        this.shell.openWebApp(url, name, slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+
+        return { ok: true }
+      }
+      case 'wallpaper': {
+        const next = writePrefs({ wallpaper: args[0] ? args[0] : undefined })
+        this.onPrefsChanged?.(next)
+
+        return { ok: true, wallpaper: next.wallpaper ?? 'default' }
+      }
+      case 'theme': {
+        // Theme names map onto the shell's theme preference; the Phase 3 engine applies the rest.
+        const name = args[0]
+
+        if (!name) {
+          return { ok: false, error: 'theme needs a name' }
+        }
+
+        const next = writePrefs({ theme: name.includes('graphite') ? 'graphite' : 'ocean' })
+        this.onPrefsChanged?.(next)
+
+        return { ok: true, theme: next.theme }
       }
       case 'state':
         return { ok: true, ...this.shell.niri.state() }

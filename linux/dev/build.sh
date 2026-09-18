@@ -38,8 +38,13 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   sudo install -m 0755 "$REPO/linux/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
   sudo install -m 0644 "$REPO/linux/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
   sudo install -m 0755 "$REPO/linux/bin/hermes-os" /usr/local/bin/hermes-os
-  mkdir -p "$HOME/.config/niri"
+  mkdir -p "$HOME/.config/niri" "$HOME/.config/swaylock"
   install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
+  install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"
+  if [[ -d /usr/share/plymouth/themes ]]; then
+    sudo install -d /usr/share/plymouth/themes/hermes-os
+    sudo install -m 0644 "$REPO"/linux/plymouth/hermes-os/* /usr/share/plymouth/themes/hermes-os/
+  fi
   for f in build.sh sync.sh restart-shell.sh shot.sh; do
     install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/hermes-os-${f%.sh}"
   done
