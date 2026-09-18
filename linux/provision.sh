@@ -41,7 +41,8 @@ fi
 step "Packages"
 PACKAGES=(
   # Session.
-  cage greetd seatd polkit dbus-daemon xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs
+  niri cage greetd seatd polkit dbus-daemon xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs
+  swaybg swaylock swayidle slurp wl-clipboard cliphist brightnessctl playerctl wtype
   pipewire pipewire-pulse wireplumber
   NetworkManager NetworkManager-wifi bluez upower
   # Electron runtime libraries and fonts.
@@ -52,7 +53,7 @@ PACKAGES=(
   nodejs npm gcc-c++ make python3 git rsync tar
   # Tools the Linux HostAdapter / HostPlatform shell out to.
   xdg-utils glib2 plocate fd-find librsvg2-tools libnotify iproute procps-ng util-linux
-  grim wl-clipboard
+  grim python3-pyyaml socat
   # Rescue terminal shown by hermes-os-session when the shell is not built.
   foot
   # A browser, a file manager and an editor so the Dock and `system_open` have real targets.
@@ -77,6 +78,11 @@ loginctl enable-linger "$HERMES_USER" || true
 step "Hermes OS session"
 install -m 0755 "$PAYLOAD/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
 install -m 0755 "$PAYLOAD/session/hermes-os-session" /usr/local/bin/hermes-os-session
+install -m 0755 "$PAYLOAD/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
+install -m 0755 "$PAYLOAD/bin/hermes-os" /usr/local/bin/hermes-os
+# niri config for the session user (managed copy; local.kdl is the user's).
+sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri"
+install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
 install -d /usr/share/wayland-sessions
 install -m 0644 "$PAYLOAD/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
 install -d /etc/greetd

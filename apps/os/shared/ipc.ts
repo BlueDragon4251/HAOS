@@ -204,12 +204,79 @@ export interface WindowState {
   focused: boolean
 }
 
+/**
+ * How the shell is composed on screen.
+ * - `desktop`: one fullscreen window draws wallpaper, menu bar, dock and windows (macOS, cage).
+ * - `panels`: a real compositor (niri) manages every window; the shell is several windows, one per surface.
+ */
+export type ShellMode = 'desktop' | 'panels'
+
+/** Which part of the shell a renderer window is. `window:<appId>` hosts one floating Hermes app. */
+export type ShellSurface = 'desktop' | 'menubar' | 'dock' | 'main' | 'command' | 'wallpaper' | `window:${string}`
+
+/** A window the compositor manages (any client, including the shell's own windows). */
+export interface WmWindow {
+  id: number
+  title: string
+  appId: string
+  pid: number | null
+  workspaceId: number | null
+  focused: boolean
+  floating: boolean
+  urgent: boolean
+  /** True for the shell's own windows (menu bar, dock, Hermes window, floating apps). */
+  ours: boolean
+}
+
+export interface WmWorkspace {
+  id: number
+  idx: number
+  name: string | null
+  output: string | null
+  active: boolean
+  focused: boolean
+  activeWindowId: number | null
+}
+
+export interface WmState {
+  /** False when no compositor IPC is available (desktop mode). */
+  available: boolean
+  windows: WmWindow[]
+  workspaces: WmWorkspace[]
+  focusedWindowId: number | null
+}
+
+/** Compositor actions the renderer may request. Arguments mirror `niri msg action`. */
+export type WmAction =
+  | { type: 'focus-window'; id: number }
+  | { type: 'close-window'; id: number }
+  | { type: 'focus-workspace'; ref: string | number }
+  | { type: 'move-window-to-workspace'; id: number; ref: string | number }
+  | { type: 'toggle-floating'; id: number }
+  | { type: 'fullscreen'; id: number }
+  | { type: 'maximize-column' }
+  | { type: 'toggle-overview' }
+  | { type: 'screenshot'; what: 'screen' | 'window' | 'select' }
+  | { type: 'raw'; args: string[] }
+
+/** A command delivered to a surface: from the `hermes-os` CLI (hotkeys), or relayed between surfaces. */
+export interface ShellCommand {
+  type: string
+  args?: string[]
+  text?: string
+  attachments?: string[]
+  /** The compositor's focused window when the command was issued (context for "ask"). */
+  context?: WmWindow | null
+  payload?: Record<string, unknown>
+}
+
 export interface EnvInfo {
   platform: NodeJS.Platform
   hermesHome: string
   homeDir: string
   version: string
   isDev: boolean
+  shellMode: ShellMode
 }
 
 /** Channel names, table-driven so preload and main cannot drift. */
@@ -268,10 +335,22 @@ export const IPC = {
 
   prefsGet: 'hermes-os:prefs:get',
   prefsSet: 'hermes-os:prefs:set',
+  prefsChanged: 'hermes-os:prefs:changed',
 
   bridgePolicyRead: 'hermes-os:bridge:policy-read',
   bridgePolicyWrite: 'hermes-os:bridge:policy-write',
   bridgeAuditRead: 'hermes-os:bridge:audit-read',
 
-  envInfo: 'hermes-os:env:info'
+  envInfo: 'hermes-os:env:info',
+
+  // Panels mode: surfaces, cross-window relay, compositor state.
+  shellOpen: 'hermes-os:shell:open',
+  shellClose: 'hermes-os:shell:close',
+  shellRelay: 'hermes-os:shell:relay',
+  shellCommand: 'hermes-os:shell:command',
+  shellResize: 'hermes-os:shell:resize',
+  shellWallpaperFrame: 'hermes-os:shell:wallpaper-frame',
+  wmGetState: 'hermes-os:wm:get-state',
+  wmState: 'hermes-os:wm:state',
+  wmAction: 'hermes-os:wm:action'
 } as const

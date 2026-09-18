@@ -152,6 +152,31 @@ body,
   overflow: hidden;
 }
 
+/*
+ * Panels mode (niri): each surface is its own compositor window. backdrop-filter cannot blur other
+ * windows, so glass fills are near-opaque; the chrome surfaces (menu bar, dock, command overlay) sit
+ * on transparent windows so the wallpaper and neighbours show around them.
+ */
+:root[data-shell-mode='panels'] {
+  --color-glass: rgba(7, 22, 76, 0.94);
+  --color-glass-2: rgba(18, 46, 122, 0.72);
+  --color-glass-3: rgba(34, 76, 170, 0.78);
+  --color-bg-elevated: rgba(8, 26, 84, 0.96);
+  --color-surface: rgba(8, 24, 78, 0.9);
+}
+
+:root[data-shell-mode='panels'][data-surface='menubar'],
+:root[data-shell-mode='panels'][data-surface='menubar'] body,
+:root[data-shell-mode='panels'][data-surface='menubar'] #root,
+:root[data-shell-mode='panels'][data-surface='dock'],
+:root[data-shell-mode='panels'][data-surface='dock'] body,
+:root[data-shell-mode='panels'][data-surface='dock'] #root,
+:root[data-shell-mode='panels'][data-surface='command'],
+:root[data-shell-mode='panels'][data-surface='command'] body,
+:root[data-shell-mode='panels'][data-surface='command'] #root {
+  background: transparent;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-fg);

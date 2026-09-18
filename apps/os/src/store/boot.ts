@@ -7,6 +7,7 @@ import { bindSidebarPrefs } from './sidebar.ts'
 import { bindNotificationEvents } from './notifications.ts'
 import { bindServerRequests } from './requests.ts'
 import { refreshSessions } from './sessions.ts'
+import { bindShell } from './shell.ts'
 
 const BOOT_FLAG = '__hermesOSBooted'
 
@@ -19,6 +20,7 @@ export function bootRenderer(): void {
   }
 
   global[BOOT_FLAG] = true
+  bindShell()
   bindBackendStores()
   bindGatewayToBackend()
   bindChatEvents()

@@ -10,10 +10,19 @@ import { registerTerminalIpc } from './ipc/terminal.ts'
 import { log, logTail } from './log.ts'
 import { hermesHome, isDev } from './paths.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
+import { ControlSocket } from './shell/control-socket.ts'
+import { shellMode } from './shell/mode.ts'
+import { PanelShell } from './shell/panels.ts'
+import { WallpaperService } from './shell/wallpaper.ts'
 import { createMainWindow } from './window.ts'
 
 const backend = new BackendManager()
 let mainWindow: BrowserWindow | null = null
+const mode = shellMode()
+// Panels mode (niri): several surface windows, compositor state mirror, control socket for hotkeys.
+const panels = mode === 'panels' ? new PanelShell(win => attachMainWindow(win)) : null
+const control = panels ? new ControlSocket(panels) : null
+const wallpaper = panels ? new WallpaperService(panels) : null
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -60,11 +69,26 @@ function registerCoreIpc(): void {
   })
 
   ipcMain.handle(IPC.prefsGet, () => readPrefs())
-  ipcMain.handle(IPC.prefsSet, (_event, patch: Partial<HermesOSPrefs>) => writePrefs(patch))
+  ipcMain.handle(IPC.prefsSet, (_event, patch: Partial<HermesOSPrefs>) => {
+    const next = writePrefs(patch)
+
+    if ('wallpaper' in patch) {
+      wallpaper?.apply(next.wallpaper)
+    }
+
+    // Every surface window sees the same preferences.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.webContents !== _event.sender) {
+        win.webContents.send(IPC.prefsChanged, next)
+      }
+    }
+
+    return next
+  })
 
   ipcMain.handle(
     IPC.envInfo,
-    (): EnvInfo => ({ platform: process.platform, hermesHome: hermesHome(), homeDir: os.homedir(), version: app.getVersion(), isDev })
+    (): EnvInfo => ({ platform: process.platform, hermesHome: hermesHome(), homeDir: os.homedir(), version: app.getVersion(), isDev, shellMode: mode })
   )
 
   registerFsIpc(() => mainWindow)
@@ -74,8 +98,7 @@ function registerCoreIpc(): void {
   registerTerminalIpc(() => mainWindow)
 }
 
-function createWindow(): void {
-  const win = createMainWindow(readPrefs())
+function attachMainWindow(win: BrowserWindow): void {
   mainWindow = win
 
   win.on('enter-full-screen', broadcastWindowState)
@@ -84,12 +107,26 @@ function createWindow(): void {
   win.on('blur', broadcastWindowState)
 
   win.on('closed', () => {
-    mainWindow = null
+    if (mainWindow === win) {
+      mainWindow = null
+    }
   })
 }
 
+function createWindow(): void {
+  if (panels) {
+    panels.start()
+    control?.start()
+    wallpaper?.start(readPrefs().wallpaper)
+
+    return
+  }
+
+  attachMainWindow(createMainWindow(readPrefs()))
+}
+
 app.whenReady().then(async () => {
-  log('main', `Hermes OS ${app.getVersion()} starting (dev=${isDev}, HERMES_HOME=${hermesHome()})`)
+  log('main', `Hermes OS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
   registerCoreIpc()
   backend.onState(state => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -122,7 +159,10 @@ app.on('activate', () => {
 })
 
 app.on('window-all-closed', () => {
-  app.quit()
+  // In panels mode the menu bar and dock keep the session alive; closing the Hermes window is fine.
+  if (!panels) {
+    app.quit()
+  }
 })
 
 let quitting = false
@@ -134,5 +174,8 @@ app.on('before-quit', event => {
   quitting = true
   event.preventDefault()
   globalShortcut.unregisterAll()
+  control?.stop()
+  wallpaper?.stop()
+  panels?.stop()
   void backend.stop().finally(() => app.quit())
 })

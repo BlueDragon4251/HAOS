@@ -1,13 +1,17 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App } from './app/App.tsx'
+import { ShellRoot } from './app/ShellRoot.tsx'
 import { bootRenderer } from './store/boot.ts'
+import { shellMode, surface } from './store/shell.ts'
 import './styles.css'
 
 bootRenderer()
+// Lets the stylesheet adapt (transparent panel windows, no desktop chrome).
+document.documentElement.dataset.shellMode = shellMode
+document.documentElement.dataset.surface = surface
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ShellRoot />
   </StrictMode>
 )

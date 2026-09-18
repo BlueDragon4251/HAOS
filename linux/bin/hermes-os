@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Hermes OS command center.
+
+Everything hotkeys and menus do is available here, so people and agents drive the system the same
+way. Most commands are relayed to the running shell over its control socket; a few call niri or
+system tools directly.
+
+    hermes-os ask [text...]        Ask Hermes about the focused window (or `text`)
+    hermes-os command              Command bar
+    hermes-os applications         Application launcher
+    hermes-os menu                 Hermes OS control menu
+    hermes-os page <id>            Show a Hermes page (overview, hermes, missions, memory, files, ...)
+    hermes-os open <app>           Open a Hermes window (terminal, system, chat-popout)
+    hermes-os launch <name>        Launch an installed application by name or desktop id
+    hermes-os screenshot           Screenshot the screen and hand it to Hermes
+    hermes-os notify <title> [body]
+    hermes-os lock | power | clipboard
+    hermes-os wm <niri action...>  Pass an action to niri (e.g. `wm focus-workspace work`)
+    hermes-os state                Dump the shell's window-manager state
+    hermes-os commands [--json]    List commands
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+from pathlib import Path
+
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+SOCKET = RUNTIME / "hermes-os" / "control.sock"
+
+# name -> (relayed to shell?, help)
+COMMANDS: dict[str, tuple[bool, str]] = {
+    "ask": (True, "Ask Hermes about the focused window, or about the given text"),
+    "command": (True, "Open the Hermes command bar"),
+    "applications": (True, "Open the application launcher"),
+    "menu": (True, "Open the Hermes OS control menu"),
+    "page": (True, "Show a Hermes page: overview hermes missions memory files automations connections settings"),
+    "open": (True, "Open a Hermes window: terminal system chat-popout"),
+    "launch": (True, "Launch an installed application by name or desktop id"),
+    "screenshot": (False, "Screenshot the screen and hand it to Hermes"),
+    "notify": (True, "Show a notification: notify <title> [body]"),
+    "lock": (False, "Lock the session"),
+    "power": (True, "Power menu (sleep, restart, shut down, log out)"),
+    "clipboard": (True, "Clipboard history"),
+    "wm": (False, "Pass an action to niri: wm <action> [args]"),
+    "state": (True, "Dump the shell's window-manager state"),
+    "commands": (False, "List commands"),
+}
+
+
+def die(message: str, code: int = 1) -> None:
+    print(f"hermes-os: {message}", file=sys.stderr)
+    sys.exit(code)
+
+
+def relay(cmd: str, args: list[str], extra: dict | None = None) -> dict:
+    """Send one JSON line to the shell and return its JSON reply."""
+    if not SOCKET.exists():
+        die(f"the Hermes OS shell is not running (no {SOCKET})", 3)
+    payload = {"cmd": cmd, "args": args, **(extra or {})}
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.settimeout(10)
+        s.connect(str(SOCKET))
+        s.sendall((json.dumps(payload) + "\n").encode())
+        buf = b""
+        while not buf.endswith(b"\n"):
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+    try:
+        return json.loads(buf.decode() or "{}")
+    except json.JSONDecodeError:
+        return {"ok": False, "error": f"bad reply: {buf[:200]!r}"}
+
+
+def niri(*action: str) -> int:
+    if not shutil.which("niri"):
+        die("niri is not installed", 2)
+    return subprocess.call(["niri", "msg", "action", *action])
+
+
+def screenshot() -> int:
+    """Capture the screen to the Hermes OS pictures folder, then open it in Hermes."""
+    out_dir = Path.home() / "Pictures" / "Screenshots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+
+    path = out_dir / f"Screenshot {datetime.now():%Y-%m-%d %H-%M-%S}.png"
+    if shutil.which("grim"):
+        code = subprocess.call(["grim", str(path)])
+    else:
+        code = niri("screenshot-screen")
+        if code == 0:
+            candidates = sorted(out_dir.glob("*.png"), key=lambda p: p.stat().st_mtime)
+            path = candidates[-1] if candidates else path
+    if code != 0 or not path.exists():
+        die("screenshot failed", code or 1)
+    reply = relay("ask", ["Here is a screenshot I just took. What do you see?"], {"attachments": [str(path)]})
+    if not reply.get("ok"):
+        print(str(path))
+    return 0
+
+
+def lock() -> int:
+    if shutil.which("swaylock"):
+        return subprocess.call([
+            "swaylock", "-f", "--color", "04113f", "--inside-color", "0a2a96aa", "--ring-color", "4d92ff",
+            "--key-hl-color", "36e6a6", "--line-color", "00000000", "--separator-color", "00000000",
+            "--text-color", "ffffff", "--inside-ver-color", "0a2a96aa", "--ring-ver-color", "36e6a6",
+            "--inside-wrong-color", "3a0a1a", "--ring-wrong-color", "ff6b6b", "--indicator-radius", "72",
+        ])
+    return subprocess.call(["loginctl", "lock-session"])
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in {"-h", "--help", "help"}:
+        print(__doc__.strip())
+        return 0
+    cmd, args = argv[0], argv[1:]
+    if cmd == "commands":
+        if "--json" in args:
+            print(json.dumps([{"name": k, "help": v[1]} for k, v in COMMANDS.items()], indent=2))
+        else:
+            width = max(len(k) for k in COMMANDS)
+            for name, (_, text) in COMMANDS.items():
+                print(f"  {name.ljust(width)}  {text}")
+        return 0
+    if cmd not in COMMANDS:
+        die(f"unknown command {cmd!r} (see `hermes-os commands`)", 2)
+    if cmd == "wm":
+        if not args:
+            die("wm needs a niri action", 2)
+        return niri(*args)
+    if cmd == "screenshot":
+        return screenshot()
+    if cmd == "lock":
+        return lock()
+    reply = relay(cmd, args)
+    if cmd == "state":
+        print(json.dumps(reply, indent=2))
+        return 0 if reply.get("ok", True) else 1
+    if not reply.get("ok", False):
+        die(reply.get("error") or "the shell rejected the command", 1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

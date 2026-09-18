@@ -8,8 +8,13 @@ export ELECTRON_OZONE_PLATFORM_HINT=wayland
 export MOZ_ENABLE_WAYLAND=1
 export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland,x11
-export HERMES_OS_KIOSK=1
 export HERMES_OS_LINUX_SESSION=1
+# desktop (cage): the shell is one fullscreen kiosk window. panels (niri): menu bar, dock and the
+# Hermes window are separate windows the compositor places; HERMES_OS_KIOSK stays off.
+export HERMES_OS_SHELL_MODE="${HERMES_OS_SHELL_MODE:-desktop}"
+if [[ "$HERMES_OS_SHELL_MODE" == "desktop" ]]; then
+  export HERMES_OS_KIOSK=1
+fi
 
 systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP 2>/dev/null || true
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
@@ -30,14 +35,16 @@ fi
 LOG_DIR="$HOME/.local/state/hermes-os"
 mkdir -p "$LOG_DIR"
 
-flags=()
+# app-id niri window rules match on; Wayland explicitly (a stray DISPLAY would send Chromium to X11).
+unset DISPLAY
+flags=(--class=hermes-os --ozone-platform=wayland)
 if [[ -n "${HERMES_OS_SOFTWARE_GPU:-}" ]]; then
   flags+=(--disable-gpu)
 fi
-# HiDPI: cage exposes the output at scale 1, so the shell zooms its page instead (HERMES_OS_ZOOM is
+# HiDPI under cage: the output is scale 1, so the shell zooms its page instead (HERMES_OS_ZOOM is
 # read by Electron main; forcing Chromium's device scale factor breaks Wayland buffer sizing).
-# 1.5 suits a 2048x1280 framebuffer on a Retina display, 2 suits 2880x1800.
-if [[ -n "${HERMES_OS_SCALE:-}" ]]; then
+# Under niri the output scale in local.kdl handles it and the compositor script unsets the zoom.
+if [[ -n "${HERMES_OS_SCALE:-}" && "$HERMES_OS_SHELL_MODE" == "desktop" ]]; then
   export HERMES_OS_ZOOM="${HERMES_OS_SCALE}"
 fi
 if [[ -n "${HERMES_OS_NO_SANDBOX:-}" ]]; then

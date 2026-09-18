@@ -35,7 +35,11 @@ fi
 if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   sudo install -m 0755 "$REPO/linux/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
   sudo install -m 0755 "$REPO/linux/session/hermes-os-session" /usr/local/bin/hermes-os-session
+  sudo install -m 0755 "$REPO/linux/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
   sudo install -m 0644 "$REPO/linux/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
+  sudo install -m 0755 "$REPO/linux/bin/hermes-os" /usr/local/bin/hermes-os
+  mkdir -p "$HOME/.config/niri"
+  install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
   for f in build.sh sync.sh restart-shell.sh shot.sh; do
     install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/hermes-os-${f%.sh}"
   done

@@ -2,6 +2,7 @@ import { atom, computed } from 'nanostores'
 import { appById, type FloatingAppId, type HermesAppId, type PageId } from '../app/apps.ts'
 import { afterExit, motion } from '../lib/motion.ts'
 import { $prefs, updatePrefs } from './backend.ts'
+import { isMainSurface, isPanels, relayToMain } from './shell.ts'
 
 export interface Bounds {
   x: number
@@ -129,6 +130,14 @@ export function ensureMainWindow(): void {
 }
 
 export function showPage(page: PageId): void {
+  // Panels mode: only the Hermes window renders pages; other surfaces ask it (and the compositor focuses it).
+  if (isPanels && !isMainSurface) {
+    relayToMain({ type: 'show-page', args: [page] })
+    window.hermesOS.shell.open('main').catch(() => undefined)
+
+    return
+  }
+
   ensureMainWindow()
   $page.set(page)
   focusWindow(MAIN_WINDOW_ID)
@@ -141,6 +150,13 @@ export function openApp(appId: HermesAppId, options: { payload?: Record<string, 
     showPage(appId as PageId)
 
     return MAIN_WINDOW_ID
+  }
+
+  // Panels mode: floating Hermes apps are real compositor windows, one Electron window each.
+  if (isPanels) {
+    window.hermesOS.shell.open(`window:${appId}`, options.payload ? { type: 'payload', payload: options.payload } : undefined).catch(() => undefined)
+
+    return `window:${appId}`
   }
 
   const singleton = options.singleton ?? appId !== 'chat-popout'

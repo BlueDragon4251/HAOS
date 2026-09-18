@@ -1,0 +1,278 @@
+// Hermes OS: niri compositor configuration.
+// Installed to ~/.config/niri/config.kdl by linux/dev/build.sh (managed; edits are overwritten).
+// Put machine-specific settings (output scale, extra binds) in ~/.config/niri/local.kdl, which
+// is included at the end and never touched by Hermes OS.
+//
+// Reference: /usr/share/doc/niri/default-config.kdl and the niri wiki.
+
+input {
+    keyboard {
+        xkb {
+        }
+        numlock
+    }
+    touchpad {
+        tap
+        natural-scroll
+        dwt
+    }
+    mouse {
+    }
+    focus-follows-mouse max-scroll-amount="0%"
+    warp-mouse-to-focus
+}
+
+// Every window is a client of Hermes OS: no client-side decorations, Hermes draws the frame.
+prefer-no-csd
+
+// The shell owns the wallpaper (swaybg with a rendered frame); this shows until it is up.
+layout {
+    gaps 10
+    center-focused-column "never"
+    always-center-single-column false
+    background-color "#04113f"
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+    default-column-width { proportion 0.5; }
+
+    // Hermes glass: a thin accent border on the focused window, a faint one elsewhere.
+    focus-ring {
+        off
+    }
+    border {
+        on
+        width 2
+        active-color "#4d92ff"
+        inactive-color "#1c2c66"
+        urgent-color "#ff6b6b"
+    }
+    shadow {
+        on
+        softness 24
+        spread 4
+        offset x=0 y=8
+        color "#000a3c66"
+    }
+
+    // Reserve the menu bar (30) and the Dock (84) so tiles never sit under them.
+    struts {
+        top 30
+        bottom 84
+    }
+
+    tab-indicator {
+        hide-when-single-tab
+        place-within-column
+        position "top"
+        gaps-between-tabs 4
+        width 3
+        active-color "#4d92ff"
+        inactive-color "#1c2c66"
+    }
+}
+
+overview {
+    zoom 0.5
+    backdrop-color "#04113f"
+    workspace-shadow {
+        off
+    }
+}
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+    hide-when-typing
+}
+
+// Spaces. The Hermes OS shell mirrors these in the menu bar and sidebar.
+workspace "personal"
+workspace "work"
+workspace "ideas"
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+screenshot-path "~/Pictures/Screenshots/Screenshot %Y-%m-%d %H-%M-%S.png"
+
+environment {
+    XDG_CURRENT_DESKTOP "HermesOS"
+    XDG_SESSION_DESKTOP "hermes-os"
+    ELECTRON_OZONE_PLATFORM_HINT "wayland"
+    MOZ_ENABLE_WAYLAND "1"
+    QT_QPA_PLATFORM "wayland"
+    GDK_BACKEND "wayland,x11"
+    // No DISPLAY: there is no XWayland here yet; a set DISPLAY makes Chromium try X11 and hang.
+}
+
+// The Hermes OS shell (menu bar, dock, main window) and its wallpaper.
+spawn-at-startup "hermes-os-session"
+
+// ---------------------------------------------------------------------------------------------
+// Window rules: shell surfaces are floating panels; everything else is a tile Hermes decorates.
+
+// Menu bar: full width, top, never focused on open, no frame.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Menu Bar$"
+    open-floating true
+    open-focused false
+    default-floating-position x=0 y=0 relative-to="top"
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+    geometry-corner-radius 0
+    clip-to-geometry false
+}
+
+// Dock: bottom centre, no frame; the shell slides it in and out.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Dock$"
+    open-floating true
+    open-focused false
+    default-floating-position x=0 y=0 relative-to="bottom"
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+    geometry-corner-radius 0
+    clip-to-geometry false
+}
+
+// Command bar / launcher / ask: centred overlay, focused, no frame.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Command$"
+    open-floating true
+    open-focused true
+    default-floating-position x=0 y=96 relative-to="top"
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+    geometry-corner-radius 0
+    clip-to-geometry false
+}
+
+// Wallpaper renderer: an offscreen helper that must never be shown.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Wallpaper$"
+    open-floating true
+    open-focused false
+    opacity 0.0
+    default-floating-position x=-10000 y=-10000
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+}
+
+// The Hermes window and its floating apps: rounded glass tiles.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"#
+    geometry-corner-radius 14
+    clip-to-geometry true
+}
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · System$"
+    default-column-width { proportion 0.5; }
+}
+
+// Foreign apps get the same rounding.
+window-rule {
+    exclude app-id=r#"^(hermes-os|Hermes OS)$"#
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+
+window-rule {
+    match app-id="firefox$" title="^Picture-in-Picture$"
+    open-floating true
+}
+
+// ---------------------------------------------------------------------------------------------
+// Keyboard grammar. Super is the Hermes key: alone with Space it talks to Hermes about whatever is
+// focused; with a letter it does the thing. Mod+K lists everything.
+binds {
+    Mod+Space hotkey-overlay-title="Ask Hermes about this window" repeat=false { spawn "hermes-os" "ask"; }
+    Mod+Shift+Space hotkey-overlay-title="Hermes command bar" repeat=false { spawn "hermes-os" "command"; }
+    Mod+A hotkey-overlay-title="Applications" repeat=false { spawn "hermes-os" "applications"; }
+    Mod+Alt+Space hotkey-overlay-title="Hermes OS menu" repeat=false { spawn "hermes-os" "menu"; }
+    Mod+K hotkey-overlay-title="Show these hotkeys" { show-hotkey-overlay; }
+
+    Mod+Return hotkey-overlay-title="Terminal" { spawn "hermes-os" "open" "terminal"; }
+    Mod+E hotkey-overlay-title="Files" { spawn "hermes-os" "page" "files"; }
+    Mod+Shift+Return hotkey-overlay-title="Browser" { spawn "hermes-os" "launch" "firefox"; }
+    Mod+I hotkey-overlay-title="System monitor" { spawn "hermes-os" "open" "system"; }
+    Mod+Comma hotkey-overlay-title="Settings" { spawn "hermes-os" "page" "settings"; }
+    Mod+Shift+M hotkey-overlay-title="Missions" { spawn "hermes-os" "page" "missions"; }
+    Mod+Grave hotkey-overlay-title="Hermes window" { spawn "hermes-os" "page" "overview"; }
+
+    Mod+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
+    Mod+F hotkey-overlay-title="Maximize column" { maximize-column; }
+    Mod+Shift+F hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+    Mod+T hotkey-overlay-title="Toggle floating" { toggle-window-floating; }
+    Mod+W hotkey-overlay-title="Toggle tabbed column" { toggle-column-tabbed-display; }
+    Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
+    Mod+C hotkey-overlay-title="Center column" { center-column; }
+
+    Mod+H { focus-column-left; }
+    Mod+L { focus-column-right; }
+    Mod+J { focus-window-down; }
+    Mod+U { focus-window-up; }
+    Mod+Left { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Down { focus-window-down; }
+    Mod+Up { focus-window-up; }
+    Mod+Shift+H { move-column-left; }
+    Mod+Shift+L { move-column-right; }
+    Mod+Shift+J { move-window-down; }
+    Mod+Shift+U { move-window-up; }
+    Mod+Shift+Left { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Shift+Down { move-window-down; }
+    Mod+Shift+Up { move-window-up; }
+    Mod+BracketLeft { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+    Mod+R { switch-preset-column-width; }
+    Mod+Shift+R { switch-preset-window-height; }
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+Equal { set-column-width "+10%"; }
+
+    Mod+1 hotkey-overlay-title="Space: Personal" { focus-workspace "personal"; }
+    Mod+2 hotkey-overlay-title="Space: Work" { focus-workspace "work"; }
+    Mod+3 hotkey-overlay-title="Space: Ideas" { focus-workspace "ideas"; }
+    Mod+Shift+1 { move-column-to-workspace "personal"; }
+    Mod+Shift+2 { move-column-to-workspace "work"; }
+    Mod+Shift+3 { move-column-to-workspace "ideas"; }
+    Mod+Page_Down { focus-workspace-down; }
+    Mod+Page_Up { focus-workspace-up; }
+    Mod+Tab repeat=false hotkey-overlay-title="Previous window" { focus-window-previous; }
+    Mod+Shift+Tab { focus-workspace-previous; }
+
+    Mod+Ctrl+L hotkey-overlay-title="Lock" { spawn "hermes-os" "lock"; }
+    Mod+Escape hotkey-overlay-title="Power menu" { spawn "hermes-os" "power"; }
+    Mod+Shift+Escape hotkey-overlay-title="Quit Hermes OS session" { quit; }
+
+    Print hotkey-overlay-title="Screenshot (select)" { screenshot; }
+    Mod+Print hotkey-overlay-title="Screenshot window" { screenshot-window; }
+    Mod+Shift+Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
+    Mod+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "hermes-os" "screenshot"; }
+
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard history" { spawn "hermes-os" "clipboard"; }
+
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioMicMute allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+    XF86AudioPlay allow-when-locked=true { spawn-sh "playerctl play-pause"; }
+    XF86AudioNext allow-when-locked=true { spawn-sh "playerctl next"; }
+    XF86AudioPrev allow-when-locked=true { spawn-sh "playerctl previous"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
+
+    Mod+Shift+P { power-off-monitors; }
+}
+
+// Machine-specific overrides (output scale, extra binds). Created by hermes-os-compositor.
+include "local.kdl"

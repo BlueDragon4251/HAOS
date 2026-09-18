@@ -42,8 +42,40 @@ const PINNED_BY_PLATFORM: Record<'darwin' | 'linux' | 'other', PinnedNative[]> =
   other: [{ label: 'Files', names: [] }]
 }
 
-function pinnedFor(platform: string | undefined): PinnedNative[] {
+export function pinnedFor(platform: string | undefined): PinnedNative[] {
   return platform === 'darwin' ? PINNED_BY_PLATFORM.darwin : platform === 'linux' ? PINNED_BY_PLATFORM.linux : PINNED_BY_PLATFORM.other
+}
+
+/**
+ * Magnification: every icon reads the cursor's distance from its centre and scales with a smooth falloff,
+ * so neighbours swell with the hovered icon like macOS. Written straight to CSS variables to skip React renders.
+ */
+export function useDockMagnification(barRef: React.RefObject<HTMLDivElement | null>, max = MAGNIFY_MAX) {
+  const onMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const bar = barRef.current
+
+    if (!bar || reducedMotion()) {
+      return
+    }
+
+    const x = event.clientX
+
+    for (const el of bar.querySelectorAll<HTMLElement>('.dock-item')) {
+      const rect = el.getBoundingClientRect()
+      const distance = Math.abs(x - (rect.left + rect.width / 2))
+      const influence = Math.max(0, 1 - distance / MAGNIFY_RADIUS)
+      const scale = 1 + max * influence * influence * (3 - 2 * influence)
+      el.style.setProperty('--dock-scale', scale.toFixed(3))
+    }
+  }
+
+  const onLeave = () => {
+    for (const el of barRef.current?.querySelectorAll<HTMLElement>('.dock-item') ?? []) {
+      el.style.setProperty('--dock-scale', '1')
+    }
+  }
+
+  return { onMove, onLeave }
 }
 
 export function Dock() {
@@ -112,32 +144,7 @@ export function Dock() {
   }, [apps, iconFor, main?.phase, platform])
 
   const barRef = useRef<HTMLDivElement>(null)
-
-  // Magnification: every icon reads the cursor's distance from its centre and scales with a smooth falloff,
-  // so neighbours swell with the hovered icon like macOS. Written straight to CSS variables to skip React renders.
-  const onMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    const bar = barRef.current
-
-    if (!bar || reducedMotion()) {
-      return
-    }
-
-    const x = event.clientX
-
-    for (const el of bar.querySelectorAll<HTMLElement>('.dock-item')) {
-      const rect = el.getBoundingClientRect()
-      const distance = Math.abs(x - (rect.left + rect.width / 2))
-      const influence = Math.max(0, 1 - distance / MAGNIFY_RADIUS)
-      const scale = 1 + MAGNIFY_MAX * influence * influence * (3 - 2 * influence)
-      el.style.setProperty('--dock-scale', scale.toFixed(3))
-    }
-  }
-
-  const onLeave = () => {
-    for (const el of barRef.current?.querySelectorAll<HTMLElement>('.dock-item') ?? []) {
-      el.style.setProperty('--dock-scale', '1')
-    }
-  }
+  const { onMove, onLeave } = useDockMagnification(barRef)
 
   const hidden = autoHide && !revealed
 
@@ -264,7 +271,7 @@ function useDockReveal(enabled: boolean): boolean {
   return revealed
 }
 
-function NativeIcon({ src, fallback }: { src?: string; fallback: 'files' | 'grid' }) {
+export function NativeIcon({ src, fallback }: { src?: string; fallback: 'files' | 'grid' }) {
   const [failed, setFailed] = useState(false)
 
   useEffect(() => setFailed(false), [src])
