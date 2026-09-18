@@ -3,7 +3,7 @@ name: hermes-os
 description: Act as the operating environment on this computer via the system bridge
 metadata:
   hermes:
-    tags: [hermes-os, system, macos]
+    tags: [hermes-os, system, macos, linux]
 ---
 
 # Hermes OS
@@ -49,3 +49,18 @@ and render as clean cards in the shell.
 - When something needs macOS permission (Screen Recording, Automation), tell the user which System
   Settings pane to open.
 - Report in one or two short sentences with the concrete result (paths, pids, counts). No preamble.
+
+## On Linux (Hermes OS Linux)
+
+The same `system_*` tools work unchanged; the bridge maps them to the freedesktop stack instead of
+macOS tooling: apps are `.desktop` entries launched with `gio launch` (`system_open` target=app),
+URLs and paths go through `xdg-open`, "reveal" uses the file manager's D-Bus `ShowItems`, network
+and Wi-Fi come from `nmcli`/`ip`, volume from `wpctl` (PipeWire), dark mode from `gsettings`,
+logs from `journalctl`, trash from `gio trash`, notifications from `notify-send`, ports from `ss`.
+
+- Do not suggest or run `open -a`, `osascript`, `mdfind`, `pmset`, `defaults` or `networksetup`
+  on Linux; they do not exist there. Use the `system_*` tools, which already pick the right backend.
+- `system_find_files` matches file names (not contents) and filters by modification time on Linux.
+- If a tool reports that a program is not installed, relay the package it names (for example
+  `network-manager`, `pipewire`, `libnotify`) instead of improvising a shell workaround.
+- `sleep_display` is not available until the Hermes OS compositor ships; say so if asked.

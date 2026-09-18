@@ -58,6 +58,13 @@ BUILTIN_PROTECTED = (
     "/Library",
     "/private/var/db",
     "/var/db",
+    # Linux system locations.
+    "/boot",
+    "/var/lib",
+    "/lib",
+    "/lib64",
+    "/proc",
+    "/sys",
 )
 
 DEFAULT_POLICY_TEXT = """# Hermes OS system bridge policy. See docs/SYSTEM-BRIDGE.md.

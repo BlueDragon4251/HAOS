@@ -1,12 +1,17 @@
+import { shell } from 'electron'
 import crypto from 'node:crypto'
 import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { BatteryStatus, CalendarEvent, CalendarResult, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { BatteryStatus, CalendarEvent, CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { hermesOsDataDir } from '../paths.ts'
 import { run } from './exec.ts'
+import { parseDf, parsePs } from './posix.ts'
 import { type EditorTarget, type HostPlatform } from './types.ts'
+
+// The `df -kP` / `ps -o` parsers are POSIX-generic and live in posix.ts; re-exported for existing importers.
+export { parseDf, parsePs } from './posix.ts'
 
 const APP_DIRS = ['/Applications', '/Applications/Utilities', '/System/Applications', '/System/Applications/Utilities', path.join(os.homedir(), 'Applications')]
 
@@ -123,36 +128,6 @@ export function parseVmStat(text: string): { pageSize: number; usedBytes: number
   return { pageSize, usedBytes: used * pageSize }
 }
 
-/** Parse POSIX `df -kP` output into mounted volumes; hides system-internal APFS volumes. */
-export function parseDf(text: string): DiskUsage[] {
-  const disks: DiskUsage[] = []
-
-  for (const line of text.split('\n').slice(1)) {
-    const parts = line.trim().split(/\s+/)
-
-    if (parts.length < 6) {
-      continue
-    }
-
-    const mount = parts.slice(5).join(' ')
-    const total = Number(parts[1]) * 1024
-    const free = Number(parts[3]) * 1024
-    // APFS: "Used" on `/` counts only the sealed system volume; the container's real usage is
-    // total minus the space still available to it.
-    const used = Math.max(0, total - free)
-
-    if (!Number.isFinite(total) || total <= 0) {
-      continue
-    }
-
-    if (mount === '/' || (mount.startsWith('/Volumes/') && !mount.startsWith('/Volumes/.'))) {
-      disks.push({ mount, total, used, free })
-    }
-  }
-
-  return disks
-}
-
 /** Parse `pmset -g batt`. */
 export function parsePmset(text: string): BatteryStatus {
   const match = /(\d+)%;\s*([a-zA-Z ]+?);/.exec(text)
@@ -164,33 +139,6 @@ export function parsePmset(text: string): BatteryStatus {
   const state = match[2].trim().toLowerCase()
 
   return { present: true, percent: Number(match[1]), charging: state === 'charging' || state === 'charged' }
-}
-
-/** Parse `ps -Axo pid=,ppid=,user=,%cpu=,%mem=,rss=,comm=` rows. */
-export function parsePs(text: string): ProcessInfo[] {
-  const rows: ProcessInfo[] = []
-
-  for (const line of text.split('\n')) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+([\d.]+)\s+([\d.]+)\s+(\d+)\s+(.*)$/.exec(line)
-
-    if (!match) {
-      continue
-    }
-
-    const command = match[7].trim()
-    rows.push({
-      pid: Number(match[1]),
-      ppid: Number(match[2]),
-      user: match[3],
-      cpuPercent: Number(match[4]),
-      memPercent: Number(match[5]),
-      rssBytes: Number(match[6]) * 1024,
-      command,
-      name: path.basename(command)
-    })
-  }
-
-  return rows
 }
 
 export class DarwinPlatform implements HostPlatform {
@@ -448,6 +396,18 @@ export class DarwinPlatform implements HostPlatform {
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true })
     }
+  }
+
+  async launchApp(appPath: string): Promise<void> {
+    const error = await shell.openPath(appPath)
+
+    if (error) {
+      throw new Error(error)
+    }
+  }
+
+  async revealPath(targetPath: string): Promise<void> {
+    shell.showItemInFolder(targetPath)
   }
 
   async openIn(target: EditorTarget, targetPath: string): Promise<void> {

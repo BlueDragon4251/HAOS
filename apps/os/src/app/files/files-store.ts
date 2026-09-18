@@ -7,6 +7,7 @@ import { type AsyncState, useLocalData } from '../../lib/use-async.ts'
 import { $prefs, updatePrefs } from '../../store/backend.ts'
 import { sendPrompt } from '../../store/chat.ts'
 import { notify } from '../../store/notifications.ts'
+import { fileManagerName } from '../../lib/platform-labels.ts'
 import { $activeSpace } from '../../store/spaces.ts'
 import { showPage } from '../../store/windows.ts'
 
@@ -762,7 +763,7 @@ export function openItem(item: FileItem): void {
 }
 
 export function revealItem(path: string): void {
-  window.hermesOS.fs.reveal(path).catch(error => notify({ title: 'Could not reveal in Finder', body: messageOf(error), level: 'error' }))
+  window.hermesOS.fs.reveal(path).catch(error => notify({ title: `Could not show in ${fileManagerName()}`, body: messageOf(error), level: 'error' }))
 }
 
 export function copyPath(path: string): void {

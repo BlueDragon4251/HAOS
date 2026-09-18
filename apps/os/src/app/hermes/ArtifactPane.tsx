@@ -33,6 +33,7 @@ import { notify } from '../../store/notifications.ts'
 import { Markdown } from '../chat/Markdown.tsx'
 import { $editing, $paneTab, $selectedArtifact, $zoom, artifactKind, collectSources, extensionOf, isEditable, type PaneTab, type SourceRow } from './artifact-store.ts'
 import { MenuDivider, MenuItem, PopMenu } from './Menu.tsx'
+import { revealLabel } from '../../lib/platform-labels.ts'
 
 const TABS: readonly TabDef<PaneTab>[] = [
   { id: 'preview', label: 'Preview' },
@@ -254,7 +255,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
               }
             }}
           >
-            Reveal in Finder
+            {revealLabel()}
           </MenuItem>
         </PopMenu>
       </div>
@@ -355,7 +356,7 @@ function Document({ artifact, file, loading, error, zoom }: { artifact: Artifact
   }
 
   if (error || !file) {
-    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={error ?? 'The file is not on disk any more.'} action={<GlassButton size="sm" onClick={() => void window.hermesOS.fs.reveal(artifact.path)}>Reveal in Finder</GlassButton>} />
+    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={error ?? 'The file is not on disk any more.'} action={<GlassButton size="sm" onClick={() => void window.hermesOS.fs.reveal(artifact.path)}>{revealLabel()}</GlassButton>} />
   }
 
   if (file.kind === 'image' && file.content) {
@@ -430,7 +431,7 @@ function Sources({ chat }: { chat: ChatState | null }) {
             </div>
           </div>
           {row.kind === 'file' && (
-            <button type="button" aria-label="Reveal in Finder" title="Reveal in Finder" onClick={() => void window.hermesOS.fs.reveal(row.target)} className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg">
+            <button type="button" aria-label={revealLabel()} title={revealLabel()} onClick={() => void window.hermesOS.fs.reveal(row.target)} className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg">
               <IconFolder size={15} />
             </button>
           )}

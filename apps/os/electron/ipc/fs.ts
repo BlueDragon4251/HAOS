@@ -266,9 +266,7 @@ export function registerFsIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.fsDirSize, (_event, target: string) => dirSize(target))
   ipcMain.handle(IPC.fsReadDir, (_event, target: string) => readDir(target))
   ipcMain.handle(IPC.fsReadFile, (_event, target: string) => readFile(target))
-  ipcMain.handle(IPC.fsReveal, (_event, target: string) => {
-    shell.showItemInFolder(normalizeUserPath(target))
-  })
+  ipcMain.handle(IPC.fsReveal, (_event, target: string) => hostPlatform().revealPath(normalizeUserPath(target)))
   ipcMain.handle(IPC.fsOpenPath, async (_event, target: string) => {
     const error = await shell.openPath(normalizeUserPath(target))
 

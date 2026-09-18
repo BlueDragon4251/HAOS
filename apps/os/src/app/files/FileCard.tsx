@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MoreButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatBytes, formatRelative } from '../../lib/format.ts'
+import { revealLabel } from '../../lib/platform-labels.ts'
 import { DRAG_MIME, type FileItem, extBadge, fileMeta, useDirCount, useInView, useThumbnail } from './files-store.ts'
 import { Menu, type MenuItemDef } from './Menu.tsx'
 
@@ -23,7 +24,7 @@ export interface FileCardProps {
 function buildMenu(item: FileItem, onAction: (action: CardAction) => void): MenuItemDef[] {
   return [
     { id: 'open', label: 'Open', icon: <IconExternalLink />, onSelect: () => onAction('open') },
-    { id: 'reveal', label: 'Reveal in Finder', icon: <IconFolderOpen />, onSelect: () => onAction('reveal') },
+    { id: 'reveal', label: revealLabel(), icon: <IconFolderOpen />, onSelect: () => onAction('reveal') },
     { id: 'rename', label: 'Rename', icon: <IconPencil />, onSelect: () => onAction('rename') },
     { id: 'copy', label: 'Copy path', icon: <IconCopy />, onSelect: () => onAction('copy-path') },
     { id: 'ask', label: 'Ask Hermes about this', icon: <IconMessage />, onSelect: () => onAction('ask'), dividerBefore: true },

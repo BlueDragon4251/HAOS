@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Hermes OS
+Comment=Agent-native desktop powered by Hermes Agent
+Exec=/usr/local/bin/hermes-os-compositor
+Type=Application
+DesktopNames=HermesOS

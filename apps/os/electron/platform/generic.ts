@@ -1,10 +1,11 @@
+import { shell } from 'electron'
 import os from 'node:os'
 import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { type EditorTarget, type HostPlatform, HostNotSupported } from './types.ts'
 
 /**
- * Placeholder for win32 / linux: enough for the shell to boot and show honest "not yet" states.
- * Real implementations land per docs/ROADMAP.md.
+ * Placeholder for win32 (and anything without a dedicated implementation): enough for the shell
+ * to boot and show honest "not yet" states. Real implementations land per docs/ROADMAP.md.
  */
 export class GenericPlatform implements HostPlatform {
   async systemInfo(): Promise<SystemInfo> {
@@ -51,6 +52,18 @@ export class GenericPlatform implements HostPlatform {
 
   async appIcon(): Promise<Buffer | null> {
     return null
+  }
+
+  async launchApp(appPath: string): Promise<void> {
+    const error = await shell.openPath(appPath)
+
+    if (error) {
+      throw new Error(error)
+    }
+  }
+
+  async revealPath(targetPath: string): Promise<void> {
+    shell.showItemInFolder(targetPath)
   }
 
   async openIn(target: EditorTarget): Promise<void> {

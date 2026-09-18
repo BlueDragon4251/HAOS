@@ -19,7 +19,8 @@
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
-    "dist:mac": "npm run build && electron-builder --mac --arm64"
+    "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "dist:linux": "npm run build && electron-builder --linux --arm64"
   },
   "dependencies": {
     "@hermes-os/client": "*",
@@ -87,6 +88,21 @@
     },
     "dmg": {
       "sign": false
+    },
+    "linux": {
+      "category": "System",
+      "executableName": "hermes-os",
+      "target": [
+        "dir",
+        "AppImage"
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "Hermes OS",
+          "Comment": "Agent-native desktop powered by Hermes Agent",
+          "Categories": "System;"
+        }
+      }
     }
   }
 }

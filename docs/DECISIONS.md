@@ -83,5 +83,31 @@ still taken from `source: "hermes_os"`, never from this env var, in line with up
 
 Machine facts and actions used by the shell (installed apps, system stats, open/reveal) go through
 `apps/os/electron/platform/HostPlatform`; agent-facing capabilities go through the plugin's
-`HostAdapter`. Both have a `darwin` implementation and typed stubs for `win32`/`linux` so the
-Windows and standalone-Linux futures have a place to land without touching call sites.
+`HostAdapter`. Both have `darwin` and `linux` implementations and a typed stub for `win32`, so the
+Windows future has a place to land without touching call sites.
+
+## ADR-012: Hermes OS Linux Stage 1 is a session, not a distribution
+
+The first Linux target boots a stock Fedora Cloud image into the Hermes OS shell as the only
+session. Kernel, systemd, NetworkManager and packaging stay Fedora's; Hermes OS owns what the user
+sees. This proves the experience before any security or packaging work. See `docs/LINUX.md`.
+
+- **Fedora Cloud Base + cloud-init, not the interactive installer.** The seed ISO creates the user
+  and runs `linux/provision.sh` unattended, so a VM is reproducible from two scripts and works in
+  both QEMU (scriptable) and UTM (nicer window) from the same qcow2.
+- **`cage` as the Stage 1 compositor.** A kiosk compositor gives the shell the whole output with no
+  code of our own; foreign apps stack fullscreen on top. Window management between foreign apps
+  needs our own wlroots compositor and is deferred to Stage 2 with the capability broker.
+- **`greetd` autologin.** `default_session` runs the compositor as the `hermes` user on VT1 and
+  respawns it when it exits; there is no greeter UI. Crash recovery for free.
+- **Electron on Wayland via Ozone, kiosk mode gated by `HERMES_OS_KIOSK=1`.** The same shell binary
+  runs windowed on macOS and as the session on Linux; `window.ts` branches on the env var, not the
+  platform, so a Linux developer can still run it windowed under GNOME.
+- **The backend stays shell-managed.** `hermes serve` is spawned by Electron exactly as on macOS.
+  A systemd user unit would add a second lifecycle model before the broker (Stage 2) gives it a
+  reason to exist.
+- **SELinux permissive on the Stage 1 VM.** greetd and cage have no tailored policy; enforcing
+  mode blocks the session on Fedora. Writing policy is part of Stage 2's sandboxing work.
+- **Repo copied into the VM, not used in place.** Native modules (`node-pty`, Electron) must be
+  installed on Linux; rsync over SSH (`linux/dev/push.sh`) or from the VirtioFS share
+  (`hermes-os-sync`) keeps one source of truth on the Mac.

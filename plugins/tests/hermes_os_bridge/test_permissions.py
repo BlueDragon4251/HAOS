@@ -34,6 +34,17 @@ def test_protected_paths_include_builtin_and_user_entries(plugin, isolated_home)
     assert perm.protected_root(Path.home() / "Documents" / "notes.txt", policy) is None
 
 
+def test_protected_paths_cover_linux_system_locations(plugin):
+    perm = _perm(plugin)
+    for root in ("/boot", "/var/lib", "/lib", "/lib64", "/proc", "/sys"):
+        assert root in perm.BUILTIN_PROTECTED
+    policy = perm.parse_policy({})
+    assert perm.protected_root(Path("/boot/vmlinuz"), policy) is not None
+    assert perm.protected_root(Path("/var/lib/dpkg/status"), policy) is not None
+    assert perm.protected_root(Path("/proc/1/status"), policy) is not None
+    assert perm.protected_root(Path("/var/log/syslog"), policy) is None
+
+
 def test_protected_path_is_refused_before_any_prompt(plugin, monkeypatch):
     perm = _perm(plugin)
     asked = []

@@ -20,3 +20,6 @@ __pycache__/
 *.log
 .env
 .env.*
+
+# Hermes OS Linux VM artifacts (images, seeds, disks, screenshots).
+linux/vm/build/

@@ -74,7 +74,7 @@ export function registerTerminalIpc(getWindow: () => BrowserWindow | null): void
       throw new Error('Terminal is unavailable: node-pty failed to load for this Electron build.')
     }
 
-    const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh')
+    const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash')
     const cwd = options.cwd ? normalizeUserPath(options.cwd) : os.homedir()
     const id = `t${nextId++}`
     const child = pty.spawn(shell, process.platform === 'win32' ? [] : ['-l'], {

@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Runs inside the compositor. Publishes the Wayland environment to systemd/D-Bus (so portals and
+# PipeWire find the display), then keeps the Hermes OS shell running: a crash restarts it, a clean
+# exit ends the session (greetd starts a fresh one).
+set -u
+
+export ELECTRON_OZONE_PLATFORM_HINT=wayland
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM=wayland
+export GDK_BACKEND=wayland,x11
+export HERMES_OS_KIOSK=1
+export HERMES_OS_LINUX_SESSION=1
+
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP 2>/dev/null || true
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
+systemctl --user start pipewire.socket pipewire-pulse.socket wireplumber.service 2>/dev/null || true
+systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
+
+APP="${HERMES_OS_APP:-$HOME/Hermes-OS/apps/os}"
+ELECTRON="${HERMES_OS_ELECTRON:-$APP/node_modules/.bin/electron}"
+LOG_DIR="$HOME/.local/state/hermes-os"
+mkdir -p "$LOG_DIR"
+
+flags=()
+if [[ -n "${HERMES_OS_SOFTWARE_GPU:-}" ]]; then
+  flags+=(--disable-gpu)
+fi
+if [[ -n "${HERMES_OS_NO_SANDBOX:-}" ]]; then
+  flags+=(--no-sandbox)
+fi
+if [[ -n "${HERMES_OS_REMOTE_DEBUG_PORT:-}" ]]; then
+  flags+=("--remote-debugging-port=${HERMES_OS_REMOTE_DEBUG_PORT}")
+fi
+
+if [[ ! -x "$ELECTRON" || ! -f "$APP/dist/electron/main.mjs" && -z "${HERMES_OS_DEV_SERVER:-}" ]]; then
+  # Nothing to run yet: show a plain message instead of a black screen and wait for a build.
+  echo "Hermes OS shell not built at $APP. Push the repo from the Mac (linux/dev/push.sh)." >&2
+  if command -v foot >/dev/null 2>&1; then
+    exec foot -e bash -c 'echo "Hermes OS shell is not built yet. Run linux/dev/push.sh from the Mac."; exec bash'
+  fi
+  sleep 30
+  exit 1
+fi
+
+failures=0
+window_start=$(date +%s)
+while :; do
+  "$ELECTRON" "$APP" "${flags[@]}" >>"$LOG_DIR/shell.log" 2>&1
+  code=$?
+  if [[ $code -eq 0 ]]; then
+    exit 0
+  fi
+  now=$(date +%s)
+  if (( now - window_start > 60 )); then
+    failures=0
+    window_start=$now
+  fi
+  failures=$((failures + 1))
+  echo "$(date -Is) shell exited with $code (failure $failures/5)" >>"$LOG_DIR/shell.log"
+  if (( failures >= 5 )); then
+    exit 1
+  fi
+  sleep 1
+done

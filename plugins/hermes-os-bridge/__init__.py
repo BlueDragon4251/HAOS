@@ -2,7 +2,7 @@
 
 Registers the ``hermes_os`` toolset: a narrow set of explicit, permission-tiered tools that let
 Hermes act on the computer it is running on. Execution goes through a per-platform
-``HostAdapter`` (macOS implemented; Windows and Linux are typed stubs), permissions through
+``HostAdapter`` (macOS and Linux implemented; Windows is a typed stub), permissions through
 ``bridge.permissions`` (tiers, protected paths, the upstream approval gate), and every call is
 recorded by ``bridge.audit``.
 

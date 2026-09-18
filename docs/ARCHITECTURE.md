@@ -36,7 +36,23 @@ flowchart LR
   Main -->|"REST with session token"| Serve
   Bridge -->|"request_tool_approval"| Serve
   Bridge -->|"mdfind, open, lsof, ps, osascript"| macOS[(macOS)]
+  Bridge -->|"plocate, gio, ss, ps, nmcli, journalctl"| Linux[(Linux)]
 ```
+
+## Host platforms
+
+Both seams (`HostPlatform` in Electron main, `HostAdapter` in the bridge plugin) are implemented per
+host. The renderer and the agent see identical tool names and return shapes on every platform.
+
+| | macOS | Linux (Hermes OS Linux) | Windows |
+| --- | --- | --- | --- |
+| Shell runs as | fullscreen app over the macOS desktop | the whole session: `greetd` -> `cage` -> shell (`HERMES_OS_KIOSK=1`) | stub |
+| `HostPlatform` | `platform/darwin.ts` (`plutil`, `sips`, `qlmanage`, `mdfind`, EventKit JXA) | `platform/linux.ts` (`/proc`, `.desktop` entries, icon themes, `nmcli`, `recently-used.xbel`, GNOME thumbnail cache) | `platform/generic.ts` |
+| `HostAdapter` | `host/darwin.py` (`osascript`, `lsof`, `mdfind`, `system_profiler`, `pmset`) | `host/linux.py` (`ps`, `ss`, `plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`, `gsettings`, `journalctl`, `loginctl`) | `host/windows.py` stub |
+| App launch / reveal | `shell.openPath` / `showItemInFolder` | `gio launch <.desktop>` / `org.freedesktop.FileManager1` | |
+| Calendar | EventKit with permission state | unavailable (EDS later) | |
+
+Setup, session model and dev loop for Linux: `docs/LINUX.md`.
 
 ## Backend lifecycle
 

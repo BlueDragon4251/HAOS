@@ -31,11 +31,27 @@ Also planned:
 
 - Windows: `HostPlatform`/`HostAdapter` implementations (PowerShell, `Get-Process`, Everything or
   Windows Search for file search), NSIS installer.
-- Linux desktop session: `HostAdapter` on `xdg-open`, `ps`, `ss`, `locate`/`fd`.
 - Signed and notarized macOS builds; auto-update channel.
 
-## Standalone Hermes OS (Linux-based)
+## Hermes OS Linux
 
-Out of scope until the shell is proven on macOS and Windows. The plan is a minimal compositor
-session (Wayland) that boots straight into the Hermes OS shell with the same renderer, the same
-runtime, and a Linux `HostAdapter`. No custom kernel.
+No custom kernel at any stage. See `docs/LINUX.md` and ADR-012.
+
+**Stage 1 (done): the session.** Fedora Cloud image + cloud-init, `greetd` autologin, `cage`
+compositor, Electron shell in kiosk mode, Linux `HostPlatform` and `HostAdapter`
+(`ps`, `ss`, `nmcli`, `wpctl`, `gio`, `journalctl`, `plocate`, `.desktop` entries). Runs in a VM
+on the Mac (QEMU or UTM).
+
+**Stage 2: Hermes owns the capability layer.**
+- Capability broker: a small privileged D-Bus service holding the permission tiers, issuing
+  mission-scoped grants, implementing the `xdg-desktop-portal` interfaces, and owning the audit
+  journal. Shell and bridge route every privileged call through it (no enforcement at first).
+- Confine the shell and the runtime (bubblewrap/Flatpak-style sandbox, Landlock, seccomp).
+- Own wlroots compositor: foreign app windows inside Hermes windows, secure approval prompts drawn
+  outside the shell, output power management.
+- `hermes serve` as a systemd user unit on a Unix socket with peer credentials.
+- SELinux policy for the session.
+
+**Stage 3: a distribution.** Image-based atomic updates, signed ISO for x86 laptops and mini PCs,
+recovery partition, hardware enablement. Apple Silicon stays VM-only until Asahi covers the
+current chips.

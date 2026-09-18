@@ -4,7 +4,7 @@ import type { InstalledApp } from '../../../shared/ipc.ts'
 import { AppGlyph, HermesAvatar } from '../../components/app-icon.tsx'
 import { cn } from '../../lib/cn.ts'
 import { reducedMotion } from '../../lib/motion.ts'
-import { $prefs } from '../../store/backend.ts'
+import { $env, $prefs } from '../../store/backend.ts'
 import { notify } from '../../store/notifications.ts'
 import { $applicationsOpen } from '../../store/surface.ts'
 import { $windows, focusWindow, MAIN_WINDOW_ID, showPage } from '../../store/windows.ts'
@@ -18,13 +18,33 @@ interface DockItem {
   running?: boolean
 }
 
-const PINNED_NATIVE: { label: string; names: string[] }[] = [
-  { label: 'Files', names: ['Finder'] },
-  { label: 'Safari', names: ['Safari', 'Google Chrome', 'Arc'] },
-  { label: 'Mail', names: ['Mail'] },
-  { label: 'Calendar', names: ['Calendar'] },
-  { label: 'Notes', names: ['Notes'] }
-]
+interface PinnedNative {
+  label: string
+  /** Candidate app names in preference order; the first one installed is pinned. */
+  names: string[]
+}
+
+const PINNED_BY_PLATFORM: Record<'darwin' | 'linux' | 'other', PinnedNative[]> = {
+  darwin: [
+    { label: 'Files', names: ['Finder'] },
+    { label: 'Safari', names: ['Safari', 'Google Chrome', 'Arc'] },
+    { label: 'Mail', names: ['Mail'] },
+    { label: 'Calendar', names: ['Calendar'] },
+    { label: 'Notes', names: ['Notes'] }
+  ],
+  linux: [
+    { label: 'Files', names: ['Files', 'Nautilus', 'Dolphin', 'Thunar'] },
+    { label: 'Browser', names: ['Firefox', 'Firefox Web Browser', 'Chromium', 'Google Chrome'] },
+    { label: 'Mail', names: ['Thunderbird', 'Geary', 'Evolution'] },
+    { label: 'Calendar', names: ['Calendar', 'GNOME Calendar'] },
+    { label: 'Notes', names: ['Text Editor', 'gedit', 'Notes'] }
+  ],
+  other: [{ label: 'Files', names: [] }]
+}
+
+function pinnedFor(platform: string | undefined): PinnedNative[] {
+  return platform === 'darwin' ? PINNED_BY_PLATFORM.darwin : platform === 'linux' ? PINNED_BY_PLATFORM.linux : PINNED_BY_PLATFORM.other
+}
 
 export function Dock() {
   const windows = useStore($windows)
@@ -33,6 +53,8 @@ export function Dock() {
   const [bouncing, setBouncing] = useState<string | null>(null)
   const autoHide = prefs.dockAutoHide !== false
   const revealed = useDockReveal(autoHide)
+  const platform = useStore($env)?.platform ?? 'darwin'
+  const trashPath = platform === 'darwin' ? '~/.Trash' : '~/.local/share/Trash/files'
 
   const main = windows[MAIN_WINDOW_ID]
   const openHermes = () => {
@@ -65,14 +87,17 @@ export function Dock() {
       }
     ]
 
-    for (const pin of PINNED_NATIVE) {
+    const findApp = (names: string[]) => names.map(n => apps.find(a => a.name.toLowerCase() === n.toLowerCase())).find(Boolean)
+
+    for (const pin of pinnedFor(platform)) {
       if (pin.label === 'Files') {
-        list.push({ id: 'files', label: 'Files', render: () => <NativeIcon src={iconFor(apps.find(a => a.name === 'Finder')?.path)} fallback="files" />, onClick: () => showPage('files') })
+        // Files is always Hermes OS's own page; borrow the host file manager's icon when it has one.
+        list.push({ id: 'files', label: 'Files', render: () => <NativeIcon src={iconFor(findApp(pin.names)?.path)} fallback="files" />, onClick: () => showPage('files') })
 
         continue
       }
 
-      const app = pin.names.map(n => apps.find(a => a.name === n)).find(Boolean)
+      const app = findApp(pin.names)
 
       if (app) {
         list.push({ id: app.path, label: app.name, render: () => <NativeIcon src={iconFor(app.path)} fallback="grid" />, onClick: () => void launch(app) })
@@ -80,11 +105,11 @@ export function Dock() {
     }
 
     list.push({ id: 'applications', label: 'Applications', render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="grid" size={22} /></span>, onClick: () => $applicationsOpen.set(true) })
-    list.push({ id: 'trash', label: 'Trash', render: () => <span className="flex size-11 items-center justify-center rounded-[11px] bg-white/6 text-fg-2"><AppGlyph id="trash" size={22} /></span>, onClick: () => void window.hermesOS.fs.openPath('~/.Trash') })
+    list.push({ id: 'trash', label: 'Trash', render: () => <span className="flex size-11 items-center justify-center rounded-[11px] bg-white/6 text-fg-2"><AppGlyph id="trash" size={22} /></span>, onClick: () => void window.hermesOS.fs.openPath(trashPath) })
 
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apps, iconFor, main?.phase])
+  }, [apps, iconFor, main?.phase, platform])
 
   const barRef = useRef<HTMLDivElement>(null)
 

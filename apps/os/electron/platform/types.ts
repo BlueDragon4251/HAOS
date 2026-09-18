@@ -13,6 +13,10 @@ export interface HostPlatform {
   listInstalledApps(): Promise<InstalledApp[]>
   /** PNG bytes for an application's icon, or null when none can be produced. */
   appIcon(appPath: string): Promise<Buffer | null>
+  /** Launch an installed application by the `path` reported in `InstalledApp` (bundle, `.desktop` entry, ...). */
+  launchApp(appPath: string): Promise<void>
+  /** Show a file or folder selected in the platform's file manager. */
+  revealPath(targetPath: string): Promise<void>
   openIn(target: EditorTarget, targetPath: string): Promise<void>
   networkStatus(): Promise<NetworkStatus>
   /** Today's calendar events (with the permission state), or `unavailable` on platforms without a bridge. */
@@ -24,8 +28,13 @@ export interface HostPlatform {
 }
 
 export class HostNotSupported extends Error {
-  constructor(feature: string) {
-    super(`${feature} is not implemented for ${process.platform} yet`)
+  /**
+   * @param feature What was asked for, e.g. `openIn(vscode)`.
+   * @param requires When the gap is a missing host package rather than missing code, name it
+   *   (e.g. `NetworkManager (nmcli)`) so the UI can tell the user what to install.
+   */
+  constructor(feature: string, requires?: string) {
+    super(requires ? `${feature} requires ${requires}, which is not installed` : `${feature} is not implemented for ${process.platform} yet`)
     this.name = 'HostNotSupported'
   }
 }

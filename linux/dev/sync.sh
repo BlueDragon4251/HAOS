@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Inside the VM (UTM with a VirtioFS share): copy the repo from the shared folder into the home
+# directory (native modules must be installed on Linux, so the tree is not used in place), build,
+# and restart the shell.
+#
+#   hermes-os-sync              # /mnt/hermes-os -> ~/Hermes-OS, build, restart
+set -euo pipefail
+
+SRC="${HERMES_OS_SHARE:-/mnt/hermes-os}"
+REPO="${HERMES_OS_REPO:-$HOME/Hermes-OS}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+mountpoint -q "$SRC" || [[ -d "$SRC/apps/os" ]] || { echo "shared folder not mounted at $SRC" >&2; exit 1; }
+
+echo "==> syncing $SRC -> $REPO"
+mkdir -p "$REPO"
+rsync -a --delete \
+  --exclude node_modules --exclude dist --exclude release --exclude .git \
+  --exclude 'upstream/hermes-agent' --exclude 'linux/vm/build' --exclude '.DS_Store' \
+  "$SRC/" "$REPO/"
+
+bash "$HERE/build.sh"
+bash "$HERE/restart-shell.sh" || true

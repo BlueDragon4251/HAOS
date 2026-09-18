@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot developer bootstrap for Hermes OS on macOS.
+# One-shot developer bootstrap for Hermes OS (macOS and Linux).
 #   1. Fetch the pinned upstream snapshot (types for the gateway wire).
 #   2. Install Node workspaces.
 #   3. Link the system-bridge plugin into the user's Hermes plugins directory.
@@ -8,10 +8,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+OS="$(uname -s)"
+export PATH="$HOME/.local/bin:$PATH"
 
-# The /usr/bin shims refuse to run until the Xcode license is accepted; the CommandLineTools
+# macOS: the /usr/bin shims refuse to run until the Xcode license is accepted; the CommandLineTools
 # binaries behind them work. Prefer them so `npm install` (node-gyp) and git keep working.
-if [[ -d /Library/Developer/CommandLineTools/usr/bin ]]; then
+if [[ "$OS" == "Darwin" && -d /Library/Developer/CommandLineTools/usr/bin ]]; then
   export PATH="/Library/Developer/CommandLineTools/usr/bin:$PATH"
   export SDKROOT="${SDKROOT:-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk}"
 fi
@@ -23,8 +25,9 @@ echo "==> Installing Node workspaces"
 (cd "$ROOT" && npm install)
 
 # npm strips the executable bit from node-pty's prebuilt spawn-helper; the app also repairs this at
-# runtime, but fixing it here keeps `npm run dist:mac` packaging a working binary.
-helper="$ROOT/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper"
+# runtime, but fixing it here keeps packaged builds working. (Linux has no prebuilds; see
+# linux/dev/build.sh, which compiles node-pty.)
+helper="$ROOT/node_modules/node-pty/prebuilds/$(node -p 'process.platform + "-" + process.arch')/spawn-helper"
 [[ -f "$helper" ]] && chmod 755 "$helper"
 
 echo "==> Linking hermes-os-bridge plugin into $HERMES_HOME/plugins"

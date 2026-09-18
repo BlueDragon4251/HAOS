@@ -9,7 +9,7 @@ const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'
  * expect the user's login-shell PATH, so ask the login shell once and merge with sane fallbacks.
  */
 export async function loginShellPath(timeoutMs = 4000): Promise<string> {
-  const shell = process.env.SHELL || '/bin/zsh'
+  const shell = process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash')
   const fromShell = await new Promise<string>(resolve => {
     const child = execFile(shell, ['-lc', 'printf "%s" "$PATH"'], { timeout: timeoutMs }, (error, stdout) => {
       resolve(error ? '' : stdout.trim())

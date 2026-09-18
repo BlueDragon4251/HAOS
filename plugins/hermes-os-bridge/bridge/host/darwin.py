@@ -15,6 +15,7 @@ from typing import Any, Literal, Sequence
 
 from ..util import run
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, PortListener, ProcessRow
+from .posix import parse_du, parse_ps  # noqa: F401 - shared with Linux; re-exported for callers/tests.
 
 APP_DIRS = ("/Applications", "/Applications/Utilities", "/System/Applications", "/System/Applications/Utilities", str(Path.home() / "Applications"))
 
@@ -76,19 +77,6 @@ def build_mdfind_query(search: FileSearch) -> str:
     if not clauses:
         raise ValueError("search needs at least one of: text, name, kind, since/until, extensions")
     return " && ".join(clauses)
-
-
-def parse_ps(text: str) -> list[ProcessRow]:
-    rows: list[ProcessRow] = []
-    for line in text.splitlines():
-        match = re.match(r"^\s*(\d+)\s+(\d+)\s+(\S+)\s+([\d.]+)\s+([\d.]+)\s+(\d+)\s+(.*)$", line)
-        if not match:
-            continue
-        rows.append(ProcessRow(
-            pid=int(match[1]), ppid=int(match[2]), user=match[3], cpu_percent=float(match[4]),
-            mem_percent=float(match[5]), rss_bytes=int(match[6]) * 1024, command=match[7].strip(),
-        ))
-    return rows
 
 
 def parse_lsof(text: str, port: int) -> list[PortListener]:
@@ -237,20 +225,6 @@ def parse_displays(json_text: str) -> list[dict[str, Any]]:
                 "connection": (disp.get("spdisplays_connection_type") or "").replace("spdisplays_", "") or None,
             })
     return displays
-
-
-def parse_du(text: str) -> list[tuple[int, str]]:
-    """``du -k`` lines -> (bytes, path)."""
-    rows: list[tuple[int, str]] = []
-    for line in text.splitlines():
-        parts = line.split("\t", 1)
-        if len(parts) != 2:
-            continue
-        try:
-            rows.append((int(parts[0]) * 1024, parts[1]))
-        except ValueError:
-            continue
-    return rows
 
 
 class DarwinHost(HostAdapter):

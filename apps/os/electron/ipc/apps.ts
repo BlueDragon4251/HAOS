@@ -1,4 +1,4 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { normalizeUserPath } from './fs.ts'
@@ -64,12 +64,6 @@ function iconFor(appPath: string): Promise<string> {
 
 export function registerAppsIpc(): void {
   ipcMain.handle(IPC.appsList, () => hostPlatform().listInstalledApps())
-  ipcMain.handle(IPC.appsLaunch, async (_event, appPath: string) => {
-    const error = await shell.openPath(normalizeUserPath(appPath))
-
-    if (error) {
-      throw new Error(error)
-    }
-  })
+  ipcMain.handle(IPC.appsLaunch, (_event, appPath: string) => hostPlatform().launchApp(normalizeUserPath(appPath)))
   ipcMain.handle(IPC.appsIcon, (_event, appPath: string) => iconFor(normalizeUserPath(appPath)))
 }
