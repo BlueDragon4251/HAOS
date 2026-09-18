@@ -15,5 +15,6 @@ linux/
 ```bash
 bash linux/vm/download-image.sh && bash linux/vm/make-seed.sh && bash linux/vm/run-qemu.sh
 bash linux/vm/run-qemu.sh console            # first boot provisions for several minutes
-bash linux/dev/push.sh --with-hermes-config  # build the shell in the VM with your Hermes credentials
+bash linux/dev/push.sh --with-hermes-config  # build the shell in the VM, copy model config (not OAuth logins)
+bash linux/dev/push.sh ssh                   # then: hermes login
 ```

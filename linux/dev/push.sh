@@ -4,9 +4,14 @@
 # or set HERMES_VM_HOST to the VM's IP).
 #
 #   bash linux/dev/push.sh                      # sync + build + restart
-#   bash linux/dev/push.sh --with-hermes-config # also copy ~/.hermes/{config.yaml,.env,auth.json}
+#   bash linux/dev/push.sh --with-hermes-config # also copy ~/.hermes/{config.yaml,.env} (model choice, API keys)
+#   bash linux/dev/push.sh --with-hermes-auth   # ALSO copy ~/.hermes/auth.json (OAuth logins). Read the warning below.
 #   bash linux/dev/push.sh --no-build           # sync only
 #   bash linux/dev/push.sh ssh                  # open a shell in the VM
+#
+# OAuth providers (Nous Portal, Codex, Copilot) use rotating refresh tokens: whichever machine
+# refreshes second is logged out. Copying auth.json therefore works only until the next refresh and
+# can log the Mac out. Prefer `hermes login` inside the VM (device-code flow works over SSH).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,11 +25,13 @@ SSH=(ssh -i "$KEY" -p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=
 
 BUILD=1
 WITH_CONFIG=
+WITH_AUTH=
 for arg in "$@"; do
   case "$arg" in
     ssh) exec "${SSH[@]}" ;;
     --no-build) BUILD= ;;
     --with-hermes-config) WITH_CONFIG=1 ;;
+    --with-hermes-auth) WITH_CONFIG=1; WITH_AUTH=1 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -45,9 +52,14 @@ rsync -az --delete \
   "$ROOT/" hermes@"$HOST":Hermes-OS/
 
 if [[ -n "$WITH_CONFIG" ]]; then
-  echo "==> copying Hermes config (model/provider credentials) into the VM"
+  FILES=(config.yaml .env)
+  if [[ -n "$WITH_AUTH" ]]; then
+    FILES+=(auth.json)
+    echo "==> WARNING: copying auth.json; OAuth refresh tokens rotate, so the Mac may be logged out on the next refresh"
+  fi
+  echo "==> copying Hermes config (${FILES[*]}) into the VM"
   "${SSH[@]}" 'mkdir -p ~/.hermes && chmod 700 ~/.hermes'
-  for f in config.yaml .env auth.json; do
+  for f in "${FILES[@]}"; do
     if [[ -f "$HOME/.hermes/$f" ]]; then
       scp -q -i "$KEY" -P "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$HOME/.hermes/$f" hermes@"$HOST":.hermes/"$f"
     fi

@@ -468,6 +468,30 @@ function spawnDetached(command: string, args: string[], requires: string): Promi
   })
 }
 
+/**
+ * Run a launcher (`gio launch`, `gtk-launch`) that hands off to a GUI app. The app inherits the
+ * launcher's stdio, so a piped `run()` would block until the app quits; ignore stdio, wait only for
+ * the launcher process, and treat one still alive after `graceMs` as a successful hand-off.
+ * Resolves with the exit code (MISSING_BINARY when the launcher is not installed).
+ */
+function runLauncher(command: string, args: string[], graceMs = 5000): Promise<number> {
+  return new Promise(resolve => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' })
+    const timer = setTimeout(() => {
+      child.unref()
+      resolve(0)
+    }, graceMs)
+    child.once('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timer)
+      resolve(error.code === 'ENOENT' ? MISSING_BINARY : 1)
+    })
+    child.once('exit', code => {
+      clearTimeout(timer)
+      resolve(code ?? 1)
+    })
+  })
+}
+
 function ipv4For(iface: string | undefined): string | undefined {
   if (!iface) {
     return undefined
@@ -702,23 +726,27 @@ export class LinuxPlatform implements HostPlatform {
       return
     }
 
-    const gio = await run('gio', ['launch', appPath], 15_000)
+    const gio = await runLauncher('gio', ['launch', appPath])
 
-    if (gio.code === 0) {
+    if (gio === 0) {
       return
     }
 
-    const gtk = await run('gtk-launch', [path.basename(appPath, '.desktop')], 15_000)
+    if (gio !== MISSING_BINARY) {
+      throw new Error(`failed to launch ${path.basename(appPath)} (gio launch exited ${gio})`)
+    }
 
-    if (gtk.code === 0) {
+    const gtk = await runLauncher('gtk-launch', [path.basename(appPath, '.desktop')])
+
+    if (gtk === 0) {
       return
     }
 
-    if (gio.code === MISSING_BINARY && gtk.code === MISSING_BINARY) {
+    if (gtk === MISSING_BINARY) {
       throw new HostNotSupported('launching desktop entries', 'glib2 (gio) or gtk3 (gtk-launch)')
     }
 
-    throw new Error((gio.code !== MISSING_BINARY ? gio.stderr : gtk.stderr).trim() || `failed to launch ${path.basename(appPath)}`)
+    throw new Error(`failed to launch ${path.basename(appPath)} (gtk-launch exited ${gtk})`)
   }
 
   /** FileManager1 D-Bus (Nautilus, Dolphin, Thunar, ...) selects the item; without it, open the parent folder. */

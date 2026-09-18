@@ -4,6 +4,7 @@ import { GlassButton, GlassCard } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatDate } from '../../lib/format.ts'
 import { type CronJob, rest } from '../../lib/rest.ts'
+import { deviceNoun } from '../../lib/platform-labels.ts'
 import { useBackendData, useLocalData } from '../../lib/use-async.ts'
 import { formatHourMinute, formatSpan, isToday, Quiet, Shimmer, toMs } from './shared.tsx'
 
@@ -121,7 +122,7 @@ export function YourDay({ now }: { now: Date }) {
           </GlassButton>
         </GlassCard>
       ) : status === 'unavailable' && entries.length === 0 ? (
-        <Quiet>{calendar.data?.error || 'Calendar is unavailable on this Mac.'}</Quiet>
+        <Quiet>{calendar.data?.error || `Calendar is unavailable on this ${deviceNoun()}.`}</Quiet>
       ) : entries.length === 0 ? (
         <Quiet>Nothing on the calendar today.</Quiet>
       ) : (

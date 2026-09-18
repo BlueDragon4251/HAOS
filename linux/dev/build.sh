@@ -31,4 +31,14 @@ if [[ -f "$SANDBOX" && "$(stat -c '%u %a' "$SANDBOX")" != "0 4755" ]]; then
   sudo chown root:root "$SANDBOX" && sudo chmod 4755 "$SANDBOX" || true
 fi
 
+# Keep the installed session files in step with the repo (they are what greetd/cage run).
+if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
+  sudo install -m 0755 "$REPO/linux/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
+  sudo install -m 0755 "$REPO/linux/session/hermes-os-session" /usr/local/bin/hermes-os-session
+  sudo install -m 0644 "$REPO/linux/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
+  for f in build.sh sync.sh restart-shell.sh shot.sh; do
+    install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/hermes-os-${f%.sh}"
+  done
+fi
+
 echo "==> build complete: $REPO/apps/os/dist"

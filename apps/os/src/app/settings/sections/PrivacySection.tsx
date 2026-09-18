@@ -1,6 +1,7 @@
 import { IconHistory, IconShieldLock } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { GlassButton, GlassCard, LinkAction } from '../../../components/ui/glass.tsx'
+import { deviceNoun } from '../../../lib/platform-labels.ts'
 import { useLocalData } from '../../../lib/use-async.ts'
 import { notify } from '../../../store/notifications.ts'
 import { AuditRow } from './AgentsSection.tsx'
@@ -42,7 +43,7 @@ export function PrivacySection() {
 
   return (
     <>
-      <SectionTitle title="Privacy" subtitle="What the system bridge may do on this Mac, and the record of what it did." />
+      <SectionTitle title="Privacy" subtitle={`What the system bridge may do on this ${deviceNoun()}, and the record of what it did.`} />
 
       <SettingsBlock title="Permission policy" label="Permission policy" description="Tiers: read runs freely, act runs and is audited, mutate asks first, destructive always asks. Protected paths are never touched." keywords="permissions yaml tiers allow confirm deny bridge">
         <GlassCard className="flex flex-col gap-3 p-3.5">

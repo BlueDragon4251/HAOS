@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { IconDeviceFloppy, IconHome } from '@tabler/icons-react'
 import { GlassButton, ProgressBar } from '../../../components/ui/glass.tsx'
 import { formatBytes } from '../../../lib/format.ts'
+import { deviceNoun } from '../../../lib/platform-labels.ts'
 import { useLocalData } from '../../../lib/use-async.ts'
 import { $env } from '../../../store/backend.ts'
 import { sendPrompt } from '../../../store/chat.ts'
@@ -22,7 +23,7 @@ export function StorageSection() {
 
   return (
     <>
-      <SectionTitle title="Storage" subtitle="Disks on this Mac and the space Hermes keeps for itself." />
+      <SectionTitle title="Storage" subtitle={`Disks on this ${deviceNoun()} and the space Hermes keeps for itself.`} />
 
       <SettingsGroup title="Disks">
         {(stats?.disks ?? []).length === 0 && <SettingsRow icon={<IconDeviceFloppy />} label="Disks" description="Reading disk usage…" keywords="volume mount" />}

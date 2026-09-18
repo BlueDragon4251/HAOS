@@ -398,6 +398,24 @@ def _detach(argv: Sequence[str]) -> None:
     subprocess.Popen(list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
+def _launcher(argv: Sequence[str], timeout: float = 5.0) -> int:
+    """Run a launcher (``gio launch``, ``xdg-open``) that hands off to a GUI app.
+
+    The launched app inherits the launcher's stdio, so capturing output would block until the app
+    quits (Firefox held ``system_open`` for its full 20 s timeout). Discard stdio, wait only for the
+    launcher process itself, and treat a launcher that is still alive after ``timeout`` as success.
+    Returns the exit code, 127 when the launcher binary is missing.
+    """
+    try:
+        proc = subprocess.Popen(list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except FileNotFoundError:
+        return 127
+    try:
+        return proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return 0
+
+
 class LinuxHost(HostAdapter):
     platform = "linux"
 
@@ -608,16 +626,16 @@ class LinuxHost(HostAdapter):
 
     def _launch(self, entry: DesktopEntry, args: Sequence[str]) -> None:
         """``gio launch`` -> ``gtk-launch`` -> exec the entry's program directly."""
-        result = run(["gio", "launch", entry.path, *args], timeout=20)
-        if result.ok:
+        code = _launcher(["gio", "launch", entry.path, *args])
+        if code == 0:
             return
-        if result.code != 127:
-            raise RuntimeError(result.stderr.strip() or f"could not launch {entry.name}")
-        result = run(["gtk-launch", entry.desktop_id, *args], timeout=20)
-        if result.ok:
+        if code != 127:
+            raise RuntimeError(f"could not launch {entry.name} (gio launch exited {code})")
+        code = _launcher(["gtk-launch", entry.desktop_id, *args])
+        if code == 0:
             return
-        if result.code != 127:
-            raise RuntimeError(result.stderr.strip() or f"could not launch {entry.name}")
+        if code != 127:
+            raise RuntimeError(f"could not launch {entry.name} (gtk-launch exited {code})")
         argv = entry.exec_argv
         if not argv or not shutil.which(argv[0]):
             raise HostNotSupported(f"Neither gio nor gtk-launch is available and {entry.exec_cmd!r} is not on PATH (install glib2 / libglib2.0-bin).")
@@ -644,12 +662,13 @@ class LinuxHost(HostAdapter):
                 raise RuntimeError(f"no application named {app!r}")
             _detach([program, target])
             return
-        result = run(["xdg-open", target], timeout=20)
-        if result.code == 127:
-            result = run(["gio", "open", target], timeout=20)
-            _missing(result, "xdg-utils")
-        if not result.ok:
-            raise RuntimeError(result.stderr.strip() or f"could not open {target}")
+        code = _launcher(["xdg-open", target])
+        if code == 127:
+            code = _launcher(["gio", "open", target])
+            if code == 127:
+                raise HostNotSupported("Opening files and URLs requires xdg-utils (xdg-open) or glib2 (gio).")
+        if code != 0:
+            raise RuntimeError(f"could not open {target} (launcher exited {code})")
 
     def open_url(self, url: str, app: str | None = None) -> None:
         self._open_with(url, app)
@@ -667,10 +686,11 @@ class LinuxHost(HostAdapter):
         if result.ok:
             return
         parent = path if path.is_dir() else path.parent
-        fallback = run(["xdg-open", str(parent)], timeout=20)
-        _missing(fallback, "xdg-utils")
-        if not fallback.ok:
-            raise RuntimeError(fallback.stderr.strip() or result.stderr.strip() or f"could not reveal {path}")
+        code = _launcher(["xdg-open", str(parent)])
+        if code == 127:
+            raise HostNotSupported("Revealing files requires a FileManager1 file manager or xdg-utils (xdg-open).")
+        if code != 0:
+            raise RuntimeError(result.stderr.strip() or f"could not reveal {path} (xdg-open exited {code})")
 
     def _app_pids(self, name: str) -> tuple[str, list[int]]:
         entry = self._resolve_entry(name)
@@ -810,10 +830,16 @@ class LinuxHost(HostAdapter):
         level = max(0, min(100, int(percent))) if percent is not None else None
         probe = run(["wpctl", "status"], timeout=5)
         if probe.code != 127:
+            # wpctl exits 0 even when there is no default sink ("Translate ID error"), so judge by output.
+            def _check(result: ExecResult) -> None:
+                text = (result.stdout + result.stderr).lower()
+                if not result.ok or "error" in text or "not found" in text:
+                    raise RuntimeError("No audio output device is available (PipeWire reports no default sink).")
+
             if level is not None:
-                run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{level}%"], timeout=5)
+                _check(run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{level}%"], timeout=5))
             if muted is not None:
-                run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if muted else "0"], timeout=5)
+                _check(run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if muted else "0"], timeout=5))
         else:
             if level is not None:
                 result = run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"], timeout=5)

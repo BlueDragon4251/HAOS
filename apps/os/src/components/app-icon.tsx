@@ -1,4 +1,7 @@
 import type { AppIconId } from '../app/apps.ts'
+// Imported (not a `/brand/...` public URL) so Vite rewrites it relative to `base`; absolute public
+// paths resolve to the filesystem root under the packaged `file://` renderer.
+import hermesAvatarUrl from '../assets/brand/hermes-avatar.jpg'
 import { cn } from '../lib/cn.ts'
 
 const PATHS: Record<AppIconId, React.ReactNode> = {
@@ -87,7 +90,7 @@ const PATHS: Record<AppIconId, React.ReactNode> = {
 export function HermesAvatar({ size = 40, className, rounded = 10 }: { size?: number; className?: string; rounded?: number }) {
   return (
     <img
-      src="/brand/hermes-avatar.jpg"
+      src={hermesAvatarUrl}
       alt="Hermes"
       width={size}
       height={size}

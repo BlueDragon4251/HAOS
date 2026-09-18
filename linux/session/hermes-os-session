@@ -17,7 +17,16 @@ systemctl --user start pipewire.socket pipewire-pulse.socket wireplumber.service
 systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
 
 APP="${HERMES_OS_APP:-$HOME/Hermes-OS/apps/os}"
-ELECTRON="${HERMES_OS_ELECTRON:-$APP/node_modules/.bin/electron}"
+# npm workspaces hoist Electron to the repo root; a standalone checkout keeps it under apps/os.
+ELECTRON="${HERMES_OS_ELECTRON:-}"
+if [[ -z "$ELECTRON" ]]; then
+  for candidate in "$APP/node_modules/.bin/electron" "$APP/../../node_modules/.bin/electron"; do
+    if [[ -x "$candidate" ]]; then
+      ELECTRON="$candidate"
+      break
+    fi
+  done
+fi
 LOG_DIR="$HOME/.local/state/hermes-os"
 mkdir -p "$LOG_DIR"
 

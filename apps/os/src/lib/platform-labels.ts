@@ -17,6 +17,11 @@ export function fileManagerName(): string {
   }
 }
 
+/** "Mac" on macOS, "computer" elsewhere, for copy such as "Everything on this Mac". */
+export function deviceNoun(): string {
+  return hostPlatform() === 'darwin' ? 'Mac' : 'computer'
+}
+
 export function revealLabel(): string {
   return hostPlatform() === 'darwin' ? 'Reveal in Finder' : `Show in ${fileManagerName()}`
 }

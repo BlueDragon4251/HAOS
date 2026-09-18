@@ -4,6 +4,7 @@ import { IconKey, IconLock, IconQuestionMark, IconShieldCheck } from '@tabler/ic
 import { useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { Badge } from '../../components/ui/primitives.tsx'
+import { deviceNoun } from '../../lib/platform-labels.ts'
 import { $pendingRequests, type PendingRequest, resolveRequest } from '../../store/requests.ts'
 
 /**
@@ -74,7 +75,7 @@ function ApprovalCard({ id, params }: { id: string; params: ApprovalRequestParam
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[13px] font-medium">
-            {bridgeTool ? 'Hermes wants to act on this Mac' : 'Hermes is asking for permission'}
+            {bridgeTool ? `Hermes wants to act on this ${deviceNoun()}` : 'Hermes is asking for permission'}
             {toolName && <Badge tone={destructive ? 'danger' : 'accent'}>{toolName.replace(/^system_/, '').replace(/_/g, ' ')}</Badge>}
           </div>
           {params.description && <div className="mt-1 text-[12.5px] text-fg-2">{params.description}</div>}

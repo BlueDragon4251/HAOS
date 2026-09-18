@@ -25,8 +25,17 @@ bash linux/dev/push.sh --with-hermes-config   # push repo, build shell, copy Her
 A QEMU window appears on the Mac. After provisioning and the first push, the VM reboots into the
 Hermes desktop with no login prompt. `bash linux/vm/run-qemu.sh stop|status|reset` manage it.
 
-`--with-hermes-config` copies `~/.hermes/{config.yaml,.env,auth.json}` into the VM so the agent
-has a model and credentials. Skip it and run `hermes setup` inside the VM instead if you prefer.
+`--with-hermes-config` copies `~/.hermes/{config.yaml,.env}` (model choice and any API keys) into
+the VM. It deliberately does not copy `auth.json`: OAuth providers (Nous Portal, Codex, Copilot)
+use rotating refresh tokens, so a copied login works only until the next refresh and whichever
+machine refreshes second is logged out. Log the VM in on its own instead:
+
+```bash
+bash linux/dev/push.sh ssh
+hermes login          # device-code flow; open the URL on the Mac
+```
+
+(`--with-hermes-auth` copies `auth.json` anyway, for short experiments where that trade-off is fine.)
 
 ## Quick start (UTM, a nicer window)
 

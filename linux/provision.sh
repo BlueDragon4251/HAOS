@@ -85,8 +85,10 @@ sed -i "s/^user = .*/user = \"$HERMES_USER\"/" /etc/greetd/config.toml
 systemctl set-default graphical.target
 systemctl enable greetd
 
-# Developer helpers for the hermes user.
-install -d -o "$HERMES_USER" -g "$HERMES_USER" "$HERMES_UID_HOME/.local/bin"
+# Developer helpers for the hermes user. (`install -d` would create ~/.local as root; keep every
+# directory under the home owned by the session user or uv/npm fail later.)
+sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.local/bin" "$HERMES_UID_HOME/.local/share" "$HERMES_UID_HOME/.local/state" "$HERMES_UID_HOME/.config/hermes-os"
+chown -R "$HERMES_USER:$HERMES_USER" "$HERMES_UID_HOME/.local" "$HERMES_UID_HOME/.config"
 for f in build.sh sync.sh restart-shell.sh shot.sh; do
   install -m 0755 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/dev/$f" "$HERMES_UID_HOME/.local/bin/hermes-os-${f%.sh}"
 done

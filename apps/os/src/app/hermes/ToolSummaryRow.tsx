@@ -3,6 +3,7 @@ import { memo, useState } from 'react'
 import { Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import type { ToolMessage } from '../../lib/chat-model.ts'
+import { deviceNoun } from '../../lib/platform-labels.ts'
 import { ToolRow } from '../chat/ToolRow.tsx'
 
 type Category = 'read' | 'web' | 'terminal' | 'system' | 'write' | 'other'
@@ -42,7 +43,7 @@ function phrase(category: Category, n: number): string {
     case 'terminal':
       return n === 1 ? 'Ran 1 command' : `Ran ${n} commands`
     case 'system':
-      return n === 1 ? 'Checked 1 thing on your Mac' : `Checked ${n} things on your Mac`
+      return n === 1 ? `Checked 1 thing on your ${deviceNoun()}` : `Checked ${n} things on your ${deviceNoun()}`
     case 'write':
       return n === 1 ? 'Wrote 1 file' : `Wrote ${n} files`
     case 'other':
