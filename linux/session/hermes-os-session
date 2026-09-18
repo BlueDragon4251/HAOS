@@ -40,11 +40,13 @@ if [[ "$HERMES_OS_SHELL_MODE" == "panels" ]]; then
     start_service hermes-os-clipboard-image wl-paste --type image --watch cliphist store
   fi
   if command -v swayidle >/dev/null; then
-    start_service hermes-os-idle swayidle -w \
-      timeout "${HERMES_OS_LOCK_AFTER:-600}" 'hermes-os lock' \
-      timeout "${HERMES_OS_SCREEN_OFF_AFTER:-900}" 'niri msg action power-off-monitors' \
-      resume 'niri msg action power-on-monitors' \
-      before-sleep 'hermes-os lock'
+    # Only arm the idle lock when the account can actually be unlocked (it has a password);
+    # otherwise the compositor would stay locked with no way back in. Screen power-off always runs.
+    idle_args=(timeout "${HERMES_OS_SCREEN_OFF_AFTER:-900}" 'niri msg action power-off-monitors' resume 'niri msg action power-on-monitors')
+    if sudo -n passwd -S "$USER" 2>/dev/null | awk '{exit ($2 == "P") ? 0 : 1}'; then
+      idle_args+=(timeout "${HERMES_OS_LOCK_AFTER:-600}" 'hermes-os lock' before-sleep 'hermes-os lock')
+    fi
+    start_service hermes-os-idle swayidle -w "${idle_args[@]}"
   fi
 fi
 

@@ -4,7 +4,8 @@ Registers the ``hermes_os`` toolset: a narrow set of explicit, permission-tiered
 Hermes act on the computer it is running on. Execution goes through a per-platform
 ``HostAdapter`` (macOS and Linux implemented; Windows is a typed stub), permissions through
 ``bridge.permissions`` (tiers, protected paths, the upstream approval gate), and every call is
-recorded by ``bridge.audit``.
+recorded by ``bridge.audit``. ``system_os`` (registered from the same ``TOOL_SPECS`` table) drives
+Hermes OS Linux's ``hermes-os`` CLI and answers with a clear failure on other platforms.
 
 Out-of-tree by design: the plugin uses only public plugin APIs (``register``,
 ``ctx.register_tool``, ``ctx.register_skill``, ``tools.approval.request_tool_approval``) so Hermes

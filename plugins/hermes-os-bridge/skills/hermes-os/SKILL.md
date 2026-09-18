@@ -64,3 +64,33 @@ logs from `journalctl`, trash from `gio trash`, notifications from `notify-send`
 - If a tool reports that a program is not installed, relay the package it names (for example
   `network-manager`, `pipewire`, `libnotify`) instead of improvising a shell workaround.
 - `sleep_display` is not available until the Hermes OS compositor ships; say so if asked.
+
+### `system_os`: Hermes OS Linux's own chores
+
+On Hermes OS Linux the `hermes-os` CLI is the control surface behind every hotkey and menu item, and
+`system_os` exposes it. Prefer it over `dnf`, `flatpak`, `niri msg` or `systemctl` in the terminal:
+the tool is tiered, audited, and returns the CLI's output. It is unavailable on macOS.
+
+| The user says | Do |
+| --- | --- |
+| "Install Firefox" / "Install org.gimp.GIMP" | `system_os` action=install_app name=firefox (a dnf package or Flatpak id) |
+| "Add Notion as an app" | `system_os` action=install_webapp name=Notion url=https://notion.so (icon_url optional) |
+| "Remove GIMP" / "Remove the Notion web app" | `system_os` action=remove_app / remove_webapp name=... |
+| "Remind me in 20 minutes to stretch" | `system_os` action=reminder duration=20m message="Stretch" |
+| "What reminders do I have?" / "Clear my reminders" | `system_os` action=reminders_list / reminders_clear |
+| "What time is it?" / "Battery?" / "Weather?" | `system_os` action=notice kind=time / battery / weather |
+| "Take a screenshot" / "Read the text on my screen" | `system_os` action=screenshot / ocr |
+| "Lock the screen" / "Put the computer to sleep" | `system_os` action=lock / suspend |
+| "Which themes are there?" / "Switch to the X theme" | `system_os` action=theme_list / theme_set name=X / theme_current |
+| "Update Hermes OS" | `system_os` action=update |
+| "Show my missions" / "Open memory" | `system_os` action=show_page page=missions (overview, hermes, missions, memory, files, automations, connections, settings) |
+| "Open a terminal" / "Open the system panel" | `system_os` action=open_window window=terminal / system / chat-popout |
+| "Launch Obsidian" | `system_os` action=launch name=obsidian |
+| "Go to my Work space" | `system_os` action=focus_workspace name=work |
+| "Close this window" | `system_os` action=close_focused_window |
+
+- `install_app`, `install_webapp`, `remove_app`, `remove_webapp`, `reminders_clear`, `update` and
+  `suspend` ask the user for confirmation before running; tell the user that is expected and do not
+  try to route around a denial.
+- Installs and updates can take minutes; report the CLI output (what was installed, or the error).
+- `duration` accepts `90s`, `20m`, `1h`, `1h30m` or a plain number of minutes.

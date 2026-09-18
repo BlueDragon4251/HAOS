@@ -1,11 +1,12 @@
 import { useStore } from '@nanostores/react'
-import { IconBellOff } from '@tabler/icons-react'
+import { IconBellOff, IconX } from '@tabler/icons-react'
 import { useEffect } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { Dot, EmptyState } from '../../components/ui/primitives.tsx'
 import { formatRelative } from '../../lib/format.ts'
-import { $notifications, $notificationsOpen, clearNotifications, markAllRead, type NotificationLevel } from '../../store/notifications.ts'
+import { $notifications, $notificationsOpen, activateDesktopNotification, clearNotifications, dismissNotification, type HermesNotification, markAllRead, type NotificationLevel } from '../../store/notifications.ts'
 import { showSurface } from '../../store/surface.ts'
+import { DesktopActions } from './Toasts.tsx'
 
 const TONE: Record<NotificationLevel, 'info' | 'ok' | 'warn' | 'danger'> = { info: 'info', success: 'ok', warn: 'warn', error: 'danger' }
 
@@ -33,6 +34,19 @@ export function NotificationsPanel() {
     return null
   }
 
+  const activate = (item: HermesNotification) => {
+    if (item.desktop) {
+      activateDesktopNotification(item, 'default')
+
+      return
+    }
+
+    if (item.surface) {
+      showSurface(item.surface)
+      $notificationsOpen.set(false)
+    }
+  }
+
   return (
     <>
       <button type="button" aria-label="Close notifications" className="absolute inset-0 z-(--z-panel)" onClick={() => $notificationsOpen.set(false)} />
@@ -48,26 +62,30 @@ export function NotificationsPanel() {
             <EmptyState icon={<IconBellOff />} title="You're all caught up" description="Tool results, approvals and task updates appear here." />
           ) : (
             items.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  if (item.surface) {
-                    showSurface(item.surface)
-                    $notificationsOpen.set(false)
-                  }
-                }}
-                className="flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left hover:bg-white/5"
-              >
+              <div key={item.id} className="group flex w-full items-start gap-2.5 rounded-md px-2 py-2 hover:bg-white/5">
                 <Dot tone={TONE[item.level]} className="mt-1.5" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[12.5px] text-fg">{item.title}</span>
-                    <span className="shrink-0 text-[11px] text-fg-4">{formatRelative(item.ts)}</span>
-                  </div>
-                  {item.body && <div className="mt-0.5 line-clamp-3 text-[12px] text-fg-3">{item.body}</div>}
+                  <button type="button" onClick={() => activate(item)} className="w-full min-w-0 text-left">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[12.5px] text-fg">{item.title}</span>
+                      <span className="shrink-0 text-[11px] text-fg-4">{formatRelative(item.ts)}</span>
+                    </div>
+                    {item.subtitle && <div className="truncate text-[11px] text-fg-4">{item.subtitle}</div>}
+                    {item.body && <div className="mt-0.5 line-clamp-3 text-[12px] text-fg-3">{item.body}</div>}
+                  </button>
+                  {item.desktop && item.desktop.actions.length > 0 && <DesktopActions item={item} />}
                 </div>
-              </button>
+                {item.desktop && (
+                  <button
+                    type="button"
+                    aria-label="Dismiss notification"
+                    onClick={() => dismissNotification(item.id)}
+                    className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded-xs text-fg-4 opacity-0 group-hover:opacity-100 hover:text-fg focus-visible:opacity-100"
+                  >
+                    <IconX size={13} />
+                  </button>
+                )}
+              </div>
             ))
           )}
         </div>

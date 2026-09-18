@@ -107,6 +107,19 @@ Native modules must be installed on Linux, so the repo is copied (rsync) rather 
 from the share; `node_modules`, `dist`, `.git` and the upstream snapshot are excluded and fetched
 inside the VM by `scripts/bootstrap.sh`.
 
+## Services (niri session)
+
+`hermes-os-session` starts, as transient user units: `wl-paste --watch cliphist store` (text and
+images; `Mod+Ctrl+V` opens the picker), and `swayidle` (display off after 15 min; lock after 10 min
+only when the account has a password). Notifications from other apps arrive through the shell's
+own `org.freedesktop.Notifications` daemon. The `hermes` VM user has no password by default, so
+`hermes-os lock` refuses until you run `hermes-os password` in a terminal; a lock nobody can undo
+would leave the compositor's session lock engaged.
+
+`Mod+Alt+Space` opens the control menu (Install / Remove / Update / Style / Trigger / System /
+Hermes); every item is a `hermes-os` command, so the agent (`system_os` tool) and scripts can do the
+same. Web apps (`hermes-os install webapp <name> <url>`) open as their own frameless windows.
+
 ## Known limits (Stage 1)
 
 - `cage` is a kiosk compositor: a launched app (Firefox, Nautilus) covers the shell fullscreen and

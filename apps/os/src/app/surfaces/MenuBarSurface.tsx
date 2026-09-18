@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconCheck, IconChevronDown } from '@tabler/icons-react'
+import { IconCheck, IconChevronDown, IconRefresh } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WmWorkspace } from '../../../shared/ipc.ts'
 import { HermesAvatar } from '../../components/app-icon.tsx'
@@ -37,7 +37,10 @@ export function MenuBarSurface() {
 
       <SpacesSwitcher workspaces={wm.workspaces} available={wm.available} />
 
-      <MenuBarStatus onSearch={() => openSurface('command', { type: 'command' })} onBell={openNotifications} />
+      <div className="flex items-center gap-3.5">
+        <UpdateIndicator />
+        <MenuBarStatus onSearch={() => openSurface('command', { type: 'command' })} onBell={openNotifications} />
+      </div>
     </header>
   )
 }
@@ -46,6 +49,69 @@ function openNotifications(): void {
   relayToMain({ type: 'notifications' })
   // Raise the Hermes window so the panel is actually visible.
   openSurface('main')
+}
+
+const UPDATE_KEY = 'hermes-os.update-available'
+
+interface UpdateAvailable {
+  version: string
+  checkedAt: number
+}
+
+/** The update service writes `{ version, checkedAt }` here when a newer Hermes OS exists; absent means up to date. */
+function readUpdateAvailable(): UpdateAvailable | null {
+  try {
+    const raw = localStorage.getItem(UPDATE_KEY)
+
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw) as Partial<UpdateAvailable> | null
+
+    return parsed && typeof parsed.version === 'string' && parsed.version ? { version: parsed.version, checkedAt: Number(parsed.checkedAt) || 0 } : null
+  } catch {
+    return null
+  }
+}
+
+/** A circular-arrows glyph with an accent dot while an update is pending; clicking runs `hermes-os update` through the control menu. */
+function UpdateIndicator() {
+  const [update, setUpdate] = useState<UpdateAvailable | null>(() => readUpdateAvailable())
+
+  useEffect(() => {
+    const refresh = () => setUpdate(readUpdateAvailable())
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === UPDATE_KEY) {
+        refresh()
+      }
+    }
+    // Other windows fire `storage`; the same window (or a non-DOM writer) is covered by a slow poll.
+    window.addEventListener('storage', onStorage)
+    const timer = window.setInterval(refresh, 60_000)
+
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  if (!update) {
+    return null
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={`Update available: Hermes OS ${update.version}`}
+      title={`Hermes OS ${update.version} is available`}
+      onClick={() => openSurface('command', { type: 'menu', args: ['update-hermes-os'] })}
+      className="relative flex size-6 items-center justify-center rounded-md hover:bg-white/10"
+    >
+      <IconRefresh size={15} />
+      <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent-strong" />
+    </button>
+  )
 }
 
 const capitalize = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value)

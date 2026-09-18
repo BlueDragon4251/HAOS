@@ -57,7 +57,8 @@ COMMANDS: dict[str, str] = {
     "ocr": "Select a screen region, extract its text (tesseract) to the clipboard",
     "clipboard": "Clipboard history picker",
     "notify": "Show a notification: notify <title> [body]",
-    "lock": "Lock the session",
+    "lock": "Lock the session (needs an account password; see `hermes-os password`)",
+    "password": "Set the login password the lock screen asks for",
     "suspend": "Suspend the machine",
     "power": "Power menu (sleep, restart, shut down, log out)",
     "webapp-open": "Internal: open a web app window: webapp-open <url> <name>",
@@ -409,12 +410,33 @@ def ocr() -> int:
 
 # ---------------------------------------------------------------------------------------------
 # System.
+def account_has_password() -> bool | None:
+    """True/False when it can be determined (needs passwordless sudo for `passwd -S`), else None."""
+    result = subprocess.run(["sudo", "-n", "passwd", "-S", os.environ.get("USER") or Path.home().name], capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    fields = result.stdout.split()
+    return len(fields) > 1 and fields[1] == "P"
+
+
 def lock() -> int:
+    # A lock nobody can undo is worse than no lock: an account without a password (the default in
+    # the dev VM) would leave the compositor's session lock engaged with no way back in.
+    if account_has_password() is False:
+        notify("Lock skipped", "Set a password first: hermes-os password")
+        return 1
     if shutil.which("swaylock"):
         cfg = HOME / ".config" / "swaylock" / "config"
         args = ["swaylock", "-f"] + (["-C", str(cfg)] if cfg.exists() else ["--color", "04113f"])
         return subprocess.call(args)
     return subprocess.call(["loginctl", "lock-session"])
+
+
+def password() -> int:
+    """Set (or change) the login password used by the lock screen; interactive by design."""
+    if not sys.stdin.isatty():
+        die("run `hermes-os password` in a terminal", 2)
+    return subprocess.call(["passwd"])
 
 
 def suspend() -> int:
@@ -518,6 +540,8 @@ def main(argv: list[str]) -> int:
         return ocr()
     if cmd == "lock":
         return lock()
+    if cmd == "password":
+        return password()
     if cmd == "suspend":
         return suspend()
     if cmd == "wm":

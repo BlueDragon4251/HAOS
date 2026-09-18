@@ -1,20 +1,33 @@
 import { atom } from 'nanostores'
+import type { IncomingNotification } from '../../shared/ipc.ts'
 import type { SurfaceId } from './surface.ts'
 import { $windowState } from './backend.ts'
 import { onGatewayEvent } from './gateway.ts'
 
 export type NotificationLevel = 'info' | 'success' | 'warn' | 'error'
 
+/** A notification another application sent through the freedesktop D-Bus service (panels mode). */
+export interface DesktopNotificationRef {
+  id: number
+  appName: string
+  /** Pairs of [actionKey, label] the app offered. */
+  actions: Array<[string, string]>
+}
+
 export interface HermesNotification {
   id: string
   title: string
   body?: string
+  /** Small secondary line under the title (the sending app's name for desktop notifications). */
+  subtitle?: string
   level: NotificationLevel
   ts: number
   read: boolean
   surface?: SurfaceId
   /** Stable key for sticky notifications the backend clears explicitly. */
   key?: string
+  /** Set when this came from another app; clicks and dismissals are reported back to it. */
+  desktop?: DesktopNotificationRef
 }
 
 export const $notifications = atom<HermesNotification[]>([])
@@ -28,12 +41,14 @@ let counter = 0
 export interface NotifyInput {
   title: string
   body?: string
+  subtitle?: string
   level?: NotificationLevel
   surface?: SurfaceId
   key?: string
   /** Also raise a native notification when the window is unfocused. */
   native?: boolean
   toast?: boolean
+  desktop?: DesktopNotificationRef
 }
 
 export function notify(input: NotifyInput): HermesNotification {
@@ -42,11 +57,13 @@ export function notify(input: NotifyInput): HermesNotification {
     id: existing?.id ?? `n${Date.now().toString(36)}${(counter++).toString(36)}`,
     title: input.title,
     body: input.body,
+    subtitle: input.subtitle,
     level: input.level ?? 'info',
     ts: Date.now(),
     read: false,
     surface: input.surface,
-    key: input.key
+    key: input.key,
+    desktop: input.desktop
   }
   const rest = $notifications.get().filter(n => n.id !== item.id)
   $notifications.set([item, ...rest].slice(0, MAX))
@@ -72,7 +89,75 @@ export function markAllRead(): void {
 }
 
 export function clearNotifications(): void {
+  // Other apps learn their notification went away when the list is cleared.
+  for (const item of $notifications.get()) {
+    if (item.desktop) {
+      reportDesktopAction(item.desktop, 'dismissed')
+    }
+  }
+
   $notifications.set([])
+}
+
+/** Remove one notification from the panel (and its toast); desktop ones tell the sender it was dismissed. */
+export function dismissNotification(id: string): void {
+  const item = $notifications.get().find(n => n.id === id)
+
+  if (item?.desktop) {
+    reportDesktopAction(item.desktop, 'dismissed')
+  }
+
+  $notifications.set($notifications.get().filter(n => n.id !== id))
+  dismissToast(id)
+}
+
+/** Tell the sending app which action (or 'default' for a click, 'dismissed' for close) the user chose. */
+export function reportDesktopAction(ref: DesktopNotificationRef, actionKey: string): void {
+  window.hermesOS?.desktopNotifications?.action(ref.id, actionKey).catch(() => undefined)
+}
+
+/** The user activated a desktop notification: report the chosen key and drop it from the list. */
+export function activateDesktopNotification(item: HermesNotification, actionKey = 'default'): void {
+  if (item.desktop) {
+    reportDesktopAction(item.desktop, actionKey)
+  }
+
+  $notifications.set($notifications.get().filter(n => n.id !== item.id))
+  dismissToast(item.id)
+}
+
+const urgencyLevel = (urgency: IncomingNotification['urgency']): NotificationLevel => (urgency === 'critical' ? 'error' : 'info')
+
+/** Push a notification another application sent (panels mode) into the shell's list and toasts. */
+export function notifyFromDesktop(incoming: IncomingNotification): HermesNotification {
+  const title = incoming.summary.trim() || incoming.appName.trim() || 'Notification'
+  const body = incoming.body.trim() || undefined
+  // Same app re-sending the same id replaces the earlier entry instead of stacking.
+  const key = `desktop:${incoming.id}`
+
+  return notify({
+    title,
+    body,
+    subtitle: incoming.appName.trim() && incoming.appName.trim() !== title ? incoming.appName.trim() : undefined,
+    level: urgencyLevel(incoming.urgency),
+    key,
+    // Low urgency stays in the panel without interrupting.
+    toast: incoming.urgency !== 'low',
+    desktop: { id: incoming.id, appName: incoming.appName, actions: incoming.actions.filter(([actionKey]) => actionKey !== 'default') }
+  })
+}
+
+/** Subscribe to desktop notifications when the bridge offers them (panels mode); no-op elsewhere. */
+export function bindDesktopNotifications(): () => void {
+  const bridge = window.hermesOS?.desktopNotifications
+
+  if (!bridge || typeof bridge.onIncoming !== 'function') {
+    return () => undefined
+  }
+
+  return bridge.onIncoming(incoming => {
+    notifyFromDesktop(incoming)
+  })
 }
 
 const levelFrom = (value: string | undefined): NotificationLevel =>

@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { ShellCommand } from '../../../shared/ipc.ts'
+import { runHermesOsWithToast } from '../../lib/hermes-os-cli.ts'
 import { afterExit, motion } from '../../lib/motion.ts'
-import { $backend } from '../../store/backend.ts'
+import { $backend, updatePrefs } from '../../store/backend.ts'
 import { openStoredSession, runSlash, sendPrompt } from '../../store/chat.ts'
-import { $notificationsOpen, notify } from '../../store/notifications.ts'
+import { $notificationsOpen, bindDesktopNotifications, notify } from '../../store/notifications.ts'
 import { openSurface } from '../../store/shell.ts'
 import { toggleSidebar } from '../../store/sidebar.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../../store/surface.ts'
@@ -36,6 +37,9 @@ export function MainSurface() {
   useEffect(() => {
     ensureMainWindow()
   }, [])
+
+  // Notifications other apps send over D-Bus land in the shell's list and toasts (panels mode only).
+  useEffect(() => bindDesktopNotifications(), [])
 
   useShellCommands((command: ShellCommand) => {
     switch (command.type) {
@@ -98,9 +102,18 @@ export function MainSurface() {
         $applicationsOpen.set(true)
 
         return
-      case 'power':
-        // TODO(phase 2): machine-side power actions need an audited IPC; until then, say so.
-        notify({ title: 'Power actions arrive in Phase 2', body: command.args?.[0] ? `Requested: ${command.args[0]}` : undefined, level: 'info' })
+      case 'hermes-os': {
+        // The overlay hands off commands that must run after it closed (screenshot, OCR, hotkey overlay).
+        const args = command.args ?? []
+
+        if (args.length > 0) {
+          void runHermesOsWithToast(args, command.text || args.join(' '))
+        }
+
+        return
+      }
+      case 'pick-wallpaper':
+        void pickWallpaper()
 
         return
       case 'payload':
@@ -183,6 +196,22 @@ export function MainSurface() {
       {bootVisible && <BootScreen state={backend} leaving={!bootOnly} />}
     </div>
   )
+}
+
+/** Style > Wallpaper: the Hermes window owns the file dialog because the overlay closes when it loses focus. */
+async function pickWallpaper(): Promise<void> {
+  try {
+    const [wallpaper] = await window.hermesOS.fs.pickFiles({ multiple: false })
+
+    if (!wallpaper) {
+      return
+    }
+
+    await updatePrefs({ wallpaper })
+    notify({ title: 'Wallpaper updated', body: wallpaper.split('/').pop() || wallpaper, level: 'success' })
+  } catch (error) {
+    notify({ title: 'Could not set wallpaper', body: error instanceof Error ? error.message : String(error), level: 'error' })
+  }
 }
 
 /** One still frame of the wallpaper behind the sidebar and page so the glass has something to sit on. */

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -19,7 +20,7 @@ from . import audit
 from .host import HostNotSupported, host
 from .host.base import FileSearch
 from .permissions import Tier, authorize
-from .util import expand, fail, ok, truncate
+from .util import expand, fail, ok, run, truncate
 
 _STR = {"type": "string"}
 _INT = {"type": "integer"}
@@ -646,6 +647,192 @@ def handle_system_logs(args: dict[str, Any], **_: Any) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
+# system_os
+# ---------------------------------------------------------------------------------------------
+
+SYSTEM_OS_SCHEMA = _schema(
+    "system_os",
+    "Hermes OS Linux's control surface: the same `hermes-os` commands the user's hotkeys and menu run. "
+    "Software: install_app (name: a dnf package or Flatpak id), install_webapp (name, url, icon_url?: pins a website as an app), remove_app, remove_webapp. "
+    "Reminders: reminder (duration like 20m or 1h30m, message), reminders_list, reminders_clear. "
+    "notice (kind=time|battery|weather) shows a status notice. screenshot captures the screen and hands it to Hermes; ocr reads the text on screen. "
+    "lock locks the session; suspend puts the computer to sleep. Themes: theme_list, theme_set (name), theme_current. update updates Hermes OS. "
+    "Hermes shell: show_page (page: overview, hermes, missions, memory, files, automations, connections, settings), open_window (window=terminal|system|chat-popout), launch (name: an installed app), notify (title, body?). "
+    "Spaces: focus_workspace (name), close_focused_window. install/remove/update and suspend ask the user to confirm. "
+    "Only available on Hermes OS Linux; on macOS this tool is unavailable (use system_open / system_control instead).",
+    {
+        "action": _enum(
+            "install_app", "install_webapp", "remove_app", "remove_webapp",
+            "reminder", "reminders_list", "reminders_clear", "notice",
+            "screenshot", "ocr", "lock", "suspend",
+            "theme_list", "theme_set", "theme_current", "update",
+            "show_page", "open_window", "launch", "notify",
+            "focus_workspace", "close_focused_window",
+            description="What to do.",
+        ),
+        "name": _desc(_STR, "For install_app / remove_app (package or Flatpak id), install_webapp / remove_webapp (web app name), theme_set (theme name), launch (app name or desktop id), focus_workspace (Space name)."),
+        "url": _desc(_STR, "For install_webapp: the site to pin (http:// or https://)."),
+        "icon_url": _desc(_STR, "For install_webapp: optional icon image URL (http:// or https://)."),
+        "duration": _desc(_STR, "For reminder: how long from now, e.g. 90s, 20m, 1h, 1h30m, or a plain number of minutes."),
+        "message": _desc(_STR, "For reminder: what to remind the user about."),
+        "kind": _enum("time", "battery", "weather", description="For notice."),
+        "page": _desc(_STR, "For show_page: the Hermes page id (overview, hermes, missions, memory, files, automations, connections, settings)."),
+        "window": _enum("terminal", "system", "chat-popout", description="For open_window."),
+        "title": _desc(_STR, "For notify."),
+        "body": _desc(_STR, "For notify: optional body text."),
+    },
+    required=("action",),
+)
+
+HERMES_OS_BIN = "hermes-os"
+_LONG_RUNNING_OS_ACTIONS = frozenset({"install_app", "install_webapp", "remove_app", "update"})
+_OS_TIMEOUT_LONG = 1200.0
+_OS_TIMEOUT_SHORT = 60.0
+_OS_OUTPUT_LIMIT = 4000
+_DURATION = re.compile(r"^\d+(s|m|h)(\d+(m|s))?$")
+
+SYSTEM_OS_TIERS: dict[str, Tier] = {
+    "theme_list": Tier.READ, "theme_current": Tier.READ, "reminders_list": Tier.READ, "notice": Tier.READ,
+    "show_page": Tier.READ, "open_window": Tier.READ, "focus_workspace": Tier.READ,
+    "launch": Tier.ACT, "notify": Tier.ACT, "screenshot": Tier.ACT, "ocr": Tier.ACT, "lock": Tier.ACT,
+    "reminder": Tier.ACT, "theme_set": Tier.ACT, "close_focused_window": Tier.ACT,
+    "install_app": Tier.MUTATE, "install_webapp": Tier.MUTATE, "remove_webapp": Tier.MUTATE, "reminders_clear": Tier.MUTATE, "update": Tier.MUTATE,
+    "remove_app": Tier.DESTRUCTIVE, "suspend": Tier.DESTRUCTIVE,
+}
+
+
+def _os_arg(args: dict[str, Any], key: str, label: str | None = None) -> str:
+    """A required free-text argument: non-empty and not shaped like a CLI flag."""
+    value = str(args.get(key) or "").strip()
+    if not value:
+        raise ValueError(f"{key} is required for action={label or args.get('action')}")
+    if value.startswith("-"):
+        raise ValueError(f"{key} must not start with '-'")
+    return value
+
+
+def _os_url(args: dict[str, Any], key: str, required: bool) -> str | None:
+    value = str(args.get(key) or "").strip()
+    if not value:
+        if required:
+            raise ValueError(f"{key} is required for action={args.get('action')}")
+        return None
+    if not value.lower().startswith(("http://", "https://")):
+        raise ValueError(f"{key} must start with http:// or https://")
+    return value
+
+
+def normalise_duration(raw: Any) -> str:
+    """Accept ``90s`` / ``20m`` / ``1h`` / ``1h30m`` or a plain number of minutes (pure; tested)."""
+    text = str(raw or "").strip().lower().replace(" ", "")
+    if not text:
+        raise ValueError("duration is required for action=reminder")
+    if text.isdigit():
+        if int(text) <= 0:
+            raise ValueError("duration must be positive")
+        return f"{int(text)}m"
+    if not _DURATION.match(text):
+        raise ValueError("duration must look like 90s, 20m, 1h or 1h30m (or a plain number of minutes)")
+    return text
+
+
+def plan_system_os(args: dict[str, Any]) -> tuple[list[str], str]:
+    """Map the tool arguments to a ``hermes-os`` argv and a human summary (pure; tested).
+
+    Raises ``ValueError`` for unknown actions and invalid or missing arguments."""
+    action = str(args.get("action") or "")
+    if action == "install_app":
+        name = _os_arg(args, "name")
+        return ["install", "app", name], f"install app {name}"
+    if action == "install_webapp":
+        name, url, icon = _os_arg(args, "name"), _os_url(args, "url", True), _os_url(args, "icon_url", False)
+        return ["install", "webapp", name, url, *([icon] if icon else [])], f"install web app {name} ({url})"  # type: ignore[list-item]
+    if action == "remove_app":
+        name = _os_arg(args, "name")
+        return ["remove", "app", name], f"remove app {name}"
+    if action == "remove_webapp":
+        name = _os_arg(args, "name")
+        return ["remove", "webapp", name], f"remove web app {name}"
+    if action == "reminder":
+        duration = normalise_duration(args.get("duration"))
+        message = _os_arg(args, "message")
+        return ["reminder", duration, message], f"remind in {duration}: {truncate(message, 60)}"
+    if action == "reminders_list":
+        return ["reminder", "list"], "list reminders"
+    if action == "reminders_clear":
+        return ["reminder", "clear"], "clear all reminders"
+    if action == "notice":
+        kind = str(args.get("kind") or "").strip().lower()
+        if kind not in ("time", "battery", "weather"):
+            raise ValueError("kind must be one of time, battery, weather")
+        return ["notice", kind], f"show the {kind} notice"
+    if action == "screenshot":
+        return ["screenshot"], "take a screenshot"
+    if action == "ocr":
+        return ["ocr"], "read the text on screen (OCR)"
+    if action == "lock":
+        return ["lock"], "lock the session"
+    if action == "suspend":
+        return ["suspend"], "suspend the computer"
+    if action == "theme_list":
+        return ["theme", "list"], "list themes"
+    if action == "theme_set":
+        name = _os_arg(args, "name")
+        return ["theme", "set", name], f"set theme {name}"
+    if action == "theme_current":
+        return ["theme", "current"], "show the current theme"
+    if action == "update":
+        return ["update"], "update Hermes OS"
+    if action == "show_page":
+        page = _os_arg(args, "page")
+        return ["page", page], f"show the {page} page"
+    if action == "open_window":
+        window = str(args.get("window") or "").strip().lower()
+        if window not in ("terminal", "system", "chat-popout"):
+            raise ValueError("window must be one of terminal, system, chat-popout")
+        return ["open", window], f"open the {window} window"
+    if action == "launch":
+        name = _os_arg(args, "name")
+        return ["launch", name], f"launch {name}"
+    if action == "notify":
+        title = _os_arg(args, "title")
+        body = str(args.get("body") or "").strip()
+        return ["notify", title, *([body] if body else [])], f"notify: {title}"
+    if action == "focus_workspace":
+        name = _os_arg(args, "name")
+        return ["wm", "focus-workspace", name], f"focus Space {name}"
+    if action == "close_focused_window":
+        return ["wm", "close-window"], "close the focused window"
+    raise ValueError(f"unknown action '{action}'")
+
+
+def system_os_handler(args: dict[str, Any], **_: Any) -> str:
+    if host().platform != "linux":
+        return fail("system_os is only available on Hermes OS Linux")
+    action = str(args.get("action") or "")
+    try:
+        cli_args, summary = plan_system_os(args)
+    except ValueError as exc:
+        return fail(str(exc))
+    tier = SYSTEM_OS_TIERS[action]
+    timeout = _OS_TIMEOUT_LONG if action in _LONG_RUNNING_OS_ACTIONS else _OS_TIMEOUT_SHORT
+    argv = [HERMES_OS_BIN, *cli_args]
+
+    def execute() -> dict[str, Any]:
+        result = run(argv, timeout=timeout)
+        if result.code == 127:
+            raise HostNotSupported("The hermes-os command is not installed (it ships with Hermes OS Linux as /usr/local/bin/hermes-os).")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"hermes-os exited {result.code}")
+        return {"action": action, "output": truncate(result.stdout.strip(), _OS_OUTPUT_LIMIT)}
+
+    return _guarded("system_os", tier, action, summary, args, (), execute)
+
+
+handle_system_os = system_os_handler
+
+
+# ---------------------------------------------------------------------------------------------
 
 TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_network", SYSTEM_NETWORK_SCHEMA, handle_system_network, "📶"),
@@ -659,6 +846,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_open", SYSTEM_OPEN_SCHEMA, handle_system_open, "↗️"),
     ToolSpec("system_kill_process", SYSTEM_KILL_PROCESS_SCHEMA, handle_system_kill_process, "⛔"),
     ToolSpec("system_files", SYSTEM_FILES_SCHEMA, handle_system_files, "🗂️"),
+    ToolSpec("system_os", SYSTEM_OS_SCHEMA, system_os_handler, "🐧"),
 )
 
-__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "plan_operations", "resolve_when", "json"]
+__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "json"]

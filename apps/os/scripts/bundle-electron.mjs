@@ -24,8 +24,10 @@ await build({
   entryPoints: [path.join(root, 'electron/main.ts')],
   outfile: path.join(root, 'dist/electron/main.mjs'),
   format: 'esm',
-  // Native module and Electron stay external; everything else is inlined.
-  external: ['electron', 'node-pty'],
+  // Native module and Electron stay external; everything else is inlined. dbus-next is bundled, but
+  // its optional peers (x11 for an unused address lookup, usocket for unix-fd passing) are not installed;
+  // leaving them external keeps the lazy `require` calls, which fail harmlessly at run time.
+  external: ['electron', 'node-pty', 'x11', 'usocket'],
   banner: {
     js: [
       "import { createRequire as __hermesCreateRequire } from 'node:module';",
