@@ -120,6 +120,25 @@ would leave the compositor's session lock engaged.
 Hermes); every item is a `hermes-os` command, so the agent (`system_os` tool) and scripts can do the
 same. Web apps (`hermes-os install webapp <name> <url>`) open as their own frameless windows.
 
+## Themes, omakase, updates
+
+- **Themes** live in `linux/themes/<name>/theme.json` (ocean, ice, violet, graphite). `hermes-os
+  theme set <name>` (or Style → Theme in the control menu, or the agent's `system_os theme_set`)
+  recolours the shell, niri borders/backdrop (`~/.config/niri/theme.kdl`), swaylock, GTK 3/4
+  (`gtk.css` + `gsettings`), and the `foot` rescue terminal in one step; a theme may also ship a
+  wallpaper. Add a theme by dropping a folder into `~/.config/hermes-os/themes/`.
+- **Omakase** (`linux/omakase/{packages,flatpaks,webapps}.txt`) is the curated software set every
+  install gets: Firefox, Nautilus, Text Editor, LibreOffice, Loupe, Papers, Calculator, Calendar,
+  VLC, developer tools, fonts; Obsidian, Spotify, LocalSend, VS Code, Signal from Flathub; and web
+  apps (HEY, Google Calendar/Messages, WhatsApp, X, YouTube, ChatGPT, GitHub) as their own windows.
+  Provisioning installs it (`HERMES_OS_OMAKASE=0` to skip); `hermes-os omakase install` re-syncs.
+- **Updates**: `hermes-os update` pulls the repo on the chosen channel (`hermes-os channel
+  stable|edge`; both track `main` until releases exist), runs one-shot `linux/migrations/*.sh`
+  (tracked in `/var/lib/hermes-os/migrations`), upgrades Fedora packages and Flatpaks, updates
+  Hermes Agent, rebuilds the shell and restarts it. A daily user timer runs `hermes-os update
+  --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
+  (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
+
 ## Known limits (Stage 1)
 
 - `cage` is a kiosk compositor: a launched app (Firefox, Nautilus) covers the shell fullscreen and

@@ -37,7 +37,11 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   sudo install -m 0755 "$REPO/linux/session/hermes-os-session" /usr/local/bin/hermes-os-session
   sudo install -m 0755 "$REPO/linux/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
   sudo install -m 0644 "$REPO/linux/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
-  sudo install -m 0755 "$REPO/linux/bin/hermes-os" /usr/local/bin/hermes-os
+  sudo install -m 0755 "$REPO/linux/bin/hermes-os" "$REPO/linux/bin/hermes-os-theme" "$REPO/linux/bin/hermes-os-omakase" "$REPO/linux/bin/hermes-os-update" /usr/local/bin/
+  mkdir -p "$HOME/.config/systemd/user"
+  install -m 0644 "$REPO/linux/session/hermes-os-update-check.service" "$REPO/linux/session/hermes-os-update-check.timer" "$HOME/.config/systemd/user/"
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable hermes-os-update-check.timer 2>/dev/null || true
   mkdir -p "$HOME/.config/niri" "$HOME/.config/swaylock"
   install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
   install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"

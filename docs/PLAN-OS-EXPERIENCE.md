@@ -1,5 +1,8 @@
 # Plan: from "Linux with a nice shell" to an OS
 
+Status: Phases 1-3 implemented and verified in the VM (see `docs/LINUX.md` for how to use the
+result). Remaining from the original list: nothing; follow-ups are noted at the end.
+
 Six changes, in three phases, each verified in the Linux VM and committed before the next. The
 thread through all of them: Hermes owns every window, every hotkey and every system chore, so a
 user never leaves Hermes OS to do something.
@@ -82,3 +85,11 @@ selector; stores that act across windows go through a small relay (`shell.relay(
 ## Out of scope (still Stage 2 security work)
 
 Capability broker, sandboxing, our own compositor, SELinux policy.
+
+## Follow-ups noted while building
+
+- Release channels are placeholders (both track `main`); cut tagged releases and point `stable` at them.
+- Dictation (Omarchy's Voxtype) has no Fedora package; Hermes's own voice path is the candidate.
+- The in-shell Terminal palette does not yet follow the theme (foot does).
+- Web-app windows are titled by name but share the shell's app id; the Dock shows them by title.
+- GPU-less VMs run niri nested in cage (software rendering); UTM with virgl or real hardware runs niri directly.

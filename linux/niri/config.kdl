@@ -286,5 +286,7 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// Machine-specific overrides (output scale, extra binds). Created by hermes-os-compositor.
+// Colours from the active theme (written by hermes-os-theme), then machine-specific overrides
+// (output scale, extra binds; created by hermes-os-compositor and never overwritten).
+include "theme.kdl"
 include "local.kdl"

@@ -11,6 +11,9 @@ interface ControlRequest {
   cmd: string
   args?: string[]
   attachments?: string[]
+  /** `theme`: the shell part of a theme definition. */
+  shell?: Record<string, unknown>
+  wallpaper?: string
 }
 
 /** Commands that open the command overlay in a given mode, with the focused window as context. */
@@ -174,6 +177,12 @@ export class ControlSocket {
 
         return { ok: true }
       }
+      case 'update-available': {
+        // From hermes-os-update --check: [pendingCount, summary]. The menu bar shows a dot when > 0.
+        this.shell.relay('menubar', { type: 'update-available', args })
+
+        return { ok: true }
+      }
       case 'webapp': {
         const [url, name, slug] = args
 
@@ -192,17 +201,27 @@ export class ControlSocket {
         return { ok: true, wallpaper: next.wallpaper ?? 'default' }
       }
       case 'theme': {
-        // Theme names map onto the shell's theme preference; the Phase 3 engine applies the rest.
+        // hermes-os-theme has already recoloured niri, swaylock, GTK and foot; this applies the
+        // shell's part (theme + accent preference, optional wallpaper) so everything switches together.
         const name = args[0]
 
         if (!name) {
           return { ok: false, error: 'theme needs a name' }
         }
 
-        const next = writePrefs({ theme: name.includes('graphite') ? 'graphite' : 'ocean' })
+        const shellSpec = (request.shell ?? {}) as { theme?: string; accent?: string }
+        const theme = shellSpec.theme === 'graphite' ? 'graphite' : shellSpec.theme === 'ocean' ? 'ocean' : name.includes('graphite') ? 'graphite' : 'ocean'
+        const accent = shellSpec.accent === 'ice' || shellSpec.accent === 'violet' ? shellSpec.accent : 'blue'
+        const patch: Partial<HermesOSPrefs> = { theme, accent }
+
+        if (typeof request.wallpaper === 'string') {
+          patch.wallpaper = request.wallpaper || undefined
+        }
+
+        const next = writePrefs(patch)
         this.onPrefsChanged?.(next)
 
-        return { ok: true, theme: next.theme }
+        return { ok: true, theme: next.theme, accent: next.accent }
       }
       case 'state':
         return { ok: true, ...this.shell.niri.state() }

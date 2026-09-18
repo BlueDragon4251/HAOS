@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# Update Hermes OS: the shell (repo + rebuild), one-shot migrations, Fedora packages, Flatpaks and
+# Hermes Agent. `--check` only reports and records whether anything is pending (the menu bar shows a
+# dot). Channels (~/.config/hermes-os/channel): stable (default) or edge; both track the repo's main
+# branch until releases are cut, and are recorded so that switching later is a one-line change.
+#
+#   hermes-os-update [--check] [--no-system] [--no-hermes]
+set -uo pipefail
+
+REPO="${HERMES_OS_REPO:-$HOME/Hermes-OS}"
+STATE="$HOME/.local/state/hermes-os"
+CONFIG="$HOME/.config/hermes-os"
+CHANNEL="$(cat "$CONFIG/channel" 2>/dev/null || echo stable)"
+MIGRATIONS_DONE="/var/lib/hermes-os/migrations"
+CHECK=0
+SYSTEM=1
+HERMES=1
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK=1 ;;
+    --no-system) SYSTEM=0 ;;
+    --no-hermes) HERMES=0 ;;
+    *) echo "unknown option $arg" >&2; exit 2 ;;
+  esac
+done
+mkdir -p "$STATE" "$CONFIG"
+
+branch_for_channel() {
+  case "$CHANNEL" in
+    edge) echo main ;;
+    *) echo main ;;
+  esac
+}
+
+notify() { hermes-os notify "$1" "${2:-}" >/dev/null 2>&1 || true; }
+report() { hermes-os update-available "$1" "$2" >/dev/null 2>&1 || true; }
+
+# ---------------------------------------------------------------------------------------------
+pending_repo=0
+repo_remote=""
+if [[ -d "$REPO/.git" ]]; then
+  branch="$(branch_for_channel)"
+  if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
+    repo_remote="origin/$branch"
+    git -C "$REPO" fetch --quiet origin "$branch" 2>/dev/null || echo "WARNING: could not fetch $repo_remote"
+    ahead="$(git -C "$REPO" rev-list --count "HEAD..$repo_remote" 2>/dev/null || echo 0)"
+    [[ "$ahead" -gt 0 ]] && pending_repo=$ahead
+  fi
+else
+  echo "repo at $REPO has no .git (pushed from a Mac): shell updates arrive with linux/dev/push.sh"
+fi
+
+pending_pkgs=0
+if [[ $SYSTEM -eq 1 ]] && command -v dnf >/dev/null; then
+  # check-update exits 100 when updates exist.
+  out="$(dnf -q check-update 2>/dev/null)"
+  rc=$?
+  if [[ $rc -eq 100 ]]; then
+    pending_pkgs="$(echo "$out" | grep -cE '^[[:alnum:]]')"
+  fi
+fi
+
+pending_flatpaks=0
+if [[ $SYSTEM -eq 1 ]] && command -v flatpak >/dev/null; then
+  pending_flatpaks="$(flatpak remote-ls --user --updates --columns=application flathub 2>/dev/null | grep -c . || true)"
+fi
+
+if [[ $CHECK -eq 1 ]]; then
+  total=$((pending_repo + pending_pkgs + pending_flatpaks))
+  summary="shell:$pending_repo packages:$pending_pkgs flatpaks:$pending_flatpaks"
+  printf '{"channel":"%s","checkedAt":"%s","pending":%d,"shell":%d,"packages":%d,"flatpaks":%d}\n' \
+    "$CHANNEL" "$(date -Is)" "$total" "$pending_repo" "$pending_pkgs" "$pending_flatpaks" >"$STATE/update-available.json"
+  echo "$summary"
+  report "$total" "$summary"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------------------------
+echo "==> Hermes OS update ($CHANNEL)"
+notify "Updating Hermes OS" "This can take a few minutes."
+failed=()
+
+if [[ -n "$repo_remote" && $pending_repo -gt 0 ]]; then
+  echo "==> shell: pulling $repo_remote"
+  git -C "$REPO" pull --ff-only --quiet origin "$(branch_for_channel)" || failed+=(shell)
+fi
+
+# One-shot migrations, tracked by file name so each runs exactly once per machine.
+if [[ -d "$REPO/linux/migrations" ]]; then
+  sudo -n mkdir -p "$MIGRATIONS_DONE"
+  for migration in "$REPO"/linux/migrations/*.sh; do
+    [[ -f "$migration" ]] || continue
+    name="$(basename "$migration")"
+    [[ -f "$MIGRATIONS_DONE/$name" ]] && continue
+    echo "==> migration $name"
+    if bash "$migration"; then
+      sudo -n touch "$MIGRATIONS_DONE/$name"
+    else
+      failed+=("migration:$name")
+    fi
+  done
+fi
+
+if [[ $SYSTEM -eq 1 ]]; then
+  echo "==> packages"
+  sudo -n dnf -y -q upgrade || failed+=(packages)
+  if command -v flatpak >/dev/null; then
+    echo "==> flatpaks"
+    flatpak update -y --noninteractive --user >/dev/null || failed+=(flatpaks)
+  fi
+fi
+
+if [[ $HERMES -eq 1 ]]; then
+  hermes_bin="$HOME/.hermes/hermes-agent/venv/bin/hermes"
+  if [[ -x "$hermes_bin" ]]; then
+    echo "==> Hermes Agent"
+    "$hermes_bin" update </dev/null >/dev/null 2>&1 || echo "WARNING: hermes update did not complete (run it in a terminal)"
+  fi
+fi
+
+if [[ -x "$REPO/linux/dev/build.sh" && ( $pending_repo -gt 0 || -n "${HERMES_OS_FORCE_REBUILD:-}" ) ]]; then
+  echo "==> rebuilding the shell"
+  bash "$REPO/linux/dev/build.sh" || failed+=(build)
+fi
+
+printf '{"channel":"%s","checkedAt":"%s","pending":0,"shell":0,"packages":0,"flatpaks":0}\n' "$CHANNEL" "$(date -Is)" >"$STATE/update-available.json"
+report 0 "up to date"
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+  notify "Update finished with problems" "${failed[*]}"
+  echo "failed: ${failed[*]}" >&2
+  exit 1
+fi
+notify "Hermes OS is up to date" "Restart the shell to use the new build."
+if [[ $pending_repo -gt 0 ]]; then
+  hermes-os-restart-shell >/dev/null 2>&1 || true
+fi

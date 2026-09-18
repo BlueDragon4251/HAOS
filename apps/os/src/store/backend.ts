@@ -37,9 +37,15 @@ export function bindBackendStores(): () => void {
     $prefs.set(prefs)
     applyPrefsToDocument(prefs)
   })
+  // Preferences changed by another surface window or by the `hermes-os` CLI (theme, wallpaper).
+  const offPrefs = window.hermesOS.prefs.onChanged?.(prefs => {
+    $prefs.set(prefs)
+    applyPrefsToDocument(prefs)
+  })
 
   return () => {
     offBackend()
     offWindow()
+    offPrefs?.()
   }
 }

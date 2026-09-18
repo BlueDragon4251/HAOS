@@ -62,6 +62,9 @@ COMMANDS: dict[str, str] = {
     "suspend": "Suspend the machine",
     "power": "Power menu (sleep, restart, shut down, log out)",
     "webapp-open": "Internal: open a web app window: webapp-open <url> <name>",
+    "update-available": "Internal: tell the menu bar how many updates are pending",
+    "channel": "Show or set the update channel: channel [stable|edge]",
+    "omakase": "Install the curated software set (omakase install | omakase list)",
     "wm": "Pass an action to niri: wm <action> [args]",
     "state": "Dump the shell's window-manager state",
     "debug": "Print diagnostics for bug reports",
@@ -494,7 +497,21 @@ def main(argv: list[str]) -> int:
     if cmd not in COMMANDS:
         die(f"unknown command {cmd!r} (see `hermes-os commands`)", 2)
 
-    if cmd in OVERLAY or cmd in {"page", "open", "launch", "notify", "state"}:
+    if cmd == "channel":
+        marker = CONFIG_DIR / "channel"
+        if args:
+            if args[0] not in ("stable", "edge"):
+                die("channel stable|edge", 2)
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            marker.write_text(args[0] + "\n")
+        print(marker.read_text().strip() if marker.exists() else "stable")
+        return 0
+    if cmd == "omakase":
+        tool = shutil.which("hermes-os-omakase")
+        if not tool:
+            die("hermes-os-omakase is not installed", 127)
+        return subprocess.call([tool, *(args or ["install"])])
+    if cmd in OVERLAY or cmd in {"page", "open", "launch", "notify", "state", "update-available"}:
         reply = relay(cmd, args)
         if cmd == "state":
             print(json.dumps(reply, indent=2))

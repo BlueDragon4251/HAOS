@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WmWorkspace } from '../../../shared/ipc.ts'
 import { HermesAvatar } from '../../components/app-icon.tsx'
 import { cn } from '../../lib/cn.ts'
-import { $wm, openSurface, relayToMain, wmAction } from '../../store/shell.ts'
+import { $wm, onShellCommand, openSurface, relayToMain, wmAction } from '../../store/shell.ts'
 import { $activeSpace, $spaces, setActiveSpace } from '../../store/spaces.ts'
 import { BackendBadge, MenuBarStatus } from '../shell/MenuBar.tsx'
 import { OUR_MAIN_TITLE, windowLabel } from './shell-utils.ts'
@@ -89,10 +89,27 @@ function UpdateIndicator() {
     // Other windows fire `storage`; the same window (or a non-DOM writer) is covered by a slow poll.
     window.addEventListener('storage', onStorage)
     const timer = window.setInterval(refresh, 60_000)
+    // `hermes-os-update --check` reports through the control socket: [pendingCount, summary].
+    const offCommand = onShellCommand(command => {
+      if (command.type !== 'update-available') {
+        return
+      }
+
+      const pending = Number(command.args?.[0] ?? 0)
+
+      if (pending > 0) {
+        localStorage.setItem(UPDATE_KEY, JSON.stringify({ version: command.args?.[1] || `${pending} pending`, checkedAt: Date.now() }))
+      } else {
+        localStorage.removeItem(UPDATE_KEY)
+      }
+
+      refresh()
+    })
 
     return () => {
       window.removeEventListener('storage', onStorage)
       window.clearInterval(timer)
+      offCommand()
     }
   }, [])
 

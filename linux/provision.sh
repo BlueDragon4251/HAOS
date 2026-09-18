@@ -81,7 +81,16 @@ step "Hermes OS session"
 install -m 0755 "$PAYLOAD/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
 install -m 0755 "$PAYLOAD/session/hermes-os-session" /usr/local/bin/hermes-os-session
 install -m 0755 "$PAYLOAD/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
-install -m 0755 "$PAYLOAD/bin/hermes-os" /usr/local/bin/hermes-os
+install -m 0755 "$PAYLOAD/bin/hermes-os" "$PAYLOAD/bin/hermes-os-theme" "$PAYLOAD/bin/hermes-os-omakase" "$PAYLOAD/bin/hermes-os-update" /usr/local/bin/
+# Themes and omakase lists for machines without the repo checked out.
+install -d /usr/local/share/hermes-os-linux/themes /usr/local/share/hermes-os-linux/omakase
+cp -R "$PAYLOAD"/themes/. /usr/local/share/hermes-os-linux/themes/
+cp -R "$PAYLOAD"/omakase/. /usr/local/share/hermes-os-linux/omakase/
+# Daily update check (user timer) and the default theme.
+sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/systemd/user"
+install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/hermes-os-update-check.service" "$PAYLOAD/session/hermes-os-update-check.timer" "$HERMES_UID_HOME/.config/systemd/user/"
+sudo -u "$HERMES_USER" -H env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable hermes-os-update-check.timer 2>/dev/null || true
+sudo -u "$HERMES_USER" -H hermes-os-theme set "$(sudo -u "$HERMES_USER" -H hermes-os-theme current)" || true
 # niri config for the session user (managed copy; local.kdl is the user's).
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri" "$HERMES_UID_HOME/.config/swaylock"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
@@ -151,6 +160,14 @@ elif [[ -d "$REPO/apps/os" ]]; then
   sudo -u "$HERMES_USER" -H bash "$PAYLOAD/dev/build.sh" || echo "WARNING: shell build failed; see above"
 else
   echo "repo not present yet. From the Mac run: bash linux/dev/push.sh"
+fi
+
+# ---------------------------------------------------------------------------------------------
+step "Omakase software set (HERMES_OS_OMAKASE=0 to skip)"
+if [[ "${HERMES_OS_OMAKASE:-1}" == "1" ]]; then
+  hermes-os-omakase install --packages || echo "WARNING: omakase packages incomplete"
+  sudo -u "$HERMES_USER" -H hermes-os-omakase install --flatpaks || echo "WARNING: omakase flatpaks incomplete"
+  # Web apps need the shell's icon fetch; they are installed on first login by hermes-os-session.
 fi
 
 date -Is >"$STATE_DIR/provisioned"

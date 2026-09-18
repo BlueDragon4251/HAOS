@@ -15,6 +15,8 @@ export HERMES_OS_SHELL_MODE="${HERMES_OS_SHELL_MODE:-desktop}"
 if [[ "$HERMES_OS_SHELL_MODE" == "desktop" ]]; then
   export HERMES_OS_KIOSK=1
 fi
+LOG_DIR="$HOME/.local/state/hermes-os"
+mkdir -p "$LOG_DIR"
 
 # Apps launched through D-Bus activation (gio launch, portals) inherit the systemd/D-Bus activation
 # environment, not ours: publish the Wayland and toolkit variables there too.
@@ -39,6 +41,10 @@ if [[ "$HERMES_OS_SHELL_MODE" == "panels" ]]; then
     start_service hermes-os-clipboard-text wl-paste --type text --watch cliphist store
     start_service hermes-os-clipboard-image wl-paste --type image --watch cliphist store
   fi
+  # Omakase web apps are per-user and need the network; install any missing ones once per login.
+  if command -v hermes-os-omakase >/dev/null && [[ ! -f "$LOG_DIR/omakase-webapps-done" ]]; then
+    (sleep 20 && hermes-os-omakase install --webapps >>"$LOG_DIR/omakase.log" 2>&1 && touch "$LOG_DIR/omakase-webapps-done") &
+  fi
   if command -v swayidle >/dev/null; then
     # Only arm the idle lock when the account can actually be unlocked (it has a password);
     # otherwise the compositor would stay locked with no way back in. Screen power-off always runs.
@@ -61,8 +67,6 @@ if [[ -z "$ELECTRON" ]]; then
     fi
   done
 fi
-LOG_DIR="$HOME/.local/state/hermes-os"
-mkdir -p "$LOG_DIR"
 
 # app-id niri window rules match on; Wayland explicitly (a stray DISPLAY would send Chromium to X11).
 unset DISPLAY

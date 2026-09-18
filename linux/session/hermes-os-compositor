@@ -56,6 +56,12 @@ if [[ ! -f "$HOME/.config/niri/local.kdl" ]]; then
   } >"$HOME/.config/niri/local.kdl"
 fi
 
+# theme.kdl is included by the managed config; make sure the active theme has written it.
+if [[ ! -f "$HOME/.config/niri/theme.kdl" ]] && command -v hermes-os-theme >/dev/null; then
+  hermes-os-theme set "$(hermes-os-theme current)" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
+fi
+[[ -f "$HOME/.config/niri/theme.kdl" ]] || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
+
 # The shell scales through the compositor under niri; do not also zoom the page.
 unset HERMES_OS_ZOOM
 
