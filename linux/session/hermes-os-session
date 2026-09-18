@@ -34,6 +34,12 @@ flags=()
 if [[ -n "${HERMES_OS_SOFTWARE_GPU:-}" ]]; then
   flags+=(--disable-gpu)
 fi
+# HiDPI: cage exposes the output at scale 1, so the shell zooms its page instead (HERMES_OS_ZOOM is
+# read by Electron main; forcing Chromium's device scale factor breaks Wayland buffer sizing).
+# 1.5 suits a 2048x1280 framebuffer on a Retina display, 2 suits 2880x1800.
+if [[ -n "${HERMES_OS_SCALE:-}" ]]; then
+  export HERMES_OS_ZOOM="${HERMES_OS_SCALE}"
+fi
 if [[ -n "${HERMES_OS_NO_SANDBOX:-}" ]]; then
   flags+=(--no-sandbox)
 fi

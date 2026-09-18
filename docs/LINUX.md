@@ -25,6 +25,12 @@ bash linux/dev/push.sh --with-hermes-config   # push repo, build shell, copy Her
 A QEMU window appears on the Mac. After provisioning and the first push, the VM reboots into the
 Hermes desktop with no login prompt. `bash linux/vm/run-qemu.sh stop|status|reset` manage it.
 
+Window size: QEMU shows guest pixels 1:1 with the Mac's device pixels. The default framebuffer is
+2048x1280 (`GUEST_W`/`GUEST_H`) with the shell zoomed 1.5x (`HERMES_OS_SCALE` in `session.env`),
+about 1024x640 points on a Retina display. For a bigger window use e.g. `GUEST_W=2880 GUEST_H=1800`
+with `HERMES_OS_SCALE=2`, or pick View -> Zoom To Fit in QEMU's menu and resize/fullscreen the
+window (toggle it after boot; enabling it at launch makes the guest adopt the initial window size).
+
 `--with-hermes-config` copies `~/.hermes/{config.yaml,.env}` (model choice and any API keys) into
 the VM. It deliberately does not copy `auth.json`: OAuth providers (Nous Portal, Codex, Copilot)
 use rotating refresh tokens, so a copied login works only until the next refresh and whichever
@@ -76,9 +82,11 @@ hermes login          # device-code flow; open the URL on the Mac
 The Hermes backend is still spawned by the shell (`electron/backend/manager.ts`), the same as on
 macOS. A systemd unit comes with the Stage 2 broker.
 
-`~/.config/hermes-os/session.env` overrides (all optional):
+`~/.config/hermes-os/session.env` overrides (all optional; changes to this file or to the session
+scripts need `sudo systemctl restart greetd`, because the running session loop keeps its old copy):
 
 ```
+HERMES_OS_SCALE=1.5                          # page zoom for HiDPI framebuffers (1.5 for 2048x1280, 2 for 2880x1800)
 HERMES_OS_DEV_SERVER=http://127.0.0.1:5180   # load the Vite dev server instead of dist/
 HERMES_OS_REMOTE_DEBUG_PORT=9333             # Chrome DevTools protocol for scripted checks
 HERMES_OS_NO_SANDBOX=1                       # if user namespaces are disabled

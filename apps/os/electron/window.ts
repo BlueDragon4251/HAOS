@@ -64,6 +64,16 @@ export function createMainWindow(prefs: HermesOSPrefs): BrowserWindow {
     void win.loadFile(path.join(here, '..', 'renderer', 'index.html'))
   }
 
+  // HiDPI on compositors that expose the output at scale 1 (cage in Stage 1): zoom the page instead
+  // of forcing Chromium's device scale factor, which would size Wayland buffers wrongly.
+  const zoom = Number(process.env.HERMES_OS_ZOOM)
+
+  if (Number.isFinite(zoom) && zoom > 0 && zoom !== 1) {
+    const apply = () => win.webContents.setZoomFactor(zoom)
+    win.webContents.on('did-finish-load', apply)
+    win.webContents.on('did-navigate', apply)
+  }
+
   win.once('ready-to-show', () => win.show())
 
   return win

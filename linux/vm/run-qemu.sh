@@ -27,6 +27,11 @@ SSH_PORT="${HERMES_VM_PORT:-2222}"
 CPUS="${CPUS:-4}"
 MEM="${MEM:-8192}"
 DISK_SIZE="${DISK_SIZE:-64G}"
+# Guest framebuffer. The Cocoa window shows guest pixels 1:1 with the Mac's device pixels, so on a
+# Retina display a 2048x1280 guest is about 1024x640 points; hermes-os-session scales the shell
+# with HERMES_OS_SCALE (see ~/.config/hermes-os/session.env) so text stays crisp.
+GUEST_W="${GUEST_W:-2048}"
+GUEST_H="${GUEST_H:-1280}"
 
 running() {
   [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
@@ -72,6 +77,8 @@ if [[ ! -f "$DISK" ]]; then
 fi
 [[ -f "$EFI_VARS" ]] || cp "$EFI_VARS_SRC" "$EFI_VARS"
 
+# No zoom-to-fit: with it on, QEMU reports the initial window size (640x400) to the guest as the
+# preferred mode and xres/yres are ignored. View -> Zoom To Fit can still be toggled from the menu.
 DISPLAY_ARGS=(-display cocoa,show-cursor=on)
 if [[ -n "${HEADLESS:-}" ]]; then
   DISPLAY_ARGS=(-vnc 127.0.0.1:1)
@@ -93,7 +100,7 @@ perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- qemu-s
   -drive if=pflash,format=raw,file="$EFI_VARS" \
   -drive if=virtio,format=qcow2,file="$DISK" \
   -drive if=virtio,format=raw,readonly=on,file="$SEED" \
-  -device virtio-gpu-pci,xres=1440,yres=900 \
+  -device virtio-gpu-pci,xres="$GUEST_W",yres="$GUEST_H" \
   "${DISPLAY_ARGS[@]}" \
   -device qemu-xhci -device usb-kbd -device usb-tablet \
   -audiodev coreaudio,id=snd0 -device intel-hda -device hda-output,audiodev=snd0 \
