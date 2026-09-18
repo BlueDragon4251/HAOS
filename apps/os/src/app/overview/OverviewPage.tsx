@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { IconSunHigh, IconTargetArrow } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EmptyGlass, LinkAction, Section, StatusDot } from '../../components/ui/glass.tsx'
+import { cn } from '../../lib/cn.ts'
 import { greetingFor } from '../../lib/format.ts'
 import { createChat, runSlash, sendPrompt } from '../../store/chat.ts'
 import { $connection } from '../../store/gateway.ts'
@@ -25,6 +26,8 @@ export function OverviewPage() {
   const review = useStore($reviewMissions)
   const info = useSystemInfo()
   const [now, setNow] = useState(() => new Date())
+  const rootRef = useRef<HTMLDivElement>(null)
+  const narrow = useNarrow(rootRef, 900)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000)
@@ -48,8 +51,8 @@ export function OverviewPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="flex min-h-full gap-6 px-6 pt-6 pb-8">
+    <div ref={rootRef} className="h-full overflow-y-auto">
+      <div className={cn('flex min-h-full gap-6 px-6 pt-6 pb-8', narrow && 'flex-col gap-7')}>
         <main className="flex min-w-0 flex-1 flex-col gap-7">
           <div className="flex flex-col gap-5">
             <div className="flex items-center gap-2 text-[10.5px] font-medium tracking-[0.14em] text-fg-3 uppercase">
@@ -82,12 +85,37 @@ export function OverviewPage() {
           <RecentWork />
         </main>
 
-        <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-line" />
+        {/* As a compositor tile the window can get narrow: stack the Today panel under the main column. */}
+        {!narrow && <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-line" />}
 
-        <TodayPanel now={now} />
+        <TodayPanel now={now} stacked={narrow} />
       </div>
     </div>
   )
+}
+
+/** True while the element is narrower than `threshold` px. */
+function useNarrow(ref: React.RefObject<HTMLElement | null>, threshold: number): boolean {
+  const [narrow, setNarrow] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+
+    if (!el) {
+      return
+    }
+
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth
+      setNarrow(width < threshold)
+    })
+    observer.observe(el)
+    setNarrow(el.clientWidth < threshold)
+
+    return () => observer.disconnect()
+  }, [ref, threshold])
+
+  return narrow
 }
 
 function QuickAction({ icon, label, onClick, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean }) {

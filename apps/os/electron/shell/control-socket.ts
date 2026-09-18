@@ -32,12 +32,17 @@ export class ControlSocket {
 
   start(): void {
     const socketPath = this.socketPath
-    fs.mkdirSync(path.dirname(socketPath), { recursive: true, mode: 0o700 })
 
     try {
+      fs.mkdirSync(path.dirname(socketPath), { recursive: true, mode: 0o700 })
       fs.unlinkSync(socketPath)
-    } catch {
-      // Not there.
+    } catch (error) {
+      // A missing socket is normal; an unwritable runtime dir must not take the shell down.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        log('control', `cannot prepare ${socketPath}: ${(error as Error).message}`)
+
+        return
+      }
     }
 
     this.server = net.createServer(connection => {

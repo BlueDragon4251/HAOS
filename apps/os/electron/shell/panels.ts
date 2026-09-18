@@ -173,7 +173,8 @@ export class PanelShell {
       title: surfaceTitle(surface),
       backgroundColor: options.transparent ? '#00000000' : '#07080a',
       webPreferences: {
-        preload: path.join(here, '..', 'preload.cjs'),
+        // main.mjs and preload.cjs sit side by side in dist/electron; the renderer is dist/renderer.
+        preload: path.join(here, 'preload.cjs'),
         contextIsolation: true,
         sandbox: true,
         nodeIntegration: false,

@@ -105,6 +105,9 @@ environment {
     XDG_SESSION_DESKTOP "hermes-os"
     ELECTRON_OZONE_PLATFORM_HINT "wayland"
     MOZ_ENABLE_WAYLAND "1"
+    // Firefox: let the compositor decorate instead of drawing a CSD title bar over the tile.
+    MOZ_GTK_TITLEBAR_DECORATION "system"
+    GTK_CSD "0"
     QT_QPA_PLATFORM "wayland"
     GDK_BACKEND "wayland,x11"
     // No DISPLAY: there is no XWayland here yet; a set DISPLAY makes Chromium try X11 and hang.
@@ -173,16 +176,25 @@ window-rule {
     geometry-corner-radius 14
     clip-to-geometry true
 }
+// The Hermes window shares the screen with one app by default (its pages adapt to a half column).
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS$"
+    default-column-width { proportion 0.5; }
+}
 window-rule {
     match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · System$"
     default-column-width { proportion 0.5; }
 }
 
-// Foreign apps get the same rounding.
+// Foreign apps get the same rounding and open as tiles even when they remember being maximized
+// or fullscreen elsewhere (apps that genuinely need fullscreen can still ask for it later).
 window-rule {
     exclude app-id=r#"^(hermes-os|Hermes OS)$"#
     geometry-corner-radius 12
     clip-to-geometry true
+    open-maximized false
+    open-maximized-to-edges false
+    open-fullscreen false
 }
 
 window-rule {

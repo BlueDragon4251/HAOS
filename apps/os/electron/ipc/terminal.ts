@@ -67,8 +67,12 @@ export function registerTerminalIpc(getWindow: () => BrowserWindow | null): void
   const sessions = new Map<string, PtyLike>()
   let nextId = 1
 
-  ipcMain.handle(IPC.terminalCreate, (_event, options: TerminalCreateOptions): TerminalHandle => {
+  ipcMain.handle(IPC.terminalCreate, (event, options: TerminalCreateOptions): TerminalHandle => {
     const pty = loadPty()
+    // Output goes back to the window that created the PTY (in panels mode each terminal is its own
+    // window); the main window is only a fallback.
+    const owner = event.sender
+    const target = () => (owner.isDestroyed() ? getWindow()?.webContents : owner)
 
     if (!pty) {
       throw new Error('Terminal is unavailable: node-pty failed to load for this Electron build.')
@@ -87,11 +91,11 @@ export function registerTerminalIpc(getWindow: () => BrowserWindow | null): void
     sessions.set(id, child)
 
     child.onData(data => {
-      getWindow()?.webContents.send(IPC.terminalData, id, data)
+      target()?.send(IPC.terminalData, id, data)
     })
     child.onExit(({ exitCode }) => {
       sessions.delete(id)
-      getWindow()?.webContents.send(IPC.terminalExit, id, exitCode)
+      target()?.send(IPC.terminalExit, id, exitCode)
     })
 
     return { id, pid: child.pid, shell }

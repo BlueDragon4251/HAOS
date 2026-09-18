@@ -15,6 +15,9 @@ export class NiriClient {
   private listeners = new Set<(state: WmState) => void>()
   private stopped = false
   private notifyTimer: NodeJS.Timeout | null = null
+  private openedAt = new Map<number, number>()
+  private untiled = new Set<number>()
+  private outputSizes: Array<[number, number]> = []
 
   get available(): boolean {
     return this.stream !== null
@@ -51,6 +54,7 @@ export class NiriClient {
 
     const child = spawn('niri', ['msg', '-j', 'event-stream'], { stdio: ['ignore', 'pipe', 'pipe'] })
     this.stream = child
+    this.refreshOutputs()
     let buffer = ''
 
     child.stdout?.setEncoding('utf8')
@@ -128,6 +132,8 @@ export class NiriClient {
 
     switch (name) {
       case 'WorkspacesChanged': {
+        // Outputs may have changed too (hotplug); workspaces are re-sent on such changes.
+        this.refreshOutputs()
         this.workspaces.clear()
 
         for (const ws of (p.workspaces as RawWorkspace[]) ?? []) {
@@ -173,8 +179,16 @@ export class NiriClient {
         break
       }
       case 'WindowOpenedOrChanged': {
-        const w = toWindow(p.window as RawWindow)
+        const raw = p.window as RawWindow
+        const w = toWindow(raw)
+        const isNew = !this.windows.has(w.id)
         this.windows.set(w.id, w)
+
+        if (isNew) {
+          this.openedAt.set(w.id, Date.now())
+        }
+
+        this.untileMaximizedToEdges(raw, w)
 
         if (w.focused) {
           for (const other of this.windows.values()) {
@@ -189,6 +203,8 @@ export class NiriClient {
       case 'WindowClosed': {
         const id = p.id as number
         this.windows.delete(id)
+        this.openedAt.delete(id)
+        this.untiled.delete(id)
 
         if (this.focusedWindowId === id) {
           this.focusedWindowId = null
@@ -222,6 +238,55 @@ export class NiriClient {
     this.emit()
   }
 
+  /**
+   * Apps that remember being maximized (Firefox, GTK apps) ask for it right after mapping, which
+   * niri honours as "maximize to edges": a borderless window covering the whole output, ignoring
+   * struts. Window rules only affect the open state, so undo it here for foreign windows during
+   * their first seconds; a user maximizing later is left alone.
+   */
+  private untileMaximizedToEdges(raw: RawWindow, w: WmWindow): void {
+    if (w.ours || w.floating || this.untiled.has(w.id)) {
+      return
+    }
+
+    const opened = this.openedAt.get(w.id) ?? 0
+
+    if (Date.now() - opened > 5000) {
+      return
+    }
+
+    const size = raw.layout?.window_size
+
+    if (!size) {
+      return
+    }
+
+    const coversOutput = this.outputSizes.some(([ow, oh]) => Math.abs(size[0] - ow) <= 2 && Math.abs(size[1] - oh) <= 2)
+
+    if (coversOutput) {
+      this.untiled.add(w.id)
+      void this.raw(['maximize-window-to-edges', '--id', String(w.id)]).catch(() => undefined)
+    }
+  }
+
+  private refreshOutputs(): void {
+    execFile('niri', ['msg', '-j', 'outputs'], { timeout: 3000 }, (error, stdout) => {
+      if (error) {
+        return
+      }
+
+      try {
+        const outputs = JSON.parse(stdout) as Record<string, { logical?: { width: number; height: number } | null }>
+        this.outputSizes = Object.values(outputs)
+          .map(o => o.logical)
+          .filter((l): l is { width: number; height: number } => Boolean(l))
+          .map(l => [l.width, l.height])
+      } catch {
+        // Ignore malformed output.
+      }
+    })
+  }
+
   private emit(): void {
     // Coalesce bursts (the initial dump arrives as several events).
     if (this.notifyTimer) {
@@ -248,6 +313,7 @@ interface RawWindow {
   is_focused: boolean
   is_floating: boolean
   is_urgent: boolean
+  layout?: { window_size?: [number, number] | null; tile_size?: [number, number] | null } | null
 }
 
 interface RawWorkspace {

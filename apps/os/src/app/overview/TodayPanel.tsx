@@ -16,8 +16,9 @@ const EXPANDED_WIDTH = 236
 const RAIL_WIDTH = 44
 
 /** Right column of Overview. Collapses to an icon rail; the rail still surfaces counts so nothing is lost. */
-export function TodayPanel({ now }: { now: Date }) {
-  const collapsed = usePanelCollapsed(TODAY_PANEL_ID)
+export function TodayPanel({ now, stacked = false }: { now: Date; stacked?: boolean }) {
+  // Stacked under the main column (narrow windows) the panel is always expanded and full width.
+  const collapsed = usePanelCollapsed(TODAY_PANEL_ID) && !stacked
   const pending = useStore($pendingRequests)
   const reviews = useStore($reviewMissions)
   const chats = useStore($chats)
@@ -29,7 +30,7 @@ export function TodayPanel({ now }: { now: Date }) {
   return (
     <aside
       className={cn('relative flex shrink-0 flex-col transition-[width] duration-200 ease-(--ease-out)', collapsed ? 'items-center' : 'gap-7')}
-      style={{ width: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH }}
+      style={{ width: stacked ? '100%' : collapsed ? RAIL_WIDTH : EXPANDED_WIDTH }}
       aria-label="Today"
       data-collapsed={collapsed || undefined}
     >
@@ -62,6 +63,7 @@ export function TodayPanel({ now }: { now: Date }) {
         </div>
       ) : (
         <>
+          {!stacked && (
           <button
             type="button"
             onClick={() => togglePanel(TODAY_PANEL_ID)}
@@ -71,6 +73,7 @@ export function TodayPanel({ now }: { now: Date }) {
           >
             <IconLayoutSidebarRightCollapse size={15} stroke={1.9} />
           </button>
+          )}
           <div className="flex min-h-0 flex-1 flex-col gap-7 animate-fade-in">
             <YourDay now={now} />
             <Attention />
