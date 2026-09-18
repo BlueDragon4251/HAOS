@@ -599,6 +599,16 @@ textarea {
   transform: translate(0, -50%);
   transition-delay: 160ms;
 }
+/* Variant for rails on the right edge: the label opens towards the left. */
+.side-tip.side-tip-left {
+  left: auto;
+  right: calc(100% + 10px);
+  transform: translate(4px, -50%);
+}
+.side-item:hover .side-tip.side-tip-left,
+.side-item:focus-visible .side-tip.side-tip-left {
+  transform: translate(0, -50%);
+}
 .side-handle::after {
   content: '';
   position: absolute;

@@ -8,14 +8,11 @@ import { $connection } from '../../store/gateway.ts'
 import { $activeMissions, $reviewMissions } from '../../store/missions.ts'
 import { useSystemInfo } from '../../store/system.ts'
 import { showPage } from '../../store/windows.ts'
-import { Attention } from './Attention.tsx'
-import { MemoryCard } from './MemoryCard.tsx'
 import { MissionCard } from './MissionCard.tsx'
 import { OverviewComposer } from './OverviewComposer.tsx'
 import { RecentWork } from './RecentWork.tsx'
 import { titleCase } from './shared.tsx'
-import { WorkingWithYou } from './WorkingWithYou.tsx'
-import { YourDay } from './YourDay.tsx'
+import { TodayPanel } from './TodayPanel.tsx'
 
 const MISSIONS_SHOWN = 3
 
@@ -87,14 +84,7 @@ export function OverviewPage() {
 
         <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-line" />
 
-        <aside className="flex w-[236px] shrink-0 flex-col gap-7">
-          <YourDay now={now} />
-          <Attention />
-          <WorkingWithYou />
-          <div className="mt-auto pt-2">
-            <MemoryCard />
-          </div>
-        </aside>
+        <TodayPanel now={now} />
       </div>
     </div>
   )
