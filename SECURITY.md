@@ -41,7 +41,8 @@ These are the guarantees Herald OS aims for. Breaking one of them is a vulnerabi
 - **Web content is contained.** Web windows, file viewers and the Studio preview have no preload,
   run in their own storage partitions, are denied every permission, cannot download files and
   cannot open pop-ups. The Studio preview loads web pages and files inside the project folder,
-  nothing else.
+  nothing else. A local page reads only the files it was opened for: a viewer its own file, a
+  preview its project folder, judged after symlinks resolve.
 - **No credentials in the repository.** API keys and logins live in `~/.hermes`, managed by
   Hermes. CI scans the full history with [gitleaks](https://github.com/gitleaks/gitleaks); run
   `bash scripts/check-secrets.sh` to do the same locally.
@@ -52,6 +53,7 @@ These are the guarantees Herald OS aims for. Breaking one of them is a vulnerabi
 - Reaching the control socket, the backend, or the preload API from a web page, a file, a model
   response, or another user on the machine.
 - Escaping a web window, viewer or preview into the shell.
+- A page in a viewer or preview reading local files beyond the ones it was opened for.
 - Credentials leaking into logs, the audit log, the repository, or a built app.
 - The Linux session or provisioning scripts doing something unsafe as root.
 

@@ -1,8 +1,8 @@
-import { BrowserWindow, ipcMain, session, type WebContents, WebContentsView } from 'electron'
+import { BrowserWindow, ipcMain, net, session, type WebContents, WebContentsView } from 'electron'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { IPC, type WebOpenOptions, type WebViewBounds, type WebViewEvent } from '../../shared/ipc.ts'
 import { isViewable } from '../../shared/viewer.ts'
 import { log } from '../log.ts'
@@ -73,16 +73,26 @@ function previewAllows(url: string, root: string | null): boolean {
   }
 
   try {
-    const file = path.normalize(decodeURIComponent(new URL(url).pathname))
-
-    return file === root || file.startsWith(root + path.sep)
+    return isInside(path.normalize(decodeURIComponent(new URL(url).pathname)), root)
   } catch {
     return false
   }
 }
 
+function isInside(file: string, folder: string): boolean {
+  return file === folder || file.startsWith(folder + path.sep)
+}
+
 function resolveHomePath(raw: string): string {
   return path.resolve(raw.replace(/^~(?=\/|$)/, os.homedir()))
+}
+
+function realPath(target: string): string {
+  try {
+    return fs.realpathSync(target)
+  } catch {
+    return target
+  }
 }
 
 export class WebViews {
@@ -107,6 +117,8 @@ export class WebViews {
   }
 
   private readonly previewRoots = new Map<string, string | null>()
+  private readonly previewFolders = new Map<string, string>()
+  private readonly viewerFiles = new Map<string, string>()
 
   /**
    * A Studio preview: a web page (usually the dev server on localhost) or a local file inside the
@@ -121,6 +133,7 @@ export class WebViews {
 
     lockDownPartition(WEB_PARTITION)
     lockDownPartition(PREVIEW_PARTITION)
+    confineFiles(PREVIEW_PARTITION, file => [...this.previewFolders.values()].some(folder => isInside(file, folder)))
     this.hookOwner(owner)
     const id = `web-${++this.counter}`
     const host = BrowserWindow.fromWebContents(owner)
@@ -128,9 +141,20 @@ export class WebViews {
     const entry: Entry = this.embed && host && !host.isDestroyed() ? this.createEmbedded(id, host, owner, PREVIEW_PREFERENCES) : this.createDetached(id, owner, title, PREVIEW_PREFERENCES)
     this.entries.set(id, entry)
     this.previewRoots.set(id, root)
+
+    if (root) {
+      this.previewFolders.set(id, realPath(root))
+    }
     const contents = entry.kind === 'view' ? entry.view.webContents : entry.win.webContents
     this.guardPreview(id, contents)
-    this.navigate(owner, id, target)
+
+    try {
+      this.navigate(owner, id, target)
+    } catch (error) {
+      this.close(id)
+      throw error
+    }
+
     log('web', `opened preview ${id} (${entry.kind}) ${target}`)
 
     return id
@@ -230,8 +254,10 @@ export class WebViews {
     const title = typeof options.title === 'string' ? options.title.slice(0, 200) : path.basename(resolved)
     const entry: Entry = this.embed && host && !host.isDestroyed() ? this.createEmbedded(id, host, owner, VIEWER_PREFERENCES) : this.createDetached(id, owner, title, VIEWER_PREFERENCES)
     this.entries.set(id, entry)
+    this.viewerFiles.set(id, realPath(resolved))
     const contents = entry.kind === 'view' ? entry.view.webContents : entry.win.webContents
     lockDownPartition(VIEWER_PARTITION)
+    confineFiles(VIEWER_PARTITION, file => [...this.viewerFiles.values()].includes(file))
     const fileUrl = pathToFileURL(resolved).toString()
     contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     // A viewer shows one file: links inside a PDF or page never navigate the view.
@@ -282,6 +308,8 @@ export class WebViews {
 
     this.entries.delete(id)
     this.previewRoots.delete(id)
+    this.previewFolders.delete(id)
+    this.viewerFiles.delete(id)
 
     if (entry.kind === 'view') {
       if (!entry.host.isDestroyed()) {
@@ -440,6 +468,32 @@ export function lockDownPartition(partition: string): void {
   guest.setPermissionCheckHandler(() => false)
   guest.setDevicePermissionHandler(() => false)
   guest.on('will-download', event => event.preventDefault())
+}
+
+const confinedPartitions = new Set<string>()
+
+/**
+ * Electron lets a file:// page read every other file:// URL, so a previewed site or an SVG in the
+ * viewer could read ~/.hermes/.env. Here a partition serves only the files `allows` accepts, judged
+ * after symlinks resolve; anything else looks missing.
+ */
+function confineFiles(partition: string, allows: (file: string) => boolean): void {
+  if (confinedPartitions.has(partition)) {
+    return
+  }
+
+  confinedPartitions.add(partition)
+  session.fromPartition(partition).protocol.handle('file', async request => {
+    try {
+      if (allows(await fs.promises.realpath(fileURLToPath(request.url)))) {
+        return await net.fetch(request, { bypassCustomProtocolHandlers: true })
+      }
+    } catch {
+      // Missing files and malformed URLs are refused like the rest.
+    }
+
+    return new Response(null, { status: 404 })
+  })
 }
 
 export function registerWebIpc(embed: boolean): WebViews {

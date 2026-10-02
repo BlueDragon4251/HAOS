@@ -369,7 +369,7 @@ export function registerFsIpc(getWindow: () => BrowserWindow | null): void {
       return null
     }
 
-    const printer = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } })
+    const printer = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, javascript: false } })
 
     try {
       await printer.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(String(html))}`)
