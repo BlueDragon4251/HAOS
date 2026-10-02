@@ -25,13 +25,23 @@ if command -v herald-os-theme >/dev/null; then
   herald-os-theme set "$(herald-os-theme current)" >/dev/null 2>&1 || echo "    WARNING: could not re-apply the theme"
 fi
 
-# The pre-rename copy of the repo (linux/dev/push.sh now syncs to ~/Herald-OS).
+# The pre-rename copy of the repo (linux/dev/push.sh now syncs to ~/Herald-OS). Synced copies have no
+# .git, so a folder with one is somebody's own checkout and stays.
 if [[ -d "$HOME/Hermes-OS" && -d "$REPO/apps" && "$HOME/Hermes-OS" != "$REPO" ]]; then
-  rm -rf "$HOME/Hermes-OS" && echo "    removed ~/Hermes-OS"
+  if [[ -e "$HOME/Hermes-OS/.git" ]]; then
+    echo "    left ~/Hermes-OS in place: it is a git checkout of the pre-rename repo"
+  else
+    rm -rf "$HOME/Hermes-OS" && echo "    removed ~/Hermes-OS"
+  fi
 fi
 # The shell moved from apps/os to apps/desktop; push.sh's --delete keeps the excluded build output.
+# In a git checkout, git has already removed the tracked files and what is left may be the user's.
 if [[ -d "$REPO/apps/os" && -f "$REPO/apps/desktop/package.json" ]]; then
-  rm -rf "$REPO/apps/os" && echo "    removed $REPO/apps/os"
+  if [[ -e "$REPO/.git" ]]; then
+    echo "    $REPO/apps/os now holds only untracked files (old build output); delete it to free space"
+  else
+    rm -rf "$REPO/apps/os" && echo "    removed $REPO/apps/os"
+  fi
 fi
 
 # User units and developer helpers.
