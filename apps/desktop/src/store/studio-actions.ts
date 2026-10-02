@@ -33,7 +33,7 @@ export async function startBuild(goal: string): Promise<{ sessionId: string; fol
   const folder = `${root}/${uniqueName(projectSlug(trimmed), taken)}`
   await window.heraldOS.fs.mkdir(folder)
 
-  const title = trimmed.charAt(0).toUpperCase() + trimmed.slice(1, TITLE_MAX)
+  const title = (trimmed.charAt(0).toUpperCase() + trimmed.slice(1, TITLE_MAX)).trimEnd()
   const chat = await createChat({ cwd: folder, title })
   markBuildSession(chat.sessionId)
   openStudio(chat.sessionId, title)

@@ -97,6 +97,12 @@ function resolveWindow(name: string | undefined): { id: string; label: string } 
     return win ? { id: win.id, label: win.id === MAIN_WINDOW_ID ? 'Hermes' : win.title } : null
   }
 
+  const listed = windows.find(w => w.id === name?.trim())
+
+  if (listed) {
+    return { id: listed.id, label: listed.id === MAIN_WINDOW_ID ? 'Hermes' : listed.title }
+  }
+
   const appId = resolveAppId(key)
   const win = windows.find(w => (appId && w.appId === appId) || w.title.toLowerCase() === key || w.title.toLowerCase().includes(key))
 
@@ -262,7 +268,7 @@ export const navigationCommands: readonly OsCommand[] = [
     title: 'Focus a window',
     description: 'Bring a window to the front (by app name or title).',
     tier: 'read',
-    args: [{ name: 'name', type: 'string', description: 'Window or app name', required: true }],
+    args: [{ name: 'name', type: 'string', description: 'Window or app name, or an id from window.list', required: true }],
     phrases: ['focus {name}', 'bring {name} to the front', 'switch to the {name} window'],
     run: ({ name }) => {
       const win = resolveWindow(String(name))
@@ -281,7 +287,7 @@ export const navigationCommands: readonly OsCommand[] = [
     title: 'Close a window',
     description: 'Close a floating window (the Hermes window minimizes instead).',
     tier: 'act',
-    args: [{ name: 'name', type: 'string', description: 'Window or app name; omit for the focused window' }],
+    args: [{ name: 'name', type: 'string', description: 'Window or app name, or an id from window.list; omit for the focused window' }],
     phrases: ['close', 'close it', 'close that', 'close this window', 'close window', 'close the window', 'close {name}', 'close the {name} window', 'quit {name}'],
     run: ({ name }) => {
       const win = resolveWindow(name ? String(name) : undefined)
@@ -300,7 +306,7 @@ export const navigationCommands: readonly OsCommand[] = [
     title: 'Minimize a window',
     description: 'Minimize a window to the Dock.',
     tier: 'act',
-    args: [{ name: 'name', type: 'string', description: 'Window or app name; omit for the focused window' }],
+    args: [{ name: 'name', type: 'string', description: 'Window or app name, or an id from window.list; omit for the focused window' }],
     phrases: ['minimize', 'minimize it', 'minimize this', 'minimize this window', 'minimize the window', 'minimize {name}', 'hide it', 'hide this window', 'hide {name}', 'put it away'],
     run: ({ name }) => {
       const win = resolveWindow(name ? String(name) : undefined)
@@ -319,7 +325,7 @@ export const navigationCommands: readonly OsCommand[] = [
     title: 'Maximize a window',
     description: 'Make a window fill the desktop.',
     tier: 'act',
-    args: [{ name: 'name', type: 'string', description: 'Window or app name; omit for the focused window' }],
+    args: [{ name: 'name', type: 'string', description: 'Window or app name, or an id from window.list; omit for the focused window' }],
     phrases: ['maximize', 'maximize it', 'maximize this window', 'expand', 'expand it', 'expand this window', 'make it bigger', 'make it full size', 'maximize {name}', 'expand {name}', 'make {name} bigger'],
     run: ({ name }) => {
       const win = resolveWindow(name ? String(name) : undefined)
@@ -342,7 +348,7 @@ export const navigationCommands: readonly OsCommand[] = [
     title: 'Restore a window',
     description: 'Bring a minimized window back, or return a maximized one to its normal size.',
     tier: 'act',
-    args: [{ name: 'name', type: 'string', description: 'Window or app name; omit for the focused window' }],
+    args: [{ name: 'name', type: 'string', description: 'Window or app name, or an id from window.list; omit for the focused window' }],
     phrases: ['restore', 'restore it', 'restore the window', 'make it smaller', 'shrink it', 'unmaximize', 'restore {name}', 'bring back {name}', 'bring {name} back'],
     run: ({ name }) => {
       const key = name ? String(name) : undefined
