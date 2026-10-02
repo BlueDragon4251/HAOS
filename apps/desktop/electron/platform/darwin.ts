@@ -244,20 +244,16 @@ export class DarwinPlatform implements HostPlatform {
     const route = await run('route', ['-n', 'get', 'default'], 4000)
     const iface = /interface:\s*(\S+)/.exec(route.stdout)?.[1]
     const ipv4 = iface ? (await run('ipconfig', ['getifaddr', iface], 4000)).stdout.trim() || undefined : undefined
-    const airport = await run('system_profiler', ['SPAirPortDataType', '-json'], 15_000)
+    // Not system_profiler SPAirPortDataType: it scans for nearby networks on every call, which takes
+    // seconds and disturbs the Wi-Fi link each time the menu bar refreshes.
+    const ports = await run('networksetup', ['-listallhardwareports'], 4000)
+    const device = /Hardware Port: Wi-Fi\s*\nDevice:\s*(\S+)/.exec(ports.stdout)?.[1]
     let wifi: NetworkStatus['wifi']
 
-    try {
-      const interfaces = (JSON.parse(airport.stdout).SPAirPortDataType?.[0]?.spairport_airport_interfaces ?? []) as Array<Record<string, unknown>>
-      const station = interfaces.find(e => !String(e._name ?? '').startsWith('awdl'))
-
-      if (station) {
-        const net = (station.spairport_current_network_information ?? {}) as Record<string, unknown>
-        const ssid = typeof net._name === 'string' && !net._name.includes('redacted') ? net._name : undefined
-        wifi = { connected: String(station.spairport_status_information ?? '').endsWith('connected'), ssid, interface: String(station._name ?? '') }
-      }
-    } catch {
-      wifi = undefined
+    if (device) {
+      const summary = (await run('ipconfig', ['getsummary', device], 4000)).stdout
+      const ssid = /^\s*SSID : (.+)$/m.exec(summary)?.[1]?.trim()
+      wifi = { connected: /LinkStatusActive : TRUE/.test(summary), ssid: ssid && !ssid.includes('redacted') ? ssid : undefined, interface: device }
     }
 
     return { online: Boolean(iface), defaultInterface: iface, ipv4, wifi }
