@@ -166,8 +166,10 @@ npm run dist:mac
 
 This writes an Apple Silicon DMG and zip to `apps/desktop/release/`. Before installing, know that:
 
-- **The build is unsigned.** macOS will refuse to open it the first time: right-click the app and
-  choose Open, or run `xattr -dr com.apple.quarantine "/Applications/Herald OS.app"`.
+- **The build is not notarized.** electron-builder signs it with a code-signing identity from your
+  keychain if it finds one, and leaves it unsigned otherwise. A copy that was downloaded or sent to
+  you will not open the first time: choose Open Anyway in System Settings → Privacy & Security, or
+  run `xattr -dr com.apple.quarantine "/Applications/Herald OS.app"`.
 - **macOS notifications need a signed build.** Notifications still appear inside Herald OS, but the
   macOS ones it sends while you are in another app only work when the app is code-signed.
 - **The desktop tools plugin is not bundled.** Run `npm run bootstrap` from a checkout once so
