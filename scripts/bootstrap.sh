@@ -96,14 +96,12 @@ if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
   hermes_run config set tools.tool_search.enabled off >/dev/null 2>&1 || true
 
   echo "==> Checking voice support (docs/VOICE.md)"
-  # The Live engine and the spoken-reply turn note need hermes >= 0.21.3 (voice-live routes).
-  runtime_version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$runtime_root/pyproject.toml" 2>/dev/null | head -1)"
-  if [[ -n "$runtime_version" ]]; then
-    if [[ "$(printf '%s\n0.21.3\n' "$runtime_version" | sort -V | head -1)" != "0.21.3" ]]; then
-      echo "    WARNING: Hermes $runtime_version is older than 0.21.3; run 'hermes update' for the Live voice engine." >&2
-    else
-      echo "    Hermes $runtime_version: voice-live routes available"
-    fi
+  # The Live engine and the spoken-reply turn note need the voice-live routes (Hermes 0.21.3 and
+  # later). Git installs report version 0.0.0, so look for the module rather than the version.
+  if [[ -f "$runtime_root/tools/voice_live.py" ]]; then
+    echo "    voice-live routes: available"
+  elif [[ -d "$runtime_root" ]]; then
+    echo "    WARNING: this Hermes has no voice-live routes; run 'hermes update' for the Live voice engine." >&2
   fi
   if [[ -n "$HERMES_PY" ]]; then
     "$HERMES_PY" - <<'PY' || true

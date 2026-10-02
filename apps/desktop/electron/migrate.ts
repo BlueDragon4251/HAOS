@@ -23,9 +23,26 @@ function exists(target: string): boolean {
   }
 }
 
+function isEmptyDir(target: string): boolean {
+  try {
+    return fs.lstatSync(target).isDirectory() && fs.readdirSync(target).length === 0
+  } catch {
+    return false
+  }
+}
+
 function moveIfMissing(from: string, to: string, moved: string[]): void {
-  if (!exists(from) || exists(to)) {
+  if (!exists(from)) {
     return
+  }
+
+  // `app.getPath('userData')` creates the folder, so an empty one is not a profile to keep.
+  if (exists(to)) {
+    if (!isEmptyDir(to)) {
+      return
+    }
+
+    fs.rmdirSync(to)
   }
 
   fs.mkdirSync(path.dirname(to), { recursive: true })

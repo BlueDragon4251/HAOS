@@ -62,6 +62,16 @@ describe('migrateLegacyData', () => {
     expect(read('.hermes/hermes-os/audit.jsonl')).toBe('old audit')
   })
 
+  it('moves the profile into the empty folder Electron creates when asked for userData', () => {
+    write('appData/Hermes OS/Local Storage/leveldb/000003.log', 'ls')
+    fs.mkdirSync(path.join(root, 'appData/Herald OS'), { recursive: true })
+
+    migrateLegacyData(locations())
+
+    expect(read('appData/Herald OS/Local Storage/leveldb/000003.log')).toBe('ls')
+    expect(fs.existsSync(path.join(root, 'appData/Hermes OS'))).toBe(false)
+  })
+
   it('never replaces an existing profile', () => {
     write('appData/Hermes OS/Preferences', 'old')
     write('appData/Herald OS/Preferences', 'new')
