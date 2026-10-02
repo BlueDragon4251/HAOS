@@ -9,7 +9,7 @@ set -euo pipefail
 REPO="${HERALD_OS_REPO:-$HOME/Herald-OS}"
 export PATH="$HOME/.local/bin:$PATH"
 
-[[ -d "$REPO/apps/os" ]] || { echo "repo not found at $REPO (push it from the Mac: linux/dev/push.sh)" >&2; exit 1; }
+[[ -d "$REPO/apps/desktop" ]] || { echo "repo not found at $REPO (push it from the Mac: linux/dev/push.sh)" >&2; exit 1; }
 cd "$REPO"
 
 echo "==> bootstrap (upstream snapshot, npm install, bridge plugin)"
@@ -22,7 +22,7 @@ if [[ ! -f node_modules/node-pty/build/Release/pty.node && ! -d "node_modules/no
 fi
 
 echo "==> building shell"
-npm run build --workspace apps/os
+npm run build --workspace apps/desktop
 
 # Chromium's setuid sandbox helper must be root-owned 4755 when unprivileged user namespaces
 # are unavailable; harmless otherwise.
@@ -60,4 +60,4 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   HERALD_OS_REPO="$REPO" bash "$REPO/linux/bin/herald-os-update" --migrate || echo "WARNING: a migration failed; see above"
 fi
 
-echo "==> build complete: $REPO/apps/os/dist"
+echo "==> build complete: $REPO/apps/desktop/dist"

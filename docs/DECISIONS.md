@@ -61,7 +61,7 @@ a copy of every PCM frame for no security gain. REST stays in main.
 The pinned upstream snapshot delivers `approval` / `clarify` / `sudo` / `secret` as server-to-client
 JSON-RPC requests. The runtime most users have installed today (0.21.0) still emits them as
 `<kind>.request` events answered through `<kind>.respond` RPCs. Herald OS folds the legacy shape
-into the same `ServerRequest` object (`apps/os/src/lib/legacy-requests.ts`), so cards and stores
+into the same `ServerRequest` object (`apps/desktop/src/lib/legacy-requests.ts`), so cards and stores
 have one code path and an older runtime keeps working until `hermes update` moves it forward.
 The fallback is narrow, named, and covered by unit tests, as upstream's compatibility rule asks.
 
@@ -87,7 +87,7 @@ still taken from `source: "herald_os"`, never from this env var, in line with up
 ## ADR-008: Platform abstraction in two places
 
 Machine facts and actions used by the shell (installed apps, system stats, open/reveal) go through
-`apps/os/electron/platform/HostPlatform`; agent-facing capabilities go through the plugin's
+`apps/desktop/electron/platform/HostPlatform`; agent-facing capabilities go through the plugin's
 `HostAdapter`. Both have `darwin` and `linux` implementations and a typed stub for `win32`, so the
 Windows future has a place to land without touching call sites.
 
@@ -119,8 +119,8 @@ sees. This proves the experience before any security or packaging work. See `doc
 
 ## ADR-013: Two voice engines behind one voice core; the free one is the default
 
-Herald OS talks and listens through `apps/os/src/store/voice.ts` and two interchangeable engines
-(`apps/os/src/lib/voice/*-engine.ts`). Hermes is the brain in both: sessions, tools, memory and
+Herald OS talks and listens through `apps/desktop/src/store/voice.ts` and two interchangeable engines
+(`apps/desktop/src/lib/voice/*-engine.ts`). Hermes is the brain in both: sessions, tools, memory and
 approvals never move.
 
 - **Chained (default, no extra cost).** Renderer mic -> energy endpointing -> `POST
@@ -151,7 +151,7 @@ approvals never move.
 
 Voice control of the OS needs the shell's actions to be nameable and callable from outside the
 component that renders them. Every user-visible action is therefore an `OsCommand` in one registry
-(`apps/os/src/store/os-commands.ts`; catalogue under `apps/os/src/app/commands/`) with typed
+(`apps/desktop/src/store/os-commands.ts`; catalogue under `apps/desktop/src/commands/`) with typed
 arguments, a permission tier and a `CommandResult` the caller can speak or show. Inline page
 handlers that voice needed (automations, connections, mission start, pause-all, the panels
 `ShellCommand` switch) moved into stores so the registry, the pages and the command bar share them.
@@ -181,7 +181,7 @@ changes marked, commands and dev-server output, and the running site. Upstream a
 of it to any client: `tool.start` (full arguments, including the content `write_file` is writing),
 `tool.complete` with `inline_diff` (Hermes's rendered review diff: ANSI colours and
 `a/<path> → b/<path>` headers before ordinary hunks), and `agent.terminal.output` / `terminal.close`
-for background processes. The Studio (`apps/os/src/app/studio/`, model in `lib/studio-model.ts`,
+for background processes. The Studio (`apps/desktop/src/features/studio/`, model in `lib/studio-model.ts`,
 store in `store/studio.ts`) folds those events per session, for every session the shell knows, so
 "show me the code" works for a build already under way.
 

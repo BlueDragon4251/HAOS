@@ -11,8 +11,8 @@ The same seam rules upstream Hermes Desktop uses apply here:
 
 | Party | Owns | Lives in |
 | --- | --- | --- |
-| Electron main | The machine: window/fullscreen lifecycle, backend process, PTYs, filesystem, app discovery, system stats, notifications, typed IPC | `apps/os/electron` |
-| Renderer (React) | The experience: surfaces, navigation, presentation, ephemeral interaction state | `apps/os/src` |
+| Electron main | The machine: window/fullscreen lifecycle, backend process, PTYs, filesystem, app discovery, system stats, notifications, typed IPC | `apps/desktop/electron` |
+| Renderer (React) | The experience: surfaces, navigation, presentation, ephemeral interaction state | `apps/desktop/src` |
 | Hermes runtime | The work: sessions, model calls, tools, skills, memory, cron, approvals | the user's Hermes install (`$HERMES_HOME/hermes-agent`) |
 
 The renderer never touches Node or Electron directly; native power arrives through a narrow,
@@ -20,7 +20,7 @@ typed preload bridge (`window.heraldOS`). Agent behaviour is never re-implemente
 
 ```mermaid
 flowchart LR
-  subgraph shell [apps/os Electron shell]
+  subgraph shell [apps/desktop Electron shell]
     Main[Electron main]
     Preload[preload bridge]
     Renderer[React renderer]
@@ -56,7 +56,7 @@ Setup, session model and dev loop for Linux: `docs/LINUX.md`.
 
 ## Backend lifecycle
 
-1. Resolve a runtime through an ordered ladder (`apps/os/electron/backend/resolve.ts`):
+1. Resolve a runtime through an ordered ladder (`apps/desktop/electron/backend/resolve.ts`):
    `HERALD_OS_HERMES_ROOT` -> `$HERMES_HOME/hermes-agent` managed install (its `venv/bin/python`)
    -> `hermes` on `PATH`. Each candidate is probed before use.
 2. Spawn `hermes serve --host 127.0.0.1 --port 0` with `HERMES_DASHBOARD_SESSION_TOKEN` (random per
@@ -82,21 +82,53 @@ lives in Hermes Desktop.
 Server-to-client requests the shell answers: `approval`, `clarify`, `sudo`, `secret`. Anything else
 is declined with `-32601` so the backend treats it as unanswered rather than hanging.
 
-## Surfaces
+## Renderer
 
-The renderer is a table-driven set of surfaces (`apps/os/src/app/surfaces.ts`): Home, Chat,
-Agents, Tasks, Skills, Files, Apps, Terminal, System, Settings, plus a Notifications panel and a
-global command bar (`Cmd+K`). Surfaces subscribe to small nanostores; shared stores live in
-`src/store`, pure helpers in `src/lib`.
+Paths in this section and the next are relative to `apps/desktop`.
+
+The renderer draws a whole desktop: wallpaper, menu bar, dock, command bar (`Cmd+K`), notifications
+and a small window manager. Its apps are registered in `src/shell/apps.ts`:
+
+- **Pages** of the main Hermes window, picked from its sidebar: Overview, Hermes (chat), Missions,
+  Memory, Files, Automations, Connections, Settings.
+- **Floating apps** with their own window: Terminal, System, Web, Studio, and a chat pop-out.
+
+It runs in one of two modes, chosen by Electron main (`electron/shell/mode.ts`):
+
+| Mode | Used by | Windows |
+| --- | --- | --- |
+| `desktop` | macOS, Linux under `cage` | One fullscreen Electron window; the renderer's own window manager (`src/store/windows.ts`, `src/shell/wm/`) lays out every app inside it. |
+| `panels` | Linux under `niri` (`HERALD_OS_SHELL_MODE=panels`) | One Electron window per surface (menu bar, dock, main window, command bar, wallpaper, each floating app), tiled by the compositor. `src/shell/ShellRoot.tsx` picks what each window shows. |
+
+Code layout (details in [`apps/desktop/README.md`](../apps/desktop/README.md), conventions in
+[`apps/desktop/DESIGN.md`](../apps/desktop/DESIGN.md)): `src/shell` is the desktop chrome,
+`src/features/<app>` holds one folder per app, `src/store` the nanostores state and actions,
+`src/lib` pure helpers with their tests, `src/commands` the OS command catalogue.
+
+## OS control
+
+Everything a user can do in the shell is also a registered command (`src/store/os-commands.ts`,
+catalogue in `src/commands/`), so three callers drive the UI the same way:
+
+1. The command bar.
+2. The voice fast path (`src/lib/voice/intents.ts`), which runs simple requests such as "open
+   missions" or "hide the sidebar" locally, without a model round-trip.
+3. Hermes itself, through the bridge's `os_ui` tool. Electron main serves a JSON-lines Unix socket
+   (`~/.hermes/herald-os/control.sock` in desktop mode, `$XDG_RUNTIME_DIR/herald-os/control.sock`
+   in panels mode) and hands the backend its path and a per-launch token
+   (`HERALD_OS_CONTROL_SOCKET`, `HERALD_OS_CONTROL_TOKEN`). Requests without the token are
+   refused.
+
+Voice (engines, wake word, barge-in) is described in [`VOICE.md`](VOICE.md).
 
 ## System bridge
 
 `plugins/herald-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset
 (`herald_os`) that exposes the host machine through explicit, permission-tiered tools. Execution
-happens on the backend host behind a `HostAdapter` abstraction (`darwin` implemented; `windows`
-and `linux` are stubs). Sensitive operations route through upstream's own approval gate
+happens on the backend host behind a `HostAdapter` abstraction (`darwin` and `linux` implemented;
+`windows` is a stub). Sensitive operations route through upstream's own approval gate
 (`tools.approval.request_tool_approval`) so the shell renders one approval card for everything.
-See `SYSTEM-BRIDGE.md`.
+See [`SYSTEM-BRIDGE.md`](SYSTEM-BRIDGE.md).
 
 ## Upstream compatibility
 

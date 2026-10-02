@@ -10,7 +10,7 @@ SRC="${HERALD_OS_SHARE:-/mnt/herald-os}"
 REPO="${HERALD_OS_REPO:-$HOME/Herald-OS}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-mountpoint -q "$SRC" || [[ -d "$SRC/apps/os" ]] || { echo "shared folder not mounted at $SRC" >&2; exit 1; }
+mountpoint -q "$SRC" || [[ -d "$SRC/apps/desktop" ]] || { echo "shared folder not mounted at $SRC" >&2; exit 1; }
 
 echo "==> syncing $SRC -> $REPO"
 mkdir -p "$REPO"

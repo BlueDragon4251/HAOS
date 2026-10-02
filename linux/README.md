@@ -6,9 +6,17 @@ your Mac). Full guide: [docs/LINUX.md](../docs/LINUX.md).
 ```
 linux/
   provision.sh            first-boot provisioner (root, idempotent)
-  session/                greetd config, compositor + session launchers, wayland-sessions entry
-  dev/                    push.sh (Mac -> VM), build.sh / sync.sh / restart-shell.sh / shot.sh (VM)
-  vm/                     download-image.sh, make-seed.sh (cloud-init), run-qemu.sh
+  bin/                    herald-os (the CLI every hotkey and menu calls), -theme, -omakase, -update
+  session/                greetd config, compositor + session launchers, wayland-sessions entry,
+                          update-check timer, lock-screen style
+  niri/config.kdl         the managed niri config: hotkeys, window rules, workspaces
+  themes/                 whole-desktop themes (shell, niri, terminal, wallpaper): herald-*
+  omakase/                the default app set: dnf packages, Flatpaks, web apps
+  plymouth/herald-os/     boot splash
+  migrations/             one-shot upgrade steps herald-os-update runs once per machine
+  dev/                    push.sh and vm-ssh.sh (Mac -> VM); build.sh, sync.sh, restart-shell.sh,
+                          shot.sh (inside the VM)
+  vm/                     download-image.sh, make-seed.sh (cloud-init), run-qemu.sh, run-vf.sh
   vm/build/               generated: image, seed ISO, SSH key, overlay disk, screenshots (gitignored)
 ```
 

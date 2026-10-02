@@ -29,6 +29,10 @@ fi
 if [[ -d "$HOME/Hermes-OS" && -d "$REPO/apps" && "$HOME/Hermes-OS" != "$REPO" ]]; then
   rm -rf "$HOME/Hermes-OS" && echo "    removed ~/Hermes-OS"
 fi
+# The shell moved from apps/os to apps/desktop; push.sh's --delete keeps the excluded build output.
+if [[ -d "$REPO/apps/os" && -f "$REPO/apps/desktop/package.json" ]]; then
+  rm -rf "$REPO/apps/os" && echo "    removed $REPO/apps/os"
+fi
 
 # User units and developer helpers.
 systemctl --user disable --now hermes-os-update-check.timer >/dev/null 2>&1 || true

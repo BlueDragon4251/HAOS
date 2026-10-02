@@ -452,7 +452,7 @@ def update(check_only: bool) -> int:
     updater = shutil.which("herald-os-update")
     if updater:
         return subprocess.call([updater] + (["--check"] if check_only else []))
-    print("The updater arrives with the update channel (see docs/PLAN-OS-EXPERIENCE.md, Phase 3).")
+    print("herald-os-update is not installed; run linux/dev/build.sh in your Herald-OS checkout to install it.")
     return 1
 
 

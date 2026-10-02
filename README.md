@@ -59,7 +59,7 @@ Useful environment variables while developing:
 ## Build an installer
 
 ```bash
-npm run dist:mac      # arm64 DMG + zip under apps/os/release/
+npm run dist:mac      # arm64 DMG + zip under apps/desktop/release/
 ```
 
 ## Tests
@@ -73,7 +73,7 @@ npm run test:bridge   # pytest for the system bridge plugin
 ## Layout
 
 ```
-apps/os/                 Electron shell (electron/ main, preload/, src/ renderer)
+apps/desktop/                 Electron shell (electron/ main, preload/, src/ renderer)
 packages/hermes-client/  Re-exports the upstream gateway client + generated wire contract
 plugins/herald-os-bridge Hermes plugin: system bridge tools, permissions, audit, skill
 plugins/tests/           pytest suite for the plugin

@@ -2,10 +2,10 @@
 
     python3 scripts/make-icons.py
 
-Source: apps/os/src/assets/brand/herald-mark.png (the white winged H on transparency, shared with
+Source: apps/desktop/src/assets/brand/herald-mark.png (the white winged H on transparency, shared with
 the Herald mobile app). Writes:
-  apps/os/build/icon.png, icon.icns     app icon (macOS squircle grid: 824 px body on 1024 canvas)
-  apps/os/public/brand/herald-icon.png  256 px icon (window icon, favicon)
+  apps/desktop/build/icon.png, icon.icns     app icon (macOS squircle grid: 824 px body on 1024 canvas)
+  apps/desktop/public/brand/herald-icon.png  256 px icon (window icon, favicon)
   linux/plymouth/herald-os/logo.png     boot splash mark
 """
 

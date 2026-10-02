@@ -56,8 +56,8 @@ if [[ "$HERALD_OS_SHELL_MODE" == "panels" ]]; then
   fi
 fi
 
-APP="${HERALD_OS_APP:-$HOME/Herald-OS/apps/os}"
-# npm workspaces hoist Electron to the repo root; a standalone checkout keeps it under apps/os.
+APP="${HERALD_OS_APP:-$HOME/Herald-OS/apps/desktop}"
+# npm workspaces hoist Electron to the repo root; a standalone checkout keeps it under apps/desktop.
 ELECTRON="${HERALD_OS_ELECTRON:-}"
 if [[ -z "$ELECTRON" ]]; then
   for candidate in "$APP/node_modules/.bin/electron" "$APP/../../node_modules/.bin/electron"; do

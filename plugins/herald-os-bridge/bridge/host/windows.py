@@ -1,4 +1,4 @@
-"""Windows host adapter: typed stub. See docs/ROADMAP.md for the planned implementation
+"""Windows host adapter: typed stub. See docs/internal/ROADMAP.md for the planned implementation
 (PowerShell ``Get-Process``, ``Get-NetTCPConnection``, Windows Search, ``Start-Process``)."""
 
 from __future__ import annotations

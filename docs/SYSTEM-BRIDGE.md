@@ -12,11 +12,16 @@ unrestricted machine access.
 | `system_info` | read | OS version, hardware, uptime, CPU load, memory, disks, battery |
 | `system_processes` | read | Top processes by CPU or memory, find by name, find by listening port |
 | `system_disk_usage` | read | Largest entries under a directory (bounded depth and time) |
-| `system_find_files` | read | Spotlight (`mdfind`) search: name, kind, screenshots, date ranges, scope |
+| `system_find_files` | read | File search (Spotlight on macOS, `plocate`/`fd` on Linux): name, kind, screenshots, date ranges, scope |
 | `system_apps` | read | Installed applications and currently running applications |
+| `system_network` | read | Connectivity (interfaces, gateway, DNS, Wi-Fi link) and Bluetooth devices |
+| `system_logs` | read | Recent lines from the system log, filtered by level and process |
+| `system_control` | read / act / mutate | Volume, dark mode, notifications, System Settings panes, display sleep, screen lock; switching Wi-Fi asks first |
 | `system_open` | act | Open an app, URL, file or folder; reveal in Finder; open a path in an editor |
 | `system_kill_process` | destructive | Terminate a process by pid or by listening port |
 | `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`); `dry_run` plans |
+| `os_ui` | per command | Operate the Herald OS interface: open pages and apps, add memories, run automations, start missions and Studio builds. Each command carries its own tier |
+| `system_os` | act / mutate | Herald OS Linux only: install apps, reminders, themes, screenshots, lock, suspend, update |
 
 "Start my development environment" is a skill: it composes `system_open` with Hermes's existing
 `terminal` tool rather than adding another core-shaped tool.
@@ -40,13 +45,19 @@ for shell commands, because it is the same gate.
 `hermes plugins enable herald-os-bridge`, `hermes tools enable herald_os` (a saved platform toolset
 list is authoritative upstream), and `hermes config set tools.tool_search.enabled off` so the tools
 are directly callable rather than deferred behind Hermes's tool-search bridge (see
-`DECISIONS.md`, ADR-010). Settings -> Permissions exposes the last switch.
+`DECISIONS.md`, ADR-010). Settings -> Privacy edits the policy file below and shows the audit log.
 
 ## Protected paths
 
 Operations that would read or modify these locations are refused before any approval prompt:
-`~/.ssh`, `~/Library/Keychains`, `$HERMES_HOME/.env`, `/System`, `/usr`, `/bin`, `/sbin`,
-`/private/etc`, `/Library`. The list is extended in the policy file.
+
+- secrets: `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/Library/Cookies`, `$HERMES_HOME/.env`,
+  `$HERMES_HOME/auth.json`;
+- system folders: `/System`, `/Library`, `/usr`, `/bin`, `/sbin`, `/etc`, `/private/etc`,
+  `/var/db`, `/private/var/db`, and on Linux `/boot`, `/lib`, `/lib64`, `/var/lib`, `/proc`, `/sys`.
+
+The list is extended (never shortened) in the policy file. The built-in list is
+`BUILTIN_PROTECTED` in `bridge/permissions.py`.
 
 ## Policy file
 
@@ -72,6 +83,12 @@ logged.
 ## Platform abstraction
 
 `bridge/host/base.py` defines `HostAdapter`. `darwin.py` implements it with `mdfind`, `open`,
-`lsof`, `ps`, `osascript`, `system_profiler`, `vm_stat`. `windows.py` and `linux.py` raise
-`HostNotSupported` with a clear message; they exist so the tool layer never branches on
-`sys.platform`.
+`lsof`, `ps`, `osascript`, `system_profiler`, `vm_stat`; `linux.py` with `ps`, `ss`,
+`plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`, `gsettings` and `journalctl`
+(shared POSIX parts live in `posix.py`). `windows.py` raises `HostNotSupported` with a clear
+message. The adapters exist so the tool layer never branches on `sys.platform`.
+
+## Tests
+
+`npm run test:bridge` runs the plugin's pytest suite (`plugins/herald-os-bridge/tests`) with the
+Hermes runtime's interpreter, or in a throwaway `uv` environment if that interpreter has no pytest.

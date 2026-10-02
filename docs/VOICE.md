@@ -58,8 +58,8 @@ to Hermes. Replies start in under a second and interruptions feel natural.
 
 ## Controlling the OS by voice
 
-Every user-visible action in Herald OS is a command in one registry (`apps/os/src/store/os-commands.ts`,
-catalogue under `apps/os/src/app/commands/`). Three things call it:
+Every user-visible action in Herald OS is a command in one registry (`apps/desktop/src/store/os-commands.ts`,
+catalogue under `apps/desktop/src/commands/`). Three things call it:
 
 1. **The voice fast path.** Simple utterances match a command locally in under 100 ms and cost no
    tokens: "open missions", "show my memory", "open the terminal", "close this window", "remember
@@ -165,16 +165,16 @@ model switches between fast, accurate, multilingual and most-accurate models.
 ## Architecture
 
 ```
-apps/os/src/store/voice.ts          state machine, hotkey/CLI commands, announcements, Live accounting
-apps/os/src/store/wake.ts           wake.start / wake.feed / wake.detected
-apps/os/src/lib/voice/audio-capture.ts   one mic graph (AudioWorklet -> 16 kHz int16 frames)
-apps/os/src/lib/voice/vad.ts        energy endpointing (utterance start/end, barge-in)
-apps/os/src/lib/voice/chained-engine.ts  free engine
-apps/os/src/lib/voice/live-engine.ts     GPT-Live engine (WebRTC + delegation loop)
-apps/os/src/lib/voice/speak-stream.ts    /api/audio/speak-stream player, POST /api/audio/speak fallback
-apps/os/src/lib/voice/speech-text.ts     sanitizer, sentence chunker, commentary chunking, stop phrases
-apps/os/src/app/voice/               VoiceOrb, MicButton, VoiceIndicator
-apps/os/electron/ipc/voice.ts        mic permission, audio WebSocket URL, global hotkey
+apps/desktop/src/store/voice.ts          state machine, hotkey/CLI commands, announcements, Live accounting
+apps/desktop/src/store/wake.ts           wake.start / wake.feed / wake.detected
+apps/desktop/src/lib/voice/audio-capture.ts   one mic graph (AudioWorklet -> 16 kHz int16 frames)
+apps/desktop/src/lib/voice/vad.ts        energy endpointing (utterance start/end, barge-in)
+apps/desktop/src/lib/voice/chained-engine.ts  free engine
+apps/desktop/src/lib/voice/live-engine.ts     GPT-Live engine (WebRTC + delegation loop)
+apps/desktop/src/lib/voice/speak-stream.ts    /api/audio/speak-stream player, POST /api/audio/speak fallback
+apps/desktop/src/lib/voice/speech-text.ts     sanitizer, sentence chunker, commentary chunking, stop phrases
+apps/desktop/src/features/voice/               VoiceOrb, MicButton, VoiceIndicator
+apps/desktop/electron/ipc/voice.ts        mic permission, audio WebSocket URL, global hotkey
 ```
 
 Decisions: `docs/DECISIONS.md` ADR-013 (and the ADR-007 amendment).

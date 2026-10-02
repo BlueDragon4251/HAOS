@@ -3,9 +3,9 @@
 # relaunches Electron with the freshly built code; if no session is running, start greetd.
 set -u
 
-if pgrep -x electron >/dev/null 2>&1 || pgrep -f 'electron .*apps/os' >/dev/null 2>&1; then
+if pgrep -x electron >/dev/null 2>&1 || pgrep -f 'electron .*apps/desktop' >/dev/null 2>&1; then
   echo "==> restarting shell"
-  pkill -TERM -f 'electron .*apps/os' || pkill -TERM -x electron || true
+  pkill -TERM -f 'electron .*apps/desktop' || pkill -TERM -x electron || true
   exit 0
 fi
 

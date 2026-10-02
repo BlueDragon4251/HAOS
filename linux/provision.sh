@@ -163,7 +163,7 @@ REPO="$HERMES_UID_HOME/Herald-OS"
 if mountpoint -q /mnt/herald-os 2>/dev/null; then
   echo "shared folder mounted at /mnt/herald-os; syncing and building"
   sudo -u "$HERMES_USER" -H bash "$PAYLOAD/dev/sync.sh" || echo "WARNING: shell build failed; see above"
-elif [[ -d "$REPO/apps/os" ]]; then
+elif [[ -d "$REPO/apps/desktop" ]]; then
   echo "repo present at $REPO; building"
   sudo -u "$HERMES_USER" -H bash "$PAYLOAD/dev/build.sh" || echo "WARNING: shell build failed; see above"
 else
