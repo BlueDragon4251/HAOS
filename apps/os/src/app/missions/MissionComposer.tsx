@@ -1,15 +1,8 @@
 import { IconRocket } from '@tabler/icons-react'
 import { useState } from 'react'
 import { GlassButton } from '../../components/ui/glass.tsx'
-import { createChat, sendPrompt } from '../../store/chat.ts'
+import { startMission } from '../../store/missions-actions.ts'
 import { notify } from '../../store/notifications.ts'
-import { showPage } from '../../store/windows.ts'
-
-const TITLE_MAX = 60
-
-function missionPrompt(text: string): string {
-  return `Mission: ${text}\n\nPlan this as a mission: first create a todo list of the concrete steps with the todo tool, then work through them, updating the todo list as you go, and finish with a short summary of what you produced.`
-}
 
 export function MissionComposer({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState('')
@@ -26,9 +19,7 @@ export function MissionComposer({ onClose }: { onClose: () => void }) {
     setStarting(true)
 
     try {
-      const chat = await createChat({ title: goal.slice(0, TITLE_MAX) })
-      void sendPrompt(missionPrompt(goal), { sessionId: chat.sessionId })
-      showPage('hermes')
+      await startMission(goal)
       onClose()
     } catch (error) {
       notify({ title: 'Could not start mission', body: error instanceof Error ? error.message : String(error), level: 'error' })

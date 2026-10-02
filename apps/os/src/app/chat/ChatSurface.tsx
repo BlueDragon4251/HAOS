@@ -19,7 +19,9 @@ export function ChatSurface() {
   const connection = useStore($connection)
   const online = connection === 'open'
 
-  const submit = (text: string) => (text.startsWith('/') ? runSlash(text) : sendPrompt(text))
+  const submit = async (text: string): Promise<void> => {
+    await (text.startsWith('/') ? runSlash(text) : sendPrompt(text))
+  }
 
   return (
     <div className="flex h-full">

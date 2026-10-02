@@ -1,7 +1,8 @@
-import { IconApps, IconMicrophone, IconX } from '@tabler/icons-react'
+import { IconApps, IconX } from '@tabler/icons-react'
 import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { HermesAvatar } from '../../components/app-icon.tsx'
 import { EmptyGlass, GlassButton, SearchField, Tabs } from '../../components/ui/glass.tsx'
+import { MicButton } from '../voice/MicButton.tsx'
 import { Kbd } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { sendPrompt } from '../../store/chat.ts'
@@ -210,9 +211,7 @@ export function ApplicationsPanel({ onClose, standalone = false, className }: Ap
             aria-label="Tell Hermes what you need"
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-4"
           />
-          <button type="button" disabled aria-label="Voice input (coming soon)" className="flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 disabled:cursor-not-allowed disabled:opacity-60">
-            <IconMicrophone size={18} />
-          </button>
+          <MicButton size={18} className="size-8" />
         </label>
       </div>
     </div>

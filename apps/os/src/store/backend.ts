@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 import type { BackendState, EnvInfo, HermesOSPrefs, WindowState } from '../../shared/ipc.ts'
+import { VOICE_DEFAULTS } from '../../shared/voice-prefs.ts'
 
 /** Cache of Electron's backend truth; Electron is authoritative. */
 export const $backend = atom<BackendState>({ phase: 'idle', attempt: 0, logTail: [] })
@@ -12,7 +13,8 @@ export const $prefs = atom<HermesOSPrefs>({
   theme: 'ocean',
   spaces: [{ id: 'personal', name: 'Personal', color: '#4d92ff' }],
   activeSpace: 'personal',
-  favorites: []
+  favorites: [],
+  voice: VOICE_DEFAULTS
 })
 
 export function applyPrefsToDocument(prefs: HermesOSPrefs): void {

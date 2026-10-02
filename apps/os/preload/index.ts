@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import {
+  type AudioWsKind,
   type AuditEntry,
   type BackendState,
   type CalendarResult,
@@ -8,13 +9,17 @@ import {
   type IncomingNotification,
   type PowerAction,
   type DirEntry,
+  type EditAction,
   type EnvInfo,
   type FilePreview,
   type HermesOSPrefs,
   type ImageInfo,
   type InstalledApp,
   IPC,
+  type MicPermission,
   type NetworkStatus,
+  type OsControlReply,
+  type OsControlRequest,
   type ProcessInfo,
   type RecentFile,
   type RestRequest,
@@ -25,6 +30,11 @@ import {
   type SystemStats,
   type TerminalCreateOptions,
   type TerminalHandle,
+  type TreeChangedEvent,
+  type TreeEntry,
+  type WebOpenOptions,
+  type WebViewBounds,
+  type WebViewEvent,
   type WindowState,
   type WmAction,
   type WmState
@@ -81,6 +91,8 @@ const api = {
     openPath: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenPath, target),
     openIn: (editor: 'vscode' | 'cursor' | 'finder' | 'terminal', target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenIn, editor, target),
     recent: (limit = 30): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.fsRecent, limit),
+    /** Files under the home folder whose name matches, best match first. */
+    find: (query: string, limit = 10): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.fsFind, query, limit),
     thumbnail: (target: string, size = 512): Promise<string | null> => ipcRenderer.invoke(IPC.fsThumbnail, target, size),
     imageInfo: (target: string): Promise<ImageInfo | null> => ipcRenderer.invoke(IPC.fsImageInfo, target),
     writeText: (target: string, content: string): Promise<void> => ipcRenderer.invoke(IPC.fsWriteText, target, content),
@@ -90,6 +102,10 @@ const api = {
     exportPdf: (html: string, suggestedName: string): Promise<string | null> => ipcRenderer.invoke(IPC.fsExportPdf, html, suggestedName),
     pickFiles: (options?: { directory?: boolean; multiple?: boolean }): Promise<string[]> => ipcRenderer.invoke(IPC.fsPickFiles, options ?? {}),
     dirSize: (target: string): Promise<{ bytes: number; files: number; complete: boolean }> => ipcRenderer.invoke(IPC.fsDirSize, target),
+    listTree: (root: string, limit = 3000): Promise<{ entries: TreeEntry[]; truncated: boolean }> => ipcRenderer.invoke(IPC.fsListTree, root, limit),
+    watchTree: (root: string): Promise<string> => ipcRenderer.invoke(IPC.fsWatchTree, root),
+    unwatchTree: (watchId: string): Promise<void> => ipcRenderer.invoke(IPC.fsUnwatchTree, watchId),
+    onTreeChanged: (listener: (event: TreeChangedEvent) => void): Unsubscribe => subscribe(IPC.fsTreeChanged, listener),
     /** Absolute path of a File dropped from Finder (Electron removed File.path). */
     pathForFile: (file: File): string => {
       try {
@@ -151,6 +167,23 @@ const api = {
     /** Suspend, reboot, power off, log out, or lock. */
     power: (action: PowerAction): Promise<void> => ipcRenderer.invoke(IPC.shellPower, action)
   },
+  edit: {
+    /** Type, press a key, or run a clipboard/undo action on the focused element (or in a web view). */
+    perform: (action: EditAction, webViewId?: string): Promise<void> => ipcRenderer.invoke(IPC.editAction, action, webViewId)
+  },
+  web: {
+    /** Open an http(s) page in an embedded view owned by this window; resolves with the view id. */
+    open: (url: string, options: WebOpenOptions = {}): Promise<string> => ipcRenderer.invoke(IPC.webOpen, url, options),
+    /** Show a local file in a viewer view owned by this window; resolves with the view id. */
+    openFile: (filePath: string, options: WebOpenOptions = {}): Promise<string> => ipcRenderer.invoke(IPC.webOpenFile, filePath, options),
+    /** Place the view over the frame's content rect (CSS px); hidden views keep their bounds. */
+    setBounds: (id: string, bounds: WebViewBounds, visible: boolean): void => ipcRenderer.send(IPC.webSetBounds, id, bounds, visible),
+    close: (id: string): Promise<void> => ipcRenderer.invoke(IPC.webClose, id),
+    openPreview: (target: string, options: WebOpenOptions = {}): Promise<string> => ipcRenderer.invoke(IPC.webOpenPreview, target, options),
+    navigate: (id: string, target: string): Promise<void> => ipcRenderer.invoke(IPC.webNavigate, id, target),
+    reload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.webReload, id),
+    onEvent: (listener: (event: WebViewEvent) => void): Unsubscribe => subscribe(IPC.webEvent, listener)
+  },
   clipboard: {
     history: (limit = 50): Promise<ClipboardEntry[]> => ipcRenderer.invoke(IPC.clipboardHistory, limit),
     paste: (id: string): Promise<void> => ipcRenderer.invoke(IPC.clipboardPaste, id)
@@ -170,6 +203,21 @@ const api = {
     set: (patch: Partial<HermesOSPrefs>): Promise<HermesOSPrefs> => ipcRenderer.invoke(IPC.prefsSet, patch),
     /** Preferences changed from another surface window. */
     onChanged: (listener: (prefs: HermesOSPrefs) => void): Unsubscribe => subscribe(IPC.prefsChanged, listener)
+  },
+  osControl: {
+    /** Main asks this window to run a registry command / list commands / report state. */
+    onRequest: (listener: (request: OsControlRequest) => void): Unsubscribe => subscribe(IPC.osControlRequest, listener),
+    reply: (reply: OsControlReply): void => ipcRenderer.send(IPC.osControlReply, reply)
+  },
+  voice: {
+    /** Current OS-level microphone authorization (always 'granted' outside macOS). */
+    microphoneStatus: (): Promise<MicPermission> => ipcRenderer.invoke(IPC.voiceMicrophoneStatus),
+    /** Prompt the OS for microphone access when it has not been decided yet. */
+    requestMicrophone: (): Promise<MicPermission> => ipcRenderer.invoke(IPC.voiceRequestMicrophone),
+    /** Tokenized URL for an authenticated audio WebSocket (speak-stream). */
+    audioWsUrl: (kind: AudioWsKind): Promise<string> => ipcRenderer.invoke(IPC.voiceAudioWsUrl, kind),
+    /** The global voice hotkey was pressed (fires in every window; the main surface acts). */
+    onHotkey: (listener: () => void): Unsubscribe => subscribe<void>(IPC.voiceHotkey, () => listener())
   },
   bridge: {
     readPolicy: (): Promise<string> => ipcRenderer.invoke(IPC.bridgePolicyRead),

@@ -62,6 +62,19 @@ export interface MemoryState {
 
 export const $memory = atom<MemoryState>({ files: null, entries: [], loading: false, loaded: false, error: null })
 
+/** A request from a command (voice, agent) for the Memory page to filter and/or select an entry. */
+export interface MemoryFocus {
+  query?: string
+  entryId?: string
+  ts: number
+}
+
+export const $memoryFocus = atom<MemoryFocus | null>(null)
+
+export function focusMemory(focus: Omit<MemoryFocus, 'ts'>): void {
+  $memoryFocus.set({ ...focus, ts: Date.now() })
+}
+
 // ---------------------------------------------------------------------------------------------
 // Text helpers (pure).
 // ---------------------------------------------------------------------------------------------

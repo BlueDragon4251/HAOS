@@ -70,7 +70,9 @@ function blocksOf(items: ChatMessage[]): Block[] {
 
 export function Conversation({ chat, online }: { chat: ChatState | null; online: boolean }) {
   const space = useStore($activeSpace)
-  const submit = (text: string) => (text.startsWith('/') ? runSlash(text) : sendPrompt(text))
+  const submit = async (text: string): Promise<void> => {
+    await (text.startsWith('/') ? runSlash(text) : sendPrompt(text))
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">

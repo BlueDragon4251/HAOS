@@ -10,7 +10,7 @@ export function MissionCard({ mission, selected, onSelect }: { mission: Mission;
   const showProgress = mission.status === 'active' || mission.status === 'queued'
 
   return (
-    <GlassCard as="button" interactive selected={selected} onClick={onSelect} className="w-full p-3.5">
+    <GlassCard as="button" interactive selected={selected} onClick={onSelect} className="w-full p-3.5" data-os-target={`mission:${mission.id}`}>
       <div className="flex items-center gap-3">
         <span className="icon-tile size-11 shrink-0" style={{ borderRadius: 11 }}>
           <Icon size={22} stroke={1.75} />

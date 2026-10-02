@@ -51,6 +51,11 @@ The session token stays in the main process. The renderer receives a WebSocket U
 and a `rest(method, path, body)` capability for everything else. A compromised renderer cannot
 mint arbitrary authenticated requests outside the exposed capability.
 
+Amendment (voice): main also mints the tokenized URL for the backend's `/api/audio/speak-stream`
+WebSocket (`window.hermesOS.voice.audioWsUrl`). The renderer already dials the gateway WebSocket
+with the same loopback token, so this widens nothing; a WebSocket proxied through main would add
+a copy of every PCM frame for no security gain. REST stays in main.
+
 ## ADR-009: Answer both request contracts (server requests and legacy events)
 
 The pinned upstream snapshot delivers `approval` / `clarify` / `sudo` / `secret` as server-to-client
@@ -111,3 +116,91 @@ sees. This proves the experience before any security or packaging work. See `doc
 - **Repo copied into the VM, not used in place.** Native modules (`node-pty`, Electron) must be
   installed on Linux; rsync over SSH (`linux/dev/push.sh`) or from the VirtioFS share
   (`hermes-os-sync`) keeps one source of truth on the Mac.
+
+## ADR-013: Two voice engines behind one voice core; the free one is the default
+
+Hermes OS talks and listens through `apps/os/src/store/voice.ts` and two interchangeable engines
+(`apps/os/src/lib/voice/*-engine.ts`). Hermes is the brain in both: sessions, tools, memory and
+approvals never move.
+
+- **Chained (default, no extra cost).** Renderer mic -> energy endpointing -> `POST
+  /api/audio/transcribe` -> `prompt.submit` with `surface: "voice-live"` (upstream's spoken-reply
+  note: short, no markdown) -> `/api/audio/speak-stream` sentence by sentence while the reply
+  streams. Providers are whatever `stt.provider` / `tts.provider` say in the runtime's config
+  (Nous-managed OpenAI audio for subscribers, `local` faster-whisper and `edge` for free, keys for
+  the rest). Turn latency is about two seconds; barge-in and an end-of-speech cue keep it
+  conversational.
+- **Live (opt-in, $0.05 per open minute).** OpenAI `gpt-live-1` over WebRTC with client
+  delegation, exactly the contract upstream's Desktop implements: every `session.delegation.created`
+  becomes a Hermes turn and the reply returns as `session.commentary.append`. It is the only path
+  with true full duplex and sub-second replies, and the only one that costs per minute, so the
+  engine opens a session only for a conversation, closes it after `liveIdleSeconds` of silence,
+  refuses to open past `liveDailyCapMinutes`, and shows the running meter on the orb.
+- **Rejected: gpt-realtime as the brain.** Cheaper audio, but it would either replace Hermes's
+  tools and memory or need a second function-call bridge to reach them.
+- **Wake word stays in the runtime.** `wake.start` / `wake.feed` / `wake.detected` with
+  openWakeWord's bundled "hey hermes" model; the shell streams 16 kHz PCM when the runtime asks
+  for client capture and otherwise lets it open the host mic. No second detector to maintain.
+- **One microphone graph.** `audio-capture.ts` opens the mic once and fans frames out to the wake
+  feed, the utterance recorder, the barge-in monitor and the WebRTC sender, so the menu-bar
+  indicator is literally "the mic is open".
+- **Config writes go through `PUT /api/config`** (deep merge), the same path the Hermes dashboard
+  uses, so `hermes tools` and Hermes OS Settings never fight over the file.
+
+## ADR-014: One command registry; the agent drives the UI through a control socket
+
+Voice control of the OS needs the shell's actions to be nameable and callable from outside the
+component that renders them. Every user-visible action is therefore an `OsCommand` in one registry
+(`apps/os/src/store/os-commands.ts`; catalogue under `apps/os/src/app/commands/`) with typed
+arguments, a permission tier and a `CommandResult` the caller can speak or show. Inline page
+handlers that voice needed (automations, connections, mission start, pause-all, the panels
+`ShellCommand` switch) moved into stores so the registry, the pages and the command bar share them.
+
+- **Fast path before the model.** A pure matcher (`lib/voice/intents.ts`) compiles each command's
+  phrases into whole-utterance grammars. A confident match runs locally (no tokens, under 100 ms)
+  and the voice speaks the result; destructive commands never match, and long or reasoning-shaped
+  utterances fall through to Hermes. A failed run also falls through, so the words are never lost.
+- **Agent -> UI over the control socket, in both shell modes.** Hermes runs in the backend and had
+  no way to reach the UI on macOS (the Linux `ControlSocket` was panels-only; upstream's `desktop_ui`
+  is gated to Hermes Desktop sessions; plugins cannot emit WebSocket events). The Electron main
+  process now serves a JSON-lines Unix socket in desktop mode too (`hermesOsDataDir()/control.sock`)
+  and hands the backend its path and a per-launch token; `ui`, `ui-list` and `ui-state` requests are
+  forwarded to the Hermes window over IPC and answered with the command's result. The bridge plugin's
+  `os_ui` tool is the client; the command's declared tier drives the existing approval gate and audit.
+  Rejected: reusing `desktop_ui` (handlers live in Hermes Desktop), notifications as commands (no
+  results, not extensible), a gateway server-request (needs core changes; still the long-term path).
+- **Show the work.** Commands return a `highlight` target; items carry `data-os-target` and a small
+  highlighter scrolls and pulses them; an action HUD captions each voice/agent command. `tool.complete`
+  events from Hermes's own memory/cron/file tools map to the matching `*.show` command during voice
+  conversations (or with the Follow Hermes preference), never while the user is typing.
+
+## ADR-015: The Studio watches builds through gateway events, not the desktop source
+
+"Build me a website" should let the person watch Hermes work: files appearing, the code with its
+changes marked, commands and dev-server output, and the running site. Upstream already streams most
+of it to any client: `tool.start` (full arguments, including the content `write_file` is writing),
+`tool.complete` with `inline_diff` (Hermes's rendered review diff: ANSI colours and
+`a/<path> → b/<path>` headers before ordinary hunks), and `agent.terminal.output` / `terminal.close`
+for background processes. The Studio (`apps/os/src/app/studio/`, model in `lib/studio-model.ts`,
+store in `store/studio.ts`) folds those events per session, for every session the shell knows, so
+"show me the code" works for a build already under way.
+
+- **Own preview command instead of `open_preview`.** Upstream's preview tools (`open_preview`,
+  `read_preview`, `drive_preview`) are in the `desktop_ui` toolset, which the gateway enables only
+  for sessions whose source is `desktop`. Hermes OS sessions keep `source: "hermes_os"` (ADR-003);
+  claiming to be Hermes Desktop would also advertise panes Hermes OS does not implement. The
+  Studio detects local server addresses in process output and exposes `studio.preview` through
+  `os_ui` for Hermes to name one explicitly; a `preview.open` event, if one ever arrives, is honoured.
+- **`build.start` owns the setup.** It creates `~/Projects/<slug>` (the `projectsRoot` pref), starts
+  a session with that folder as its working directory, opens the Studio and sends a brief that asks
+  for `write_file` / `patch` (so every file is visible as it is written), background servers and a
+  preview. Voice matches "create / build / make a website for …" on the fast path; longer requests
+  reach Hermes, which calls `build.start` through `os_ui`.
+- **Previews are their own locked-down view.** `web.openPreview` uses a separate partition, allows
+  http(s) and `file://` inside the project folder only, and supports `navigate` / `reload`; the
+  Studio reloads it after file changes and retries while a dev server is still starting.
+- **The disk is watched too.** `fs.watchTree` (recursive `fs.watch`, dependencies, build output and
+  scratch files skipped) catches files that commands create, such as a scaffolded project.
+- **Focus rules hold.** A session started with `build.start` opens its Studio when it starts
+  working and never again after the user closes it; other sessions that start writing code only get
+  a one-time caption ("say 'show me' to watch").

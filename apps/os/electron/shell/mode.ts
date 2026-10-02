@@ -19,7 +19,8 @@ export const SURFACE_TITLE: Record<Exclude<ShellSurface, `window:${string}`>, st
 export const FLOATING_APPS: Record<string, { title: string; width: number; height: number }> = {
   terminal: { title: 'Hermes OS · Terminal', width: 900, height: 560 },
   system: { title: 'Hermes OS · System', width: 980, height: 640 },
-  'chat-popout': { title: 'Hermes OS · Chat', width: 520, height: 720 }
+  'chat-popout': { title: 'Hermes OS · Chat', width: 520, height: 720 },
+  studio: { title: 'Hermes OS · Studio', width: 1280, height: 800 }
 }
 
 export function surfaceTitle(surface: ShellSurface): string {

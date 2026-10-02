@@ -22,6 +22,7 @@ export function ConnectionCard({ connection, selected, onSelect, actions, busy }
       interactive
       selected={selected}
       onClick={onSelect}
+      data-os-target={`connection:${connection.id}`}
       className={cn('relative flex min-h-[150px] flex-col p-4', busy && 'opacity-70')}
     >
       <div className="flex items-start gap-3">

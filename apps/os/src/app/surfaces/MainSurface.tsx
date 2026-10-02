@@ -1,16 +1,12 @@
 import { useStore } from '@nanostores/react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import type { ShellCommand } from '../../../shared/ipc.ts'
-import { runHermesOsWithToast } from '../../lib/hermes-os-cli.ts'
 import { afterExit, motion } from '../../lib/motion.ts'
-import { $backend, updatePrefs } from '../../store/backend.ts'
-import { openStoredSession, runSlash, sendPrompt } from '../../store/chat.ts'
-import { $notificationsOpen, bindDesktopNotifications, notify } from '../../store/notifications.ts'
-import { openSurface } from '../../store/shell.ts'
+import { $backend } from '../../store/backend.ts'
+import { bindDesktopNotifications } from '../../store/notifications.ts'
 import { toggleSidebar } from '../../store/sidebar.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../../store/surface.ts'
-import { ensureMainWindow, openApp, showPage } from '../../store/windows.ts'
-import { HERMES_APPS, PAGES, type PageId } from '../apps.ts'
+import { ensureMainWindow, openApp } from '../../store/windows.ts'
+import { HERMES_APPS } from '../apps.ts'
 import { BootScreen } from '../shell/BootScreen.tsx'
 import { CommandBar } from '../shell/CommandBar.tsx'
 import { MainWindow } from '../shell/MainWindow.tsx'
@@ -18,11 +14,11 @@ import { NotificationsPanel } from '../shell/NotificationsPanel.tsx'
 import { RequestHost } from '../shell/RequestHost.tsx'
 import { Toasts } from '../shell/Toasts.tsx'
 import { drawWallpaperFrame } from '../shell/Wallpaper.tsx'
-import { composePrompt, useShellCommands } from './shell-utils.ts'
+import { HermesLoginCard } from '../auth/HermesLoginCard.tsx'
+import { ActionHud, OsHighlighter } from '../voice/ActionHud.tsx'
+import { VoiceOrb } from '../voice/VoiceOrb.tsx'
 
 const ApplicationsOverlay = lazy(() => import('../apps/ApplicationsOverlay.tsx').then(m => ({ default: m.ApplicationsOverlay })))
-
-const isPageId = (value: string | undefined): value is PageId => PAGES.some(page => page.id === value)
 
 /**
  * Panels mode: the Hermes window. niri tiles it like any other client, so it is just the sidebar and
@@ -41,86 +37,8 @@ export function MainSurface() {
   // Notifications other apps send over D-Bus land in the shell's list and toasts (panels mode only).
   useEffect(() => bindDesktopNotifications(), [])
 
-  useShellCommands((command: ShellCommand) => {
-    switch (command.type) {
-      case 'show-page': {
-        const id = command.args?.[0]
-
-        if (isPageId(id)) {
-          showPage(id)
-        }
-
-        return
-      }
-      case 'send-prompt': {
-        const text = composePrompt(command.text ?? '', command.context, command.attachments)
-
-        if (!text) {
-          return
-        }
-
-        showPage('hermes')
-        openSurface('main')
-
-        // A bare slash command from the palette runs as one; anything with context or files is a prompt.
-        if (text.startsWith('/') && !command.context && !command.attachments?.length) {
-          void runSlash(text)
-        } else {
-          void sendPrompt(text)
-        }
-
-        return
-      }
-      case 'open-session': {
-        const id = command.args?.[0]
-
-        if (id) {
-          showPage('hermes')
-          void openStoredSession(id)
-        }
-
-        return
-      }
-      case 'notify': {
-        const [title, ...rest] = command.args ?? []
-
-        if (title) {
-          notify({ title, body: rest.join(' ') || command.text || undefined })
-        }
-
-        return
-      }
-      case 'notifications':
-        $notificationsOpen.set(!$notificationsOpen.get())
-
-        return
-      case 'command':
-        toggleCommandBar(true)
-
-        return
-      case 'applications':
-        $applicationsOpen.set(true)
-
-        return
-      case 'hermes-os': {
-        // The overlay hands off commands that must run after it closed (screenshot, OCR, hotkey overlay).
-        const args = command.args ?? []
-
-        if (args.length > 0) {
-          void runHermesOsWithToast(args, command.text || args.join(' '))
-        }
-
-        return
-      }
-      case 'pick-wallpaper':
-        void pickWallpaper()
-
-        return
-      case 'payload':
-      default:
-        return
-    }
-  })
+  // Commands from the CLI, the overlay and the control server are handled by store/shell-commands.ts
+  // (bound once at boot), shared with the macOS desktop window.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -183,6 +101,10 @@ export function MainSurface() {
         <div className="absolute inset-0 z-(--z-windows)">
           <MainWindow />
         </div>
+        <VoiceOrb offsetClass="bottom-6" />
+        <ActionHud offsetClass="top-4" />
+        <OsHighlighter />
+        <HermesLoginCard />
         <RequestHost />
         <Toasts />
         <NotificationsPanel />
@@ -196,22 +118,6 @@ export function MainSurface() {
       {bootVisible && <BootScreen state={backend} leaving={!bootOnly} />}
     </div>
   )
-}
-
-/** Style > Wallpaper: the Hermes window owns the file dialog because the overlay closes when it loses focus. */
-async function pickWallpaper(): Promise<void> {
-  try {
-    const [wallpaper] = await window.hermesOS.fs.pickFiles({ multiple: false })
-
-    if (!wallpaper) {
-      return
-    }
-
-    await updatePrefs({ wallpaper })
-    notify({ title: 'Wallpaper updated', body: wallpaper.split('/').pop() || wallpaper, level: 'success' })
-  } catch (error) {
-    notify({ title: 'Could not set wallpaper', body: error instanceof Error ? error.message : String(error), level: 'error' })
-  }
 }
 
 /** One still frame of the wallpaper behind the sidebar and page so the glass has something to sit on. */

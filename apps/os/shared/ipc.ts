@@ -168,6 +168,60 @@ export interface SpaceDef {
   cwd?: string
 }
 
+/** Which pipeline turns speech into a Hermes turn and back. See docs/VOICE.md. */
+export type VoiceEngine = 'chained' | 'live'
+
+export interface VoicePrefs {
+  /** Master switch: when off, no microphone is ever opened and the orb stays hidden. */
+  enabled: boolean
+  engine: VoiceEngine
+  /** Arm the backend "hey hermes" detector with client-captured audio while the shell runs. */
+  wakeWord: boolean
+  /** Electron accelerator toggling a conversation from anywhere (empty disables the hotkey). */
+  hotkey: string
+  /** Seconds the mic keeps listening for a follow-up after Hermes finishes speaking. */
+  followUpSeconds: number
+  /** Speak `notification.show` bodies (missions, reminders) aloud while voice is enabled. */
+  announceNotifications: boolean
+  /** Show Hermes's own tool results on screen (memory, automations, files) even outside a voice conversation. */
+  followHermes: boolean
+  /** Set once Hermes OS has tuned local speech recognition (model + vocabulary), so a later user choice is never overwritten. */
+  sttTuned: boolean
+  /** Live engine: close the paid session after this many idle seconds. */
+  liveIdleSeconds: number
+  /** Live engine: refuse to open new sessions once today's minutes reach this cap (0 = no cap). */
+  liveDailyCapMinutes: number
+  /** Live engine: seconds of session time used on `day` (YYYY-MM-DD, local). */
+  liveUsage: { day: string; seconds: number }
+}
+
+export type MicPermission = 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
+
+/** Keyboard modifiers for `EditAction` key presses (Electron accelerator names). */
+export type KeyModifier = 'shift' | 'control' | 'alt' | 'meta'
+
+/** Text and editing actions performed on whatever is focused in a Hermes OS window. */
+export type EditAction =
+  | { kind: 'insert'; text: string }
+  | { kind: 'key'; key: string; modifiers?: KeyModifier[] }
+  | { kind: 'copy' | 'cut' | 'paste' | 'selectAll' | 'undo' | 'redo' | 'delete' | 'unselect' }
+
+/** Main -> renderer: run a registry command, list the catalogue, or describe the shell state. */
+export type OsControlRequest =
+  | { requestId: string; kind: 'run'; command: string; args: Record<string, unknown>; source: 'agent' | 'cli' }
+  | { requestId: string; kind: 'list' }
+  | { requestId: string; kind: 'state' }
+
+export interface OsControlReply {
+  requestId: string
+  /** A `CommandResult`, a command list, or a state snapshot; `error` when the renderer failed outright. */
+  result?: unknown
+  error?: string
+}
+
+/** Authenticated WebSocket endpoints the renderer may dial besides the gateway. */
+export type AudioWsKind = 'speak-stream'
+
 export interface HermesOSPrefs {
   fullscreenOnLaunch: boolean
   reduceMotion: boolean
@@ -176,15 +230,20 @@ export interface HermesOSPrefs {
   /** Absolute path or file:// URL of a custom wallpaper image. */
   wallpaper?: string
   defaultCwd?: string
+  /** Where "build …" creates project folders (default ~/Projects). */
+  projectsRoot?: string
   spaces: SpaceDef[]
   activeSpace: string
   favorites: string[]
+  /** Files the user removed from Recents (the system's own recent list is left alone). */
+  hiddenRecents?: string[]
   /** Persisted window bounds per app id. */
   windowBounds?: Record<string, { x: number; y: number; width: number; height: number }>
   /** Main-window sidebar: expanded width in px and whether it is collapsed to icons. */
   sidebar?: { width: number; collapsed: boolean }
   /** Slide the Dock off-screen until the cursor reaches the bottom edge (default on). */
   dockAutoHide?: boolean
+  voice: VoicePrefs
 }
 
 export interface AuditEntry {
@@ -270,6 +329,43 @@ export interface ShellCommand {
   payload?: Record<string, unknown>
 }
 
+/** A rectangle in the renderer's CSS pixels; main converts to device-independent pixels. */
+export interface WebViewBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Corner radius matching the frame around the view (CSS px). */
+  radius?: number
+}
+
+export interface WebOpenOptions {
+  /** Fixed window title; when omitted the page title is reported through `title` events. */
+  title?: string
+  /** Previews only: the project folder whose local files the preview may show. */
+  root?: string
+}
+
+/** Main -> renderer: lifecycle of one embedded web view (`window.hermesOS.web`). */
+export type WebViewEvent =
+  | { id: string; type: 'title'; title: string }
+  | { id: string; type: 'url'; url: string }
+  | { id: string; type: 'loading'; loading: boolean }
+  | { id: string; type: 'error'; error: string }
+  | { id: string; type: 'closed' }
+
+/** One entry of a project listing (`fs.listTree`), for the Studio's file tree. */
+export interface TreeEntry {
+  path: string
+  kind: 'file' | 'directory'
+}
+
+/** Main -> renderer: files changed under a watched project folder (`fs.watchTree`). */
+export interface TreeChangedEvent {
+  watchId: string
+  paths: string[]
+}
+
 export interface EnvInfo {
   platform: NodeJS.Platform
   hermesHome: string
@@ -304,6 +400,8 @@ export const IPC = {
   fsOpenPath: 'hermes-os:fs:open-path',
   fsOpenIn: 'hermes-os:fs:open-in',
   fsRecent: 'hermes-os:fs:recent',
+  /** Find files by name under the home folder (Spotlight on macOS). */
+  fsFind: 'hermes-os:fs:find',
   fsThumbnail: 'hermes-os:fs:thumbnail',
   fsImageInfo: 'hermes-os:fs:image-info',
   fsWriteText: 'hermes-os:fs:write-text',
@@ -313,6 +411,12 @@ export const IPC = {
   fsExportPdf: 'hermes-os:fs:export-pdf',
   fsPickFiles: 'hermes-os:fs:pick-files',
   fsDirSize: 'hermes-os:fs:dir-size',
+  /** A bounded recursive listing of a project folder (build output and dependencies skipped). */
+  fsListTree: 'hermes-os:fs:list-tree',
+  fsWatchTree: 'hermes-os:fs:watch-tree',
+  fsUnwatchTree: 'hermes-os:fs:unwatch-tree',
+  /** Main -> renderer: `TreeChangedEvent`. */
+  fsTreeChanged: 'hermes-os:fs:tree-changed',
 
   systemNetwork: 'hermes-os:system:network',
   calendarToday: 'hermes-os:calendar:today',
@@ -333,6 +437,21 @@ export const IPC = {
 
   shellOpenExternal: 'hermes-os:shell:open-external',
 
+  // Embedded web views: http(s) pages rendered inside a Hermes OS window, never the system browser.
+  /** Perform an `EditAction` in this window (or in one of its web views). */
+  editAction: 'hermes-os:edit:action',
+  webOpen: 'hermes-os:web:open',
+  /** Show a local file (PDF, image, text, media) in a locked-down viewer view. */
+  webOpenFile: 'hermes-os:web:open-file',
+  webSetBounds: 'hermes-os:web:set-bounds',
+  webClose: 'hermes-os:web:close',
+  /** Studio preview: a web page or a file inside the project folder. */
+  webOpenPreview: 'hermes-os:web:open-preview',
+  webNavigate: 'hermes-os:web:navigate',
+  webReload: 'hermes-os:web:reload',
+  /** Main -> renderer: title/url/loading changes and `closed`. */
+  webEvent: 'hermes-os:web:event',
+
   prefsGet: 'hermes-os:prefs:get',
   prefsSet: 'hermes-os:prefs:set',
   prefsChanged: 'hermes-os:prefs:changed',
@@ -342,6 +461,18 @@ export const IPC = {
   bridgeAuditRead: 'hermes-os:bridge:audit-read',
 
   envInfo: 'hermes-os:env:info',
+
+  // OS control: main asks the Hermes window to run a registry command (from the control socket /
+  // the agent's os_ui tool) and the window replies.
+  osControlRequest: 'hermes-os:os-control:request',
+  osControlReply: 'hermes-os:os-control:reply',
+
+  // Voice: microphone permission, tokenized audio WebSocket URLs, the global hotkey.
+  voiceRequestMicrophone: 'hermes-os:voice:request-microphone',
+  voiceMicrophoneStatus: 'hermes-os:voice:microphone-status',
+  voiceAudioWsUrl: 'hermes-os:voice:audio-ws-url',
+  /** Main -> renderer: the global voice hotkey was pressed. */
+  voiceHotkey: 'hermes-os:voice:hotkey',
 
   // Panels mode: surfaces, cross-window relay, compositor state.
   shellOpen: 'hermes-os:shell:open',

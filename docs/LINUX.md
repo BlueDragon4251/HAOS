@@ -25,11 +25,12 @@ bash linux/dev/push.sh --with-hermes-config   # push repo, build shell, copy Her
 A QEMU window appears on the Mac. After provisioning and the first push, the VM reboots into the
 Hermes desktop with no login prompt. `bash linux/vm/run-qemu.sh stop|status|reset` manage it.
 
-Window size: QEMU shows guest pixels 1:1 with the Mac's device pixels. The default framebuffer is
-2048x1280 (`GUEST_W`/`GUEST_H`) with the shell zoomed 1.5x (`HERMES_OS_SCALE` in `session.env`),
-about 1024x640 points on a Retina display. For a bigger window use e.g. `GUEST_W=2880 GUEST_H=1800`
-with `HERMES_OS_SCALE=2`, or pick View -> Zoom To Fit in QEMU's menu and resize/fullscreen the
-window (toggle it after boot; enabling it at launch makes the guest adopt the initial window size).
+Window size: QEMU shows guest pixels 1:1 with the Mac's device pixels. The framebuffer defaults to
+the main display's width and its height minus the menu and title bars (3024x1820 on a 14-inch
+MacBook Pro), so the window fills the screen; override with `GUEST_W`/`GUEST_H`. On Retina, set
+`HERMES_OS_SCALE=2` in `session.env` and `scale 2` in `~/.config/niri/local.kdl` so the desktop
+matches Mac apps in size. View -> Zoom To Fit in QEMU's menu still works (toggle it after boot;
+enabling it at launch makes the guest adopt the initial window size).
 
 `--with-hermes-config` copies `~/.hermes/{config.yaml,.env}` (model choice and any API keys) into
 the VM. It deliberately does not copy `auth.json`: OAuth providers (Nous Portal, Codex, Copilot)

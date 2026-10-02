@@ -43,7 +43,9 @@ PACKAGES=(
   # Session.
   niri cage greetd seatd polkit dbus-daemon xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs
   swaybg swaylock swayidle slurp wl-clipboard cliphist brightnessctl playerctl wtype
-  pipewire pipewire-pulse wireplumber
+  pipewire pipewire-pulse wireplumber alsa-utils
+  # Cloud images ship kernel-core only; the sound drivers (snd-hda-intel for the VM's audio) live here.
+  kernel-modules
   NetworkManager NetworkManager-wifi bluez upower
   # Electron runtime libraries and fonts.
   nss atk at-spi2-atk cups-libs gtk3 libdrm mesa-libgbm mesa-dri-drivers alsa-lib libxkbcommon
@@ -148,6 +150,12 @@ if [[ ! -x "$AGENT/venv/bin/python" ]]; then
 else
   echo "already installed: $AGENT"
 fi
+
+# Voice: local transcription, free neural voices and the "hey hermes" wake word.
+sudo -u "$HERMES_USER" -H bash -euo pipefail -c "
+  cd '$AGENT'
+  PATH=\"\$HOME/.local/bin:\$PATH\" uv pip install --python venv/bin/python -q -e '.[voice,edge-tts,wake-openwakeword]' || echo 'voice extras failed; voice falls back to cloud providers'
+"
 
 # ---------------------------------------------------------------------------------------------
 step "Hermes OS shell"

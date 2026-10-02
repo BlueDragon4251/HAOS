@@ -1,6 +1,7 @@
-import { IconMicrophone, IconPaperclip, IconPlayerStop, IconSend2 } from '@tabler/icons-react'
+import { IconPaperclip, IconPlayerStop, IconSend2 } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
+import { MicButton } from '../voice/MicButton.tsx'
 
 /*
  * The Hermes page composer. Same behaviour as chat/Composer.tsx (Enter sends, Shift+Enter breaks
@@ -67,9 +68,7 @@ export function HermesComposer({ disabled, streaming, placeholder, autoFocus, on
         }}
         className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-6 outline-none placeholder:text-fg-4 disabled:opacity-50"
       />
-      <button type="button" aria-label="Dictate (coming soon)" disabled title="Dictation is not available yet" className="flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 disabled:cursor-not-allowed disabled:opacity-50">
-        <IconMicrophone size={17} stroke={1.7} />
-      </button>
+      <MicButton size={17} className="size-8" disabled={disabled} />
       {streaming && onInterrupt ? (
         <button type="button" aria-label="Stop" onClick={onInterrupt} className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-danger/40 bg-danger/15 text-danger hover:bg-danger/25">
           <IconPlayerStop size={15} />

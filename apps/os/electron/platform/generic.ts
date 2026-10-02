@@ -82,6 +82,10 @@ export class GenericPlatform implements HostPlatform {
     return []
   }
 
+  async findFiles(): Promise<RecentFile[]> {
+    return []
+  }
+
   async thumbnail(): Promise<Buffer | null> {
     return null
   }

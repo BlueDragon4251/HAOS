@@ -27,11 +27,15 @@ SSH_PORT="${HERMES_VM_PORT:-2222}"
 CPUS="${CPUS:-4}"
 MEM="${MEM:-8192}"
 DISK_SIZE="${DISK_SIZE:-64G}"
-# Guest framebuffer. The Cocoa window shows guest pixels 1:1 with the Mac's device pixels, so on a
-# Retina display a 2048x1280 guest is about 1024x640 points; hermes-os-session scales the shell
-# with HERMES_OS_SCALE (see ~/.config/hermes-os/session.env) so text stays crisp.
-GUEST_W="${GUEST_W:-2048}"
-GUEST_H="${GUEST_H:-1280}"
+# Guest framebuffer. The Cocoa window shows guest pixels 1:1 with the Mac's device pixels, so the
+# default fills the main display's width and leaves room for the menu bar and title bar (72 points,
+# 144 pixels on Retina). Pair a Retina-sized guest with HERMES_OS_SCALE=2 in
+# ~/.config/hermes-os/session.env (and `scale 2` in ~/.config/niri/local.kdl) so text stays crisp.
+DISPLAY_RES="$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Main Display: Yes/{main=1} /Resolution:/{res=$2" "$4} main && res{print res; exit}')"
+[[ -n "$DISPLAY_RES" ]] || DISPLAY_RES="$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Resolution:/{print $2" "$4; exit}')"
+read -r DISPLAY_W DISPLAY_H <<<"${DISPLAY_RES:-2048 1424}"
+GUEST_W="${GUEST_W:-$DISPLAY_W}"
+GUEST_H="${GUEST_H:-$((DISPLAY_H - 144))}"
 
 running() {
   [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
@@ -103,7 +107,7 @@ perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- qemu-s
   -device virtio-gpu-pci,xres="$GUEST_W",yres="$GUEST_H" \
   "${DISPLAY_ARGS[@]}" \
   -device qemu-xhci -device usb-kbd -device usb-tablet \
-  -audiodev coreaudio,id=snd0 -device intel-hda -device hda-output,audiodev=snd0 \
+  -audiodev coreaudio,id=snd0 -device intel-hda -device hda-duplex,audiodev=snd0 \
   -netdev user,id=net0,hostfwd=tcp:127.0.0.1:"$SSH_PORT"-:22 -device virtio-net-pci,netdev=net0 \
   -device virtio-rng-pci \
   -serial file:"$SERIAL" \

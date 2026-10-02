@@ -1,8 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { IconPlus, IconTarget } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { EmptyGlass, GlassButton, GlassCard, LinkAction, MoreButton, PageHeader, Section, Tabs, type TabDef } from '../../components/ui/glass.tsx'
-import { $activeMissions, $activity, $completedMissions, $reviewMissions } from '../../store/missions.ts'
+import { $activeMissions, $activity, $completedMissions, $missionFocus, $reviewMissions } from '../../store/missions.ts'
 import { ActivityTimeline } from './ActivityTimeline.tsx'
 import { MissionCard } from './MissionCard.tsx'
 import { MissionComposer } from './MissionComposer.tsx'
@@ -28,6 +28,27 @@ export function MissionsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [composing, setComposing] = useState(false)
+
+  // A command (voice, agent) asked for a tab, a mission or the composer: follow it.
+  const focus = useStore($missionFocus)
+
+  useEffect(() => {
+    if (!focus) {
+      return
+    }
+
+    if (focus.tab) {
+      setTab(focus.tab === 'queued' ? 'active' : focus.tab)
+    }
+
+    if (focus.missionId) {
+      setSelectedId(focus.missionId)
+    }
+
+    if (focus.compose) {
+      setComposing(true)
+    }
+  }, [focus])
 
   const tabs: readonly TabDef<TabId>[] = [
     { id: 'active', label: 'Active', count: active.length },

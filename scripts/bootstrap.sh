@@ -65,6 +65,29 @@ if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
   # agent falls back to shell commands. Keep them direct (Settings -> Permissions can flip it back).
   echo "    tools.tool_search.enabled = off (system tools stay directly callable)"
   (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" config set tools.tool_search.enabled off </dev/null >/dev/null 2>&1 || true)
+
+  echo "==> Checking voice support (docs/VOICE.md)"
+  # The Live engine and the spoken-reply turn note need hermes >= 0.21.3 (voice-live routes).
+  runtime_root="${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}"
+  runtime_version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$runtime_root/pyproject.toml" 2>/dev/null | head -1)"
+  if [[ -n "$runtime_version" ]]; then
+    if [[ "$(printf '%s\n0.21.3\n' "$runtime_version" | sort -V | head -1)" != "0.21.3" ]]; then
+      echo "    WARNING: Hermes $runtime_version is older than 0.21.3; run 'hermes update' for the Live voice engine." >&2
+    else
+      echo "    Hermes $runtime_version: voice-live routes available"
+    fi
+  fi
+  if [[ -x "$runtime_root/venv/bin/python" ]]; then
+    "$runtime_root/venv/bin/python" - <<'PY' || true
+import importlib
+for name, purpose in (("openwakeword", "wake word"), ("faster_whisper", "local STT"), ("edge_tts", "free TTS")):
+    try:
+        importlib.import_module(name)
+        print(f"    {name}: ok ({purpose})")
+    except Exception:
+        print(f"    {name}: missing ({purpose}); install with: pip install 'hermes-agent[voice]' inside the Hermes venv")
+PY
+  fi
 fi
 
 echo "==> Done. Start Hermes OS with: npm run dev"

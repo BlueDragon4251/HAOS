@@ -10,6 +10,7 @@ import { $activeSpace, $spaces, setActiveSpace } from '../../store/spaces.ts'
 import { toggleCommandBar } from '../../store/surface.ts'
 import { $systemStats, useNetworkStatus, useSystemStats } from '../../store/system.ts'
 import { $focusedTitle } from '../../store/windows.ts'
+import { VoiceIndicator } from '../voice/VoiceIndicator.tsx'
 
 export function useClock(): Date {
   const [now, setNow] = useState(() => new Date())
@@ -42,6 +43,7 @@ export function MenuBarStatus({ onSearch, onBell, bellActive }: { onSearch: () =
       <button type="button" aria-label="Search" onClick={onSearch} className="flex size-6 items-center justify-center rounded-md hover:bg-white/10">
         <IconSearch size={15} />
       </button>
+      <VoiceIndicator />
       <span title={network?.wifi?.connected ? `Wi-Fi ${network.wifi.ssid ?? ''}`.trim() : network?.online ? 'Wired' : 'Offline'}>
         {network?.online === false ? <IconWifiOff size={15} className="text-fg-3" /> : <IconWifi size={15} />}
       </span>

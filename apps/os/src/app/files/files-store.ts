@@ -9,7 +9,9 @@ import { sendPrompt } from '../../store/chat.ts'
 import { notify } from '../../store/notifications.ts'
 import { fileManagerName } from '../../lib/platform-labels.ts'
 import { $activeSpace } from '../../store/spaces.ts'
+import { openFileWindow } from '../../store/web-windows.ts'
 import { showPage } from '../../store/windows.ts'
+import { isViewable } from '../../../shared/viewer.ts'
 
 /*
  * Page-local state for Files: where we are, what is selected, how we look at it, plus the
@@ -204,7 +206,24 @@ function fromDirEntry(entry: DirEntry): FileItem {
   }
 }
 
-function fromRecent(entry: RecentFile): FileItem {
+const MAX_HIDDEN_RECENTS = 500
+
+/** Recent files minus the ones the user removed from Recents. */
+export async function loadRecents(limit: number): Promise<RecentFile[]> {
+  const hidden = new Set($prefs.get().hiddenRecents ?? [])
+  const recent = await window.hermesOS.fs.recent(Math.min(200, limit + hidden.size))
+
+  return recent.filter(entry => !hidden.has(entry.path)).slice(0, limit)
+}
+
+/** Hide a file from Recents here and on the Overview; the file itself is untouched. */
+export async function removeFromRecents(path: string): Promise<void> {
+  const hidden = [path, ...($prefs.get().hiddenRecents ?? []).filter(p => p !== path)].slice(0, MAX_HIDDEN_RECENTS)
+  await updatePrefs({ hiddenRecents: hidden })
+  $refreshTick.set($refreshTick.get() + 1)
+}
+
+export function fromRecent(entry: RecentFile): FileItem {
   return {
     name: entry.name,
     path: entry.path,
@@ -264,7 +283,7 @@ export async function loadLocation(location: Location, favorites: string[]): Pro
     case 'dir':
       return sortItems((await window.hermesOS.fs.readDir(location.path)).map(fromDirEntry))
     case 'recent':
-      return (await window.hermesOS.fs.recent(40)).map(fromRecent)
+      return (await loadRecents(40)).map(fromRecent)
     case 'favorites':
       return loadFavorites(favorites)
   }
@@ -755,6 +774,13 @@ export async function createTextFile(dir: string, name: string): Promise<string 
 export function openItem(item: FileItem): void {
   if (item.kind === 'directory') {
     navigate({ kind: 'dir', path: item.path })
+
+    return
+  }
+
+  // PDFs, images, text and media open inside Hermes OS; other types go to the app that owns them.
+  if (isViewable(item.path)) {
+    openFileWindow(item.path).catch(error => notify({ title: `Could not open "${item.name}"`, body: messageOf(error), level: 'error' }))
 
     return
   }

@@ -1,13 +1,22 @@
+import { registerOsCommands } from '../app/commands/index.ts'
 import { bindAgentEvents } from './agents.ts'
+import { bindEditTarget } from './edit-target.ts'
 import { bindBackendStores } from './backend.ts'
 import { bindChatEvents, resetChats } from './chat.ts'
 import { $connectionEpoch, bindGatewayToBackend } from './gateway.ts'
+import { bindFollow } from './follow.ts'
+import { bindHermesAuth } from './hermes-auth.ts'
 import { bindMissionEvents } from './missions.ts'
 import { bindSidebarPrefs } from './sidebar.ts'
 import { bindNotificationEvents } from './notifications.ts'
+import { bindOsControl } from './os-control.ts'
 import { bindServerRequests } from './requests.ts'
 import { refreshSessions } from './sessions.ts'
 import { bindShell } from './shell.ts'
+import { bindShellCommands } from './shell-commands.ts'
+import { bindStudioEvents } from './studio.ts'
+import { bindVoice } from './voice.ts'
+import { bindWake } from './wake.ts'
 
 const BOOT_FLAG = '__hermesOSBooted'
 
@@ -20,6 +29,8 @@ export function bootRenderer(): void {
   }
 
   global[BOOT_FLAG] = true
+  registerOsCommands()
+  bindEditTarget()
   bindShell()
   bindBackendStores()
   bindGatewayToBackend()
@@ -29,6 +40,13 @@ export function bootRenderer(): void {
   bindAgentEvents()
   bindMissionEvents()
   bindSidebarPrefs()
+  bindVoice()
+  bindWake()
+  bindHermesAuth()
+  bindShellCommands()
+  bindOsControl()
+  bindFollow()
+  bindStudioEvents()
 
   let lastEpoch = 0
   $connectionEpoch.subscribe(epoch => {

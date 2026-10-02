@@ -23,6 +23,8 @@ export interface HostPlatform {
   calendarToday(): Promise<CalendarResult>
   /** Recently used documents under the user's folders. */
   recentFiles(limit: number): Promise<RecentFile[]>
+  /** Files and folders under the home folder whose name matches `query`, best match first. */
+  findFiles(query: string, limit: number): Promise<RecentFile[]>
   /** PNG thumbnail bytes for any file (QuickLook on macOS), or null. */
   thumbnail(filePath: string, size: number): Promise<Buffer | null>
 }

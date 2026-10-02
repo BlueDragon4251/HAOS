@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from . import audit
+from . import audit, ui
 from .host import HostNotSupported, host
 from .host.base import FileSearch
 from .permissions import Tier, authorize
@@ -292,7 +292,7 @@ EDITOR_APPS = {"vscode": "Visual Studio Code", "code": "Visual Studio Code", "cu
 
 SYSTEM_OPEN_SCHEMA = _schema(
     "system_open",
-    "Open things for the user. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=vscode|cursor|xcode|zed|terminal), e.g. 'open this repo in VS Code'; target=settings opens a System Settings pane (pane=privacy_and_security, wifi, bluetooth, sound, displays, notifications, screen_recording, accessibility_privacy, automation, ...). Runs immediately; every call is audited.",
+    "Open things for the user. Inside Hermes OS, target=url opens the page in a Hermes OS window, target=path opens files in the Hermes OS viewer (PDFs, images, text, media) or shows them in Files, and target=reveal shows the item in the Files page; pass app=... only when the user names a Mac app to use. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=vscode|cursor|xcode|zed|terminal), e.g. 'open this repo in VS Code'; target=settings opens a System Settings pane (pane=privacy_and_security, wifi, bluetooth, sound, displays, notifications, screen_recording, accessibility_privacy, automation, ...). Runs immediately; every call is audited.",
     {
         "target": _enum("app", "url", "path", "reveal", "editor", "settings"),
         "app": _desc(_STR, "Application name (for target=app, or the app to open a url/path with)."),
@@ -306,9 +306,42 @@ SYSTEM_OPEN_SCHEMA = _schema(
 )
 
 
+def _open_in_shell(target: str, args: dict[str, Any]) -> str | None:
+    """Inside Hermes OS, pages, files and folders open in the OS itself, not in macOS apps.
+
+    Returns the tool result, or ``None`` when the shell is not running (or the request is one only
+    the host can serve: a named app, an editor, System Settings), so the caller falls back to the host.
+    """
+    try:
+        ui.control_endpoint()
+    except ui.ShellUnavailable:
+        return None
+    if args.get("app"):
+        return None
+    if target == "url":
+        url = str(args.get("url") or "").strip()
+        if not url.lower().startswith(("http://", "https://")):
+            return None
+        return handle_os_ui({"action": "run", "command": "web.open", "args": {"url": url}})
+    if target in ("path", "reveal"):
+        raw = str(args.get("path") or "").strip()
+        if not raw:
+            return None
+        path = expand(raw)
+        if not path.exists():
+            return fail(f"{path} does not exist")
+        if target == "reveal" or path.is_dir():
+            return handle_os_ui({"action": "run", "command": "files.show", "args": {"path": str(path)}})
+        return handle_os_ui({"action": "run", "command": "file.open", "args": {"name": str(path)}})
+    return None
+
+
 def handle_system_open(args: dict[str, Any], **_: Any) -> str:
     target = str(args.get("target") or "")
     adapter = host()
+    in_shell = _open_in_shell(target, args)
+    if in_shell is not None:
+        return in_shell
     if target == "app":
         name = str(args.get("app") or "").strip()
         if not name:
@@ -833,8 +866,95 @@ handle_system_os = system_os_handler
 
 
 # ---------------------------------------------------------------------------------------------
+# os_ui: drive the Hermes OS shell (both macOS and Linux) through its command registry
+# ---------------------------------------------------------------------------------------------
+
+OS_UI_SCHEMA = _schema(
+    "os_ui",
+    "Operate the Hermes OS user interface the user is looking at: open pages (missions, memory, files, automations, connections, settings) and apps (terminal, system), focus/close windows, show or add memories, list/run/pause automations, start missions, open web pages inside the OS, change appearance and voice settings. "
+    "Use action=list once to see every command with its arguments, then action=run with command=<id> and args. action=state tells you which page and windows are on screen. "
+    "Prefer this over describing where things are: when the user asks to open, show, add, find or change something in Hermes OS, do it and then say what you did. "
+    "After using other tools whose result lives on a page (memory, cronjob, files), run page.open so the user sees it. Destructive commands (forget, delete, trash) ask the user for approval. "
+    "When the user asks you to build, create or make something new (a website, app, landing page, store, game), do not write it yourself in a scratch or temporary folder: run command=build.start with args={\"goal\": \"<what they asked for>\"}. It creates a project folder, starts a session that builds it there and opens the Studio so they watch it happen; then just tell them it has started.",
+    {
+        "action": {"type": "string", "enum": ["run", "list", "state"], "description": "run a command, list the catalogue, or read the screen state"},
+        "command": {"type": "string", "description": "Command id for action=run, e.g. page.open, memory.add, automation.pause"},
+        "args": {"type": "object", "description": "Arguments for the command (see list)", "additionalProperties": True},
+    },
+    ["action"],
+)
+
+_UI_TIERS = {"read": Tier.READ, "act": Tier.ACT, "mutate": Tier.MUTATE, "destructive": Tier.DESTRUCTIVE}
+_UI_CATALOGUE: dict[str, dict[str, Any]] = {}
+
+
+def _ui_catalogue() -> dict[str, dict[str, Any]]:
+    """Command id -> summary, fetched from the shell and cached for the life of the process."""
+    if not _UI_CATALOGUE:
+        for entry in ui.list_commands():
+            if isinstance(entry, dict) and entry.get("id"):
+                _UI_CATALOGUE[str(entry["id"])] = entry
+    return _UI_CATALOGUE
+
+
+def ui_tier_for(command: str, catalogue: dict[str, dict[str, Any]]) -> Tier:
+    """The registry's declared tier drives approval; unknown commands are treated as mutating (pure; tested)."""
+    entry = catalogue.get(command) or {}
+    return _UI_TIERS.get(str(entry.get("tier") or ""), Tier.MUTATE)
+
+
+def ui_summary(command: str, args: dict[str, Any], catalogue: dict[str, dict[str, Any]]) -> str:
+    """One line for the approval card and the audit log (pure; tested)."""
+    entry = catalogue.get(command) or {}
+    title = str(entry.get("title") or command)
+    detail = ", ".join(f"{k}={truncate(str(v), 40)}" for k, v in args.items() if v not in (None, ""))
+    return f"{title} ({detail})" if detail else title
+
+
+def handle_os_ui(args: dict[str, Any], **_: Any) -> str:
+    action = str(args.get("action") or "run").strip().lower()
+    try:
+        if action == "list":
+            return _read("os_ui", "list", args, lambda: {"commands": ui.summarise_commands(list(_ui_catalogue().values()))})
+        if action == "state":
+            return _read("os_ui", "state", args, ui.shell_state)
+        if action != "run":
+            return fail("action must be one of run, list, state")
+        command = str(args.get("command") or "").strip()
+        if not command:
+            return fail("command is required for action=run (use action=list to see them)")
+        raw_args = args.get("args")
+        # Some models send the arguments as a JSON string; accept both.
+        if isinstance(raw_args, str) and raw_args.strip().startswith("{"):
+            try:
+                raw_args = json.loads(raw_args)
+            except json.JSONDecodeError:
+                raw_args = {}
+        command_args = raw_args if isinstance(raw_args, dict) else {}
+        catalogue = _ui_catalogue()
+        if catalogue and command not in catalogue:
+            known = ", ".join(sorted(catalogue)[:40])
+            return fail(f"unknown command '{command}'; known commands: {known}")
+        tier = ui_tier_for(command, catalogue)
+        summary = ui_summary(command, command_args, catalogue)
+
+        def execute() -> dict[str, Any]:
+            reply = ui.run_command(command, command_args)
+            if not reply.get("ok"):
+                raise RuntimeError(str(reply.get("error") or reply.get("summary") or "the shell refused the command"))
+            # The shell's own one-liner ("Opened Memory") rides along as `result`; `summary` stays the audit line.
+            payload = {k: v for k, v in reply.items() if k not in ("ok", "summary")}
+            payload["result"] = reply.get("summary")
+            payload["command"] = command
+            return payload
+
+        return _guarded("os_ui", tier, command, summary, {"command": command, "args": command_args}, (), execute)
+    except ui.ShellUnavailable as exc:
+        return fail(str(exc))
+
 
 TOOL_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec("os_ui", OS_UI_SCHEMA, handle_os_ui, "🪟"),
     ToolSpec("system_network", SYSTEM_NETWORK_SCHEMA, handle_system_network, "📶"),
     ToolSpec("system_control", SYSTEM_CONTROL_SCHEMA, handle_system_control, "🎛️"),
     ToolSpec("system_logs", SYSTEM_LOGS_SCHEMA, handle_system_logs, "📜"),
@@ -849,4 +969,4 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_os", SYSTEM_OS_SCHEMA, system_os_handler, "🐧"),
 )
 
-__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "json"]
+__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "handle_os_ui", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "ui_summary", "ui_tier_for", "json"]

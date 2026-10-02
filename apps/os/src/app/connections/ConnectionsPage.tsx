@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EmptyGlass, GlassButton, GlassCard, PageHeader, SearchField, Tabs, type TabDef } from '../../components/ui/glass.tsx'
 import { useBackendData } from '../../lib/use-async.ts'
 import { sendPrompt } from '../../store/chat.ts'
+import { $connectionsTick, setConnectionEnabled } from '../../store/connections-actions.ts'
 import { $activity } from '../../store/missions.ts'
 import { notify } from '../../store/notifications.ts'
 import { showPage } from '../../store/windows.ts'
@@ -19,7 +20,9 @@ const probeCache = new Map<string, McpProbeResult>()
 
 export function ConnectionsPage() {
   const activity = useStore($activity)
-  const { data, error, loading, reload } = useBackendData(loadConnections, [])
+  // Reload when a command (voice, agent) changed a connection outside this page.
+  const connectionsTick = useStore($connectionsTick)
+  const { data, error, loading, reload } = useBackendData(loadConnections, [connectionsTick])
   const [tab, setTab] = useState<TabId>('connected')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -124,26 +127,14 @@ export function ConnectionsPage() {
 
   const setEnabled = (connection: Connection, enabled: boolean) => {
     void withBusy(connection.id, async () => {
-      const source = connection.source
+      if (connection.source.kind === 'provider') {
+        notify({ title: 'Providers are signed in or out', body: 'Use Sign out to remove this account.', level: 'info' })
 
-      switch (source.kind) {
-        case 'mcp':
-          await api.setMcpEnabled(source.server.name, enabled)
-          notify({ title: `${connection.name} ${enabled ? 'enabled' : 'disabled'}`, body: 'Takes effect on the next Hermes session.', level: 'success' })
-          break
-        case 'messaging':
-          await api.setPlatformEnabled(source.platform.id, enabled)
-          await Promise.all(source.toolsets.map(ts => api.setToolsetEnabled(ts.name, enabled)))
-          notify({ title: `${connection.name} ${enabled ? 'enabled' : 'disabled'}`, body: enabled ? 'Restart the gateway to start receiving messages.' : undefined, level: 'success' })
-          break
-        case 'toolset':
-          await api.setToolsetEnabled(source.toolset.name, enabled)
-          notify({ title: `${connection.name} ${enabled ? 'enabled' : 'disabled'}`, level: 'success' })
-          break
-        case 'provider':
-          notify({ title: 'Providers are signed in or out', body: 'Use Sign out to remove this account.', level: 'info' })
-          break
+        return
       }
+
+      // Shared with the command registry (store/connections-actions.ts).
+      await setConnectionEnabled(connection, enabled)
     })
   }
 

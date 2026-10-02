@@ -65,6 +65,20 @@ export interface Mission {
   live: boolean
 }
 
+/** A command (voice, agent) asked the Missions page to show a tab and/or select a mission. */
+export interface MissionFocus {
+  tab?: MissionStatus | 'active' | 'review' | 'completed'
+  missionId?: string
+  compose?: boolean
+  ts: number
+}
+
+export const $missionFocus = atom<MissionFocus | null>(null)
+
+export function focusMissions(focus: Omit<MissionFocus, 'ts'>): void {
+  $missionFocus.set({ ...focus, ts: Date.now() })
+}
+
 export const $todos = map<Record<string, { todos: TodoItem[]; revision: number }>>({})
 export const $artifacts = map<Record<string, Artifact[]>>({})
 export const $activity = atom<ActivityEntry[]>([])

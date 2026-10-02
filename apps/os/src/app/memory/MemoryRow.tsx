@@ -7,7 +7,7 @@ export const formatShortDate = (epochMs: number): string => (epochMs ? new Date(
 
 export function MemoryRow({ entry, selected, onSelect }: { entry: MemoryEntry; selected: boolean; onSelect: () => void }) {
   return (
-    <GlassCard as="button" interactive selected={selected} onClick={onSelect} className="flex w-full items-center gap-3.5 px-3.5 py-3">
+    <GlassCard as="button" interactive selected={selected} onClick={onSelect} className="flex w-full items-center gap-3.5 px-3.5 py-3" data-os-target={`memory:${entry.id}`}>
       <MemoryTile entry={entry} size={40} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13px] font-medium text-fg">{entry.title}</div>

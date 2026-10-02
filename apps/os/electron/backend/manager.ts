@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { BackendRuntime, BackendState, RestRequest } from '../../shared/ipc.ts'
+import type { AudioWsKind, BackendRuntime, BackendState, RestRequest } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
 import { hermesHome, hermesOsDataDir } from '../paths.ts'
 import { waitForStatus } from './probe.ts'
@@ -27,7 +27,13 @@ export class BackendManager {
   private state: BackendState = { phase: 'idle', attempt: 0, logTail: [] }
   private child: ChildProcess | null = null
   private token = ''
+  /** Control socket the bridge plugin's `os_ui` tool dials, and the token it must present. */
+  private control: { socketPath: string; token: string } | null = null
   private listeners = new Set<BackendListener>()
+
+  setControl(socketPath: string, token: string): void {
+    this.control = { socketPath, token }
+  }
   private stopping = false
   private startGeneration = 0
   private restartTimer: ReturnType<typeof setTimeout> | null = null
@@ -63,6 +69,22 @@ export class BackendManager {
     this.clearRestartTimer()
     await this.killChild()
     this.update({ phase: 'stopped', wsUrl: undefined, baseUrl: undefined, port: undefined })
+  }
+
+  /**
+   * Tokenized URL for an authenticated audio WebSocket. The renderer already receives the gateway
+   * `wsUrl` with the same loopback token, so this widens nothing (ADR-007 amendment).
+   */
+  audioWsUrl(kind: AudioWsKind): string {
+    const { port, phase } = this.state
+
+    if (!port || phase !== 'ready') {
+      throw new Error('Hermes backend is not ready')
+    }
+
+    const paths: Record<AudioWsKind, string> = { 'speak-stream': '/api/audio/speak-stream' }
+
+    return `ws://127.0.0.1:${port}${paths[kind]}?token=${encodeURIComponent(this.token)}`
   }
 
   async rest<T>(request: RestRequest): Promise<T> {
@@ -180,7 +202,8 @@ export class BackendManager {
       HERMES_OS: '1',
       HERMES_PARENT_PID: String(process.pid),
       HERMES_DESKTOP_READY_FILE: readyFile,
-      PYTHONUNBUFFERED: '1'
+      PYTHONUNBUFFERED: '1',
+      ...(this.control ? { HERMES_OS_CONTROL_SOCKET: this.control.socketPath, HERMES_OS_CONTROL_TOKEN: this.control.token } : {})
     }
     delete env.ELECTRON_RUN_AS_NODE
 

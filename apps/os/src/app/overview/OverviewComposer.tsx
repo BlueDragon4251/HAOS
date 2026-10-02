@@ -1,7 +1,8 @@
-import { IconArrowUp, IconMicrophone, IconPaperclip } from '@tabler/icons-react'
+import { IconArrowUp, IconPaperclip } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useSlashCatalog } from '../chat/use-slash-catalog.ts'
+import { MicButton } from '../voice/MicButton.tsx'
 
 /*
  * The Overview's glass prompt: one line that grows, a paperclip that attaches file paths, a
@@ -144,9 +145,7 @@ export function OverviewComposer({ disabled, placeholder, onSubmit, className }:
           <button type="button" aria-label="Attach files" disabled={disabled || picking} onClick={() => void attach()} className="flex size-9 items-center justify-center rounded-lg text-fg-2 transition-colors duration-120 hover:bg-white/8 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40">
             <IconPaperclip size={17} />
           </button>
-          <button type="button" aria-label="Voice coming soon" disabled className="flex size-9 items-center justify-center rounded-lg text-fg-2 disabled:cursor-not-allowed disabled:opacity-40">
-            <IconMicrophone size={17} />
-          </button>
+          <MicButton size={17} className="size-9" disabled={disabled} />
           <button
             type="button"
             aria-label="Send"

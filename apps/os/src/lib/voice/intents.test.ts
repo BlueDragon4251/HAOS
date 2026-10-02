@@ -1,0 +1,137 @@
+import { describe, expect, it } from 'vitest'
+import type { CommandSummary } from '../../store/os-commands.ts'
+import { matchIntent, normaliseUtterance } from './intents.ts'
+
+// A slice of the real catalogue's phrases (the registry itself needs the DOM to import).
+const commands: CommandSummary[] = [
+  { id: 'open.any', title: 'Open', description: '', tier: 'act', hidden: true, args: [{ name: 'name', type: 'string', description: '', required: true }], phrases: ['open {name}', 'show {name}', 'go to {name}', 'show me {name}', 'launch {name}'] },
+  { id: 'page.open', title: 'Open a page', description: '', tier: 'read', hidden: false, args: [{ name: 'name', type: 'string', description: '', required: true }], phrases: ['open the {name} page', 'switch to {name}'] },
+  { id: 'memory.show', title: 'Show memory', description: '', tier: 'read', hidden: false, args: [{ name: 'query', type: 'string', description: '' }], phrases: ['show my memory', 'open memory', 'what do you remember about {query}', 'search my memory for {query}'] },
+  { id: 'memory.add', title: 'Remember something', description: '', tier: 'mutate', hidden: false, args: [{ name: 'text', type: 'string', description: '', required: true }], phrases: ['remember that {text}', 'add {text} to my memory', 'remember {text}'] },
+  { id: 'memory.forget', title: 'Forget', description: '', tier: 'destructive', hidden: false, args: [{ name: 'match', type: 'string', description: '', required: true }], phrases: ['forget {match}', 'forget that {match}'] },
+  { id: 'window.close', title: 'Close a window', description: '', tier: 'act', hidden: false, args: [{ name: 'name', type: 'string', description: '' }], phrases: ['close {name}', 'close the {name} window', 'close this window'] },
+  { id: 'chat.new', title: 'New chat', description: '', tier: 'act', hidden: false, args: [], phrases: ['new chat', 'start a new chat'] },
+  { id: 'automation.pause', title: 'Pause an automation', description: '', tier: 'mutate', hidden: false, args: [{ name: 'name', type: 'string', description: '', required: true }], phrases: ['pause the {name} automation', 'pause {name}'] },
+  { id: 'mission.start', title: 'Start a mission', description: '', tier: 'mutate', hidden: false, args: [{ name: 'goal', type: 'string', description: '', required: true }], phrases: ['start a mission to {goal}'] },
+  { id: 'text.type', title: 'Type text', description: '', tier: 'mutate', hidden: false, args: [{ name: 'text', type: 'string', description: '', required: true }], phrases: ['type {text}'] },
+  { id: 'edit.copy', title: 'Copy', description: '', tier: 'act', hidden: false, args: [], phrases: ['copy', 'copy that'] },
+  { id: 'window.minimize', title: 'Minimize', description: '', tier: 'act', hidden: false, args: [{ name: 'name', type: 'string', description: '' }], phrases: ['minimize', 'minimize it', 'minimize {name}'] },
+  { id: 'file.open', title: 'Open a file', description: '', tier: 'act', hidden: false, args: [{ name: 'name', type: 'string', description: '', required: true }], phrases: ['open the file {name}', 'open file {name}', 'find and open {name}'] },
+  {
+    id: 'build.start',
+    title: 'Build something',
+    description: '',
+    tier: 'mutate',
+    hidden: false,
+    args: [
+      { name: 'goal', type: 'string', description: '', required: true },
+      { name: 'prefix', type: 'string', description: '' }
+    ],
+    phrases: [{ phrase: 'create a website for {goal}', args: { prefix: 'a website for' } }, { phrase: 'build me an app that {goal}', args: { prefix: 'an app that' } }, 'build me {goal}']
+  },
+  { id: 'studio.open', title: 'Show the Studio', description: '', tier: 'read', hidden: false, args: [], phrases: ['show me the code', 'show me what youre doing', 'show me'] },
+  { id: 'overlay.applications', title: 'Show all apps', description: '', tier: 'read', hidden: false, args: [], phrases: ['show applications', 'open apps', 'open my apps', 'show all apps'] },
+  {
+    id: 'sidebar.toggle',
+    title: 'Toggle sidebar',
+    description: '',
+    tier: 'read',
+    hidden: false,
+    args: [{ name: 'collapsed', type: 'boolean', description: '' }],
+    phrases: ['toggle the sidebar', { phrase: 'hide the sidebar', args: { collapsed: true } }, { phrase: 'show the sidebar', args: { collapsed: false } }]
+  }
+]
+
+const match = (text: string) => matchIntent(text, commands)
+
+describe('normaliseUtterance', () => {
+  it('drops the wake word, politeness and punctuation', () => {
+    expect(normaliseUtterance('Hey Hermes, could you please open Missions?')).toBe('open missions')
+    expect(normaliseUtterance('Open the memory page, please.')).toBe('open the memory page')
+    expect(normaliseUtterance("I'd like to see my automations now")).toBe('see my automations')
+  })
+})
+
+describe('matchIntent', () => {
+  it('routes simple opens through the open router with articles stripped', () => {
+    expect(match('open missions')).toMatchObject({ command: 'open.any', args: { name: 'missions' } })
+    expect(match('Hey Hermes, open the memory')).toMatchObject({ command: 'open.any', args: { name: 'memory' } })
+    expect(match('show me my downloads')).toMatchObject({ command: 'open.any', args: { name: 'downloads' } })
+    expect(match('launch Safari')).toMatchObject({ command: 'open.any', args: { name: 'Safari' } })
+  })
+
+  it('prefers the more specific phrase', () => {
+    expect(match('open the missions page')).toMatchObject({ command: 'page.open', args: { name: 'missions' } })
+    expect(match('close the terminal window')).toMatchObject({ command: 'window.close', args: { name: 'terminal' } })
+    expect(match('open memory')).toMatchObject({ command: 'memory.show' })
+  })
+
+  it('fills preset arguments from the words', () => {
+    expect(match('hide the sidebar')).toMatchObject({ command: 'sidebar.toggle', args: { collapsed: true } })
+    expect(match('show the sidebar')).toMatchObject({ command: 'sidebar.toggle', args: { collapsed: false } })
+  })
+
+  it('captures free text slots with the original casing', () => {
+    expect(match('remember that I prefer short answers')).toMatchObject({ command: 'memory.add', args: { text: 'I prefer short answers' } })
+    expect(match('what do you remember about Herald')).toMatchObject({ command: 'memory.show', args: { query: 'Herald' } })
+    expect(match('pause the daily digest automation')).toMatchObject({ command: 'automation.pause', args: { name: 'daily digest' } })
+    expect(match('start a mission to clean up my downloads')).toMatchObject({ command: 'mission.start', args: { goal: 'clean up my downloads' } })
+  })
+
+  it('never runs destructive commands from the fast path', () => {
+    expect(match('forget that I like tea')).toBeNull()
+  })
+
+  it('hands reasoning and long requests to Hermes', () => {
+    expect(match('open the file I was editing yesterday afternoon in the herald project')).toBeNull()
+    expect(match('why is my disk full')).toBeNull()
+    expect(match('write a summary of my missions')).toBeNull()
+    expect(match('stop the dev server on port 3000')).toBeNull()
+    expect(match('')).toBeNull()
+  })
+
+  it('routes dictation to text.type with the exact words, even when it sounds like a question', () => {
+    expect(match('Hey Hermes, type how hi are you?')).toMatchObject({ command: 'text.type', args: { text: 'how hi are you?' } })
+    expect(match('type why is the sky blue and write me a long essay about it please')).toMatchObject({ command: 'text.type' })
+  })
+
+  it('matches bare editing and window verbs, with British spellings', () => {
+    expect(match('copy that')).toMatchObject({ command: 'edit.copy' })
+    expect(match('Minimise it.')).toMatchObject({ command: 'window.minimize' })
+    expect(match('minimize')).toMatchObject({ command: 'window.minimize', args: {} })
+  })
+
+  it('opens the app launcher for "open apps"', () => {
+    expect(match('Hey Hermes, open Apps.')).toMatchObject({ command: 'overlay.applications' })
+    expect(match('show all apps')).toMatchObject({ command: 'overlay.applications' })
+  })
+
+  it('routes spoken file names to the file opener, including mis-heard web addresses', () => {
+    expect(match('Open hello.pdf.')).toMatchObject({ command: 'open.any', args: { name: 'hello.pdf' } })
+    expect(match('open hello dot pdf')).toMatchObject({ command: 'open.any', args: { name: 'hello dot pdf' } })
+    expect(match('open the file Budget.xlsx')).toMatchObject({ command: 'file.open', args: { name: 'Budget.xlsx' } })
+    expect(match('www.openhello.pdf')).toMatchObject({ command: 'file.open', args: { name: 'hello.pdf' } })
+    expect(match('hello.pdf')).toMatchObject({ command: 'file.open', args: { name: 'hello.pdf' } })
+  })
+
+  it('starts builds and opens the Studio', () => {
+    expect(match('Hey Hermes, create a website for a hair salon.')).toMatchObject({ command: 'build.start', args: { goal: 'a website for a hair salon' } })
+    expect(match('build me an app that tracks my runs')).toMatchObject({ command: 'build.start', args: { goal: 'an app that tracks my runs' } })
+    expect(match('build me a portfolio site')).toMatchObject({ command: 'build.start', args: { goal: 'a portfolio site' } })
+    // The transcriber often loses the name after "hey", or mishears it.
+    expect(match('Hey, create a website for a hair salon.')).toMatchObject({ command: 'build.start', args: { goal: 'a website for a hair salon' } })
+    expect(match('Hey herpes, build me a simple landing page for my bakery with a contact form and opening hours')).toMatchObject({ command: 'build.start', args: { goal: 'a simple landing page for my bakery with a contact form and opening hours' } })
+    expect(match('Can you make an online store for handmade candles?')).toMatchObject({ command: 'build.start', args: { goal: 'an online store for handmade candles' } })
+    expect(match('make the app icon bigger')).toBeNull()
+    expect(match('Create a website, create a website for a hair salon.')).toMatchObject({ command: 'build.start', args: { goal: 'a website for a hair salon' } })
+    expect(match('Hey, open missions')).toMatchObject({ command: 'open.any', args: { name: 'missions' } })
+    expect(match("show me what you're doing")).toMatchObject({ command: 'studio.open' })
+    expect(match('show me the code')).toMatchObject({ command: 'studio.open' })
+    expect(match('show me my downloads')).toMatchObject({ command: 'open.any' })
+  })
+
+  it('reports confidence', () => {
+    expect(match('new chat')?.confidence).toBe(1)
+    expect(match('open missions')?.confidence).toBeLessThan(1)
+  })
+})

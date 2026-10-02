@@ -20,12 +20,12 @@ export function GeneralSection() {
     }
   }
 
-  const chooseFolder = async () => {
+  const chooseFolder = async (key: 'defaultCwd' | 'projectsRoot' = 'defaultCwd') => {
     try {
       const [path] = await window.hermesOS.fs.pickFiles({ directory: true })
 
       if (path) {
-        await save({ defaultCwd: path })
+        await save({ [key]: path })
       }
     } catch (error) {
       notify({ title: 'Could not choose folder', body: errorText(error), level: 'error' })
@@ -64,6 +64,11 @@ export function GeneralSection() {
         </SettingsRow>
         <SettingsRow icon={<IconFolder />} label="Default folder" description={<span className="selectable font-mono text-[11.5px]">{prefs.defaultCwd || '~'}</span>} keywords="working directory cwd">
           <GlassButton size="sm" onClick={() => void chooseFolder()} aria-label="Choose default folder">
+            Choose…
+          </GlassButton>
+        </SettingsRow>
+        <SettingsRow icon={<IconFolder />} label="Projects folder" description={<span className="selectable font-mono text-[11.5px]">{prefs.projectsRoot || '~/Projects'}</span>} keywords="build studio code website app">
+          <GlassButton size="sm" onClick={() => void chooseFolder('projectsRoot')} aria-label="Choose projects folder">
             Choose…
           </GlassButton>
         </SettingsRow>

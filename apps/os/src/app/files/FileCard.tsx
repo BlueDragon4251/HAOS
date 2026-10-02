@@ -138,6 +138,7 @@ export function FileCard({ item, selected, renaming, onSelect, onOpen, onAction,
       aria-label={item.name}
       tabIndex={-1}
       data-path={item.path}
+      data-os-target={`file:${item.path}`}
       draggable={!renaming}
       onDragStart={event => startDrag(event, item)}
       onClick={onSelect}
@@ -147,7 +148,7 @@ export function FileCard({ item, selected, renaming, onSelect, onOpen, onAction,
         onSelect()
         setMenu(true)
       }}
-      className={cn('glass-card glass-card-hover relative flex cursor-pointer flex-col gap-2 rounded-xl p-3 text-left outline-none', selected && 'glass-card-selected', item.hidden && 'opacity-70')}
+      className={cn('glass-card glass-card-hover relative flex cursor-pointer flex-col gap-2 rounded-xl p-3 text-left outline-none', selected && 'glass-card-selected', item.hidden && 'opacity-70', menu && 'z-30')}
     >
       <div className="absolute top-2 right-2 z-10" onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
         <MoreButton aria-label={`More actions for ${item.name}`} onClick={() => setMenu(open => !open)} className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/10 hover:text-fg" />
@@ -176,6 +177,7 @@ export function FileRow({ item, selected, renaming, onSelect, onOpen, onAction, 
       aria-label={item.name}
       tabIndex={-1}
       data-path={item.path}
+      data-os-target={`file:${item.path}`}
       draggable={!renaming}
       onDragStart={event => startDrag(event, item)}
       onClick={onSelect}
@@ -185,7 +187,7 @@ export function FileRow({ item, selected, renaming, onSelect, onOpen, onAction, 
         onSelect()
         setMenu(true)
       }}
-      className={cn('group relative flex h-9 cursor-pointer items-center gap-3 rounded-lg px-2.5 text-[12.5px] transition-colors duration-120', selected ? 'bg-accent-soft text-fg' : 'text-fg-2 hover:bg-white/5', item.hidden && 'opacity-70')}
+      className={cn('group relative flex h-9 cursor-pointer items-center gap-3 rounded-lg px-2.5 text-[12.5px] transition-colors duration-120', selected ? 'bg-accent-soft text-fg' : 'text-fg-2 hover:bg-white/5', item.hidden && 'opacity-70', menu && 'z-30')}
     >
       <span className="flex w-5 shrink-0 items-center justify-center">
         {item.kind === 'directory' ? (

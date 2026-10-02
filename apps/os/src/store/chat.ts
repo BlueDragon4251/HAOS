@@ -105,12 +105,26 @@ export async function openStoredSession(storedId: string): Promise<ChatState> {
   return state
 }
 
-/** Send a prompt to the active chat, creating one when none exists. */
-export async function sendPrompt(text: string, options: { sessionId?: string; cwd?: string } = {}): Promise<void> {
+export interface SendPromptOptions {
+  sessionId?: string
+  cwd?: string
+  /**
+   * Client surface the turn comes from. `voice-live` makes the backend prepend its spoken-reply
+   * note (short, no markdown) and accept `voiceContext`; the default is the shell itself.
+   */
+  surface?: 'voice-live'
+  /** Recent spoken exchange (newest last) so "yes" or "Thursday, not Friday" has its referent. */
+  voiceContext?: string
+  /** The user spoke over an in-flight reply; the backend notes the interruption for the model. */
+  interrupted?: boolean
+}
+
+/** Send a prompt to the active chat, creating one when none exists. Resolves with the session id used. */
+export async function sendPrompt(text: string, options: SendPromptOptions = {}): Promise<string | null> {
   const trimmed = text.trim()
 
   if (!trimmed) {
-    return
+    return null
   }
 
   let sid = options.sessionId ?? $activeChatId.get()
@@ -126,7 +140,13 @@ export async function sendPrompt(text: string, options: { sessionId?: string; cw
   }
 
   try {
-    await gatewayRequest('prompt.submit', { session_id: sid, text: trimmed, surface: SESSION_SOURCE })
+    await gatewayRequest('prompt.submit', {
+      session_id: sid,
+      text: trimmed,
+      surface: options.surface ?? SESSION_SOURCE,
+      ...(options.surface && options.voiceContext ? { voice_context: options.voiceContext } : {}),
+      ...(options.interrupted ? { interrupted: true } : {})
+    })
   } catch (error) {
     const current = $chats.get()[sid]
 
@@ -134,6 +154,8 @@ export async function sendPrompt(text: string, options: { sessionId?: string; cw
       $chats.setKey(sid, { ...appendSystem(current, error instanceof Error ? error.message : String(error), 'error'), streaming: false })
     }
   }
+
+  return sid
 }
 
 export async function runSlash(command: string, sessionId?: string): Promise<void> {

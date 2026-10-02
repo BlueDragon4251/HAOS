@@ -9,7 +9,7 @@ import { AddMemoryForm } from './AddMemoryForm.tsx'
 import { MemoryDetail } from './MemoryDetail.tsx'
 import { MemoryMenu } from './MemoryMenu.tsx'
 import { MemoryRow } from './MemoryRow.tsx'
-import { $memory, addEntry, countRelatedSessions, forgetEntry, loadMemory, type MemoryEntry, type MemoryFile, type MemoryKind, memoryPath, updateEntry } from './memory-store.ts'
+import { $memory, $memoryFocus, addEntry, countRelatedSessions, forgetEntry, loadMemory, type MemoryEntry, type MemoryFile, type MemoryKind, memoryPath, updateEntry } from './memory-store.ts'
 import { useMemoryToolset } from './use-memory-toolset.ts'
 
 type Filter = 'all' | MemoryKind
@@ -42,6 +42,24 @@ export function MemoryPage() {
       void loadMemory(hermesHome)
     }
   }, [hermesHome])
+
+  // A command (voice, agent) asked the page to filter or select: follow it.
+  const focus = useStore($memoryFocus)
+
+  useEffect(() => {
+    if (!focus) {
+      return
+    }
+
+    if (focus.query !== undefined) {
+      setQuery(focus.query)
+      setFilter('all')
+    }
+
+    if (focus.entryId) {
+      setSelectedId(focus.entryId)
+    }
+  }, [focus])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()

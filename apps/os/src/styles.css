@@ -298,6 +298,11 @@ textarea {
   border: 1px solid var(--color-line-strong);
 }
 
+/* Menus sit over thumbnails and text; keep them almost opaque so their items stay readable. */
+.float.menu-surface {
+  background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+}
+
 .icon-tile {
   display: inline-flex;
   align-items: center;
@@ -480,6 +485,23 @@ textarea {
   vertical-align: -0.15em;
   background: var(--color-accent-strong);
   animation: var(--animate-pulse-soft);
+}
+
+/* ---- OS action highlight: the item a voice/agent command just touched --------------------- */
+
+.os-highlight {
+  animation: os-highlight 1.6s var(--ease-out) both;
+}
+@keyframes os-highlight {
+  0% {
+    box-shadow: 0 0 0 0 var(--color-accent-strong), 0 0 0 0 rgba(47, 125, 255, 0.35);
+  }
+  25% {
+    box-shadow: 0 0 0 2px var(--color-accent-strong), 0 0 28px 6px rgba(47, 125, 255, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 0 var(--color-accent-strong), 0 0 0 0 rgba(47, 125, 255, 0);
+  }
 }
 
 /* ---- Motion utilities -------------------------------------------------------------------- */

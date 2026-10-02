@@ -48,7 +48,7 @@ export function Menu({ items, onClose, align = 'right', className }: { items: Me
     <div
       ref={ref}
       role="menu"
-      className={cn('float absolute z-30 min-w-48 rounded-xl p-1 animate-pop', align === 'right' ? 'right-0' : 'left-0', className)}
+      className={cn('float menu-surface absolute z-30 min-w-48 rounded-xl p-1 animate-pop', align === 'right' ? 'right-0' : 'left-0', className)}
       onClick={event => event.stopPropagation()}
       onDoubleClick={event => event.stopPropagation()}
       onMouseDown={event => event.stopPropagation()}

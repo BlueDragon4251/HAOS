@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { BatteryStatus, CalendarResult, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { MISSING_BINARY, run, runBuffer } from './exec.ts'
+import { normaliseFileQuery, rankFiles } from './find.ts'
 import { parseDf, parsePs } from './posix.ts'
 import { type EditorTarget, type HostPlatform, HostNotSupported } from './types.ts'
 
@@ -869,6 +870,31 @@ export class LinuxPlatform implements HostPlatform {
     rows.sort((a, b) => b.lastUsedAt - a.lastUsedAt)
 
     return rows.slice(0, limit)
+  }
+
+  async findFiles(query: string, limit: number): Promise<RecentFile[]> {
+    const name = normaliseFileQuery(query)
+
+    if (!name) {
+      return []
+    }
+
+    // No universal file index on Linux: a bounded `find` over the home folder, hidden and build dirs pruned.
+    const pattern = `*${name.replace(/[*?[\]]/g, '')}*`
+    const args = [os.homedir(), '-maxdepth', '6', '(', '-name', '.*', '-o', '-name', 'node_modules', '-o', '-name', 'venv', ')', '-prune', '-o', '-iname', pattern, '-print']
+    const result = await run('find', args, 8000).catch(() => ({ stdout: '' }))
+    const paths = result.stdout.split('\n').filter(Boolean).slice(0, 300)
+    const rows: RecentFile[] = []
+
+    for (const file of paths) {
+      const stat = await fs.stat(file).catch(() => null)
+
+      if (stat) {
+        rows.push({ path: file, name: path.basename(file), extension: path.extname(file).toLowerCase(), size: stat.size, modifiedAt: stat.mtimeMs, lastUsedAt: stat.atimeMs, kind: stat.isDirectory() ? 'directory' : 'file' })
+      }
+    }
+
+    return rankFiles(name, rows, limit)
   }
 
   /** Fallback when GTK keeps no history: regular files touched in the last 3 days under the usual folders, two levels deep. */

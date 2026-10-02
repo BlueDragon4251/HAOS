@@ -1,0 +1,143 @@
+import type { ShellCommand } from '../../shared/ipc.ts'
+import { PAGES, type PageId } from '../app/apps.ts'
+import { composePrompt } from '../app/surfaces/shell-utils.ts'
+import { runHermesOsWithToast } from '../lib/hermes-os-cli.ts'
+import { updatePrefs } from './backend.ts'
+import { openStoredSession, runSlash, sendPrompt } from './chat.ts'
+import { $notificationsOpen, notify } from './notifications.ts'
+import { runCommand } from './os-commands.ts'
+import { isMainSurface, onShellCommand, openSurface } from './shell.ts'
+import { $applicationsOpen, toggleCommandBar } from './surface.ts'
+import { showPage } from './windows.ts'
+
+/*
+ * `ShellCommand`s addressed to the Hermes window: from the `hermes-os` CLI (compositor hotkeys), the
+ * command overlay (panels mode) and the Electron control server. One handler serves the macOS
+ * desktop window and the panels-mode main surface alike, so every hotkey the Linux session has works
+ * on the Mac too. Voice commands are handled by store/voice.ts on the same bus.
+ */
+
+const isPageId = (value: string | undefined): value is PageId => PAGES.some(page => page.id === value)
+
+/** Style > Wallpaper: the Hermes window owns the file dialog because the overlay closes when it loses focus. */
+async function pickWallpaper(): Promise<void> {
+  try {
+    const [wallpaper] = await window.hermesOS.fs.pickFiles({ multiple: false })
+
+    if (!wallpaper) {
+      return
+    }
+
+    await updatePrefs({ wallpaper })
+    notify({ title: 'Wallpaper updated', body: wallpaper.split('/').pop() || wallpaper, level: 'success' })
+  } catch (error) {
+    notify({ title: 'Could not set wallpaper', body: error instanceof Error ? error.message : String(error), level: 'error' })
+  }
+}
+
+export function handleShellCommand(command: ShellCommand): void {
+  switch (command.type) {
+    case 'show-page': {
+      const id = command.args?.[0]
+
+      if (isPageId(id)) {
+        showPage(id)
+      }
+
+      return
+    }
+    case 'send-prompt': {
+      const text = composePrompt(command.text ?? '', command.context, command.attachments)
+
+      if (!text) {
+        return
+      }
+
+      showPage('hermes')
+      openSurface('main')
+
+      // A bare slash command from the palette runs as one; anything with context or files is a prompt.
+      if (text.startsWith('/') && !command.context && !command.attachments?.length) {
+        void runSlash(text)
+      } else {
+        void sendPrompt(text)
+      }
+
+      return
+    }
+    case 'open-session': {
+      const id = command.args?.[0]
+
+      if (id) {
+        showPage('hermes')
+        void openStoredSession(id)
+      }
+
+      return
+    }
+    case 'notify': {
+      const [title, ...rest] = command.args ?? []
+
+      if (title) {
+        notify({ title, body: rest.join(' ') || command.text || undefined })
+      }
+
+      return
+    }
+    case 'notifications':
+      $notificationsOpen.set(!$notificationsOpen.get())
+
+      return
+    case 'command':
+      toggleCommandBar(true)
+
+      return
+    case 'applications':
+      $applicationsOpen.set(true)
+
+      return
+    case 'hermes-os': {
+      // The overlay hands off commands that must run after it closed (screenshot, OCR, hotkey overlay).
+      const args = command.args ?? []
+
+      if (args.length > 0) {
+        void runHermesOsWithToast(args, command.text || args.join(' '))
+      }
+
+      return
+    }
+    case 'pick-wallpaper':
+      void pickWallpaper()
+
+      return
+    case 'os': {
+      // `hermes-os os <command.id> [json args]`: run a registry command from the CLI.
+      const id = command.args?.[0]
+
+      if (id) {
+        void runCommand(id, (command.payload as Record<string, unknown> | undefined) ?? {}, { source: 'cli' })
+      }
+
+      return
+    }
+    default:
+      return
+  }
+}
+
+let bound = false
+
+/** Subscribe the Hermes window to the command bus once (desktop and panels main surface). */
+export function bindShellCommands(): () => void {
+  if (bound || !isMainSurface) {
+    return () => undefined
+  }
+
+  bound = true
+  const off = onShellCommand(handleShellCommand)
+
+  return () => {
+    off()
+    bound = false
+  }
+}

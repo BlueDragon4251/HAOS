@@ -185,6 +185,15 @@ window-rule {
     match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · System$"
     default-column-width { proportion 0.5; }
 }
+// The Studio and its site preview side by side fill the screen while Hermes builds.
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Studio$"
+    default-column-width { proportion 0.6; }
+}
+window-rule {
+    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Preview$"
+    default-column-width { proportion 0.4; }
+}
 
 // Foreign apps get the same rounding and open as tiles even when they remember being maximized
 // or fullscreen elsewhere (apps that genuinely need fullscreen can still ask for it later).
@@ -210,6 +219,7 @@ binds {
     Mod+Shift+Space hotkey-overlay-title="Hermes command bar" repeat=false { spawn "hermes-os" "command"; }
     Mod+A hotkey-overlay-title="Applications" repeat=false { spawn "hermes-os" "applications"; }
     Mod+Alt+Space hotkey-overlay-title="Hermes OS menu" repeat=false { spawn "hermes-os" "menu"; }
+    Mod+V hotkey-overlay-title="Talk to Hermes" repeat=false { spawn "hermes-os" "voice"; }
     Mod+K hotkey-overlay-title="Show these hotkeys" { show-hotkey-overlay; }
 
     Mod+Return hotkey-overlay-title="Terminal" { spawn "hermes-os" "open" "terminal"; }

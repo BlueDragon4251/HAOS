@@ -102,6 +102,7 @@ export const Window = memo(function Window({ win, children, chrome = true }: { w
       ref={frame}
       role="dialog"
       aria-label={win.title}
+      data-window-id={win.id}
       onPointerDownCapture={() => {
         if (!focused) {
           focusWindow(win.id)

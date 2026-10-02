@@ -9,6 +9,7 @@ import { useShellCommands } from './shell-utils.ts'
 const TerminalSurface = lazy(() => import('../terminal/TerminalSurface.tsx').then(m => ({ default: m.TerminalSurface })))
 const SystemSurface = lazy(() => import('../system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
 const ChatPopout = lazy(() => import('../hermes/ChatPopout.tsx').then(m => ({ default: m.ChatPopout })))
+const StudioWindow = lazy(() => import('../studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
 
 const isFloatingAppId = (value: string): value is FloatingAppId => FLOATING_APPS.some(app => app.id === value)
 
@@ -20,6 +21,9 @@ function FloatingContent({ appId, payload }: { appId: FloatingAppId; payload: Re
       return <SystemSurface />
     case 'chat-popout':
       return <ChatPopout sessionId={typeof payload.sessionId === 'string' ? payload.sessionId : undefined} />
+    case 'studio':
+      // The compositor owns this window; the preview opens as its own window there.
+      return <StudioWindow win={{ id: 'panel-studio', appId: 'studio', title: 'Studio', bounds: { x: 0, y: 0, width: 0, height: 0 }, z: 0, phase: 'open', maximized: true, payload }} />
     default:
       return null
   }

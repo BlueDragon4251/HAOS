@@ -4,7 +4,7 @@ import type { ComponentType } from 'react'
 export type PageId = 'overview' | 'hermes' | 'missions' | 'memory' | 'files' | 'automations' | 'connections' | 'settings'
 
 /** Apps that open in their own floating window. */
-export type FloatingAppId = 'terminal' | 'system' | 'chat-popout'
+export type FloatingAppId = 'terminal' | 'system' | 'chat-popout' | 'web' | 'studio'
 
 export type HermesAppId = PageId | FloatingAppId
 
@@ -54,8 +54,15 @@ export const PAGES: readonly HermesAppDef<PageId>[] = [
 export const FLOATING_APPS: readonly HermesAppDef<FloatingAppId>[] = [
   { id: 'terminal', name: 'Terminal', tagline: 'A real shell.', category: 'development', kind: 'window', icon: 'terminal', defaultSize: { width: 900, height: 560 }, shortcut: '8' },
   { id: 'system', name: 'System', tagline: 'Monitor and control your Mac.', category: 'system', kind: 'window', icon: 'system', defaultSize: { width: 980, height: 640 }, shortcut: '9' },
-  { id: 'chat-popout', name: 'Hermes', tagline: 'A conversation in its own window.', category: 'productivity', kind: 'window', icon: 'hermes', defaultSize: { width: 820, height: 620 } }
+  { id: 'chat-popout', name: 'Hermes', tagline: 'A conversation in its own window.', category: 'productivity', kind: 'window', icon: 'hermes', defaultSize: { width: 820, height: 620 } },
+  // Opened by the shell for a specific page (e.g. the provider sign-in); not launchable on its own.
+  { id: 'web', name: 'Web', tagline: 'A page inside Hermes OS.', category: 'productivity', kind: 'window', icon: 'grid', defaultSize: { width: 960, height: 680 } },
+  // One per Hermes session; opened with "build …" or "show me the code".
+  { id: 'studio', name: 'Studio', tagline: 'Watch Hermes build.', category: 'development', kind: 'window', icon: 'studio', defaultSize: { width: 1280, height: 800 } }
 ]
+
+/** Floating apps the launcher and command bar offer; the rest open only with a payload. */
+export const LAUNCHABLE_APPS: readonly HermesAppDef[] = [...PAGES, ...FLOATING_APPS].filter(app => app.id !== 'chat-popout' && app.id !== 'web' && app.id !== 'studio')
 
 export const HERMES_APPS: readonly HermesAppDef[] = [...PAGES, ...FLOATING_APPS]
 

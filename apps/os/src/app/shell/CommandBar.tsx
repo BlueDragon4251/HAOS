@@ -1,17 +1,20 @@
 import { useStore } from '@nanostores/react'
-import { IconArrowRight, IconMessage, IconSlash } from '@tabler/icons-react'
+import { IconArrowRight, IconBolt, IconMessage, IconSlash } from '@tabler/icons-react'
 import { Command } from 'cmdk'
 import { useMemo, useState } from 'react'
 import { AppGlyph, HermesAvatar } from '../../components/app-icon.tsx'
 import { Kbd } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
+import { matchIntent } from '../../lib/voice/intents.ts'
 import { openStoredSession, runSlash, sendPrompt } from '../../store/chat.ts'
 import { useNativeApps } from '../../store/native-apps.ts'
+import { notify } from '../../store/notifications.ts'
+import { listCommands, runCommand } from '../../store/os-commands.ts'
 import { $sessions } from '../../store/sessions.ts'
 import { openSurface, relayToMain } from '../../store/shell.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../../store/surface.ts'
 import { openApp, showPage } from '../../store/windows.ts'
-import { HERMES_APPS } from '../apps.ts'
+import { LAUNCHABLE_APPS } from '../apps.ts'
 import { useSlashCatalog } from '../chat/use-slash-catalog.ts'
 
 /**
@@ -102,7 +105,7 @@ export function CommandPalette({ onClose, standalone = false, onApplications, cl
   const isSlash = trimmed.startsWith('/')
   const needle = trimmed.toLowerCase()
   const matches = (label: string) => !needle || label.toLowerCase().includes(needle)
-  const filteredApps = useMemo(() => (isSlash ? [] : HERMES_APPS.filter(app => app.id !== 'chat-popout' && matches(app.name))), [isSlash, needle])
+  const filteredApps = useMemo(() => (isSlash ? [] : LAUNCHABLE_APPS.filter(app => matches(app.name))), [isSlash, needle])
   const filteredSessions = useMemo(() => (isSlash ? [] : sessions.filter(session => matches(session.title ?? session.preview ?? '')).slice(0, 8)), [isSlash, needle, sessions])
   const filteredSlash = useMemo(() => {
     if (!isSlash) {
@@ -120,6 +123,35 @@ export function CommandPalette({ onClose, standalone = false, onApplications, cl
 
     return apps.filter(app => app.name.toLowerCase().includes(needle)).slice(0, 6)
   }, [apps, isSlash, needle, trimmed.length])
+  // Registry commands without required arguments run directly; the rest match as intents below.
+  const filteredCommands = useMemo(() => {
+    if (trimmed.length < 2 || isSlash) {
+      return []
+    }
+
+    return listCommands()
+      .filter(command => !command.hidden && !command.args.some(arg => arg.required))
+      .filter(command => command.title.toLowerCase().includes(needle) || command.phrases.some(phrase => (typeof phrase === 'string' ? phrase : phrase.phrase).toLowerCase().includes(needle)))
+      .slice(0, 6)
+  }, [isSlash, needle, trimmed.length])
+  const intent = useMemo(() => (trimmed.length >= 3 && !isSlash ? matchIntent(trimmed) : null), [isSlash, trimmed])
+
+  const runRegistry = async (id: string, args: Record<string, unknown>) => {
+    close()
+
+    if (standalone) {
+      relayToMain({ type: 'os', args: [id], payload: args })
+      openSurface('main')
+
+      return
+    }
+
+    const result = await runCommand(id, args, { source: 'palette' })
+
+    if (!result.ok) {
+      notify({ title: 'Could not do that', body: result.error ?? result.summary, level: 'warn' })
+    }
+  }
 
   return (
     <Command
@@ -145,6 +177,23 @@ export function CommandPalette({ onClose, standalone = false, onApplications, cl
             <Item value={`ask:${trimmed}`} onSelect={() => void ask(trimmed)} icon={<IconMessage size={15} />} hint="↵">
               {isSlash ? `Run ${trimmed}` : `Ask Hermes: “${trimmed}”`}
             </Item>
+          </Command.Group>
+        )}
+
+        {(intent || filteredCommands.length > 0) && (
+          <Command.Group heading="Do">
+            {intent && (
+              <Item value={`intent:${intent.command}`} onSelect={() => void runRegistry(intent.command, intent.args)} icon={<IconBolt size={15} />} hint={intent.command}>
+                {intent.title}
+              </Item>
+            )}
+            {filteredCommands
+              .filter(command => command.id !== intent?.command)
+              .map(command => (
+                <Item key={command.id} value={`do:${command.id}`} onSelect={() => void runRegistry(command.id, {})} icon={<IconBolt size={15} />} hint={command.id}>
+                  {command.title}
+                </Item>
+              ))}
           </Command.Group>
         )}
 

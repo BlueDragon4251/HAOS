@@ -9,8 +9,16 @@ and swappable pages, floating glass windows for secondary apps, a dock, a menu b
 
 - `src/app/shell/Desktop.tsx` composes Wallpaper, MenuBar, the window layer, Dock and overlays.
 - `src/store/windows.ts` is the window manager. `showPage(pageId)` switches the main window's page;
-  `openApp(appId)` opens floating apps (`terminal`, `system`, `chat-popout`). Never navigate any
+  `openApp(appId)` opens floating apps (`terminal`, `system`, `chat-popout`, `web`, `studio` via `openStudio(sessionId)`). Never navigate any
   other way. `$page` is the current page id.
+- Web pages open inside Hermes OS, never in the system browser: `openWebWindow(url, { title })` in
+  `src/store/web-windows.ts` opens a `web` floating window (`src/app/web/WebWindow.tsx`: title bar,
+  read-only address bar) and main layers a locked-down `WebContentsView` over its content rect. The
+  view paints above every DOM layer, so it hides while the command bar, launcher, notifications panel
+  or a pending request is up, and while another window overlaps it from above. Reserve
+  `shell.openExternal` for links that genuinely belong to another app. Any component that hosts a
+  native view (web windows, the Studio preview) places it with `useNativeView` in
+  `src/app/web/native-view.ts`, which also trims it around the voice pill and action captions.
 - `src/app/apps.ts` is the registry: `PAGES` (sidebar), `FLOATING_APPS`, `HERMES_APPS`,
   `FEATURED_NATIVE` (macOS apps by name). Icons are ids rendered by `AppGlyph` / `AppTile`
   (`src/components/app-icon.tsx`); `HermesAvatar` is the brand mark.
@@ -65,12 +73,17 @@ Stores (nanostores; subscribe with `useStore`):
 - `store/backend.ts`: `$backend`, `$prefs`, `updatePrefs`, `$env`.
 - `store/system.ts`: `useSystemStats()`, `useSystemInfo()`, `useNetworkStatus()`.
 - `store/native-apps.ts`: `useNativeApps()` -> `{ apps, iconFor(path) }`, `findNativeApp(names)`.
+- `store/os-commands.ts`: the OS command registry (`defineCommands`, `runCommand`, `listCommands`, `$commandLog`); catalogue in `src/app/commands/`; `store/os-control.ts` answers main's control-socket requests; `store/follow.ts` shows Hermes's own tool results; `lib/voice/intents.ts` is the voice fast path.
+- `store/hermes-auth.ts`: `$hermesAuth` (active model provider, sign-in state), `requestHermesLogin`, `refreshHermesAuth`, device-code helpers; the OS sign-in card is `src/app/auth/HermesLoginCard.tsx` and opens on boot or on any turn that fails for lack of credentials. The provider's portal opens in a web window beside the card and closes itself on approval.
+- `store/web-windows.ts`: `$webWindows`, `openWebWindow(url, { title, bounds })`, `closeWebWindow`, `focusWebWindow`, `$webViewsCovered` (overlays that hide the native views).
+- `store/voice.ts`: `$voice` (state, engine, captions, live meter), `$voiceActive`, `startVoice`, `endConversation`, `toggleVoice`, `toggleMute`; `store/wake.ts`: `$wake`, `setWakeWordEnabled`. Voice UI lives in `src/app/voice/` (`VoiceOrb`, `MicButton`, `VoiceIndicator`); see `docs/VOICE.md`.
 
 Electron bridge `window.hermesOS` (typed in `preload/index.ts`):
 `backend.{getState,onState,restart,rest,logTail}`, `system.{info,stats,processes,network,subscribeStats}`,
 `apps.{list,launch,icon}`, `fs.{home,readDir,readFile,reveal,openPath,openIn,recent,thumbnail,imageInfo,writeText,mkdir,rename,trash,exportPdf,pickFiles,dirSize}`,
 `calendar.today()`, `terminal.*`, `notifications.native`, `window.*`, `shell.openExternal`,
-`prefs.{get,set}`, `bridge.{readPolicy,writePolicy,readAudit}`, `env()`.
+`web.{open,setBounds,close,onEvent}` (embedded http(s) views: sandboxed, isolated, own partition, no preload),
+`prefs.{get,set}`, `bridge.{readPolicy,writePolicy,readAudit}`, `voice.{microphoneStatus,requestMicrophone,audioWsUrl,onHotkey}`, `env()`.
 
 Hermes data on disk (read through `fs.readFile`, write through `fs.writeText`):
 memories in `$HERMES_HOME/memories/MEMORY.md` and `USER.md`, entries separated by a line `§`.
@@ -85,3 +98,7 @@ memories in `$HERMES_HOME/memories/MEMORY.md` and `USER.md`, entries separated b
 - Reduced motion (`prefers-reduced-motion` or the pref) must collapse all animation.
 - Keep pages self-contained under their directory; shared changes (stores, IPC, primitives) are
   proposed in the page's report, not made ad hoc.
+- Every new user-visible action registers an `OsCommand` (`src/app/commands/<area>.ts`, see
+  `store/os-commands.ts`) with a tier and a spoken-friendly `summary`; list items it can point at
+  carry `data-os-target="<kind>:<id>"`. That is what makes it reachable by voice, by Hermes (`os_ui`)
+  and from the command bar. Page-local selection/filter state exposes a `focus*()` atom for commands.

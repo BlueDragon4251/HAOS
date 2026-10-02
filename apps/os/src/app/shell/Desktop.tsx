@@ -12,11 +12,16 @@ import { NotificationsPanel } from './NotificationsPanel.tsx'
 import { RequestHost } from './RequestHost.tsx'
 import { Toasts } from './Toasts.tsx'
 import { Wallpaper } from './Wallpaper.tsx'
+import { HermesLoginCard } from '../auth/HermesLoginCard.tsx'
+import { ActionHud, OsHighlighter } from '../voice/ActionHud.tsx'
+import { VoiceOrb } from '../voice/VoiceOrb.tsx'
 
 const TerminalSurface = lazy(() => import('../terminal/TerminalSurface.tsx').then(m => ({ default: m.TerminalSurface })))
 const SystemSurface = lazy(() => import('../system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
 const ChatPopout = lazy(() => import('../hermes/ChatPopout.tsx').then(m => ({ default: m.ChatPopout })))
 const ApplicationsOverlay = lazy(() => import('../apps/ApplicationsOverlay.tsx').then(m => ({ default: m.ApplicationsOverlay })))
+const WebWindow = lazy(() => import('../web/WebWindow.tsx').then(m => ({ default: m.WebWindow })))
+const StudioWindow = lazy(() => import('../studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
 
 function FloatingContent({ win }: { win: OSWindow }) {
   switch (win.appId) {
@@ -26,6 +31,10 @@ function FloatingContent({ win }: { win: OSWindow }) {
       return <SystemSurface />
     case 'chat-popout':
       return <ChatPopout sessionId={typeof win.payload?.sessionId === 'string' ? win.payload.sessionId : undefined} />
+    case 'web':
+      return <WebWindow win={win} />
+    case 'studio':
+      return <StudioWindow win={win} />
     default:
       return null
   }
@@ -78,6 +87,10 @@ export function Desktop() {
         )}
       </div>
       <Dock />
+      <VoiceOrb offsetClass="bottom-24" />
+      <ActionHud offsetClass="top-12" />
+      <OsHighlighter />
+      <HermesLoginCard />
       <RequestHost />
       <Toasts />
       <NotificationsPanel />

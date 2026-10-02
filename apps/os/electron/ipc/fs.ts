@@ -1,8 +1,9 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell, type WebContents } from 'electron'
+import { type FSWatcher, watch as watchFs } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { type DirEntry, type FilePreview, IPC } from '../../shared/ipc.ts'
+import { type DirEntry, type FilePreview, IPC, type TreeEntry } from '../../shared/ipc.ts'
 import { run } from '../platform/exec.ts'
 import { type EditorTarget, hostPlatform } from '../platform/index.ts'
 
@@ -183,9 +184,137 @@ async function dirSize(target: string, budgetMs = 4000): Promise<{ bytes: number
   return { bytes, files, complete }
 }
 
+/** Folders a project listing and watcher skip: dependencies, VCS data, caches and build output. */
+const SKIPPED_DIRS = new Set(['node_modules', '.git', '.hg', '.svn', 'dist', 'build', '.next', '.nuxt', '.vite', '.turbo', '.cache', '.parcel-cache', '__pycache__', '.venv', 'venv', '.pytest_cache', '.DS_Store', 'coverage', '.idea'])
+
+/** Scratch files: Hermes's atomic-save temporaries, editor swap and backup files. */
+const SCRATCH_FILE = /^\.hermes-tmp\.|^\.#|\.sw[op]$|~$|^\.DS_Store$/
+
+const skipped = (relative: string): boolean => relative.split(path.sep).some(part => SKIPPED_DIRS.has(part)) || SCRATCH_FILE.test(path.basename(relative))
+
+/** Project folders must be real directories inside the home folder. */
+async function projectRoot(target: string): Promise<string> {
+  const root = normalizeUserPath(target)
+
+  if (!root.startsWith(os.homedir() + path.sep) && !root.startsWith('/tmp/') && !root.startsWith('/private/tmp/')) {
+    throw new Error('project folders must be inside your home folder')
+  }
+
+  if (!(await fs.stat(root)).isDirectory()) {
+    throw new Error(`${root} is not a folder`)
+  }
+
+  return root
+}
+
+async function listTree(target: string, limit: number): Promise<{ entries: TreeEntry[]; truncated: boolean }> {
+  const root = await projectRoot(target)
+  const entries: TreeEntry[] = []
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }]
+
+  while (queue.length) {
+    const { dir, depth } = queue.shift()!
+    let dirents: import('node:fs').Dirent[] = []
+
+    try {
+      dirents = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+
+    for (const dirent of dirents) {
+      if (SKIPPED_DIRS.has(dirent.name) || SCRATCH_FILE.test(dirent.name)) {
+        continue
+      }
+
+      const full = path.join(dir, dirent.name)
+
+      if (entries.length >= limit) {
+        return { entries, truncated: true }
+      }
+
+      if (dirent.isDirectory()) {
+        entries.push({ path: full, kind: 'directory' })
+
+        if (depth < 10) {
+          queue.push({ dir: full, depth: depth + 1 })
+        }
+      } else if (dirent.isFile() || dirent.isSymbolicLink()) {
+        entries.push({ path: full, kind: 'file' })
+      }
+    }
+  }
+
+  return { entries, truncated: false }
+}
+
+interface TreeWatch {
+  watcher: FSWatcher
+  owner: WebContents
+  pending: Set<string>
+  timer: ReturnType<typeof setTimeout> | null
+}
+
+const treeWatches = new Map<string, TreeWatch>()
+let treeWatchCounter = 0
+
+function unwatchTree(watchId: string): void {
+  const watch = treeWatches.get(watchId)
+
+  if (watch) {
+    watch.watcher.close()
+
+    if (watch.timer) {
+      clearTimeout(watch.timer)
+    }
+
+    treeWatches.delete(watchId)
+  }
+}
+
+/** Report changes under a project folder to the renderer, batched, ignoring dependencies and build output. */
+async function watchTree(owner: WebContents, target: string): Promise<string> {
+  const root = await projectRoot(target)
+  const watchId = `tree-${++treeWatchCounter}`
+  const watch: TreeWatch = { watcher: watchFs(root, { recursive: true }), owner, pending: new Set(), timer: null }
+  const flush = () => {
+    watch.timer = null
+
+    if (!owner.isDestroyed() && watch.pending.size) {
+      owner.send(IPC.fsTreeChanged, { watchId, paths: [...watch.pending].slice(0, 500) })
+    }
+
+    watch.pending.clear()
+  }
+
+  watch.watcher.on('change', (_type, filename) => {
+    const relative = typeof filename === 'string' ? filename : filename?.toString()
+
+    if (!relative || skipped(relative)) {
+      return
+    }
+
+    watch.pending.add(path.join(root, relative))
+    watch.timer ??= setTimeout(flush, 250)
+  })
+  watch.watcher.on('error', () => unwatchTree(watchId))
+  owner.once('destroyed', () => unwatchTree(watchId))
+  treeWatches.set(watchId, watch)
+
+  return watchId
+}
+
 export function registerFsIpc(getWindow: () => BrowserWindow | null): void {
+  ipcMain.handle(IPC.fsListTree, (_event, target: string, limit: number) => listTree(target, Math.max(1, Math.min(10_000, Number(limit) || 3000))))
+  ipcMain.handle(IPC.fsWatchTree, (event, target: string) => watchTree(event.sender, target))
+  ipcMain.handle(IPC.fsUnwatchTree, (event, watchId: string) => {
+    if (treeWatches.get(watchId)?.owner === event.sender) {
+      unwatchTree(watchId)
+    }
+  })
   ipcMain.handle(IPC.fsHome, () => os.homedir())
   ipcMain.handle(IPC.fsRecent, (_event, limit: number) => hostPlatform().recentFiles(Math.max(1, Math.min(200, Number(limit) || 30))))
+  ipcMain.handle(IPC.fsFind, (_event, query: string, limit: number) => hostPlatform().findFiles(String(query ?? '').slice(0, 200), Math.max(1, Math.min(50, Number(limit) || 10))))
   ipcMain.handle(IPC.fsThumbnail, async (_event, target: string, size: number) => {
     const png = await hostPlatform().thumbnail(normalizeUserPath(target), Math.max(64, Math.min(1024, Number(size) || 512)))
 

@@ -7,6 +7,7 @@ import path from 'node:path'
 import type { BatteryStatus, CalendarEvent, CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { hermesOsDataDir } from '../paths.ts'
 import { run } from './exec.ts'
+import { normaliseFileQuery, rankFiles } from './find.ts'
 import { parseDf, parsePs } from './posix.ts'
 import { type EditorTarget, type HostPlatform } from './types.ts'
 
@@ -303,6 +304,30 @@ export class DarwinPlatform implements HostPlatform {
     rows.sort((a, b) => b.lastUsedAt - a.lastUsedAt)
 
     return rows.slice(0, limit)
+  }
+
+  async findFiles(query: string, limit: number): Promise<RecentFile[]> {
+    const name = normaliseFileQuery(query)
+
+    if (!name) {
+      return []
+    }
+
+    // Spotlight's filename index: substring match on the name, case-insensitive, home folder only.
+    const result = await run('mdfind', ['-onlyin', os.homedir(), '-name', name], 10_000)
+    const paths = result.stdout.split('\n').filter(Boolean).slice(0, 300)
+    const rows: RecentFile[] = []
+
+    await mapPool(paths, 16, async file => {
+      try {
+        const stat = await fs.stat(file)
+        rows.push({ path: file, name: path.basename(file), extension: path.extname(file).toLowerCase(), size: stat.size, modifiedAt: stat.mtimeMs, lastUsedAt: stat.atimeMs, kind: stat.isDirectory() ? 'directory' : 'file' })
+      } catch {
+        // Vanished between mdfind and stat.
+      }
+    })
+
+    return rankFiles(name, rows, limit)
   }
 
   async thumbnail(filePath: string, size: number): Promise<Buffer | null> {

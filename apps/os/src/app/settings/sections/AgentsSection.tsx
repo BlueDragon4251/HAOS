@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconBolt, IconCloud, IconCpu, IconFileText, IconHistory, IconLock, IconMessage, IconScale, IconSearch, IconUsers } from '@tabler/icons-react'
+import { IconBolt, IconCloud, IconCpu, IconFileText, IconHistory, IconKey, IconLock, IconMessage, IconRefresh, IconScale, IconSearch, IconUsers } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import type { AuditEntry } from '../../../../shared/ipc.ts'
 import { HermesAvatar } from '../../../components/app-icon.tsx'
@@ -10,6 +10,7 @@ import { rest } from '../../../lib/rest.ts'
 import { useBackendData, useLocalData } from '../../../lib/use-async.ts'
 import { $activeChat } from '../../../store/chat.ts'
 import { $connection, gatewayRequest } from '../../../store/gateway.ts'
+import { $hermesAuth, loginTarget, refreshHermesAuth, requestHermesLogin } from '../../../store/hermes-auth.ts'
 import { notify } from '../../../store/notifications.ts'
 import { readTier, withTier } from './policy.ts'
 import { errorText, InlineNote, markSaved, MenuDropdown, RadioCard, SectionTitle, SettingsBlock, SettingsGroup, SettingsRow, Stepper, useDismiss } from './shared.tsx'
@@ -49,6 +50,10 @@ export function AgentsSection() {
 
       <AutonomyBlock ready={ready} />
 
+      <SettingsGroup title="Account">
+        <ProviderAccountRow />
+      </SettingsGroup>
+
       <SettingsGroup title="Model & performance">
         <PreferredModelRow ready={ready} />
         <RunOnRow />
@@ -61,6 +66,43 @@ export function AgentsSection() {
         <ActivityHistoryRow />
       </SettingsGroup>
     </>
+  )
+}
+
+// ---- Account -------------------------------------------------------------------------------
+
+/** The model provider's sign-in state; "Sign in" opens the OS sign-in card (device-code flow). */
+function ProviderAccountRow() {
+  const auth = useStore($hermesAuth)
+  const target = loginTarget(auth)
+  const signedIn = Boolean(target?.loggedIn)
+  const others = auth.providers.filter(p => p.loggedIn && p.id !== target?.id)
+
+  return (
+    <SettingsRow
+      icon={<IconKey />}
+      label={target ? `${target.name}` : 'Model provider'}
+      description={
+        !auth.checked
+          ? 'Checking sign-in…'
+          : !target
+            ? 'No OAuth provider is configured; the model uses an API key.'
+            : signedIn
+              ? `Signed in${target.source ? ` (${target.source.replace(/_/g, ' ')})` : ''}.${others.length ? ` Also signed in: ${others.map(p => p.name).join(', ')}.` : ''}`
+              : 'Signed out. Hermes cannot answer until you sign in.'
+      }
+      keywords="login sign in account oauth nous portal credentials"
+    >
+      {target && (signedIn ? <Pill tone="ok" dot>Signed in</Pill> : <Pill tone="warn" dot>Signed out</Pill>)}
+      {target && !signedIn && (
+        <GlassButton size="sm" variant="primary" onClick={() => requestHermesLogin(`${target.name} is signed out.`)} aria-label={`Sign in with ${target.name}`}>
+          Sign in
+        </GlassButton>
+      )}
+      <GlassButton size="sm" variant="ghost" onClick={() => void refreshHermesAuth()} aria-label="Refresh sign-in status">
+        <IconRefresh />
+      </GlassButton>
+    </SettingsRow>
   )
 }
 

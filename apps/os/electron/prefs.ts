@@ -1,9 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { HermesOSPrefs } from '../shared/ipc.ts'
+import { normalizeVoicePrefs, VOICE_DEFAULTS } from '../shared/voice-prefs.ts'
 import { hermesOsDataDir } from './paths.ts'
 
 const DEFAULTS: HermesOSPrefs = {
+  voice: VOICE_DEFAULTS,
   fullscreenOnLaunch: true,
   reduceMotion: false,
   accent: 'blue',
@@ -28,14 +30,22 @@ export function readPrefs(): HermesOSPrefs {
     const legacy: Record<string, HermesOSPrefs['accent']> = { gold: 'blue', jade: 'violet', blue: 'blue', ice: 'ice', violet: 'violet' }
     const accent = parsed.accent ? legacy[parsed.accent] : undefined
 
-    return { ...DEFAULTS, ...parsed, accent: (accent as HermesOSPrefs['accent']) ?? DEFAULTS.accent, spaces: parsed.spaces?.length ? parsed.spaces : DEFAULTS.spaces }
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      accent: (accent as HermesOSPrefs['accent']) ?? DEFAULTS.accent,
+      spaces: parsed.spaces?.length ? parsed.spaces : DEFAULTS.spaces,
+      voice: normalizeVoicePrefs(parsed.voice)
+    }
   } catch {
     return { ...DEFAULTS }
   }
 }
 
 export function writePrefs(patch: Partial<HermesOSPrefs>): HermesOSPrefs {
-  const next = { ...readPrefs(), ...patch }
+  const current = readPrefs()
+  // `voice` is the one nested pref object callers patch field by field; merge instead of replacing.
+  const next = { ...current, ...patch, voice: normalizeVoicePrefs({ ...current.voice, ...(patch.voice ?? {}) }) }
   fs.mkdirSync(hermesOsDataDir(), { recursive: true })
   fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2))
 

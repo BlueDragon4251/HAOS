@@ -18,7 +18,8 @@ export function useShellCommands(handler: (command: ShellCommand) => void): void
 const OUR_FLOATING_TITLES: Record<string, FloatingAppId> = {
   'Hermes OS · Terminal': 'terminal',
   'Hermes OS · System': 'system',
-  'Hermes OS · Chat': 'chat-popout'
+  'Hermes OS · Chat': 'chat-popout',
+  'Hermes OS · Studio': 'studio'
 }
 
 export const OUR_MAIN_TITLE = 'Hermes OS'

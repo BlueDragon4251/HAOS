@@ -1,11 +1,10 @@
 import { useStore } from '@nanostores/react'
-import { IconAccessible, IconBell, IconCircleCheckFilled, IconDatabase, IconInfoCircle, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
+import { IconAccessible, IconBell, IconCircleCheckFilled, IconDatabase, IconInfoCircle, IconListDetails, IconMicrophone, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
 import { type ComponentType, useEffect, useState } from 'react'
 import { GlassButton, PageHeader, SearchField } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
-import { type CronJob, rest } from '../../lib/rest.ts'
-import { $chats, interruptChat } from '../../store/chat.ts'
-import { notify } from '../../store/notifications.ts'
+import { pauseAllAgents } from '../../store/agents-control.ts'
+import { $chats } from '../../store/chat.ts'
 import { AboutSection } from './sections/AboutSection.tsx'
 import { AccessibilitySection, applyAccessibility } from './sections/AccessibilitySection.tsx'
 import { AgentsSection } from './sections/AgentsSection.tsx'
@@ -14,8 +13,10 @@ import { GeneralSection } from './sections/GeneralSection.tsx'
 import { NetworkSection } from './sections/NetworkSection.tsx'
 import { NotificationsSection } from './sections/NotificationsSection.tsx'
 import { PrivacySection } from './sections/PrivacySection.tsx'
-import { $settingsSavedAt, errorText, SettingsFilterContext } from './sections/shared.tsx'
+import { $settingsFocus, $settingsSavedAt, type SectionId, SettingsFilterContext } from './sections/shared.tsx'
 import { StorageSection } from './sections/StorageSection.tsx'
+import { VoiceCommandsSection } from './sections/VoiceCommandsSection.tsx'
+import { VoiceSection } from './sections/VoiceSection.tsx'
 
 /*
  * Settings: left nav of sections, right content of grouped rows. A search query replaces the
@@ -23,12 +24,12 @@ import { StorageSection } from './sections/StorageSection.tsx'
  * collapse through `:has()`, so the result reads as "matching rows grouped by section".
  */
 
-type SectionId = 'general' | 'appearance' | 'agents' | 'privacy' | 'notifications' | 'network' | 'storage' | 'accessibility' | 'about'
-
 const SECTIONS: { id: SectionId; label: string; icon: ComponentType<{ size?: number; stroke?: number }>; view: ComponentType }[] = [
   { id: 'general', label: 'General', icon: IconSettings, view: GeneralSection },
   { id: 'appearance', label: 'Appearance', icon: IconPalette, view: AppearanceSection },
   { id: 'agents', label: 'Hermes & agents', icon: IconRobot, view: AgentsSection },
+  { id: 'voice', label: 'Voice', icon: IconMicrophone, view: VoiceSection },
+  { id: 'commands', label: 'Voice commands', icon: IconListDetails, view: VoiceCommandsSection },
   { id: 'privacy', label: 'Privacy', icon: IconShield, view: PrivacySection },
   { id: 'notifications', label: 'Notifications', icon: IconBell, view: NotificationsSection },
   { id: 'network', label: 'Network', icon: IconWifi, view: NetworkSection },
@@ -45,6 +46,24 @@ export function SettingsPage() {
   const searching = query.trim().length > 0
 
   useEffect(applyAccessibility, [])
+
+  // A command (voice, agent) asked for a section or a search: follow it.
+  const focus = useStore($settingsFocus)
+
+  useEffect(() => {
+    if (!focus) {
+      return
+    }
+
+    if (focus.section && SECTIONS.some(item => item.id === focus.section)) {
+      setQuery('')
+      setSection(focus.section as SectionId)
+    }
+
+    if (focus.query !== undefined) {
+      setQuery(focus.query)
+    }
+  }, [focus])
 
   return (
     <div className="page-enter flex h-full flex-col">
@@ -149,45 +168,12 @@ function PauseAllAgents() {
   const pauseAll = async () => {
     setConfirming(false)
     setBusy(true)
-    let interrupted = 0
-    let paused = 0
-    const failures: string[] = []
-
-    await Promise.all(
-      streaming.map(async chat => {
-        try {
-          await interruptChat(chat.sessionId)
-          interrupted++
-        } catch (error) {
-          failures.push(`${chat.title || chat.sessionId}: ${errorText(error)}`)
-        }
-      })
-    )
 
     try {
-      const jobs = await rest.get<CronJob[]>('/api/cron/jobs')
-      const active = (Array.isArray(jobs) ? jobs : []).filter(job => job.enabled !== false && job.state !== 'paused')
-
-      await Promise.all(
-        active.map(async job => {
-          try {
-            await rest.post(`/api/cron/jobs/${encodeURIComponent(job.id)}/pause`, undefined, job.profile ? { profile: job.profile } : undefined)
-            paused++
-          } catch (error) {
-            failures.push(`${job.name || job.id}: ${errorText(error)}`)
-          }
-        })
-      )
-    } catch (error) {
-      failures.push(`Scheduled tasks: ${errorText(error)}`)
+      await pauseAllAgents()
+    } finally {
+      setBusy(false)
     }
-
-    setBusy(false)
-    notify({
-      title: failures.length ? 'Paused with errors' : 'All agents paused',
-      body: `${interrupted} running ${interrupted === 1 ? 'session' : 'sessions'} interrupted, ${paused} scheduled ${paused === 1 ? 'task' : 'tasks'} paused.${failures.length ? ` ${failures.length} failed.` : ''}`,
-      level: failures.length ? 'warn' : 'success'
-    })
   }
 
   if (confirming) {

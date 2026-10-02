@@ -16,6 +16,18 @@ import { cn } from '../../../lib/cn.ts'
 /** Timestamp of the last successful write made from the Settings page. */
 export const $settingsSavedAt = atom(0)
 
+export type SectionId = 'general' | 'appearance' | 'agents' | 'voice' | 'commands' | 'privacy' | 'notifications' | 'network' | 'storage' | 'accessibility' | 'about'
+
+/** Section ids in nav order; kept here (not in SettingsPage) so commands can import them without the page. */
+export const SETTINGS_SECTION_IDS: readonly SectionId[] = ['general', 'appearance', 'agents', 'voice', 'commands', 'privacy', 'notifications', 'network', 'storage', 'accessibility', 'about']
+
+/** A command (voice, agent) asked the Settings page to show a section (id) and optionally search. */
+export const $settingsFocus = atom<{ section?: string; query?: string; ts: number } | null>(null)
+
+export function focusSettings(focus: { section?: string; query?: string }): void {
+  $settingsFocus.set({ ...focus, ts: Date.now() })
+}
+
 export function markSaved(): void {
   $settingsSavedAt.set(Date.now())
 }

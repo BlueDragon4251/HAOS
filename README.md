@@ -22,6 +22,14 @@ Alpha 0.1 for macOS. Working today against Hermes 0.21.x:
 - System bridge tools: `system_info`, `system_processes`, `system_disk_usage`, `system_find_files`,
   `system_apps`, `system_open`, `system_kill_process`, `system_files`, with read / act / mutate /
   destructive tiers, protected paths, an audit trail and the standard Hermes approval card.
+- Voice: talk to Hermes and hear it answer, by hotkey (`Alt+Space`), "hey hermes" wake word or the
+  mic button; a free engine (any STT/TTS provider, streamed speech) and an opt-in GPT-Live engine
+  with idle auto-close and a daily cap. Say "open missions", "remember that …", "pause the daily
+  digest" and watch the OS do it; Hermes can drive the UI itself through the `os_ui` tool. See
+  `docs/VOICE.md`.
+- Studio: say "create a website for a hair salon" and watch Hermes build it in one window: the
+  project's files, the code as it is written with changes marked, its commands and dev-server
+  output, and a live preview.
 
 ## Requirements
 
@@ -37,7 +45,8 @@ npm run dev           # Vite + Electron; boots your Hermes runtime and goes full
 ```
 
 `Cmd+Ctrl+F` toggles fullscreen, `Cmd+K` opens the command bar, `Cmd+1..9` switch surfaces,
-`Cmd+Q` quits (and stops the backend Hermes OS started).
+`Alt+Space` starts or ends a voice conversation, `Cmd+Q` quits (and stops the backend Hermes OS
+started).
 
 Useful environment variables while developing:
 
@@ -69,7 +78,7 @@ packages/hermes-client/  Re-exports the upstream gateway client + generated wire
 plugins/hermes-os-bridge Hermes plugin: system bridge tools, permissions, audit, skill
 plugins/tests/           pytest suite for the plugin
 upstream/                UPSTREAM.lock (pinned sha) + fetched snapshot (gitignored)
-docs/                    ARCHITECTURE, DECISIONS (ADRs), SYSTEM-BRIDGE, ROADMAP, PLAN
+docs/                    ARCHITECTURE, DECISIONS (ADRs), SYSTEM-BRIDGE, VOICE, ROADMAP, PLAN
 scripts/                 bootstrap, sync-upstream, test-bridge
 ```
 

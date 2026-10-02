@@ -5,6 +5,7 @@ import { cn } from '../../lib/cn.ts'
 import type { CronJob } from '../../lib/rest.ts'
 import { useBackendData } from '../../lib/use-async.ts'
 import { onGatewayEvent } from '../../store/gateway.ts'
+import { deleteAutomation, duplicateAutomation, setAutomationEnabled, triggerAutomation } from '../../store/automations.ts'
 import { notify } from '../../store/notifications.ts'
 import { type CronJobDraft, type CronJobEdits, type CronRun, LOCAL_TARGET, cronApi, errorText, isFailedStatus, isPaused, jobKey } from './api.ts'
 import { AutomationDetail } from './AutomationDetail.tsx'
@@ -112,43 +113,38 @@ export function AutomationsPage() {
 
   /* ---- Mutations ---------------------------------------------------------------------------- */
 
+  // The mutations live in store/automations.ts (shared with the command registry); the page keeps
+  // only the optimistic toggle and selection bookkeeping. Toasts come from the store.
   const toggleEnabled = async (job: CronJob, enabled: boolean) => {
     const key = jobKey(job)
     setOptimistic(prev => ({ ...prev, [key]: enabled }))
 
     try {
-      await (enabled ? cronApi.resume(job) : cronApi.pause(job))
-      toast(job.name || 'Automation', enabled ? 'Resumed' : 'Paused')
+      await setAutomationEnabled(job, enabled)
       jobs.reload()
-    } catch (error) {
+    } catch {
       setOptimistic(prev => {
         const next = { ...prev }
         delete next[key]
 
         return next
       })
-      toast(enabled ? 'Could not resume' : 'Could not pause', errorText(error), 'error')
     }
   }
 
   const runAction = async (job: CronJob, action: JobMenuAction) => {
-    const name = job.name || 'Automation'
-
     try {
       if (action === 'trigger') {
-        await cronApi.trigger(job)
-        toast(name, 'Run started')
+        await triggerAutomation(job)
       } else if (action === 'duplicate') {
-        const created = await cronApi.duplicate(job)
-        toast(name, 'Duplicated')
+        const created = await duplicateAutomation(job)
 
         if (created?.id) {
           setSelectedKey(jobKey({ id: created.id, profile: created.profile ?? job.profile }))
           setMode('detail')
         }
       } else {
-        await cronApi.remove(job)
-        toast(name, 'Deleted', 'info')
+        await deleteAutomation(job)
 
         if (selected && jobKey(selected) === jobKey(job)) {
           setSelectedKey(null)
@@ -156,8 +152,8 @@ export function AutomationsPage() {
       }
 
       jobs.reload()
-    } catch (error) {
-      toast(`${action === 'trigger' ? 'Run' : action === 'duplicate' ? 'Duplicate' : 'Delete'} failed`, errorText(error), 'error')
+    } catch {
+      // The store already reported the failure.
     }
   }
 
@@ -338,7 +334,7 @@ function JobCard({ job, enabled, selected, onSelect, onToggle, onAction }: { job
   const nextLine = enabled ? formatNextRun({ ...job, enabled: true, state: job.state === 'paused' ? 'scheduled' : job.state }) : 'Paused'
 
   return (
-    <GlassCard interactive selected={selected} onClick={onSelect} className="flex items-center gap-3.5 p-3.5">
+    <GlassCard interactive selected={selected} onClick={onSelect} className="flex items-center gap-3.5 p-3.5" data-os-target={`automation:${job.id}`}>
       <button type="button" className="flex min-w-0 flex-1 items-center gap-3.5 text-left" aria-label={`Open ${name}`} aria-current={selected ? 'true' : undefined}>
         <JobTile job={job} size={44} />
         <span className="min-w-0 flex-1">

@@ -139,8 +139,37 @@ export function showPage(page: PageId): void {
   }
 
   ensureMainWindow()
+  const current = $page.get()
+
+  if (current !== page && !navigatingBack) {
+    pageHistory.push(current)
+    pageHistory.splice(0, Math.max(0, pageHistory.length - 30))
+  }
+
   $page.set(page)
   focusWindow(MAIN_WINDOW_ID)
+}
+
+const pageHistory: PageId[] = []
+let navigatingBack = false
+
+/** Return to the previous page ("go back"); false when there is nowhere to go. */
+export function goBackPage(): PageId | null {
+  const previous = pageHistory.pop()
+
+  if (!previous) {
+    return null
+  }
+
+  navigatingBack = true
+
+  try {
+    showPage(previous)
+  } finally {
+    navigatingBack = false
+  }
+
+  return previous
 }
 
 export function openApp(appId: HermesAppId, options: { payload?: Record<string, unknown>; title?: string; bounds?: Bounds; singleton?: boolean } = {}): string {
@@ -187,6 +216,13 @@ export function openApp(appId: HermesAppId, options: { payload?: Record<string, 
   afterExit(() => update(id, { phase: 'open' }), motion.base)
 
   return id
+}
+
+/** Rename a floating window (e.g. a web window following its page title). */
+export function retitleWindow(id: string, title: string): void {
+  if (id !== MAIN_WINDOW_ID && title.trim()) {
+    update(id, { title: title.trim() })
+  }
 }
 
 export function closeWindow(id: string): void {

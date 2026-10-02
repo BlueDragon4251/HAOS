@@ -9,6 +9,7 @@ platforms:
   - linux
   - windows
 provides_tools:
+  - os_ui
   - system_network
   - system_control
   - system_logs

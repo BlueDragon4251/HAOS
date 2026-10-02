@@ -5,6 +5,7 @@ import type { HermesOSPrefs, ShellCommand } from '../../shared/ipc.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
 import { writePrefs } from '../prefs.ts'
+import { handleUiRequest, isUiRequest, type OsCommandBridge, type UiControlRequest } from './os-control.ts'
 import type { PanelShell } from './panels.ts'
 
 interface ControlRequest {
@@ -29,7 +30,9 @@ export class ControlSocket {
   constructor(
     private readonly shell: PanelShell,
     /** Called after the CLI changes preferences so windows and the wallpaper follow. */
-    private readonly onPrefsChanged?: (prefs: HermesOSPrefs) => void
+    private readonly onPrefsChanged?: (prefs: HermesOSPrefs) => void,
+    /** Runs registry commands in the Hermes window (`ui`, `ui-list`, `ui-state`; token-protected). */
+    private readonly osBridge?: OsCommandBridge
   ) {}
 
   get socketPath(): string {
@@ -111,6 +114,27 @@ export class ControlSocket {
     const args = request.args ?? []
     const { cmd } = request
 
+    if (this.osBridge && isUiRequest(cmd)) {
+      const reply = await handleUiRequest(request as unknown as UiControlRequest, this.osBridge)
+
+      if (reply) {
+        return reply
+      }
+    }
+
+    if (cmd === 'os') {
+      // `hermes-os os <command.id> [json]`: the CLI path to the registry (no token; same user).
+      const [id, json] = args
+
+      if (!id) {
+        return { ok: false, error: 'os needs a command id' }
+      }
+
+      this.shell.relay('main', { type: 'os', args: [id], payload: json ? (JSON.parse(json) as Record<string, unknown>) : undefined })
+
+      return { ok: true }
+    }
+
     if (OVERLAY_MODES.has(cmd)) {
       const focused = this.shell.niri.focusedWindow()
       const command: ShellCommand = {
@@ -174,6 +198,18 @@ export class ControlSocket {
       }
       case 'notify': {
         this.shell.relay('main', { type: 'notify', args })
+
+        return { ok: true }
+      }
+      case 'voice': {
+        // toggle | start | stop | mute: the Hermes window owns the conversation (see store/voice.ts).
+        const action = args[0] ?? 'toggle'
+
+        if (!['toggle', 'start', 'stop', 'mute'].includes(action)) {
+          return { ok: false, error: 'voice needs toggle | start | stop | mute' }
+        }
+
+        this.shell.relay('main', { type: 'voice', args: [action] })
 
         return { ok: true }
       }

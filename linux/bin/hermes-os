@@ -57,6 +57,7 @@ COMMANDS: dict[str, str] = {
     "ocr": "Select a screen region, extract its text (tesseract) to the clipboard",
     "clipboard": "Clipboard history picker",
     "notify": "Show a notification: notify <title> [body]",
+    "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "lock": "Lock the session (needs an account password; see `hermes-os password`)",
     "password": "Set the login password the lock screen asks for",
     "suspend": "Suspend the machine",
@@ -511,7 +512,7 @@ def main(argv: list[str]) -> int:
         if not tool:
             die("hermes-os-omakase is not installed", 127)
         return subprocess.call([tool, *(args or ["install"])])
-    if cmd in OVERLAY or cmd in {"page", "open", "launch", "notify", "state", "update-available"}:
+    if cmd in OVERLAY or cmd in {"page", "open", "launch", "notify", "voice", "state", "update-available"}:
         reply = relay(cmd, args)
         if cmd == "state":
             print(json.dumps(reply, indent=2))
