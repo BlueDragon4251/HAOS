@@ -36,12 +36,14 @@ const THEME = {
   brightWhite: '#f4f6f8'
 }
 
-/** Real shells in real PTYs. Tabs stay alive when the surface is hidden. */
+/** Real shells in real PTYs. Tabs stay alive while the surface is hidden and end when it closes. */
 export function TerminalSurface() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [active, setActive] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pending = useRef(false)
+  const mounted = useRef(false)
+  const live = useRef(new Set<string>())
 
   const create = async () => {
     if (pending.current) {
@@ -52,6 +54,14 @@ export function TerminalSurface() {
 
     try {
       const handle = await window.heraldOS.terminal.create({ cols: 120, rows: 30 })
+
+      if (!mounted.current) {
+        void window.heraldOS.terminal.dispose(handle.id)
+
+        return
+      }
+
+      live.current.add(handle.id)
       setTabs(current => [...current, { id: handle.id, title: handle.shell.split('/').pop() ?? 'shell' }])
       setActive(handle.id)
       setError(null)
@@ -69,9 +79,25 @@ export function TerminalSurface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const ids = live.current
+    mounted.current = true
+
+    return () => {
+      mounted.current = false
+
+      for (const id of ids) {
+        void window.heraldOS.terminal.dispose(id)
+      }
+
+      ids.clear()
+    }
+  }, [])
+
   useEffect(
     () =>
       window.heraldOS.terminal.onExit(id => {
+        live.current.delete(id)
         setTabs(current => {
           const next = current.filter(tab => tab.id !== id)
           setActive(prev => (prev === id ? (next[next.length - 1]?.id ?? null) : prev))
@@ -83,6 +109,7 @@ export function TerminalSurface() {
   )
 
   const close = (id: string) => {
+    live.current.delete(id)
     void window.heraldOS.terminal.dispose(id)
     setTabs(current => {
       const next = current.filter(tab => tab.id !== id)
