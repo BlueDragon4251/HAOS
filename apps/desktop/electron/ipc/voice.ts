@@ -2,6 +2,7 @@ import { BrowserWindow, globalShortcut, ipcMain, session, systemPreferences } fr
 import { type AudioWsKind, IPC, type MicPermission } from '../../shared/ipc.ts'
 import type { BackendManager } from '../backend/manager.ts'
 import { log } from '../log.ts'
+import { isShellPage } from '../paths.ts'
 
 /** Chromium permission names the shell grants for its own origin; everything else stays denied. */
 const MEDIA_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection'])
@@ -43,8 +44,8 @@ function installMediaPermissions(): void {
       return false
     }
 
-    // The shell is the only page these windows load (dev server or file://); never a remote origin.
-    if (!/^(file:|http:\/\/127\.0\.0\.1|http:\/\/localhost)/.test(requestingUrl)) {
+    // Pinned web apps share this session; only the shell itself may capture audio.
+    if (!isShellPage(requestingUrl)) {
       return false
     }
 

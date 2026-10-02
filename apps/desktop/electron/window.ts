@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { HeraldOSPrefs } from '../shared/ipc.ts'
 import { osEnv } from './env.ts'
-import { devServerUrl } from './paths.ts'
+import { devServerUrl, isShellPage, rendererIndex } from './paths.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,9 +58,7 @@ export function createMainWindow(prefs: HeraldOSPrefs): BrowserWindow {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {
-    const allowed = devServerUrl()
-
-    if (!(allowed && url.startsWith(allowed)) && !url.startsWith('file:')) {
+    if (!isShellPage(url)) {
       event.preventDefault()
     }
   })
@@ -70,7 +68,7 @@ export function createMainWindow(prefs: HeraldOSPrefs): BrowserWindow {
   if (dev) {
     void win.loadURL(dev)
   } else {
-    void win.loadFile(path.join(here, '..', 'renderer', 'index.html'))
+    void win.loadFile(rendererIndex())
   }
 
   // HiDPI on compositors that expose the output at scale 1 (cage in Stage 1): zoom the page instead

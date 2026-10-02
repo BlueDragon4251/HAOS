@@ -45,11 +45,13 @@ use a per-call `rule_key` so "always" cannot persist for them.
 Herald OS launches fullscreen and frameless but always allows leaving (`Cmd+Ctrl+F` toggles
 fullscreen, `Cmd+Q` quits). Alpha runs on top of the user's macOS session and must never trap them.
 
-## ADR-007: REST runs in Electron main; the renderer holds no credentials
+## ADR-007: REST runs in Electron main
 
-The session token stays in the main process. The renderer receives a WebSocket URL for streaming
-and a `rest(method, path, body)` capability for everything else. A compromised renderer cannot
-mint arbitrary authenticated requests outside the exposed capability.
+The renderer gets a `rest(method, path, body)` capability, and main adds the session token to each
+request, so renderer code never handles the token for REST. The renderer does see the token inside
+the gateway WebSocket URL it dials for streaming (the gateway authenticates WebSockets by query
+string), so this is not a credential boundary against a compromised renderer. What protects the
+backend is that it listens on 127.0.0.1 only and the token changes on every launch.
 
 Amendment (voice): main also mints the tokenized URL for the backend's `/api/audio/speak-stream`
 WebSocket (`window.heraldOS.voice.audioWsUrl`). The renderer already dials the gateway WebSocket

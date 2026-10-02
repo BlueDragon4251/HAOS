@@ -56,6 +56,11 @@ const osControlPath = panels ? path.join(process.env.XDG_RUNTIME_DIR || `/run/us
 const osControl = panels
   ? null
   : new OsControlServer(osControlPath, async request => {
+      // No CLI talks to this socket (the Linux one serves `herald-os`), so every client is the backend.
+      if (request.token !== osControlToken()) {
+        return { ok: false, error: 'invalid control token' }
+      }
+
       const ui = await handleUiRequest(request as unknown as Parameters<typeof handleUiRequest>[0], osBridge)
 
       if (ui) {
@@ -117,7 +122,10 @@ function registerCoreIpc(): void {
 
   ipcMain.handle(IPC.notifyNative, (_event, title: string, body: string) => {
     if (Notification.isSupported()) {
-      new Notification({ title: String(title).slice(0, 120), body: String(body).slice(0, 400), silent: true }).show()
+      const notification = new Notification({ title: String(title).slice(0, 120), body: String(body).slice(0, 400), silent: true })
+      // macOS only shows notifications from code-signed apps; unsigned builds fail here.
+      notification.on('failed', (_event, error) => log('notify', `native notification failed: ${error}`))
+      notification.show()
     }
   })
 

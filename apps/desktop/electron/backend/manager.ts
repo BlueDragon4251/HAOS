@@ -22,7 +22,7 @@ export type BackendListener = (state: BackendState) => void
 
 /**
  * Owns the `hermes serve` child: resolve -> spawn -> ready -> probe -> ready state, restart with
- * bounded backoff on unexpected exit, and REST forwarding so the renderer never holds the token.
+ * bounded backoff on unexpected exit, and REST forwarding that adds the token in main (ADR-007).
  */
 export class BackendManager {
   private state: BackendState = { phase: 'idle', attempt: 0, logTail: [] }

@@ -18,7 +18,8 @@ import { log } from '../log.ts'
  * every permission denied, http(s) only, popups denied (same-origin ones navigate the same view).
  */
 
-const PARTITION = 'persist:herald-web'
+export const WEB_PARTITION = 'persist:herald-web'
+const VIEWER_PARTITION = 'persist:herald-viewer'
 const DETACHED_SIZE = { width: 1000, height: 720 }
 
 const isHttp = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -40,7 +41,7 @@ interface DetachedView {
 
 type Entry = EmbeddedView | DetachedView
 
-const GUEST_PREFERENCES: Electron.WebPreferences = {
+export const GUEST_PREFERENCES: Electron.WebPreferences = {
   sandbox: true,
   contextIsolation: true,
   nodeIntegration: false,
@@ -51,11 +52,11 @@ const GUEST_PREFERENCES: Electron.WebPreferences = {
   webviewTag: false,
   plugins: false,
   spellcheck: false,
-  partition: PARTITION
+  partition: WEB_PARTITION
 }
 
 /** Local files: same lockdown, own partition, plus Chromium's PDF viewer plugin. */
-const VIEWER_PREFERENCES: Electron.WebPreferences = { ...GUEST_PREFERENCES, plugins: true, partition: 'persist:herald-viewer' }
+const VIEWER_PREFERENCES: Electron.WebPreferences = { ...GUEST_PREFERENCES, plugins: true, partition: VIEWER_PARTITION }
 
 /** Studio previews of the site Hermes is building: same lockdown, own partition so dev-server state never mixes with browsing. */
 const PREVIEW_PARTITION = 'persist:herald-preview'
@@ -88,7 +89,6 @@ export class WebViews {
   private readonly entries = new Map<string, Entry>()
   private readonly hookedOwners = new WeakSet<WebContents>()
   private counter = 0
-  private sessionReady = false
 
   /** `embed`: layer views over the sender's window (desktop mode); otherwise open real windows. */
   constructor(private readonly embed: boolean) {}
@@ -119,8 +119,8 @@ export class WebViews {
       throw new Error('a preview folder must be inside your home folder')
     }
 
-    this.prepareSession()
-    this.preparePreviewSession()
+    lockDownPartition(WEB_PARTITION)
+    lockDownPartition(PREVIEW_PARTITION)
     this.hookOwner(owner)
     const id = `web-${++this.counter}`
     const host = BrowserWindow.fromWebContents(owner)
@@ -191,27 +191,12 @@ export class WebViews {
     })
   }
 
-  private previewReady = false
-
-  private preparePreviewSession(): void {
-    if (this.previewReady) {
-      return
-    }
-
-    this.previewReady = true
-    const preview = session.fromPartition(PREVIEW_PARTITION)
-    preview.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
-    preview.setPermissionCheckHandler(() => false)
-    preview.setDevicePermissionHandler(() => false)
-    preview.on('will-download', event => event.preventDefault())
-  }
-
   open(owner: WebContents, url: string, options: WebOpenOptions): string {
     if (typeof url !== 'string' || !isHttp(url)) {
       throw new Error('only http(s) URLs may be opened in a Herald OS web window')
     }
 
-    this.prepareSession()
+    lockDownPartition(WEB_PARTITION)
     this.hookOwner(owner)
     const id = `web-${++this.counter}`
     const host = BrowserWindow.fromWebContents(owner)
@@ -246,7 +231,7 @@ export class WebViews {
     const entry: Entry = this.embed && host && !host.isDestroyed() ? this.createEmbedded(id, host, owner, VIEWER_PREFERENCES) : this.createDetached(id, owner, title, VIEWER_PREFERENCES)
     this.entries.set(id, entry)
     const contents = entry.kind === 'view' ? entry.view.webContents : entry.win.webContents
-    this.prepareViewerSession()
+    lockDownPartition(VIEWER_PARTITION)
     const fileUrl = pathToFileURL(resolved).toString()
     contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     // A viewer shows one file: links inside a PDF or page never navigate the view.
@@ -270,22 +255,6 @@ export class WebViews {
     if (entry) {
       this.emit(entry, event)
     }
-  }
-
-  private viewerReady = false
-
-  /** The viewer partition grants nothing either. */
-  private prepareViewerSession(): void {
-    if (this.viewerReady) {
-      return
-    }
-
-    this.viewerReady = true
-    const viewer = session.fromPartition('persist:herald-viewer')
-    viewer.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
-    viewer.setPermissionCheckHandler(() => false)
-    viewer.setDevicePermissionHandler(() => false)
-    viewer.on('will-download', event => event.preventDefault())
   }
 
   setBounds(sender: WebContents, id: string, bounds: WebViewBounds, visible: boolean): void {
@@ -455,20 +424,22 @@ export class WebViews {
     owner.on('did-navigate', () => this.closeAll(owner))
     owner.on('destroyed', () => this.closeAll(owner))
   }
+}
 
-  /** The guest partition grants nothing: no camera, mic, notifications, clipboard, or downloads. */
-  private prepareSession(): void {
-    if (this.sessionReady) {
-      return
-    }
+const lockedPartitions = new Set<string>()
 
-    this.sessionReady = true
-    const guest = session.fromPartition(PARTITION)
-    guest.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
-    guest.setPermissionCheckHandler(() => false)
-    guest.setDevicePermissionHandler(() => false)
-    guest.on('will-download', event => event.preventDefault())
+/** Guest partitions grant nothing: no camera, mic, notifications, clipboard, or downloads. */
+export function lockDownPartition(partition: string): void {
+  if (lockedPartitions.has(partition)) {
+    return
   }
+
+  lockedPartitions.add(partition)
+  const guest = session.fromPartition(partition)
+  guest.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  guest.setPermissionCheckHandler(() => false)
+  guest.setDevicePermissionHandler(() => false)
+  guest.on('will-download', event => event.preventDefault())
 }
 
 export function registerWebIpc(embed: boolean): WebViews {

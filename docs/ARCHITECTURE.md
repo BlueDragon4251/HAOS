@@ -116,8 +116,9 @@ catalogue in `src/commands/`), so three callers drive the UI the same way:
 3. Hermes itself, through the bridge's `os_ui` tool. Electron main serves a JSON-lines Unix socket
    (`~/.hermes/herald-os/control.sock` in desktop mode, `$XDG_RUNTIME_DIR/herald-os/control.sock`
    in panels mode) and hands the backend its path and a per-launch token
-   (`HERALD_OS_CONTROL_SOCKET`, `HERALD_OS_CONTROL_TOKEN`). Requests without the token are
-   refused.
+   (`HERALD_OS_CONTROL_SOCKET`, `HERALD_OS_CONTROL_TOKEN`). The socket is readable only by the
+   user (mode 0600) and refuses requests without the token. In panels mode it also serves the
+   `herald-os` CLI that the compositor's hotkeys call; those commands need no token.
 
 Voice (engines, wake word, barge-in) is described in [`VOICE.md`](VOICE.md).
 

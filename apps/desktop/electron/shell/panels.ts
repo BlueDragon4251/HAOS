@@ -2,8 +2,9 @@ import { BrowserWindow, ipcMain, screen, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC, type ShellCommand, type ShellSurface, type WmAction } from '../../shared/ipc.ts'
+import { GUEST_PREFERENCES, lockDownPartition, WEB_PARTITION } from '../ipc/web.ts'
 import { log } from '../log.ts'
-import { devServerUrl } from '../paths.ts'
+import { devServerUrl, isShellPage, rendererIndex } from '../paths.ts'
 import { NiriClient } from '../wm/niri.ts'
 import { FLOATING_APPS, shellMode, surfaceTitle } from './mode.ts'
 
@@ -136,18 +137,20 @@ export class PanelShell {
     }
 
     const origin = new URL(url).origin
+    const sameOrigin = (target: string) => URL.canParse(target) && new URL(target).origin === origin
+    lockDownPartition(WEB_PARTITION)
     const win = new BrowserWindow({
       width: 1100,
       height: 760,
       frame: false,
       title: name,
       backgroundColor: '#ffffff',
-      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: false }
+      webPreferences: { ...GUEST_PREFERENCES }
     })
     win.on('page-title-updated', event => event.preventDefault())
     // Same-site links stay inside the app; everything else goes to the default browser.
     win.webContents.setWindowOpenHandler(({ url: target }) => {
-      if (target.startsWith(origin)) {
+      if (sameOrigin(target)) {
         void win.loadURL(target)
       } else if (/^https?:/i.test(target)) {
         void shell.openExternal(target)
@@ -156,7 +159,7 @@ export class PanelShell {
       return { action: 'deny' }
     })
     win.webContents.on('will-navigate', (event, target) => {
-      if (!target.startsWith(origin) && /^https?:/i.test(target)) {
+      if (!sameOrigin(target) && /^https?:/i.test(target)) {
         event.preventDefault()
         void shell.openExternal(target)
       }
@@ -236,6 +239,12 @@ export class PanelShell {
     win.on('page-title-updated', event => event.preventDefault())
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
+    win.webContents.on('will-navigate', (event, url) => {
+      if (!isShellPage(url)) {
+        event.preventDefault()
+      }
+    })
+
     const dev = devServerUrl()
 
     if (dev) {
@@ -243,7 +252,7 @@ export class PanelShell {
       url.searchParams.set('surface', surface)
       void win.loadURL(url.toString())
     } else {
-      void win.loadFile(path.join(here, '..', 'renderer', 'index.html'), { query: { surface } })
+      void win.loadFile(rendererIndex(), { query: { surface } })
     }
 
     win.webContents.on('did-finish-load', () => {

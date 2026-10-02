@@ -1,6 +1,6 @@
 // Thin REST helpers over the FastAPI routers `hermes serve` mounts next to the JSON-RPC socket.
-// The renderer never holds the token: Electron main performs these requests (see apps/desktop), so the
-// client is built around an injected `fetch`-like function.
+// Electron main performs these requests and adds the token (see apps/desktop), so the client is built
+// around an injected `fetch`-like function.
 
 export interface RestClientOptions {
   baseUrl: string
