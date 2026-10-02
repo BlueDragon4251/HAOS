@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in Herald OS does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For security problems, do not file an issue: see SECURITY.md.
+        Problems with Hermes Agent itself (models, providers, the `hermes` CLI) belong in
+        [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent/issues).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Ask Hermes to ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (npm run dev)
+        - macOS (built app)
+        - Herald OS Linux (niri)
+        - Herald OS Linux (cage)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: macOS or distro version, `node --version`, `hermes --version`, and the Herald OS commit (`git rev-parse --short HEAD`).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        The end of `~/.hermes/logs/herald-os.log` (on Linux, also `~/.local/state/herald-os/shell.log`).
+        Remove anything private (API keys, file names, conversation text) before pasting.
+      render: text

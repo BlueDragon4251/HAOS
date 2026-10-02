@@ -91,7 +91,7 @@ HERALD_OS_SCALE=1.5                          # page zoom for HiDPI framebuffers 
 HERALD_OS_DEV_SERVER=http://127.0.0.1:5180   # load the Vite dev server instead of dist/
 HERALD_OS_REMOTE_DEBUG_PORT=9333             # Chrome DevTools protocol for scripted checks
 HERALD_OS_NO_SANDBOX=1                       # if user namespaces are disabled
-HERALD_OS_APP=/path/to/apps/desktop               # alternate build location
+HERALD_OS_APP=/path/to/apps/desktop          # alternate build location
 ```
 
 ## Dev loop

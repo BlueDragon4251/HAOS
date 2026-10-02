@@ -4,6 +4,7 @@ node_modules/
 # Build output.
 dist/
 release/
+coverage/
 *.tsbuildinfo
 
 # Upstream snapshot is fetched by scripts/sync-upstream.sh, pinned by upstream/UPSTREAM.lock.
@@ -20,6 +21,21 @@ __pycache__/
 *.log
 .env
 .env.*
+!.env.example
+
+# Credentials. Hermes keeps its own in ~/.hermes; none belong in this repository.
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+id_ecdsa*
+id_hermes*
+auth.json
 
 # Herald OS Linux VM artifacts (images, seeds, disks, screenshots).
 linux/vm/build/
+*.qcow2
+*.raw
+*.iso
+*.dmg

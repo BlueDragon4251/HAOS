@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Hermes Agent issues
+    url: https://github.com/NousResearch/hermes-agent/issues
+    about: Models, providers, the hermes CLI, and the gateway are part of Hermes Agent.
