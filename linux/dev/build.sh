@@ -24,9 +24,12 @@ fi
 echo "==> building shell"
 npm run build --workspace apps/desktop
 
+# Electron downloads its binary on first use, not at npm install: fetch it now so the first login
+# does not wait on a download and the sandbox helper below exists.
+(cd "$REPO/apps/desktop" && node -e "require('electron')")
 # Chromium's setuid sandbox helper must be root-owned 4755 when unprivileged user namespaces
 # are unavailable; harmless otherwise.
-SANDBOX="$REPO/node_modules/electron/dist/chrome-sandbox"
+SANDBOX="$(dirname "$(cd "$REPO/apps/desktop" && node -p "require('electron')")")/chrome-sandbox"
 if [[ -f "$SANDBOX" && "$(stat -c '%u %a' "$SANDBOX")" != "0 4755" ]]; then
   sudo chown root:root "$SANDBOX" && sudo chmod 4755 "$SANDBOX" || true
 fi

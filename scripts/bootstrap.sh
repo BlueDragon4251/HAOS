@@ -26,6 +26,10 @@ bash "$ROOT/scripts/sync-upstream.sh"
 echo "==> Installing Node workspaces"
 (cd "$ROOT" && npm install)
 
+# Electron fetches its binary on first use rather than at install; do it once here.
+echo "==> Fetching the Electron binary"
+(cd "$ROOT/apps/desktop" && node -e "require('electron')") || echo "    WARNING: could not download Electron; npm run dev will try again"
+
 # npm strips the executable bit from node-pty's prebuilt spawn-helper; the app also repairs this at
 # runtime, but fixing it here keeps packaged builds working. (Linux has no prebuilds; see
 # linux/dev/build.sh, which compiles node-pty.)
