@@ -4,15 +4,15 @@ import { Toggle } from '../../../components/ui/glass.tsx'
 import { markSaved, readLocalFlag, SectionTitle, SettingsGroup, SettingsRow, writeLocal } from './shared.tsx'
 
 /*
- * Notification preferences are shell-side flags in localStorage (`hermes-os.notify.*`). The
+ * Notification preferences are shell-side flags in localStorage (`herald-os.notify.*`). The
  * notification store does not read them yet; see the page report for the proposed wiring.
  */
 
 export const NOTIFY_KEYS = {
-  toolCompletions: 'hermes-os.notify.tool-completions',
-  approvals: 'hermes-os.notify.approvals',
-  taskUpdates: 'hermes-os.notify.task-updates',
-  nativeWhenUnfocused: 'hermes-os.notify.native-unfocused'
+  toolCompletions: 'herald-os.notify.tool-completions',
+  approvals: 'herald-os.notify.approvals',
+  taskUpdates: 'herald-os.notify.task-updates',
+  nativeWhenUnfocused: 'herald-os.notify.native-unfocused'
 } as const
 
 type NotifyKey = keyof typeof NOTIFY_KEYS
@@ -21,7 +21,7 @@ const ROWS: { key: NotifyKey; label: string; description: string; icon: React.Re
   { key: 'toolCompletions', label: 'Tool completions', description: 'A toast when a long-running tool finishes in a session you are not looking at.', icon: <IconChecklist />, keywords: 'toast finished' },
   { key: 'approvals', label: 'Approvals', description: 'Tell me when Hermes is waiting for a decision.', icon: <IconShieldCheck />, keywords: 'permission request waiting' },
   { key: 'taskUpdates', label: 'Task updates', description: 'Scheduled tasks that ran, failed or changed.', icon: <IconBellRinging />, keywords: 'cron automations' },
-  { key: 'nativeWhenUnfocused', label: 'Native notifications when unfocused', description: 'Use macOS Notification Center while Hermes OS is in the background.', icon: <IconDeviceDesktop />, keywords: 'macos system background' }
+  { key: 'nativeWhenUnfocused', label: 'Native notifications when unfocused', description: 'Use macOS Notification Center while Herald OS is in the background.', icon: <IconDeviceDesktop />, keywords: 'macos system background' }
 ]
 
 export function NotificationsSection() {
@@ -40,7 +40,7 @@ export function NotificationsSection() {
 
   return (
     <>
-      <SectionTitle title="Notifications" subtitle="These are Hermes OS shell preferences. They shape what the shell surfaces; Hermes itself keeps working either way." />
+      <SectionTitle title="Notifications" subtitle="These are Herald OS shell preferences. They shape what the shell surfaces; Hermes itself keeps working either way." />
 
       <SettingsGroup title="Alerts">
         {ROWS.map(row => (

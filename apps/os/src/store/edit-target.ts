@@ -151,7 +151,7 @@ export async function performEdit(action: EditAction, options: { needsField?: bo
   const web = frontWebView()
 
   if (web) {
-    await window.hermesOS.edit.perform(action, web)
+    await window.heraldOS.edit.perform(action, web)
 
     return { target: 'the web page' }
   }
@@ -173,7 +173,7 @@ export async function performEdit(action: EditAction, options: { needsField?: bo
   }
 
   const target = describeTarget()
-  await window.hermesOS.edit.perform(action)
+  await window.heraldOS.edit.perform(action)
 
   return { target }
 }

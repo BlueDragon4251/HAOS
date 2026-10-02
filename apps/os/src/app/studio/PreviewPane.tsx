@@ -27,7 +27,7 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
   const { covered, occluded } = useNativeView(viewId, host, win, { active: !error, followFrameRadius: false })
 
   useEffect(() => {
-    const off = window.hermesOS.web.onEvent(event => {
+    const off = window.heraldOS.web.onEvent(event => {
       if (event.id !== idRef.current) {
         return
       }
@@ -49,7 +49,7 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
       off()
 
       if (idRef.current) {
-        void window.hermesOS.web.close(idRef.current)
+        void window.heraldOS.web.close(idRef.current)
         idRef.current = null
       }
     }
@@ -65,11 +65,11 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
     setError(null)
 
     if (idRef.current) {
-      void window.hermesOS.web.navigate(idRef.current, target).catch(err => setError(err instanceof Error ? err.message : String(err)))
+      void window.heraldOS.web.navigate(idRef.current, target).catch(err => setError(err instanceof Error ? err.message : String(err)))
       return
     }
 
-    void window.hermesOS.web
+    void window.heraldOS.web
       .openPreview(target, { root: root ?? undefined, title: 'Preview' })
       .then(id => {
         idRef.current = id
@@ -88,7 +88,7 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
       retries.current += 1
 
       if (idRef.current) {
-        void window.hermesOS.web.navigate(idRef.current, target).catch(() => undefined)
+        void window.heraldOS.web.navigate(idRef.current, target).catch(() => undefined)
       }
     }, RETRY_MS)
 
@@ -103,7 +103,7 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
 
     const timer = setTimeout(() => {
       if (idRef.current) {
-        void window.hermesOS.web.reload(idRef.current)
+        void window.heraldOS.web.reload(idRef.current)
       }
     }, RELOAD_DEBOUNCE_MS)
 
@@ -121,7 +121,7 @@ export function PreviewPane({ win, target, root, contentKey, compact = false }: 
           <span className="truncate text-fg-2">{label || 'No preview yet'}</span>
           {loading && <Spinner className="ml-auto shrink-0" />}
         </div>
-        <button type="button" disabled={!viewId} onClick={() => viewId && void window.hermesOS.web.reload(viewId)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg disabled:opacity-40" title="Reload" aria-label="Reload preview">
+        <button type="button" disabled={!viewId} onClick={() => viewId && void window.heraldOS.web.reload(viewId)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg disabled:opacity-40" title="Reload" aria-label="Reload preview">
           <IconRefresh size={14} />
         </button>
         <button type="button" disabled={!target || !isWeb(target)} onClick={() => target && void openWebWindow(url || target)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg disabled:opacity-40" title="Open in its own window" aria-label="Open preview in its own window">

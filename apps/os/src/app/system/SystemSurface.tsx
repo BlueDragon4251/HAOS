@@ -22,7 +22,7 @@ export function SystemSurface() {
   useEffect(() => {
     let cancelled = false
     const load = () =>
-      window.hermesOS.system.processes(sort, 30).then(rows => {
+      window.heraldOS.system.processes(sort, 30).then(rows => {
         if (!cancelled) {
           setProcesses(rows)
         }
@@ -91,7 +91,7 @@ export function SystemSurface() {
               </button>
             ))}
           </div>
-          <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => void window.hermesOS.system.processes(sort, 30).then(setProcesses)}>
+          <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => void window.heraldOS.system.processes(sort, 30).then(setProcesses)}>
             <IconRefresh size={15} />
           </Button>
         </div>

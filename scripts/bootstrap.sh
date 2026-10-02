@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# One-shot developer bootstrap for Hermes OS (macOS and Linux).
+# One-shot developer bootstrap for Herald OS (macOS and Linux). Safe to re-run after every pull.
 #   1. Fetch the pinned upstream snapshot (types for the gateway wire).
 #   2. Install Node workspaces.
 #   3. Link the system-bridge plugin into the user's Hermes plugins directory.
-#   4. Verify a Hermes runtime with `serve` is reachable.
+#   4. Find the Hermes runtime, migrate pre-rename settings, enable the plugin and its toolset.
+#   5. Report voice support.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+HERALD_OS_HERMES_ROOT="${HERALD_OS_HERMES_ROOT:-${HERMES_OS_HERMES_ROOT:-}}"
 OS="$(uname -s)"
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -30,45 +32,67 @@ echo "==> Installing Node workspaces"
 helper="$ROOT/node_modules/node-pty/prebuilds/$(node -p 'process.platform + "-" + process.arch')/spawn-helper"
 [[ -f "$helper" ]] && chmod 755 "$helper"
 
-echo "==> Linking hermes-os-bridge plugin into $HERMES_HOME/plugins"
+echo "==> Linking herald-os-bridge plugin into $HERMES_HOME/plugins"
 mkdir -p "$HERMES_HOME/plugins"
-link="$HERMES_HOME/plugins/hermes-os-bridge"
+# The pre-rename link points at a folder that no longer exists; remove it only when it is ours.
+legacy="$HERMES_HOME/plugins/hermes-os-bridge"
+if [[ -L "$legacy" && "$(readlink "$legacy")" == "$ROOT/plugins/"* ]]; then
+  rm -f "$legacy"
+  echo "    removed the pre-rename hermes-os-bridge link"
+fi
+link="$HERMES_HOME/plugins/herald-os-bridge"
 if [[ -L "$link" || -e "$link" ]]; then
   rm -rf "$link"
 fi
-ln -s "$ROOT/plugins/hermes-os-bridge" "$link"
+ln -s "$ROOT/plugins/herald-os-bridge" "$link"
 
 echo "==> Verifying Hermes runtime"
 HERMES_CMD=()
-if [[ -n "${HERMES_OS_HERMES_ROOT:-}" && -x "$HERMES_OS_HERMES_ROOT/venv/bin/python" ]]; then
-  echo "    HERMES_OS_HERMES_ROOT=$HERMES_OS_HERMES_ROOT"
-  HERMES_CMD=("$HERMES_OS_HERMES_ROOT/venv/bin/python" -m hermes_cli.main)
+HERMES_PY=""
+if [[ -n "$HERALD_OS_HERMES_ROOT" && -x "$HERALD_OS_HERMES_ROOT/venv/bin/python" ]]; then
+  echo "    HERALD_OS_HERMES_ROOT=$HERALD_OS_HERMES_ROOT"
+  HERMES_PY="$HERALD_OS_HERMES_ROOT/venv/bin/python"
 elif [[ -x "$HERMES_HOME/hermes-agent/venv/bin/python" ]]; then
   echo "    managed install: $HERMES_HOME/hermes-agent"
-  HERMES_CMD=("$HERMES_HOME/hermes-agent/venv/bin/python" -m hermes_cli.main)
+  HERMES_PY="$HERMES_HOME/hermes-agent/venv/bin/python"
 elif command -v hermes >/dev/null 2>&1; then
   echo "    hermes on PATH: $(command -v hermes)"
   HERMES_CMD=(hermes)
+  # A pip/uv install's entry point names its interpreter on the first line.
+  shebang="$(head -1 "$(command -v hermes)" 2>/dev/null | sed -n 's/^#!\(.*python[0-9.]*\)$/\1/p')"
+  [[ -n "$shebang" && -x "$shebang" ]] && HERMES_PY="$shebang"
 else
-  echo "    WARNING: no Hermes runtime found. Install with:" >&2
+  echo "    WARNING: no Hermes runtime found. Install it, then re-run this script:" >&2
   echo "      curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash" >&2
 fi
+[[ -n "$HERMES_PY" && ${#HERMES_CMD[@]} -eq 0 ]] && HERMES_CMD=("$HERMES_PY" -m hermes_cli.main)
+runtime_root="${HERALD_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}"
+
+# From the runtime checkout, like the `hermes` entry point: an editable install does not map
+# top-level modules added after it was created.
+hermes_run() {
+  (cd "$runtime_root" 2>/dev/null || true; "${HERMES_CMD[@]}" "$@" </dev/null)
+}
 
 if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
+  if [[ -n "$HERMES_PY" ]]; then
+    echo "==> Migrating settings from the pre-rename Hermes OS"
+    HERMES_HOME="$HERMES_HOME" PYTHONPATH="$runtime_root${PYTHONPATH:+:$PYTHONPATH}" "$HERMES_PY" "$ROOT/scripts/migrate-hermes-config.py" || true
+  fi
+
   echo "==> Enabling the system bridge plugin and its toolset"
   # User plugins are opt-in (plugins.enabled) and a saved platform toolset list is authoritative, so
   # both must be recorded. The override prompt is answered "no" (stdin closed): the bridge never
   # replaces built-in tools.
-  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" plugins enable hermes-os-bridge </dev/null >/dev/null 2>&1 || true)
-  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" tools enable hermes_os </dev/null 2>&1 | tail -1 || true)
+  hermes_run plugins enable herald-os-bridge >/dev/null 2>&1 || true
+  hermes_run tools enable herald_os 2>&1 | tail -1 || true
   # Upstream defers plugin tools behind its tool-search bridge; with the system tools hidden the
   # agent falls back to shell commands. Keep them direct (Settings -> Permissions can flip it back).
   echo "    tools.tool_search.enabled = off (system tools stay directly callable)"
-  (cd "${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}" 2>/dev/null || true; "${HERMES_CMD[@]}" config set tools.tool_search.enabled off </dev/null >/dev/null 2>&1 || true)
+  hermes_run config set tools.tool_search.enabled off >/dev/null 2>&1 || true
 
   echo "==> Checking voice support (docs/VOICE.md)"
   # The Live engine and the spoken-reply turn note need hermes >= 0.21.3 (voice-live routes).
-  runtime_root="${HERMES_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}"
   runtime_version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$runtime_root/pyproject.toml" 2>/dev/null | head -1)"
   if [[ -n "$runtime_version" ]]; then
     if [[ "$(printf '%s\n0.21.3\n' "$runtime_version" | sort -V | head -1)" != "0.21.3" ]]; then
@@ -77,8 +101,8 @@ if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
       echo "    Hermes $runtime_version: voice-live routes available"
     fi
   fi
-  if [[ -x "$runtime_root/venv/bin/python" ]]; then
-    "$runtime_root/venv/bin/python" - <<'PY' || true
+  if [[ -n "$HERMES_PY" ]]; then
+    "$HERMES_PY" - <<'PY' || true
 import importlib
 for name, purpose in (("openwakeword", "wake word"), ("faster_whisper", "local STT"), ("edge_tts", "free TTS")):
     try:
@@ -90,4 +114,4 @@ PY
   fi
 fi
 
-echo "==> Done. Start Hermes OS with: npm run dev"
+echo "==> Done. Start Herald OS with: npm run dev"

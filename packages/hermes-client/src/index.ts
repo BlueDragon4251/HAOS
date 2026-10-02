@@ -1,4 +1,4 @@
-// Hermes OS consumes the upstream gateway client unchanged. Everything below is a re-export of the
+// Herald OS consumes the upstream gateway client unchanged. Everything below is a re-export of the
 // pinned snapshot under upstream/hermes-agent/apps/shared/src (see upstream/UPSTREAM.lock), so
 // bumping upstream is a lock edit followed by `npm run typecheck`.
 export {

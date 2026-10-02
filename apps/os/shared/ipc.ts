@@ -185,7 +185,7 @@ export interface VoicePrefs {
   announceNotifications: boolean
   /** Show Hermes's own tool results on screen (memory, automations, files) even outside a voice conversation. */
   followHermes: boolean
-  /** Set once Hermes OS has tuned local speech recognition (model + vocabulary), so a later user choice is never overwritten. */
+  /** Set once Herald OS has tuned local speech recognition (model + vocabulary), so a later user choice is never overwritten. */
   sttTuned: boolean
   /** Live engine: close the paid session after this many idle seconds. */
   liveIdleSeconds: number
@@ -200,7 +200,7 @@ export type MicPermission = 'granted' | 'denied' | 'not-determined' | 'restricte
 /** Keyboard modifiers for `EditAction` key presses (Electron accelerator names). */
 export type KeyModifier = 'shift' | 'control' | 'alt' | 'meta'
 
-/** Text and editing actions performed on whatever is focused in a Hermes OS window. */
+/** Text and editing actions performed on whatever is focused in a Herald OS window. */
 export type EditAction =
   | { kind: 'insert'; text: string }
   | { kind: 'key'; key: string; modifiers?: KeyModifier[] }
@@ -222,7 +222,7 @@ export interface OsControlReply {
 /** Authenticated WebSocket endpoints the renderer may dial besides the gateway. */
 export type AudioWsKind = 'speak-stream'
 
-export interface HermesOSPrefs {
+export interface HeraldOSPrefs {
   fullscreenOnLaunch: boolean
   reduceMotion: boolean
   accent: 'blue' | 'ice' | 'violet'
@@ -318,7 +318,7 @@ export type WmAction =
   | { type: 'screenshot'; what: 'screen' | 'window' | 'select' }
   | { type: 'raw'; args: string[] }
 
-/** A command delivered to a surface: from the `hermes-os` CLI (hotkeys), or relayed between surfaces. */
+/** A command delivered to a surface: from the `herald-os` CLI (hotkeys), or relayed between surfaces. */
 export interface ShellCommand {
   type: string
   args?: string[]
@@ -346,7 +346,7 @@ export interface WebOpenOptions {
   root?: string
 }
 
-/** Main -> renderer: lifecycle of one embedded web view (`window.hermesOS.web`). */
+/** Main -> renderer: lifecycle of one embedded web view (`window.heraldOS.web`). */
 export type WebViewEvent =
   | { id: string; type: 'title'; title: string }
   | { id: string; type: 'url'; url: string }
@@ -377,125 +377,125 @@ export interface EnvInfo {
 
 /** Channel names, table-driven so preload and main cannot drift. */
 export const IPC = {
-  backendGetState: 'hermes-os:backend:get-state',
-  backendState: 'hermes-os:backend:state',
-  backendRestart: 'hermes-os:backend:restart',
-  backendRest: 'hermes-os:backend:rest',
-  backendLogTail: 'hermes-os:backend:log-tail',
+  backendGetState: 'herald-os:backend:get-state',
+  backendState: 'herald-os:backend:state',
+  backendRestart: 'herald-os:backend:restart',
+  backendRest: 'herald-os:backend:rest',
+  backendLogTail: 'herald-os:backend:log-tail',
 
-  systemInfo: 'hermes-os:system:info',
-  systemStats: 'hermes-os:system:stats',
-  systemStatsPush: 'hermes-os:system:stats-push',
-  systemStatsSubscribe: 'hermes-os:system:stats-subscribe',
-  systemProcesses: 'hermes-os:system:processes',
+  systemInfo: 'herald-os:system:info',
+  systemStats: 'herald-os:system:stats',
+  systemStatsPush: 'herald-os:system:stats-push',
+  systemStatsSubscribe: 'herald-os:system:stats-subscribe',
+  systemProcesses: 'herald-os:system:processes',
 
-  appsList: 'hermes-os:apps:list',
-  appsLaunch: 'hermes-os:apps:launch',
-  appsIcon: 'hermes-os:apps:icon',
+  appsList: 'herald-os:apps:list',
+  appsLaunch: 'herald-os:apps:launch',
+  appsIcon: 'herald-os:apps:icon',
 
-  fsHome: 'hermes-os:fs:home',
-  fsReadDir: 'hermes-os:fs:read-dir',
-  fsReadFile: 'hermes-os:fs:read-file',
-  fsReveal: 'hermes-os:fs:reveal',
-  fsOpenPath: 'hermes-os:fs:open-path',
-  fsOpenIn: 'hermes-os:fs:open-in',
-  fsRecent: 'hermes-os:fs:recent',
+  fsHome: 'herald-os:fs:home',
+  fsReadDir: 'herald-os:fs:read-dir',
+  fsReadFile: 'herald-os:fs:read-file',
+  fsReveal: 'herald-os:fs:reveal',
+  fsOpenPath: 'herald-os:fs:open-path',
+  fsOpenIn: 'herald-os:fs:open-in',
+  fsRecent: 'herald-os:fs:recent',
   /** Find files by name under the home folder (Spotlight on macOS). */
-  fsFind: 'hermes-os:fs:find',
-  fsThumbnail: 'hermes-os:fs:thumbnail',
-  fsImageInfo: 'hermes-os:fs:image-info',
-  fsWriteText: 'hermes-os:fs:write-text',
-  fsMkdir: 'hermes-os:fs:mkdir',
-  fsRename: 'hermes-os:fs:rename',
-  fsTrash: 'hermes-os:fs:trash',
-  fsExportPdf: 'hermes-os:fs:export-pdf',
-  fsPickFiles: 'hermes-os:fs:pick-files',
-  fsDirSize: 'hermes-os:fs:dir-size',
+  fsFind: 'herald-os:fs:find',
+  fsThumbnail: 'herald-os:fs:thumbnail',
+  fsImageInfo: 'herald-os:fs:image-info',
+  fsWriteText: 'herald-os:fs:write-text',
+  fsMkdir: 'herald-os:fs:mkdir',
+  fsRename: 'herald-os:fs:rename',
+  fsTrash: 'herald-os:fs:trash',
+  fsExportPdf: 'herald-os:fs:export-pdf',
+  fsPickFiles: 'herald-os:fs:pick-files',
+  fsDirSize: 'herald-os:fs:dir-size',
   /** A bounded recursive listing of a project folder (build output and dependencies skipped). */
-  fsListTree: 'hermes-os:fs:list-tree',
-  fsWatchTree: 'hermes-os:fs:watch-tree',
-  fsUnwatchTree: 'hermes-os:fs:unwatch-tree',
+  fsListTree: 'herald-os:fs:list-tree',
+  fsWatchTree: 'herald-os:fs:watch-tree',
+  fsUnwatchTree: 'herald-os:fs:unwatch-tree',
   /** Main -> renderer: `TreeChangedEvent`. */
-  fsTreeChanged: 'hermes-os:fs:tree-changed',
+  fsTreeChanged: 'herald-os:fs:tree-changed',
 
-  systemNetwork: 'hermes-os:system:network',
-  calendarToday: 'hermes-os:calendar:today',
+  systemNetwork: 'herald-os:system:network',
+  calendarToday: 'herald-os:calendar:today',
 
-  terminalCreate: 'hermes-os:terminal:create',
-  terminalWrite: 'hermes-os:terminal:write',
-  terminalResize: 'hermes-os:terminal:resize',
-  terminalDispose: 'hermes-os:terminal:dispose',
-  terminalData: 'hermes-os:terminal:data',
-  terminalExit: 'hermes-os:terminal:exit',
+  terminalCreate: 'herald-os:terminal:create',
+  terminalWrite: 'herald-os:terminal:write',
+  terminalResize: 'herald-os:terminal:resize',
+  terminalDispose: 'herald-os:terminal:dispose',
+  terminalData: 'herald-os:terminal:data',
+  terminalExit: 'herald-os:terminal:exit',
 
-  notifyNative: 'hermes-os:notify:native',
+  notifyNative: 'herald-os:notify:native',
 
-  windowState: 'hermes-os:window:state',
-  windowGetState: 'hermes-os:window:get-state',
-  windowToggleFullscreen: 'hermes-os:window:toggle-fullscreen',
-  windowQuit: 'hermes-os:window:quit',
+  windowState: 'herald-os:window:state',
+  windowGetState: 'herald-os:window:get-state',
+  windowToggleFullscreen: 'herald-os:window:toggle-fullscreen',
+  windowQuit: 'herald-os:window:quit',
 
-  shellOpenExternal: 'hermes-os:shell:open-external',
+  shellOpenExternal: 'herald-os:shell:open-external',
 
-  // Embedded web views: http(s) pages rendered inside a Hermes OS window, never the system browser.
+  // Embedded web views: http(s) pages rendered inside a Herald OS window, never the system browser.
   /** Perform an `EditAction` in this window (or in one of its web views). */
-  editAction: 'hermes-os:edit:action',
-  webOpen: 'hermes-os:web:open',
+  editAction: 'herald-os:edit:action',
+  webOpen: 'herald-os:web:open',
   /** Show a local file (PDF, image, text, media) in a locked-down viewer view. */
-  webOpenFile: 'hermes-os:web:open-file',
-  webSetBounds: 'hermes-os:web:set-bounds',
-  webClose: 'hermes-os:web:close',
+  webOpenFile: 'herald-os:web:open-file',
+  webSetBounds: 'herald-os:web:set-bounds',
+  webClose: 'herald-os:web:close',
   /** Studio preview: a web page or a file inside the project folder. */
-  webOpenPreview: 'hermes-os:web:open-preview',
-  webNavigate: 'hermes-os:web:navigate',
-  webReload: 'hermes-os:web:reload',
+  webOpenPreview: 'herald-os:web:open-preview',
+  webNavigate: 'herald-os:web:navigate',
+  webReload: 'herald-os:web:reload',
   /** Main -> renderer: title/url/loading changes and `closed`. */
-  webEvent: 'hermes-os:web:event',
+  webEvent: 'herald-os:web:event',
 
-  prefsGet: 'hermes-os:prefs:get',
-  prefsSet: 'hermes-os:prefs:set',
-  prefsChanged: 'hermes-os:prefs:changed',
+  prefsGet: 'herald-os:prefs:get',
+  prefsSet: 'herald-os:prefs:set',
+  prefsChanged: 'herald-os:prefs:changed',
 
-  bridgePolicyRead: 'hermes-os:bridge:policy-read',
-  bridgePolicyWrite: 'hermes-os:bridge:policy-write',
-  bridgeAuditRead: 'hermes-os:bridge:audit-read',
+  bridgePolicyRead: 'herald-os:bridge:policy-read',
+  bridgePolicyWrite: 'herald-os:bridge:policy-write',
+  bridgeAuditRead: 'herald-os:bridge:audit-read',
 
-  envInfo: 'hermes-os:env:info',
+  envInfo: 'herald-os:env:info',
 
   // OS control: main asks the Hermes window to run a registry command (from the control socket /
   // the agent's os_ui tool) and the window replies.
-  osControlRequest: 'hermes-os:os-control:request',
-  osControlReply: 'hermes-os:os-control:reply',
+  osControlRequest: 'herald-os:os-control:request',
+  osControlReply: 'herald-os:os-control:reply',
 
   // Voice: microphone permission, tokenized audio WebSocket URLs, the global hotkey.
-  voiceRequestMicrophone: 'hermes-os:voice:request-microphone',
-  voiceMicrophoneStatus: 'hermes-os:voice:microphone-status',
-  voiceAudioWsUrl: 'hermes-os:voice:audio-ws-url',
+  voiceRequestMicrophone: 'herald-os:voice:request-microphone',
+  voiceMicrophoneStatus: 'herald-os:voice:microphone-status',
+  voiceAudioWsUrl: 'herald-os:voice:audio-ws-url',
   /** Main -> renderer: the global voice hotkey was pressed. */
-  voiceHotkey: 'hermes-os:voice:hotkey',
+  voiceHotkey: 'herald-os:voice:hotkey',
 
   // Panels mode: surfaces, cross-window relay, compositor state.
-  shellOpen: 'hermes-os:shell:open',
-  shellClose: 'hermes-os:shell:close',
-  shellRelay: 'hermes-os:shell:relay',
-  shellCommand: 'hermes-os:shell:command',
-  shellResize: 'hermes-os:shell:resize',
-  shellWallpaperFrame: 'hermes-os:shell:wallpaper-frame',
-  wmGetState: 'hermes-os:wm:get-state',
-  wmState: 'hermes-os:wm:state',
-  wmAction: 'hermes-os:wm:action',
+  shellOpen: 'herald-os:shell:open',
+  shellClose: 'herald-os:shell:close',
+  shellRelay: 'herald-os:shell:relay',
+  shellCommand: 'herald-os:shell:command',
+  shellResize: 'herald-os:shell:resize',
+  shellWallpaperFrame: 'herald-os:shell:wallpaper-frame',
+  wmGetState: 'herald-os:wm:get-state',
+  wmState: 'herald-os:wm:state',
+  wmAction: 'herald-os:wm:action',
 
   // Phase 2: system services reachable from any surface.
-  /** Run a `hermes-os` CLI command (install, reminder, notice, ocr, …); resolves with its output. */
-  shellHermesOs: 'hermes-os:shell:hermes-os',
+  /** Run a `herald-os` CLI command (install, reminder, notice, ocr, …); resolves with its output. */
+  shellHeraldOs: 'herald-os:shell:herald-os',
   /** Power actions: suspend | reboot | poweroff | logout | lock. */
-  shellPower: 'hermes-os:shell:power',
+  shellPower: 'herald-os:shell:power',
   /** Clipboard history (cliphist): list entries / paste one back to the clipboard. */
-  clipboardHistory: 'hermes-os:clipboard:history',
-  clipboardPaste: 'hermes-os:clipboard:paste',
+  clipboardHistory: 'herald-os:clipboard:history',
+  clipboardPaste: 'herald-os:clipboard:paste',
   /** Desktop notifications from other apps (org.freedesktop.Notifications), pushed to the Hermes window. */
-  notificationsIncoming: 'hermes-os:notifications:incoming',
-  notificationsAction: 'hermes-os:notifications:action'
+  notificationsIncoming: 'herald-os:notifications:incoming',
+  notificationsAction: 'herald-os:notifications:action'
 } as const
 
 export type PowerAction = 'suspend' | 'reboot' | 'poweroff' | 'logout' | 'lock'
@@ -521,7 +521,7 @@ export interface IncomingNotification {
   expireTimeout: number
 }
 
-export interface HermesOsResult {
+export interface HeraldOsResult {
   code: number
   stdout: string
   stderr: string

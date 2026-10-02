@@ -60,7 +60,7 @@ export function OverviewComposer({ disabled, placeholder, onSubmit, className }:
     setPicking(true)
 
     try {
-      const paths = await window.hermesOS.fs.pickFiles({ multiple: true })
+      const paths = await window.heraldOS.fs.pickFiles({ multiple: true })
 
       if (paths.length > 0) {
         setValue(current => `${current.trimEnd()}${current.trim() ? '\n' : ''}Attached: ${paths.join(', ')}`)

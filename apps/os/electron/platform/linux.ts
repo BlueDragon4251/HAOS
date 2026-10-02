@@ -787,7 +787,7 @@ export class LinuxPlatform implements HostPlatform {
         return
       }
       case 'terminal':
-        // Hermes OS ships its own terminal; there is no portable "the" terminal on Linux to hand off to.
+        // Herald OS ships its own terminal; there is no portable "the" terminal on Linux to hand off to.
         throw new HostNotSupported('external terminal')
     }
   }

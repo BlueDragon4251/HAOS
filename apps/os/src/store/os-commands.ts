@@ -4,7 +4,7 @@ import type { PageId } from '../app/apps.ts'
 /*
  * The OS command registry: every user-visible thing the shell can do, as a named command with typed
  * arguments, a permission tier and a result the caller can speak or show. The command bar, the voice
- * fast path, the `hermes-os` CLI / control socket and the agent's `os_ui` tool all call `runCommand`,
+ * fast path, the `herald-os` CLI / control socket and the agent's `os_ui` tool all call `runCommand`,
  * so a feature exists for voice the moment it registers here (DESIGN.md rule).
  */
 

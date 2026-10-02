@@ -8,8 +8,8 @@ import { $applicationsOpen, $commandBarOpen } from './surface.ts'
 import { $windows, type Bounds, closeWindow, focusWindow, openApp, retitleWindow } from './windows.ts'
 
 /*
- * Web pages inside Hermes OS. A web window is a native view main layers over the shell
- * (`window.hermesOS.web`), framed by a floating `web` Hermes window whose content rect it follows.
+ * Web pages inside Herald OS. A web window is a native view main layers over the shell
+ * (`window.heraldOS.web`), framed by a floating `web` Hermes window whose content rect it follows.
  * The shell never sends the user to the system browser for something it can host itself; the
  * provider sign-in is the first such page. Panels mode has no desktop window to layer over, so
  * there main opens a compositor window and no floating frame exists.
@@ -101,26 +101,26 @@ function bind(): void {
   }
 
   bound = true
-  window.hermesOS.web.onEvent(onEvent)
+  window.heraldOS.web.onEvent(onEvent)
   // The frame owns the page: once the window manager drops the frame, the view goes too.
   $windows.subscribe(windows => {
     for (const entry of Object.values($webWindows.get())) {
       if (entry.windowId && !windows[entry.windowId]) {
         remove(entry.id)
-        void window.hermesOS.web.close(entry.id).catch(() => undefined)
+        void window.heraldOS.web.close(entry.id).catch(() => undefined)
       }
     }
   })
 }
 
-/** Open an http(s) page in a Hermes OS window; resolves with the web window id. */
+/** Open an http(s) page in a Herald OS window; resolves with the web window id. */
 export async function openWebWindow(url: string, options: OpenWebWindowOptions = {}): Promise<string> {
   if (!isWebUrl(url)) {
-    throw new Error('Only http(s) pages can open in a Hermes OS window.')
+    throw new Error('Only http(s) pages can open in a Herald OS window.')
   }
 
   bind()
-  const id = await window.hermesOS.web.open(url, { title: options.title })
+  const id = await window.heraldOS.web.open(url, { title: options.title })
   const title = options.title ?? new URL(url).host
   const windowId = isPanels ? null : openApp('web', { payload: { viewId: id, url }, title, bounds: options.bounds, singleton: false })
   $webWindows.set({ ...$webWindows.get(), [id]: { id, windowId, url, title, fixedTitle: Boolean(options.title), loading: true } })
@@ -128,11 +128,11 @@ export async function openWebWindow(url: string, options: OpenWebWindowOptions =
   return id
 }
 
-/** Show a local file (PDF, image, text, media) in a Hermes OS window; resolves with the view id. */
+/** Show a local file (PDF, image, text, media) in a Herald OS window; resolves with the view id. */
 export async function openFileWindow(filePath: string, options: OpenWebWindowOptions = {}): Promise<string> {
   bind()
   const title = options.title ?? filePath.split('/').pop() ?? filePath
-  const id = await window.hermesOS.web.openFile(filePath, { title })
+  const id = await window.heraldOS.web.openFile(filePath, { title })
   const url = `file://${filePath}`
   const windowId = isPanels ? null : openApp('web', { payload: { viewId: id, url }, title, bounds: options.bounds, singleton: false })
   $webWindows.set({ ...$webWindows.get(), [id]: { id, windowId, url, title, fixedTitle: true, loading: true } })
@@ -152,7 +152,7 @@ export function closeWebWindow(id: string): void {
     closeWindow(entry.windowId)
   } else {
     remove(id)
-    void window.hermesOS.web.close(id).catch(() => undefined)
+    void window.heraldOS.web.close(id).catch(() => undefined)
   }
 }
 

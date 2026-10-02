@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot Hermes OS Linux in QEMU (Apple Hypervisor) from the terminal. This is the scriptable twin of
+# Boot Herald OS Linux in QEMU (Apple Hypervisor) from the terminal. This is the scriptable twin of
 # the UTM setup in linux/README.md: same qcow2 image, same seed, same SSH port, so everything in
 # linux/dev/ works against either.
 #
@@ -15,7 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$HERE/build"
 VERSION="${FEDORA_VERSION:-44}"
 BASE="$BUILD/fedora-cloud-${VERSION}-aarch64.qcow2"
-DISK="$BUILD/hermes-os.qcow2"
+DISK="$BUILD/herald-os.qcow2"
 SEED="$BUILD/cidata.iso"
 EFI_CODE="$(brew --prefix 2>/dev/null || echo /opt/homebrew)/share/qemu/edk2-aarch64-code.fd"
 EFI_VARS_SRC="$(dirname "$EFI_CODE")/edk2-arm-vars.fd"
@@ -23,14 +23,14 @@ EFI_VARS="$BUILD/efivars.fd"
 PIDFILE="$BUILD/qemu.pid"
 SERIAL="$BUILD/serial.log"
 MONITOR="$BUILD/monitor.sock"
-SSH_PORT="${HERMES_VM_PORT:-2222}"
+SSH_PORT="${HERALD_VM_PORT:-${HERMES_VM_PORT:-2222}}"
 CPUS="${CPUS:-4}"
 MEM="${MEM:-8192}"
 DISK_SIZE="${DISK_SIZE:-64G}"
 # Guest framebuffer. The Cocoa window shows guest pixels 1:1 with the Mac's device pixels, so the
 # default fills the main display's width and leaves room for the menu bar and title bar (72 points,
-# 144 pixels on Retina). Pair a Retina-sized guest with HERMES_OS_SCALE=2 in
-# ~/.config/hermes-os/session.env (and `scale 2` in ~/.config/niri/local.kdl) so text stays crisp.
+# 144 pixels on Retina). Pair a Retina-sized guest with HERALD_OS_SCALE=2 in
+# ~/.config/herald-os/session.env (and `scale 2` in ~/.config/niri/local.kdl) so text stays crisp.
 DISPLAY_RES="$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Main Display: Yes/{main=1} /Resolution:/{res=$2" "$4} main && res{print res; exit}')"
 [[ -n "$DISPLAY_RES" ]] || DISPLAY_RES="$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Resolution:/{print $2" "$4; exit}')"
 read -r DISPLAY_W DISPLAY_H <<<"${DISPLAY_RES:-2048 1424}"
@@ -94,7 +94,7 @@ echo "==> Starting QEMU (ssh -p $SSH_PORT -i $BUILD/id_hermes hermes@127.0.0.1)"
 # it in its own session (perl setsid; macOS has no setsid binary) so closing this terminal or a
 # parent process group does not take the VM down.
 perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- qemu-system-aarch64 \
-  -name hermes-os \
+  -name herald-os \
   -machine virt,highmem=on \
   -accel hvf \
   -cpu host \

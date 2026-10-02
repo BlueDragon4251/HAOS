@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { IconCheck, IconChevronDown, IconRefresh } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WmWorkspace } from '../../../shared/ipc.ts'
-import { HermesAvatar } from '../../components/app-icon.tsx'
+import { HeraldLogo } from '../../components/herald-logo.tsx'
 import { cn } from '../../lib/cn.ts'
 import { $wm, onShellCommand, openSurface, relayToMain, wmAction } from '../../store/shell.ts'
 import { $activeSpace, $spaces, setActiveSpace } from '../../store/spaces.ts'
@@ -24,8 +24,8 @@ export function MenuBarSurface() {
   return (
     <header className="flex h-full w-full items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, rgba(3,10,40,.72), rgba(3,10,40,.42))' }}>
       <div className="flex min-w-0 items-center gap-2.5">
-        <HermesAvatar size={18} rounded={5} />
-        <span className="font-semibold">Hermes OS</span>
+        <HeraldLogo height={12} />
+        <span className="font-semibold">Herald OS</span>
         {title && (
           <>
             <span className="text-fg-4">·</span>
@@ -51,14 +51,14 @@ function openNotifications(): void {
   openSurface('main')
 }
 
-const UPDATE_KEY = 'hermes-os.update-available'
+const UPDATE_KEY = 'herald-os.update-available'
 
 interface UpdateAvailable {
   version: string
   checkedAt: number
 }
 
-/** The update service writes `{ version, checkedAt }` here when a newer Hermes OS exists; absent means up to date. */
+/** The update service writes `{ version, checkedAt }` here when a newer Herald OS exists; absent means up to date. */
 function readUpdateAvailable(): UpdateAvailable | null {
   try {
     const raw = localStorage.getItem(UPDATE_KEY)
@@ -75,7 +75,7 @@ function readUpdateAvailable(): UpdateAvailable | null {
   }
 }
 
-/** A circular-arrows glyph with an accent dot while an update is pending; clicking runs `hermes-os update` through the control menu. */
+/** A circular-arrows glyph with an accent dot while an update is pending; clicking runs `herald-os update` through the control menu. */
 function UpdateIndicator() {
   const [update, setUpdate] = useState<UpdateAvailable | null>(() => readUpdateAvailable())
 
@@ -89,7 +89,7 @@ function UpdateIndicator() {
     // Other windows fire `storage`; the same window (or a non-DOM writer) is covered by a slow poll.
     window.addEventListener('storage', onStorage)
     const timer = window.setInterval(refresh, 60_000)
-    // `hermes-os-update --check` reports through the control socket: [pendingCount, summary].
+    // `herald-os-update --check` reports through the control socket: [pendingCount, summary].
     const offCommand = onShellCommand(command => {
       if (command.type !== 'update-available') {
         return
@@ -120,9 +120,9 @@ function UpdateIndicator() {
   return (
     <button
       type="button"
-      aria-label={`Update available: Hermes OS ${update.version}`}
-      title={`Hermes OS ${update.version} is available`}
-      onClick={() => openSurface('command', { type: 'menu', args: ['update-hermes-os'] })}
+      aria-label={`Update available: Herald OS ${update.version}`}
+      title={`Herald OS ${update.version} is available`}
+      onClick={() => openSurface('command', { type: 'menu', args: ['update-herald-os'] })}
       className="relative flex size-6 items-center justify-center rounded-md hover:bg-white/10"
     >
       <IconRefresh size={15} />

@@ -1,8 +1,8 @@
-import type { HermesOSApi } from '../../preload/index.ts'
+import type { HeraldOSApi } from '../../preload/index.ts'
 
 declare global {
   interface Window {
-    hermesOS: HermesOSApi
+    heraldOS: HeraldOSApi
   }
 }
 

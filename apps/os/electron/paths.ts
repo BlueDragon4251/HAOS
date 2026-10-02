@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { osEnv } from './env.ts'
 
 /** Profile-aware Hermes home; mirrors upstream `get_hermes_home()` for the default profile. */
 export function hermesHome(): string {
@@ -16,12 +17,12 @@ export function hermesHome(): string {
   return path.join(os.homedir(), '.hermes')
 }
 
-export function hermesOsDataDir(): string {
-  return path.join(hermesHome(), 'hermes-os')
+export function heraldOsDataDir(): string {
+  return path.join(hermesHome(), 'herald-os')
 }
 
-export const isDev = process.env.HERMES_OS_BUILD_MODE === 'development' || Boolean(process.env.HERMES_OS_DEV_SERVER)
+export const isDev = process.env.HERALD_OS_BUILD_MODE === 'development' || Boolean(osEnv('DEV_SERVER'))
 
 export function devServerUrl(): string | undefined {
-  return process.env.HERMES_OS_DEV_SERVER
+  return osEnv('DEV_SERVER')
 }

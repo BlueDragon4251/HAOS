@@ -1,6 +1,6 @@
 # linux/
 
-Everything needed to run Hermes OS as the whole desktop of a Fedora machine (Stage 1: a VM on
+Everything needed to run Herald OS as the whole desktop of a Fedora machine (Stage 1: a VM on
 your Mac). Full guide: [docs/LINUX.md](../docs/LINUX.md).
 
 ```

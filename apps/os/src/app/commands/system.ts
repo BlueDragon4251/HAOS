@@ -1,4 +1,4 @@
-import type { HermesOSPrefs, VoiceEngine } from '../../../shared/ipc.ts'
+import type { HeraldOSPrefs, VoiceEngine } from '../../../shared/ipc.ts'
 import { $prefs, updatePrefs } from '../../store/backend.ts'
 import { $nativeApps, loadNativeApps } from '../../store/native-apps.ts'
 import { delegate, fail, ok, type OsCommand } from '../../store/os-commands.ts'
@@ -90,7 +90,7 @@ export const systemCommands: readonly OsCommand[] = [
         return fail(`No installed app called "${String(name)}".`)
       }
 
-      await window.hermesOS.apps.launch(app.path)
+      await window.heraldOS.apps.launch(app.path)
 
       return ok(`Launched ${app.name}`, { spoken: `Opening ${app.name}.`, data: { path: app.path } })
     }
@@ -98,7 +98,7 @@ export const systemCommands: readonly OsCommand[] = [
   {
     id: 'web.open',
     title: 'Open a web page',
-    description: 'Open a URL in a window inside Hermes OS.',
+    description: 'Open a URL in a window inside Herald OS.',
     tier: 'act',
     args: [
       { name: 'url', type: 'string', description: 'URL or domain (https is assumed)', required: true },
@@ -157,7 +157,7 @@ export const systemCommands: readonly OsCommand[] = [
     args: [{ name: 'theme', type: 'string', description: 'Theme name', required: true, enum: ['ocean', 'graphite'] }],
     phrases: ['set the theme to {theme}', 'switch to the {theme} theme', 'use the {theme} theme'],
     run: async ({ theme }) => {
-      await updatePrefs({ theme: theme as HermesOSPrefs['theme'] })
+      await updatePrefs({ theme: theme as HeraldOSPrefs['theme'] })
 
       return ok(`Theme set to ${String(theme)}`, { highlight: { kind: 'setting', id: 'appearance' } })
     }
@@ -170,7 +170,7 @@ export const systemCommands: readonly OsCommand[] = [
     args: [{ name: 'accent', type: 'string', description: 'Accent name', required: true, enum: ['blue', 'ice', 'violet'] }],
     phrases: ['set the accent to {accent}', 'make the accent {accent}', 'change the accent color to {accent}'],
     run: async ({ accent }) => {
-      await updatePrefs({ accent: accent as HermesOSPrefs['accent'] })
+      await updatePrefs({ accent: accent as HeraldOSPrefs['accent'] })
 
       return ok(`Accent set to ${String(accent)}`, { highlight: { kind: 'setting', id: 'appearance' } })
     }

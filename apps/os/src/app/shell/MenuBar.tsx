@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { IconBattery, IconBattery1, IconBattery2, IconBattery3, IconBattery4, IconBatteryCharging, IconBell, IconCheck, IconChevronDown, IconSearch, IconWifi, IconWifiOff } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
-import { HermesAvatar } from '../../components/app-icon.tsx'
+import { HeraldLogo } from '../../components/herald-logo.tsx'
 import { cn } from '../../lib/cn.ts'
 import { $backend } from '../../store/backend.ts'
 import { $connection } from '../../store/gateway.ts'
@@ -102,9 +102,9 @@ export function MenuBar() {
   return (
     <header className="drag-region absolute inset-x-0 top-0 z-(--z-menubar) flex h-(--menubar-h) items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, rgba(3,10,40,.55), rgba(3,10,40,.15))' }}>
       <div className="flex items-center gap-2.5 pl-[74px]">
-        <HermesAvatar size={18} rounded={5} />
-        <span className="font-semibold">Hermes OS</span>
-        {title !== 'Hermes OS' && (
+        <HeraldLogo height={12} />
+        <span className="font-semibold">Herald OS</span>
+        {title !== 'Herald OS' && (
           <>
             <span className="text-fg-4">·</span>
             <span className="text-fg-2">{title}</span>

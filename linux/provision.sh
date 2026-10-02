@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
-# Turn a stock Fedora Cloud install into Hermes OS Linux (Stage 1). Runs as root, idempotent.
+# Turn a stock Fedora Cloud install into Herald OS Linux (Stage 1). Runs as root, idempotent.
 # Invoked by cloud-init on first boot (see linux/vm/make-seed.sh); safe to re-run by hand:
 #
-#   sudo bash /usr/local/share/hermes-os-linux/provision.sh
+#   sudo bash /usr/local/share/herald-os-linux/provision.sh
 #
 # What it does:
 #   1. Installs the compositor (cage), greeter (greetd), audio, networking, Electron runtime libs,
 #      Node.js, and the CLI tools the Linux HostAdapter uses.
 #   2. Installs Hermes Agent for the `hermes` user at the pinned upstream revision.
-#   3. Installs the Hermes OS session and makes greetd auto-login straight into it.
-#   4. Builds the Hermes OS shell if the repo is reachable (shared folder or pushed copy).
+#   3. Installs the Herald OS session and makes greetd auto-login straight into it.
+#   4. Builds the Herald OS shell if the repo is reachable (shared folder or pushed copy).
 set -euo pipefail
 
 PAYLOAD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HERMES_USER="${HERMES_USER:-hermes}"
 HERMES_UID_HOME="$(getent passwd "$HERMES_USER" | cut -d: -f6)"
-STATE_DIR=/var/lib/hermes-os
-LOG=/var/log/hermes-os-provision.log
+STATE_DIR=/var/lib/herald-os
+LOG=/var/log/herald-os-provision.log
 
 mkdir -p "$STATE_DIR"
 exec > >(tee -a "$LOG") 2>&1
-echo "==> Hermes OS Linux provisioner $(date -Is) (payload $PAYLOAD)"
+echo "==> Herald OS Linux provisioner $(date -Is) (payload $PAYLOAD)"
 
-if [[ -f /etc/hermes-os/ref ]]; then
+if [[ -f /etc/herald-os/ref ]]; then
   # shellcheck disable=SC1091
-  source /etc/hermes-os/ref
+  source /etc/herald-os/ref
 fi
 HERMES_REF="${HERMES_REF:-main}"
 
@@ -58,7 +58,7 @@ PACKAGES=(
   grim python3-pyyaml socat
   # Phase 2 services: OCR, Flatpak software, boot splash.
   tesseract tesseract-langpack-eng flatpak plymouth plymouth-scripts plymouth-plugin-script
-  # Rescue terminal shown by hermes-os-session when the shell is not built.
+  # Rescue terminal shown by herald-os-session when the shell is not built.
   foot
   # A browser, a file manager and an editor so the Dock and `system_open` have real targets.
   firefox nautilus gnome-text-editor
@@ -79,20 +79,20 @@ systemctl enable sshd || true
 loginctl enable-linger "$HERMES_USER" || true
 
 # ---------------------------------------------------------------------------------------------
-step "Hermes OS session"
-install -m 0755 "$PAYLOAD/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
-install -m 0755 "$PAYLOAD/session/hermes-os-session" /usr/local/bin/hermes-os-session
-install -m 0755 "$PAYLOAD/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
-install -m 0755 "$PAYLOAD/bin/hermes-os" "$PAYLOAD/bin/hermes-os-theme" "$PAYLOAD/bin/hermes-os-omakase" "$PAYLOAD/bin/hermes-os-update" /usr/local/bin/
+step "Herald OS session"
+install -m 0755 "$PAYLOAD/session/herald-os-compositor" /usr/local/bin/herald-os-compositor
+install -m 0755 "$PAYLOAD/session/herald-os-session" /usr/local/bin/herald-os-session
+install -m 0755 "$PAYLOAD/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
+install -m 0755 "$PAYLOAD/bin/herald-os" "$PAYLOAD/bin/herald-os-theme" "$PAYLOAD/bin/herald-os-omakase" "$PAYLOAD/bin/herald-os-update" /usr/local/bin/
 # Themes and omakase lists for machines without the repo checked out.
-install -d /usr/local/share/hermes-os-linux/themes /usr/local/share/hermes-os-linux/omakase
-cp -R "$PAYLOAD"/themes/. /usr/local/share/hermes-os-linux/themes/
-cp -R "$PAYLOAD"/omakase/. /usr/local/share/hermes-os-linux/omakase/
+install -d /usr/local/share/herald-os-linux/themes /usr/local/share/herald-os-linux/omakase
+cp -R "$PAYLOAD"/themes/. /usr/local/share/herald-os-linux/themes/
+cp -R "$PAYLOAD"/omakase/. /usr/local/share/herald-os-linux/omakase/
 # Daily update check (user timer) and the default theme.
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/systemd/user"
-install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/hermes-os-update-check.service" "$PAYLOAD/session/hermes-os-update-check.timer" "$HERMES_UID_HOME/.config/systemd/user/"
-sudo -u "$HERMES_USER" -H env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable hermes-os-update-check.timer 2>/dev/null || true
-sudo -u "$HERMES_USER" -H hermes-os-theme set "$(sudo -u "$HERMES_USER" -H hermes-os-theme current)" || true
+install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/herald-os-update-check.service" "$PAYLOAD/session/herald-os-update-check.timer" "$HERMES_UID_HOME/.config/systemd/user/"
+sudo -u "$HERMES_USER" -H env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
+sudo -u "$HERMES_USER" -H herald-os-theme set "$(sudo -u "$HERMES_USER" -H herald-os-theme current)" || true
 # niri config for the session user (managed copy; local.kdl is the user's).
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri" "$HERMES_UID_HOME/.config/swaylock"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
@@ -101,11 +101,11 @@ install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/swaylock.c
 # ---------------------------------------------------------------------------------------------
 step "Boot splash (Plymouth) and Flathub"
 if command -v plymouth-set-default-theme >/dev/null; then
-  install -d /usr/share/plymouth/themes/hermes-os
-  install -m 0644 "$PAYLOAD"/plymouth/hermes-os/* /usr/share/plymouth/themes/hermes-os/
-  if [[ "$(plymouth-set-default-theme 2>/dev/null)" != "hermes-os" ]]; then
+  install -d /usr/share/plymouth/themes/herald-os
+  install -m 0644 "$PAYLOAD"/plymouth/herald-os/* /usr/share/plymouth/themes/herald-os/
+  if [[ "$(plymouth-set-default-theme 2>/dev/null)" != "herald-os" ]]; then
     # -R rebuilds the initramfs so the splash is available at boot (takes a minute).
-    plymouth-set-default-theme -R hermes-os || echo "WARNING: could not set the Plymouth theme"
+    plymouth-set-default-theme -R herald-os || echo "WARNING: could not set the Plymouth theme"
     # Show the splash instead of the console on boot.
     if command -v grubby >/dev/null; then
       grubby --update-kernel=ALL --args="rhgb quiet" || true
@@ -116,7 +116,7 @@ if command -v flatpak >/dev/null; then
   flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 fi
 install -d /usr/share/wayland-sessions
-install -m 0644 "$PAYLOAD/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
+install -m 0644 "$PAYLOAD/session/herald-os.desktop" /usr/share/wayland-sessions/herald-os.desktop
 install -d /etc/greetd
 install -m 0644 "$PAYLOAD/session/greetd-config.toml" /etc/greetd/config.toml
 sed -i "s/^user = .*/user = \"$HERMES_USER\"/" /etc/greetd/config.toml
@@ -125,10 +125,10 @@ systemctl enable greetd
 
 # Developer helpers for the hermes user. (`install -d` would create ~/.local as root; keep every
 # directory under the home owned by the session user or uv/npm fail later.)
-sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.local/bin" "$HERMES_UID_HOME/.local/share" "$HERMES_UID_HOME/.local/state" "$HERMES_UID_HOME/.config/hermes-os"
+sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.local/bin" "$HERMES_UID_HOME/.local/share" "$HERMES_UID_HOME/.local/state" "$HERMES_UID_HOME/.config/herald-os"
 chown -R "$HERMES_USER:$HERMES_USER" "$HERMES_UID_HOME/.local" "$HERMES_UID_HOME/.config"
 for f in build.sh sync.sh restart-shell.sh shot.sh; do
-  install -m 0755 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/dev/$f" "$HERMES_UID_HOME/.local/bin/hermes-os-${f%.sh}"
+  install -m 0755 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/dev/$f" "$HERMES_UID_HOME/.local/bin/herald-os-${f%.sh}"
 done
 
 # ---------------------------------------------------------------------------------------------
@@ -158,10 +158,10 @@ sudo -u "$HERMES_USER" -H bash -euo pipefail -c "
 "
 
 # ---------------------------------------------------------------------------------------------
-step "Hermes OS shell"
-REPO="$HERMES_UID_HOME/Hermes-OS"
-if mountpoint -q /mnt/hermes-os 2>/dev/null; then
-  echo "shared folder mounted at /mnt/hermes-os; syncing and building"
+step "Herald OS shell"
+REPO="$HERMES_UID_HOME/Herald-OS"
+if mountpoint -q /mnt/herald-os 2>/dev/null; then
+  echo "shared folder mounted at /mnt/herald-os; syncing and building"
   sudo -u "$HERMES_USER" -H bash "$PAYLOAD/dev/sync.sh" || echo "WARNING: shell build failed; see above"
 elif [[ -d "$REPO/apps/os" ]]; then
   echo "repo present at $REPO; building"
@@ -171,12 +171,12 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------
-step "Omakase software set (HERMES_OS_OMAKASE=0 to skip)"
-if [[ "${HERMES_OS_OMAKASE:-1}" == "1" ]]; then
-  hermes-os-omakase install --packages || echo "WARNING: omakase packages incomplete"
-  sudo -u "$HERMES_USER" -H hermes-os-omakase install --flatpaks || echo "WARNING: omakase flatpaks incomplete"
-  # Web apps need the shell's icon fetch; they are installed on first login by hermes-os-session.
+step "Omakase software set (HERALD_OS_OMAKASE=0 to skip)"
+if [[ "${HERALD_OS_OMAKASE:-1}" == "1" ]]; then
+  herald-os-omakase install --packages || echo "WARNING: omakase packages incomplete"
+  sudo -u "$HERMES_USER" -H herald-os-omakase install --flatpaks || echo "WARNING: omakase flatpaks incomplete"
+  # Web apps need the shell's icon fetch; they are installed on first login by herald-os-session.
 fi
 
 date -Is >"$STATE_DIR/provisioned"
-echo "==> Provisioning complete. greetd will start Hermes OS on the next boot (or: systemctl start greetd)."
+echo "==> Provisioning complete. greetd will start Herald OS on the next boot (or: systemctl start greetd)."

@@ -2,7 +2,7 @@
 @import '@xterm/xterm/css/xterm.css';
 
 /*
- * Hermes OS design tokens: deep-blue glass on a living wallpaper.
+ * Herald OS design tokens: deep-blue glass on a living wallpaper.
  * One source per concern; components reference tokens, never literals.
  */
 @theme {

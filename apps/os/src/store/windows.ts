@@ -35,7 +35,7 @@ export const $page = atom<PageId>('overview')
 /** Menu-bar title: the focused window's title. */
 export const $focusedTitle = computed([$windows, $focusedWindowId, $page], (windows, id, page) => {
   if (!id || !windows[id]) {
-    return 'Hermes OS'
+    return 'Herald OS'
   }
 
   return id === MAIN_WINDOW_ID ? appById(page).name : windows[id].title
@@ -133,7 +133,7 @@ export function showPage(page: PageId): void {
   // Panels mode: only the Hermes window renders pages; other surfaces ask it (and the compositor focuses it).
   if (isPanels && !isMainSurface) {
     relayToMain({ type: 'show-page', args: [page] })
-    window.hermesOS.shell.open('main').catch(() => undefined)
+    window.heraldOS.shell.open('main').catch(() => undefined)
 
     return
   }
@@ -183,7 +183,7 @@ export function openApp(appId: HermesAppId, options: { payload?: Record<string, 
 
   // Panels mode: floating Hermes apps are real compositor windows, one Electron window each.
   if (isPanels) {
-    window.hermesOS.shell.open(`window:${appId}`, options.payload ? { type: 'payload', payload: options.payload } : undefined).catch(() => undefined)
+    window.heraldOS.shell.open(`window:${appId}`, options.payload ? { type: 'payload', payload: options.payload } : undefined).catch(() => undefined)
 
     return `window:${appId}`
   }

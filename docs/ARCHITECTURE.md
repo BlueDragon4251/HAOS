@@ -1,6 +1,6 @@
-# Hermes OS Architecture
+# Herald OS Architecture
 
-Hermes OS is an agent-native desktop environment. It runs on top of macOS (Apple Silicon first)
+Herald OS is an agent-native desktop environment. It runs on top of macOS (Apple Silicon first)
 and makes Hermes Agent the primary interface between the user and the computer. It is a separate
 product from Hermes Desktop: it consumes the upstream Hermes runtime unchanged and grows its own
 shell on top.
@@ -16,7 +16,7 @@ The same seam rules upstream Hermes Desktop uses apply here:
 | Hermes runtime | The work: sessions, model calls, tools, skills, memory, cron, approvals | the user's Hermes install (`$HERMES_HOME/hermes-agent`) |
 
 The renderer never touches Node or Electron directly; native power arrives through a narrow,
-typed preload bridge (`window.hermesOS`). Agent behaviour is never re-implemented in React.
+typed preload bridge (`window.heraldOS`). Agent behaviour is never re-implemented in React.
 
 ```mermaid
 flowchart LR
@@ -29,10 +29,10 @@ flowchart LR
   subgraph runtime [Hermes runtime in HERMES_HOME]
     Serve["hermes serve (JSON-RPC + REST)"]
     Agent[AIAgent, tools, skills, memory]
-    Bridge[hermes-os-bridge plugin]
+    Bridge[herald-os-bridge plugin]
     Serve --> Agent --> Bridge
   end
-  Renderer -->|"WebSocket JSON-RPC (@hermes-os/client)"| Serve
+  Renderer -->|"WebSocket JSON-RPC (@herald-os/client)"| Serve
   Main -->|"REST with session token"| Serve
   Bridge -->|"request_tool_approval"| Serve
   Bridge -->|"mdfind, open, lsof, ps, osascript"| macOS[(macOS)]
@@ -44,9 +44,9 @@ flowchart LR
 Both seams (`HostPlatform` in Electron main, `HostAdapter` in the bridge plugin) are implemented per
 host. The renderer and the agent see identical tool names and return shapes on every platform.
 
-| | macOS | Linux (Hermes OS Linux) | Windows |
+| | macOS | Linux (Herald OS Linux) | Windows |
 | --- | --- | --- | --- |
-| Shell runs as | fullscreen app over the macOS desktop | the whole session: `greetd` -> `cage` -> shell (`HERMES_OS_KIOSK=1`) | stub |
+| Shell runs as | fullscreen app over the macOS desktop | the whole session: `greetd` -> `cage` -> shell (`HERALD_OS_KIOSK=1`) | stub |
 | `HostPlatform` | `platform/darwin.ts` (`plutil`, `sips`, `qlmanage`, `mdfind`, EventKit JXA) | `platform/linux.ts` (`/proc`, `.desktop` entries, icon themes, `nmcli`, `recently-used.xbel`, GNOME thumbnail cache) | `platform/generic.ts` |
 | `HostAdapter` | `host/darwin.py` (`osascript`, `lsof`, `mdfind`, `system_profiler`, `pmset`) | `host/linux.py` (`ps`, `ss`, `plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`, `gsettings`, `journalctl`, `loginctl`) | `host/windows.py` stub |
 | App launch / reveal | `shell.openPath` / `showItemInFolder` | `gio launch <.desktop>` / `org.freedesktop.FileManager1` | |
@@ -57,10 +57,10 @@ Setup, session model and dev loop for Linux: `docs/LINUX.md`.
 ## Backend lifecycle
 
 1. Resolve a runtime through an ordered ladder (`apps/os/electron/backend/resolve.ts`):
-   `HERMES_OS_HERMES_ROOT` -> `$HERMES_HOME/hermes-agent` managed install (its `venv/bin/python`)
+   `HERALD_OS_HERMES_ROOT` -> `$HERMES_HOME/hermes-agent` managed install (its `venv/bin/python`)
    -> `hermes` on `PATH`. Each candidate is probed before use.
 2. Spawn `hermes serve --host 127.0.0.1 --port 0` with `HERMES_DASHBOARD_SESSION_TOKEN` (random per
-   launch), `HERMES_OS=1`, and `HERMES_HOME`.
+   launch), `HERALD_OS=1`, and `HERMES_HOME`.
 3. Read `HERMES_BACKEND_READY port=N` from stdout, then poll `GET /api/status` with
    `X-Hermes-Session-Token` until it answers.
 4. Hand `{ wsUrl, baseUrl }` to the renderer. The renderer dials `ws://127.0.0.1:N/api/ws?token=...`
@@ -72,11 +72,11 @@ Setup, session model and dev loop for Linux: `docs/LINUX.md`.
 ## Wire contract
 
 The wire is declared in Python (`tui_gateway/contracts`) and generated into
-`apps/shared/src/gateway-contract.generated.ts` upstream. Hermes OS re-exports that file through
+`apps/shared/src/gateway-contract.generated.ts` upstream. Herald OS re-exports that file through
 `packages/hermes-client`, so a field the backend stops sending fails `tsc` here instead of drifting.
 
-Sessions are created with `source: "hermes_os"`. Upstream only folds Desktop-only GUI tools into
-sessions whose source is `desktop`, so a Hermes OS session never receives tools whose client half
+Sessions are created with `source: "herald_os"`. Upstream only folds Desktop-only GUI tools into
+sessions whose source is `desktop`, so a Herald OS session never receives tools whose client half
 lives in Hermes Desktop.
 
 Server-to-client requests the shell answers: `approval`, `clarify`, `sudo`, `secret`. Anything else
@@ -91,8 +91,8 @@ global command bar (`Cmd+K`). Surfaces subscribe to small nanostores; shared sto
 
 ## System bridge
 
-`plugins/hermes-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset
-(`hermes_os`) that exposes the host machine through explicit, permission-tiered tools. Execution
+`plugins/herald-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset
+(`herald_os`) that exposes the host machine through explicit, permission-tiered tools. Execution
 happens on the backend host behind a `HostAdapter` abstraction (`darwin` implemented; `windows`
 and `linux` are stubs). Sensitive operations route through upstream's own approval gate
 (`tools.approval.request_tool_approval`) so the shell renders one approval card for everything.
@@ -101,9 +101,9 @@ See `SYSTEM-BRIDGE.md`.
 ## Upstream compatibility
 
 - The Python runtime is never forked: it is whatever `hermes update` installs.
-- Only `apps/shared/src` is compiled into Hermes OS, from a pinned snapshot
+- Only `apps/shared/src` is compiled into Herald OS, from a pinned snapshot
   (`upstream/UPSTREAM.lock`, fetched by `scripts/sync-upstream.sh`).
 - The plugin uses only public plugin APIs (`register`, `ctx.register_tool`, `ctx.register_skill`,
   `tools.approval.request_tool_approval`).
-- Anything Hermes OS needs from core that does not exist yet (for example a generic plugin
+- Anything Herald OS needs from core that does not exist yet (for example a generic plugin
   server-request hook for client-side execution) is proposed upstream rather than patched locally.

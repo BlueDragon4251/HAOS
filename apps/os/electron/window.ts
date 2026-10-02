@@ -1,16 +1,25 @@
-import { BrowserWindow, screen, shell } from 'electron'
+import { app, BrowserWindow, screen, shell } from 'electron'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { HermesOSPrefs } from '../shared/ipc.ts'
+import type { HeraldOSPrefs } from '../shared/ipc.ts'
+import { osEnv } from './env.ts'
 import { devServerUrl } from './paths.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-export function createMainWindow(prefs: HermesOSPrefs): BrowserWindow {
+/** The Herald icon: the 1024 px source in a checkout, the renderer's 256 px copy in a package. */
+export function appIconPath(): string | undefined {
+  const root = app.getAppPath()
+
+  return [path.join(root, 'build', 'icon.png'), path.join(root, 'dist', 'renderer', 'brand', 'herald-icon.png')].find(file => fs.existsSync(file))
+}
+
+export function createMainWindow(prefs: HeraldOSPrefs): BrowserWindow {
   const { workAreaSize } = screen.getPrimaryDisplay()
-  // Hermes OS Linux: the shell is the whole session (cage hands it the only output). Kiosk mode
+  // Herald OS Linux: the shell is the whole session (cage hands it the only output). Kiosk mode
   // removes every escape hatch a window manager would normally offer.
-  const kiosk = process.env.HERMES_OS_KIOSK === '1'
+  const kiosk = osEnv('KIOSK') === '1'
   const darwin = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: workAreaSize.width,
@@ -20,16 +29,16 @@ export function createMainWindow(prefs: HermesOSPrefs): BrowserWindow {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    // Hermes OS is its own environment: launch fullscreen on its own Space. `simpleFullscreen`
+    // Herald OS is its own environment: launch fullscreen on its own Space. `simpleFullscreen`
     // keeps the menu bar hidden without the macOS fullscreen animation on every toggle.
-    // HERMES_OS_WINDOWED=1 is a developer escape hatch for automated runs and screenshots.
-    fullscreen: kiosk || (prefs.fullscreenOnLaunch && !process.env.HERMES_OS_WINDOWED),
+    // HERALD_OS_WINDOWED=1 is a developer escape hatch for automated runs and screenshots.
+    fullscreen: kiosk || (prefs.fullscreenOnLaunch && !osEnv('WINDOWED')),
     kiosk,
     simpleFullscreen: false,
     fullscreenable: true,
     backgroundColor: '#07080a',
     // Window vibrancy exists only on macOS; Electron ignores it elsewhere but keep main honest.
-    ...(darwin ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const } : {}),
+    ...(darwin ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const } : { icon: appIconPath() }),
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),
       contextIsolation: true,
@@ -66,7 +75,7 @@ export function createMainWindow(prefs: HermesOSPrefs): BrowserWindow {
 
   // HiDPI on compositors that expose the output at scale 1 (cage in Stage 1): zoom the page instead
   // of forcing Chromium's device scale factor, which would size Wayland buffers wrongly.
-  const zoom = Number(process.env.HERMES_OS_ZOOM)
+  const zoom = Number(osEnv('ZOOM'))
 
   if (Number.isFinite(zoom) && zoom > 0 && zoom !== 1) {
     const apply = () => win.webContents.setZoomFactor(zoom)

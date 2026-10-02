@@ -6,7 +6,7 @@ import { type CommandPhrase, type CommandSummary, listCommands, runCommand } fro
 import { SectionTitle, SettingsFilterContext } from './shared.tsx'
 
 /*
- * Everything Hermes OS can do by voice, generated from the command registry so it can never fall
+ * Everything Herald OS can do by voice, generated from the command registry so it can never fall
  * behind the code. Grouped by area; each command shows what to say (slots in angle quotes), what it
  * does, whether it asks first, and a Try button for commands that need no details.
  */
@@ -106,7 +106,7 @@ export function VoiceCommandsSection() {
     <>
       <SectionTitle
         title="Voice commands"
-        subtitle={`${commands.length} things Hermes OS can do. Press Alt+Space (or say "hey hermes") and say one of these; anything else goes to Hermes, who can use every command too.`}
+        subtitle={`${commands.length} things Herald OS can do. Press Alt+Space (or say "hey hermes") and say one of these; anything else goes to Hermes, who can use every command too.`}
       />
 
       <GlassCard className="settings-item flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-[12px] text-fg-2">

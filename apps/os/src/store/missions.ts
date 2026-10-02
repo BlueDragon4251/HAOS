@@ -1,8 +1,8 @@
-import type { GatewayEvent, SubagentEventPayload, ToolCompletePayload, ToolStartPayload } from '@hermes-os/client'
+import type { GatewayEvent, SubagentEventPayload, ToolCompletePayload, ToolStartPayload } from '@herald-os/client'
 import { atom, computed, map } from 'nanostores'
 import type { ChatState } from '../lib/chat-model.ts'
 import { $agents, type AgentActivity } from './agents.ts'
-import { $chats } from './chat.ts'
+import { $chats, SESSION_SOURCE } from './chat.ts'
 import { onAnyGatewayEvent } from './gateway.ts'
 import { $pendingRequests } from './requests.ts'
 import { $runtimeIds, $sessions } from './sessions.ts'
@@ -323,7 +323,7 @@ export const $missions = computed([$chats, $sessions, $runtimeIds, $todos, $arti
 
   for (const chat of Object.values(chats)) {
     if (!seenRuntime.has(chat.sessionId)) {
-      missions.push(buildMission(chat.storedSessionId, chat.sessionId, chat, chat.title, undefined, undefined, chat.messages.length, 'hermes_os', todos, artifacts, agents, pending, reviewed))
+      missions.push(buildMission(chat.storedSessionId, chat.sessionId, chat, chat.title, undefined, undefined, chat.messages.length, SESSION_SOURCE, todos, artifacts, agents, pending, reviewed))
     }
   }
 

@@ -132,7 +132,7 @@ export const studioCommands: readonly OsCommand[] = [
     run: async () => {
       // Panels mode: the Studio is its own compositor window.
       if (isPanels) {
-        await window.hermesOS.shell.close('window:studio')
+        await window.heraldOS.shell.close('window:studio')
 
         return ok('Closed the Studio')
       }

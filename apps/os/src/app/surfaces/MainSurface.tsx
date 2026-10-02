@@ -22,7 +22,7 @@ const ApplicationsOverlay = lazy(() => import('../apps/ApplicationsOverlay.tsx')
 
 /**
  * Panels mode: the Hermes window. niri tiles it like any other client, so it is just the sidebar and
- * pages filling the window plus the overlays that belong to it. Other surfaces and the `hermes-os` CLI
+ * pages filling the window plus the overlays that belong to it. Other surfaces and the `herald-os` CLI
  * drive it through `ShellCommand`s.
  */
 export function MainSurface() {

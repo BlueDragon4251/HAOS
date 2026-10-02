@@ -1,7 +1,7 @@
-// Hermes OS: niri compositor configuration.
+// Herald OS: niri compositor configuration.
 // Installed to ~/.config/niri/config.kdl by linux/dev/build.sh (managed; edits are overwritten).
 // Put machine-specific settings (output scale, extra binds) in ~/.config/niri/local.kdl, which
-// is included at the end and never touched by Hermes OS.
+// is included at the end and never touched by Herald OS.
 //
 // Reference: /usr/share/doc/niri/default-config.kdl and the niri wiki.
 
@@ -22,7 +22,7 @@ input {
     warp-mouse-to-focus
 }
 
-// Every window is a client of Hermes OS: no client-side decorations, Hermes draws the frame.
+// Every window is a client of Herald OS: no client-side decorations, Hermes draws the frame.
 prefer-no-csd
 
 // The shell owns the wallpaper (swaybg with a rendered frame); this shows until it is up.
@@ -89,7 +89,7 @@ cursor {
     hide-when-typing
 }
 
-// Spaces. The Hermes OS shell mirrors these in the menu bar and sidebar.
+// Spaces. The Herald OS shell mirrors these in the menu bar and sidebar.
 workspace "personal"
 workspace "work"
 workspace "ideas"
@@ -101,8 +101,8 @@ hotkey-overlay {
 screenshot-path "~/Pictures/Screenshots/Screenshot %Y-%m-%d %H-%M-%S.png"
 
 environment {
-    XDG_CURRENT_DESKTOP "HermesOS"
-    XDG_SESSION_DESKTOP "hermes-os"
+    XDG_CURRENT_DESKTOP "HeraldOS"
+    XDG_SESSION_DESKTOP "herald-os"
     ELECTRON_OZONE_PLATFORM_HINT "wayland"
     MOZ_ENABLE_WAYLAND "1"
     // Firefox: let the compositor decorate instead of drawing a CSD title bar over the tile.
@@ -113,15 +113,15 @@ environment {
     // No DISPLAY: there is no XWayland here yet; a set DISPLAY makes Chromium try X11 and hang.
 }
 
-// The Hermes OS shell (menu bar, dock, main window) and its wallpaper.
-spawn-at-startup "hermes-os-session"
+// The Herald OS shell (menu bar, dock, main window) and its wallpaper.
+spawn-at-startup "herald-os-session"
 
 // ---------------------------------------------------------------------------------------------
 // Window rules: shell surfaces are floating panels; everything else is a tile Hermes decorates.
 
 // Menu bar: full width, top, never focused on open, no frame.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Menu Bar$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Menu Bar$"
     open-floating true
     open-focused false
     default-floating-position x=0 y=0 relative-to="top"
@@ -134,7 +134,7 @@ window-rule {
 
 // Dock: bottom centre, no frame; the shell slides it in and out.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Dock$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Dock$"
     open-floating true
     open-focused false
     default-floating-position x=0 y=0 relative-to="bottom"
@@ -147,7 +147,7 @@ window-rule {
 
 // Command bar / launcher / ask: centred overlay, focused, no frame.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Command$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Command$"
     open-floating true
     open-focused true
     default-floating-position x=0 y=96 relative-to="top"
@@ -160,7 +160,7 @@ window-rule {
 
 // Wallpaper renderer: an offscreen helper that must never be shown.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Wallpaper$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Wallpaper$"
     open-floating true
     open-focused false
     opacity 0.0
@@ -172,33 +172,33 @@ window-rule {
 
 // The Hermes window and its floating apps: rounded glass tiles.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"#
+    match app-id=r#"^(herald-os|Herald OS)$"#
     geometry-corner-radius 14
     clip-to-geometry true
 }
 // The Hermes window shares the screen with one app by default (its pages adapt to a half column).
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS$"
     default-column-width { proportion 0.5; }
 }
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · System$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · System$"
     default-column-width { proportion 0.5; }
 }
 // The Studio and its site preview side by side fill the screen while Hermes builds.
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Hermes OS · Studio$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Studio$"
     default-column-width { proportion 0.6; }
 }
 window-rule {
-    match app-id=r#"^(hermes-os|Hermes OS)$"# title="^Preview$"
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Preview$"
     default-column-width { proportion 0.4; }
 }
 
 // Foreign apps get the same rounding and open as tiles even when they remember being maximized
 // or fullscreen elsewhere (apps that genuinely need fullscreen can still ask for it later).
 window-rule {
-    exclude app-id=r#"^(hermes-os|Hermes OS)$"#
+    exclude app-id=r#"^(herald-os|Herald OS)$"#
     geometry-corner-radius 12
     clip-to-geometry true
     open-maximized false
@@ -215,20 +215,20 @@ window-rule {
 // Keyboard grammar. Super is the Hermes key: alone with Space it talks to Hermes about whatever is
 // focused; with a letter it does the thing. Mod+K lists everything.
 binds {
-    Mod+Space hotkey-overlay-title="Ask Hermes about this window" repeat=false { spawn "hermes-os" "ask"; }
-    Mod+Shift+Space hotkey-overlay-title="Hermes command bar" repeat=false { spawn "hermes-os" "command"; }
-    Mod+A hotkey-overlay-title="Applications" repeat=false { spawn "hermes-os" "applications"; }
-    Mod+Alt+Space hotkey-overlay-title="Hermes OS menu" repeat=false { spawn "hermes-os" "menu"; }
-    Mod+V hotkey-overlay-title="Talk to Hermes" repeat=false { spawn "hermes-os" "voice"; }
+    Mod+Space hotkey-overlay-title="Ask Hermes about this window" repeat=false { spawn "herald-os" "ask"; }
+    Mod+Shift+Space hotkey-overlay-title="Hermes command bar" repeat=false { spawn "herald-os" "command"; }
+    Mod+A hotkey-overlay-title="Applications" repeat=false { spawn "herald-os" "applications"; }
+    Mod+Alt+Space hotkey-overlay-title="Herald OS menu" repeat=false { spawn "herald-os" "menu"; }
+    Mod+V hotkey-overlay-title="Talk to Hermes" repeat=false { spawn "herald-os" "voice"; }
     Mod+K hotkey-overlay-title="Show these hotkeys" { show-hotkey-overlay; }
 
-    Mod+Return hotkey-overlay-title="Terminal" { spawn "hermes-os" "open" "terminal"; }
-    Mod+E hotkey-overlay-title="Files" { spawn "hermes-os" "page" "files"; }
-    Mod+Shift+Return hotkey-overlay-title="Browser" { spawn "hermes-os" "launch" "firefox"; }
-    Mod+I hotkey-overlay-title="System monitor" { spawn "hermes-os" "open" "system"; }
-    Mod+Comma hotkey-overlay-title="Settings" { spawn "hermes-os" "page" "settings"; }
-    Mod+Shift+M hotkey-overlay-title="Missions" { spawn "hermes-os" "page" "missions"; }
-    Mod+Grave hotkey-overlay-title="Hermes window" { spawn "hermes-os" "page" "overview"; }
+    Mod+Return hotkey-overlay-title="Terminal" { spawn "herald-os" "open" "terminal"; }
+    Mod+E hotkey-overlay-title="Files" { spawn "herald-os" "page" "files"; }
+    Mod+Shift+Return hotkey-overlay-title="Browser" { spawn "herald-os" "launch" "firefox"; }
+    Mod+I hotkey-overlay-title="System monitor" { spawn "herald-os" "open" "system"; }
+    Mod+Comma hotkey-overlay-title="Settings" { spawn "herald-os" "page" "settings"; }
+    Mod+Shift+M hotkey-overlay-title="Missions" { spawn "herald-os" "page" "missions"; }
+    Mod+Grave hotkey-overlay-title="Hermes window" { spawn "herald-os" "page" "overview"; }
 
     Mod+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
     Mod+F hotkey-overlay-title="Maximize column" { maximize-column; }
@@ -272,16 +272,16 @@ binds {
     Mod+Tab repeat=false hotkey-overlay-title="Previous window" { focus-window-previous; }
     Mod+Shift+Tab { focus-workspace-previous; }
 
-    Mod+Ctrl+L hotkey-overlay-title="Lock" { spawn "hermes-os" "lock"; }
-    Mod+Escape hotkey-overlay-title="Power menu" { spawn "hermes-os" "power"; }
-    Mod+Shift+Escape hotkey-overlay-title="Quit Hermes OS session" { quit; }
+    Mod+Ctrl+L hotkey-overlay-title="Lock" { spawn "herald-os" "lock"; }
+    Mod+Escape hotkey-overlay-title="Power menu" { spawn "herald-os" "power"; }
+    Mod+Shift+Escape hotkey-overlay-title="Quit Herald OS session" { quit; }
 
     Print hotkey-overlay-title="Screenshot (select)" { screenshot; }
     Mod+Print hotkey-overlay-title="Screenshot window" { screenshot-window; }
     Mod+Shift+Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
-    Mod+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "hermes-os" "screenshot"; }
+    Mod+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "herald-os" "screenshot"; }
 
-    Mod+Ctrl+V hotkey-overlay-title="Clipboard history" { spawn "hermes-os" "clipboard"; }
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard history" { spawn "herald-os" "clipboard"; }
 
     XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
@@ -296,7 +296,7 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// Colours from the active theme (written by hermes-os-theme), then machine-specific overrides
-// (output scale, extra binds; created by hermes-os-compositor and never overwritten).
+// Colours from the active theme (written by herald-os-theme), then machine-specific overrides
+// (output scale, extra binds; created by herald-os-compositor and never overwritten).
 include "theme.kdl"
 include "local.kdl"

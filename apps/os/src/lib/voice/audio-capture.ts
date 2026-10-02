@@ -48,16 +48,16 @@ async function open(): Promise<void> {
   }
 
   opening = (async () => {
-    const permission = await window.hermesOS.voice.microphoneStatus().catch(() => 'unknown' as const)
+    const permission = await window.heraldOS.voice.microphoneStatus().catch(() => 'unknown' as const)
 
     if (permission === 'not-determined') {
-      const granted = await window.hermesOS.voice.requestMicrophone().catch(() => 'unknown' as const)
+      const granted = await window.heraldOS.voice.requestMicrophone().catch(() => 'unknown' as const)
 
       if (granted === 'denied' || granted === 'restricted') {
-        throw new MicrophoneUnavailableError('denied', 'Microphone access was denied. Allow Hermes OS in System Settings > Privacy & Security > Microphone.')
+        throw new MicrophoneUnavailableError('denied', 'Microphone access was denied. Allow Herald OS in System Settings > Privacy & Security > Microphone.')
       }
     } else if (permission === 'denied' || permission === 'restricted') {
-      throw new MicrophoneUnavailableError('denied', 'Microphone access is denied. Allow Hermes OS in System Settings > Privacy & Security > Microphone.')
+      throw new MicrophoneUnavailableError('denied', 'Microphone access is denied. Allow Herald OS in System Settings > Privacy & Security > Microphone.')
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {

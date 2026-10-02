@@ -155,7 +155,7 @@ export function ConnectionsPage() {
             const flow = await api.authMcp(source.server.name)
 
             if (flow.authorization_url) {
-              await window.hermesOS.shell.openExternal(flow.authorization_url)
+              await window.heraldOS.shell.openExternal(flow.authorization_url)
               notify({ title: `Finish signing in to ${connection.name}`, body: 'Approve access in your browser, then reconnect.', level: 'info' })
             } else {
               notify({ title: `Could not start sign-in for ${connection.name}`, body: flow.error ?? 'No authorization link was returned.', level: 'error' })
@@ -202,7 +202,7 @@ export function ConnectionsPage() {
     const started = await api.startProviderOAuth(id)
 
     if (started.verification_url) {
-      await window.hermesOS.shell.openExternal(started.verification_url)
+      await window.heraldOS.shell.openExternal(started.verification_url)
     }
 
     notify({ title: `Sign in to ${name}`, body: started.user_code ? `Enter code ${started.user_code} in your browser, then come back.` : 'Approve access in your browser, then come back.', level: 'info' })

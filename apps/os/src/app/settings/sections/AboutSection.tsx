@@ -13,14 +13,14 @@ export function AboutSection() {
   const backend = useStore($backend)
   const status = useBackendData(() => rest.get<HermesStatusPayload>('/api/status'))
   const [showLog, setShowLog] = useState(false)
-  const log = useLocalData(() => (showLog ? window.hermesOS.backend.logTail(300) : Promise.resolve<string[]>([])), [showLog, backend.phase])
+  const log = useLocalData(() => (showLog ? window.heraldOS.backend.logTail(300) : Promise.resolve<string[]>([])), [showLog, backend.phase])
 
   return (
     <>
       <SectionTitle title="About" subtitle="Versions, the runtime underneath, and where to look when something is off." />
 
       <SettingsGroup title="Versions">
-        <SettingsRow icon={<IconInfoCircle />} label="Hermes OS" description={env?.isDev ? 'Development build.' : 'Agent-native desktop environment.'} keywords="version build shell">
+        <SettingsRow icon={<IconInfoCircle />} label="Herald OS" description={env?.isDev ? 'Development build.' : 'Agent-native desktop environment.'} keywords="version build shell">
           <Pill tone="accent">{env?.version ?? '—'}</Pill>
         </SettingsRow>
         <SettingsRow icon={<IconServer />} label="Hermes runtime" description={<span className="selectable">{backend.runtime?.label ?? 'Not resolved yet.'}</span>} keywords="hermes agent version runtime">
@@ -30,7 +30,7 @@ export function AboutSection() {
       </SettingsGroup>
 
       <SettingsGroup title="Maintenance">
-        <SettingsRow icon={<IconDownload />} label="Check for updates" description="Hermes OS runs whatever Hermes is installed. Run “hermes update” in Terminal, then restart Hermes from Network." keywords="upgrade update hermes update terminal">
+        <SettingsRow icon={<IconDownload />} label="Check for updates" description="Herald OS runs whatever Hermes is installed. Run “hermes update” in Terminal, then restart Hermes from Network." keywords="upgrade update hermes update terminal">
           <GlassButton size="sm" onClick={() => openApp('terminal')} aria-label="Open Terminal">
             Open Terminal
           </GlassButton>

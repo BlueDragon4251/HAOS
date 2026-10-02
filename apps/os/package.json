@@ -1,10 +1,10 @@
 {
-  "name": "@hermes-os/shell",
-  "productName": "Hermes OS",
+  "name": "@herald-os/shell",
+  "productName": "Herald OS",
   "version": "0.1.0-alpha.1",
   "private": true,
-  "description": "Hermes OS: agent-native desktop environment powered by Hermes Agent.",
-  "author": "Hermes OS contributors",
+  "description": "Herald OS: agent-native desktop environment powered by Hermes Agent.",
+  "author": "Luke The Dev",
   "license": "MIT",
   "type": "module",
   "main": "dist/electron/main.mjs",
@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "concurrently -k -n renderer,electron -c cyan,yellow \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite --host 127.0.0.1 --port 5180 --strictPort",
-    "dev:electron": "wait-on http://127.0.0.1:5180 && node scripts/bundle-electron.mjs --dev && HERMES_OS_DEV_SERVER=http://127.0.0.1:5180 electron .",
+    "dev:electron": "wait-on http://127.0.0.1:5180 && node scripts/bundle-electron.mjs --dev && HERALD_OS_DEV_SERVER=http://127.0.0.1:5180 electron .",
     "build": "vite build && node scripts/bundle-electron.mjs",
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
@@ -23,7 +23,7 @@
     "dist:linux": "npm run build && electron-builder --linux --arm64"
   },
   "dependencies": {
-    "@hermes-os/client": "*",
+    "@herald-os/client": "*",
     "@nanostores/react": "1.1.0",
     "@tabler/icons-react": "3.46.0",
     "@xterm/addon-fit": "0.11.0",
@@ -57,10 +57,10 @@
     "wait-on": "9.1.0"
   },
   "build": {
-    "appId": "dev.hermesos.shell",
-    "productName": "Hermes OS",
-    "executableName": "Hermes OS",
-    "artifactName": "HermesOS-${version}-${os}-${arch}.${ext}",
+    "appId": "dev.iamluke.heraldos",
+    "productName": "Herald OS",
+    "executableName": "Herald OS",
+    "artifactName": "HeraldOS-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -75,6 +75,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
       "target": [
         "dmg",
         "zip"
@@ -84,8 +85,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "Hermes OS controls applications on your behalf when you ask it to.",
-        "NSMicrophoneUsageDescription": "Hermes OS uses the microphone for voice input."
+        "NSAppleEventsUsageDescription": "Herald OS controls applications on your behalf when you ask it to.",
+        "NSMicrophoneUsageDescription": "Herald OS uses the microphone for voice input."
       }
     },
     "dmg": {
@@ -93,14 +94,15 @@
     },
     "linux": {
       "category": "System",
-      "executableName": "hermes-os",
+      "icon": "build/icon.png",
+      "executableName": "herald-os",
       "target": [
         "dir",
         "AppImage"
       ],
       "desktop": {
         "entry": {
-          "Name": "Hermes OS",
+          "Name": "Herald OS",
           "Comment": "Agent-native desktop powered by Hermes Agent",
           "Categories": "System;"
         }

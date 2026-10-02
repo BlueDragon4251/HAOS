@@ -8,7 +8,7 @@ import { isViewable } from '../../shared/viewer.ts'
 import { log } from '../log.ts'
 
 /*
- * Embedded web pages. Hermes OS is a whole environment, so a web page (the provider sign-in portal,
+ * Embedded web pages. Herald OS is a whole environment, so a web page (the provider sign-in portal,
  * for now) opens inside it rather than in the system browser. In desktop mode the page is a
  * `WebContentsView` layered over the shell window; the renderer's window manager draws the frame and
  * streams the content rect here so the page sits exactly inside it. In panels mode (niri) there is
@@ -18,7 +18,7 @@ import { log } from '../log.ts'
  * every permission denied, http(s) only, popups denied (same-origin ones navigate the same view).
  */
 
-const PARTITION = 'persist:hermes-web'
+const PARTITION = 'persist:herald-web'
 const DETACHED_SIZE = { width: 1000, height: 720 }
 
 const isHttp = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -55,10 +55,10 @@ const GUEST_PREFERENCES: Electron.WebPreferences = {
 }
 
 /** Local files: same lockdown, own partition, plus Chromium's PDF viewer plugin. */
-const VIEWER_PREFERENCES: Electron.WebPreferences = { ...GUEST_PREFERENCES, plugins: true, partition: 'persist:hermes-viewer' }
+const VIEWER_PREFERENCES: Electron.WebPreferences = { ...GUEST_PREFERENCES, plugins: true, partition: 'persist:herald-viewer' }
 
 /** Studio previews of the site Hermes is building: same lockdown, own partition so dev-server state never mixes with browsing. */
-const PREVIEW_PARTITION = 'persist:hermes-preview'
+const PREVIEW_PARTITION = 'persist:herald-preview'
 const PREVIEW_PREFERENCES: Electron.WebPreferences = { ...GUEST_PREFERENCES, partition: PREVIEW_PARTITION }
 
 /** A preview may show http(s) pages and local files inside the project folder, nothing else. */
@@ -208,7 +208,7 @@ export class WebViews {
 
   open(owner: WebContents, url: string, options: WebOpenOptions): string {
     if (typeof url !== 'string' || !isHttp(url)) {
-      throw new Error('only http(s) URLs may be opened in a Hermes OS web window')
+      throw new Error('only http(s) URLs may be opened in a Herald OS web window')
     }
 
     this.prepareSession()
@@ -226,7 +226,7 @@ export class WebViews {
     return id
   }
 
-  /** Show a local file (PDF, image, text, media) inside Hermes OS; the view can never navigate elsewhere. */
+  /** Show a local file (PDF, image, text, media) inside Herald OS; the view can never navigate elsewhere. */
   openFile(owner: WebContents, filePath: string, options: WebOpenOptions): string {
     const resolved = typeof filePath === 'string' ? path.resolve(filePath.replace(/^~(?=\/|$)/, os.homedir())) : ''
     const stat = resolved ? fs.statSync(resolved, { throwIfNoEntry: false }) : undefined
@@ -236,7 +236,7 @@ export class WebViews {
     }
 
     if (!isViewable(resolved)) {
-      throw new Error(`Hermes OS cannot display ${path.extname(resolved) || 'this kind of'} files yet`)
+      throw new Error(`Herald OS cannot display ${path.extname(resolved) || 'this kind of'} files yet`)
     }
 
     this.hookOwner(owner)
@@ -281,7 +281,7 @@ export class WebViews {
     }
 
     this.viewerReady = true
-    const viewer = session.fromPartition('persist:hermes-viewer')
+    const viewer = session.fromPartition('persist:herald-viewer')
     viewer.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     viewer.setPermissionCheckHandler(() => false)
     viewer.setDevicePermissionHandler(() => false)
@@ -367,7 +367,7 @@ export class WebViews {
     const win = new BrowserWindow({
       ...DETACHED_SIZE,
       frame: false,
-      title: title ?? 'Hermes OS · Web',
+      title: title ?? 'Herald OS · Web',
       backgroundColor: '#ffffff',
       webPreferences: { ...preferences }
     })

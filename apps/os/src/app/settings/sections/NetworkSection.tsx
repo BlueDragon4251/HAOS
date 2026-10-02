@@ -33,7 +33,7 @@ export function NetworkSection() {
           <Pill tone={phaseTone(backend.phase)} dot>
             {backend.phase}
           </Pill>
-          <GlassButton size="sm" variant="ghost" onClick={() => void window.hermesOS.backend.restart()} aria-label="Restart Hermes">
+          <GlassButton size="sm" variant="ghost" onClick={() => void window.heraldOS.backend.restart()} aria-label="Restart Hermes">
             Restart
           </GlassButton>
         </SettingsRow>

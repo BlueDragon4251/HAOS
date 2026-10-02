@@ -123,7 +123,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 /** Dropped Finder files: Electron no longer exposes File.path, so this only works when the bridge adds it. */
 function pathOfDroppedFile(file: File): string | null {
-  const candidate = window.hermesOS.fs.pathForFile?.(file) || (file as File & { path?: string }).path
+  const candidate = window.heraldOS.fs.pathForFile?.(file) || (file as File & { path?: string }).path
 
   return typeof candidate === 'string' && candidate.startsWith('/') ? candidate : null
 }
@@ -514,7 +514,7 @@ export function FilesPage() {
                   label: 'Open in Terminal',
                   icon: <IconTerminal2 />,
                   disabled: !cwd,
-                  onSelect: () => cwd && window.hermesOS.fs.openIn('terminal', cwd).catch(error => notify({ title: 'Could not open Terminal', body: messageOf(error), level: 'error' }))
+                  onSelect: () => cwd && window.heraldOS.fs.openIn('terminal', cwd).catch(error => notify({ title: 'Could not open Terminal', body: messageOf(error), level: 'error' }))
                 },
                 { id: 'hidden', label: showHidden ? 'Hide hidden files' : 'Show hidden files', icon: showHidden ? <IconEyeOff /> : <IconEye />, checked: showHidden, onSelect: () => $showHidden.set(!showHidden), dividerBefore: true },
                 { id: 'refresh', label: 'Refresh', icon: <IconRefresh />, onSelect: refresh }

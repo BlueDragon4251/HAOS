@@ -1,4 +1,4 @@
-# Hermes OS Alpha 0.1 Implementation Plan
+# Herald OS Alpha 0.1 Implementation Plan
 
 Working copy of the plan that drives Alpha 0.1. `DECISIONS.md` holds the rationale.
 

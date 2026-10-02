@@ -31,7 +31,7 @@ export function AppearanceSection() {
 
   const chooseWallpaper = async () => {
     try {
-      const [path] = await window.hermesOS.fs.pickFiles({ directory: false, multiple: false })
+      const [path] = await window.heraldOS.fs.pickFiles({ directory: false, multiple: false })
 
       if (path) {
         await save({ wallpaper: `file://${path}` })

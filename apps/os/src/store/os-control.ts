@@ -38,7 +38,7 @@ export function osState(): Record<string, unknown> {
 let bound = false
 
 export function bindOsControl(): () => void {
-  const bridge = window.hermesOS?.osControl
+  const bridge = window.heraldOS?.osControl
 
   if (bound || !isMainSurface || !bridge) {
     return () => undefined

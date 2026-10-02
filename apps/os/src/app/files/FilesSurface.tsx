@@ -21,13 +21,13 @@ export function FilesSurface() {
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   useEffect(() => {
-    void window.hermesOS.fs.home().then(dir => {
+    void window.heraldOS.fs.home().then(dir => {
       setHome(dir)
       setCwd(current => current ?? dir)
     })
   }, [])
 
-  const listing = useLocalData(() => (cwd ? window.hermesOS.fs.readDir(cwd) : Promise.resolve([] as DirEntry[])), [cwd])
+  const listing = useLocalData(() => (cwd ? window.heraldOS.fs.readDir(cwd) : Promise.resolve([] as DirEntry[])), [cwd])
   const entries = useMemo(() => (listing.data ?? []).filter(entry => showHidden || !entry.hidden), [listing.data, showHidden])
   const quickLinks = useMemo(() => (home ? QUICK.map(name => ({ name, path: `${home}/${name}` })) : []), [home])
 
@@ -40,7 +40,7 @@ export function FilesSurface() {
     }
 
     let cancelled = false
-    window.hermesOS.fs
+    window.heraldOS.fs
       .readFile(selected.path)
       .then(result => {
         if (!cancelled) {
@@ -113,7 +113,7 @@ export function FilesSurface() {
             <IconRefresh size={15} />
           </Button>
           {cwd && (
-            <Button variant="ghost" size="sm" onClick={() => void window.hermesOS.fs.reveal(cwd)}>
+            <Button variant="ghost" size="sm" onClick={() => void window.heraldOS.fs.reveal(cwd)}>
               Finder
             </Button>
           )}
@@ -132,7 +132,7 @@ export function FilesSurface() {
                 key={entry.path}
                 type="button"
                 onClick={() => setSelected(entry)}
-                onDoubleClick={() => (entry.kind === 'directory' ? navigate(entry.path) : void window.hermesOS.fs.openPath(entry.path))}
+                onDoubleClick={() => (entry.kind === 'directory' ? navigate(entry.path) : void window.heraldOS.fs.openPath(entry.path))}
                 className={cn('flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left text-[12.5px]', selected?.path === entry.path ? 'bg-white/6 text-fg' : 'text-fg-2 hover:bg-white/4')}
               >
                 <span className={cn('shrink-0', entry.kind === 'directory' ? 'text-accent' : 'text-fg-4')}>{entry.kind === 'directory' ? <IconFolder size={15} /> : <IconFile size={15} />}</span>
@@ -153,9 +153,9 @@ export function FilesSurface() {
                   {selected.kind === 'directory' ? 'Folder' : formatBytes(selected.size)} · modified {formatRelative(selected.modifiedAt)}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Button size="sm" onClick={() => void window.hermesOS.fs.openPath(selected.path)}>Open</Button>
-                  <Button size="sm" variant="ghost" onClick={() => void window.hermesOS.fs.reveal(selected.path)}>Reveal</Button>
-                  <Button size="sm" variant="ghost" onClick={() => void window.hermesOS.fs.openIn('vscode', selected.path)}>VS Code</Button>
+                  <Button size="sm" onClick={() => void window.heraldOS.fs.openPath(selected.path)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void window.heraldOS.fs.reveal(selected.path)}>Reveal</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void window.heraldOS.fs.openIn('vscode', selected.path)}>VS Code</Button>
                   <Button size="sm" variant="ghost" onClick={() => askHermes(selected)}>
                     <IconMessage size={13} /> Ask Hermes
                   </Button>

@@ -21,7 +21,7 @@ export class SurfaceErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error(`[hermes-os] ${this.props.label} crashed`, error, info.componentStack)
+    console.error(`[herald-os] ${this.props.label} crashed`, error, info.componentStack)
   }
 
   render(): ReactNode {

@@ -18,7 +18,7 @@ import { bindStudioEvents } from './studio.ts'
 import { bindVoice } from './voice.ts'
 import { bindWake } from './wake.ts'
 
-const BOOT_FLAG = '__hermesOSBooted'
+const BOOT_FLAG = '__heraldOSBooted'
 
 /** Wire every store to its source exactly once, before React mounts (guard survives dev HMR re-evaluation). */
 export function bootRenderer(): void {

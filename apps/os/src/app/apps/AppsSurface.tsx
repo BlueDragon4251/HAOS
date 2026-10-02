@@ -8,7 +8,7 @@ import { notify } from '../../store/notifications.ts'
 
 export function AppsSurface() {
   const [query, setQuery] = useState('')
-  const apps = useLocalData(() => window.hermesOS.apps.list())
+  const apps = useLocalData(() => window.heraldOS.apps.list())
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
 
@@ -17,7 +17,7 @@ export function AppsSurface() {
 
   const launch = async (app: InstalledApp) => {
     try {
-      await window.hermesOS.apps.launch(app.path)
+      await window.heraldOS.apps.launch(app.path)
       notify({ title: `Opened ${app.name}`, level: 'info', toast: false })
     } catch (error) {
       notify({ title: `Could not open ${app.name}`, body: error instanceof Error ? error.message : String(error), level: 'error' })
@@ -51,7 +51,7 @@ const AppTile = memo(function AppTile({ app, onLaunch }: { app: InstalledApp; on
 
   useEffect(() => {
     let cancelled = false
-    void window.hermesOS.apps
+    void window.heraldOS.apps
       .icon(app.path)
       .then(url => {
         if (!cancelled) {

@@ -1,7 +1,7 @@
 # System Bridge
 
 The system bridge is how Hermes acts on the computer. It is a Hermes plugin
-(`plugins/hermes-os-bridge`) that registers a small toolset named `hermes_os`. Every capability is
+(`plugins/herald-os-bridge`) that registers a small toolset named `herald_os`. Every capability is
 an explicit tool with a typed schema, a permission tier, and an audit record. The model never gets
 unrestricted machine access.
 
@@ -36,8 +36,8 @@ for shell commands, because it is the same gate.
 
 ## Enabling
 
-`scripts/bootstrap.sh` links the plugin into `$HERMES_HOME/plugins/hermes-os-bridge`, then runs
-`hermes plugins enable hermes-os-bridge`, `hermes tools enable hermes_os` (a saved platform toolset
+`scripts/bootstrap.sh` links the plugin into `$HERMES_HOME/plugins/herald-os-bridge`, then runs
+`hermes plugins enable herald-os-bridge`, `hermes tools enable herald_os` (a saved platform toolset
 list is authoritative upstream), and `hermes config set tools.tool_search.enabled off` so the tools
 are directly callable rather than deferred behind Hermes's tool-search bridge (see
 `DECISIONS.md`, ADR-010). Settings -> Permissions exposes the last switch.
@@ -50,7 +50,7 @@ Operations that would read or modify these locations are refused before any appr
 
 ## Policy file
 
-`$HERMES_HOME/hermes-os/permissions.yaml`
+`$HERMES_HOME/herald-os/permissions.yaml`
 
 ```yaml
 version: 1
@@ -65,7 +65,7 @@ protected_paths:
 
 ## Audit log
 
-Every tool invocation appends one JSON line to `$HERMES_HOME/hermes-os/audit.jsonl`:
+Every tool invocation appends one JSON line to `$HERMES_HOME/herald-os/audit.jsonl`:
 `{ts, tool, tier, action, args, decision, ok, error}`. Arguments are truncated; no file contents are
 logged.
 

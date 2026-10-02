@@ -7,8 +7,8 @@ import type { ShellCommand, ShellMode, ShellSurface, WmAction, WmState, WmWindow
  * - `panels` mode (niri): the menu bar, dock, Hermes window, command overlay and floating apps are
  *   separate windows; stores that act on another window go through `relay`.
  */
-export const surface: ShellSurface = window.hermesOS?.shell?.surface ?? 'desktop'
-export const shellMode: ShellMode = window.hermesOS?.shell?.mode ?? 'desktop'
+export const surface: ShellSurface = window.heraldOS?.shell?.surface ?? 'desktop'
+export const shellMode: ShellMode = window.heraldOS?.shell?.mode ?? 'desktop'
 export const isPanels = shellMode === 'panels'
 export const isMainSurface = surface === 'desktop' || surface === 'main'
 
@@ -16,7 +16,7 @@ export const isMainSurface = surface === 'desktop' || surface === 'main'
 export const $wm = atom<WmState>({ available: false, windows: [], workspaces: [], focusedWindowId: null })
 
 export function wmAction(action: WmAction): Promise<void> {
-  return window.hermesOS.wm.action(action).catch(() => undefined)
+  return window.heraldOS.wm.action(action).catch(() => undefined)
 }
 
 /** The compositor's focused window, if it is not one of ours. */
@@ -44,7 +44,7 @@ function dispatch(command: ShellCommand): void {
   }
 }
 
-/** Receive commands addressed to this surface (from the `hermes-os` CLI or another surface). */
+/** Receive commands addressed to this surface (from the `herald-os` CLI or another surface). */
 export function onShellCommand(handler: CommandHandler): () => void {
   handlers.add(handler)
 
@@ -67,15 +67,15 @@ export function relayToMain(command: ShellCommand): void {
     return
   }
 
-  window.hermesOS.shell.relay('main', command).catch(() => undefined)
+  window.heraldOS.shell.relay('main', command).catch(() => undefined)
 }
 
 export function openSurface(target: ShellSurface, command?: ShellCommand): void {
-  window.hermesOS.shell.open(target, command).catch(() => undefined)
+  window.heraldOS.shell.open(target, command).catch(() => undefined)
 }
 
 export function closeThisSurface(): void {
-  window.hermesOS.shell.close().catch(() => undefined)
+  window.heraldOS.shell.close().catch(() => undefined)
 }
 
 let bound = false
@@ -89,12 +89,12 @@ export function bindShell(): void {
   bound = true
 
   if (isPanels) {
-    window.hermesOS.wm
+    window.heraldOS.wm
       .getState()
       .then(state => $wm.set(state))
       .catch(() => undefined)
-    window.hermesOS.wm.onState(state => $wm.set(state))
+    window.heraldOS.wm.onState(state => $wm.set(state))
   }
 
-  window.hermesOS.shell.onCommand(dispatch)
+  window.heraldOS.shell.onCommand(dispatch)
 }

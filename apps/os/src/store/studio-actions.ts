@@ -28,10 +28,10 @@ export async function startBuild(goal: string): Promise<{ sessionId: string; fol
   }
 
   const root = projectsRoot()
-  await window.hermesOS.fs.mkdir(root)
-  const taken = new Set((await window.hermesOS.fs.readDir(root)).map(entry => entry.name))
+  await window.heraldOS.fs.mkdir(root)
+  const taken = new Set((await window.heraldOS.fs.readDir(root)).map(entry => entry.name))
   const folder = `${root}/${uniqueName(projectSlug(trimmed), taken)}`
-  await window.hermesOS.fs.mkdir(folder)
+  await window.heraldOS.fs.mkdir(folder)
 
   const title = trimmed.charAt(0).toUpperCase() + trimmed.slice(1, TITLE_MAX)
   const chat = await createChat({ cwd: folder, title })

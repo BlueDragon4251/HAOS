@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import type { HermesOSPrefs, ShellCommand } from '../../shared/ipc.ts'
+import type { HeraldOSPrefs, ShellCommand } from '../../shared/ipc.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
 import { writePrefs } from '../prefs.ts'
@@ -21,7 +21,7 @@ interface ControlRequest {
 const OVERLAY_MODES = new Set(['ask', 'command', 'applications', 'menu', 'power', 'clipboard'])
 
 /**
- * Unix socket the `hermes-os` CLI (and therefore every compositor hotkey) talks to:
+ * Unix socket the `herald-os` CLI (and therefore every compositor hotkey) talks to:
  * one JSON object per line in, one JSON object per line out.
  */
 export class ControlSocket {
@@ -30,7 +30,7 @@ export class ControlSocket {
   constructor(
     private readonly shell: PanelShell,
     /** Called after the CLI changes preferences so windows and the wallpaper follow. */
-    private readonly onPrefsChanged?: (prefs: HermesOSPrefs) => void,
+    private readonly onPrefsChanged?: (prefs: HeraldOSPrefs) => void,
     /** Runs registry commands in the Hermes window (`ui`, `ui-list`, `ui-state`; token-protected). */
     private readonly osBridge?: OsCommandBridge
   ) {}
@@ -38,7 +38,7 @@ export class ControlSocket {
   get socketPath(): string {
     const runtime = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`
 
-    return path.join(runtime, 'hermes-os', 'control.sock')
+    return path.join(runtime, 'herald-os', 'control.sock')
   }
 
   start(): void {
@@ -123,7 +123,7 @@ export class ControlSocket {
     }
 
     if (cmd === 'os') {
-      // `hermes-os os <command.id> [json]`: the CLI path to the registry (no token; same user).
+      // `herald-os os <command.id> [json]`: the CLI path to the registry (no token; same user).
       const [id, json] = args
 
       if (!id) {
@@ -214,7 +214,7 @@ export class ControlSocket {
         return { ok: true }
       }
       case 'update-available': {
-        // From hermes-os-update --check: [pendingCount, summary]. The menu bar shows a dot when > 0.
+        // From herald-os-update --check: [pendingCount, summary]. The menu bar shows a dot when > 0.
         this.shell.relay('menubar', { type: 'update-available', args })
 
         return { ok: true }
@@ -237,7 +237,7 @@ export class ControlSocket {
         return { ok: true, wallpaper: next.wallpaper ?? 'default' }
       }
       case 'theme': {
-        // hermes-os-theme has already recoloured niri, swaylock, GTK and foot; this applies the
+        // herald-os-theme has already recoloured niri, swaylock, GTK and foot; this applies the
         // shell's part (theme + accent preference, optional wallpaper) so everything switches together.
         const name = args[0]
 
@@ -248,7 +248,7 @@ export class ControlSocket {
         const shellSpec = (request.shell ?? {}) as { theme?: string; accent?: string }
         const theme = shellSpec.theme === 'graphite' ? 'graphite' : shellSpec.theme === 'ocean' ? 'ocean' : name.includes('graphite') ? 'graphite' : 'ocean'
         const accent = shellSpec.accent === 'ice' || shellSpec.accent === 'violet' ? shellSpec.accent : 'blue'
-        const patch: Partial<HermesOSPrefs> = { theme, accent }
+        const patch: Partial<HeraldOSPrefs> = { theme, accent }
 
         if (typeof request.wallpaper === 'string') {
           patch.wallpaper = request.wallpaper || undefined

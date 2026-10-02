@@ -105,7 +105,7 @@ export function CodeView({ path, file, root, pinned, onTogglePin, running = fals
     }
 
     let cancelled = false
-    window.hermesOS.fs
+    window.heraldOS.fs
       .readFile(path)
       .then(preview => {
         if (cancelled) {
@@ -194,7 +194,7 @@ export function CodeView({ path, file, root, pinned, onTogglePin, running = fals
           <button type="button" onClick={onTogglePin} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title={pinned ? 'Follow Hermes from file to file' : 'Stay on this file'} aria-label={pinned ? 'Follow Hermes' : 'Stay on this file'}>
             {pinned ? <IconPinnedOff size={14} /> : <IconPin size={14} />}
           </button>
-          <button type="button" onClick={() => void window.hermesOS.fs.openIn('vscode', path)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title="Open in VS Code" aria-label="Open in VS Code">
+          <button type="button" onClick={() => void window.heraldOS.fs.openIn('vscode', path)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title="Open in VS Code" aria-label="Open in VS Code">
             <IconExternalLink size={14} />
           </button>
         </span>

@@ -1,9 +1,9 @@
 {
-  "name": "@hermes-os/client",
+  "name": "@herald-os/client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Hermes gateway client for Hermes OS: re-exports the upstream apps/shared JSON-RPC client and generated wire contract, plus thin REST helpers.",
+  "description": "Hermes gateway client for Herald OS: re-exports the upstream apps/shared JSON-RPC client and generated wire contract, plus thin REST helpers.",
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",

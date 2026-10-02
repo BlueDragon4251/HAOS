@@ -14,7 +14,7 @@ export function StorageSection() {
   const stats = useSystemStats()
   const env = useStore($env)
   const hermesHome = env?.hermesHome ?? null
-  const homeSize = useLocalData(() => (hermesHome ? window.hermesOS.fs.dirSize(hermesHome) : Promise.resolve(null)), [hermesHome])
+  const homeSize = useLocalData(() => (hermesHome ? window.heraldOS.fs.dirSize(hermesHome) : Promise.resolve(null)), [hermesHome])
 
   const askHermes = () => {
     showPage('hermes')

@@ -29,7 +29,7 @@ export function ClipboardPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     let cancelled = false
-    const bridge = window.hermesOS?.clipboard
+    const bridge = window.heraldOS?.clipboard
 
     if (!bridge) {
       setEntries([])
@@ -74,7 +74,7 @@ export function ClipboardPanel({ onClose }: { onClose: () => void }) {
     }
 
     setPasting(entry.id)
-    window.hermesOS.clipboard
+    window.heraldOS.clipboard
       .paste(entry.id)
       .then(onClose)
       .catch((reason: unknown) => {
@@ -117,7 +117,7 @@ export function ClipboardPanel({ onClose }: { onClose: () => void }) {
         </div>
       ) : entries.length === 0 ? (
         <div className="p-4">
-          <EmptyGlass icon={<IconClipboard />} title="Clipboard history is empty" description={error ?? 'Copies you make on Hermes OS Linux are collected by cliphist and listed here.'} />
+          <EmptyGlass icon={<IconClipboard />} title="Clipboard history is empty" description={error ?? 'Copies you make on Herald OS Linux are collected by cliphist and listed here.'} />
         </div>
       ) : (
         <>

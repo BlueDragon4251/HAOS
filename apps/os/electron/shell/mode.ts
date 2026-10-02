@@ -1,31 +1,32 @@
 import type { ShellMode, ShellSurface } from '../../shared/ipc.ts'
+import { osEnv } from '../env.ts'
 
 /** `panels` only when the session asks for it (niri); everything else is the single-window desktop. */
 export function shellMode(): ShellMode {
-  return process.env.HERMES_OS_SHELL_MODE === 'panels' ? 'panels' : 'desktop'
+  return osEnv('SHELL_MODE') === 'panels' ? 'panels' : 'desktop'
 }
 
 /** Window titles double as the identity niri window rules match on; keep them stable. */
 export const SURFACE_TITLE: Record<Exclude<ShellSurface, `window:${string}`>, string> = {
-  desktop: 'Hermes OS',
-  main: 'Hermes OS',
-  menubar: 'Hermes OS · Menu Bar',
-  dock: 'Hermes OS · Dock',
-  command: 'Hermes OS · Command',
-  wallpaper: 'Hermes OS · Wallpaper'
+  desktop: 'Herald OS',
+  main: 'Herald OS',
+  menubar: 'Herald OS · Menu Bar',
+  dock: 'Herald OS · Dock',
+  command: 'Herald OS · Command',
+  wallpaper: 'Herald OS · Wallpaper'
 }
 
 /** Floating Hermes apps that may open as their own window in panels mode. */
 export const FLOATING_APPS: Record<string, { title: string; width: number; height: number }> = {
-  terminal: { title: 'Hermes OS · Terminal', width: 900, height: 560 },
-  system: { title: 'Hermes OS · System', width: 980, height: 640 },
-  'chat-popout': { title: 'Hermes OS · Chat', width: 520, height: 720 },
-  studio: { title: 'Hermes OS · Studio', width: 1280, height: 800 }
+  terminal: { title: 'Herald OS · Terminal', width: 900, height: 560 },
+  system: { title: 'Herald OS · System', width: 980, height: 640 },
+  'chat-popout': { title: 'Herald OS · Chat', width: 520, height: 720 },
+  studio: { title: 'Herald OS · Studio', width: 1280, height: 800 }
 }
 
 export function surfaceTitle(surface: ShellSurface): string {
   if (surface.startsWith('window:')) {
-    return FLOATING_APPS[surface.slice('window:'.length)]?.title ?? 'Hermes OS'
+    return FLOATING_APPS[surface.slice('window:'.length)]?.title ?? 'Herald OS'
   }
 
   return SURFACE_TITLE[surface as keyof typeof SURFACE_TITLE]

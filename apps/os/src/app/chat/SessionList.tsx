@@ -3,7 +3,7 @@ import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatRelative } from '../../lib/format.ts'
-import { $activeChatId, $chats, createChat, forgetChat, openStoredSession } from '../../store/chat.ts'
+import { $activeChatId, $chats, createChat, forgetChat, LISTED_SESSION_SOURCES, openStoredSession } from '../../store/chat.ts'
 import { $runtimeIds, $sessions, deleteSession } from '../../store/sessions.ts'
 
 export function SessionList() {
@@ -11,7 +11,7 @@ export function SessionList() {
   const runtimeIds = useStore($runtimeIds)
   const activeId = useStore($activeChatId)
   const chats = useStore($chats)
-  const visible = sessions.filter(row => !row.source || row.source === 'hermes_os' || row.source === 'desktop' || row.source === 'cli' || row.source === 'tui')
+  const visible = sessions.filter(row => !row.source || LISTED_SESSION_SOURCES.has(row.source))
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-hairline">

@@ -14,8 +14,8 @@ import { errorText, markSaved, readLocalFlag, SectionTitle, SettingsGroup, Setti
 
 export type TextSize = 'small' | 'default' | 'large'
 
-const TEXT_SIZE_KEY = 'hermes-os.a11y.text-size'
-const CONTRAST_KEY = 'hermes-os.a11y.high-contrast'
+const TEXT_SIZE_KEY = 'herald-os.a11y.text-size'
+const CONTRAST_KEY = 'herald-os.a11y.high-contrast'
 const TEXT_SIZES: { id: TextSize; label: string; px: string }[] = [
   { id: 'small', label: 'Small', px: '12px' },
   { id: 'default', label: 'Default', px: '13px' },
@@ -82,7 +82,7 @@ export function AccessibilitySection() {
 
   return (
     <>
-      <SectionTitle title="Accessibility" subtitle="Make Hermes OS easier to read and calmer to watch." />
+      <SectionTitle title="Accessibility" subtitle="Make Herald OS easier to read and calmer to watch." />
 
       <SettingsGroup title="Vision">
         <SettingsRow icon={<IconTextSize />} label="Text size" description="Scales the whole interface." keywords="font zoom bigger smaller">

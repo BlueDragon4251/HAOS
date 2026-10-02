@@ -122,7 +122,7 @@ export class PanelShell {
   }
 
   /**
-   * Web apps: a frameless window showing one site (installed through `hermes-os install webapp`).
+   * Web apps: a frameless window showing one site (installed through `herald-os install webapp`).
    * Titled with the app's name so niri, the dock and the menu bar treat it as its own app.
    */
   openWebApp(url: string, name: string, slug: string): void {

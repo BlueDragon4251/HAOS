@@ -7,7 +7,7 @@ import {
   reconnectBackoffDelayMs,
   type RpcMethods,
   type ServerRequestHandler
-} from '@hermes-os/client'
+} from '@herald-os/client'
 import { atom } from 'nanostores'
 import { $backend } from './backend.ts'
 

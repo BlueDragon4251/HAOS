@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { map } from 'nanostores'
 
-const STORAGE_KEY = 'hermes-os.panels'
+const STORAGE_KEY = 'herald-os.panels'
 
 function load(): Record<string, boolean> {
   try {

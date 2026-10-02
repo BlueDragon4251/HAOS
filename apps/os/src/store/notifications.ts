@@ -74,7 +74,7 @@ export function notify(input: NotifyInput): HermesNotification {
   }
 
   if (input.native && !$windowState.get().focused) {
-    void window.hermesOS.notifications.native(item.title, item.body ?? '')
+    void window.heraldOS.notifications.native(item.title, item.body ?? '')
   }
 
   return item
@@ -113,7 +113,7 @@ export function dismissNotification(id: string): void {
 
 /** Tell the sending app which action (or 'default' for a click, 'dismissed' for close) the user chose. */
 export function reportDesktopAction(ref: DesktopNotificationRef, actionKey: string): void {
-  window.hermesOS?.desktopNotifications?.action(ref.id, actionKey).catch(() => undefined)
+  window.heraldOS?.desktopNotifications?.action(ref.id, actionKey).catch(() => undefined)
 }
 
 /** The user activated a desktop notification: report the chosen key and drop it from the list. */
@@ -149,7 +149,7 @@ export function notifyFromDesktop(incoming: IncomingNotification): HermesNotific
 
 /** Subscribe to desktop notifications when the bridge offers them (panels mode); no-op elsewhere. */
 export function bindDesktopNotifications(): () => void {
-  const bridge = window.hermesOS?.desktopNotifications
+  const bridge = window.heraldOS?.desktopNotifications
 
   if (!bridge || typeof bridge.onIncoming !== 'function') {
     return () => undefined

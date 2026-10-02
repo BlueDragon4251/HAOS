@@ -15,7 +15,7 @@ const common = {
   minify: false,
   logLevel: 'info',
   define: {
-    'process.env.HERMES_OS_BUILD_MODE': JSON.stringify(dev ? 'development' : 'production')
+    'process.env.HERALD_OS_BUILD_MODE': JSON.stringify(dev ? 'development' : 'production')
   }
 }
 

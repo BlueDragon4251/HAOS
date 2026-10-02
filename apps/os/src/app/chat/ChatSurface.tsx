@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { BrandMark } from '../../components/brand-mark.tsx'
+import { HermesMark } from '../../components/hermes-mark.tsx'
 import { Badge } from '../../components/ui/primitives.tsx'
 import { $activeChat, interruptChat, runSlash, sendPrompt } from '../../store/chat.ts'
 import { $connection } from '../../store/gateway.ts'
@@ -37,7 +37,7 @@ export function ChatSurface() {
           <Transcript chat={chat} />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6">
-            <BrandMark size={36} />
+            <HermesMark size={36} />
             <div className="text-center">
               <div className="text-[18px] font-medium tracking-tight">Hermes</div>
               <div className="mt-1 text-[13px] text-fg-3">Your computer, in conversation.</div>

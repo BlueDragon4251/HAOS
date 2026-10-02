@@ -49,9 +49,9 @@ function GeneralSettings() {
   const env = useStore($env)
 
   return (
-    <SurfaceFrame title="General" subtitle={env ? `Hermes OS ${env.version}` : undefined}>
+    <SurfaceFrame title="General" subtitle={env ? `Herald OS ${env.version}` : undefined}>
       <div className="max-w-2xl divide-y divide-hairline">
-        <Row title="Launch fullscreen" description="Hermes OS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time.">
+        <Row title="Launch fullscreen" description="Herald OS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time.">
           <Switch checked={prefs.fullscreenOnLaunch} onChange={next => void updatePrefs({ fullscreenOnLaunch: next })} label="Launch fullscreen" />
         </Row>
         <Row title="Reduce motion" description="Disable non-essential animation.">
@@ -71,8 +71,8 @@ function GeneralSettings() {
             ))}
           </div>
         </Row>
-        <Row title="Quit Hermes OS" description="Stops the Hermes backend this shell started and returns to macOS.">
-          <Button variant="danger" size="sm" onClick={() => void window.hermesOS.window.quit()}>
+        <Row title="Quit Herald OS" description="Stops the Hermes backend this shell started and returns to macOS.">
+          <Button variant="danger" size="sm" onClick={() => void window.heraldOS.window.quit()}>
             Quit
           </Button>
         </Row>
@@ -166,7 +166,7 @@ function DirectToolsRow() {
   return (
     <Row
       title="Direct system tools"
-      description="Keep the Hermes OS tools in every session's tool list so Hermes reaches for them first. Off defers them behind Hermes's tool search (fewer prompt tokens, but the agent tends to fall back to shell commands)."
+      description="Keep the Herald OS tools in every session's tool list so Hermes reaches for them first. Off defers them behind Hermes's tool search (fewer prompt tokens, but the agent tends to fall back to shell commands)."
     >
       <Switch checked={direct} onChange={next => void toggle(next)} label="Direct system tools" />
       {busy && <span className="text-[11px] text-fg-4">saving</span>}
@@ -175,8 +175,8 @@ function DirectToolsRow() {
 }
 
 function PermissionSettings() {
-  const policy = useLocalData(() => window.hermesOS.bridge.readPolicy())
-  const audit = useLocalData(() => window.hermesOS.bridge.readAudit(200))
+  const policy = useLocalData(() => window.heraldOS.bridge.readPolicy())
+  const audit = useLocalData(() => window.heraldOS.bridge.readAudit(200))
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? policy.data ?? ''
   const dirty = draft !== null && draft !== policy.data
@@ -187,7 +187,7 @@ function PermissionSettings() {
 
   const save = async () => {
     try {
-      await window.hermesOS.bridge.writePolicy(text)
+      await window.heraldOS.bridge.writePolicy(text)
       notify({ title: 'Permissions saved', body: 'The system bridge reads the policy on its next action.', level: 'success' })
       policy.reload()
     } catch (error) {
@@ -254,7 +254,7 @@ function BackendSettings() {
   const connection = useStore($connection)
   const [log, setLog] = useState<string[]>([])
 
-  const loadLog = () => void window.hermesOS.backend.logTail(300).then(setLog)
+  const loadLog = () => void window.heraldOS.backend.logTail(300).then(setLog)
 
   useEffect(loadLog, [backend.phase])
 
@@ -267,7 +267,7 @@ function BackendSettings() {
           <Button variant="ghost" size="sm" onClick={loadLog}>
             Refresh log
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => void window.hermesOS.backend.restart()}>
+          <Button variant="secondary" size="sm" onClick={() => void window.heraldOS.backend.restart()}>
             Restart Hermes
           </Button>
         </>
@@ -283,7 +283,7 @@ function BackendSettings() {
         <Row title="Runtime" description={backend.runtime ? backend.runtime.command.join(' ') : '—'}>
           {backend.runtime && <Badge tone="muted">{backend.runtime.kind}</Badge>}
         </Row>
-        <Row title="Update Hermes" description="Hermes OS runs whatever `hermes update` installs. Run it in the Terminal, then restart Hermes here." />
+        <Row title="Update Hermes" description="Herald OS runs whatever `hermes update` installs. Run it in the Terminal, then restart Hermes here." />
       </div>
       {backend.error && <div className="mt-4"><ErrorNote message={backend.error} /></div>}
       <pre className="selectable mt-6 max-h-[420px] overflow-auto rounded-md bg-surface p-3 font-mono text-[11px] leading-relaxed text-fg-3 hairline">{log.join('\n') || 'No log output yet.'}</pre>

@@ -45,7 +45,7 @@ export function useNativeView(viewId: string | null, element: RefObject<HTMLElem
       const radius = frame ? Number.parseFloat(getComputedStyle(frame).borderBottomLeftRadius) || 0 : 0
       // Leave room for the voice pill and action captions; a sliver of page is not worth showing.
       const trimmed = trimAround({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }, Object.values(avoid))
-      window.hermesOS.web.setBounds(viewId, { ...trimmed, radius }, visible && trimmed.height >= 60 && trimmed.width >= 60)
+      window.heraldOS.web.setBounds(viewId, { ...trimmed, radius }, visible && trimmed.height >= 60 && trimmed.width >= 60)
     }
 
     report()

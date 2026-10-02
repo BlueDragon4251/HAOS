@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the cloud-init NoCloud seed (cidata.iso) that turns a stock Fedora Cloud image into a
-# Hermes OS Linux machine on first boot: creates the `hermes` user, installs an SSH key, embeds
+# Herald OS Linux machine on first boot: creates the `hermes` user, installs an SSH key, embeds
 # the `linux/` payload (provisioner, session files, dev scripts) and runs the provisioner.
 #
 #   bash linux/vm/make-seed.sh            # writes linux/vm/build/cidata.iso
@@ -21,7 +21,7 @@ rm -f "$SEED/user-data" "$SEED/meta-data"
 # SSH key used by linux/dev/push.sh and the verification scripts.
 if [[ ! -f "$KEY" ]]; then
   echo "==> Generating SSH key $KEY"
-  ssh-keygen -q -t ed25519 -N '' -C 'hermes-os-dev' -f "$KEY"
+  ssh-keygen -q -t ed25519 -N '' -C 'herald-os-dev' -f "$KEY"
 fi
 PUBKEY="$(cat "$KEY.pub")"
 
@@ -34,13 +34,13 @@ HERMES_REF="$(sed -n 's/^sha=//p' "$ROOT/upstream/UPSTREAM.lock" | tr -d '[:spac
 PAYLOAD_B64="$(cd "$LINUX_DIR" && COPYFILE_DISABLE=1 tar czf - --exclude './vm/build' . | base64 | tr -d '\n')"
 
 cat >"$SEED/meta-data" <<EOF
-instance-id: hermes-os-$(date +%Y%m%d%H%M%S)
-local-hostname: hermes-os
+instance-id: herald-os-$(date +%Y%m%d%H%M%S)
+local-hostname: herald-os
 EOF
 
 cat >"$SEED/user-data" <<EOF
 #cloud-config
-hostname: hermes-os
+hostname: herald-os
 preserve_hostname: false
 timezone: $(readlink /etc/localtime | sed 's|.*/zoneinfo/||' || echo UTC)
 
@@ -63,25 +63,25 @@ disable_root: true
 
 # UTM (Apple Virtualization backend) exposes a VirtioFS share by tag; harmless when absent.
 mounts:
-  - ["hermes-os", "/mnt/hermes-os", "virtiofs", "defaults,nofail,x-systemd.device-timeout=5", "0", "0"]
+  - ["herald-os", "/mnt/herald-os", "virtiofs", "defaults,nofail,x-systemd.device-timeout=5", "0", "0"]
 
 write_files:
-  - path: /etc/hermes-os/ref
+  - path: /etc/herald-os/ref
     permissions: '0644'
     content: |
       HERMES_REF=${HERMES_REF}
-  - path: /usr/local/share/hermes-os-linux.tar.gz
+  - path: /usr/local/share/herald-os-linux.tar.gz
     permissions: '0644'
     encoding: b64
     content: ${PAYLOAD_B64}
 
 runcmd:
-  - [mkdir, -p, /usr/local/share/hermes-os-linux]
-  - [tar, -xzf, /usr/local/share/hermes-os-linux.tar.gz, -C, /usr/local/share/hermes-os-linux]
-  - [chmod, -R, a+rX, /usr/local/share/hermes-os-linux]
-  - [bash, /usr/local/share/hermes-os-linux/provision.sh]
+  - [mkdir, -p, /usr/local/share/herald-os-linux]
+  - [tar, -xzf, /usr/local/share/herald-os-linux.tar.gz, -C, /usr/local/share/herald-os-linux]
+  - [chmod, -R, a+rX, /usr/local/share/herald-os-linux]
+  - [bash, /usr/local/share/herald-os-linux/provision.sh]
 
-final_message: "Hermes OS Linux provisioned after \$UPTIME seconds"
+final_message: "Herald OS Linux provisioned after \$UPTIME seconds"
 EOF
 
 rm -f "$BUILD/cidata.iso"

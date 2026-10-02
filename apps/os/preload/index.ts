@@ -5,14 +5,14 @@ import {
   type BackendState,
   type CalendarResult,
   type ClipboardEntry,
-  type HermesOsResult,
+  type HeraldOsResult,
   type IncomingNotification,
   type PowerAction,
   type DirEntry,
   type EditAction,
   type EnvInfo,
   type FilePreview,
-  type HermesOSPrefs,
+  type HeraldOSPrefs,
   type ImageInfo,
   type InstalledApp,
   IPC,
@@ -156,14 +156,14 @@ const api = {
     close: (surface?: ShellSurface): Promise<void> => ipcRenderer.invoke(IPC.shellClose, surface),
     /** Deliver a command to another surface (e.g. the command overlay asking main to send a prompt). */
     relay: (target: ShellSurface, command: ShellCommand): Promise<void> => ipcRenderer.invoke(IPC.shellRelay, target, command),
-    /** Commands arriving for this surface: from the `hermes-os` CLI (hotkeys) or another surface. */
+    /** Commands arriving for this surface: from the `herald-os` CLI (hotkeys) or another surface. */
     onCommand: (listener: (command: ShellCommand) => void): Unsubscribe => subscribe(IPC.shellCommand, listener),
     /** Ask main to resize this surface window (overlays size to their content). */
     resize: (width: number, height: number): Promise<void> => ipcRenderer.invoke(IPC.shellResize, width, height),
     /** Wallpaper surface only: hand a rendered PNG frame to main for swaybg. */
     wallpaperFrame: (dataUrl: string): Promise<void> => ipcRenderer.invoke(IPC.shellWallpaperFrame, dataUrl),
-    /** Run a `hermes-os` CLI command from the shell (Linux; rejects elsewhere). */
-    hermesOs: (args: string[]): Promise<HermesOsResult> => ipcRenderer.invoke(IPC.shellHermesOs, args),
+    /** Run a `herald-os` CLI command from the shell (Linux; rejects elsewhere). */
+    heraldOs: (args: string[]): Promise<HeraldOsResult> => ipcRenderer.invoke(IPC.shellHeraldOs, args),
     /** Suspend, reboot, power off, log out, or lock. */
     power: (action: PowerAction): Promise<void> => ipcRenderer.invoke(IPC.shellPower, action)
   },
@@ -199,10 +199,10 @@ const api = {
     action: (action: WmAction): Promise<void> => ipcRenderer.invoke(IPC.wmAction, action)
   },
   prefs: {
-    get: (): Promise<HermesOSPrefs> => ipcRenderer.invoke(IPC.prefsGet),
-    set: (patch: Partial<HermesOSPrefs>): Promise<HermesOSPrefs> => ipcRenderer.invoke(IPC.prefsSet, patch),
+    get: (): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.prefsGet),
+    set: (patch: Partial<HeraldOSPrefs>): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.prefsSet, patch),
     /** Preferences changed from another surface window. */
-    onChanged: (listener: (prefs: HermesOSPrefs) => void): Unsubscribe => subscribe(IPC.prefsChanged, listener)
+    onChanged: (listener: (prefs: HeraldOSPrefs) => void): Unsubscribe => subscribe(IPC.prefsChanged, listener)
   },
   osControl: {
     /** Main asks this window to run a registry command / list commands / report state. */
@@ -227,6 +227,6 @@ const api = {
   env: (): Promise<EnvInfo> => ipcRenderer.invoke(IPC.envInfo)
 }
 
-export type HermesOSApi = typeof api
+export type HeraldOSApi = typeof api
 
-contextBridge.exposeInMainWorld('hermesOS', api)
+contextBridge.exposeInMainWorld('heraldOS', api)

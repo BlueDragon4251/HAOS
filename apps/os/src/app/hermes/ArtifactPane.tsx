@@ -71,7 +71,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const editor = useRef<HTMLTextAreaElement>(null)
-  const file = useLocalData<FilePreview | null>(() => (artifact ? window.hermesOS.fs.readFile(artifact.path) : Promise.resolve(null)), [artifact?.path, artifact?.ts])
+  const file = useLocalData<FilePreview | null>(() => (artifact ? window.heraldOS.fs.readFile(artifact.path) : Promise.resolve(null)), [artifact?.path, artifact?.ts])
   const editable = Boolean(artifact && isEditable(artifact.name) && file.data?.kind === 'text')
   const kind = artifact ? artifactKind(artifact.name) : 'other'
   const showToolbar = tab === 'preview' && editable
@@ -99,7 +99,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
     setSaving(true)
 
     try {
-      await window.hermesOS.fs.writeText(artifact.path, draft)
+      await window.heraldOS.fs.writeText(artifact.path, draft)
       notify({ title: 'Saved', body: artifact.name, level: 'success', surface: 'hermes' })
       $editing.set(false)
       file.reload()
@@ -125,7 +125,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
 
     const body = kind === 'markdown' || extensionOf(artifact.name) === 'txt' ? renderToStaticMarkup(<Markdown text={text} className="prose-document" />) : `<pre>${escapeHtml(text)}</pre>`
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(artifact.name)}</title><style>${PDF_STYLE}</style></head><body>${body}</body></html>`
-    const saved = await window.hermesOS.fs.exportPdf(html, artifact.name.replace(/\.[a-z0-9]{1,6}$/i, ''))
+    const saved = await window.heraldOS.fs.exportPdf(html, artifact.name.replace(/\.[a-z0-9]{1,6}$/i, ''))
 
     if (saved) {
       notify({ title: 'Exported PDF', body: saved, level: 'success', surface: 'hermes' })
@@ -216,7 +216,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
               setExportOpen(false)
 
               if (artifact) {
-                void window.hermesOS.fs.reveal(artifact.path)
+                void window.heraldOS.fs.reveal(artifact.path)
               }
             }}
           >
@@ -239,7 +239,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
               setExportOpen(false)
 
               if (artifact) {
-                void window.hermesOS.fs.openPath(artifact.path)
+                void window.heraldOS.fs.openPath(artifact.path)
               }
             }}
           >
@@ -251,7 +251,7 @@ export function ArtifactPane({ chat }: { chat: ChatState | null }) {
               setExportOpen(false)
 
               if (artifact) {
-                void window.hermesOS.fs.reveal(artifact.path)
+                void window.heraldOS.fs.reveal(artifact.path)
               }
             }}
           >
@@ -356,7 +356,7 @@ function Document({ artifact, file, loading, error, zoom }: { artifact: Artifact
   }
 
   if (error || !file) {
-    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={error ?? 'The file is not on disk any more.'} action={<GlassButton size="sm" onClick={() => void window.hermesOS.fs.reveal(artifact.path)}>{revealLabel()}</GlassButton>} />
+    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={error ?? 'The file is not on disk any more.'} action={<GlassButton size="sm" onClick={() => void window.heraldOS.fs.reveal(artifact.path)}>{revealLabel()}</GlassButton>} />
   }
 
   if (file.kind === 'image' && file.content) {
@@ -389,7 +389,7 @@ function Document({ artifact, file, loading, error, zoom }: { artifact: Artifact
 }
 
 function BinaryPreview({ artifact, file, zoom }: { artifact: Artifact; file: FilePreview; zoom: number }) {
-  const thumb = useLocalData(() => window.hermesOS.fs.thumbnail(artifact.path, 800), [artifact.path, artifact.ts])
+  const thumb = useLocalData(() => window.heraldOS.fs.thumbnail(artifact.path, 800), [artifact.path, artifact.ts])
 
   return (
     <div className="flex flex-col items-center gap-4 rounded-xl bg-white/95 px-8 py-8 text-[#0b1230] shadow-card" style={{ zoom: zoom / 100 }}>
@@ -400,7 +400,7 @@ function BinaryPreview({ artifact, file, zoom }: { artifact: Artifact; file: Fil
           {extensionOf(artifact.name).toUpperCase() || 'File'} · {formatBytes(file.size)}
         </div>
       </div>
-      <GlassButton size="sm" variant="primary" onClick={() => void window.hermesOS.fs.openPath(artifact.path)}>
+      <GlassButton size="sm" variant="primary" onClick={() => void window.heraldOS.fs.openPath(artifact.path)}>
         <IconExternalLink />
         Open in default app
       </GlassButton>
@@ -431,7 +431,7 @@ function Sources({ chat }: { chat: ChatState | null }) {
             </div>
           </div>
           {row.kind === 'file' && (
-            <button type="button" aria-label={revealLabel()} title={revealLabel()} onClick={() => void window.hermesOS.fs.reveal(row.target)} className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg">
+            <button type="button" aria-label={revealLabel()} title={revealLabel()} onClick={() => void window.heraldOS.fs.reveal(row.target)} className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg">
               <IconFolder size={15} />
             </button>
           )}
@@ -439,7 +439,7 @@ function Sources({ chat }: { chat: ChatState | null }) {
             type="button"
             aria-label={row.kind === 'url' ? 'Open in browser' : 'Open'}
             title={row.kind === 'url' ? 'Open in browser' : 'Open'}
-            onClick={() => void (row.kind === 'url' ? window.hermesOS.shell.openExternal(row.target) : window.hermesOS.fs.openPath(row.target))}
+            onClick={() => void (row.kind === 'url' ? window.heraldOS.shell.openExternal(row.target) : window.heraldOS.fs.openPath(row.target))}
             className="flex size-7 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg"
           >
             <IconExternalLink size={15} />

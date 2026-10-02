@@ -26,12 +26,12 @@ interface AskState {
 /**
  * Panels mode: one transparent overlay window (680 wide) niri centres over everything. The inbound
  * command picks what it shows: ask (about the focused window), the command palette, the launcher,
- * the Hermes OS menu, power actions or clipboard history. Escape (or losing focus) closes it.
+ * the Herald OS menu, power actions or clipboard history. Escape (or losing focus) closes it.
  */
 export function CommandSurface() {
   const [mode, setMode] = useState<Mode | null>(null)
   const [ask, setAsk] = useState<AskState>({ text: '', context: null, attachments: [] })
-  // `hermes-os menu <item>` (and the menu bar's update dot) open the control menu on one item.
+  // `herald-os menu <item>` (and the menu bar's update dot) open the control menu on one item.
   const [menuItem, setMenuItem] = useState<string | undefined>(undefined)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -87,7 +87,7 @@ export function CommandSurface() {
 
       if (height > 0 && height !== lastHeight) {
         lastHeight = height
-        window.hermesOS.shell.resize(WINDOW_WIDTH, height).catch(() => undefined)
+        window.heraldOS.shell.resize(WINDOW_WIDTH, height).catch(() => undefined)
       }
     }
     const observer = new ResizeObserver(fit)

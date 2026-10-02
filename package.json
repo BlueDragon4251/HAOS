@@ -1,9 +1,16 @@
 {
-  "name": "hermes-os",
+  "name": "herald-os",
   "version": "0.1.0-alpha.1",
   "private": true,
-  "description": "Hermes OS: an agent-native desktop environment powered by Hermes Agent.",
+  "description": "Herald OS: an agent-native desktop environment powered by Hermes Agent.",
   "license": "MIT",
+  "author": "Luke The Dev",
+  "homepage": "https://github.com/iamlukethedev/Herald-OS",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamlukethedev/Herald-OS.git"
+  },
+  "bugs": "https://github.com/iamlukethedev/Herald-OS/issues",
   "type": "module",
   "workspaces": [
     "apps/*",

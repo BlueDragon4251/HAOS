@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, Notification, shell } from 'electron'
 import os from 'node:os'
 import path from 'node:path'
-import { type EnvInfo, type HermesOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
+import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
 import { BackendManager } from './backend/manager.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
@@ -12,7 +12,8 @@ import { applyVoiceHotkey, registerVoiceIpc } from './ipc/voice.ts'
 import { registerEditIpc } from './ipc/edit.ts'
 import { registerWebIpc } from './ipc/web.ts'
 import { log, logTail } from './log.ts'
-import { hermesHome, hermesOsDataDir, isDev } from './paths.ts'
+import { migrateLegacyData } from './migrate.ts'
+import { hermesHome, heraldOsDataDir, isDev } from './paths.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
 import { ControlSocket } from './shell/control-socket.ts'
 import { shellMode } from './shell/mode.ts'
@@ -21,7 +22,13 @@ import { handleUiRequest, OsCommandBridge, OsControlServer, osControlToken } fro
 import { PanelShell } from './shell/panels.ts'
 import { registerServiceIpc } from './shell/services.ts'
 import { WallpaperService } from './shell/wallpaper.ts'
-import { createMainWindow } from './window.ts'
+import { appIconPath, createMainWindow } from './window.ts'
+
+app.setName('Herald OS')
+
+for (const line of migrateLegacyData({ hermesHome: hermesHome(), appData: app.getPath('appData'), userData: app.getPath('userData') })) {
+  log('migrate', line)
+}
 
 const backend = new BackendManager()
 let mainWindow: BrowserWindow | null = null
@@ -45,7 +52,7 @@ const control = panels
     )
   : null
 // Desktop mode has no compositor CLI socket; the OS control server gives it the same `ui*` surface.
-const osControlPath = panels ? path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`, 'hermes-os', 'control.sock') : path.join(hermesOsDataDir(), 'control.sock')
+const osControlPath = panels ? path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`, 'herald-os', 'control.sock') : path.join(heraldOsDataDir(), 'control.sock')
 const osControl = panels
   ? null
   : new OsControlServer(osControlPath, async request => {
@@ -92,8 +99,6 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 
-app.setName('Hermes OS')
-
 function windowState(win: BrowserWindow): WindowState {
   return { fullscreen: win.isFullScreen(), focused: win.isFocused() }
 }
@@ -133,7 +138,7 @@ function registerCoreIpc(): void {
   })
 
   ipcMain.handle(IPC.prefsGet, () => readPrefs())
-  ipcMain.handle(IPC.prefsSet, (_event, patch: Partial<HermesOSPrefs>) => {
+  ipcMain.handle(IPC.prefsSet, (_event, patch: Partial<HeraldOSPrefs>) => {
     const next = writePrefs(patch)
 
     if ('wallpaper' in patch) {
@@ -201,7 +206,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  log('main', `Hermes OS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
+  log('main', `Herald OS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
+  // A packaged app carries its icon in the bundle; `electron .` would show Electron's.
+  const icon = isDev ? appIconPath() : undefined
+
+  if (icon && process.platform === 'darwin') {
+    app.dock?.setIcon(icon)
+  }
+
   registerCoreIpc()
   backend.onState(state => {
     for (const win of BrowserWindow.getAllWindows()) {

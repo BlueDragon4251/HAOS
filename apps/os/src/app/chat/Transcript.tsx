@@ -1,6 +1,6 @@
 import { IconChevronRight } from '@tabler/icons-react'
 import { memo, useEffect, useRef, useState } from 'react'
-import { BrandMark } from '../../components/brand-mark.tsx'
+import { HermesMark } from '../../components/hermes-mark.tsx'
 import { cn } from '../../lib/cn.ts'
 import type { AssistantMessage, ChatMessage, ChatState } from '../../lib/chat-model.ts'
 import { Markdown } from './Markdown.tsx'
@@ -85,7 +85,7 @@ function Assistant({ message }: { message: AssistantMessage }) {
   return (
     <div className="flex gap-3">
       <div className="mt-1.5 flex size-5 shrink-0 items-center justify-center">
-        <BrandMark size={14} className={cn(message.streaming && 'animate-pulse-soft')} />
+        <HermesMark size={14} className={cn(message.streaming && 'animate-pulse-soft')} />
       </div>
       <div className="min-w-0 flex-1">
         {hasReasoning && (

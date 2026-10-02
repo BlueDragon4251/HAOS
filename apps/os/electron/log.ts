@@ -14,7 +14,7 @@ function ensureStream(): fs.WriteStream | null {
   try {
     const dir = path.join(hermesHome(), 'logs')
     fs.mkdirSync(dir, { recursive: true })
-    stream = fs.createWriteStream(path.join(dir, 'hermes-os.log'), { flags: 'a' })
+    stream = fs.createWriteStream(path.join(dir, 'herald-os.log'), { flags: 'a' })
   } catch {
     stream = null
   }

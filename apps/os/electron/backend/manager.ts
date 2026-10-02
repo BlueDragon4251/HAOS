@@ -4,8 +4,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { AudioWsKind, BackendRuntime, BackendState, RestRequest } from '../../shared/ipc.ts'
+import { osEnv } from '../env.ts'
 import { log } from '../log.ts'
-import { hermesHome, hermesOsDataDir } from '../paths.ts'
+import { hermesHome, heraldOsDataDir } from '../paths.ts'
 import { waitForStatus } from './probe.ts'
 import { LineBuffer, parseReadyLine } from './ready.ts'
 import { resolveBackendRuntime } from './resolve.ts'
@@ -144,7 +145,7 @@ export class BackendManager {
       this.update({
         phase: 'failed',
         error:
-          'No Hermes runtime found. Install Hermes Agent (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash) or set HERMES_OS_HERMES_ROOT.'
+          'No Hermes runtime found. Install Hermes Agent (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash) or set HERALD_OS_HERMES_ROOT.'
       })
 
       return
@@ -185,8 +186,8 @@ export class BackendManager {
     this.token = crypto.randomBytes(32).toString('base64url')
     const [command, ...head] = runtime.command
     const args = [...head, 'serve', '--host', '127.0.0.1', '--port', '0']
-    const readyFile = path.join(hermesOsDataDir(), `backend-ready-${process.pid}.json`)
-    fs.mkdirSync(hermesOsDataDir(), { recursive: true })
+    const readyFile = path.join(heraldOsDataDir(), `backend-ready-${process.pid}.json`)
+    fs.mkdirSync(heraldOsDataDir(), { recursive: true })
     fs.rmSync(readyFile, { force: true })
 
     const env: NodeJS.ProcessEnv = {
@@ -194,16 +195,16 @@ export class BackendManager {
       PATH: await loginShellPath(),
       HERMES_HOME: hermesHome(),
       // Sessions start in the user's world, not inside the runtime checkout.
-      TERMINAL_CWD: process.env.HERMES_OS_DEFAULT_CWD || os.homedir(),
+      TERMINAL_CWD: osEnv('DEFAULT_CWD') || os.homedir(),
       HERMES_DASHBOARD_SESSION_TOKEN: this.token,
       // The loopback token exemption, in-process cron ticker and orphan reaping upstream key on
-      // this flag; Hermes OS spawns and owns the backend exactly the way Desktop does.
+      // this flag; Herald OS spawns and owns the backend exactly the way Desktop does.
       HERMES_DESKTOP: '1',
-      HERMES_OS: '1',
+      HERALD_OS: '1',
       HERMES_PARENT_PID: String(process.pid),
       HERMES_DESKTOP_READY_FILE: readyFile,
       PYTHONUNBUFFERED: '1',
-      ...(this.control ? { HERMES_OS_CONTROL_SOCKET: this.control.socketPath, HERMES_OS_CONTROL_TOKEN: this.control.token } : {})
+      ...(this.control ? { HERALD_OS_CONTROL_SOCKET: this.control.socketPath, HERALD_OS_CONTROL_TOKEN: this.control.token } : {})
     }
     delete env.ELECTRON_RUN_AS_NODE
 

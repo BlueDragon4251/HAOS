@@ -1,4 +1,4 @@
-import type { SessionListRow } from '@hermes-os/client'
+import type { SessionListRow } from '@herald-os/client'
 import { atom } from 'nanostores'
 import type { DirEntry } from '../../../shared/ipc.ts'
 
@@ -255,7 +255,7 @@ async function readMemoryFile(hermesHome: string, file: MemoryFile, listing: rea
     return { file, path, exists: false, modifiedAt: 0, truncated: false, texts: [] }
   }
 
-  const preview = await window.hermesOS.fs.readFile(path)
+  const preview = await window.heraldOS.fs.readFile(path)
 
   if (preview.kind !== 'text') {
     // Binary or too large to preview: show nothing rather than a garbled list, and never write back.
@@ -281,7 +281,7 @@ export async function loadMemory(hermesHome: string): Promise<void> {
     let listing: DirEntry[] = []
 
     try {
-      listing = await window.hermesOS.fs.readDir(memoriesDir(hermesHome))
+      listing = await window.heraldOS.fs.readDir(memoriesDir(hermesHome))
     } catch {
       // No memories folder yet: both files are simply absent.
     }
@@ -321,13 +321,13 @@ async function commitFile(hermesHome: string, file: MemoryFile, texts: string[])
   try {
     if (!current?.exists) {
       try {
-        await window.hermesOS.fs.mkdir(memoriesDir(hermesHome))
+        await window.heraldOS.fs.mkdir(memoriesDir(hermesHome))
       } catch {
         // Folder probably exists already; the write below reports real failures.
       }
     }
 
-    await window.hermesOS.fs.writeText(memoryPath(hermesHome, file), serialize(texts))
+    await window.heraldOS.fs.writeText(memoryPath(hermesHome, file), serialize(texts))
   } finally {
     await loadMemory(hermesHome)
   }

@@ -1,8 +1,0 @@
-[Plymouth Theme]
-Name=Hermes OS
-Description=Hermes OS boot splash: the Hermes mark on a deep-blue field with a soft pulse.
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/hermes-os
-ScriptFile=/usr/share/plymouth/themes/hermes-os/hermes-os.script

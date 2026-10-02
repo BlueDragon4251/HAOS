@@ -15,7 +15,7 @@ Borrowed from the field (see `LANDSCAPE.md` for the source of each):
 - Whole-environment themes driven by Hermes skins; agent-authored themes (Omarchy).
 - Agent Task Manager: per-session resources, tokens, approvals, stop (OpenNeo).
 - Live "Hermes is acting" banner with Interrupt during GUI automation (SomaOS).
-- `hermes-os-tailor` skill so Hermes can reconfigure Hermes OS itself (Omarchy).
+- `herald-os-tailor` skill so Hermes can reconfigure Herald OS itself (Omarchy).
 - `system_shortcut` tool over macOS Shortcuts / App Intents (Apple).
 
 Also planned:
@@ -33,7 +33,7 @@ Also planned:
   Windows Search for file search), NSIS installer.
 - Signed and notarized macOS builds; auto-update channel.
 
-## Hermes OS Linux
+## Herald OS Linux
 
 No custom kernel at any stage. See `docs/LINUX.md` and ADR-012.
 

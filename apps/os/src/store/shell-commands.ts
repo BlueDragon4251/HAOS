@@ -1,7 +1,7 @@
 import type { ShellCommand } from '../../shared/ipc.ts'
 import { PAGES, type PageId } from '../app/apps.ts'
 import { composePrompt } from '../app/surfaces/shell-utils.ts'
-import { runHermesOsWithToast } from '../lib/hermes-os-cli.ts'
+import { runHeraldOsWithToast } from '../lib/herald-os-cli.ts'
 import { updatePrefs } from './backend.ts'
 import { openStoredSession, runSlash, sendPrompt } from './chat.ts'
 import { $notificationsOpen, notify } from './notifications.ts'
@@ -11,7 +11,7 @@ import { $applicationsOpen, toggleCommandBar } from './surface.ts'
 import { showPage } from './windows.ts'
 
 /*
- * `ShellCommand`s addressed to the Hermes window: from the `hermes-os` CLI (compositor hotkeys), the
+ * `ShellCommand`s addressed to the Hermes window: from the `herald-os` CLI (compositor hotkeys), the
  * command overlay (panels mode) and the Electron control server. One handler serves the macOS
  * desktop window and the panels-mode main surface alike, so every hotkey the Linux session has works
  * on the Mac too. Voice commands are handled by store/voice.ts on the same bus.
@@ -22,7 +22,7 @@ const isPageId = (value: string | undefined): value is PageId => PAGES.some(page
 /** Style > Wallpaper: the Hermes window owns the file dialog because the overlay closes when it loses focus. */
 async function pickWallpaper(): Promise<void> {
   try {
-    const [wallpaper] = await window.hermesOS.fs.pickFiles({ multiple: false })
+    const [wallpaper] = await window.heraldOS.fs.pickFiles({ multiple: false })
 
     if (!wallpaper) {
       return
@@ -96,12 +96,12 @@ export function handleShellCommand(command: ShellCommand): void {
       $applicationsOpen.set(true)
 
       return
-    case 'hermes-os': {
+    case 'herald-os': {
       // The overlay hands off commands that must run after it closed (screenshot, OCR, hotkey overlay).
       const args = command.args ?? []
 
       if (args.length > 0) {
-        void runHermesOsWithToast(args, command.text || args.join(' '))
+        void runHeraldOsWithToast(args, command.text || args.join(' '))
       }
 
       return
@@ -111,7 +111,7 @@ export function handleShellCommand(command: ShellCommand): void {
 
       return
     case 'os': {
-      // `hermes-os os <command.id> [json args]`: run a registry command from the CLI.
+      // `herald-os os <command.id> [json args]`: run a registry command from the CLI.
       const id = command.args?.[0]
 
       if (id) {

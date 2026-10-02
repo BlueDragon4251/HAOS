@@ -98,7 +98,7 @@ export function ApplicationsPanel({ onClose, standalone = false, className }: Ap
         return
       }
 
-      window.hermesOS.apps.launch(tile.app.path).catch((error: unknown) => {
+      window.heraldOS.apps.launch(tile.app.path).catch((error: unknown) => {
         notify({ title: `Could not open ${tile.label}`, body: error instanceof Error ? error.message : String(error), level: 'error' })
       })
       close()

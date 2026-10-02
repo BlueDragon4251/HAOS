@@ -86,7 +86,7 @@ export function registerTerminalIpc(getWindow: () => BrowserWindow | null): void
       cols: Math.max(2, options.cols),
       rows: Math.max(1, options.rows),
       cwd,
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'HermesOS', LANG: process.env.LANG || 'en_US.UTF-8' }
+      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'HeraldOS', LANG: process.env.LANG || 'en_US.UTF-8' }
     })
     sessions.set(id, child)
 

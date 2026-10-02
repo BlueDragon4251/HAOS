@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import type { ApprovalChoice, ApprovalRequestParams, ClarifyRequestParams } from '@hermes-os/client'
+import type { ApprovalChoice, ApprovalRequestParams, ClarifyRequestParams } from '@herald-os/client'
 import { IconKey, IconLock, IconQuestionMark, IconShieldCheck } from '@tabler/icons-react'
 import { useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'

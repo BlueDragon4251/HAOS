@@ -19,7 +19,7 @@ export class WallpaperService {
   constructor(private readonly shell: PanelShell) {}
 
   get file(): string {
-    return path.join(os.homedir(), '.local', 'share', 'hermes-os', 'wallpaper.png')
+    return path.join(os.homedir(), '.local', 'share', 'herald-os', 'wallpaper.png')
   }
 
   start(customImage: string | undefined): void {

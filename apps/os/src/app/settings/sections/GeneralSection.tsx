@@ -22,7 +22,7 @@ export function GeneralSection() {
 
   const chooseFolder = async (key: 'defaultCwd' | 'projectsRoot' = 'defaultCwd') => {
     try {
-      const [path] = await window.hermesOS.fs.pickFiles({ directory: true })
+      const [path] = await window.heraldOS.fs.pickFiles({ directory: true })
 
       if (path) {
         await save({ [key]: path })
@@ -34,13 +34,13 @@ export function GeneralSection() {
 
   return (
     <>
-      <SectionTitle title="General" subtitle="How Hermes OS starts and where it works." />
+      <SectionTitle title="General" subtitle="How Herald OS starts and where it works." />
 
       <SettingsGroup title="Startup">
-        <SettingsRow icon={<IconMaximize />} label="Launch fullscreen" description="Hermes OS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time." keywords="full screen start">
+        <SettingsRow icon={<IconMaximize />} label="Launch fullscreen" description="Herald OS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time." keywords="full screen start">
           <Toggle checked={prefs.fullscreenOnLaunch} onChange={next => void save({ fullscreenOnLaunch: next })} label="Launch fullscreen" />
         </SettingsRow>
-        <SettingsRow icon={<IconStack2 />} label="Default Space" description="The Space Hermes OS opens in.">
+        <SettingsRow icon={<IconStack2 />} label="Default Space" description="The Space Herald OS opens in.">
           <MenuDropdown
             ariaLabel="Default Space"
             label={
@@ -75,8 +75,8 @@ export function GeneralSection() {
       </SettingsGroup>
 
       <SettingsGroup title="Session">
-        <SettingsRow icon={<IconPower />} label="Quit Hermes OS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
-          <GlassButton size="sm" variant="danger" onClick={() => void window.hermesOS.window.quit()} aria-label="Quit Hermes OS">
+        <SettingsRow icon={<IconPower />} label="Quit Herald OS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
+          <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Quit Herald OS">
             Quit
           </GlassButton>
         </SettingsRow>

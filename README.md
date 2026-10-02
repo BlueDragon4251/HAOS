@@ -1,14 +1,14 @@
-# Hermes OS
+# Herald OS
 
 An agent-native desktop environment powered by [Hermes Agent](https://github.com/NousResearch/hermes-agent).
 
-Hermes OS runs on top of macOS (Apple Silicon first) and makes Hermes the primary interface
+Herald OS runs on top of macOS (Apple Silicon first) and makes Hermes the primary interface
 between you and your computer. It is a fullscreen environment, not a chat window: Home, Hermes,
 Agents, Tasks, Skills, Files, Apps, Terminal, System and Settings surfaces, a global command bar,
 and a permission-gated system bridge that lets Hermes open apps, find files, inspect processes,
 stop things and organise folders on your behalf.
 
-Hermes OS does not fork Hermes. It drives whatever Hermes runtime you have installed
+Herald OS does not fork Hermes. It drives whatever Hermes runtime you have installed
 (`~/.hermes/hermes-agent`, kept current by `hermes update`) over its JSON-RPC and REST surface,
 and adds capability as a regular out-of-tree Hermes plugin.
 
@@ -45,15 +45,15 @@ npm run dev           # Vite + Electron; boots your Hermes runtime and goes full
 ```
 
 `Cmd+Ctrl+F` toggles fullscreen, `Cmd+K` opens the command bar, `Cmd+1..9` switch surfaces,
-`Alt+Space` starts or ends a voice conversation, `Cmd+Q` quits (and stops the backend Hermes OS
+`Alt+Space` starts or ends a voice conversation, `Cmd+Q` quits (and stops the backend Herald OS
 started).
 
 Useful environment variables while developing:
 
 | Variable | Effect |
 | --- | --- |
-| `HERMES_OS_WINDOWED=1` | Start in a normal window instead of fullscreen |
-| `HERMES_OS_HERMES_ROOT=/path/to/checkout` | Use a specific Hermes source checkout (needs its `venv/`) |
+| `HERALD_OS_WINDOWED=1` | Start in a normal window instead of fullscreen |
+| `HERALD_OS_HERMES_ROOT=/path/to/checkout` | Use a specific Hermes source checkout (needs its `venv/`) |
 | `HERMES_HOME=/tmp/throwaway` | Sandbox away from your real Hermes home |
 
 ## Build an installer
@@ -75,7 +75,7 @@ npm run test:bridge   # pytest for the system bridge plugin
 ```
 apps/os/                 Electron shell (electron/ main, preload/, src/ renderer)
 packages/hermes-client/  Re-exports the upstream gateway client + generated wire contract
-plugins/hermes-os-bridge Hermes plugin: system bridge tools, permissions, audit, skill
+plugins/herald-os-bridge Hermes plugin: system bridge tools, permissions, audit, skill
 plugins/tests/           pytest suite for the plugin
 upstream/                UPSTREAM.lock (pinned sha) + fetched snapshot (gitignored)
 docs/                    ARCHITECTURE, DECISIONS (ADRs), SYSTEM-BRIDGE, VOICE, ROADMAP, PLAN
@@ -86,7 +86,7 @@ Read `docs/ARCHITECTURE.md` first, then `docs/DECISIONS.md` for the why.
 
 ## Upstream
 
-Hermes OS tracks `NousResearch/hermes-agent`. To move the pin: edit `upstream/UPSTREAM.lock`, run
+Herald OS tracks `NousResearch/hermes-agent`. To move the pin: edit `upstream/UPSTREAM.lock`, run
 `npm run sync-upstream`, then `npm run typecheck`; a changed wire field fails the build rather than
 drifting silently.
 

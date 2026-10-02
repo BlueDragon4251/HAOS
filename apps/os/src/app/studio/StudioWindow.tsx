@@ -98,7 +98,7 @@ export function StudioWindow({ win }: { win: OSWindow }) {
     }
 
     let cancelled = false
-    window.hermesOS.fs
+    window.heraldOS.fs
       .readDir(root)
       .then(entries => !cancelled && setIndexOnDisk(entries.some(entry => entry.name === 'index.html' && entry.kind === 'file')))
       .catch(() => !cancelled && setIndexOnDisk(false))
@@ -177,7 +177,7 @@ export function StudioWindow({ win }: { win: OSWindow }) {
           <IconMessage size={15} />
         </button>
         {root && (
-          <button type="button" onClick={() => void window.hermesOS.fs.openIn('vscode', root)} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg" title="Open the project in VS Code" aria-label="Open the project in VS Code">
+          <button type="button" onClick={() => void window.heraldOS.fs.openIn('vscode', root)} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg" title="Open the project in VS Code" aria-label="Open the project in VS Code">
             <IconExternalLink size={15} />
           </button>
         )}

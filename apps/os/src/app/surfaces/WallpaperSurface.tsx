@@ -49,7 +49,7 @@ export function WallpaperSurface() {
         const dataUrl = source.toDataURL('image/png')
 
         if (!cancelled) {
-          window.hermesOS.shell.wallpaperFrame(dataUrl).catch(() => undefined)
+          window.heraldOS.shell.wallpaperFrame(dataUrl).catch(() => undefined)
         }
       } catch {
         // Nothing to fall back to here; main keeps the previous render on disk.

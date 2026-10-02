@@ -214,7 +214,7 @@ export function CommandPalette({ onClose, standalone = false, onApplications, cl
                 key={app.path}
                 value={`app:${app.name}`}
                 onSelect={() => {
-                  window.hermesOS.apps.launch(app.path).catch(() => undefined)
+                  window.heraldOS.apps.launch(app.path).catch(() => undefined)
                   close()
                 }}
                 icon={<IconArrowRight size={15} />}

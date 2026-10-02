@@ -37,16 +37,16 @@ import { HermesAvatar } from '../../components/app-icon.tsx'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { Kbd, Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
-import { CLI_UNAVAILABLE_MESSAGE, type CliOutcome, parseThemeList, runHermesOs, runHermesOsWithToast } from '../../lib/hermes-os-cli.ts'
+import { CLI_UNAVAILABLE_MESSAGE, type CliOutcome, parseThemeList, runHeraldOs, runHeraldOsWithToast } from '../../lib/herald-os-cli.ts'
 import { $env } from '../../store/backend.ts'
 import { openSurface, relayToMain } from '../../store/shell.ts'
 import { openApp, showPage } from '../../store/windows.ts'
 
 /*
- * The Hermes OS control menu (Mod+Alt+Space), modelled on Omarchy's: a tree of groups whose leaves
- * run the `hermes-os` CLI, a power action, or a shell navigation. Leaves that need input show an
+ * The Herald OS control menu (Mod+Alt+Space), modelled on Omarchy's: a tree of groups whose leaves
+ * run the `herald-os` CLI, a power action, or a shell navigation. Leaves that need input show an
  * inline form step; destructive power actions show an inline confirm step. Everything degrades to
- * "Available on Hermes OS Linux" where the CLI does not exist.
+ * "Available on Herald OS Linux" where the CLI does not exist.
  */
 
 interface FormField {
@@ -111,10 +111,10 @@ const POWER_CONFIRM: Partial<Record<PowerAction, string>> = {
 
 /** Run a power action; resolves to an inline message when the machine cannot do it here. */
 export async function runPower(action: PowerAction): Promise<string | null> {
-  const bridge = window.hermesOS?.shell?.power
+  const bridge = window.heraldOS?.shell?.power
   const platform = $env.get()?.platform
 
-  // systemctl / niri / hermes-os only exist on Hermes OS Linux; elsewhere say so instead of spawning nothing.
+  // systemctl / niri / herald-os only exist on Herald OS Linux; elsewhere say so instead of spawning nothing.
   if (typeof bridge !== 'function' || (platform && platform !== 'linux')) {
     return CLI_UNAVAILABLE_MESSAGE
   }
@@ -132,7 +132,7 @@ export async function runPower(action: PowerAction): Promise<string | null> {
 
 const field = (id: string, label: string, placeholder: string): FormField => ({ id, label, placeholder, required: true })
 
-/** The menu tree. `hermes-os` argv per leaf is spelled out inline so it doubles as documentation. */
+/** The menu tree. `herald-os` argv per leaf is spelled out inline so it doubles as documentation. */
 function buildMenu(actions: { applications: () => void; close: () => void }): MenuItem[] {
   return [
     {
@@ -187,9 +187,9 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
     {
       id: 'update',
       label: 'Update',
-      hint: 'Hermes OS',
+      hint: 'Herald OS',
       icon: IconRefresh,
-      children: [{ id: 'update-hermes-os', label: 'Hermes OS', hint: 'Fetch and apply the latest release', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } }]
+      children: [{ id: 'update-herald-os', label: 'Herald OS', hint: 'Fetch and apply the latest release', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } }]
     },
     {
       id: 'style',
@@ -338,7 +338,7 @@ type Step =
 export interface ControlMenuProps {
   onClose: () => void
   onApplications: () => void
-  /** Jump straight to an item (by id), e.g. `update-hermes-os` from the menu bar's update indicator. */
+  /** Jump straight to an item (by id), e.g. `update-herald-os` from the menu bar's update indicator. */
   initialItem?: string
 }
 
@@ -396,7 +396,7 @@ export function ControlMenu({ onClose, onApplications, initialItem }: ControlMen
     switch (leaf.kind) {
       case 'cli':
         if (leaf.detached) {
-          relayToMain({ type: 'hermes-os', args: leaf.argv, text: item.label })
+          relayToMain({ type: 'herald-os', args: leaf.argv, text: item.label })
           onClose()
         } else {
           setStep({ kind: 'run', title: item.label, argv: leaf.argv })
@@ -528,7 +528,7 @@ export function ControlMenu({ onClose, onApplications, initialItem }: ControlMen
           <HermesAvatar size={22} rounded={6} />
         )}
         <span className="flex min-w-0 items-center gap-1.5 text-[14px] font-semibold">
-          <span className={cn(title.length > 0 && 'text-fg-3')}>Hermes OS</span>
+          <span className={cn(title.length > 0 && 'text-fg-3')}>Herald OS</span>
           {title.map(label => (
             <span key={label} className="flex items-center gap-1.5">
               <IconChevronRight size={13} className="text-fg-4" />
@@ -734,7 +734,7 @@ export function PowerConfirm({ action, onCancel, onDone }: { action: PowerAction
   )
 }
 
-/** Runs one `hermes-os` command with a spinner, then shows the tail of its output. */
+/** Runs one `herald-os` command with a spinner, then shows the tail of its output. */
 function RunStep({ title, argv, onClose, onBack }: { title: string; argv: string[]; onClose: () => void; onBack: () => void }) {
   const [outcome, setOutcome] = useState<CliOutcome | null>(null)
   const doneRef = useRef<HTMLButtonElement>(null)
@@ -742,7 +742,7 @@ function RunStep({ title, argv, onClose, onBack }: { title: string; argv: string
   useEffect(() => {
     let cancelled = false
     setOutcome(null)
-    void runHermesOsWithToast(argv, title).then(result => {
+    void runHeraldOsWithToast(argv, title).then(result => {
       if (!cancelled) {
         setOutcome(result)
       }
@@ -760,7 +760,7 @@ function RunStep({ title, argv, onClose, onBack }: { title: string; argv: string
     }
   }, [outcome])
 
-  const command = `hermes-os ${argv.map(arg => (/\s/.test(arg) ? JSON.stringify(arg) : arg)).join(' ')}`
+  const command = `herald-os ${argv.map(arg => (/\s/.test(arg) ? JSON.stringify(arg) : arg)).join(' ')}`
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -793,7 +793,7 @@ function RunStep({ title, argv, onClose, onBack }: { title: string; argv: string
   )
 }
 
-/** `hermes-os theme list` as a keyboard-navigable list of choices; picking one runs `theme set <name>`. */
+/** `herald-os theme list` as a keyboard-navigable list of choices; picking one runs `theme set <name>`. */
 function ThemeStep({ onBack, onRun }: { onBack: () => void; onRun: (title: string, argv: string[]) => void }) {
   const [themes, setThemes] = useState<string[] | null>(null)
   const [current, setCurrent] = useState<string | null>(null)
@@ -804,7 +804,7 @@ function ThemeStep({ onBack, onRun }: { onBack: () => void; onRun: (title: strin
 
   useEffect(() => {
     let cancelled = false
-    void Promise.all([runHermesOs(['theme', 'list']), runHermesOs(['theme', 'current'])]).then(([list, now]) => {
+    void Promise.all([runHeraldOs(['theme', 'list']), runHeraldOs(['theme', 'current'])]).then(([list, now]) => {
       if (cancelled) {
         return
       }
@@ -928,7 +928,7 @@ export function InlineMessage({ text, tone, className }: { text: string; tone: '
   )
 }
 
-/** Power mode (`hermes-os power`): the System group as a compact card. */
+/** Power mode (`herald-os power`): the System group as a compact card. */
 export function PowerCard({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState<PowerAction | null>(null)
   const [message, setMessage] = useState<string | null>(null)

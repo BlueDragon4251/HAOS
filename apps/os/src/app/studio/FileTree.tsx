@@ -58,7 +58,7 @@ export function FileTree({ root, files, activeFile, revision, onOpen }: { root: 
   useEffect(() => {
     let cancelled = false
     const timer = setTimeout(() => {
-      window.hermesOS.fs
+      window.heraldOS.fs
         .listTree(root)
         .then(result => {
           if (!cancelled) {

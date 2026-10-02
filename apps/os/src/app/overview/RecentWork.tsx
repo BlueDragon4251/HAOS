@@ -16,7 +16,7 @@ import { FileThumb, IconTile, Shimmer } from './shared.tsx'
 
 const SHOWN = 4
 
-/** Open inside Hermes OS: folders in Files, PDFs/images/text/media in the viewer, the rest in their app. */
+/** Open inside Herald OS: folders in Files, PDFs/images/text/media in the viewer, the rest in their app. */
 function openRecent(file: RecentFile): void {
   if (file.kind === 'directory') {
     showPage('files')
@@ -29,7 +29,7 @@ function menuFor(file: RecentFile, onRemove: () => void): MenuItemDef[] {
   const items: MenuItemDef[] = [{ id: 'open', label: 'Open', icon: <IconAppWindow />, onSelect: () => openRecent(file) }]
 
   if (file.kind === 'file' && isViewable(file.path)) {
-    items.push({ id: 'open-app', label: 'Open in its app', icon: <IconExternalLink />, onSelect: () => void window.hermesOS.fs.openPath(file.path).catch(error => notify({ title: `Could not open "${file.name}"`, body: String(error), level: 'error' })) })
+    items.push({ id: 'open-app', label: 'Open in its app', icon: <IconExternalLink />, onSelect: () => void window.heraldOS.fs.openPath(file.path).catch(error => notify({ title: `Could not open "${file.name}"`, body: String(error), level: 'error' })) })
   }
 
   items.push(

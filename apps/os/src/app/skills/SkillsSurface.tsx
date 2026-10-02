@@ -1,4 +1,4 @@
-import type { AgentPluginRow } from '@hermes-os/client'
+import type { AgentPluginRow } from '@herald-os/client'
 import { IconBolt, IconRefresh } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
@@ -117,7 +117,7 @@ export function SkillsSurface() {
                         <span className="text-[13px]">{plugin.name}</span>
                         <span className="text-[11px] text-fg-4">{plugin.version}</span>
                         <Badge tone={plugin.source === 'bundled' ? 'muted' : 'accent'}>{plugin.source}</Badge>
-                        {plugin.key === 'hermes-os-bridge' && <Badge tone="ok">system bridge</Badge>}
+                        {plugin.key === 'herald-os-bridge' && <Badge tone="ok">system bridge</Badge>}
                         {plugin.update_available && <Badge tone="info">update</Badge>}
                       </div>
                       {plugin.description && <div className="mt-0.5 truncate text-[12px] text-fg-3">{plugin.description}</div>}

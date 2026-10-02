@@ -8,7 +8,7 @@ import type {
   TranscriptMessage,
   TurnStatus,
   Usage
-} from '@hermes-os/client'
+} from '@herald-os/client'
 
 export interface UserMessage {
   id: string

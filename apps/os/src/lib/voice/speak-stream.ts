@@ -57,7 +57,7 @@ export class SpeakStream {
     let url: string
 
     try {
-      url = await window.hermesOS.voice.audioWsUrl('speak-stream')
+      url = await window.heraldOS.voice.audioWsUrl('speak-stream')
     } catch (error) {
       this.finish('error', error instanceof Error ? error.message : String(error))
 

@@ -3,11 +3,11 @@
 # directory (native modules must be installed on Linux, so the tree is not used in place), build,
 # and restart the shell.
 #
-#   hermes-os-sync              # /mnt/hermes-os -> ~/Hermes-OS, build, restart
+#   herald-os-sync              # /mnt/herald-os -> ~/Herald-OS, build, restart
 set -euo pipefail
 
-SRC="${HERMES_OS_SHARE:-/mnt/hermes-os}"
-REPO="${HERMES_OS_REPO:-$HOME/Hermes-OS}"
+SRC="${HERALD_OS_SHARE:-/mnt/herald-os}"
+REPO="${HERALD_OS_REPO:-$HOME/Herald-OS}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 mountpoint -q "$SRC" || [[ -d "$SRC/apps/os" ]] || { echo "shared folder not mounted at $SRC" >&2; exit 1; }

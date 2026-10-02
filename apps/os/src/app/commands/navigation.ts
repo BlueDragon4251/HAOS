@@ -107,7 +107,7 @@ export const navigationCommands: readonly OsCommand[] = [
   {
     id: 'page.open',
     title: 'Open a page or app',
-    description: 'Show a Hermes OS page (overview, hermes, missions, memory, files, automations, connections, settings) or open an app (terminal, system).',
+    description: 'Show a Herald OS page (overview, hermes, missions, memory, files, automations, connections, settings) or open an app (terminal, system).',
     tier: 'read',
     args: [{ name: 'name', type: 'string', description: 'Page or app name', required: true }],
     phrases: ['open the {name} page', 'switch to {name}', 'go to the {name} page'],
@@ -252,7 +252,7 @@ export const navigationCommands: readonly OsCommand[] = [
     args: [],
     phrases: ['toggle fullscreen', 'go fullscreen', 'fullscreen', 'exit fullscreen', 'leave fullscreen', 'enter fullscreen'],
     run: async () => {
-      await window.hermesOS.window.toggleFullscreen()
+      await window.heraldOS.window.toggleFullscreen()
 
       return ok('Toggled fullscreen')
     }

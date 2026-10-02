@@ -1,6 +1,0 @@
-[Unit]
-Description=Hermes OS: check for updates
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/hermes-os-update --check

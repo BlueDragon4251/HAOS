@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { ipcMain } from 'electron'
-import { type ClipboardEntry, type HermesOsResult, IPC, type PowerAction } from '../../shared/ipc.ts'
+import { type ClipboardEntry, type HeraldOsResult, IPC, type PowerAction } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
 
 const POWER_COMMANDS: Record<PowerAction, string[]> = {
@@ -8,10 +8,10 @@ const POWER_COMMANDS: Record<PowerAction, string[]> = {
   reboot: ['systemctl', 'reboot'],
   poweroff: ['systemctl', 'poweroff'],
   logout: ['niri', 'msg', 'action', 'quit', '--skip-confirmation'],
-  lock: ['hermes-os', 'lock']
+  lock: ['herald-os', 'lock']
 }
 
-function run(command: string, args: string[], input?: string, timeout = 60_000): Promise<HermesOsResult> {
+function run(command: string, args: string[], input?: string, timeout = 60_000): Promise<HeraldOsResult> {
   return new Promise(resolve => {
     const child = execFile(command, args, { timeout, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
       const code = error ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? 127 : (child.exitCode ?? 1)) : 0
@@ -26,19 +26,19 @@ function run(command: string, args: string[], input?: string, timeout = 60_000):
 
 /** System services every surface can reach: the CLI, power actions, clipboard history. Linux only. */
 export function registerServiceIpc(): void {
-  ipcMain.handle(IPC.shellHermesOs, async (_event, args: string[]): Promise<HermesOsResult> => {
+  ipcMain.handle(IPC.shellHeraldOs, async (_event, args: string[]): Promise<HeraldOsResult> => {
     if (process.platform !== 'linux') {
-      return { code: 127, stdout: '', stderr: 'hermes-os CLI is only available on Hermes OS Linux' }
+      return { code: 127, stdout: '', stderr: 'herald-os CLI is only available on Herald OS Linux' }
     }
 
     if (!Array.isArray(args) || args.some(a => typeof a !== 'string')) {
-      throw new Error('hermes-os arguments must be strings')
+      throw new Error('herald-os arguments must be strings')
     }
 
     // Long installs may exceed a minute; give package managers room.
     const timeout = args[0] === 'install' || args[0] === 'remove' || args[0] === 'update' ? 20 * 60_000 : 60_000
-    const result = await run('hermes-os', args, undefined, timeout)
-    log('services', `hermes-os ${args.join(' ')} -> ${result.code}`)
+    const result = await run('herald-os', args, undefined, timeout)
+    log('services', `herald-os ${args.join(' ')} -> ${result.code}`)
 
     return result
   })

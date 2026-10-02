@@ -75,10 +75,10 @@ async function findFile(name: string): Promise<{ path: string; candidates: strin
 
   // Transcribers glue a stray "www." or "open" onto the name ("www.openhello.pdf").
   const query = text.replace(/^(?:https?:\/\/)?(?:www\.)/i, '').replace(/^open\s*/i, '')
-  let matches = await window.hermesOS.fs.find(query, 8)
+  let matches = await window.heraldOS.fs.find(query, 8)
 
   if (matches.length === 0 && query !== text) {
-    matches = await window.hermesOS.fs.find(text, 8)
+    matches = await window.heraldOS.fs.find(text, 8)
   }
 
   const files = matches.filter(m => m.kind === 'file')
@@ -90,7 +90,7 @@ export const filesCommands: readonly OsCommand[] = [
   {
     id: 'file.open',
     title: 'Open a file',
-    description: 'Find a file by name (or path) and open it inside Hermes OS: PDFs, images, text and media in a viewer window; other files are shown in Files.',
+    description: 'Find a file by name (or path) and open it inside Herald OS: PDFs, images, text and media in a viewer window; other files are shown in Files.',
     tier: 'act',
     args: [{ name: 'name', type: 'string', description: 'File name as you remember it ("hello.pdf", "the budget spreadsheet") or a path', required: true }],
     phrases: ['open the file {name}', 'open file {name}', 'show the file {name}', 'open the document {name}', 'open the pdf {name}', 'open my {name} file', 'find and open {name}'],
@@ -118,13 +118,13 @@ export const filesCommands: readonly OsCommand[] = [
       navigate({ kind: 'dir', path: parent })
       $selectedPath.set(found.path)
 
-      return ok(`Showing ${fileName} in Files`, { spoken: `Here is ${fileName.replace(/\.[^.]+$/, '')}. Say "open it in its app" to open it outside Hermes OS.`, page: 'files', highlight: { kind: 'file', id: found.path }, data: { path: found.path } })
+      return ok(`Showing ${fileName} in Files`, { spoken: `Here is ${fileName.replace(/\.[^.]+$/, '')}. Say "open it in its app" to open it outside Herald OS.`, page: 'files', highlight: { kind: 'file', id: found.path }, data: { path: found.path } })
     }
   },
   {
     id: 'file.openExternal',
     title: 'Open a file in its app',
-    description: 'Open the selected (or given) file with the Mac app that owns it (Pages, Excel, …). This leaves Hermes OS.',
+    description: 'Open the selected (or given) file with the Mac app that owns it (Pages, Excel, …). This leaves Herald OS.',
     tier: 'act',
     args: [{ name: 'path', type: 'string', description: 'Path; omit for the selected file' }],
     phrases: ['open it in its app', 'open it outside', 'open it in the default app', 'open it externally'],
@@ -135,7 +135,7 @@ export const filesCommands: readonly OsCommand[] = [
         return fail('Select a file in Files first.')
       }
 
-      await window.hermesOS.fs.openPath(target)
+      await window.heraldOS.fs.openPath(target)
 
       return ok(`Opened ${basename(target)} in its app`)
     }
@@ -150,7 +150,7 @@ export const filesCommands: readonly OsCommand[] = [
     run: async ({ path }) => {
       const home = await ensureHome()
       const target = expandHome(String(path), home) ?? String(path)
-      const entries = await window.hermesOS.fs.readDir(target).then(
+      const entries = await window.heraldOS.fs.readDir(target).then(
         () => true,
         () => false
       )

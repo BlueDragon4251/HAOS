@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot Hermes OS Linux with Apple's Virtualization framework via vfkit: GPU-accelerated virtio-gpu
+# Boot Herald OS Linux with Apple's Virtualization framework via vfkit: GPU-accelerated virtio-gpu
 # (what niri needs), virtio-fs share, NAT networking, EFI. Same disk lineage as run-qemu.sh (the
 # qcow2 is converted to a raw image on first use; both runners must not use the disk at once).
 #
@@ -15,8 +15,8 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 BUILD="$HERE/build"
 VFKIT="$BUILD/bin/vfkit"
 VFKIT_VERSION="${VFKIT_VERSION:-v0.6.4}"
-QCOW="$BUILD/hermes-os.qcow2"
-RAW="$BUILD/hermes-os.raw"
+QCOW="$BUILD/herald-os.qcow2"
+RAW="$BUILD/herald-os.raw"
 SEED_DIR="$BUILD/seed"
 EFI_STORE="$BUILD/efistore.nvram"
 PIDFILE="$BUILD/vfkit.pid"
@@ -122,7 +122,7 @@ perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- "$VFKI
   --device virtio-input,pointing \
   --device virtio-rng \
   --device "virtio-serial,logFilePath=$SERIAL" \
-  --device "virtio-fs,sharedDir=$ROOT,mountTag=hermes-os" \
+  --device "virtio-fs,sharedDir=$ROOT,mountTag=herald-os" \
   --restful-uri "$REST" \
   --gui \
   >"$BUILD/vfkit.log" 2>&1 &

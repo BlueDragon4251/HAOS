@@ -131,7 +131,7 @@ export function MemoryPage() {
       return
     }
 
-    void window.hermesOS.fs.openPath(memoryPath(hermesHome, file)).catch(err => notify({ title: `Could not open ${file}`, body: errorMessage(err), level: 'error' }))
+    void window.heraldOS.fs.openPath(memoryPath(hermesHome, file)).catch(err => notify({ title: `Could not open ${file}`, body: errorMessage(err), level: 'error' }))
   }
 
   const count = filtered.length

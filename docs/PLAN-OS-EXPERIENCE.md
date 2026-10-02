@@ -5,7 +5,7 @@ result). Remaining from the original list: nothing; follow-ups are noted at the 
 
 Six changes, in three phases, each verified in the Linux VM and committed before the next. The
 thread through all of them: Hermes owns every window, every hotkey and every system chore, so a
-user never leaves Hermes OS to do something.
+user never leaves Herald OS to do something.
 
 Compositor: **niri** (Fedora official repos; Hyprland has no Fedora aarch64 packages). Scrollable
 tiling, JSON IPC + event stream, window rules, `layout.struts`, named workspaces, fractional output
@@ -13,9 +13,9 @@ scale, built-in screenshots and hotkey overlay.
 
 niri needs hardware GL on its DRM backend (Smithay skips software EGL). QEMU from Homebrew and
 Apple's Virtualization framework (vfkit) both expose a 2D-only virtio-gpu (`-virgl`), so in those
-VMs `hermes-os-compositor` nests niri's windowed backend inside cage (cage owns the display with
+VMs `herald-os-compositor` nests niri's windowed backend inside cage (cage owns the display with
 software rendering; niri still manages every window). On hardware, or in UTM's QEMU with virgl,
-niri runs on the tty directly. `HERMES_OS_NIRI_NESTED=0|1` overrides the detection.
+niri runs on the tty directly. `HERALD_OS_NIRI_NESTED=0|1` overrides the detection.
 
 ## Architecture change: the shell becomes panels
 
@@ -48,10 +48,10 @@ selector; stores that act across windows go through a small relay (`shell.relay(
   `Mod+T` toggle floating, `Mod+H/L` focus columns, `Mod+Shift+H/L` move, `Mod+1..3` Spaces,
   `Mod+O` overview, `Mod+K` hotkey overlay, `Mod+Escape` power menu, `Mod+Ctrl+L` lock,
   `Print` screenshot, `Mod+C/V` clipboard (Phase 2 history).
-- `hermes-os-compositor` runs niri (`HERMES_OS_COMPOSITOR=cage` keeps Stage 1). Session exports
-  `HERMES_OS_SHELL_MODE=panels`.
+- `herald-os-compositor` runs niri (`HERALD_OS_COMPOSITOR=cage` keeps Stage 1). Session exports
+  `HERALD_OS_SHELL_MODE=panels`.
 - Electron: panels mode, niri IPC client, `wm.*` IPC (state, focus, close, workspace, floating,
-  fullscreen, screenshot), control socket `$XDG_RUNTIME_DIR/hermes-os.sock` + `hermes-os` CLI
+  fullscreen, screenshot), control socket `$XDG_RUNTIME_DIR/herald-os.sock` + `herald-os` CLI
   (`ask`, `launcher`, `applications`, `page`, `open`, `screenshot`, `lock`, `wm …`).
 - Renderer: surface selector; MenuBar with niri workspaces + focused title; Dock with running
   windows + icons from `.desktop` app-id match; command surface with window context.
@@ -60,7 +60,7 @@ selector; stores that act across windows go through a small relay (`shell.relay(
 
 ## Phase 2: one control surface, system services (ideas 3, 4)
 
-- `hermes-os` CLI grows: `install app|webapp`, `remove`, `update`, `theme list|set`, `font`,
+- `herald-os` CLI grows: `install app|webapp`, `remove`, `update`, `theme list|set`, `font`,
   `reminder`, `notice time|battery|weather`, `clipboard`, `ocr`, `lock`, `suspend`, `debug`.
 - Control menu (`Mod+Alt+Space`): Install / Remove / Update / Style / Setup / Trigger / System,
   same commands as the CLI. Every command also a bridge tool (`system_os`) with tiers.
@@ -68,18 +68,18 @@ selector; stores that act across windows go through a small relay (`shell.relay(
   --on-active` → notification), notices, screenshots (niri) and OCR (`slurp` + `tesseract`),
   notification daemon (org.freedesktop.Notifications in Electron main so foreign apps' notifications
   land in Hermes), lock screen (`swaylock` themed) + idle (`swayidle`), power menu, web apps as
-  frameless Electron windows (`hermes-os install webapp <name> <url>`), boot splash (Plymouth).
+  frameless Electron windows (`herald-os install webapp <name> <url>`), boot splash (Plymouth).
 
 ## Phase 3: whole-system themes, omakase, updates (ideas 5, 6)
 
 - Theme engine: `linux/themes/<name>/theme.json` → shell tokens, niri colours, GTK (`gsettings`,
-  `gtk.css`), swaylock, terminal palette, swaybg wallpaper set; `hermes-os theme set` applies
+  `gtk.css`), swaylock, terminal palette, swaybg wallpaper set; `herald-os theme set` applies
   atomically; Hermes tool to switch.
 - Omakase: `linux/omakase/{packages,flatpaks,webapps}.txt` installed by provisioning; Hermes knows
   the set (SKILL.md). Curated: Firefox, Nautilus, Text Editor, LibreOffice, Obsidian (Flatpak),
   Spotify (Flatpak), VS Code, LocalSend, web apps (HEY, Google Calendar, WhatsApp, X).
-- Updates: `hermes-os update` (git pull to a release channel, `linux/migrations/*.sh` tracked in
-  `/var/lib/hermes-os/migrations`, `dnf upgrade`, `flatpak update`, `hermes update`, shell rebuild
+- Updates: `herald-os update` (git pull to a release channel, `linux/migrations/*.sh` tracked in
+  `/var/lib/herald-os/migrations`, `dnf upgrade`, `flatpak update`, `hermes update`, shell rebuild
   + restart); menu-bar indicator via a daily timer; channels `stable|edge`.
 
 ## Out of scope (still Stage 2 security work)

@@ -18,19 +18,19 @@ async function loadPreview(artifact: Artifact): Promise<PreviewData> {
   const kind = previewKind(artifact.path)
 
   if (kind === 'image') {
-    const thumb = await window.hermesOS.fs.thumbnail(artifact.path, 640)
+    const thumb = await window.heraldOS.fs.thumbnail(artifact.path, 640)
 
     if (thumb) {
       return { type: 'image', src: thumb }
     }
 
-    const file = await window.hermesOS.fs.readFile(artifact.path)
+    const file = await window.heraldOS.fs.readFile(artifact.path)
 
     return file.kind === 'image' && file.content ? { type: 'image', src: file.content } : { type: 'file' }
   }
 
   if (kind === 'text') {
-    const file = await window.hermesOS.fs.readFile(artifact.path)
+    const file = await window.heraldOS.fs.readFile(artifact.path)
 
     if (file.kind === 'text' && typeof file.content === 'string') {
       const lines = file.content.split('\n')
@@ -61,7 +61,7 @@ export function MissionPreview({ artifact }: { artifact: Artifact | undefined })
         <>
           <PreviewCard artifact={artifact} data={preview.data} loading={preview.loading} error={preview.error} />
           <div className="flex justify-center">
-            <GlassButton size="sm" onClick={() => void window.hermesOS.fs.openPath(artifact.path)} aria-label={`Open ${artifact.name}`}>
+            <GlassButton size="sm" onClick={() => void window.heraldOS.fs.openPath(artifact.path)} aria-label={`Open ${artifact.name}`}>
               <IconExternalLink />
               Open preview
             </GlassButton>

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build the Hermes OS shell inside the Linux VM (run as the session user).
+# Build the Herald OS shell inside the Linux VM (run as the session user).
 # Fetches the upstream snapshot, installs Node workspaces, links + enables the bridge plugin
 # (scripts/bootstrap.sh), compiles the shell, and fixes Electron's sandbox helper permissions.
 #
-#   hermes-os-build            # after linux/dev/push.sh or hermes-os-sync
+#   herald-os-build            # after linux/dev/push.sh or herald-os-sync
 set -euo pipefail
 
-REPO="${HERMES_OS_REPO:-$HOME/Hermes-OS}"
+REPO="${HERALD_OS_REPO:-$HOME/Herald-OS}"
 export PATH="$HOME/.local/bin:$PATH"
 
 [[ -d "$REPO/apps/os" ]] || { echo "repo not found at $REPO (push it from the Mac: linux/dev/push.sh)" >&2; exit 1; }
@@ -33,25 +33,31 @@ fi
 
 # Keep the installed session files in step with the repo (they are what greetd/cage run).
 if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
-  sudo install -m 0755 "$REPO/linux/session/hermes-os-compositor" /usr/local/bin/hermes-os-compositor
-  sudo install -m 0755 "$REPO/linux/session/hermes-os-session" /usr/local/bin/hermes-os-session
-  sudo install -m 0755 "$REPO/linux/session/hermes-os-niri-nested" /usr/local/bin/hermes-os-niri-nested
-  sudo install -m 0644 "$REPO/linux/session/hermes-os.desktop" /usr/share/wayland-sessions/hermes-os.desktop
-  sudo install -m 0755 "$REPO/linux/bin/hermes-os" "$REPO/linux/bin/hermes-os-theme" "$REPO/linux/bin/hermes-os-omakase" "$REPO/linux/bin/hermes-os-update" /usr/local/bin/
+  sudo install -m 0755 "$REPO/linux/session/herald-os-compositor" /usr/local/bin/herald-os-compositor
+  sudo install -m 0755 "$REPO/linux/session/herald-os-session" /usr/local/bin/herald-os-session
+  sudo install -m 0755 "$REPO/linux/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
+  sudo install -m 0644 "$REPO/linux/session/herald-os.desktop" /usr/share/wayland-sessions/herald-os.desktop
+  sudo install -m 0755 "$REPO/linux/bin/herald-os" "$REPO/linux/bin/herald-os-theme" "$REPO/linux/bin/herald-os-omakase" "$REPO/linux/bin/herald-os-update" /usr/local/bin/
   mkdir -p "$HOME/.config/systemd/user"
-  install -m 0644 "$REPO/linux/session/hermes-os-update-check.service" "$REPO/linux/session/hermes-os-update-check.timer" "$HOME/.config/systemd/user/"
+  install -m 0644 "$REPO/linux/session/herald-os-update-check.service" "$REPO/linux/session/herald-os-update-check.timer" "$HOME/.config/systemd/user/"
   systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable hermes-os-update-check.timer 2>/dev/null || true
+  systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
   mkdir -p "$HOME/.config/niri" "$HOME/.config/swaylock"
   install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
   install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"
   if [[ -d /usr/share/plymouth/themes ]]; then
-    sudo install -d /usr/share/plymouth/themes/hermes-os
-    sudo install -m 0644 "$REPO"/linux/plymouth/hermes-os/* /usr/share/plymouth/themes/hermes-os/
+    sudo install -d /usr/share/plymouth/themes/herald-os
+    sudo install -m 0644 "$REPO"/linux/plymouth/herald-os/* /usr/share/plymouth/themes/herald-os/
   fi
   for f in build.sh sync.sh restart-shell.sh shot.sh; do
-    install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/hermes-os-${f%.sh}"
+    install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/herald-os-${f%.sh}"
   done
+  sudo install -d /usr/local/share/herald-os-linux/themes /usr/local/share/herald-os-linux/omakase
+  sudo cp -R "$REPO"/linux/themes/. /usr/local/share/herald-os-linux/themes/
+  sudo cp -R "$REPO"/linux/omakase/. /usr/local/share/herald-os-linux/omakase/
+
+  echo "==> one-shot migrations"
+  HERALD_OS_REPO="$REPO" bash "$REPO/linux/bin/herald-os-update" --migrate || echo "WARNING: a migration failed; see above"
 fi
 
 echo "==> build complete: $REPO/apps/os/dist"

@@ -18,7 +18,7 @@ export const Markdown = memo(function Markdown({ text, className }: { text: stri
                 event.preventDefault()
 
                 if (href) {
-                  void window.hermesOS.shell.openExternal(href)
+                  void window.heraldOS.shell.openExternal(href)
                 }
               }}
             >

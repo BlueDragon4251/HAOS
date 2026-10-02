@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { IconArrowRight, IconCalendarClock, IconMessage } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { BrandMark } from '../../components/brand-mark.tsx'
+import { HermesMark } from '../../components/hermes-mark.tsx'
 import { Meter, SectionTitle } from '../../components/ui/primitives.tsx'
 import { formatBytes, formatDate, formatDuration, formatPercent, formatRelative, greetingFor } from '../../lib/format.ts'
 import { type CronJob, rest } from '../../lib/rest.ts'
@@ -44,7 +44,7 @@ export function HomeSurface() {
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-8 pt-[9vh] pb-10">
         <div className="flex flex-col items-center gap-5 text-center">
-          <BrandMark size={40} />
+          <HermesMark size={40} />
           <div>
             <h1 className="text-[28px] font-medium tracking-tight">{greeting}</h1>
             <div className="mt-1 text-[13px] text-fg-3">{formatDate(now)}</div>

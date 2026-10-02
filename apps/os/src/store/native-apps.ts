@@ -14,7 +14,7 @@ export function loadNativeApps(): void {
   }
 
   loaded = true
-  void window.hermesOS.apps
+  void window.heraldOS.apps
     .list()
     .then(apps => $nativeApps.set(apps))
     .catch(() => {
@@ -28,7 +28,7 @@ export function requestIcon(appPath: string): void {
   }
 
   requested.add(appPath)
-  void window.hermesOS.apps
+  void window.heraldOS.apps
     .icon(appPath)
     .then(url => $nativeIcons.setKey(appPath, url))
     .catch(() => undefined)

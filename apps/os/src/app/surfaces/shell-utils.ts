@@ -16,13 +16,13 @@ export function useShellCommands(handler: (command: ShellCommand) => void): void
 
 /** Window titles main gives our own floating windows (see electron/shell/mode.ts); they double as identity. */
 const OUR_FLOATING_TITLES: Record<string, FloatingAppId> = {
-  'Hermes OS · Terminal': 'terminal',
-  'Hermes OS · System': 'system',
-  'Hermes OS · Chat': 'chat-popout',
-  'Hermes OS · Studio': 'studio'
+  'Herald OS · Terminal': 'terminal',
+  'Herald OS · System': 'system',
+  'Herald OS · Chat': 'chat-popout',
+  'Herald OS · Studio': 'studio'
 }
 
-export const OUR_MAIN_TITLE = 'Hermes OS'
+export const OUR_MAIN_TITLE = 'Herald OS'
 
 /** Which floating Hermes app one of our compositor windows hosts, when it is one. */
 export function ourFloatingAppId(win: WmWindow): FloatingAppId | null {

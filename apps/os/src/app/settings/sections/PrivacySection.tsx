@@ -8,17 +8,17 @@ import { AuditRow } from './AgentsSection.tsx'
 import { errorText, markSaved, SectionTitle, SettingsBlock, SettingsGroup, SettingsRow } from './shared.tsx'
 
 /*
- * Privacy: the raw permission policy the Hermes OS bridge plugin enforces, plus the audit
+ * Privacy: the raw permission policy the Herald OS bridge plugin enforces, plus the audit
  * trail. The textarea is the source of truth; the "Ask before sending" toggle in Hermes &
  * agents edits the same file line by line.
  */
 
 export function PrivacySection() {
-  const policy = useLocalData(() => window.hermesOS.bridge.readPolicy())
+  const policy = useLocalData(() => window.heraldOS.bridge.readPolicy())
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
-  const audit = useLocalData(() => (showAudit ? window.hermesOS.bridge.readAudit(200) : Promise.resolve([])), [showAudit])
+  const audit = useLocalData(() => (showAudit ? window.heraldOS.bridge.readAudit(200) : Promise.resolve([])), [showAudit])
   const text = draft ?? policy.data ?? ''
   const dirty = draft !== null && draft !== policy.data
 
@@ -30,7 +30,7 @@ export function PrivacySection() {
     setSaving(true)
 
     try {
-      await window.hermesOS.bridge.writePolicy(text)
+      await window.heraldOS.bridge.writePolicy(text)
       markSaved()
       notify({ title: 'Permissions saved', body: 'The system bridge reads the policy on its next action.', level: 'success' })
       policy.reload()
