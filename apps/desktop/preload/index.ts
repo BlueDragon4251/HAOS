@@ -89,7 +89,7 @@ const api = {
     readFile: (target: string): Promise<FilePreview> => ipcRenderer.invoke(IPC.fsReadFile, target),
     reveal: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsReveal, target),
     openPath: (target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenPath, target),
-    openIn: (editor: 'vscode' | 'cursor' | 'finder' | 'terminal', target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenIn, editor, target),
+    openIn: (app: 'editor' | 'finder' | 'terminal', target: string): Promise<void> => ipcRenderer.invoke(IPC.fsOpenIn, app, target),
     recent: (limit = 30): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.fsRecent, limit),
     /** Files under the home folder whose name matches, best match first. */
     find: (query: string, limit = 10): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.fsFind, query, limit),

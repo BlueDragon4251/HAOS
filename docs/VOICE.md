@@ -101,7 +101,7 @@ named Mac app ("open it in Preview") leaves the OS.
 - Files: the project tree; new files are marked A, edited ones M, the one being written pulses.
 - Code: the file Hermes is writing appears as it types, then syntax-coloured, with the lines each
   edit changed marked and scrolled into view. It follows Hermes from file to file; the pin keeps
-  it on one file. Open in VS Code is one click.
+  it on one file. One click opens it in your code editor.
 - Terminal: every command Hermes ran with its output, plus a live read-only tab per background
   process (the dev server).
 - Preview: the running site. The dev server's address is picked up from its output (or Hermes names

@@ -10,6 +10,7 @@ import { $studios, focusStudioFile, studioFor, watchStudioFolder } from '../../s
 import { openApp, type OSWindow } from '../../store/windows.ts'
 import { CodeView } from './CodeView.tsx'
 import { FileTree } from './FileTree.tsx'
+import { openInEditor } from './open-in-editor.ts'
 import { PreviewPane } from './PreviewPane.tsx'
 import { TerminalPane } from './TerminalPane.tsx'
 
@@ -177,7 +178,7 @@ export function StudioWindow({ win }: { win: OSWindow }) {
           <IconMessage size={15} />
         </button>
         {root && (
-          <button type="button" onClick={() => void window.heraldOS.fs.openIn('vscode', root)} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg" title="Open the project in VS Code" aria-label="Open the project in VS Code">
+          <button type="button" onClick={() => openInEditor(root)} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-white/8 hover:text-fg" title="Open the project in an editor" aria-label="Open the project in an editor">
             <IconExternalLink size={15} />
           </button>
         )}

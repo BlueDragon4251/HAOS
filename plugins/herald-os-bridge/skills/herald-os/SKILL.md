@@ -79,7 +79,7 @@ preview of the site.
 | "Pause the daily digest" / "What automations do I have?" | `os_ui` run `automation.pause` / `automation.list` |
 | "Start a mission to …" | `os_ui` run `mission.start` |
 | "Open Safari" / "Launch VS Code" | `os_ui` run `native.launch`, or `system_open` target=app |
-| "Open this repo in my editor" / "Open my Herald project in VS Code" | find the folder (`system_find_files` kind=folder name=Herald, or a known path), then `system_open` target=editor editor=vscode path=... |
+| "Open this repo in my editor" / "Open my Herald project in VS Code" | find the folder (`system_find_files` kind=folder name=Herald, or a known path), then `system_open` target=editor path=... (editor=auto picks the installed editor; pass editor=vscode, cursor or zed when they name one) |
 | "Open example.com" | `os_ui` run `web.open` (inside Herald OS; `system_open` target=url does the same when the shell is running) |
 | "Open hello.pdf" / "Open the file report" | `os_ui` run `file.open name=...` (in-OS viewer); "in Preview" → `system_open` target=path app=Preview |
 | "Open Apps" / "Show all apps" | `os_ui` run `overlay.applications` |

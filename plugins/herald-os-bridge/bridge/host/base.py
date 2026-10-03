@@ -114,6 +114,11 @@ class HostAdapter(ABC):
     @abstractmethod
     def running_apps(self) -> list[AppInfo]: ...
 
+    def resolve_app(self, name: str) -> AppInfo | None:
+        """The installed app ``name`` refers to, or None. Hosts may also match bundle ids or executables."""
+        needle = name.strip().lower()
+        return next((app for app in self.installed_apps() if app.name.lower() == needle), None)
+
     # --- act --------------------------------------------------------------------------------
     @abstractmethod
     def open_app(self, name: str, args: Sequence[str] = ()) -> None: ...

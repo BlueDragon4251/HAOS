@@ -5,6 +5,7 @@ import { EmptyState, Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { highlightLines } from '../../lib/highlight.ts'
 import type { StudioFile, StudioState } from '../../lib/studio-model.ts'
+import { openInEditor } from './open-in-editor.ts'
 
 const MAX_LINES = 5000
 /** How long a file Hermes is writing takes to "type" onto the screen. */
@@ -194,7 +195,7 @@ export function CodeView({ path, file, root, pinned, onTogglePin, running = fals
           <button type="button" onClick={onTogglePin} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title={pinned ? 'Follow Hermes from file to file' : 'Stay on this file'} aria-label={pinned ? 'Follow Hermes' : 'Stay on this file'}>
             {pinned ? <IconPinnedOff size={14} /> : <IconPin size={14} />}
           </button>
-          <button type="button" onClick={() => void window.heraldOS.fs.openIn('vscode', path)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title="Open in VS Code" aria-label="Open in VS Code">
+          <button type="button" onClick={() => openInEditor(path)} className="flex size-6 items-center justify-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg" title="Open in editor" aria-label="Open in editor">
             <IconExternalLink size={14} />
           </button>
         </span>

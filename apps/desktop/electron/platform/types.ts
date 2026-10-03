@@ -1,6 +1,7 @@
 import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 
-export type EditorTarget = 'vscode' | 'cursor' | 'finder' | 'terminal'
+/** `editor` is the first installed of `CODE_EDITORS`; `finder` shows the item in the file manager. */
+export type EditorTarget = 'editor' | 'finder' | 'terminal'
 
 /**
  * Machine facts and actions the SHELL needs (not the agent; that is the plugin's HostAdapter).
@@ -31,7 +32,7 @@ export interface HostPlatform {
 
 export class HostNotSupported extends Error {
   /**
-   * @param feature What was asked for, e.g. `openIn(vscode)`.
+   * @param feature What was asked for, e.g. `openIn(terminal)`.
    * @param requires When the gap is a missing host package rather than missing code, name it
    *   (e.g. `NetworkManager (nmcli)`) so the UI can tell the user what to install.
    */

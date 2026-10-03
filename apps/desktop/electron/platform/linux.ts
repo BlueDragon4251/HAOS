@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { BatteryStatus, CalendarResult, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import { findCodeEditor } from './editors.ts'
 import { MISSING_BINARY, run, runBuffer } from './exec.ts'
 import { normaliseFileQuery, rankFiles } from './find.ts'
 import { parseDf, parsePs } from './posix.ts'
@@ -500,6 +501,31 @@ function runLauncher(command: string, args: string[], graceMs = 5000): Promise<n
   })
 }
 
+/** Launch a `.desktop` entry through `gio launch`, else `gtk-launch`; `args` are handed to the app (files to open). */
+async function launchDesktopEntry(entry: string, args: string[]): Promise<void> {
+  const gio = await runLauncher('gio', ['launch', entry, ...args])
+
+  if (gio === 0) {
+    return
+  }
+
+  if (gio !== MISSING_BINARY) {
+    throw new Error(`failed to launch ${path.basename(entry)} (gio launch exited ${gio})`)
+  }
+
+  const gtk = await runLauncher('gtk-launch', [path.basename(entry, '.desktop'), ...args])
+
+  if (gtk === 0) {
+    return
+  }
+
+  if (gtk === MISSING_BINARY) {
+    throw new HostNotSupported('launching desktop entries', 'glib2 (gio) or gtk3 (gtk-launch)')
+  }
+
+  throw new Error(`failed to launch ${path.basename(entry)} (gtk-launch exited ${gtk})`)
+}
+
 function ipv4For(iface: string | undefined): string | undefined {
   if (!iface) {
     return undefined
@@ -734,27 +760,7 @@ export class LinuxPlatform implements HostPlatform {
       return
     }
 
-    const gio = await runLauncher('gio', ['launch', appPath])
-
-    if (gio === 0) {
-      return
-    }
-
-    if (gio !== MISSING_BINARY) {
-      throw new Error(`failed to launch ${path.basename(appPath)} (gio launch exited ${gio})`)
-    }
-
-    const gtk = await runLauncher('gtk-launch', [path.basename(appPath, '.desktop')])
-
-    if (gtk === 0) {
-      return
-    }
-
-    if (gtk === MISSING_BINARY) {
-      throw new HostNotSupported('launching desktop entries', 'glib2 (gio) or gtk3 (gtk-launch)')
-    }
-
-    throw new Error(`failed to launch ${path.basename(appPath)} (gtk-launch exited ${gtk})`)
+    await launchDesktopEntry(appPath, [])
   }
 
   /** FileManager1 D-Bus (Nautilus, Dolphin, Thunar, ...) selects the item; without it, open the parent folder. */
@@ -770,12 +776,8 @@ export class LinuxPlatform implements HostPlatform {
 
   async openIn(target: EditorTarget, targetPath: string): Promise<void> {
     switch (target) {
-      case 'vscode':
-        await spawnDetached('code', [targetPath], 'Visual Studio Code (`code` on PATH)')
-
-        return
-      case 'cursor':
-        await spawnDetached('cursor', [targetPath], 'Cursor (`cursor` on PATH)')
+      case 'editor':
+        await launchDesktopEntry(findCodeEditor(await this.listInstalledApps()).path, [targetPath])
 
         return
       case 'finder': {

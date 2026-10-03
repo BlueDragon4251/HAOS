@@ -291,16 +291,18 @@ def handle_system_apps(args: dict[str, Any], **_: Any) -> str:
 # ---------------------------------------------------------------------------------------------
 
 EDITOR_APPS = {"vscode": "Visual Studio Code", "code": "Visual Studio Code", "cursor": "Cursor", "xcode": "Xcode", "zed": "Zed", "finder": None, "terminal": "Terminal", "iterm": "iTerm"}
+# editor=auto opens the first of these that is installed.
+AUTO_EDITORS = ("Visual Studio Code", "Cursor", "Zed")
 
 SYSTEM_OPEN_SCHEMA = _schema(
     "system_open",
-    "Open things for the user. Inside Herald OS, target=url opens the page in a Herald OS window, target=path opens files in the Herald OS viewer (PDFs, images, text, media) or shows them in Files, and target=reveal shows the item in the Files page; pass app=... only when the user names a Mac app to use. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=vscode|cursor|xcode|zed|terminal), e.g. 'open this repo in VS Code'; target=settings opens a System Settings pane (pane=privacy_and_security, wifi, bluetooth, sound, displays, notifications, screen_recording, accessibility_privacy, automation, ...). Runs immediately; every call is audited.",
+    "Open things for the user. Inside Herald OS, target=url opens the page in a Herald OS window, target=path opens files in the Herald OS viewer (PDFs, images, text, media) or shows them in Files, and target=reveal shows the item in the Files page; pass app=... only when the user names a Mac app to use. target=app launches an application by name ('Open Safari'); target=url opens a URL (optionally in a specific browser); target=path opens a file or folder with its default app or a named app; target=reveal shows a file in Finder; target=editor opens a folder/file in a code editor (editor=auto, the default, picks the first installed of VS Code, Cursor and Zed; pass vscode|cursor|xcode|zed|terminal when the user names one), e.g. 'open this repo in my editor'; target=settings opens a System Settings pane (pane=privacy_and_security, wifi, bluetooth, sound, displays, notifications, screen_recording, accessibility_privacy, automation, ...). Runs immediately; every call is audited.",
     {
         "target": _enum("app", "url", "path", "reveal", "editor", "settings"),
         "app": _desc(_STR, "Application name (for target=app, or the app to open a url/path with)."),
         "url": _desc(_STR, "For target=url."),
         "path": _desc(_STR, "For target=path / reveal / editor. Supports ~."),
-        "editor": _enum("vscode", "cursor", "xcode", "zed", "terminal", "iterm", description="For target=editor (default vscode)."),
+        "editor": _enum("auto", "vscode", "cursor", "xcode", "zed", "terminal", "iterm", description="For target=editor (default auto: the first installed of VS Code, Cursor and Zed)."),
         "pane": _desc(_STR, "For target=settings: the System Settings pane name."),
         "args": {"type": "array", "items": _STR, "description": "For target=app: extra launch arguments."},
     },
@@ -371,8 +373,16 @@ def handle_system_open(args: dict[str, Any], **_: Any) -> str:
         if target == "reveal":
             return _guarded("system_open", Tier.ACT, "reveal", f"reveal {path} in Finder", args, (path,), lambda: (adapter.reveal(path), {"revealed": str(path)})[1])
         if target == "editor":
-            editor = str(args.get("editor") or "vscode").lower()
-            app = EDITOR_APPS.get(editor, editor)
+            editor = str(args.get("editor") or "auto").lower()
+            if editor == "auto":
+                try:
+                    app = next((name for name in AUTO_EDITORS if adapter.resolve_app(name)), None)
+                except HostNotSupported as exc:
+                    return fail(str(exc))
+                if app is None:
+                    return fail(f"no code editor is installed (looked for {', '.join(AUTO_EDITORS)}); pass editor=... to name one")
+            else:
+                app = EDITOR_APPS.get(editor, editor)
             if app is None:
                 return _guarded("system_open", Tier.ACT, "reveal", f"reveal {path} in Finder", args, (path,), lambda: (adapter.reveal(path), {"revealed": str(path)})[1])
             return _guarded("system_open", Tier.ACT, "editor", f"open {path} in {app}", args, (path,), lambda: (adapter.open_path(path, app), {"opened": str(path), "app": app})[1])

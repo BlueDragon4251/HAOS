@@ -9,6 +9,7 @@ import { heraldOsDataDir } from '../paths.ts'
 import { run } from './exec.ts'
 import { normaliseFileQuery, rankFiles } from './find.ts'
 import { parseDf, parsePs } from './posix.ts'
+import { findCodeEditor } from './editors.ts'
 import { type EditorTarget, type HostPlatform } from './types.ts'
 
 // The `df -kP` / `ps -o` parsers are POSIX-generic and live in posix.ts; re-exported for existing importers.
@@ -437,13 +438,12 @@ export class DarwinPlatform implements HostPlatform {
   }
 
   async openIn(target: EditorTarget, targetPath: string): Promise<void> {
-    const table: Record<EditorTarget, string[]> = {
-      vscode: ['-a', 'Visual Studio Code', targetPath],
-      cursor: ['-a', 'Cursor', targetPath],
+    const table: Record<Exclude<EditorTarget, 'editor'>, string[]> = {
       finder: ['-R', targetPath],
       terminal: ['-a', 'Terminal', targetPath]
     }
-    const result = await run('open', table[target])
+    const args = target === 'editor' ? ['-a', findCodeEditor(await this.listInstalledApps()).path, targetPath] : table[target]
+    const result = await run('open', args)
 
     if (result.code !== 0) {
       throw new Error(result.stderr.trim() || `open failed with code ${result.code}`)

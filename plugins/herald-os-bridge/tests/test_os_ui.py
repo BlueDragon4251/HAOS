@@ -189,6 +189,24 @@ def test_system_open_with_a_named_app_uses_the_host(plugin, shell, decisions, mo
     assert len(shell.requests) == before
 
 
+def test_system_open_editor_uses_the_first_installed_editor(plugin, shell, decisions, monkeypatch, tmp_path):
+    tools = _mod(plugin, "tools")
+    opened, installed = [], {"Cursor", "Zed"}
+    fake_host = type("H", (), {
+        "open_path": lambda self, path, app: opened.append((str(path), app)),
+        "resolve_app": lambda self, name: name if name in installed else None,
+        "platform": "darwin",
+    })()
+    monkeypatch.setattr(tools, "host", lambda: fake_host)
+    reply = json.loads(tools.handle_system_open({"target": "editor", "path": str(tmp_path)}))
+    assert reply["success"] is True and opened == [(str(tmp_path), "Cursor")]
+    reply = json.loads(tools.handle_system_open({"target": "editor", "path": str(tmp_path), "editor": "zed"}))
+    assert reply["success"] is True and opened[-1] == (str(tmp_path), "Zed")
+    installed.clear()
+    reply = json.loads(tools.handle_system_open({"target": "editor", "path": str(tmp_path)}))
+    assert reply["success"] is False and "Visual Studio Code, Cursor, Zed" in reply["error"]
+
+
 def test_without_shell_the_tool_explains(plugin, monkeypatch):
     tools = _mod(plugin, "tools")
     monkeypatch.delenv("HERALD_OS_CONTROL_SOCKET", raising=False)
