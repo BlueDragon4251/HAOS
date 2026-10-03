@@ -151,18 +151,31 @@ def flatpak_ready() -> bool:
     return True
 
 
-def flatpak_resolve(name: str) -> str | None:
-    """Find a Flathub app id for a human name (exact name match first)."""
-    if looks_like_flatpak_id(name):
-        return name
+def flatpak_search(name: str) -> list[tuple[str, str]]:
+    """Flathub matches for a human name, as (app id, name) pairs."""
     if not flatpak_ready():
-        return None
+        return []
     result = sh(["flatpak", "search", "--columns=application,name", name], timeout=120)
     rows = [line.split("\t") for line in result.stdout.splitlines() if "\t" in line]
-    for app_id, app_name in rows:
-        if app_name.strip().lower() == name.lower():
-            return app_id.strip()
-    return rows[0][0].strip() if rows else None
+    return [(row[0].strip(), row[1].strip()) for row in rows]
+
+
+def flatpak_resolve(name: str) -> str:
+    """The Flathub app id a name clearly means: an exact name match or the only result. A loose search
+    also returns themes and plugins ("obsidian" lists GTK themes first), so anything else is refused
+    with the candidates, for the caller to pick one by id."""
+    if looks_like_flatpak_id(name):
+        return name
+    matches = flatpak_search(name)
+    exact = [app_id for app_id, app_name in matches if app_name.lower() == name.lower()]
+    if exact:
+        return exact[0]
+    if len(matches) == 1:
+        return matches[0][0]
+    if not matches:
+        die(f"no package or Flatpak found for {name!r}", 1)
+    options = ", ".join(f"{app_name} ({app_id})" for app_id, app_name in matches[:5])
+    die(f"{name!r} matches several Flatpaks; install one by id: {options}", 1)
 
 
 def rpm_available(name: str) -> bool:
@@ -180,8 +193,6 @@ def install_app(name: str) -> int:
         notify("Installed" if code == 0 else "Install failed", name)
         return code
     app_id = flatpak_resolve(name)
-    if not app_id:
-        die(f"no package or Flatpak found for {name!r}", 1)
     print(f"==> flatpak install {app_id}")
     code = subprocess.call(["flatpak", "install", "-y", "--noninteractive", "--user", "flathub", app_id])
     notify("Installed" if code == 0 else "Install failed", app_id)

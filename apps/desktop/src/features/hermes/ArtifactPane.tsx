@@ -356,7 +356,9 @@ function Document({ artifact, file, loading, error, zoom }: { artifact: Artifact
   }
 
   if (error || !file) {
-    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={error ?? 'The file is not on disk any more.'} action={<GlassButton size="sm" onClick={() => void window.heraldOS.fs.reveal(artifact.path)}>{revealLabel()}</GlassButton>} />
+    const missing = !error || /ENOENT/.test(error)
+
+    return <EmptyGlass className="h-full" icon={<IconFileText />} title="Can't open this file" description={missing ? 'The file is not on disk any more.' : error} action={<GlassButton size="sm" onClick={() => void window.heraldOS.fs.reveal(artifact.path)}>{revealLabel()}</GlassButton>} />
   }
 
   if (file.kind === 'image' && file.content) {

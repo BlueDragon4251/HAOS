@@ -884,7 +884,11 @@ class LinuxHost(HostAdapter):
         raise RuntimeError(result.stderr.strip() or fallback.stderr.strip() or "could not lock the screen")
 
     def sleep_display(self) -> None:
-        raise HostNotSupported("Display sleep needs the Herald OS compositor (Stage 2)")
+        # niri, Herald OS Linux's compositor, turns the screens back on at the next key press or mouse move.
+        result = run(["niri", "msg", "action", "power-off-monitors"], timeout=10)
+        _missing(result, "niri (the Herald OS Linux session)")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not put the display to sleep")
 
     def set_wifi_power(self, enabled: bool) -> None:
         result = run(["nmcli", "radio", "wifi", "on" if enabled else "off"], timeout=15)

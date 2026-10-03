@@ -8,7 +8,8 @@ export const TILE_ICON = 68
 /**
  * One launcher tile: a 68px icon area with a label underneath. Hermes apps render the blue glass
  * AppTile; native apps fetch their icon lazily once the tile scrolls into view, showing a neutral
- * placeholder until then. Keyboard focus stays in the search field, so `active` is the roving ring.
+ * placeholder until then and their initial if they have none. Keyboard focus stays in the search
+ * field, so `active` is the roving ring.
  */
 export const AppTileButton = memo(function AppTileButton({
   tile,
@@ -76,6 +77,10 @@ export const AppTileButton = memo(function AppTileButton({
           <AppTile id={tile.icon} size={TILE_ICON} />
         ) : iconUrl ? (
           <img src={iconUrl} alt="" width={TILE_ICON} height={TILE_ICON} draggable={false} loading="lazy" className="size-[68px] rounded-[18px] object-contain" />
+        ) : iconUrl === '' ? (
+          <span aria-hidden="true" className="icon-tile size-[68px] rounded-[18px] text-[28px] font-semibold">
+            {(tile.label.trim()[0] ?? '?').toUpperCase()}
+          </span>
         ) : (
           <span aria-hidden="true" className="size-[68px] rounded-[18px] bg-surface-2 hairline shimmer" />
         )}

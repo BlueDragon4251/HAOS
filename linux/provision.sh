@@ -5,7 +5,7 @@
 #   sudo bash /usr/local/share/herald-os-linux/provision.sh
 #
 # What it does:
-#   1. Installs the compositor (cage), greeter (greetd), audio, networking, Electron runtime libs,
+#   1. Installs the compositors (niri, cage), greeter (greetd), audio, networking, Electron runtime libs,
 #      Node.js, and the CLI tools the Linux HostAdapter uses.
 #   2. Installs Hermes Agent for the `hermes` user at the pinned upstream revision.
 #   3. Installs the Herald OS session and makes greetd auto-login straight into it.
@@ -20,6 +20,8 @@ LOG=/var/log/herald-os-provision.log
 
 mkdir -p "$STATE_DIR"
 exec > >(tee -a "$LOG") 2>&1
+# cloud-init prints its own final message either way, so a failure has to say so here.
+trap 'echo "==> Provisioning FAILED at line $LINENO. Full log: $LOG"' ERR
 echo "==> Herald OS Linux provisioner $(date -Is) (payload $PAYLOAD)"
 
 if [[ -f /etc/herald-os/ref ]]; then
@@ -77,6 +79,11 @@ systemctl enable --now plocate-updatedb.timer || true
 systemctl enable sshd || true
 # Let the hermes user's systemd instance (pipewire, portals) survive when no one is logged in.
 loginctl enable-linger "$HERMES_USER" || true
+# The VM's first-boot seed disc (linux/vm/make-seed.sh) stays attached for cloud-init; keep it out
+# of Files and the desktop.
+echo 'SUBSYSTEM=="block", ENV{ID_FS_LABEL}=="cidata", ENV{UDISKS_IGNORE}="1"' >/etc/udev/rules.d/90-herald-os-hide-seed.rules
+udevadm control --reload || true
+udevadm trigger --subsystem-match=block || true
 
 # ---------------------------------------------------------------------------------------------
 step "Herald OS session"
@@ -84,10 +91,21 @@ install -m 0755 "$PAYLOAD/session/herald-os-compositor" /usr/local/bin/herald-os
 install -m 0755 "$PAYLOAD/session/herald-os-session" /usr/local/bin/herald-os-session
 install -m 0755 "$PAYLOAD/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
 install -m 0755 "$PAYLOAD/bin/herald-os" "$PAYLOAD/bin/herald-os-theme" "$PAYLOAD/bin/herald-os-omakase" "$PAYLOAD/bin/herald-os-update" /usr/local/bin/
-# Themes and omakase lists for machines without the repo checked out.
-install -d /usr/local/share/herald-os-linux/themes /usr/local/share/herald-os-linux/omakase
-cp -R "$PAYLOAD"/themes/. /usr/local/share/herald-os-linux/themes/
-cp -R "$PAYLOAD"/omakase/. /usr/local/share/herald-os-linux/omakase/
+# foot's client and server entries are for scripts; Applications keeps Foot next to Herald's Terminal.
+install -d /usr/local/share/applications
+for entry in footclient foot-server; do
+  if [[ -f "/usr/share/applications/$entry.desktop" ]]; then
+    printf '[Desktop Entry]\nType=Application\nName=%s\nHidden=true\n' "$entry" >"/usr/local/share/applications/$entry.desktop"
+  fi
+done
+# Themes and omakase lists for machines without the repo checked out. The cloud-init payload is
+# unpacked in this very folder, and cp refuses to copy a folder onto itself.
+SHARE=/usr/local/share/herald-os-linux
+install -d "$SHARE/themes" "$SHARE/omakase"
+if [[ "$(realpath "$PAYLOAD")" != "$(realpath "$SHARE")" ]]; then
+  cp -R "$PAYLOAD"/themes/. "$SHARE/themes/"
+  cp -R "$PAYLOAD"/omakase/. "$SHARE/omakase/"
+fi
 # Daily update check (user timer) and the default theme.
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/systemd/user"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/herald-os-update-check.service" "$PAYLOAD/session/herald-os-update-check.timer" "$HERMES_UID_HOME/.config/systemd/user/"
@@ -104,11 +122,14 @@ if command -v plymouth-set-default-theme >/dev/null; then
   install -d /usr/share/plymouth/themes/herald-os
   install -m 0644 "$PAYLOAD"/plymouth/herald-os/* /usr/share/plymouth/themes/herald-os/
   if [[ "$(plymouth-set-default-theme 2>/dev/null)" != "herald-os" ]]; then
-    # -R rebuilds the initramfs so the splash is available at boot (takes a minute).
-    plymouth-set-default-theme -R herald-os || echo "WARNING: could not set the Plymouth theme"
-    # Show the splash instead of the console on boot.
+    plymouth-set-default-theme herald-os || echo "WARNING: could not set the Plymouth theme"
+    # The splash has to be in every kernel's initramfs, not only the running one's (what -R rebuilds):
+    # the package step usually installs a newer kernel, and that is the one the next boot starts.
+    dracut -f --regenerate-all || echo "WARNING: could not rebuild the initramfs"
+    # Show the splash instead of the console on boot. With a serial console on the kernel command
+    # line (the VM's), Plymouth falls back to scrolling text unless told to ignore it.
     if command -v grubby >/dev/null; then
-      grubby --update-kernel=ALL --args="rhgb quiet" || true
+      grubby --update-kernel=ALL --args="rhgb quiet plymouth.ignore-serial-consoles" || true
     fi
   fi
 fi
@@ -139,7 +160,8 @@ if [[ ! -x "$AGENT/venv/bin/python" ]]; then
   sudo -u "$HERMES_USER" -H bash -euo pipefail -c "
     mkdir -p '$HERMES_HOME'
     if [[ ! -d '$AGENT/.git' ]]; then
-      git clone https://github.com/NousResearch/hermes-agent '$AGENT'
+      # Every commit, but file contents only as checkouts need them: a quarter of the full download.
+      git clone --filter=blob:none https://github.com/NousResearch/hermes-agent '$AGENT'
     fi
     cd '$AGENT'
     git fetch --quiet origin '$HERMES_REF' || true

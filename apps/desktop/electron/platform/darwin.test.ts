@@ -1,5 +1,44 @@
-import { describe, expect, it } from 'vitest'
-import { parseDf, parsePmset, parsePs, parseVmStat } from './darwin.ts'
+import { describe, expect, it, vi } from 'vitest'
+import { DarwinPlatform, parseDf, parsePmset, parsePs, parseVmStat, parseWifiDevice, parseWifiSummary } from './darwin.ts'
+
+const commands = vi.hoisted(() => ({ outputs: new Map<string, string>(), calls: [] as string[] }))
+
+vi.mock('./exec.ts', () => ({
+  MISSING_BINARY: 127,
+  run: vi.fn(async (command: string, args: string[]) => {
+    const line = [command, ...args].join(' ')
+    commands.calls.push(line)
+
+    return { stdout: commands.outputs.get(line) ?? '', stderr: '', code: 0 }
+  }),
+  runBuffer: vi.fn()
+}))
+
+const PORTS = '\nHardware Port: Ethernet Adapter (en3)\nDevice: en3\nEthernet Address: 7a:00:00:00:00:01\n\nHardware Port: Wi-Fi\nDevice: en0\nEthernet Address: 7a:00:00:00:00:02\n'
+const SUMMARY = '<dictionary> {\n  BSSID : <redacted>\n  InterfaceType : WiFi\n  LinkStatusActive : TRUE\n  SSID : Cafe Guest\n}\n'
+
+describe('Wi-Fi status', () => {
+  it('finds the Wi-Fi device among the hardware ports', () => {
+    expect(parseWifiDevice(PORTS)).toBe('en0')
+    expect(parseWifiDevice('Hardware Port: Ethernet\nDevice: en5\n')).toBeUndefined()
+  })
+
+  it('reads the link and the SSID, and drops an SSID macOS redacted', () => {
+    expect(parseWifiSummary(SUMMARY, 'en0')).toEqual({ connected: true, ssid: 'Cafe Guest', interface: 'en0' })
+    expect(parseWifiSummary(SUMMARY.replace('SSID : Cafe Guest', 'SSID : <redacted>'), 'en0').ssid).toBeUndefined()
+    expect(parseWifiSummary('  LinkStatusActive : FALSE\n', 'en0')).toEqual({ connected: false, ssid: undefined, interface: 'en0' })
+  })
+
+  it('never runs system_profiler, which scans for networks on every call', async () => {
+    commands.outputs.set('route -n get default', '   route to: default\n  interface: en0\n')
+    commands.outputs.set('ipconfig getifaddr en0', '192.168.1.20\n')
+    commands.outputs.set('networksetup -listallhardwareports', PORTS)
+    commands.outputs.set('ipconfig getsummary en0', SUMMARY)
+
+    expect(await new DarwinPlatform().networkStatus()).toEqual({ online: true, defaultInterface: 'en0', ipv4: '192.168.1.20', wifi: { connected: true, ssid: 'Cafe Guest', interface: 'en0' } })
+    expect(commands.calls.filter(line => line.startsWith('system_profiler'))).toEqual([])
+  })
+})
 
 describe('darwin parsers', () => {
   it('derives used memory from active + wired + compressor pages', () => {

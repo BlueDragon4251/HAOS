@@ -81,7 +81,7 @@ runcmd:
   - [chmod, -R, a+rX, /usr/local/share/herald-os-linux]
   - [bash, /usr/local/share/herald-os-linux/provision.sh]
 
-final_message: "Herald OS Linux provisioned after \$UPTIME seconds"
+final_message: "cloud-init finished after \$UPTIME seconds; the Herald OS provisioning log is /var/log/herald-os-provision.log"
 EOF
 
 rm -f "$BUILD/cidata.iso"

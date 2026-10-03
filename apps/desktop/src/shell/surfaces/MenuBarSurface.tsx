@@ -54,11 +54,12 @@ function openNotifications(): void {
 const UPDATE_KEY = 'herald-os.update-available'
 
 interface UpdateAvailable {
-  version: string
+  /** What is pending, e.g. "Herald OS, 192 packages, 3 apps". */
+  summary: string
   checkedAt: number
 }
 
-/** The update service writes `{ version, checkedAt }` here when a newer Herald OS exists; absent means up to date. */
+/** `{ summary, checkedAt }` while the last update check found something pending; absent means up to date. */
 function readUpdateAvailable(): UpdateAvailable | null {
   try {
     const raw = localStorage.getItem(UPDATE_KEY)
@@ -69,7 +70,7 @@ function readUpdateAvailable(): UpdateAvailable | null {
 
     const parsed = JSON.parse(raw) as Partial<UpdateAvailable> | null
 
-    return parsed && typeof parsed.version === 'string' && parsed.version ? { version: parsed.version, checkedAt: Number(parsed.checkedAt) || 0 } : null
+    return parsed && typeof parsed.summary === 'string' && parsed.summary ? { summary: parsed.summary, checkedAt: Number(parsed.checkedAt) || 0 } : null
   } catch {
     return null
   }
@@ -98,7 +99,7 @@ function UpdateIndicator() {
       const pending = Number(command.args?.[0] ?? 0)
 
       if (pending > 0) {
-        localStorage.setItem(UPDATE_KEY, JSON.stringify({ version: command.args?.[1] || `${pending} pending`, checkedAt: Date.now() }))
+        localStorage.setItem(UPDATE_KEY, JSON.stringify({ summary: command.args?.[1] || `${pending} updates`, checkedAt: Date.now() }))
       } else {
         localStorage.removeItem(UPDATE_KEY)
       }
@@ -120,8 +121,8 @@ function UpdateIndicator() {
   return (
     <button
       type="button"
-      aria-label={`Update available: Herald OS ${update.version}`}
-      title={`Herald OS ${update.version} is available`}
+      aria-label={`Updates available: ${update.summary}`}
+      title={`Updates available: ${update.summary}`}
       onClick={() => openSurface('command', { type: 'menu', args: ['update-herald-os'] })}
       className="relative flex size-6 items-center justify-center rounded-md hover:bg-white/10"
     >

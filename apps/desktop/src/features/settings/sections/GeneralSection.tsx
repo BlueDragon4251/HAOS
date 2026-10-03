@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { IconFolder, IconMaximize, IconPower, IconStack2 } from '@tabler/icons-react'
 import { GlassButton, Toggle } from '../../../components/ui/glass.tsx'
+import { hostPlatform } from '../../../lib/platform-labels.ts'
 import { $prefs, updatePrefs } from '../../../store/backend.ts'
 import { notify } from '../../../store/notifications.ts'
 import { $spaces } from '../../../store/spaces.ts'
@@ -75,11 +76,19 @@ export function GeneralSection() {
       </SettingsGroup>
 
       <SettingsGroup title="Session">
-        <SettingsRow icon={<IconPower />} label="Quit Herald OS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
-          <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Quit Herald OS">
-            Quit
-          </GlassButton>
-        </SettingsRow>
+        {hostPlatform() === 'linux' ? (
+          <SettingsRow icon={<IconPower />} label="Restart Herald OS" description="Stops the Hermes backend this shell started and starts a fresh session." keywords="exit close quit">
+            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Restart Herald OS">
+              Restart
+            </GlassButton>
+          </SettingsRow>
+        ) : (
+          <SettingsRow icon={<IconPower />} label="Quit Herald OS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
+            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Quit Herald OS">
+              Quit
+            </GlassButton>
+          </SettingsRow>
+        )}
       </SettingsGroup>
     </>
   )

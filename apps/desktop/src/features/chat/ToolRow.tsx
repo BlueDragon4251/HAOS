@@ -21,7 +21,7 @@ const FRIENDLY: Record<string, string> = {
   system_info: 'Checked system info',
   system_processes: 'Inspected processes',
   system_disk_usage: 'Measured disk usage',
-  system_find_files: 'Searched the Mac',
+  system_find_files: 'Searched for files',
   system_apps: 'Listed apps',
   system_open: 'Opened',
   system_kill_process: 'Stopped a process',

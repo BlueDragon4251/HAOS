@@ -1,5 +1,5 @@
 import type { InstalledApp } from '../../../shared/ipc.ts'
-import { type AppCategory, type AppIconId, FEATURED_NATIVE, type HermesAppId, appById } from '../../shell/apps.ts'
+import { type AppCategory, type AppIconId, FEATURED_NATIVE, type HermesAppId, appById, distinctAppLabel } from '../../shell/apps.ts'
 
 /*
  * The launcher catalog: turns the Hermes registry plus the installed macOS apps into one ordered
@@ -145,9 +145,10 @@ export function buildCatalog(apps: readonly InstalledApp[]): LauncherTile[] {
   }
 
   const rest = apps.filter(app => !used.has(app.path)).sort((a, b) => a.name.localeCompare(b.name))
+  const taken = new Set(tiles.map(tile => tile.label.toLowerCase()))
 
   for (const app of rest) {
-    pushNative(app, app.name, nativeCategory(app))
+    pushNative(app, distinctAppLabel(app, taken), nativeCategory(app))
   }
 
   return tiles

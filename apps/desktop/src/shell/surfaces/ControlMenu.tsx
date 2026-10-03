@@ -43,7 +43,7 @@ import { openSurface, relayToMain } from '../../store/shell.ts'
 import { openApp, showPage } from '../../store/windows.ts'
 
 /*
- * The Herald OS control menu (Mod+Alt+Space), modelled on Omarchy's: a tree of groups whose leaves
+ * The Herald OS control menu (Mod+M or Mod+Alt+Space), modelled on Omarchy's: a tree of groups whose leaves
  * run the `herald-os` CLI, a power action, or a shell navigation. Leaves that need input show an
  * inline form step; destructive power actions show an inline confirm step. Everything degrades to
  * "Available on Herald OS Linux" where the CLI does not exist.
@@ -189,7 +189,7 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
       label: 'Update',
       hint: 'Herald OS',
       icon: IconRefresh,
-      children: [{ id: 'update-herald-os', label: 'Herald OS', hint: 'Fetch and apply the latest release', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } }]
+      children: [{ id: 'update-herald-os', label: 'Herald OS', hint: 'The shell, system packages, apps and Hermes', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } }]
     },
     {
       id: 'style',

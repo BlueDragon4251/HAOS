@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { AppGlyph, HermesAvatar } from '../components/app-icon.tsx'
 import { Kbd } from '../components/ui/primitives.tsx'
 import { cn } from '../lib/cn.ts'
+import { shortcutLabel } from '../lib/platform-labels.ts'
 import { matchIntent } from '../lib/voice/intents.ts'
 import { openStoredSession, runSlash, sendPrompt } from '../store/chat.ts'
 import { useNativeApps } from '../store/native-apps.ts'
@@ -237,12 +238,12 @@ export function CommandPalette({ onClose, standalone = false, onApplications, cl
                   close()
                 }}
                 icon={<AppGlyph id={app.icon} size={15} />}
-                hint={app.shortcut ? `⌘${app.shortcut}` : undefined}
+                hint={app.shortcut ? shortcutLabel(app.shortcut) : undefined}
               >
                 {app.name}
               </Item>
             ))}
-            <Item value="page:applications" onSelect={applications} icon={<AppGlyph id="grid" size={15} />} hint="⌘⇧A">
+            <Item value="page:applications" onSelect={applications} icon={<AppGlyph id="grid" size={15} />} hint={shortcutLabel('A', { shift: true })}>
               Applications
             </Item>
           </Command.Group>

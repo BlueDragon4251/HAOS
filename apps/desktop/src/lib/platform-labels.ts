@@ -25,3 +25,13 @@ export function deviceNoun(): string {
 export function revealLabel(): string {
   return hostPlatform() === 'darwin' ? 'Reveal in Finder' : `Show in ${fileManagerName()}`
 }
+
+/** A shell shortcut as the keyboard spells it: `⌘⇧A` on macOS, `Ctrl+Shift+A` elsewhere (the shell takes either). */
+export function shortcutLabel(key: string, { shift = false } = {}): string {
+  return hostPlatform() === 'darwin' ? `⌘${shift ? '⇧' : ''}${key}` : `Ctrl+${shift ? 'Shift+' : ''}${key}`
+}
+
+/** What starts a voice conversation: the session's Super+V on Linux, the configured global hotkey elsewhere. */
+export function voiceKeyLabel(hotkey: string): string | undefined {
+  return hostPlatform() === 'linux' ? 'Super+V' : hotkey.trim() || undefined
+}

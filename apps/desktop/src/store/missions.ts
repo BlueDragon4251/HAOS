@@ -1,6 +1,7 @@
 import type { GatewayEvent, SubagentEventPayload, ToolCompletePayload, ToolStartPayload } from '@herald-os/client'
 import { atom, computed, map } from 'nanostores'
 import type { ChatState } from '../lib/chat-model.ts'
+import { systemFilesOutputs } from '../lib/file-ops.ts'
 import { $agents, type AgentActivity } from './agents.ts'
 import { $chats, SESSION_SOURCE } from './chat.ts'
 import { onAnyGatewayEvent } from './gateway.ts'
@@ -124,8 +125,13 @@ function extractPaths(args: Record<string, unknown> | null | undefined): string[
   return out
 }
 
+/** Paths a tool call leaves on disk. */
+function outputPaths(tool: string, args: Record<string, unknown> | null | undefined): string[] {
+  return tool === 'system_files' ? systemFilesOutputs(args) : extractPaths(args)
+}
+
 function recordArtifact(sessionId: string, tool: string, args: Record<string, unknown> | null | undefined): void {
-  const paths = extractPaths(args)
+  const paths = outputPaths(tool, args)
 
   if (paths.length === 0) {
     return
@@ -166,7 +172,7 @@ const FRIENDLY_TOOL: Record<string, string> = {
   delegate_task: 'delegated work',
   todo_list: 'updated the plan',
   memory: 'updated memory',
-  system_find_files: 'searched this Mac',
+  system_find_files: 'searched for files',
   system_open: 'opened something',
   system_files: 'organised files',
   system_processes: 'inspected processes'
@@ -271,7 +277,7 @@ function seedArtifactsFromChat(chat: ChatState): void {
 
     const ts = row.ts
 
-    for (const p of extractPaths(row.args)) {
+    for (const p of outputPaths(row.name, row.args)) {
       const name = p.split('/').filter(Boolean).pop() ?? p
       const existing = found.find(a => a.path === p)
 

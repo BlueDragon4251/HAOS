@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -12,9 +12,12 @@ import type { PanelShell } from './panels.ts'
  * frame of its procedural wallpaper offscreen, writes a PNG, and hands it to swaybg (a layer-shell
  * client the compositor keeps beneath every window). A custom image wallpaper is passed straight through.
  */
+const UNIT = 'herald-os-wallpaper'
+
 export class WallpaperService {
   private swaybg: ChildProcess | null = null
   private current: string | null = null
+  private queue: Promise<void> = Promise.resolve()
 
   constructor(private readonly shell: PanelShell) {}
 
@@ -48,6 +51,7 @@ export class WallpaperService {
   stop(): void {
     this.swaybg?.kill()
     this.swaybg = null
+    execFile('systemctl', ['--user', 'stop', UNIT], () => undefined)
   }
 
   private receiveFrame(dataUrl: string): void {
@@ -65,12 +69,31 @@ export class WallpaperService {
   }
 
   private show(file: string, force = false): void {
-    if (this.current === file && this.swaybg && !force) {
+    if (this.current === file && !force) {
       return
     }
 
-    this.swaybg?.kill()
     this.current = file
+    this.queue = this.queue.then(() => this.run(file))
+  }
+
+  /**
+   * swaybg runs as a transient user unit rather than as our child: a child inherits Electron's open
+   * sockets (the DevTools port among them) and outlives a crashed shell, one more after every restart.
+   * Starting the unit first stops whatever the last shell left running.
+   */
+  private async run(file: string): Promise<void> {
+    await succeeds('systemctl', ['--user', 'stop', UNIT])
+    const started = await succeeds('systemd-run', ['--user', '--quiet', '--collect', `--unit=${UNIT}`, `--setenv=WAYLAND_DISPLAY=${process.env.WAYLAND_DISPLAY ?? ''}`, 'swaybg', '-m', 'fill', '-i', file])
+
+    if (!started) {
+      this.spawnChild(file)
+    }
+  }
+
+  /** Without a systemd user instance, swaybg is our child and dies with a clean quit only. */
+  private spawnChild(file: string): void {
+    this.swaybg?.kill()
     const child = spawn('swaybg', ['-m', 'fill', '-i', file], { stdio: 'ignore' })
     child.on('error', error => log('wallpaper', `swaybg unavailable: ${error.message}`))
     child.on('exit', () => {
@@ -80,4 +103,8 @@ export class WallpaperService {
     })
     this.swaybg = child
   }
+}
+
+function succeeds(command: string, args: string[]): Promise<boolean> {
+  return new Promise(resolve => execFile(command, args, error => resolve(!error)))
 }

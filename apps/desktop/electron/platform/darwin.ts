@@ -142,6 +142,18 @@ export function parsePmset(text: string): BatteryStatus {
   return { present: true, percent: Number(match[1]), charging: state === 'charging' || state === 'charged' }
 }
 
+/** The Wi-Fi device (`en0` on most Macs) from `networksetup -listallhardwareports`. */
+export function parseWifiDevice(ports: string): string | undefined {
+  return /Hardware Port: Wi-Fi\s*\nDevice:\s*(\S+)/.exec(ports)?.[1]
+}
+
+/** Parse `ipconfig getsummary <device>`. macOS shows `<redacted>` as the SSID to apps without location access. */
+export function parseWifiSummary(summary: string, device: string): NonNullable<NetworkStatus['wifi']> {
+  const ssid = /^\s*SSID : (.+)$/m.exec(summary)?.[1]?.trim()
+
+  return { connected: /LinkStatusActive : TRUE/.test(summary), ssid: ssid && !ssid.includes('redacted') ? ssid : undefined, interface: device }
+}
+
 export class DarwinPlatform implements HostPlatform {
   private previousCpu = cpuSample()
   private appsCache: { at: number; apps: InstalledApp[] } | null = null
@@ -246,15 +258,8 @@ export class DarwinPlatform implements HostPlatform {
     const ipv4 = iface ? (await run('ipconfig', ['getifaddr', iface], 4000)).stdout.trim() || undefined : undefined
     // Not system_profiler SPAirPortDataType: it scans for nearby networks on every call, which takes
     // seconds and disturbs the Wi-Fi link each time the menu bar refreshes.
-    const ports = await run('networksetup', ['-listallhardwareports'], 4000)
-    const device = /Hardware Port: Wi-Fi\s*\nDevice:\s*(\S+)/.exec(ports.stdout)?.[1]
-    let wifi: NetworkStatus['wifi']
-
-    if (device) {
-      const summary = (await run('ipconfig', ['getsummary', device], 4000)).stdout
-      const ssid = /^\s*SSID : (.+)$/m.exec(summary)?.[1]?.trim()
-      wifi = { connected: /LinkStatusActive : TRUE/.test(summary), ssid: ssid && !ssid.includes('redacted') ? ssid : undefined, interface: device }
-    }
+    const device = parseWifiDevice((await run('networksetup', ['-listallhardwareports'], 4000)).stdout)
+    const wifi = device ? parseWifiSummary((await run('ipconfig', ['getsummary', device], 4000)).stdout, device) : undefined
 
     return { online: Boolean(iface), defaultInterface: iface, ipv4, wifi }
   }

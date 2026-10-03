@@ -1,6 +1,9 @@
+import { useStore } from '@nanostores/react'
 import { IconMicrophone, IconPlayerPlay, IconRobot, IconShieldCheck } from '@tabler/icons-react'
 import { useContext, useMemo } from 'react'
 import { GlassButton, GlassCard, Pill } from '../../../components/ui/glass.tsx'
+import { deviceNoun, voiceKeyLabel } from '../../../lib/platform-labels.ts'
+import { $prefs } from '../../../store/backend.ts'
 import { notify } from '../../../store/notifications.ts'
 import { type CommandPhrase, type CommandSummary, listCommands, runCommand } from '../../../store/os-commands.ts'
 import { SectionTitle, SettingsFilterContext } from './shared.tsx'
@@ -88,6 +91,7 @@ export function exampleFor(command: CommandSummary): string | null {
 export function VoiceCommandsSection() {
   const query = useContext(SettingsFilterContext).trim().toLowerCase()
   const commands = useMemo(() => listCommands({ includeHidden: true }), [])
+  const voiceKey = voiceKeyLabel(useStore($prefs).voice.hotkey)
   const matches = (command: CommandSummary) =>
     !query || command.title.toLowerCase().includes(query) || command.description.toLowerCase().includes(query) || command.id.includes(query) || command.phrases.some(p => phraseText(p).toLowerCase().includes(query))
 
@@ -106,12 +110,12 @@ export function VoiceCommandsSection() {
     <>
       <SectionTitle
         title="Voice commands"
-        subtitle={`${commands.length} things Herald OS can do. Press Alt+Space (or say "hey hermes") and say one of these; anything else goes to Hermes, who can use every command too.`}
+        subtitle={`${commands.length} things Herald OS can do. ${voiceKey ? `Press ${voiceKey} (or say "hey hermes")` : 'Say "hey hermes"'} and say one of these; anything else goes to Hermes, who can use every command too.`}
       />
 
       <GlassCard className="settings-item flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-[12px] text-fg-2">
         <span className="flex items-center gap-1.5">
-          <IconMicrophone size={14} className="text-accent-strong" /> Instant: runs on this Mac, no tokens
+          <IconMicrophone size={14} className="text-accent-strong" /> Instant: runs on this {deviceNoun()}, no tokens
         </span>
         <span className="flex items-center gap-1.5">
           <IconShieldCheck size={14} className="text-warn" /> Asks first: Hermes shows an approval card

@@ -194,7 +194,7 @@ def handle_system_disk_usage(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_FIND_FILES_SCHEMA = _schema(
     "system_find_files",
-    "Search this Mac with Spotlight. Combine: text (content or display name), name (filename substring), kind (image, screenshot, document, pdf, video, audio, folder, code, archive), when (today, yesterday, this_week, last_7_days, this_month) or explicit since/until dates, scope (a directory), extensions. Example: 'screenshots I took yesterday' -> kind=screenshot, when=yesterday. Returns paths newest first. Read-only.",
+    "Search this computer's files (Spotlight on macOS; plocate, fd or find on Linux). Combine: text (content or display name), name (filename substring), kind (image, screenshot, document, pdf, video, audio, folder, code, archive), when (today, yesterday, this_week, last_7_days, this_month) or explicit since/until dates, scope (a directory), extensions. Example: 'screenshots I took yesterday' -> kind=screenshot, when=yesterday. Returns paths newest first. Read-only.",
     {
         "text": _desc(_STR, "Words to match in file content or display name."),
         "name": _desc(_STR, "Filename substring (case-insensitive)."),
@@ -252,7 +252,7 @@ def handle_system_find_files(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_APPS_SCHEMA = _schema(
     "system_apps",
-    "Applications on this Mac. action=installed lists installed apps (optionally filtered by name); action=running lists apps currently open; action=quit asks an app to quit (force=true kills it). Use system_open to launch an app.",
+    "Applications on this computer. action=installed lists installed apps (optionally filtered by name); action=running lists apps currently open; action=quit asks an app to quit (force=true kills it). Use system_open to launch an app.",
     {
         "action": _enum("installed", "running", "quit"),
         "filter": _desc(_STR, "For installed/running: case-insensitive name substring."),
@@ -453,7 +453,7 @@ def handle_system_kill_process(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_FILES_SCHEMA = _schema(
     "system_files",
-    "Organise files and folders on this Mac. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan; the user confirms mutating actions once per batch. Use the write_file tool to create file contents.",
+    "Organise files and folders on this computer. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan; the user confirms mutating actions once per batch. Use the write_file tool to create file contents.",
     {
         "action": _enum("mkdir", "move", "copy", "trash", "batch"),
         "path": _desc(_STR, "Target path for mkdir/move/copy/trash."),
@@ -584,7 +584,7 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_NETWORK_SCHEMA = _schema(
     "system_network",
-    "Connectivity on this Mac. action=status: online/offline, default interface, gateway, DNS, each active interface with its IPv4, and the Wi-Fi link (connected, channel, rate, signal; macOS hides the network name unless Location Services is granted). action=bluetooth: power state, connected and paired devices. Read-only.",
+    "Connectivity on this computer. action=status: online/offline, default interface, gateway, DNS, each active interface with its IPv4, and the Wi-Fi link (connected, channel, rate, signal; macOS hides the network name unless Location Services is granted). action=bluetooth: power state, connected and paired devices. Read-only.",
     {"action": _enum("status", "bluetooth", description="Default status.")},
 )
 
@@ -606,7 +606,7 @@ def handle_system_network(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_CONTROL_SCHEMA = _schema(
     "system_control",
-    "Read or change device settings. Reads: audio (output/input/alert volume, mute), appearance (dark mode, displays). Actions: set_volume (percent and/or muted), set_dark_mode (enabled), notify (title, body: a macOS notification), open_settings (pane, e.g. privacy_and_security, screen_recording, wifi, bluetooth, sound, displays, notifications), sleep_display, lock_screen, set_wifi (enabled). Actions run immediately and are audited; set_wifi asks first.",
+    "Read or change device settings. Reads: audio (output/input/alert volume, mute), appearance (dark mode, displays). Actions: set_volume (percent and/or muted), set_dark_mode (enabled), notify (title, body: a system notification), open_settings (pane, e.g. privacy_and_security, screen_recording, wifi, bluetooth, sound, displays, notifications), sleep_display, lock_screen, set_wifi (enabled). Actions run immediately and are audited; set_wifi asks first.",
     {
         "action": _enum("audio", "appearance", "set_volume", "set_dark_mode", "notify", "open_settings", "sleep_display", "lock_screen", "set_wifi"),
         "percent": _desc(_INT, "For set_volume: 0-100."),

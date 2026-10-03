@@ -5,6 +5,7 @@ import { EmptyGlass, GlassButton, SearchField, Tabs } from '../../components/ui/
 import { MicButton } from '../voice/MicButton.tsx'
 import { Kbd } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
+import { shortcutLabel } from '../../lib/platform-labels.ts'
 import { sendPrompt } from '../../store/chat.ts'
 import { useNativeApps } from '../../store/native-apps.ts'
 import { notify } from '../../store/notifications.ts'
@@ -163,7 +164,7 @@ export function ApplicationsPanel({ onClose, standalone = false, className }: Ap
       </div>
 
       <div ref={searchWrapRef} className="px-7">
-        <SearchField autoFocus value={query} onChange={setQuery} onSubmit={submitSearch} placeholder="Search apps or describe what you want to do" trailing={<Kbd>⌘ K</Kbd>} className="h-10" />
+        <SearchField autoFocus value={query} onChange={setQuery} onSubmit={submitSearch} placeholder="Search apps or describe what you want to do" trailing={<Kbd>{shortcutLabel('K')}</Kbd>} className="h-10" />
       </div>
 
       <div className="px-7 pt-3 pb-3">

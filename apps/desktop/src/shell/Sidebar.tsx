@@ -3,6 +3,7 @@ import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconPlus } 
 import { useRef, useState } from 'react'
 import { AppGlyph, HermesAvatar } from '../components/app-icon.tsx'
 import { cn } from '../lib/cn.ts'
+import { shortcutLabel } from '../lib/platform-labels.ts'
 import { $sidebar, SIDEBAR_COLLAPSED, SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_SNAP, setSidebarCollapsed, setSidebarWidth, toggleSidebar } from '../store/sidebar.ts'
 import { $activeSpace, $spaces, addSpace, setActiveSpace } from '../store/spaces.ts'
 import { $page, showPage } from '../store/windows.ts'
@@ -196,7 +197,7 @@ export function Sidebar() {
         type="button"
         onClick={toggleSidebar}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (⌘\\)`}
+        title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (${shortcutLabel('\\')})`}
         className={cn('side-item group relative mt-auto flex h-8 items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-white/8 hover:text-fg', collapsed ? 'w-9 justify-center' : 'gap-2.5 px-2.5 text-[12px]')}
       >
         {collapsed ? <IconLayoutSidebarLeftExpand size={16} stroke={1.9} /> : <IconLayoutSidebarLeftCollapse size={16} stroke={1.9} />}

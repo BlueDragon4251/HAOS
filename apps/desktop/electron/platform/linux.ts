@@ -60,10 +60,17 @@ const APPLICATION_DIRS = [
 ]
 
 /** Icon themes searched as `<theme>/<size>/apps/<name>.<ext>`. */
-const ICON_THEME_DIRS = [path.join(os.homedir(), '.local', 'share', 'icons', 'hicolor'), '/usr/share/icons/hicolor', '/usr/share/icons/Adwaita', '/var/lib/flatpak/exports/share/icons/hicolor']
+const ICON_THEME_DIRS = [
+  path.join(os.homedir(), '.local', 'share', 'icons', 'hicolor'),
+  '/usr/share/icons/hicolor',
+  '/usr/share/icons/Adwaita',
+  path.join(os.homedir(), '.local', 'share', 'flatpak', 'exports', 'share', 'icons', 'hicolor'),
+  '/var/lib/flatpak/exports/share/icons/hicolor'
+]
 /** Flat icon dirs searched as `<dir>/<name>.<ext>`. */
 const ICON_FLAT_DIRS = [path.join(os.homedir(), '.local', 'share', 'icons'), '/usr/share/pixmaps']
-const ICON_SIZES = ['256x256', '128x128', '96x96', '64x64', '48x48', 'scalable']
+/** Ordered for a sharp 68 px tile at scale 2; some Flatpaks ship nothing between 512 and 32. */
+const ICON_SIZES = ['256x256', '128x128', '512x512', '96x96', '64x64', '48x48', 'scalable']
 const ICON_EXTENSIONS = ['.png', '.svg']
 
 /** GNOME thumbnail cache buckets, largest first. */

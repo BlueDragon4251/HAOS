@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { InstalledApp } from '../../shared/ipc.ts'
 
 /** Pages inside the main Hermes window (sidebar navigation). */
 export type PageId = 'overview' | 'hermes' | 'missions' | 'memory' | 'files' | 'automations' | 'connections' | 'settings'
@@ -87,5 +88,19 @@ export const FEATURED_NATIVE: readonly NativeAppAlias[] = [
   { label: 'Music', names: ['Music', 'Spotify'], category: 'creative', icon: 'grid' },
   { label: 'App Store', names: ['App Store'], category: 'system', icon: 'grid' }
 ]
+
+/**
+ * An installed app's label beside Herald's own: GNOME Files becomes "Files (Nautilus)" next to
+ * Herald's Files, named after the last part of its id. `taken` holds lowercase labels already shown.
+ */
+export function distinctAppLabel(app: Pick<InstalledApp, 'name' | 'bundleId'>, taken: ReadonlySet<string>): string {
+  const tail = app.bundleId?.split('.').pop() ?? ''
+
+  if (!taken.has(app.name.toLowerCase()) || !tail || tail.toLowerCase() === app.name.toLowerCase()) {
+    return app.name
+  }
+
+  return `${app.name} (${tail[0].toUpperCase()}${tail.slice(1)})`
+}
 
 export type PageComponent = ComponentType<Record<string, never>>

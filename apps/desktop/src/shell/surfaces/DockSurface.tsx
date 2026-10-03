@@ -9,7 +9,7 @@ import { useNativeApps } from '../../store/native-apps.ts'
 import { notify } from '../../store/notifications.ts'
 import { $wm, openSurface, wmAction } from '../../store/shell.ts'
 import { showPage } from '../../store/windows.ts'
-import { appById, type FloatingAppId } from '../apps.ts'
+import { appById, distinctAppLabel, type FloatingAppId } from '../apps.ts'
 import { NativeIcon, pinnedFor, useDockMagnification } from '../Dock.tsx'
 import { OUR_MAIN_TITLE, ourFloatingAppId, windowLabel } from './shell-utils.ts'
 
@@ -129,8 +129,9 @@ export function DockSurface() {
 
     for (const pin of pinnedFor(platform)) {
       if (pin.label === 'Files') {
-        // Files is always Herald OS's own page; borrow the host file manager's icon when it has one.
-        list.push({ id: 'files', label: 'Files', render: () => <NativeIcon src={iconFor(findApp(pin.names)?.path)} fallback="files" />, onClick: () => showPage('files') })
+        // Files is always Herald OS's own page, in Herald's own tile: a running file manager gets an entry
+        // of its own here, and a borrowed icon would make the two look like the same app.
+        list.push({ id: 'files', label: 'Files', render: () => <AppTile id="files" size={44} />, onClick: () => showPage('files') })
 
         continue
       }
@@ -189,10 +190,12 @@ export function DockSurface() {
       groups.set(key, [...(groups.get(key) ?? []), win])
     }
 
+    const taken = new Set(list.map(entry => entry.label.toLowerCase()))
+
     for (const [key, windows] of groups) {
       const sample = windows[0]
       const app = appForWindow(apps, sample.appId)
-      const label = app?.name ?? sample.appId ?? windowLabel(sample)
+      const label = app ? distinctAppLabel(app, taken) : (sample.appId ?? windowLabel(sample))
       list.push({
         id: `wm:${key}`,
         label,

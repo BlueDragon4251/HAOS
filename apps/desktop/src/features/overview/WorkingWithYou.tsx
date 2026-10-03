@@ -31,7 +31,7 @@ const TOOL_VERB: Record<string, string> = {
   delegate_task: 'Delegating work',
   todo_list: 'Updating the plan',
   memory: 'Updating memory',
-  system_find_files: 'Searching this Mac',
+  system_find_files: 'Searching for files',
   system_open: 'Opening something',
   system_files: 'Organising files',
   system_processes: 'Inspecting processes'

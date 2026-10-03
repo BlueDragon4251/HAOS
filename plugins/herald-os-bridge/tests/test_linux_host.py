@@ -137,16 +137,26 @@ def test_log_priorities_and_settings_panes_mirror_darwin(plugin):
         assert pane in linux.SETTINGS_PANES and pane in darwin.SETTINGS_PANES
 
 
-def test_linux_host_is_unavailable_off_linux_and_sleep_display_is_stage_two(plugin, monkeypatch):
+def test_linux_host_is_unavailable_off_linux(plugin, monkeypatch):
     linux = _mod(plugin, "linux")
-    base = _mod(plugin, "base")
     host = linux.LinuxHost()
     monkeypatch.setattr(linux.sys, "platform", "darwin")
     assert host.available() is False
     monkeypatch.setattr(linux.sys, "platform", "linux")
     assert host.available() is True
-    with pytest.raises(base.HostNotSupported):
-        host.sleep_display()
+
+
+def test_sleep_display_powers_off_monitors_through_niri(plugin, monkeypatch):
+    linux = _mod(plugin, "linux")
+    base = _mod(plugin, "base")
+    util = importlib.import_module(plugin.__name__ + ".bridge.util")
+    calls = []
+    monkeypatch.setattr(linux, "run", lambda argv, **kw: calls.append(list(argv)) or util.ExecResult(0, "", ""))
+    linux.LinuxHost().sleep_display()
+    assert calls == [["niri", "msg", "action", "power-off-monitors"]]
+    monkeypatch.setattr(linux, "run", lambda argv, **kw: util.ExecResult(127, "", "niri: not found (No such file)"))
+    with pytest.raises(base.HostNotSupported, match="niri"):
+        linux.LinuxHost().sleep_display()
 
 
 def test_missing_binary_becomes_host_not_supported(plugin, monkeypatch):

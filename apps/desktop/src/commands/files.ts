@@ -222,7 +222,7 @@ export const filesCommands: readonly OsCommand[] = [
   },
   {
     id: 'files.reveal',
-    title: 'Reveal in Finder',
+    title: 'Reveal in file manager',
     description: 'Show the selected (or given) file in the system file manager.',
     tier: 'act',
     args: [{ name: 'path', type: 'string', description: 'Path; omit for the selected file' }],

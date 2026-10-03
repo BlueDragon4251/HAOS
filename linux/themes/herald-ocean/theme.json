@@ -1,6 +1,6 @@
 {
   "name": "herald-ocean",
-  "label": "Hermes Ocean",
+  "label": "Herald Ocean",
   "description": "Deep blue glass on a living wallpaper. The default.",
   "shell": {
     "theme": "ocean",

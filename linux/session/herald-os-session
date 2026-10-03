@@ -42,8 +42,13 @@ if [[ "$HERALD_OS_SHELL_MODE" == "panels" ]]; then
     start_service herald-os-clipboard-image wl-paste --type image --watch cliphist store
   fi
   # Omakase web apps are per-user and need the network; install any missing ones once per login.
+  # Offline, every icon would fall back to a generic one for good, so that waits for a later login.
   if command -v herald-os-omakase >/dev/null && [[ ! -f "$LOG_DIR/omakase-webapps-done" ]]; then
-    (sleep 20 && herald-os-omakase install --webapps >>"$LOG_DIR/omakase.log" 2>&1 && touch "$LOG_DIR/omakase-webapps-done") &
+    (
+      sleep 20
+      case "$(nmcli -t networking connectivity 2>/dev/null)" in none | limited | portal) exit 0 ;; esac
+      herald-os-omakase install --webapps >>"$LOG_DIR/omakase.log" 2>&1 && touch "$LOG_DIR/omakase-webapps-done"
+    ) &
   fi
   if command -v swayidle >/dev/null; then
     # Only arm the idle lock when the account can actually be unlocked (it has a password);
@@ -97,12 +102,29 @@ if [[ ! -x "$ELECTRON" || ! -f "$APP/dist/electron/main.mjs" && -z "${HERALD_OS_
   exit 1
 fi
 
+# The shell's children inherit its DevTools socket, so one still shutting down (the backend, after a
+# restart) would make the next shell's bind fail without a word.
+wait_for_debug_port() {
+  [[ -n "${HERALD_OS_REMOTE_DEBUG_PORT:-}" ]] || return 0
+  local _
+  for _ in $(seq 1 20); do
+    ss -Hltn "sport = :${HERALD_OS_REMOTE_DEBUG_PORT}" 2>/dev/null | grep -q . || return 0
+    sleep 0.5
+  done
+}
+
 failures=0
 window_start=$(date +%s)
 while :; do
+  wait_for_debug_port
   "$ELECTRON" "$APP" "${flags[@]}" >>"$LOG_DIR/shell.log" 2>&1
   code=$?
   if [[ $code -eq 0 ]]; then
+    # niri outlives the programs it spawned, so it has to be told to end too; otherwise the session
+    # would sit there without a menu bar or dock instead of greetd starting a fresh one.
+    if [[ "$HERALD_OS_SHELL_MODE" == "panels" ]]; then
+      niri msg action quit --skip-confirmation >/dev/null 2>&1 || true
+    fi
     exit 0
   fi
   now=$(date +%s)

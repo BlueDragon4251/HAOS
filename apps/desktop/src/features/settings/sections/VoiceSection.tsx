@@ -3,6 +3,7 @@ import { IconBellRinging, IconBolt, IconClockPause, IconCoin, IconEar, IconEye, 
 import { useEffect, useState } from 'react'
 import type { MicPermission, VoiceEngine, VoicePrefs } from '../../../../shared/ipc.ts'
 import { GlassButton, Pill, Toggle } from '../../../components/ui/glass.tsx'
+import { deviceNoun } from '../../../lib/platform-labels.ts'
 import { rest } from '../../../lib/rest.ts'
 import { useBackendData } from '../../../lib/use-async.ts'
 import { LOCAL_STT_MODELS } from '../../../lib/voice/stt-tuning.ts'
@@ -27,7 +28,7 @@ interface HermesConfig {
 
 const STT_PROVIDERS = [
   { id: 'nous', label: 'Nous subscription', description: 'OpenAI transcription through the Nous gateway; no extra cost' },
-  { id: 'local', label: 'On this Mac (faster-whisper)', description: 'Free and private; slower on long utterances' },
+  { id: 'local', label: 'On this device (faster-whisper)', description: 'Free and private; slower on long utterances' },
   { id: 'openai', label: 'OpenAI', description: 'gpt-4o-mini-transcribe with your OPENAI_API_KEY' },
   { id: 'groq', label: 'Groq Whisper', description: 'GROQ_API_KEY' },
   { id: 'mistral', label: 'Mistral Voxtral', description: 'MISTRAL_API_KEY' },
@@ -39,7 +40,7 @@ const TTS_PROVIDERS = [
   { id: 'edge', label: 'Edge neural voices', description: 'Free, no key; whole sentences at a time' },
   { id: 'openai', label: 'OpenAI', description: 'gpt-4o-mini-tts, streams sentence by sentence' },
   { id: 'elevenlabs', label: 'ElevenLabs', description: 'Most expressive; streams; paid' },
-  { id: 'neutts', label: 'NeuTTS (local)', description: 'Runs on this Mac; needs the neutts extra' },
+  { id: 'neutts', label: 'NeuTTS (local)', description: 'Runs on this device; needs the neutts extra' },
   { id: 'kittentts', label: 'KittenTTS (local)', description: 'Tiny local model' },
   { id: 'piper', label: 'Piper (local)', description: 'Fast local voices' }
 ] as const
@@ -203,7 +204,7 @@ export function VoiceSection() {
               ? `Listening${wake.capture === 'local' ? ' (Hermes opened the mic itself)' : ''}.`
               : wake.error
                 ? wake.error
-                : 'Runs the on-device openWakeWord detector inside Hermes; nothing leaves this Mac until you speak to it.'
+                : `Runs the on-device openWakeWord detector inside Hermes; nothing leaves this ${deviceNoun()} until you speak to it.`
           }
           keywords="hey hermes always listening"
         >

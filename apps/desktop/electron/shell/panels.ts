@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain, screen, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IPC, type ShellCommand, type ShellSurface, type WmAction } from '../../shared/ipc.ts'
+import { IPC, type ShellCommand, type ShellSurface, type WmAction, type WmWindow } from '../../shared/ipc.ts'
 import { GUEST_PREFERENCES, lockDownPartition, WEB_PARTITION } from '../ipc/web.ts'
 import { log } from '../log.ts'
 import { devServerUrl, isShellPage, rendererIndex } from '../paths.ts'
@@ -9,6 +9,12 @@ import { NiriClient } from '../wm/niri.ts'
 import { FLOATING_APPS, shellMode, surfaceTitle } from './mode.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+const PANEL_TITLES = new Set((['menubar', 'dock', 'command', 'wallpaper'] as const).map(surfaceTitle))
+
+/** The menu bar, dock, overlays and wallpaper renderer: our windows that are not apps. */
+function isPanel(win: WmWindow): boolean {
+  return win.ours && PANEL_TITLES.has(win.title)
+}
 
 const MENUBAR_HEIGHT = 30
 const DOCK_SIZE = { width: 720, height: 84 }
@@ -36,12 +42,20 @@ export class PanelShell {
   private readonly pending = new Map<ShellSurface, ShellCommand[]>()
   private readonly loaded = new Set<ShellSurface>()
   private readonly webApps = new Map<string, BrowserWindow>()
+  /** The last focused window that is not one of our panels: where focus goes back to after an overlay. */
+  private lastAppFocus: number | null = null
 
   constructor(private readonly onMainCreated: (win: BrowserWindow) => void) {}
 
   start(): void {
     this.niri.start()
     this.niri.onState(state => {
+      const focused = state.windows.find(w => w.id === state.focusedWindowId)
+
+      if (focused && !isPanel(focused)) {
+        this.lastAppFocus = focused.id
+      }
+
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) {
           win.webContents.send(IPC.wmState, state)
@@ -208,6 +222,26 @@ export class PanelShell {
     }
   }
 
+  /**
+   * When an overlay closes, niri focuses the next floating window, which is the dock or the menu bar:
+   * keys would then go nowhere. Give focus back to the window that had it, if it is still on screen.
+   */
+  private async restoreAppFocus(): Promise<void> {
+    const state = this.niri.state()
+    const focused = state.windows.find(w => w.id === state.focusedWindowId)
+
+    if (focused && !isPanel(focused)) {
+      return
+    }
+
+    const activeWorkspace = state.workspaces.find(ws => ws.focused)?.id
+    const target = state.windows.find(w => w.id === this.lastAppFocus)
+
+    if (target && target.workspaceId === activeWorkspace) {
+      await this.niri.action({ type: 'focus-window', id: target.id }).catch(() => undefined)
+    }
+  }
+
   private create(surface: ShellSurface): BrowserWindow {
     const display = screen.getPrimaryDisplay()
     const options = this.optionsFor(surface, display.workAreaSize.width, display.size)
@@ -269,6 +303,7 @@ export class PanelShell {
     if (surface === 'command') {
       // Overlays dismiss when focus leaves them (the renderer also closes on Escape).
       win.on('blur', () => setTimeout(() => !win.isDestroyed() && !win.isFocused() && win.close(), 150))
+      win.on('closed', () => setTimeout(() => void this.restoreAppFocus(), 100))
     }
 
     win.on('closed', () => {

@@ -67,8 +67,9 @@ sudo -n rm -f /usr/share/wayland-sessions/hermes-os.desktop
 sudo -n rm -rf /usr/local/share/hermes-os-linux
 if command -v plymouth-set-default-theme >/dev/null && [[ -d /usr/share/plymouth/themes/herald-os ]]; then
   if [[ "$(plymouth-set-default-theme 2>/dev/null)" == "hermes-os" ]]; then
-    # -R rebuilds the initramfs so the new splash shows at boot (takes a minute).
-    sudo -n plymouth-set-default-theme -R herald-os >/dev/null 2>&1 || echo "    WARNING: could not switch the Plymouth theme"
+    # Every kernel's initramfs, not only the running one's (what -R rebuilds): whichever kernel boots
+    # next has to carry the new splash (takes a minute).
+    { sudo -n plymouth-set-default-theme herald-os && sudo -n dracut -f --regenerate-all; } >/dev/null 2>&1 || echo "    WARNING: could not switch the Plymouth theme"
   fi
   sudo -n rm -rf /usr/share/plymouth/themes/hermes-os
 fi

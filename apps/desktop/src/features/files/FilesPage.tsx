@@ -21,6 +21,7 @@ import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chips, EmptyGlass, GlassButton, MoreButton, PageHeader, SearchField, Toggle } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
+import { revealLabel } from '../../lib/platform-labels.ts'
 import { notify } from '../../store/notifications.ts'
 import { $activeSpace } from '../../store/spaces.ts'
 import { $page, showPage } from '../../store/windows.ts'
@@ -508,7 +509,7 @@ export function FilesPage() {
               onClose={() => setMoreMenu(false)}
               className="top-9"
               items={[
-                { id: 'reveal', label: 'Reveal in Finder', icon: <IconFolderOpen />, disabled: !cwd, onSelect: () => cwd && revealItem(cwd) },
+                { id: 'reveal', label: revealLabel(), icon: <IconFolderOpen />, disabled: !cwd, onSelect: () => cwd && revealItem(cwd) },
                 {
                   id: 'terminal',
                   label: 'Open in Terminal',

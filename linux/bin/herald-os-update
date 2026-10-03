@@ -95,9 +95,20 @@ if [[ $SYSTEM -eq 1 ]] && command -v flatpak >/dev/null; then
   pending_flatpaks="$(flatpak remote-ls --user --updates --columns=application flathub 2>/dev/null | grep -c . || true)"
 fi
 
+plural() { [[ $1 -eq 1 ]] && echo "$1 $2" || echo "$1 ${2}s"; }
+
 if [[ $CHECK -eq 1 ]]; then
   total=$((pending_repo + pending_pkgs + pending_flatpaks))
-  summary="shell:$pending_repo packages:$pending_pkgs flatpaks:$pending_flatpaks"
+  # What the menu bar shows, e.g. "Herald OS, 192 packages, 3 apps".
+  parts=()
+  [[ $pending_repo -gt 0 ]] && parts+=("Herald OS")
+  [[ $pending_pkgs -gt 0 ]] && parts+=("$(plural "$pending_pkgs" package)")
+  [[ $pending_flatpaks -gt 0 ]] && parts+=("$(plural "$pending_flatpaks" app)")
+  summary="up to date"
+  if [[ ${#parts[@]} -gt 0 ]]; then
+    summary="$(printf '%s, ' "${parts[@]}")"
+    summary="${summary%, }"
+  fi
   printf '{"channel":"%s","checkedAt":"%s","pending":%d,"shell":%d,"packages":%d,"flatpaks":%d}\n' \
     "$CHANNEL" "$(date -Is)" "$total" "$pending_repo" "$pending_pkgs" "$pending_flatpaks" >"$STATE/update-available.json"
   echo "$summary"

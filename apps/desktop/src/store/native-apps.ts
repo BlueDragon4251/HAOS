@@ -4,6 +4,7 @@ import { useCallback, useEffect } from 'react'
 import type { InstalledApp } from '../../shared/ipc.ts'
 
 export const $nativeApps = atom<InstalledApp[]>([])
+/** Icon data URLs by app path; `''` once an app is known to have none. */
 export const $nativeIcons = map<Record<string, string>>({})
 const requested = new Set<string>()
 let loaded = false
@@ -31,10 +32,10 @@ export function requestIcon(appPath: string): void {
   void window.heraldOS.apps
     .icon(appPath)
     .then(url => $nativeIcons.setKey(appPath, url))
-    .catch(() => undefined)
+    .catch(() => $nativeIcons.setKey(appPath, ''))
 }
 
-/** Installed macOS apps with lazily fetched icons; shared by the dock, launcher and command bar. */
+/** Installed apps with lazily fetched icons; shared by the dock, launcher and command bar. */
 export function useNativeApps() {
   const apps = useStore($nativeApps)
   const icons = useStore($nativeIcons)

@@ -12,6 +12,11 @@ export PATH="$HOME/.local/bin:$PATH"
 [[ -d "$REPO/apps/desktop" ]] || { echo "repo not found at $REPO (push it from the Mac: linux/dev/push.sh)" >&2; exit 1; }
 cd "$REPO"
 
+# One build at a time: the first-boot provisioner and push.sh can each start one, and two npm
+# installs in the same tree corrupt it.
+exec 9>"/tmp/herald-os-build-$(id -u).lock"
+flock 9
+
 echo "==> bootstrap (upstream snapshot, npm install, bridge plugin)"
 bash scripts/bootstrap.sh
 
@@ -50,7 +55,14 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"
   if [[ -d /usr/share/plymouth/themes ]]; then
     sudo install -d /usr/share/plymouth/themes/herald-os
-    sudo install -m 0644 "$REPO"/linux/plymouth/herald-os/* /usr/share/plymouth/themes/herald-os/
+    # The splash boots from the initramfs, so a changed theme needs every kernel's rebuilt (a minute).
+    if ! diff -rq "$REPO/linux/plymouth/herald-os" /usr/share/plymouth/themes/herald-os >/dev/null 2>&1; then
+      sudo install -m 0644 "$REPO"/linux/plymouth/herald-os/* /usr/share/plymouth/themes/herald-os/
+      if [[ "$(plymouth-set-default-theme 2>/dev/null)" == "herald-os" ]]; then
+        echo "==> boot splash changed: rebuilding the initramfs"
+        sudo dracut -f --regenerate-all >/dev/null 2>&1 || echo "WARNING: could not rebuild the initramfs"
+      fi
+    fi
   fi
   for f in build.sh sync.sh restart-shell.sh shot.sh; do
     install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/herald-os-${f%.sh}"
