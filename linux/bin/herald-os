@@ -336,15 +336,18 @@ def parse_duration(text: str) -> int:
 
 def reminder(args: list[str]) -> int:
     if not args or args[0] == "list":
-        result = sh(["systemctl", "--user", "list-timers", "--all", "--no-legend", "--no-pager", "hermes-reminder-*"], timeout=15)
-        rows = [line for line in result.stdout.splitlines() if "hermes-reminder-" in line]
-        if not rows:
+        result = sh(["systemctl", "--user", "list-timers", "--all", "--no-pager", "--output=json", "hermes-reminder-*"], timeout=15)
+        try:
+            timers = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError:
+            timers = []
+        if not timers:
             print("No reminders set.")
             return 0
-        for line in rows:
-            unit = next((tok for tok in line.split() if tok.startswith("hermes-reminder-")), "")
-            desc = sh(["systemctl", "--user", "show", "-p", "Description", "--value", unit], timeout=10).stdout.strip()
-            print(f"{line.split('  ')[0].strip():<32} {desc}")
+        for timer in sorted(timers, key=lambda t: t.get("next") or 0):
+            desc = sh(["systemctl", "--user", "show", "-p", "Description", "--value", timer["unit"]], timeout=10).stdout.strip()
+            when = datetime.fromtimestamp(timer["next"] / 1_000_000).strftime("%a %H:%M") if timer.get("next") else "now"
+            print(f"{when:<9} {desc.removeprefix('Reminder: ')}")
         return 0
     if args[0] == "clear":
         result = sh(["systemctl", "--user", "list-units", "--all", "--no-legend", "--no-pager", "hermes-reminder-*"], timeout=15)
@@ -357,7 +360,7 @@ def reminder(args: list[str]) -> int:
         die("reminder <duration> <message>", 2)
     seconds = parse_duration(args[0])
     message = " ".join(args[1:])
-    unit = f"hermes-reminder-{int(time.time())}"
+    unit = f"hermes-reminder-{time.time_ns()}"
     result = sh([
         "systemd-run", "--user", "--quiet", f"--on-active={seconds}", f"--unit={unit}",
         f"--description=Reminder: {message}", "--timer-property=AccuracySec=1s",

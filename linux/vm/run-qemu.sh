@@ -37,8 +37,10 @@ read -r DISPLAY_W DISPLAY_H <<<"${DISPLAY_RES:-2048 1424}"
 GUEST_W="${GUEST_W:-$DISPLAY_W}"
 GUEST_H="${GUEST_H:-$((DISPLAY_H - 144))}"
 
+# A VM that powers itself off leaves its pid file behind, and macOS may give that pid to another
+# process later: only a QEMU process counts, so `stop` never kills something else.
 running() {
-  [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+  [[ -f "$PIDFILE" ]] && [[ "$(ps -p "$(cat "$PIDFILE")" -o comm= 2>/dev/null)" == *qemu-system* ]]
 }
 
 case "${1:-start}" in
