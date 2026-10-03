@@ -22,7 +22,7 @@ linux/
 
 ```bash
 bash linux/vm/download-image.sh && bash linux/vm/make-seed.sh && bash linux/vm/run-qemu.sh
-bash linux/vm/run-qemu.sh console            # first boot provisions for several minutes
+bash linux/vm/run-qemu.sh console            # first boot provisions (30-45 min, mostly downloads)
 bash linux/dev/push.sh --with-hermes-config  # build the shell in the VM, copy model config (not OAuth logins)
-bash linux/dev/push.sh ssh                   # then: hermes login
+bash linux/dev/push.sh ssh                   # then: hermes setup (or sign in from the card in Herald OS)
 ```

@@ -11,10 +11,14 @@ Hermes Agent without modifying it, and includes the following material from it:
 - The TypeScript gateway client and generated wire contract
   (apps/shared/src upstream). They are downloaded at build time into
   upstream/hermes-agent/ (pinned by upstream/UPSTREAM.lock), re-exported by
-  packages/hermes-client and compiled into the desktop app.
+  packages/hermes-client and compiled into the Herald OS shell.
 
 The Hermes Agent runtime itself is not distributed with Herald OS; users
 install it separately.
+
+Herald OS is an independent project. It is not an official Hermes Agent or
+Nous Research product, and it is not affiliated with, sponsored by or endorsed
+by Nous Research.
 
 Third-party npm and Python packages keep their own licenses. A packaged build
 includes Electron (MIT, https://github.com/electron/electron/blob/main/LICENSE)

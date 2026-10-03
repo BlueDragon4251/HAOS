@@ -1,7 +1,8 @@
 # Herald OS Architecture
 
-Herald OS is an agent-native desktop environment. It runs on top of macOS (Apple Silicon first)
-and makes Hermes Agent the primary interface between the user and the computer. It is a separate
+Herald OS is an agent-native operating system: it makes Hermes Agent the primary interface between
+the user and the computer. Herald OS Linux is the whole system (Fedora underneath, the Herald shell
+as the session); on macOS the same shell runs fullscreen over the macOS desktop. It is a separate
 product from Hermes Desktop: it consumes the upstream Hermes runtime unchanged and grows its own
 shell on top.
 
@@ -46,7 +47,7 @@ host. The renderer and the agent see identical tool names and return shapes on e
 
 | | macOS | Linux (Herald OS Linux) | Windows |
 | --- | --- | --- | --- |
-| Shell runs as | fullscreen app over the macOS desktop | the whole session: `greetd` -> `cage` -> shell (`HERALD_OS_KIOSK=1`) | stub |
+| Shell runs as | fullscreen over the macOS desktop | the whole session: `greetd` -> `niri` -> shell (`cage` as a fallback) | stub |
 | `HostPlatform` | `platform/darwin.ts` (`plutil`, `sips`, `qlmanage`, `mdfind`, EventKit JXA) | `platform/linux.ts` (`/proc`, `.desktop` entries, icon themes, `nmcli`, `recently-used.xbel`, GNOME thumbnail cache) | `platform/generic.ts` |
 | `HostAdapter` | `host/darwin.py` (`osascript`, `lsof`, `mdfind`, `system_profiler`, `pmset`) | `host/linux.py` (`ps`, `ss`, `plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`, `gsettings`, `journalctl`, `loginctl`) | `host/windows.py` stub |
 | App launch / reveal | `shell.openPath` / `showItemInFolder` | `gio launch <.desktop>` / `org.freedesktop.FileManager1` | |

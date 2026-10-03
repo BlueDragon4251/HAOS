@@ -1,11 +1,11 @@
-# Herald OS Linux (Stage 1)
+# Herald OS Linux
 
-Herald OS as the whole desktop of a Linux machine: a Fedora base, `cage` as the Wayland compositor,
-the Electron shell as the only session, Hermes Agent underneath. Stage 1 runs in a virtual machine
-on your Mac; nothing on the Mac changes.
+Herald OS as a whole operating system: a Fedora base, greetd signing you in, niri arranging the
+windows, the Herald shell drawing the menu bar, dock and system menus, and Hermes Agent underneath.
+Today it runs in a virtual machine on your Mac; nothing on the Mac changes.
 
 ```
-kernel + systemd  ->  greetd (autologin: hermes)  ->  cage  ->  Herald OS shell  ->  hermes serve
+kernel + systemd  ->  greetd (autologin: hermes)  ->  niri  ->  Herald OS shell  ->  hermes serve
                                                                       |                    |
                                                           HostPlatform (linux.ts)   herald-os-bridge (LinuxHost)
                                                                       \__________  ps ss nmcli wpctl gio journalctl plocate
@@ -17,13 +17,14 @@ kernel + systemd  ->  greetd (autologin: hermes)  ->  cage  ->  Herald OS shell 
 brew install qemu                       # once
 bash linux/vm/download-image.sh         # Fedora Cloud Base aarch64 qcow2 (~500 MB)
 bash linux/vm/make-seed.sh              # cloud-init seed + SSH key (linux/vm/build/)
-bash linux/vm/run-qemu.sh               # boots; first boot provisions (5-10 min)
-bash linux/vm/run-qemu.sh console       # watch cloud-init / provisioning
-bash linux/dev/push.sh --with-hermes-config   # push repo, build shell, copy Hermes credentials
+bash linux/vm/run-qemu.sh               # boots; first boot provisions (30-45 min, mostly downloads)
+bash linux/vm/run-qemu.sh console       # watch it; wait for "==> Provisioning complete"
+bash linux/dev/push.sh                  # push the repo, build the shell, start Herald OS
 ```
 
-A QEMU window appears on the Mac. After provisioning and the first push, the VM reboots into the
-Hermes desktop with no login prompt. `bash linux/vm/run-qemu.sh stop|status|reset` manage it.
+A QEMU window appears on the Mac. After provisioning and the first push, the VM starts Herald OS
+with no login prompt, and every later boot goes straight to it. `bash linux/vm/run-qemu.sh
+stop|status|reset` manage it.
 
 Window size: QEMU shows guest pixels 1:1 with the Mac's device pixels. The framebuffer defaults to
 the main display's width and its height minus the menu and title bars (3024x1820 on a 14-inch
@@ -32,17 +33,34 @@ MacBook Pro), so the window fills the screen; override with `GUEST_W`/`GUEST_H`.
 matches Mac apps in size. View -> Zoom To Fit in QEMU's menu still works (toggle it after boot;
 enabling it at launch makes the guest adopt the initial window size).
 
-`--with-hermes-config` copies `~/.hermes/{config.yaml,.env}` (model choice and any API keys) into
-the VM. It deliberately does not copy `auth.json`: OAuth providers (Nous Portal, Codex, Copilot)
-use rotating refresh tokens, so a copied login works only until the next refresh and whichever
-machine refreshes second is logged out. Log the VM in on its own instead:
+### Signing Hermes in
+
+Hermes in the VM starts signed out. Sign it in from the card Herald OS shows (a short code you
+confirm on any device), or from a shell in the VM:
 
 ```bash
 bash linux/dev/push.sh ssh
-hermes login          # device-code flow; open the URL on the Mac
+hermes setup          # any provider, including API keys; `hermes portal` for Nous Portal only
 ```
 
-(`--with-hermes-auth` copies `auth.json` anyway, for short experiments where that trade-off is fine.)
+`--with-hermes-config` copies `~/.hermes/{config.yaml,.env}` (model choice and any API keys) into
+the VM. It deliberately does not copy `auth.json`: OAuth providers (Nous Portal, Codex, Copilot)
+use rotating refresh tokens, so a copied login works only until the next refresh and whichever
+machine refreshes second is logged out. (`--with-hermes-auth` copies it anyway, for short
+experiments where that trade-off is fine.)
+
+To use the Mac's Nous Portal sign-in without copying it, run Hermes's subscription proxy on the Mac
+and point the VM at it. The credentials stay on the Mac, which is the only machine that refreshes
+them:
+
+```bash
+hermes proxy start                       # on the Mac; serves http://127.0.0.1:8645/v1
+bash linux/dev/push.sh ssh               # then, in the VM:
+hermes config set model.provider custom
+hermes config set model.base_url http://10.0.2.2:8645/v1   # QEMU's address for the Mac
+hermes config set model.api_key proxy    # any value; the proxy attaches the real token
+hermes config set model.default <model>  # a Portal model id, as in the Mac's config.yaml
+```
 
 ## Quick start (UTM, a nicer window)
 
@@ -60,8 +78,8 @@ hermes login          # device-code flow; open the URL on the Mac
 
 ## What provisioning does (`linux/provision.sh`)
 
-- SELinux permissive (greetd + cage have no tailored policy yet; Stage 2 writes one).
-- `dnf install`: cage, greetd, seatd, PipeWire, NetworkManager, BlueZ, UPower, portals,
+- SELinux permissive (greetd and the compositors have no tailored policy yet; Stage 2 writes one).
+- `dnf install`: niri, cage, greetd, seatd, PipeWire, NetworkManager, BlueZ, UPower, portals,
   Electron runtime libraries, fonts, Node.js + toolchain, and the CLI tools the Linux adapters use
   (`xdg-utils`, `gio`, `plocate`, `fd`, `rsvg-convert`, `notify-send`, `grim`), plus Firefox,
   Nautilus, Text Editor and `foot` as a rescue terminal.
@@ -76,8 +94,8 @@ hermes login          # device-code flow; open the URL on the Mac
 | Piece | Role |
 | --- | --- |
 | `/etc/greetd/config.toml` | Logs `hermes` in on VT1 and runs `herald-os-compositor`. Respawns when it exits. |
-| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, `exec cage -s -- herald-os-session`. |
-| `herald-os-session` | Publishes `WAYLAND_DISPLAY` to systemd/D-Bus, starts PipeWire + portals, runs Electron with `HERALD_OS_KIOSK=1` on Wayland (Ozone). Restarts the shell on a crash (5 per minute), exits on a clean quit. |
+| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, then starts niri with the managed config. Without hardware GL (QEMU and Apple Virtualization without virgl) niri runs windowed inside `cage` (`herald-os-niri-nested`). `HERALD_OS_COMPOSITOR=cage` runs the Stage 1 kiosk instead. |
+| `herald-os-session` | Publishes `WAYLAND_DISPLAY` to systemd/D-Bus, starts PipeWire + portals and the session services below, runs Electron on Wayland (Ozone) as panels: the menu bar, dock and Hermes window are separate windows niri places. Restarts the shell on a crash (5 per minute), exits on a clean quit. |
 | `herald-os.desktop` | `wayland-sessions` entry so a normal greeter can also start Herald OS. |
 
 The Hermes backend is still spawned by the shell (`electron/backend/manager.ts`), the same as on
@@ -117,9 +135,11 @@ own `org.freedesktop.Notifications` daemon. The `hermes` VM user has no password
 `herald-os lock` refuses until you run `herald-os password` in a terminal; a lock nobody can undo
 would leave the compositor's session lock engaged.
 
-`Mod+Alt+Space` opens the control menu (Install / Remove / Update / Style / Trigger / System /
-Hermes); every item is a `herald-os` command, so the agent (`system_os` tool) and scripts can do the
-same. Web apps (`herald-os install webapp <name> <url>`) open as their own frameless windows.
+`Mod+M` or `Mod+Alt+Space` opens the control menu (Install / Remove / Update / Style / Trigger /
+System / Hermes); every item is a `herald-os` command, so the agent (`system_os` tool) and scripts
+can do the same. `Mod` is `Super` on real hardware and `Alt` when niri runs nested (the QEMU VM),
+where `Mod+Alt+Space` is only `Alt+Space` and `Mod+M` is the way in. `Mod+K` lists every hotkey.
+Web apps (`herald-os install webapp <name> <url>`) open as their own frameless windows.
 
 ## Themes, omakase, updates
 
@@ -140,14 +160,13 @@ same. Web apps (`herald-os install webapp <name> <url>`) open as their own frame
   --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
   (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
 
-## Known limits (Stage 1)
+## Known limits
 
-- `cage` is a kiosk compositor: a launched app (Firefox, Nautilus) covers the shell fullscreen and
-  returns to it when closed. No window switching between foreign apps until the Stage 2 compositor.
 - No calendar (`calendar.today` reports `unavailable`); Evolution Data Server integration is later.
-- Display sleep (`system_control sleep_display`) is not available; lock uses `loginctl`.
-- QEMU has no GPU acceleration on macOS: cage renders with pixman and Electron with
-  `--disable-gpu`. UTM's Apple Virtualization backend gives virtio-gpu-gl.
+- QEMU has no GPU acceleration on macOS: niri runs nested inside cage, which renders with pixman,
+  and Electron runs with `--disable-gpu`. UTM's Apple Virtualization backend gives virtio-gpu-gl.
+- Under the `HERALD_OS_COMPOSITOR=cage` kiosk, a launched app (Firefox, Nautilus) covers the shell
+  fullscreen and returns to it when closed; there is no switching between other apps' windows.
 - SELinux is permissive on the VM.
 - Apple Silicon Macs cannot boot this natively (no Asahi support for M4/M5); the VM is the target.
   x86 hardware comes with the ISO work in the roadmap.

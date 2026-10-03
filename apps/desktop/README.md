@@ -1,6 +1,7 @@
 # apps/desktop
 
-The Herald OS shell: an Electron app whose renderer draws the whole desktop. Setup is in the
+The Herald OS shell, built on Electron. Its renderer draws everything you see in Herald OS: the menu
+bar, dock, windows, launcher and Herald's own apps. Setup is in the
 [root README](../../README.md); how the pieces talk to each other is in
 [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md); conventions for pages are in
 [DESIGN.md](DESIGN.md).

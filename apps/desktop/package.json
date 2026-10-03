@@ -3,7 +3,7 @@
   "productName": "Herald OS",
   "version": "0.1.0-alpha.1",
   "private": true,
-  "description": "Herald OS: agent-native desktop environment powered by Hermes Agent.",
+  "description": "The Herald OS shell: menu bar, dock, windows and apps for an agent-native operating system.",
   "author": "Luke The Dev",
   "license": "MIT",
   "type": "module",

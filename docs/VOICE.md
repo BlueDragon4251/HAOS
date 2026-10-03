@@ -32,8 +32,8 @@ conversation closes on its own.
 
 | Provider | Cost | Notes |
 | --- | --- | --- |
-| Nous subscription (`nous`) | Included | OpenAI `gpt-4o-mini-transcribe` / `gpt-4o-mini-tts` through the Nous gateway; needs `hermes login` with a plan that includes managed tools |
-| On this Mac (`local` STT, `edge` TTS) | Free | faster-whisper runs offline; Edge neural voices need internet, no key |
+| Nous subscription (`nous`) | Included | OpenAI `gpt-4o-mini-transcribe` / `gpt-4o-mini-tts` through the Nous gateway; needs a Nous Portal sign-in (`hermes portal`) with a plan that includes managed tools |
+| On this device (`local` STT, `edge` TTS) | Free | faster-whisper runs offline; Edge neural voices need internet, no key |
 | OpenAI / ElevenLabs / Groq / Mistral | Your key | Set the key in `~/.hermes/.env`; OpenAI and ElevenLabs stream PCM |
 | NeuTTS / KittenTTS / Piper | Free, local | Install the matching extra in the Hermes venv |
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { describeTurnError } from './engine.ts'
 
 describe('describeTurnError', () => {
-  it('explains a revoked Hermes login and points at hermes login', () => {
+  it('explains a revoked Hermes login without sending the user to a terminal', () => {
     const described = describeTurnError('agent init failed: No access token found for Nous Portal login.')
     expect(described.fixable).toBe(true)
     expect(described.kind).toBe('auth')

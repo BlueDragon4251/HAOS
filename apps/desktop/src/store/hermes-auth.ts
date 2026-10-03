@@ -9,7 +9,7 @@ import { isMainSurface } from './shell.ts'
  * Hermes's model-provider sign-in, owned by the OS. The runtime exposes the same device-code flow
  * its CLI uses (`/api/providers/oauth/...`): start returns a short code and a portal URL, a poller
  * on the backend exchanges the code and persists credentials, and the shell polls the status. So a
- * signed-out Hermes becomes a card in the shell, never "go type `hermes login` in a terminal".
+ * signed-out Hermes becomes a card in the shell, never "go sign in from a terminal".
  */
 
 export interface OAuthProvider {
