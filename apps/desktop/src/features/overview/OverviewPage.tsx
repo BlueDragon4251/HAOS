@@ -5,12 +5,14 @@ import { EmptyGlass, LinkAction, Section, StatusDot } from '../../components/ui/
 import { cn } from '../../lib/cn.ts'
 import { greetingFor } from '../../lib/format.ts'
 import { createChat, runSlash, sendPrompt } from '../../store/chat.ts'
+import { $threads } from '../../store/continuity.ts'
 import { $connection } from '../../store/gateway.ts'
 import { $activeMissions, $reviewMissions } from '../../store/missions.ts'
 import { useSystemInfo } from '../../store/system.ts'
 import { showPage } from '../../store/windows.ts'
 import { MissionCard } from './MissionCard.tsx'
 import { OverviewComposer } from './OverviewComposer.tsx'
+import { PickUp } from './PickUp.tsx'
 import { RecentWork } from './RecentWork.tsx'
 import { titleCase } from './shared.tsx'
 import { TodayPanel } from './TodayPanel.tsx'
@@ -24,6 +26,7 @@ export function OverviewPage() {
   const connection = useStore($connection)
   const active = useStore($activeMissions)
   const review = useStore($reviewMissions)
+  const threads = useStore($threads)
   const info = useSystemInfo()
   const [now, setNow] = useState(() => new Date())
   const rootRef = useRef<HTMLDivElement>(null)
@@ -61,7 +64,7 @@ export function OverviewPage() {
             </div>
             <div>
               <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-fg">{greeting}</h1>
-              <div className="mt-1 text-[16px] text-fg-2">Your day, already in motion.</div>
+              <div className="mt-1 text-[16px] text-fg-2">{threads.length > 0 ? 'Welcome back. Here is where you left off.' : 'Your day, already in motion.'}</div>
             </div>
             <OverviewComposer disabled={!online} placeholder={online ? 'What would you like to make happen?' : 'Starting Hermes…'} onSubmit={submit} />
             <div className="flex flex-wrap items-center gap-2">
@@ -69,6 +72,8 @@ export function OverviewPage() {
               <QuickAction icon={<IconTargetArrow />} label="Start a mission" disabled={!online} onClick={() => void startMission()} />
             </div>
           </div>
+
+          <PickUp />
 
           <Section title="Active missions" action={<LinkAction onClick={() => showPage('missions')}>See all</LinkAction>}>
             {missions.length === 0 ? (

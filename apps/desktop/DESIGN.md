@@ -78,12 +78,13 @@ Stores (nanostores; subscribe with `useStore`):
 - `store/os-commands.ts`: the OS command registry (`defineCommands`, `runCommand`, `listCommands`, `$commandLog`); catalogue in `src/commands/`; `store/os-control.ts` answers main's control-socket requests; `store/follow.ts` shows Hermes's own tool results; `lib/voice/intents.ts` is the voice fast path.
 - `store/hermes-auth.ts`: `$hermesAuth` (active model provider, sign-in state), `requestHermesLogin`, `refreshHermesAuth`, device-code helpers; the OS sign-in card is `src/features/auth/HermesLoginCard.tsx` and opens on boot or on any turn that fails for lack of credentials. The provider's portal opens in a web window beside the card and closes itself on approval.
 - `store/web-windows.ts`: `$webWindows`, `openWebWindow(url, { title, bounds })`, `closeWebWindow`, `focusWebWindow`, `$webViewsCovered` (overlays that hide the native views).
+- `store/continuity.ts`: `$threads`, `$catchUp`, `refreshThreads`, `continueThread`, `startNextStep`, `dismissThread`, `setExclusions` (Pick up where you left off; pure evidence and parsing in `lib/continuity.ts`, see `docs/ARCHITECTURE.md`).
 - `store/voice.ts`: `$voice` (state, engine, captions, live meter), `$voiceActive`, `startVoice`, `endConversation`, `toggleVoice`, `toggleMute`; `store/wake.ts`: `$wake`, `setWakeWordEnabled`. Voice UI lives in `src/features/voice/` (`VoiceOrb`, `MicButton`, `VoiceIndicator`); see `docs/VOICE.md`.
 
 Electron bridge `window.heraldOS` (typed in `preload/index.ts`):
 `backend.{getState,onState,restart,rest,logTail}`, `system.{info,stats,processes,network,subscribeStats}`,
 `apps.{list,launch,icon}`, `fs.{home,readDir,readFile,reveal,openPath,openIn,recent,thumbnail,imageInfo,writeText,mkdir,rename,trash,exportPdf,pickFiles,dirSize}`,
-`calendar.today()`, `terminal.*`, `notifications.native`, `window.*`, `shell.openExternal`,
+`calendar.today()`, `context.{snapshot,onReturned}`, `terminal.*`, `notifications.native`, `window.*`, `shell.openExternal`,
 `web.{open,setBounds,close,onEvent}` (embedded http(s) views: sandboxed, isolated, own partition, no preload),
 `prefs.{get,set}`, `bridge.{readPolicy,writePolicy,readAudit}`, `voice.{microphoneStatus,requestMicrophone,audioWsUrl,onHotkey}`, `env()`.
 

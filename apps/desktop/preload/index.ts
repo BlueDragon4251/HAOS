@@ -5,6 +5,8 @@ import {
   type BackendState,
   type CalendarResult,
   type ClipboardEntry,
+  type ContextReturn,
+  type ContextSnapshot,
   type HeraldOsResult,
   type IncomingNotification,
   type PowerAction,
@@ -117,6 +119,12 @@ const api = {
   },
   calendar: {
     today: (): Promise<CalendarResult> => ipcRenderer.invoke(IPC.calendarToday)
+  },
+  context: {
+    /** Recent documents, active project folders and running apps, minus the user's exclusions. */
+    snapshot: (): Promise<ContextSnapshot> => ipcRenderer.invoke(IPC.contextSnapshot),
+    /** The user is back after sleep, a lock or a long idle stretch (fires in every window). */
+    onReturned: (listener: (event: ContextReturn) => void): Unsubscribe => subscribe(IPC.contextReturned, listener)
   },
   terminal: {
     create: (options: TerminalCreateOptions): Promise<TerminalHandle> => ipcRenderer.invoke(IPC.terminalCreate, options),

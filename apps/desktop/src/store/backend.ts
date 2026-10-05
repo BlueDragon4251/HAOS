@@ -14,7 +14,9 @@ export const $prefs = atom<HeraldOSPrefs>({
   spaces: [{ id: 'personal', name: 'Personal', color: '#4d92ff' }],
   activeSpace: 'personal',
   favorites: [],
-  voice: VOICE_DEFAULTS
+  voice: VOICE_DEFAULTS,
+  // Off until the real prefs arrive, so the Overview never flashes the catch-up offer.
+  continuity: { enabled: false, exclude: [] }
 })
 
 export function applyPrefsToDocument(prefs: HeraldOSPrefs): void {

@@ -3,6 +3,7 @@ import { bindAgentEvents } from './agents.ts'
 import { bindEditTarget } from './edit-target.ts'
 import { bindBackendStores } from './backend.ts'
 import { bindChatEvents, resetChats } from './chat.ts'
+import { bindContinuity } from './continuity.ts'
 import { $connectionEpoch, bindGatewayToBackend } from './gateway.ts'
 import { bindFollow } from './follow.ts'
 import { bindHermesAuth } from './hermes-auth.ts'
@@ -47,6 +48,7 @@ export function bootRenderer(): void {
   bindOsControl()
   bindFollow()
   bindStudioEvents()
+  bindContinuity()
 
   let lastEpoch = 0
   $connectionEpoch.subscribe(epoch => {

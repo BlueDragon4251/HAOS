@@ -5,6 +5,7 @@ import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellComm
 import { BackendManager } from './backend/manager.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
+import { registerContextIpc } from './ipc/context.ts'
 import { registerFsIpc } from './ipc/fs.ts'
 import { registerSystemIpc } from './ipc/system.ts'
 import { registerTerminalIpc } from './ipc/terminal.ts'
@@ -177,6 +178,7 @@ function registerCoreIpc(): void {
   registerBridgeIpc()
   registerServiceIpc()
   registerSystemIpc(() => BrowserWindow.getAllWindows())
+  registerContextIpc(() => BrowserWindow.getAllWindows())
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.

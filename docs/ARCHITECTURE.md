@@ -123,6 +123,33 @@ catalogue in `src/commands/`), so three callers drive the UI the same way:
 
 Voice (engines, wake word, barge-in) is described in [`VOICE.md`](VOICE.md).
 
+## Pick up where you left off
+
+The Overview leads with up to three threads of work the user may want to resume.
+
+- **Electron main** (`electron/context/snapshot.ts`, `electron/ipc/context.ts`) takes a context
+  snapshot on request: documents opened or changed in the last three days (the platform's recents
+  plus new files on the Desktop and in Downloads), folders under the usual project roots with
+  activity this week (branch, uncommitted changes and last commit for git repositories, read with
+  `--no-optional-locks` so looking never rewrites the index), and the GUI apps running. Folders and
+  words the user excluded are dropped before anything leaves main. `powerMonitor` turns a wake, an
+  unlock or the end of a 15-minute idle stretch into a `context:returned` event when the user was
+  away for at least ten minutes.
+- **The renderer** (`src/store/continuity.ts`) adds recent Hermes conversations and today's
+  calendar, numbers every entry (`f1`, `p1`, `c1`) and sends it with fixed instructions through the
+  gateway's `llm.oneshot`: one stateless model call with no session, no tools and no transcript.
+  `src/lib/continuity.ts` parses the JSON answer and keeps only items whose ids were in the
+  evidence, so a card cannot point at a file the model made up. Threads are stored in prefs and
+  refreshed on boot (when older than ten minutes), when the user returns, and on demand.
+- **Acting stays with the user.** Continue reopens a thread's conversation (in Studio when it built
+  the thread's project), its folder and its documents. The suggested next step is a button that
+  sends the prompt Hermes proposed. A return only updates the cards, or posts a notification when
+  another page is showing. `continuity.catchUp`, `continuity.continue` and `continuity.nextStep`
+  expose the same actions to voice, the command bar and Hermes.
+
+The feature stays off until the user turns it on, because the names of files, projects,
+conversations and events go to the model provider.
+
 ## System bridge
 
 `plugins/herald-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset

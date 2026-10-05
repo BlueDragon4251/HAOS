@@ -124,6 +124,72 @@ export interface RecentFile {
   kind: 'file' | 'directory'
 }
 
+/** A project folder with recent activity: a git repository or any folder under the projects roots. */
+export interface ProjectActivity {
+  path: string
+  name: string
+  /** Current branch; absent when the folder is not a git repository. */
+  branch?: string
+  /** Files with uncommitted changes. */
+  changed: number
+  /** The first few of them, relative to the folder. */
+  changedFiles: string[]
+  /** The last few commits, newest first. */
+  commits: { subject: string; at: number }[]
+  /** Newest change seen (a commit, a changed file or the folder itself), epoch ms. */
+  touchedAt: number
+}
+
+/**
+ * What Herald OS can see of the user's recent work, for "Pick up where you left off": documents,
+ * project folders and running apps, minus everything the user excluded. Never window titles or
+ * screen contents.
+ */
+export interface ContextSnapshot {
+  takenAt: number
+  files: RecentFile[]
+  projects: ProjectActivity[]
+  /** Names of the apps running now. */
+  apps: string[]
+}
+
+/** The user came back after sleep, a locked screen or a long idle stretch. */
+export interface ContextReturn {
+  reason: 'resume' | 'unlock' | 'idle'
+  awayMs: number
+}
+
+export interface ContinuityItem {
+  kind: 'file' | 'folder' | 'project' | 'chat'
+  /** Absolute path, or the stored session id for chats. */
+  ref: string
+  label: string
+}
+
+/** One piece of work Hermes thinks the user will want to resume. */
+export interface ContinuityThread {
+  id: string
+  title: string
+  summary: string
+  /** Where the work stopped, in one short sentence. */
+  stopped: string
+  /** A suggested next step; the user starts it. */
+  next?: { label: string; prompt: string }
+  items: ContinuityItem[]
+}
+
+export interface ContinuityPrefs {
+  /** Null until the user answers the offer on the Overview: the catch-up sends names to the model provider. */
+  enabled: boolean | null
+  /** Folders (absolute paths) and words Herald never looks at; a word hides any path, chat or event containing it. */
+  exclude: string[]
+  /** Threads from the last catch-up. */
+  threads?: ContinuityThread[]
+  updatedAt?: number
+  /** Ids of threads the user dismissed. */
+  dismissed?: string[]
+}
+
 export interface ImageInfo {
   width: number
   height: number
@@ -244,6 +310,7 @@ export interface HeraldOSPrefs {
   /** Slide the Dock off-screen until the cursor reaches the bottom edge (default on). */
   dockAutoHide?: boolean
   voice: VoicePrefs
+  continuity: ContinuityPrefs
 }
 
 export interface AuditEntry {
@@ -420,6 +487,11 @@ export const IPC = {
 
   systemNetwork: 'herald-os:system:network',
   calendarToday: 'herald-os:calendar:today',
+
+  /** Recent documents, project folders and running apps, for "Pick up where you left off". */
+  contextSnapshot: 'herald-os:context:snapshot',
+  /** Main tells the windows the user is back after sleep, a lock or a long idle stretch. */
+  contextReturned: 'herald-os:context:returned',
 
   terminalCreate: 'herald-os:terminal:create',
   terminalWrite: 'herald-os:terminal:write',

@@ -72,6 +72,10 @@ abilities as a regular Hermes plugin, `herald-os-bridge`.
 
 - **Hermes at the centre.** Overview, Hermes, Missions, Memory, Files, Automations, Connections and
   Settings, plus a Terminal, a System monitor, and floating chat windows.
+- **Pick up where you left off.** When you open Herald OS or come back after a break, Hermes looks
+  at your recent documents, project folders (with their git state), conversations and today's
+  calendar, and puts up to three threads of work on the Overview. Continue reopens a thread's
+  conversation, folder and files; its suggested next step starts only when you click it.
 - **A command bar** for every action in the OS: open pages and apps, add memories, run automations,
   start missions.
 - **System tools for Hermes**: system info, processes, disk usage, file search, opening apps,
@@ -259,6 +263,12 @@ own credentials, are always refused.
 
 Settings > Privacy shows the policy and the audit log (`~/.hermes/herald-os/audit.jsonl`). Hermes's
 own terminal tool keeps following Hermes's approval settings.
+
+Pick up where you left off is off until you turn it on from the Overview. It reads names and dates
+(recent files and folders, project branches and commit messages, conversation titles, today's
+event titles, open apps), never file contents, window titles or the screen, and sends them to your
+Hermes model provider to write the suggestions. Settings > Privacy turns it off and lists folders
+and words it must leave out, such as a client's name.
 
 ### Settings and data
 
