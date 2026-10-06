@@ -7,7 +7,7 @@ import { $pendingRequests, resolveRequest } from './requests.ts'
 import { $sessions } from './sessions.ts'
 import { openAsk, showSurface } from './surface.ts'
 import { matchIntent } from '../lib/voice/intents.ts'
-import { $commandLog, listCommands, runCommand } from './os-commands.ts'
+import { $commandLog, type CommandSource, listCommands, runCommand } from './os-commands.ts'
 import { $voice, endConversation, runVoiceIntent, speakWithFreeFallback, startVoice, toggleMute } from './voice.ts'
 import { $studios, openStudio, setPreview } from './studio.ts'
 import { startBuild } from './studio-actions.ts'
@@ -32,7 +32,7 @@ export function installDebugHook(): void {
       resolveRequest,
       prefs: { get: () => $prefs.get(), update: updatePrefs },
       os: {
-        run: (id: string, args?: Record<string, unknown>) => runCommand(id, args ?? {}, { source: 'cli' }),
+        run: (id: string, args?: Record<string, unknown>, source: CommandSource = 'cli') => runCommand(id, args ?? {}, { source }),
         list: () => listCommands({ includeHidden: true }),
         match: matchIntent,
         intent: runVoiceIntent,

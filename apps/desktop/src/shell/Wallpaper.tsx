@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { HeraldOSPrefs } from '../../shared/ipc.ts'
 import { wallpaperTint, type WallpaperTint } from '../../shared/theme.ts'
 import { $prefs, $windowState } from '../store/backend.ts'
@@ -118,12 +118,41 @@ export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number,
   ctx.fillRect(0, 0, w, h)
 }
 
+/**
+ * A local wallpaper (a path or file:// URL) as a data: URL read through main. Pages served over
+ * http (the dev server) cannot load local files, and a bare path would resolve against the page.
+ */
+function useWallpaperSource(custom: string | undefined): string | undefined {
+  const [source, setSource] = useState<string | undefined>()
+
+  useEffect(() => {
+    if (!custom || /^(https?|data|blob):/i.test(custom)) {
+      setSource(custom)
+
+      return
+    }
+
+    let cancelled = false
+    window.heraldOS.capture.readImage(custom).then(
+      url => !cancelled && setSource(url),
+      () => !cancelled && setSource(custom.startsWith('/') ? `file://${custom}` : custom)
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [custom])
+
+  return source
+}
+
 export function Wallpaper() {
   const prefs = useStore($prefs)
   const win = useStore($windowState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pausedRef = useRef(false)
   const custom = prefs.wallpaper
+  const source = useWallpaperSource(custom)
   const tint = useMemo(() => tintFor(prefs), [prefs.themeColors, prefs.themeScheme])
 
   // Pausing must not restart the draw loop, otherwise a stale loop can survive cleanup and
@@ -206,7 +235,7 @@ export function Wallpaper() {
   }, [custom, prefs.reduceMotion, tint])
 
   if (custom) {
-    return <div className="absolute inset-0 z-(--z-wallpaper) bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(custom)})` }} />
+    return <div className="absolute inset-0 z-(--z-wallpaper) bg-cover bg-center" style={{ backgroundImage: source ? `url(${JSON.stringify(source)})` : undefined }} />
   }
 
   return <canvas ref={canvasRef} className="absolute inset-0 z-(--z-wallpaper) h-full w-full" style={{ filter: 'blur(1.5px)' }} aria-hidden="true" />
