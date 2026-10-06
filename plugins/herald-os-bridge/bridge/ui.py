@@ -26,10 +26,23 @@ class ShellUnavailable(RuntimeError):
     """The shell is not running (or did not hand us a socket), so UI commands cannot run."""
 
 
+def shared_endpoint() -> tuple[str, str]:
+    """A shell attached to a backend it did not start writes ``herald-os/control.json`` (0600) instead."""
+    home = os.environ.get("HERMES_HOME") or os.path.join(os.path.expanduser("~"), ".hermes")
+    try:
+        with open(os.path.join(home, "herald-os", "control.json"), encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return "", ""
+    return str(data.get("socket") or ""), str(data.get("token") or "")
+
+
 def control_endpoint() -> tuple[str, str]:
-    """``(socket_path, token)`` from the environment the shell gave the backend."""
+    """``(socket_path, token)`` from the environment the shell gave the backend, or the shared file."""
     path = os_env("CONTROL_SOCKET").strip()
     token = os_env("CONTROL_TOKEN").strip()
+    if not path or not token:
+        path, token = shared_endpoint()
     if not path or not token:
         raise ShellUnavailable("Herald OS is not running this session (no control socket); UI commands need the shell.")
     if not os.path.exists(path):

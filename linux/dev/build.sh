@@ -45,7 +45,7 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   sudo install -m 0755 "$REPO/linux/session/herald-os-session" /usr/local/bin/herald-os-session
   sudo install -m 0755 "$REPO/linux/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
   sudo install -m 0644 "$REPO/linux/session/herald-os.desktop" /usr/share/wayland-sessions/herald-os.desktop
-  sudo install -m 0755 "$REPO/linux/bin/herald-os" "$REPO/linux/bin/herald-os-theme" "$REPO/linux/bin/herald-os-omakase" "$REPO/linux/bin/herald-os-update" "$REPO/linux/bin/herald-os-idle" "$REPO/linux/bin/herald-os-catalog" /usr/local/bin/
+  sudo install -m 0755 "$REPO"/linux/bin/herald-os* /usr/local/bin/
   mkdir -p "$HOME/.config/systemd/user"
   install -m 0644 "$REPO/linux/session/herald-os-update-check.service" "$REPO/linux/session/herald-os-update-check.timer" "$HOME/.config/systemd/user/"
   systemctl --user daemon-reload 2>/dev/null || true

@@ -46,7 +46,7 @@ STATE_DIR = HOME / ".local" / "state" / "herald-os"
 CONFIG_DIR = HOME / ".config" / "herald-os"
 APPS_DIR = HOME / ".local" / "share" / "applications"
 ICONS_DIR = HOME / ".local" / "share" / "icons" / "hermes-webapps"
-THEME_DIRS = [HOME / "Herald-OS" / "linux" / "themes", Path("/usr/local/share/herald-os-linux/themes"), HOME / ".config" / "herald-os" / "themes"]
+THEME_DIRS = [HOME / "Herald-OS" / "linux" / "themes", Path("/usr/local/share/herald-os-linux/themes"), Path("/usr/share/herald-os/themes"), HOME / ".config" / "herald-os" / "themes"]
 
 # name -> help
 COMMANDS: dict[str, str] = {
@@ -93,7 +93,9 @@ COMMANDS: dict[str, str] = {
     "update-available": "Internal: tell the menu bar how many updates are pending",
     "channel": "Show or set the update channel: channel [stable|edge]",
     "omakase": "Install the curated software set (omakase install | omakase list)",
-    "wm": "Pass an action to niri: wm <action> [args]",
+    "wm": "A window-manager action: wm <niri action> [args] (on Hyprland the same names, or a dispatcher)",
+    "omarchy": "omarchy install | remove | status: run Herald OS inside Omarchy (theme hook, menu entry, keys)",
+    "setup": "setup [--yes]: once per user after installing: Hermes Agent and the bridge plugin that lets it use the system",
     "state": "Dump the shell's window-manager state",
     "debug": "Print diagnostics for bug reports",
     "commands": "List commands",
@@ -159,6 +161,44 @@ def niri(*action: str) -> int:
     return subprocess.call(["niri", "msg", "action", *action])
 
 
+def compositor() -> str | None:
+    """The compositor this session runs under, from the socket each one advertises."""
+    if os.environ.get("NIRI_SOCKET"):
+        return "niri"
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return "hyprland"
+    return None
+
+
+# The niri actions Herald's own binds and docs use, as Hyprland dispatchers.
+HYPR_ACTIONS = {
+    "close-window": ["killactive"],
+    "fullscreen-window": ["fullscreen", "0"],
+    "maximize-column": ["fullscreen", "1"],
+    "toggle-window-floating": ["togglefloating"],
+    "focus-column-left": ["movefocus", "l"],
+    "focus-column-right": ["movefocus", "r"],
+    "focus-window-up": ["movefocus", "u"],
+    "focus-window-down": ["movefocus", "d"],
+    "close-focused-window": ["killactive"],
+}
+
+
+def wm(*action: str) -> int:
+    """`herald-os wm <action>`: niri actions on niri; on Hyprland, the same names mapped to dispatchers
+    (or a raw dispatcher, e.g. `wm workspace 3`)."""
+    if compositor() == "hyprland":
+        if not shutil.which("hyprctl"):
+            die("hyprctl is not installed", 2)
+        name, rest = action[0], list(action[1:])
+        if name == "focus-workspace" and rest:
+            dispatch = ["workspace", rest[0] if rest[0].isdigit() else f"name:{rest[0]}"]
+        else:
+            dispatch = HYPR_ACTIONS.get(name, [name]) + ([] if name in HYPR_ACTIONS else rest)
+        return subprocess.call(["hyprctl", "dispatch", *dispatch])
+    return niri(*action)
+
+
 def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "webapp"
 
@@ -205,18 +245,20 @@ def flatpak_resolve(name: str) -> str:
     die(f"{name!r} matches several Flatpaks; install one by id: {options}", 1)
 
 
-def rpm_available(name: str) -> bool:
-    if not shutil.which("dnf"):
-        return False
-    return sh(["dnf", "-q", "list", "--available", name], timeout=180).returncode == 0
+def pkg(*args: str, quiet: bool = False) -> int:
+    """The system package layer (dnf, pacman, or none on the image) in herald-os-catalog."""
+    tool = shutil.which("herald-os-catalog") or str(Path(__file__).resolve().with_name("herald-os-catalog"))
+    if not Path(tool).exists():
+        return 127
+    return subprocess.call([sys.executable, tool, "pkg", *args], stdout=subprocess.DEVNULL if quiet else None, stderr=subprocess.DEVNULL if quiet else None)
 
 
 def install_app(name: str) -> int:
     if not name:
         die("install app needs a name", 2)
-    if not looks_like_flatpak_id(name) and rpm_available(name):
-        print(f"==> dnf install {name}")
-        code = subprocess.call(["sudo", "-n", "dnf", "-y", "install", name])
+    if not looks_like_flatpak_id(name) and pkg("available", name, quiet=True) == 0:
+        print(f"==> system package {name}")
+        code = pkg("install", name)
         notify("Installed" if code == 0 else "Install failed", name)
         return code
     app_id = flatpak_resolve(name)
@@ -229,8 +271,8 @@ def install_app(name: str) -> int:
 def remove_app(name: str) -> int:
     if not name:
         die("remove app needs a name", 2)
-    if sh(["rpm", "-q", name], timeout=30).returncode == 0:
-        code = subprocess.call(["sudo", "-n", "dnf", "-y", "remove", name])
+    if not looks_like_flatpak_id(name) and pkg("has", name, quiet=True) == 0:
+        code = pkg("remove", name)
     else:
         app_id = name if looks_like_flatpak_id(name) else None
         if app_id is None and shutil.which("flatpak"):
@@ -1015,7 +1057,7 @@ def debug() -> int:
 # Shift+Insert), and moves the Herald binds they replace one modifier over.
 KEYMAP_FILE = CONFIG_DIR / "keymap"
 KEYMAPS = ("herald", "omarchy")
-NIRI_TEMPLATES = [HOME / "Herald-OS" / "linux" / "niri" / "config.kdl", Path("/usr/local/share/herald-os-linux/niri/config.kdl")]
+NIRI_TEMPLATES = [HOME / "Herald-OS" / "linux" / "niri" / "config.kdl", Path("/usr/local/share/herald-os-linux/niri/config.kdl"), Path("/usr/share/herald-os/niri/config.kdl")]
 OMARCHY_BINDS = {
     "Mod+C": 'Mod+C hotkey-overlay-title="Copy" { spawn "wtype" "-M" "ctrl" "-k" "Insert" "-m" "ctrl"; }',
     "Mod+X": 'Mod+X hotkey-overlay-title="Cut" { spawn "wtype" "-M" "ctrl" "x" "-m" "ctrl"; }',
@@ -1078,6 +1120,200 @@ def keymap_cmd(args: list[str]) -> int:
     if action != "apply":
         print(f"keymap: {current_keymap()}" + (" (Super+C, X and V copy, cut and paste; voice moved to Super+Shift+V)" if current_keymap() == "omarchy" else ""))
     return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# Per-user setup after installing the package: Hermes, and the bridge plugin that gives it the system.
+HERMES_HOME = Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
+BRIDGE_DIRS = [HOME / "Herald-OS" / "plugins" / "herald-os-bridge", Path("/usr/share/herald-os/bridge"), Path("/opt/herald-os/resources/herald-os-bridge")]
+HERMES_INSTALLER = "https://hermes-agent.nousresearch.com/install.sh"
+
+
+def hermes_command() -> list[str] | None:
+    managed = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "hermes"
+    if managed.exists():
+        return [str(managed)]
+    found = shutil.which("hermes")
+    return [found] if found else None
+
+
+def setup(args: list[str]) -> int:
+    """Link the bridge plugin into Hermes, turn on its tools, and install Hermes if it is missing."""
+    assume_yes = "--yes" in args or "-y" in args
+    bridge = next((d for d in BRIDGE_DIRS if (d / "plugin.yaml").exists()), None)
+    if not bridge:
+        die("the herald-os-bridge plugin is missing; reinstall Herald OS", 1)
+    hermes = hermes_command()
+    if not hermes:
+        print(f"Hermes Agent is not installed. Herald OS runs on it; the installer is {HERMES_INSTALLER}")
+        if not assume_yes and not (sys.stdin.isatty() and input("Install Hermes Agent now? [Y/n] ").strip().lower() in ("", "y", "yes")):
+            die("run `herald-os setup` again once Hermes is installed", 1)
+        code = subprocess.call(["bash", "-c", f"curl -fsSL {HERMES_INSTALLER} | bash"])
+        hermes = hermes_command()
+        if code != 0 or not hermes:
+            die("the Hermes installer did not finish; see its output above", 1)
+    plugins = HERMES_HOME / "plugins"
+    plugins.mkdir(parents=True, exist_ok=True)
+    link = plugins / "herald-os-bridge"
+    if link.is_symlink():
+        link.unlink()
+    elif link.exists():
+        die(f"{link} exists and is not a link Herald OS made; move it aside and run setup again", 1)
+    link.symlink_to(bridge)
+    print(f"==> bridge plugin: {link} -> {bridge}")
+    # User plugins are opt-in and a saved toolset list is authoritative, so both are recorded. Plugin
+    # tools stay directly callable (tool search would hide them behind a lookup).
+    for step in (["plugins", "enable", "herald-os-bridge"], ["tools", "enable", "herald_os"], ["config", "set", "tools.tool_search.enabled", "off"]):
+        subprocess.run([*hermes, *step], stdin=subprocess.DEVNULL, capture_output=True, check=False)
+    print("==> Hermes can now use the system (files, apps, settings), asking before anything that changes it")
+    if is_omarchy():
+        print("Omarchy: `herald-os omarchy install` adds Herald OS to its menu, theme and keys.")
+    print("Start the full session from your login screen (Herald OS), or run herald-os-app inside your desktop.")
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# Omarchy: Herald OS as an app inside it (herald-os-app), wearing Omarchy's theme, in its menu, on
+# one key chord. Herald never overwrites a file Omarchy or the person owns; it prints what to add.
+OMARCHY_SHARE = HOME / ".local" / "share" / "omarchy"
+OMARCHY_HOOKS = HOME / ".config" / "omarchy" / "hooks"
+OMARCHY_MENU = HOME / ".config" / "omarchy" / "extensions" / "omarchy-menu.jsonc"
+HYPR_DIR = HOME / ".config" / "hypr"
+HERALD_HYPR = HYPR_DIR / "herald-os.conf"
+HYPR_SOURCE = "source = ~/.config/hypr/herald-os.conf  # herald-os"
+APP_DESKTOP = APPS_DIR / "herald-os-app.desktop"
+THEME_HOOK = "#!/bin/sh\n# Herald OS follows the Omarchy theme (herald-os omarchy remove takes this out).\nexec herald-os theme omarchy >/dev/null 2>&1\n"
+HOOK_DISPATCHER = (
+    "#!/bin/sh\n# herald-os: runs every hook in theme-set.d with the theme's name.\n"
+    'for hook in "$(dirname "$0")"/theme-set.d/*; do [ -x "$hook" ] && "$hook" "$@"; done\n'
+)
+MENU_ENTRY = '{ "id": "herald-os", "label": "Herald OS", "icon": "󰚩", "command": "herald-os-app" }'
+HYPR_BINDS = """# Herald OS (written by `herald-os omarchy install`; `herald-os omarchy remove` takes it out).
+# Super+Alt+H, then: Return opens Herald OS, A asks about this window, C opens the command bar,
+# V talks to Hermes, X dictates into the focused app, E picks an emoji, M shows Missions.
+bindd = SUPER ALT, H, Herald OS keys, submap, herald
+submap = herald
+bindd = , Return, Open Herald OS, exec, herald-os-app
+bindd = , A, Ask Hermes about this window, exec, herald-os ask
+bindd = , C, Hermes command bar, exec, herald-os command
+bindd = , V, Talk to Hermes, exec, herald-os voice
+bindd = , X, Dictate into the focused app, exec, herald-os dictate
+bindd = , E, Emoji, exec, herald-os emoji
+bindd = , M, Missions, exec, herald-os page missions
+"""
+HYPR_BINDS += "".join(f"bind = , {key}, submap, reset\n" for key in ("Return", "A", "C", "V", "X", "E", "M", "escape"))
+HYPR_BINDS += "submap = reset\n"
+
+
+def is_omarchy() -> bool:
+    return OMARCHY_SHARE.is_dir()
+
+
+def omarchy_app_mode() -> bool:
+    """Herald runs inside Omarchy (Hyprland), not as its own niri session."""
+    return is_omarchy() and compositor() == "hyprland"
+
+
+def omarchy_tool(name: str) -> str | None:
+    return shutil.which(name) or (str(OMARCHY_SHARE / "bin" / name) if (OMARCHY_SHARE / "bin" / name).exists() else None)
+
+
+def omarchy_theme(sub: str, name: str) -> int:
+    if sub == "set":
+        tool = omarchy_tool("omarchy-theme-set")
+        if not tool:
+            die("omarchy-theme-set is missing; set the theme from Omarchy's menu", 127)
+        return subprocess.call([tool, name])
+    current = HOME / ".config" / "omarchy" / "current" / "theme"
+    if sub == "current":
+        print(current.resolve().name if current.exists() else "")
+        return 0
+    for base in (HOME / ".config" / "omarchy" / "themes", OMARCHY_SHARE / "themes"):
+        if base.is_dir():
+            for theme in sorted(p.name for p in base.iterdir() if p.is_dir()):
+                print(theme)
+    return 0
+
+
+def omarchy_status() -> dict[str, bool]:
+    return {
+        "app entry": APP_DESKTOP.exists(),
+        "theme hook": (OMARCHY_HOOKS / "theme-set.d" / "herald-os").exists(),
+        "menu entry": OMARCHY_MENU.exists() and '"herald-os"' in OMARCHY_MENU.read_text(errors="replace"),
+        "keys": HERALD_HYPR.exists() and (HYPR_DIR / "hyprland.conf").exists() and HYPR_SOURCE in (HYPR_DIR / "hyprland.conf").read_text(errors="replace"),
+    }
+
+
+def omarchy_install() -> int:
+    if not is_omarchy():
+        die("this is not an Omarchy install (no ~/.local/share/omarchy)", 1)
+    notes: list[str] = []
+    APPS_DIR.mkdir(parents=True, exist_ok=True)
+    APP_DESKTOP.write_text(
+        "[Desktop Entry]\nName=Herald OS\nComment=The AI-native desktop, as an app\nExec=herald-os-app\n"
+        "Icon=herald-os\nType=Application\nCategories=System;Utility;\nTerminal=false\nStartupWMClass=herald-os\n"
+    )
+    hooks = OMARCHY_HOOKS / "theme-set.d"
+    hooks.mkdir(parents=True, exist_ok=True)
+    (hooks / "herald-os").write_text(THEME_HOOK)
+    (hooks / "herald-os").chmod(0o755)
+    dispatcher = OMARCHY_HOOKS / "theme-set"
+    if not dispatcher.exists():
+        dispatcher.write_text(HOOK_DISPATCHER)
+        dispatcher.chmod(0o755)
+    elif "herald-os" not in dispatcher.read_text(errors="replace"):
+        notes.append(f'Your {dispatcher} hook exists; add this line so Herald follows themes:\n  for hook in ~/.config/omarchy/hooks/theme-set.d/*; do [ -x "$hook" ] && "$hook" "$@"; done')
+    if not OMARCHY_MENU.exists():
+        OMARCHY_MENU.parent.mkdir(parents=True, exist_ok=True)
+        OMARCHY_MENU.write_text(f"// Added by Herald OS (herald-os omarchy remove takes it out).\n[\n  {MENU_ENTRY}\n]\n")
+    elif '"herald-os"' not in OMARCHY_MENU.read_text(errors="replace"):
+        notes.append(f"Add Herald OS to {OMARCHY_MENU}:\n  {MENU_ENTRY}")
+    HYPR_DIR.mkdir(parents=True, exist_ok=True)
+    HERALD_HYPR.write_text(HYPR_BINDS)
+    hyprland = HYPR_DIR / "hyprland.conf"
+    if hyprland.exists() and HYPR_SOURCE not in hyprland.read_text(errors="replace"):
+        with hyprland.open("a") as handle:
+            handle.write(f"\n{HYPR_SOURCE}\n")
+    elif not hyprland.exists():
+        notes.append(f"No {hyprland}; source {HERALD_HYPR} from your Hyprland config for Herald's keys.")
+    relay("theme-omarchy", [], quiet=True)
+    print("Herald OS is set up inside Omarchy: open it from Applications or with Super+Alt+H then Return.")
+    for note in notes:
+        print(note)
+    return 0
+
+
+def omarchy_remove() -> int:
+    for path in (APP_DESKTOP, OMARCHY_HOOKS / "theme-set.d" / "herald-os", HERALD_HYPR):
+        path.unlink(missing_ok=True)
+    dispatcher = OMARCHY_HOOKS / "theme-set"
+    if dispatcher.exists() and dispatcher.read_text(errors="replace") == HOOK_DISPATCHER:
+        dispatcher.unlink()
+    if OMARCHY_MENU.exists() and OMARCHY_MENU.read_text(errors="replace").startswith("// Added by Herald OS"):
+        OMARCHY_MENU.unlink()
+    hyprland = HYPR_DIR / "hyprland.conf"
+    if hyprland.exists():
+        lines = [line for line in hyprland.read_text(errors="replace").splitlines() if line.strip() != HYPR_SOURCE]
+        hyprland.write_text("\n".join(lines).rstrip("\n") + "\n")
+    print("Herald OS is out of Omarchy's theme hook, menu and keys.")
+    return 0
+
+
+def omarchy_cmd(args: list[str]) -> int:
+    action = args[0] if args else "status"
+    if action == "install":
+        return omarchy_install()
+    if action == "remove":
+        return omarchy_remove()
+    if action == "status":
+        if not is_omarchy():
+            print("not Omarchy")
+            return 1
+        for name, done in omarchy_status().items():
+            print(f"{name:<11} {'yes' if done else 'no'}")
+        return 0
+    die("omarchy install | remove | status", 2)
+    return 2
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1146,6 +1382,16 @@ def main(argv: list[str]) -> int:
         return update("--check" in args)
     if cmd == "theme":
         sub = args[0] if args else "current"
+        if sub == "omarchy":
+            # Omarchy's theme-set hook: Herald's colours follow Omarchy's theme.
+            reply = relay("theme-omarchy", [], quiet=True)
+            if not reply.get("ok"):
+                die(reply.get("error") or "the Herald OS shell is not running", 1)
+            print(reply.get("theme", ""))
+            return 0
+        if omarchy_app_mode() and sub in ("list", "current", "set"):
+            # Inside Omarchy, Omarchy owns themes; Herald follows through the hook.
+            return omarchy_theme(sub, " ".join(args[1:]))
         if sub == "list":
             return theme_list()
         if sub == "current":
@@ -1187,6 +1433,10 @@ def main(argv: list[str]) -> int:
         return keymap_cmd(args)
     if cmd == "weather":
         return weather_cmd(args)
+    if cmd == "omarchy":
+        return omarchy_cmd(args)
+    if cmd == "setup":
+        return setup(args)
     if cmd == "event":
         return event_cmd(args)
     if cmd == "hook":
@@ -1207,8 +1457,8 @@ def main(argv: list[str]) -> int:
         return suspend()
     if cmd == "wm":
         if not args:
-            die("wm needs a niri action", 2)
-        return niri(*args)
+            die("wm needs an action (niri's names, mapped to dispatchers on Hyprland)", 2)
+        return wm(*args)
     if cmd == "debug":
         return debug()
     die(f"{cmd} is not implemented", 2)

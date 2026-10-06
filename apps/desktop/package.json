@@ -20,7 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
     "dist:mac": "npm run build && electron-builder --mac --arm64 -c.npmRebuild=false",
-    "dist:linux": "npm run build && electron-builder --linux --arm64"
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@herald-os/client": "*",
@@ -115,9 +115,38 @@
       "category": "System",
       "icon": "build/icon.png",
       "executableName": "herald-os",
+      "artifactName": "herald-os-${version}-linux-${arch}.${ext}",
       "target": [
-        "dir",
-        "AppImage"
+        "tar.gz"
+      ],
+      "extraResources": [
+        {
+          "from": "../../linux",
+          "to": "herald-os-linux",
+          "filter": [
+            "bin/**",
+            "session/**",
+            "niri/**",
+            "omakase/**",
+            "migrations/**",
+            "plymouth/**",
+            "!**/__pycache__/**"
+          ]
+        },
+        {
+          "from": "build/icon.png",
+          "to": "icons/herald-os.png"
+        },
+        {
+          "from": "../../plugins/herald-os-bridge",
+          "to": "herald-os-bridge",
+          "filter": [
+            "**/*",
+            "!tests/**",
+            "!**/__pycache__/**",
+            "!.pytest_cache/**"
+          ]
+        }
       ],
       "desktop": {
         "entry": {

@@ -103,6 +103,24 @@ def test_package_commands_per_manager(monkeypatch):
         cat.pkg_command("install", ["helix"], None)
 
 
+def test_pkg_available_asks_the_right_manager(monkeypatch):
+    seen = []
+
+    def fake_quiet(argv, timeout=60):
+        seen.append(argv)
+        return cat.subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(cat, "quiet", fake_quiet)
+    assert cat.pkg_available("helix", "dnf") and cat.pkg_available("helix", "pacman")
+    assert seen == [["dnf", "-q", "list", "--available", "helix"], ["pacman", "-Si", "helix"]]
+
+
+def test_pkg_manager_reports_the_image(monkeypatch, capsys):
+    monkeypatch.setattr(cat, "is_image", lambda: True)
+    assert cat.main(["pkg", "manager"]) == 0
+    assert capsys.readouterr().out.strip() == "image"
+
+
 def test_entry_view_reports_state_and_extras(monkeypatch):
     class Nothing(cat.Probe):
         def installed(self, entry):

@@ -5,7 +5,9 @@ import { IPC, type ShellCommand, type ShellSurface, type WmAction, type WmWindow
 import { GUEST_PREFERENCES, lockDownPartition, WEB_PARTITION } from '../ipc/web.ts'
 import { log } from '../log.ts'
 import { devServerUrl, isShellPage, rendererIndex } from '../paths.ts'
+import type { Compositor } from '../wm/compositor.ts'
 import { NiriClient } from '../wm/niri.ts'
+import type { ShellHost } from './host.ts'
 import { FLOATING_APPS, shellMode, surfaceTitle } from './mode.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -38,8 +40,9 @@ interface SurfaceWindowOptions {
  * titles). This class owns those windows, relays commands between them, and mirrors compositor
  * state to every renderer.
  */
-export class PanelShell {
-  readonly niri = new NiriClient()
+export class PanelShell implements ShellHost {
+  /** The Herald OS session runs on niri: its window rules place these windows. */
+  readonly wm: Compositor = new NiriClient()
   private readonly windows = new Map<ShellSurface, BrowserWindow>()
   private readonly pending = new Map<ShellSurface, ShellCommand[]>()
   private readonly loaded = new Set<ShellSurface>()
@@ -50,8 +53,8 @@ export class PanelShell {
   constructor(private readonly onMainCreated: (win: BrowserWindow) => void) {}
 
   start(): void {
-    this.niri.start()
-    this.niri.onState(state => {
+    this.wm.start()
+    this.wm.onState(state => {
       const focused = state.windows.find(w => w.id === state.focusedWindowId)
 
       if (focused && !isPanel(focused)) {
@@ -65,8 +68,8 @@ export class PanelShell {
       }
     })
 
-    ipcMain.handle(IPC.wmGetState, () => this.niri.state())
-    ipcMain.handle(IPC.wmAction, (_event, action: WmAction) => this.niri.action(action))
+    ipcMain.handle(IPC.wmGetState, () => this.wm.state())
+    ipcMain.handle(IPC.wmAction, (_event, action: WmAction) => this.wm.action(action))
     ipcMain.handle(IPC.shellOpen, (_event, surface: ShellSurface, command?: ShellCommand) => this.open(surface, command))
     ipcMain.handle(IPC.shellClose, (event, surface?: ShellSurface) => {
       const target = surface ?? this.surfaceOf(event.sender.id)
@@ -91,7 +94,7 @@ export class PanelShell {
   }
 
   stop(): void {
-    this.niri.stop()
+    this.wm.stop()
   }
 
   mainWindow(): BrowserWindow | null {
@@ -205,17 +208,17 @@ export class PanelShell {
 
   /** Ask the compositor to focus one of our windows (it knows them by title and pid). */
   async focusInCompositor(surface: ShellSurface): Promise<void> {
-    if (!this.niri.available) {
+    if (!this.wm.available) {
       return
     }
 
     const title = surfaceTitle(surface)
     // The compositor learns about a new window a moment after Electron creates it.
     for (let attempt = 0; attempt < 10; attempt++) {
-      const target = this.niri.ourWindow(title)
+      const target = this.wm.ourWindow(title)
 
       if (target) {
-        await this.niri.action({ type: 'focus-window', id: target.id }).catch(() => undefined)
+        await this.wm.action({ type: 'focus-window', id: target.id }).catch(() => undefined)
 
         return
       }
@@ -229,7 +232,7 @@ export class PanelShell {
    * keys would then go nowhere. Give focus back to the window that had it, if it is still on screen.
    */
   private async restoreAppFocus(): Promise<void> {
-    const state = this.niri.state()
+    const state = this.wm.state()
     const focused = state.windows.find(w => w.id === state.focusedWindowId)
 
     if (focused && !isPanel(focused)) {
@@ -240,7 +243,7 @@ export class PanelShell {
     const target = state.windows.find(w => w.id === this.lastAppFocus)
 
     if (target && target.workspaceId === activeWorkspace) {
-      await this.niri.action({ type: 'focus-window', id: target.id }).catch(() => undefined)
+      await this.wm.action({ type: 'focus-window', id: target.id }).catch(() => undefined)
     }
   }
 
@@ -299,7 +302,7 @@ export class PanelShell {
       }
 
       this.pending.delete(surface)
-      win.webContents.send(IPC.wmState, this.niri.state())
+      win.webContents.send(IPC.wmState, this.wm.state())
     })
 
     if (surface === 'command' || surface === 'panel') {

@@ -72,3 +72,52 @@ jobs:
           files=(apps/desktop/release/*.dmg apps/desktop/release/*.zip)
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Herald OS $GITHUB_REF_NAME" --notes "Draft written by the release workflow."
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
+  linux:
+    name: Linux tarball (${{ matrix.arch }})
+    # Native runners per architecture: node-pty is compiled for the target, not cross-built.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build tools for node-pty
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential python3
+      - name: Fetch the pinned Hermes Agent snapshot
+        run: npm run sync-upstream
+      - run: npm ci
+      - name: Build the tarball
+        run: npm run dist:linux --workspace apps/desktop -- --${{ matrix.arch }}
+      - name: Check what the tarball carries
+        run: |
+          tarball="$(ls apps/desktop/release/herald-os-*-linux-*.tar.gz)"
+          listing="$(tar -tzf "$tarball")"
+          for required in /herald-os /resources/app.asar /resources/herald-os-linux/bin/herald-os /resources/herald-os-linux/bin/herald-os-catalog \
+            /resources/herald-os-linux/session/herald-os-session /resources/themes/ /resources/catalog/ai.json /resources/herald-os-bridge/plugin.yaml; do
+            grep -q -- "$required" <<<"$listing" || { echo "::error::$required is missing from $tarball"; exit 1; }
+          done
+          sha256sum "$tarball" | tee "$tarball.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: herald-os-linux-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/herald-os-*-linux-*.tar.gz
+            apps/desktop/release/herald-os-*-linux-*.tar.gz.sha256
+          if-no-files-found: error
+      - name: Attach to the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Herald OS $GITHUB_REF_NAME" --notes "Draft written by the release workflow."
+          gh release upload "$GITHUB_REF_NAME" apps/desktop/release/herald-os-*-linux-*.tar.gz apps/desktop/release/herald-os-*-linux-*.tar.gz.sha256 --clobber

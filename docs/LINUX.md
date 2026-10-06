@@ -175,10 +175,62 @@ Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores 
   Provisioning installs it (`HERALD_OS_OMAKASE=0` to skip); `herald-os omakase install` re-syncs.
 - **Updates**: `herald-os update` pulls the repo on the chosen channel (`herald-os channel
   stable|edge`; both track `main` until releases exist), runs one-shot `linux/migrations/*.sh`
-  (tracked in `/var/lib/herald-os/migrations`), upgrades Fedora packages and Flatpaks, updates
-  Hermes Agent, rebuilds the shell and restarts it. A daily user timer runs `herald-os update
+  (tracked in `/var/lib/herald-os/migrations`), upgrades the system (dnf on Fedora, pacman and the
+  AUR helper on Arch; on Omarchy it leaves the system to `omarchy-update`, which Omarchy requires;
+  the Herald OS image updates as a whole with `bootc upgrade`) and Flatpaks, updates Hermes Agent,
+  rebuilds the shell and restarts it. A daily user timer runs `herald-os update
   --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
   (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
+
+## Arch Linux (and Omarchy)
+
+Fedora stays the base Herald OS builds and tests on (ADR-017); Arch gets a package.
+`packaging/arch/herald-os-bin` packages the release tarball and `packaging/arch/herald-os-git` builds
+from source; both lay out the same files: the app in `/opt/herald-os`, the CLIs and session scripts
+in `/usr/bin`, shared data in `/usr/share/herald-os`, the session for the login screen in
+`/usr/share/wayland-sessions/herald-os.desktop`, and Herald OS as an app in the application menu.
+Neither is on the AUR yet; they are published once the project is public. Until then:
+
+```bash
+cd packaging/arch/herald-os-bin
+HERALD_OS_TARBALL_URL=file:///path/to/herald-os-0.1.0-alpha.1-linux-x64.tar.gz makepkg -si
+herald-os setup        # once per user: Hermes Agent and the bridge plugin
+```
+
+The session needs niri (and a login screen such as greetd); the optional dependencies list what
+each panel and feature uses. `.github/workflows/arch.yml` builds the package from a fresh tarball in
+an Arch container, lints it with namcap, installs it and runs the CLIs.
+
+## Inside Hyprland and Omarchy (app mode)
+
+Herald OS also runs as an app inside another compositor: `herald-os-app` starts the single-window
+shell (fullscreen, as on macOS) and leaves the compositor's bar, keys and window rules alone. The
+shell finds the compositor from `NIRI_SOCKET` or `HYPRLAND_INSTANCE_SIGNATURE`; on Hyprland it mirrors
+windows through `hyprctl -j` and the event socket, so "ask about this window" works, and `herald-os
+wm` maps niri's action names to Hyprland dispatchers. The `herald-os` CLI reaches the one window
+through the same control socket the niri session uses, so every `herald-os` command works as a key.
+
+On Omarchy, `herald-os omarchy install` sets the rest up, and `herald-os omarchy remove` takes it out:
+
+- **Theme:** a hook in `~/.config/omarchy/hooks/theme-set.d/` runs `herald-os theme omarchy` when the
+  Omarchy theme changes, and Herald reads that theme's `colors.toml` (or `alacritty.toml`) and its
+  background. Herald's `theme list`, `set` and `current` hand off to Omarchy's commands there.
+- **Menu:** an entry in `~/.config/omarchy/extensions/omarchy-menu.jsonc`.
+- **Keys:** one chord, `Super+Alt+H`, then Return (open Herald OS), A (ask), C (command bar),
+  V (voice), X (dictate), E (emoji) or M (Missions), from `~/.config/hypr/herald-os.conf`.
+- **Updates and installs:** `herald-os update` leaves the system to `omarchy-update` and catalog
+  installs go through `omarchy-pkg-add` and the AUR helper Omarchy ships.
+
+Files that already exist (a `theme-set` hook, a menu file) are never overwritten; the command prints
+the line to add instead.
+
+**Sharing a Hermes home.** Omarchy's Hermes Desktop owns `~/.hermes` and runs its own backend and
+messaging gateway. A second backend from Herald is safe (Hermes takes a lock for every cron tick and
+keeps one gateway per home), and Settings > Network says when another app's gateway is running. To
+not run a second backend at all, start Herald with `HERALD_OS_BACKEND_URL=http://127.0.0.1:<port>`
+and the backend's token in `HERALD_OS_BACKEND_TOKEN` (or `~/.config/herald-os/backend-token`); Herald
+then attaches to it and writes `~/.hermes/herald-os/control.json` (mode 0600) so the bridge plugin
+can still drive Herald's UI.
 
 ## Known limits
 

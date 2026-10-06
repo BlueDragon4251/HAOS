@@ -7,7 +7,7 @@ import { useBackendData } from '../../../lib/use-async.ts'
 import { $backend } from '../../../store/backend.ts'
 import { $connection } from '../../../store/gateway.ts'
 import { notify } from '../../../store/notifications.ts'
-import { errorText, markSaved, SectionTitle, SettingsGroup, SettingsRow } from './shared.tsx'
+import { errorText, InlineNote, markSaved, SectionTitle, SettingsGroup, SettingsRow } from './shared.tsx'
 
 interface McpServerRow {
   name: string
@@ -42,9 +42,20 @@ export function NetworkSection() {
             {connection}
           </Pill>
         </SettingsRow>
-        <SettingsRow icon={<IconTerminal2 />} label="Runtime command" description={<span className="selectable font-mono text-[11.5px]">{backend.runtime ? backend.runtime.command.join(' ') : '—'}</span>} keywords="hermes command path managed">
+        <SettingsRow
+          icon={<IconTerminal2 />}
+          label="Runtime command"
+          description={<span className="selectable font-mono text-[11.5px]">{backend.runtime?.kind === 'attached' ? `Using ${backend.runtime.label} (HERALD_OS_BACKEND_URL)` : backend.runtime ? backend.runtime.command.join(' ') : '—'}</span>}
+          keywords="hermes command path managed attached shared"
+        >
           {backend.runtime && <Pill>{backend.runtime.kind}</Pill>}
         </SettingsRow>
+        {backend.sharedGateway && (
+          <InlineNote tone="info">
+            Another app (Hermes Desktop, say) runs a Hermes gateway on this Hermes home (pid {backend.sharedGateway}). That is fine: Hermes runs each scheduled job once and keeps one messaging gateway. To share its backend
+            too, start Herald OS with HERALD_OS_BACKEND_URL and HERALD_OS_BACKEND_TOKEN.
+          </InlineNote>
+        )}
       </SettingsGroup>
 
       <McpServersGroup />

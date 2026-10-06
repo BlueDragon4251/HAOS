@@ -1,0 +1,53 @@
+# Maintainer: Luke The Dev <252071647+iamlukethedev@users.noreply.github.com>
+#
+# Herald OS from the release tarball. Not on the AUR yet: it is published once the project is public.
+# A local tarball builds too: HERALD_OS_TARBALL_URL=file:///path/herald-os-<v>-linux-x64.tar.gz makepkg -si
+
+pkgname=herald-os-bin
+_version=0.1.0-alpha.1
+pkgver=0.1.0alpha.1
+pkgrel=1
+pkgdesc='An AI-native desktop built around Hermes Agent: a niri session, or an app inside Hyprland and Omarchy'
+arch=('x86_64' 'aarch64')
+url='https://github.com/iamlukethedev/Herald-OS'
+license=('MIT')
+depends=('gtk3' 'nss' 'alsa-lib' 'libsecret' 'libnotify' 'python' 'curl' 'wl-clipboard' 'wtype' 'grim' 'slurp')
+optdepends=(
+  'niri: the full Herald OS session (menu bar, dock, tiling)'
+  'greetd: a login screen that starts the session'
+  'swaybg: the wallpaper in the session'
+  'swaylock: locking the session'
+  'swayidle: locking and screens off when idle'
+  'cliphist: clipboard history'
+  'brightnessctl: the brightness keys and the display panel'
+  'playerctl: the media keys'
+  'networkmanager: the Wi-Fi panel'
+  'bluez-utils: the Bluetooth panel'
+  'libpulse: the sound panel (pactl)'
+  'power-profiles-daemon: power modes in the battery panel'
+  'upower: the battery panel'
+  'wlsunset: night light'
+  'wf-recorder: screen recording'
+  'ffmpeg: converting recordings'
+  'zbar: reading QR codes from the screen'
+  'tesseract: copying text from the screen'
+  'flatpak: installing apps from the catalog'
+  'podman: the Windows VM and containers'
+  'yay: AUR installs from the catalog'
+)
+provides=('herald-os')
+conflicts=('herald-os' 'herald-os-git')
+options=('!strip' '!debug')
+install=herald-os.install
+source=('herald-os-package.sh')
+source_x86_64=("herald-os-${_version}-x64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/releases/download/v${_version}/herald-os-${_version}-linux-x64.tar.gz}")
+source_aarch64=("herald-os-${_version}-arm64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/releases/download/v${_version}/herald-os-${_version}-linux-arm64.tar.gz}")
+# Filled in from the release's .sha256 files (updpkgsums) when the release is published.
+sha256sums=('SKIP')
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  source "$srcdir/herald-os-package.sh"
+  _herald_os_package "$(_herald_os_appdir "$srcdir")"
+}

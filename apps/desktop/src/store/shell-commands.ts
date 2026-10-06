@@ -1,16 +1,19 @@
 import type { CrashReport, ShellCommand } from '../../shared/ipc.ts'
-import { PAGES, type PageId } from '../shell/apps.ts'
+import { HERMES_APPS, type HermesAppId, PAGES, type PageId } from '../shell/apps.ts'
 import { composePrompt } from '../shell/surfaces/shell-utils.ts'
 import { runHeraldOsWithToast } from '../lib/herald-os-cli.ts'
 import { updatePrefs } from './backend.ts'
 import { openStoredSession, runSlash, sendPrompt } from './chat.ts'
 import { offerCrashHelp } from './crashes.ts'
+import { openEmojiPicker } from './emoji.ts'
 import { $notificationsOpen, notify } from './notifications.ts'
 import { runCommand } from './os-commands.ts'
 import { isMainSurface, onShellCommand, openSurface } from './shell.ts'
+import { openStatusPanel } from './status-panel.ts'
 import { $screensaverUp } from './switches.ts'
-import { $applicationsOpen, toggleCommandBar } from './surface.ts'
-import { showPage } from './windows.ts'
+import { $applicationsOpen, openAsk, toggleCommandBar } from './surface.ts'
+import { openWebWindow } from './web-windows.ts'
+import { openApp, showPage } from './windows.ts'
 
 /*
  * `ShellCommand`s addressed to the Hermes window: from the `herald-os` CLI (compositor hotkeys), the
@@ -91,6 +94,10 @@ export function handleShellCommand(command: ShellCommand): void {
 
       return
     case 'command':
+    // One window (app mode inside Hyprland or Omarchy): the panels-only overlays fall back to the command bar.
+    case 'menu':
+    case 'power':
+    case 'clipboard':
       toggleCommandBar(true)
 
       return
@@ -98,6 +105,43 @@ export function handleShellCommand(command: ShellCommand): void {
       $applicationsOpen.set(true)
 
       return
+    case 'ask': {
+      const context = command.context ? `About ${command.context.appId || 'the window'} "${command.context.title}": ` : ''
+      openAsk({ text: `${context}${command.text ?? ''}`, attachments: command.attachments })
+
+      return
+    }
+    case 'emoji':
+      openEmojiPicker()
+
+      return
+    case 'panel': {
+      const panel = command.args?.[0]
+
+      if (panel === 'wifi' || panel === 'bluetooth' || panel === 'audio' || panel === 'display' || panel === 'power' || panel === 'clock') {
+        openStatusPanel(panel)
+      }
+
+      return
+    }
+    case 'open-app': {
+      const app = command.args?.[0]
+
+      if (app && HERMES_APPS.some(item => item.id === app)) {
+        openApp(app as HermesAppId)
+      }
+
+      return
+    }
+    case 'webapp': {
+      const [url, name] = command.args ?? []
+
+      if (url && /^https?:\/\//.test(url)) {
+        void openWebWindow(url, { title: name || undefined })
+      }
+
+      return
+    }
     case 'herald-os': {
       // The overlay hands off commands that must run after it closed (screenshot, OCR, hotkey overlay).
       const args = command.args ?? []

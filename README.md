@@ -320,6 +320,20 @@ This writes an Apple Silicon DMG and zip to `apps/desktop/release/`. Before inst
 - **Hermes Agent is not bundled either.** The build finds it as in development:
   `HERALD_OS_HERMES_ROOT`, then `~/.hermes/hermes-agent`, then `hermes` on your PATH.
 
+## Building a Linux release
+
+```bash
+npm run dist:linux --workspace apps/desktop            # this machine's architecture
+npm run dist:linux --workspace apps/desktop -- --arm64  # or pick one
+```
+
+This writes `herald-os-<version>-linux-<arch>.tar.gz` to `apps/desktop/release/`: the app, with the
+`herald-os` CLIs, the niri session, themes, the install catalog and the bridge plugin under
+`resources/`. Build on the target architecture (node-pty is compiled, not cross-built); the release
+workflow builds x64 and arm64 on matching runners. The tarball is what the Arch package and the
+Herald OS image install; on its own, unpack it to `/opt/herald-os`, make `chrome-sandbox` root-owned
+and mode 4755, and the session finds it there.
+
 ## Project layout
 
 ```

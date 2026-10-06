@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Update Herald OS: the shell (repo + rebuild), one-shot migrations, Fedora packages, Flatpaks and
-# Hermes Agent. `--check` only reports and records whether anything is pending (the menu bar shows a
-# dot). Channels (~/.config/herald-os/channel): stable (default) or edge; both track the repo's main
+# Update Herald OS: the shell (repo + rebuild), one-shot migrations, system packages (dnf on Fedora,
+# pacman and the AUR helper on Arch, Omarchy's own updater on Omarchy, the whole image with bootc on
+# the Herald OS image), Flatpaks and Hermes Agent. `--check` only reports and records whether
+# anything is pending (the menu bar shows a dot). Channels (~/.config/herald-os/channel): stable (default) or edge; both track the repo's main
 # branch until releases are cut, and are recorded so that switching later is a one-line change.
 #
 #   herald-os-update [--check] [--migrate] [--no-system] [--no-hermes]
@@ -39,14 +40,91 @@ branch_for_channel() {
 notify() { herald-os notify "$1" "${2:-}" >/dev/null 2>&1 || true; }
 report() { herald-os update-available "$1" "$2" >/dev/null 2>&1 || true; }
 
+# What updates the system underneath: Omarchy refuses a bare `pacman -Syu` (it updates its own
+# configs alongside), and the image is replaced as a whole, never package by package.
+system_kind() {
+  if [[ -e /run/ostree-booted ]]; then
+    echo image
+  elif command -v omarchy-update >/dev/null || [[ -x "$HOME/.local/share/omarchy/bin/omarchy-update" ]]; then
+    echo omarchy
+  elif command -v pacman >/dev/null; then
+    echo pacman
+  elif command -v dnf >/dev/null; then
+    echo dnf
+  else
+    echo none
+  fi
+}
+SYSTEM_KIND="$(system_kind)"
+AUR_HELPER="$(command -v yay || command -v paru || true)"
+
+# Pending system updates (a count; the image counts as one).
+count_system_updates() {
+  local out rc
+  case "$SYSTEM_KIND" in
+    dnf)
+      # check-update exits 100 when updates exist.
+      out="$(dnf -q check-update 2>/dev/null)"
+      rc=$?
+      if [[ $rc -eq 100 ]]; then
+        echo "$out" | grep -cE '^[[:alnum:]]' || true
+      else
+        echo 0
+      fi
+      ;;
+    pacman | omarchy)
+      local repo=0 aur=0
+      command -v checkupdates >/dev/null && repo="$(checkupdates 2>/dev/null | grep -c . || true)"
+      [[ -n "$AUR_HELPER" ]] && aur="$("$AUR_HELPER" -Qua 2>/dev/null | grep -c . || true)"
+      echo $((repo + aur))
+      ;;
+    image)
+      command -v bootc >/dev/null && sudo -n bootc upgrade --check 2>/dev/null | grep -qi 'update available' && echo 1 || echo 0
+      ;;
+    *) echo 0 ;;
+  esac
+}
+
+update_system() {
+  case "$SYSTEM_KIND" in
+    dnf) sudo -n dnf -y -q upgrade ;;
+    pacman)
+      if [[ -n "$AUR_HELPER" ]]; then
+        "$AUR_HELPER" -Syu --noconfirm
+      else
+        sudo -n pacman -Syu --noconfirm
+      fi
+      ;;
+    omarchy)
+      local updater
+      updater="$(command -v omarchy-update || echo "$HOME/.local/share/omarchy/bin/omarchy-update")"
+      if [[ -t 0 ]]; then
+        "$updater"
+      else
+        # Omarchy's updater asks questions; from the menu it belongs in Omarchy's own flow.
+        echo "Omarchy updates the system itself: run omarchy-update (or Update in Omarchy's menu)."
+        notify "System updates go through Omarchy" "Run Update from Omarchy's menu; Herald OS updated its own parts."
+      fi
+      ;;
+    image)
+      # Stages the new image; it boots on the next restart and the old one stays in the boot menu.
+      sudo -n bootc upgrade
+      ;;
+    *) return 0 ;;
+  esac
+}
+
 # One-shot migrations, tracked by file name so each runs exactly once per machine. Appends failures
 # to `failed`.
 failed=()
 run_migrations() {
-  [[ -d "$REPO/linux/migrations" ]] || return 0
+  # A checkout's migrations, or the installed package's (/usr/share/herald-os/migrations).
+  local dir="$REPO/linux/migrations"
+  [[ -d "$dir" ]] || dir=/usr/share/herald-os/migrations
+  [[ -d "$dir" ]] || return 0
   sudo -n mkdir -p "$MIGRATIONS_DONE"
   local migration name
-  for migration in "$REPO"/linux/migrations/*.sh; do
+  for migration in "$dir"/*.sh; do
     [[ -f "$migration" ]] || continue
     name="$(basename "$migration")"
     [[ -f "$MIGRATIONS_DONE/$name" ]] && continue
@@ -81,13 +159,8 @@ else
 fi
 
 pending_pkgs=0
-if [[ $SYSTEM -eq 1 ]] && command -v dnf >/dev/null; then
-  # check-update exits 100 when updates exist.
-  out="$(dnf -q check-update 2>/dev/null)"
-  rc=$?
-  if [[ $rc -eq 100 ]]; then
-    pending_pkgs="$(echo "$out" | grep -cE '^[[:alnum:]]')"
-  fi
+if [[ $SYSTEM -eq 1 ]]; then
+  pending_pkgs="$(count_system_updates)"
 fi
 
 pending_flatpaks=0
@@ -128,8 +201,8 @@ fi
 run_migrations
 
 if [[ $SYSTEM -eq 1 ]]; then
-  echo "==> packages"
-  sudo -n dnf -y -q upgrade || failed+=(packages)
+  echo "==> system ($SYSTEM_KIND)"
+  update_system || failed+=(packages)
   if command -v flatpak >/dev/null; then
     echo "==> flatpaks"
     flatpak update -y --noninteractive --user >/dev/null || failed+=(flatpaks)

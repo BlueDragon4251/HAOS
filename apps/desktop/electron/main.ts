@@ -29,8 +29,12 @@ import { registerNotificationHistoryIpc } from './notifications-history.ts'
 import { SwitchService } from './switches.ts'
 import { hermesHome, heraldOsDataDir, isDev } from './paths.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
+import { isOmarchy, readOmarchyTheme } from './theme/omarchy.ts'
+import { prefsForTheme } from './theme/themes.ts'
 import { ControlSocket } from './shell/control-socket.ts'
+import { DesktopHost, type ShellHost } from './shell/host.ts'
 import { shellMode } from './shell/mode.ts'
+import { createCompositor, detectCompositor } from './wm/compositor.ts'
 import { NotificationDaemon } from './shell/notification-daemon.ts'
 import { handleUiRequest, OsCommandBridge, OsControlServer, osControlToken } from './shell/os-control.ts'
 import { PanelShell } from './shell/panels.ts'
@@ -67,9 +71,13 @@ const switches = new SwitchService({
   onPrefs: broadcastPrefs,
   showScreensaver: () => mainWindow?.webContents.send(IPC.shellCommand, { type: 'screensaver' } satisfies ShellCommand)
 })
-const control = panels
+// Linux without the panels session: Herald as an app inside Hyprland or Omarchy, or the cage kiosk.
+// The `herald-os` CLI (and so the compositor's hotkeys) reaches the one window through the same socket.
+const appHost = !panels && process.platform === 'linux' ? new DesktopHost(() => mainWindow, createCompositor(detectCompositor())) : null
+const shellHost: ShellHost | null = panels ?? appHost
+const control = shellHost
   ? new ControlSocket(
-      panels,
+      shellHost,
       broadcastPrefs,
       osBridge,
       spec => {
@@ -278,6 +286,17 @@ function createWindow(): void {
 
   attachMainWindow(createMainWindow(readPrefs()))
   osControl?.start()
+  appHost?.start()
+  control?.start()
+
+  // Inside Omarchy, Herald wears Omarchy's theme from the start (its theme-set hook keeps it in step),
+  // unless a Herald theme was picked since.
+  const themeName = readPrefs().themeName
+  const omarchy = appHost && isOmarchy() && (!themeName || themeName.startsWith('omarchy-')) ? readOmarchyTheme() : null
+
+  if (omarchy) {
+    broadcastPrefs(writePrefs(prefsForTheme(omarchy.spec, omarchy.dir)))
+  }
 }
 
 app.whenReady().then(async () => {
@@ -350,5 +369,6 @@ app.on('before-quit', event => {
   wallpaper?.stop()
   notifications?.stop()
   panels?.stop()
+  appHost?.stop()
   void backend.stop().finally(() => app.quit())
 })

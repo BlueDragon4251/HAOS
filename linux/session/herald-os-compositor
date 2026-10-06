@@ -37,7 +37,7 @@ echo "$(date -Is) starting $COMPOSITOR (renderer=${WLR_RENDERER:-gpu})"
 
 if [[ "$COMPOSITOR" == "cage" ]] || ! command -v niri >/dev/null 2>&1; then
   export HERALD_OS_SHELL_MODE=desktop
-  exec cage -s -- /usr/local/bin/herald-os-session
+  exec cage -s -- "$(command -v herald-os-session)"
 fi
 
 export HERALD_OS_SHELL_MODE=panels
@@ -89,7 +89,7 @@ fi
 
 if [[ "$nested" == "1" ]]; then
   echo "no hardware GL: nesting niri (windowed) inside cage"
-  exec cage -s -- /usr/local/bin/herald-os-niri-nested
+  exec cage -s -- "$(command -v herald-os-niri-nested)"
 fi
 
 exec niri --session --config "$HOME/.config/niri/config.kdl"

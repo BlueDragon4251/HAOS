@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -7,6 +7,7 @@ import type { AudioWsKind, BackendRuntime, BackendState, RestRequest } from '../
 import { osEnv } from '../env.ts'
 import { log } from '../log.ts'
 import { hermesHome, heraldOsDataDir } from '../paths.ts'
+import { type AttachTarget, attachTarget, foreignGateway } from './coexist.ts'
 import { waitForStatus } from './probe.ts'
 import { LineBuffer, parseReadyLine, readyFileName, staleReadyFiles } from './ready.ts'
 import { resolveBackendRuntime } from './resolve.ts'
@@ -144,6 +145,22 @@ export class BackendManager {
     const generation = ++this.startGeneration
     this.update({ phase: attempt === 0 ? 'resolving' : 'restarting', attempt, error: undefined })
 
+    let attach: AttachTarget | null
+
+    try {
+      attach = attachTarget()
+    } catch (error) {
+      this.update({ phase: 'failed', error: error instanceof Error ? error.message : String(error) })
+
+      return
+    }
+
+    if (attach) {
+      await this.attach(attach, attempt, generation)
+
+      return
+    }
+
     const runtime = resolveBackendRuntime()
 
     if (!runtime) {
@@ -173,7 +190,7 @@ export class BackendManager {
       }
 
       const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(this.token)}`
-      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined })
+      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined, sharedGateway: this.sharedGateway()?.pid })
       log('backend', `ready on ${baseUrl} via ${runtime.label}`)
     } catch (error) {
       if (generation !== this.startGeneration) {
@@ -185,6 +202,42 @@ export class BackendManager {
       await this.killChild()
       this.scheduleRestart(attempt, message)
     }
+  }
+
+  /** Use a backend that is already running (HERALD_OS_BACKEND_URL) instead of starting a second one. */
+  private async attach(target: AttachTarget, attempt: number, generation: number): Promise<void> {
+    this.token = target.token
+    this.update({ runtime: { kind: 'attached', label: `the Hermes backend at ${target.baseUrl}`, command: [] }, phase: 'starting' })
+
+    try {
+      await waitForStatus(target.baseUrl, this.token, STATUS_TIMEOUT_MS)
+
+      if (generation !== this.startGeneration) {
+        return
+      }
+
+      // It did not get our control socket in its environment; the bridge plugin reads this instead.
+      if (this.control) {
+        const file = path.join(heraldOsDataDir(), 'control.json')
+        fs.mkdirSync(heraldOsDataDir(), { recursive: true })
+        fs.writeFileSync(file, JSON.stringify({ socket: this.control.socketPath, token: this.control.token }), { mode: 0o600 })
+        fs.chmodSync(file, 0o600)
+      }
+
+      const url = new URL(target.baseUrl)
+      const port = Number(url.port) || 80
+      this.update({ phase: 'ready', port, baseUrl: target.baseUrl, wsUrl: `ws://${url.host}/api/ws?token=${encodeURIComponent(this.token)}`, error: undefined, sharedGateway: undefined })
+      log('backend', `attached to ${target.baseUrl}`)
+    } catch (error) {
+      if (generation === this.startGeneration) {
+        this.scheduleRestart(attempt, `could not reach ${target.baseUrl}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+
+  /** Another app's messaging gateway on this Hermes home (Hermes Desktop, say), for Settings to mention. */
+  sharedGateway(): { pid: number } | null {
+    return foreignGateway(hermesHome(), { appPid: process.pid, backendPid: this.child?.pid ?? null }, { alive: isProcessAlive, parentOf: parentPid })
   }
 
   private async spawnServe(runtime: BackendRuntime, generation: number): Promise<number> {
@@ -370,6 +423,24 @@ export class BackendManager {
     for (const listener of this.listeners) {
       listener(snapshot)
     }
+  }
+}
+
+function parentPid(pid: number): number | null {
+  try {
+    if (process.platform === 'linux') {
+      // /proc/<pid>/stat: "pid (comm) state ppid …"; comm may contain spaces, so split after the ")".
+      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8')
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
+
+      return Number(fields[1]) || null
+    }
+
+    const out = execFileSync('ps', ['-o', 'ppid=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 })
+
+    return Number(out.trim()) || null
+  } catch {
+    return null
   }
 }
 

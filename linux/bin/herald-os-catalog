@@ -5,7 +5,7 @@
   herald-os-catalog install <id> [--ram <GB>] [--cpus <n>] [--disk <GB>]
   herald-os-catalog remove <id> [--purge]
   herald-os-catalog status <id>
-  herald-os-catalog pkg install|remove|has <name>...     (the package layer the other scripts share)
+  herald-os-catalog pkg manager | pkg install|remove|has|available <name>...   (the package layer the other scripts share)
   herald-os-catalog windows start|stop|status|connect|remove [--purge]
 
 The catalog is linux/catalog/*.json. Each entry lists install methods in order of preference
@@ -107,6 +107,10 @@ def pkg_command(action: str, names: list[str], manager: str | None = None) -> li
     if manager == "dnf":
         return [*sudo(), "dnf", "-y", "install" if action == "install" else "remove", *names]
     if manager == "pacman":
+        # Omarchy installs packages through its own wrapper (it keeps its package lists in step).
+        omarchy_add = shutil.which("omarchy-pkg-add") if is_omarchy() else None
+        if action == "install" and omarchy_add:
+            return [omarchy_add, *names]
         return [*sudo(), "pacman", "--noconfirm", *(["--needed", "-S"] if action == "install" else ["-Rns"]), *names]
     if manager == "aur":
         helper = aur_helper()
@@ -115,6 +119,16 @@ def pkg_command(action: str, names: list[str], manager: str | None = None) -> li
         # AUR helpers build as the user and call sudo themselves.
         return [helper, "--noconfirm", *(["--needed", "-S"] if action == "install" else ["-Rns"]), *names]
     raise CatalogError("this system has no package manager Herald OS can use; try the Flatpak instead" if is_image() else "no dnf or pacman here")
+
+
+def pkg_available(name: str, manager: str | None = None) -> bool:
+    """The system repositories have a package by this name."""
+    manager = manager or pkg_manager()
+    if manager == "dnf":
+        return quiet(["dnf", "-q", "list", "--available", name], timeout=180).returncode == 0
+    if manager == "pacman":
+        return quiet(["pacman", "-Si", name], timeout=60).returncode == 0
+    return False
 
 
 def pkg_installed(names: list[str], manager: str | None = None) -> bool:
@@ -784,10 +798,15 @@ def main(argv: list[str]) -> int:
             print(json.dumps(entry_view(group, entry, m, Probe(m)), indent=2))
             return 0
         if cmd == "pkg":
-            if len(args) < 2 or args[0] not in ("install", "remove", "has"):
-                raise CatalogError("pkg install|remove|has <name>...")
+            if args[:1] == ["manager"]:
+                print(pkg_manager() or ("image" if is_image() else "none"))
+                return 0
+            if len(args) < 2 or args[0] not in ("install", "remove", "has", "available"):
+                raise CatalogError("pkg manager | pkg install|remove|has|available <name>...")
             if args[0] == "has":
                 return 0 if pkg_installed(args[1:]) else 1
+            if args[0] == "available":
+                return 0 if all(pkg_available(name) for name in args[1:]) else 1
             return pkg_run(args[0], args[1:])
         if cmd == "windows":
             action = args[0] if args else "status"

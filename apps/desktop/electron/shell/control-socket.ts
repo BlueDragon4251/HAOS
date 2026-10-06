@@ -8,9 +8,10 @@ import { events } from '../events/bus.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
 import { readPrefs, writePrefs } from '../prefs.ts'
+import { readOmarchyTheme } from '../theme/omarchy.ts'
 import { findTheme, prefsForTheme } from '../theme/themes.ts'
+import type { ShellHost } from './host.ts'
 import { handleUiRequest, isUiRequest, type OsCommandBridge, type UiControlRequest } from './os-control.ts'
-import type { PanelShell } from './panels.ts'
 
 interface ControlRequest {
   cmd: string
@@ -34,7 +35,7 @@ export class ControlSocket {
   private server: net.Server | null = null
 
   constructor(
-    private readonly shell: PanelShell,
+    private readonly shell: ShellHost,
     /** Called after the CLI changes preferences so windows and the wallpaper follow. */
     private readonly onPrefsChanged?: (prefs: HeraldOSPrefs) => void,
     /** Runs registry commands in the Hermes window (`ui`, `ui-list`, `ui-state`; token-protected). */
@@ -146,7 +147,7 @@ export class ControlSocket {
     }
 
     if (OVERLAY_MODES.has(cmd)) {
-      const focused = this.shell.niri.focusedWindow()
+      const focused = this.shell.wm?.focusedWindow() ?? null
       const command: ShellCommand = {
         type: cmd,
         args,
@@ -278,8 +279,22 @@ export class ControlSocket {
 
         return { ok: true, theme: next.themeName ?? next.theme, accent: next.accent }
       }
+      case 'theme-omarchy': {
+        // Omarchy's theme-set hook (herald-os omarchy install): Herald's colours follow Omarchy's.
+        const found = readOmarchyTheme()
+
+        if (!found) {
+          return { ok: false, error: "no Omarchy theme found (~/.config/omarchy/current/theme)" }
+        }
+
+        const next = writePrefs(prefsForTheme(found.spec, found.dir))
+        this.onPrefsChanged?.(next)
+        this.onTheme?.(found.spec)
+
+        return { ok: true, theme: found.spec.name }
+      }
       case 'state':
-        return { ok: true, ...this.shell.niri.state() }
+        return { ok: true, ...(this.shell.wm?.state() ?? { available: false, windows: [], workspaces: [], focusedWindowId: null }) }
       case 'switches':
         this.onSwitches?.()
 

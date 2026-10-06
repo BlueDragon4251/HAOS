@@ -94,7 +94,7 @@ step "Herald OS session"
 install -m 0755 "$PAYLOAD/session/herald-os-compositor" /usr/local/bin/herald-os-compositor
 install -m 0755 "$PAYLOAD/session/herald-os-session" /usr/local/bin/herald-os-session
 install -m 0755 "$PAYLOAD/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
-install -m 0755 "$PAYLOAD/bin/herald-os" "$PAYLOAD/bin/herald-os-theme" "$PAYLOAD/bin/herald-os-omakase" "$PAYLOAD/bin/herald-os-update" "$PAYLOAD/bin/herald-os-idle" "$PAYLOAD/bin/herald-os-catalog" /usr/local/bin/
+install -m 0755 "$PAYLOAD"/bin/herald-os* /usr/local/bin/
 # foot's client and server entries are for scripts; Applications keeps Foot next to Herald's Terminal.
 install -d /usr/local/share/applications
 for entry in footclient foot-server; do

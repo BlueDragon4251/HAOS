@@ -7,8 +7,8 @@ import type { ColorScheme, ThemeColors } from './theme.ts'
 export type BackendPhase = 'idle' | 'resolving' | 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
 
 export interface BackendRuntime {
-  /** How the runtime was found: env override, managed install, or PATH shim. */
-  kind: 'env' | 'managed' | 'path'
+  /** How the runtime was found: env override, managed install, PATH shim, or a backend already running (HERALD_OS_BACKEND_URL). */
+  kind: 'env' | 'managed' | 'path' | 'attached'
   label: string
   /** Source checkout root when known (managed install / env override). */
   root?: string
@@ -24,6 +24,8 @@ export interface BackendState {
   port?: number
   error?: string
   logTail: string[]
+  /** Another app's messaging gateway on this Hermes home (Hermes Desktop, say): its pid. */
+  sharedGateway?: number
 }
 
 export interface RestRequest {

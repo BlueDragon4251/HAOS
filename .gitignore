@@ -33,6 +33,13 @@ id_ecdsa*
 id_hermes*
 auth.json
 
+# makepkg's work (packaging/arch): sources, build trees and packages.
+packaging/arch/*/src/
+packaging/arch/*/pkg/
+packaging/arch/*/herald-os/
+packaging/arch/*/*.tar.gz
+*.pkg.tar.zst
+
 # Herald OS Linux VM artifacts (images, seeds, disks, screenshots).
 linux/vm/build/
 *.qcow2

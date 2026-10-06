@@ -6,7 +6,7 @@
 set -euo pipefail
 
 LISTS="${HERALD_OS_OMAKASE_DIR:-}"
-for candidate in "$LISTS" "$HOME/Herald-OS/linux/omakase" /usr/local/share/herald-os-linux/omakase; do
+for candidate in "$LISTS" "$HOME/Herald-OS/linux/omakase" /usr/local/share/herald-os-linux/omakase /usr/share/herald-os/omakase; do
   if [[ -n "$candidate" && -d "$candidate" ]]; then
     LISTS="$candidate"
     break
@@ -21,13 +21,25 @@ shift || true
 only="${1:-}"
 
 packages() {
-  local pkgs
-  mapfile -t pkgs < <(strip "$LISTS/packages.txt")
+  local pkgs manager list
+  # Fedora names in packages.txt, Arch names in packages.pacman.txt; the image bakes its set in.
+  manager="$(herald-os-catalog pkg manager 2>/dev/null || { command -v dnf >/dev/null && echo dnf; } || echo none)"
+  case "$manager" in
+    dnf) list="$LISTS/packages.txt" ;;
+    pacman) list="$LISTS/packages.pacman.txt" ;;
+    *) [[ "$cmd" == "list" ]] || echo "==> packages: none on this system ($manager)"; return 0 ;;
+  esac
+  [[ -f "$list" ]] || return 0
+  mapfile -t pkgs < <(strip "$list")
   [[ ${#pkgs[@]} -gt 0 ]] || return 0
   if [[ "$cmd" == "list" ]]; then printf 'package %s\n' "${pkgs[@]}"; return 0; fi
   echo "==> packages (${#pkgs[@]})"
-  # --skip-unavailable keeps one missing package from failing the whole set.
-  sudo -n dnf -y -q install --skip-unavailable --setopt=install_weak_deps=False "${pkgs[@]}" || echo "WARNING: some packages did not install"
+  if [[ "$manager" == "dnf" ]]; then
+    # --skip-unavailable keeps one missing package from failing the whole set.
+    sudo -n dnf -y -q install --skip-unavailable --setopt=install_weak_deps=False "${pkgs[@]}" || echo "WARNING: some packages did not install"
+  else
+    sudo -n pacman -S --needed --noconfirm "${pkgs[@]}" || echo "WARNING: some packages did not install"
+  fi
 }
 
 flatpaks() {

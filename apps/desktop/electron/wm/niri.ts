@@ -1,13 +1,15 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import type { WmAction, WmState, WmWindow, WmWorkspace } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
+import type { Compositor } from './compositor.ts'
 
 /**
  * Client for niri's IPC: keeps a mirror of windows and workspaces from `niri msg -j event-stream`
  * (the stream sends the full state first, then deltas) and issues `niri msg action ...`.
  * Windows belonging to this process (the shell's own) are flagged `ours` by pid.
  */
-export class NiriClient {
+export class NiriClient implements Compositor {
+  readonly name = 'niri' as const
   private stream: ChildProcess | null = null
   private windows = new Map<number, WmWindow>()
   private workspaces = new Map<number, WmWorkspace>()
