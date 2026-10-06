@@ -1254,6 +1254,10 @@ def setup_sign_in(kind: str) -> int:
     """Fingerprint (fprintd) or a security key (pam-u2f) for the lock screen and sudo."""
     if not sys.stdin.isatty():
         die(f"setup {kind} needs a terminal: you touch the sensor or the key while it runs", 2)
+    # Omarchy has its own setup for both, which also covers its lock screen and polkit.
+    omarchy_tool = shutil.which("omarchy-setup-fingerprint" if kind == "fingerprint" else "omarchy-setup-fido2")
+    if is_omarchy() and omarchy_tool:
+        return subprocess.call([omarchy_tool])
     if kind == "fingerprint":
         if not shutil.which("fprintd-enroll"):
             die("fprintd is not installed (sudo dnf install fprintd fprintd-pam, or pacman -S fprintd)", 127)
@@ -1278,14 +1282,47 @@ def setup_sign_in(kind: str) -> int:
         feature, pam = "with-pam-u2f", "auth sufficient pam_u2f.so cue"
     if code != 0:
         return code
+    what = "fingerprint" if kind == "fingerprint" else "security key"
     if shutil.which("authselect"):
         # Fedora: one switch turns it on for the lock screen, sudo and the login screen.
         code = subprocess.call(["sudo", "authselect", "enable-feature", feature])
         if code == 0:
-            print(f"Done: the lock screen and sudo accept your {'fingerprint' if kind == 'fingerprint' else 'security key'} as well as your password.")
+            print(f"Done: the lock screen and sudo accept your {what} as well as your password.")
         return code
-    print(f"Enrolled. To use it for the lock screen and sudo, add this line at the top of /etc/pam.d/system-auth (or swaylock and sudo):\n  {pam}")
+    # Arch: the line goes into sudo and Herald's lock screen (swaylock), with a backup of every
+    # file it changes. hyprlock does fingerprints itself and is left alone.
+    changed = [file for file in PAM_FILES if Path(file).exists() and pam_enable(Path(file), pam)]
+    if not any(Path(file).exists() for file in PAM_FILES):
+        die(f"none of {', '.join(PAM_FILES)} exist; add this line to your PAM config yourself:\n  {pam}", 1)
+    print(f"Done: sudo and the lock screen accept your {what} as well as your password." + (f" (changed {', '.join(changed)}; a .herald-os.bak copy sits next to each)" if changed else " (already set up)"))
     return 0
+
+
+PAM_FILES = ("/etc/pam.d/sudo", "/etc/pam.d/swaylock")
+
+
+def pam_with(text: str, line: str) -> str | None:
+    """`text` with `line` as its first auth rule, or None when it is already there (pure; tested)."""
+    rules = text.splitlines()
+    if any(rule.split() == line.split() for rule in rules):
+        return None
+    at = next((i for i, rule in enumerate(rules) if rule.split()[:1] == ["auth"]), None)
+    if at is None:
+        # No auth rules of its own (only includes): after the header and comments.
+        at = next((i for i, rule in enumerate(rules) if rule.strip() and not rule.lstrip().startswith("#")), len(rules))
+    return "\n".join([*rules[:at], line, *rules[at:]]) + "\n"
+
+
+def pam_enable(file: Path, line: str) -> bool:
+    """Put `line` first in a PAM file through sudo, keeping a backup; False when it was already there."""
+    updated = pam_with(file.read_text(), line)
+    if updated is None:
+        return False
+    backup = Path(f"{file}.herald-os.bak")
+    if not backup.exists():
+        subprocess.run(["sudo", "cp", "-p", str(file), str(backup)], check=True)
+    subprocess.run(["sudo", "tee", str(file)], input=updated, text=True, stdout=subprocess.DEVNULL, check=True)
+    return True
 
 
 def is_image() -> bool:

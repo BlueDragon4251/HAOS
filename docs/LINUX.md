@@ -244,7 +244,10 @@ its apps and saved networks on the next restart and runs setup again; the system
   (port 53317) and mDNS. SSH is off in release images; the development VM's zone allows it.
 - **Secure Boot:** works through Fedora's signed shim.
 - **Sign-in:** `herald-os setup fingerprint` (fprintd) and `herald-os setup fido2` (a security key,
-  pam-u2f) add them to the lock screen and sudo through authselect.
+  pam-u2f) enrol it and turn it on for the lock screen and sudo: through authselect on Fedora and
+  the image, by adding the rule to `/etc/pam.d/sudo` and `/etc/pam.d/swaylock` on Arch (each file
+  keeps a `.herald-os.bak` copy), and through Omarchy's own `omarchy-setup-fingerprint` and
+  `omarchy-setup-fido2` on Omarchy.
 - **Firmware:** `herald-os firmware check|update` (fwupd), also in the menu under Update.
 - **Image signatures:** the image workflow signs each image with the project's cosign key, never
   keyless (which would publish to a transparency log) and without a log upload. Once

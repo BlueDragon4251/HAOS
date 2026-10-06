@@ -191,6 +191,16 @@ def test_unknown_keymap_falls_back_to_herald(tmp_path, monkeypatch):
     assert cli.current_keymap() == "omarchy"
 
 
+def test_pam_line_goes_first_once():
+    sudo = "#%PAM-1.0\nauth\t\tinclude\t\tsystem-auth\naccount\t\tinclude\t\tsystem-auth\n"
+    updated = cli.pam_with(sudo, "auth sufficient pam_fprintd.so")
+    assert updated.splitlines() == ["#%PAM-1.0", "auth sufficient pam_fprintd.so", "auth\t\tinclude\t\tsystem-auth", "account\t\tinclude\t\tsystem-auth"]
+    # Already there (whatever the spacing): nothing to change.
+    assert cli.pam_with(updated.replace("auth sufficient", "auth   sufficient"), "auth sufficient pam_fprintd.so") is None
+    # A file with only includes and comments gets it after them.
+    assert cli.pam_with("#%PAM-1.0\n# swaylock\n-include login\n", "auth sufficient pam_u2f.so cue").splitlines()[2] == "auth sufficient pam_u2f.so cue"
+
+
 def test_bar_words_become_registry_commands():
     assert cli.bar_args([]) == ("bar.layout", {})
     assert cli.bar_args(["hide", "bluetooth"]) == ("bar.hide", {"item": "bluetooth"})
