@@ -179,7 +179,10 @@ body,
 :root[data-shell-mode='panels'][data-surface='dock'] #root,
 :root[data-shell-mode='panels'][data-surface='command'],
 :root[data-shell-mode='panels'][data-surface='command'] body,
-:root[data-shell-mode='panels'][data-surface='command'] #root {
+:root[data-shell-mode='panels'][data-surface='command'] #root,
+:root[data-shell-mode='panels'][data-surface='panel'],
+:root[data-shell-mode='panels'][data-surface='panel'] body,
+:root[data-shell-mode='panels'][data-surface='panel'] #root {
   background: transparent;
 }
 

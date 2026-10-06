@@ -570,8 +570,18 @@ export class LinuxPlatform implements HostPlatform {
     }
   }
 
-  /** GECOS field of the account's passwd entry (`getent` is glibc; absence just leaves it undefined). */
+  /** The name first-boot setup saved, else the GECOS field of the account (`getent` is glibc). */
   private async fullName(): Promise<string | undefined> {
+    try {
+      const saved = (await fs.readFile(path.join(os.homedir(), '.config', 'herald-os', 'name'), 'utf8')).trim()
+
+      if (saved) {
+        return saved
+      }
+    } catch {
+      // Not set up through Herald OS's setup.
+    }
+
     const result = await run('getent', ['passwd', os.userInfo().username], 3000)
 
     if (result.code !== 0) {

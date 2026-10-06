@@ -20,6 +20,7 @@ import { Screensaver } from '../features/screensaver/Screensaver.tsx'
 import { $screensaverUp } from '../store/switches.ts'
 import { ActionHud, OsHighlighter } from '../features/voice/ActionHud.tsx'
 import { VoiceOrb } from '../features/voice/VoiceOrb.tsx'
+import { FirstRunSetup } from '../features/setup/FirstRunSetup.tsx'
 
 const TerminalSurface = lazy(() => import('../features/terminal/TerminalSurface.tsx').then(m => ({ default: m.TerminalSurface })))
 const SystemSurface = lazy(() => import('../features/system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
@@ -103,6 +104,7 @@ export function Desktop() {
       <ActionHud offsetClass="top-12" />
       <OsHighlighter />
       <HermesLoginCard />
+      <FirstRunSetup />
       <RequestHost />
       <Toasts />
       <NotificationsPanel />

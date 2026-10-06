@@ -248,8 +248,9 @@ def mise_tool(ref: str) -> str:
 
 
 def mise_installed(ref: str) -> bool:
+    # A version is a folder; `uninstall` leaves its alias links (latest, 0.25) dangling behind.
     installs = MISE_DATA / "installs" / mise_tool(ref)
-    return installs.is_dir() and any(installs.iterdir())
+    return installs.is_dir() and any(entry.is_dir() for entry in installs.iterdir())
 
 
 def webapp_desktop(label: str) -> Path:
@@ -407,7 +408,12 @@ def remove_method(entry: dict, method: dict, opts: dict) -> int:
         return call([npm, "uninstall", "-g", "--prefix", str(LOCAL), ref]) if npm else 0
     if kind == "mise":
         mise = find_bin("mise")
-        return call([mise, "unuse", "-g", mise_tool(ref)]) if mise else 0
+        if not mise:
+            return 0
+        # `unuse` only takes it out of the config; the installed versions go with `uninstall`.
+        code = call([mise, "unuse", "-g", mise_tool(ref)])
+        call([mise, "uninstall", "--all", mise_tool(ref)])
+        return code
     if kind == "script":
         return RECIPES[ref].remove(opts)
     if kind == "webapp":

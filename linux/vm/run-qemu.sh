@@ -5,6 +5,7 @@
 #
 #   bash linux/vm/run-qemu.sh              # window on the Mac, SSH on 127.0.0.1:2222
 #   HEADLESS=1 bash linux/vm/run-qemu.sh   # VNC on 127.0.0.1:5901 instead of a window
+#   bash linux/vm/run-qemu.sh --image herald-os-<v>-aarch64.qcow2   # boot a built Herald OS image
 #   bash linux/vm/run-qemu.sh stop|status|console|reset
 #
 # First boot runs cloud-init provisioning (several minutes: dnf + Hermes Agent install). Watch it
@@ -17,6 +18,14 @@ VERSION="${FEDORA_VERSION:-44}"
 BASE="$BUILD/fedora-cloud-${VERSION}-aarch64.qcow2"
 DISK="$BUILD/herald-os.qcow2"
 SEED="$BUILD/cidata.iso"
+# --image: a Herald OS disk from bootc-image-builder; it sets itself up on the first boot, no seed.
+IMAGE=""
+if [[ "${1:-}" == "--image" ]]; then
+  IMAGE="$(cd "$(dirname "${2:?--image needs a qcow2}")" && pwd)/$(basename "$2")"
+  shift 2
+  BASE="$IMAGE"
+  DISK="$BUILD/herald-os-image.qcow2"
+fi
 EFI_CODE="$(brew --prefix 2>/dev/null || echo /opt/homebrew)/share/qemu/edk2-aarch64-code.fd"
 EFI_VARS_SRC="$(dirname "$EFI_CODE")/edk2-arm-vars.fd"
 EFI_VARS="$BUILD/efivars.fd"
@@ -69,8 +78,12 @@ esac
 
 command -v qemu-system-aarch64 >/dev/null || { echo "qemu missing: brew install qemu" >&2; exit 1; }
 [[ -f "$EFI_CODE" ]] || { echo "EDK2 firmware not found at $EFI_CODE" >&2; exit 1; }
-[[ -s "$BASE" ]] || bash "$HERE/download-image.sh"
-[[ -s "$SEED" ]] || bash "$HERE/make-seed.sh"
+if [[ -z "$IMAGE" ]]; then
+  [[ -s "$BASE" ]] || bash "$HERE/download-image.sh"
+  [[ -s "$SEED" ]] || bash "$HERE/make-seed.sh"
+fi
+SEED_ARGS=()
+[[ -n "$IMAGE" ]] || SEED_ARGS=(-drive if=virtio,format=raw,readonly=on,file="$SEED")
 
 if running; then
   echo "already running (pid $(cat "$PIDFILE"))"
@@ -105,7 +118,7 @@ perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- qemu-s
   -drive if=pflash,format=raw,readonly=on,file="$EFI_CODE" \
   -drive if=pflash,format=raw,file="$EFI_VARS" \
   -drive if=virtio,format=qcow2,file="$DISK" \
-  -drive if=virtio,format=raw,readonly=on,file="$SEED" \
+  ${SEED_ARGS[@]+"${SEED_ARGS[@]}"} \
   -device virtio-gpu-pci,xres="$GUEST_W",yres="$GUEST_H" \
   "${DISPLAY_ARGS[@]}" \
   -device qemu-xhci -device usb-kbd -device usb-tablet \

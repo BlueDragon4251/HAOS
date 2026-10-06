@@ -14,6 +14,7 @@ import { registerBridgeIpc } from './ipc/bridge.ts'
 import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerControlsIpc } from './ipc/controls.ts'
 import { registerCatalogIpc } from './ipc/catalog.ts'
+import { registerSetupIpc } from './ipc/setup.ts'
 import { registerDictationIpc } from './ipc/dictation.ts'
 import { registerContextIpc } from './ipc/context.ts'
 import { registerFsIpc } from './ipc/fs.ts'
@@ -43,6 +44,10 @@ import { WallpaperService } from './shell/wallpaper.ts'
 import { appIconPath, createMainWindow } from './window.ts'
 
 app.setName('Herald OS')
+
+// Electron shows a modal dialog for an uncaught main-process error and waits on it: the whole
+// shell, the Linux session included, would freeze behind a box nobody may see. Log it and go on.
+process.on('uncaughtException', error => log('main', `uncaught exception: ${error.stack ?? error.message}`))
 
 for (const line of migrateLegacyData({ hermesHome: hermesHome(), appData: app.getPath('appData'), userData: app.getPath('userData') })) {
   log('migrate', line)
@@ -252,6 +257,7 @@ function registerCoreIpc(): void {
   registerNotificationHistoryIpc()
   registerDictationIpc(() => (panels ? panels.mainWindow() : mainWindow))
   registerCatalogIpc()
+  registerSetupIpc()
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.

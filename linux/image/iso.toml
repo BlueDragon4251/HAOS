@@ -1,0 +1,5 @@
+# bootc-image-builder: the installer ISO. Anaconda's storage screen stays interactive, so it can
+# install next to Windows or macOS (dual boot) and encrypt the disk (btrfs, Fedora's default). For an
+# unattended install, boot it with inst.ks=<url> pointing at a kickstart like unattended.ks.
+[customizations.installer.modules]
+enable = ["org.fedoraproject.Anaconda.Modules.Localization", "org.fedoraproject.Anaconda.Modules.Timezone"]

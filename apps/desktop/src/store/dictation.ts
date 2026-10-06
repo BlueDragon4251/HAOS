@@ -6,7 +6,7 @@ import { bytesToBase64, concatInt16, encodeWav, TARGET_SAMPLE_RATE } from '../li
 import { withProviderFallback } from '../lib/voice/provider-fallback.ts'
 import { DEFAULT_ENDPOINTER, Endpointer } from '../lib/voice/vad.ts'
 import { notify } from './notifications.ts'
-import { isMainSurface, isPanels, onShellCommand } from './shell.ts'
+import { isMainSurface, isPanels, onShellCommand, surface } from './shell.ts'
 import { $voiceActive } from './voice.ts'
 
 /*
@@ -128,8 +128,14 @@ export function bindDictation(): () => void {
     return () => undefined
   }
 
-  // Panels-mode menu bar: mirror the Hermes window's state for the "Dictating" indicator.
+  // Panels-mode menu bar: mirror the Hermes window's state for the "Dictating" indicator. Only
+  // there: a handler registered early on every surface would swallow the commands that open
+  // overlays and panels, which wait in a queue until their window's own handler mounts.
   if (!isMainSurface) {
+    if (surface !== 'menubar') {
+      return () => undefined
+    }
+
     bound = true
 
     return onShellCommand(command => {

@@ -182,6 +182,60 @@ Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores 
   --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
   (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
 
+## The Herald OS image (Fedora bootc)
+
+Herald OS ships as a bootable container image (ADR-018), built in two halves that the development
+VM's provisioner also runs, so the VM and the image cannot drift apart:
+
+- **`linux/image/packages.sh`, at image build:** the packages in `linux/image/packages.txt` (and the
+  omakase set), the session and CLIs under `/usr`, the prebuilt shell in `/usr/share/herald-os/app`,
+  the boot splash and its initramfs, Flathub, the services. `--dev` does the same for the VM under
+  `/usr/local`, with the build tools from `packages-dev.txt`.
+- **`linux/image/firstboot.sh`, on the first boot:** the session user, its niri config, theme and
+  update timer, and Hermes Agent (`herald-os-firstboot.service`, before the login screen), then the
+  omakase Flatpaks (`herald-os-firstboot-apps.service`, while the session is up).
+
+`linux/image/Containerfile` starts from `quay.io/fedora/fedora-bootc:44`; `.github/workflows/image.yml`
+builds it for x86_64 and aarch64 on matching runners, pushes it to the repository's GHCR package
+(`ghcr.io/iamlukethedev/herald-os`, private like the repository) and, for a release, turns it into:
+
+- **an x86_64 installer ISO** (bootc-image-builder `anaconda-iso`, `linux/image/iso.toml`): the
+  storage screen stays interactive, so it installs next to another system and encrypts the disk
+  (btrfs). Boot it with `inst.ks=<url>` and a kickstart like `linux/image/unattended.ks` for an
+  unattended install.
+- **an aarch64 VM disk** (`qcow2`, `linux/image/disk.toml`): `bash linux/vm/run-qemu.sh --image <disk>`
+  or `bash linux/vm/run-vf.sh --image <disk>` boot it, and `bash linux/vm/try.sh` fetches the latest
+  release's disk and boots it in one command.
+
+On the image, apps install through Flatpak or into `~/.local` (the catalog picks those methods
+there); the system itself changes only by a whole new image.
+
+**Updates you can undo.** `herald-os update` runs `bootc upgrade` (the image tag of the channel:
+`stable` for releases, `edge` for main; `herald-os channel edge` switches with `bootc switch`), then
+Flatpaks and `hermes update`. The new image starts on the next restart and the previous one stays in
+the boot menu; `herald-os rollback` (or Update > Go back to the previous version) makes it the
+default again.
+
+**Setup and reset.** The first boot makes the account and installs Hermes; then the shell's setup
+asks who the computer is for. For yourself: a name, a password (set with `passwd` as you, so the
+setup never needs root), Wi-Fi and Hermes's sign-in. For someone else: just Wi-Fi, and setup waits
+for them at the next start. `herald-os reset` (type ERASE, then your password) erases the account,
+its apps and saved networks on the next restart and runs setup again; the system stays.
+
+**Security.**
+
+- **Firewall:** firewalld with a `herald-os` zone that refuses incoming connections except LocalSend
+  (port 53317) and mDNS. SSH is off in release images; the development VM's zone allows it.
+- **Secure Boot:** works through Fedora's signed shim.
+- **Sign-in:** `herald-os setup fingerprint` (fprintd) and `herald-os setup fido2` (a security key,
+  pam-u2f) add them to the lock screen and sudo through authselect.
+- **Firmware:** `herald-os firmware check|update` (fwupd), also in the menu under Update.
+- **Image signatures:** the image workflow signs each image with the project's cosign key, never
+  keyless (which would publish to a transparency log) and without a log upload. Once
+  `linux/image/cosign.pub` is in the repository, the image only accepts signed updates of itself
+  (a `sigstoreSigned` policy for `ghcr.io/iamlukethedev/herald-os`).
+- **SELinux** stays permissive for now (ADR-012).
+
 ## Arch Linux (and Omarchy)
 
 Fedora stays the base Herald OS builds and tests on (ADR-017); Arch gets a package.

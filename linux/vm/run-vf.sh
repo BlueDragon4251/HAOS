@@ -4,6 +4,7 @@
 # qcow2 is converted to a raw image on first use; both runners must not use the disk at once).
 #
 #   bash linux/vm/run-vf.sh                 # window on the Mac, SSH via the VM's NAT address
+#   bash linux/vm/run-vf.sh --image herald-os-<v>-aarch64.qcow2   # a built Herald OS image instead
 #   bash linux/vm/run-vf.sh stop|status|console|ip|ssh
 #
 # Guest resolution: GUEST_W x GUEST_H (default 2048x1280). vfkit is downloaded to
@@ -27,6 +28,15 @@ MEM="${MEM:-8192}"
 GUEST_W="${GUEST_W:-2048}"
 GUEST_H="${GUEST_H:-1280}"
 KEY="$BUILD/id_hermes"
+# --image: a Herald OS disk from bootc-image-builder; it sets itself up on the first boot (no cloud-init).
+IMAGE=""
+if [[ "${1:-}" == "--image" ]]; then
+  IMAGE="$(cd "$(dirname "${2:?--image needs a qcow2}")" && pwd)/$(basename "$2")"
+  shift 2
+  QCOW="$IMAGE"
+  RAW="$BUILD/herald-os-image.raw"
+  EFI_STORE="$BUILD/efistore-image.nvram"
+fi
 
 running() {
   [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
@@ -101,7 +111,11 @@ if [[ ! -f "$RAW" ]]; then
   echo "==> Converting $(basename "$QCOW") to raw (sparse) for the Virtualization framework"
   qemu-img convert -p -O raw "$QCOW" "$RAW"
 fi
-[[ -d "$SEED_DIR" ]] || bash "$HERE/make-seed.sh"
+CLOUD_INIT=()
+if [[ -z "$IMAGE" ]]; then
+  [[ -d "$SEED_DIR" ]] || bash "$HERE/make-seed.sh"
+  CLOUD_INIT=(--cloud-init "$SEED_DIR/user-data,$SEED_DIR/meta-data")
+fi
 
 # A stable MAC so the NAT lease (and therefore the IP) survives restarts.
 if [[ ! -f "$BUILD/vf-mac" ]]; then
@@ -115,7 +129,7 @@ perl -e 'use POSIX qw(setsid); setsid(); exec @ARGV or die "exec: $!"' -- "$VFKI
   --cpus "$CPUS" --memory "$MEM" \
   --bootloader "efi,variable-store=$EFI_STORE,create" \
   --device "virtio-blk,path=$RAW" \
-  --cloud-init "$SEED_DIR/user-data,$SEED_DIR/meta-data" \
+  ${CLOUD_INIT[@]+"${CLOUD_INIT[@]}"} \
   --device "virtio-net,nat,mac=$MAC" \
   --device "virtio-gpu,width=$GUEST_W,height=$GUEST_H" \
   --device virtio-input,keyboard \

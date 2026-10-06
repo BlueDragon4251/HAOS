@@ -6,6 +6,8 @@ import {
   type CalendarResult,
   type CatalogGroupView,
   type CatalogResult,
+  type SetupResult,
+  type SetupState,
   type ClipboardEntry,
   type ContextReturn,
   type ContextSnapshot,
@@ -176,6 +178,14 @@ const api = {
     remove: (id: string): Promise<CatalogResult> => ipcRenderer.invoke(IPC.catalogRemove, id),
     /** The models a local server has (for "Use with Hermes"); rejects with what to do when it is not running. */
     localModels: (kind: 'ollama' | 'lmstudio'): Promise<string[]> => ipcRenderer.invoke(IPC.catalogLocalModels, kind)
+  },
+  setup: {
+    /** First-boot setup on the Herald OS image: due or not, the account, the name so far. */
+    state: (): Promise<SetupState> => ipcRenderer.invoke(IPC.setupState),
+    name: (name: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupName, name),
+    password: (password: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupPassword, password),
+    /** `later`: setting it up for someone else, who finishes setup at the next start. */
+    finish: (options: { later?: boolean } = {}): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupFinish, options)
   },
   dictation: {
     /** Type text into the focused app (any app); `copied` when it could only be left on the clipboard. */

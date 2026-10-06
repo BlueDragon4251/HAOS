@@ -1,0 +1,167 @@
+name: Herald OS image
+
+# The Fedora bootc image (ADR-018) per architecture on matching runners, pushed to the repository's
+# GHCR package (private like the repository), joined into one multi-arch tag; then the installer ISO
+# (x86_64) and the VM disk (aarch64) from it. A tag attaches the disks to the draft release; nothing
+# here makes the image, the package or a release public.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      disks:
+        description: Also build the ISO and the VM disk
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/herald-os
+  # Tags are releases (stable); manual runs are edge.
+  CHANNEL: ${{ startsWith(github.ref, 'refs/tags/v') && 'stable' || 'edge' }}
+  # Signing waits for the key (cosign generate-key-pair; the public half goes in linux/image/cosign.pub).
+  SIGNING: ${{ secrets.COSIGN_PRIVATE_KEY != '' && 'true' || 'false' }}
+
+jobs:
+  image:
+    name: Image (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            shell: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            shell: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the shell for this architecture
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq build-essential python3
+          npm run sync-upstream
+          npm ci
+          npm run dist:linux --workspace apps/desktop -- --${{ matrix.shell }}
+          cp apps/desktop/release/herald-os-*-linux-${{ matrix.shell }}.tar.gz herald-os-linux.tar.gz
+      - name: Build the image
+        run: |
+          sudo podman build -f linux/image/Containerfile --build-arg SHELL_TARBALL=herald-os-linux.tar.gz \
+            -t "$IMAGE:$CHANNEL-${{ matrix.arch }}" .
+      - name: Push it
+        run: |
+          echo "${{ github.token }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sudo podman push --digestfile digest.txt "$IMAGE:$CHANNEL-${{ matrix.arch }}"
+      - uses: sigstore/cosign-installer@v3
+        if: env.SIGNING == 'true'
+      - name: Sign it with the project's key
+        if: env.SIGNING == 'true'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          echo "${{ github.token }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # A key, not keyless: no identity or entry goes to the public transparency log.
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY --tlog-upload=false "$IMAGE@$(cat digest.txt)"
+
+  manifest:
+    name: Multi-arch tag
+    needs: image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Join both architectures under one tag
+        run: |
+          echo "${{ github.token }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman manifest create "$IMAGE:$CHANNEL" "$IMAGE:$CHANNEL-amd64" "$IMAGE:$CHANNEL-arm64"
+          podman manifest push --all --digestfile digest.txt "$IMAGE:$CHANNEL" "docker://$IMAGE:$CHANNEL"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            podman manifest push --all "$IMAGE:$CHANNEL" "docker://$IMAGE:${GITHUB_REF_NAME#v}"
+          fi
+      - uses: sigstore/cosign-installer@v3
+        if: env.SIGNING == 'true'
+      - name: Sign the multi-arch tag
+        if: env.SIGNING == 'true'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          echo "${{ github.token }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY --tlog-upload=false "$IMAGE@$(cat digest.txt)"
+
+  disks:
+    name: ${{ matrix.type }} (${{ matrix.arch }})
+    needs: manifest
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.disks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            type: anaconda-iso
+            config: iso.toml
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            type: qcow2
+            config: disk.toml
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the disk with bootc-image-builder
+        run: |
+          echo "${{ github.token }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sudo podman pull "$IMAGE:$CHANNEL-${{ matrix.arch }}"
+          mkdir -p output
+          sudo podman run --rm --privileged --pull=newer --security-opt label=type:unconfined_t \
+            -v ./output:/output -v "./linux/image/${{ matrix.config }}:/config.toml:ro" \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type ${{ matrix.type }} --rootfs btrfs --local "$IMAGE:$CHANNEL-${{ matrix.arch }}"
+      - name: Name, compress and size-check it
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/v* ]] || version="edge-$(git rev-parse --short HEAD)"
+          sudo chown -R "$(id -u)" output
+          if [[ "${{ matrix.type }}" == "anaconda-iso" ]]; then
+            file="herald-os-$version-x86_64.iso"
+            mv output/bootiso/install.iso "$file"
+          else
+            file="herald-os-$version-aarch64.qcow2.zst"
+            zstd -T0 -19 -q output/qcow2/disk.qcow2 -o "$file"
+          fi
+          # GitHub refuses release assets over 2 GiB.
+          size="$(stat -c %s "$file")"
+          echo "$file: $((size / 1024 / 1024)) MiB"
+          if (( size >= 2147483648 )); then
+            echo "::error::$file is $((size / 1024 / 1024)) MiB, over GitHub's 2 GiB release-asset limit"
+            exit 1
+          fi
+          sha256sum "$file" >"$file.sha256"
+          echo "DISK=$file" >>"$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: herald-os-${{ matrix.type }}-${{ matrix.arch }}
+          path: |
+            ${{ env.DISK }}
+            ${{ env.DISK }}.sha256
+          if-no-files-found: error
+      - name: Attach to the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Herald OS $GITHUB_REF_NAME" --notes "Draft written by the release workflow."
+          gh release upload "$GITHUB_REF_NAME" "$DISK" "$DISK.sha256" --clobber

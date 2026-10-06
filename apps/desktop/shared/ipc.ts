@@ -398,6 +398,19 @@ export interface CatalogGroupView {
   entries: CatalogEntryView[]
 }
 
+export interface SetupState {
+  /** The Herald OS image has not been set up by its owner yet. */
+  needed: boolean
+  user: string
+  /** The name Herald greets with (blank until setup asks). */
+  name: string
+}
+
+export interface SetupResult {
+  ok: boolean
+  error?: string
+}
+
 export interface CatalogResult {
   ok: boolean
   /** The last lines of the installer's output. */
@@ -771,6 +784,12 @@ export const IPC = {
   catalogRemove: 'herald-os:catalog:remove',
   /** Models a local server (Ollama, LM Studio) has, for "Use with Hermes". */
   catalogLocalModels: 'herald-os:catalog:local-models',
+
+  /** First-boot setup on the Herald OS image: whether it is due, the name, the password, done. */
+  setupState: 'herald-os:setup:state',
+  setupName: 'herald-os:setup:name',
+  setupPassword: 'herald-os:setup:password',
+  setupFinish: 'herald-os:setup:finish',
 
   /** The events main emitted lately (`HeraldEvent[]`, newest first), for Settings and the agent. */
   eventsRecent: 'herald-os:events:recent',

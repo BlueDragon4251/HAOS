@@ -4,6 +4,26 @@ import { type IncomingNotification, IPC } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
 import type { PanelShell } from './panels.ts'
 
+/**
+ * The session bus address for dbus-next through Node's own sockets. For `unix:path=` addresses
+ * dbus-next prefers the optional `usocket` module when it is installed, and usocket calls
+ * `util.isError`, which current Node no longer has: the first write throws in the main process.
+ * `unix:socket=` (dbus-next's own form) always uses `net`.
+ */
+export function nodeSocketAddress(address: string | undefined): string | undefined {
+  const raw = address?.split(';')[0]?.trim()
+  const uid = process.getuid?.() ?? 1000
+  const path = raw ? /^unix:path=([^,]+)/.exec(raw)?.[1] : `/run/user/${uid}/bus`
+  const abstract = raw ? /^unix:abstract=([^,]+)/.exec(raw)?.[1] : undefined
+
+  if (path) {
+    return `unix:socket=${path}`
+  }
+
+  // Linux abstract sockets: a leading NUL byte in the path, which net understands too.
+  return abstract ? `unix:socket=\u0000${abstract}` : raw
+}
+
 const BUS_NAME = 'org.freedesktop.Notifications'
 const OBJECT_PATH = '/org/freedesktop/Notifications'
 const CONNECT_TIMEOUT_MS = 5000
@@ -146,7 +166,7 @@ export class NotificationDaemon {
     let bus: dbus.MessageBus
 
     try {
-      bus = dbus.sessionBus()
+      bus = dbus.sessionBus({ busAddress: nodeSocketAddress(process.env.DBUS_SESSION_BUS_ADDRESS) })
     } catch (error) {
       log('notifications', `session bus unavailable: ${(error as Error).message}`)
 

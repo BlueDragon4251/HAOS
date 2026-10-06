@@ -47,7 +47,7 @@ export function ensureSpawnHelperExecutable(ptyEntry: string): void {
   }
 }
 
-function loadPty(): PtyModule | null {
+export function loadPty(): PtyModule | null {
   if (ptyModule !== undefined) {
     return ptyModule
   }

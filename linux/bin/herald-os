@@ -91,11 +91,14 @@ COMMANDS: dict[str, str] = {
     "power": "Power menu (sleep, restart, shut down, log out)",
     "webapp-open": "Internal: open a web app window: webapp-open <url> <name>",
     "update-available": "Internal: tell the menu bar how many updates are pending",
-    "channel": "Show or set the update channel: channel [stable|edge]",
+    "channel": "Show or set the update channel: channel [stable|edge] (on the image, the image tag it follows)",
+    "rollback": "The Herald OS image: go back to the previous version on the next start (it stays in the boot menu)",
+    "firmware": "firmware [check|update]: device firmware through fwupd (the BIOS, the dock, the SSD)",
+    "reset": "reset: erase this computer's account, apps and files and start setup again (asks to confirm)",
     "omakase": "Install the curated software set (omakase install | omakase list)",
     "wm": "A window-manager action: wm <niri action> [args] (on Hyprland the same names, or a dispatcher)",
     "omarchy": "omarchy install | remove | status: run Herald OS inside Omarchy (theme hook, menu entry, keys)",
-    "setup": "setup [--yes]: once per user after installing: Hermes Agent and the bridge plugin that lets it use the system",
+    "setup": "setup [--yes]: once per user after installing (Hermes Agent and the bridge plugin) | setup fingerprint | setup fido2",
     "state": "Dump the shell's window-manager state",
     "debug": "Print diagnostics for bug reports",
     "commands": "List commands",
@@ -1139,6 +1142,10 @@ def hermes_command() -> list[str] | None:
 
 def setup(args: list[str]) -> int:
     """Link the bridge plugin into Hermes, turn on its tools, and install Hermes if it is missing."""
+    if args[:1] == ["fingerprint"]:
+        return setup_sign_in("fingerprint")
+    if args[:1] == ["fido2"]:
+        return setup_sign_in("fido2")
     assume_yes = "--yes" in args or "-y" in args
     bridge = next((d for d in BRIDGE_DIRS if (d / "plugin.yaml").exists()), None)
     if not bridge:
@@ -1170,6 +1177,113 @@ def setup(args: list[str]) -> int:
         print("Omarchy: `herald-os omarchy install` adds Herald OS to its menu, theme and keys.")
     print("Start the full session from your login screen (Herald OS), or run herald-os-app inside your desktop.")
     return 0
+
+
+def setup_sign_in(kind: str) -> int:
+    """Fingerprint (fprintd) or a security key (pam-u2f) for the lock screen and sudo."""
+    if not sys.stdin.isatty():
+        die(f"setup {kind} needs a terminal: you touch the sensor or the key while it runs", 2)
+    if kind == "fingerprint":
+        if not shutil.which("fprintd-enroll"):
+            die("fprintd is not installed (sudo dnf install fprintd fprintd-pam, or pacman -S fprintd)", 127)
+        print("Touch the fingerprint sensor several times when asked.")
+        code = subprocess.call(["fprintd-enroll"])
+        feature, pam = "with-fingerprint", "auth sufficient pam_fprintd.so"
+    else:
+        if not shutil.which("pamu2fcfg"):
+            die("pam-u2f is not installed (sudo dnf install pam-u2f pamu2fcfg, or pacman -S pam-u2f)", 127)
+        keys = HOME / ".config" / "Yubico" / "u2f_keys"
+        keys.parent.mkdir(parents=True, exist_ok=True)
+        print("Touch your security key when it blinks.")
+        registration = subprocess.run(["pamu2fcfg"], capture_output=True, text=True)
+        if registration.returncode != 0 or not registration.stdout.strip():
+            die(registration.stderr.strip() or "the key did not register", 1)
+        # One line per user; a second key appends its credential to the same line.
+        line = registration.stdout.strip()
+        existing = keys.read_text().strip() if keys.exists() else ""
+        keys.write_text((existing + line[line.index(":"):] if existing.startswith(line.split(":", 1)[0] + ":") else line) + "\n")
+        keys.chmod(0o600)
+        code = 0
+        feature, pam = "with-pam-u2f", "auth sufficient pam_u2f.so cue"
+    if code != 0:
+        return code
+    if shutil.which("authselect"):
+        # Fedora: one switch turns it on for the lock screen, sudo and the login screen.
+        code = subprocess.call(["sudo", "authselect", "enable-feature", feature])
+        if code == 0:
+            print(f"Done: the lock screen and sudo accept your {'fingerprint' if kind == 'fingerprint' else 'security key'} as well as your password.")
+        return code
+    print(f"Enrolled. To use it for the lock screen and sudo, add this line at the top of /etc/pam.d/system-auth (or swaylock and sudo):\n  {pam}")
+    return 0
+
+
+def is_image() -> bool:
+    """The Herald OS image (bootc): updates replace the whole system and can be undone."""
+    return Path("/run/ostree-booted").exists()
+
+
+def image_switch(channel: str) -> int:
+    """Follow the image tag for a channel (stable for releases, edge for main)."""
+    status = sh(["sudo", "bootc", "status", "--format", "json"], timeout=60)
+    try:
+        current = json.loads(status.stdout)["spec"]["image"]["image"]
+    except (ValueError, KeyError, TypeError):
+        current = "ghcr.io/iamlukethedev/herald-os:stable"
+    target = current.rsplit(":", 1)[0] + f":{channel}"
+    if target == current:
+        return 0
+    print(f"==> following {target}")
+    return subprocess.call(["sudo", "bootc", "switch", target])
+
+
+def rollback() -> int:
+    if not is_image():
+        die("rollback is for the Herald OS image; on this system, use your package manager's history", 2)
+    code = subprocess.call(["sudo", "bootc", "rollback"])
+    if code == 0:
+        notify("Rollback ready", "Restart to use the previous version of Herald OS; this one stays in the boot menu.")
+    return code
+
+
+def firmware(args: list[str]) -> int:
+    if not shutil.which("fwupdmgr"):
+        die("fwupd is not installed (sudo dnf install fwupd)", 127)
+    action = args[0] if args else "check"
+    subprocess.call(["fwupdmgr", "refresh", "--force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if action == "check":
+        result = sh(["fwupdmgr", "get-updates", "--json"], timeout=120)
+        try:
+            devices = [d for d in json.loads(result.stdout or "{}").get("Devices", []) if d.get("Releases")]
+        except ValueError:
+            devices = []
+        if not devices:
+            print("Firmware is up to date")
+            return 0
+        for device in devices:
+            print(f"{device.get('Name')}: {device['Releases'][0].get('Version')} available")
+        return 0
+    if action == "update":
+        # Some updates apply on the next restart; fwupd says which.
+        return subprocess.call(["fwupdmgr", "update", "--assume-yes", "--no-reboot-check"])
+    die("firmware [check|update]", 2)
+    return 2
+
+
+RESET_HELPER = Path("/usr/libexec/herald-os/reset-helper")
+
+
+def reset(args: list[str]) -> int:
+    if not RESET_HELPER.exists():
+        die("reset is for the Herald OS image", 2)
+    if not sys.stdin.isatty():
+        die("reset needs a terminal: it asks you to confirm and for your password", 2)
+    user = os.environ.get("USER", "")
+    print(f"This erases {user}'s files, apps and settings on this computer, then restarts into setup.")
+    print("Herald OS itself stays. Back up anything you want to keep first.")
+    if input("Type ERASE to continue: ").strip() != "ERASE":
+        print("Nothing was changed.")
+        return 1
+    return subprocess.call(["sudo", str(RESET_HELPER), "schedule", user])
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1340,8 +1454,16 @@ def main(argv: list[str]) -> int:
                 die("channel stable|edge", 2)
             CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             marker.write_text(args[0] + "\n")
+            if is_image() and image_switch(args[0]) != 0:
+                die("could not switch the image's channel (bootc switch)", 1)
         print(marker.read_text().strip() if marker.exists() else "stable")
         return 0
+    if cmd == "rollback":
+        return rollback()
+    if cmd == "firmware":
+        return firmware(args)
+    if cmd == "reset":
+        return reset(args)
     if cmd == "omakase":
         tool = shutil.which("herald-os-omakase")
         if not tool:

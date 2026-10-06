@@ -14,6 +14,8 @@ import {
   IconCloud,
   IconCoffee,
   IconColorPicker,
+  IconCpu,
+  IconHistory,
   IconDeviceDesktop,
   IconDownload,
   IconFolder,
@@ -203,7 +205,12 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
       label: 'Update',
       hint: 'Herald OS',
       icon: IconRefresh,
-      children: [{ id: 'update-herald-os', label: 'Herald OS', hint: 'The shell, system packages, apps and Hermes', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } }]
+      children: [
+        { id: 'update-herald-os', label: 'Herald OS', hint: 'The shell, system packages, apps and Hermes', icon: IconRefresh, leaf: { kind: 'cli', argv: ['update'] } },
+        { id: 'update-firmware-check', label: 'Firmware', hint: 'Check the BIOS, docks and drives (fwupd)', icon: IconCpu, leaf: { kind: 'cli', argv: ['firmware', 'check'] } },
+        { id: 'update-firmware', label: 'Install firmware updates', hint: 'Some finish on the next restart', icon: IconCpu, leaf: { kind: 'cli', argv: ['firmware', 'update'] } },
+        { id: 'update-rollback', label: 'Go back to the previous version', hint: 'The Herald OS image; it applies on restart', icon: IconHistory, leaf: { kind: 'cli', argv: ['rollback'] } }
+      ]
     },
     {
       id: 'style',

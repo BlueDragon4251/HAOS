@@ -17,6 +17,7 @@ import { drawWallpaperFrame, tintFor } from '../Wallpaper.tsx'
 import { HermesLoginCard } from '../../features/auth/HermesLoginCard.tsx'
 import { ActionHud, OsHighlighter } from '../../features/voice/ActionHud.tsx'
 import { VoiceOrb } from '../../features/voice/VoiceOrb.tsx'
+import { FirstRunSetup } from '../../features/setup/FirstRunSetup.tsx'
 
 const ApplicationsOverlay = lazy(() => import('../../features/applications/ApplicationsOverlay.tsx').then(m => ({ default: m.ApplicationsOverlay })))
 
@@ -105,6 +106,7 @@ export function MainSurface() {
         <ActionHud offsetClass="top-4" />
         <OsHighlighter />
         <HermesLoginCard />
+        <FirstRunSetup />
         <RequestHost />
         <Toasts />
         <NotificationsPanel />

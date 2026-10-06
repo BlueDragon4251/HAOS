@@ -15,6 +15,14 @@ step is a deliberate decision.
    images build, then boot the qcow2 with `linux/vm/run-qemu.sh --image`.
 4. **History and secrets.** `bash scripts/check-secrets.sh` on the full history; no personal names,
    work email or private screenshots anywhere (README images, docs, commits).
+5. **Image signing key.** `cosign generate-key-pair`; add `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD`
+   as repository secrets and commit `cosign.pub` as `linux/image/cosign.pub` (images built after
+   that only accept signed updates). Keep the private key and its password out of the repository.
+6. **The Arch package.** Run the Arch package workflow; fill `sha256sums` in
+   `packaging/arch/herald-os-bin/PKGBUILD` from the release's `.sha256` files (`updpkgsums`), and
+   generate each `.SRCINFO` with `makepkg --printsrcinfo`.
+7. **An Omarchy test.** On an Omarchy VM: install the package, `herald-os setup`, `herald-os omarchy
+   install`, and check the theme hook, the menu entry (Omarchy's menu extension format) and the keys.
 
 ## Launch day
 
