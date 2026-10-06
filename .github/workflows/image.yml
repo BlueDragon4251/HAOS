@@ -130,7 +130,7 @@ jobs:
             -v /var/lib/containers/storage:/var/lib/containers/storage \
             quay.io/centos-bootc/bootc-image-builder:latest \
             --type ${{ matrix.type }} --rootfs btrfs --local "$IMAGE:$CHANNEL-${{ matrix.arch }}"
-      - name: Name, compress and size-check it
+      - name: Name, compress and split it
         run: |
           version="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF" == refs/tags/v* ]] || version="edge-$(git rev-parse --short HEAD)"
@@ -142,21 +142,21 @@ jobs:
             file="herald-os-$version-aarch64.qcow2.zst"
             zstd -T0 -19 -q output/qcow2/disk.qcow2 -o "$file"
           fi
-          # GitHub refuses release assets over 2 GiB.
+          sha256sum "$file" >"$file.sha256"
           size="$(stat -c %s "$file")"
           echo "$file: $((size / 1024 / 1024)) MiB"
+          # GitHub refuses release assets of 2 GiB or more, so a bigger disk goes up in parts
+          # (.part0, .part1, …) that cat joins again; the .sha256 is the whole file's.
           if (( size >= 2147483648 )); then
-            echo "::error::$file is $((size / 1024 / 1024)) MiB, over GitHub's 2 GiB release-asset limit"
-            exit 1
+            split -b 1900M -d -a 1 "$file" "$file.part"
+            rm "$file"
           fi
-          sha256sum "$file" >"$file.sha256"
+          ls -l "$file"*
           echo "DISK=$file" >>"$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
           name: herald-os-${{ matrix.type }}-${{ matrix.arch }}
-          path: |
-            ${{ env.DISK }}
-            ${{ env.DISK }}.sha256
+          path: ${{ env.DISK }}*
           if-no-files-found: error
       - name: Attach to the draft release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -164,4 +164,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Herald OS $GITHUB_REF_NAME" --notes "Draft written by the release workflow."
-          gh release upload "$GITHUB_REF_NAME" "$DISK" "$DISK.sha256" --clobber
+          gh release upload "$GITHUB_REF_NAME" "$DISK"* --clobber

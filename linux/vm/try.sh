@@ -14,14 +14,22 @@ mkdir -p "$BUILD"
 disk="${1:-}"
 if [[ -z "$disk" ]]; then
   echo "==> Finding the latest Herald OS VM disk"
-  url="$(curl -fsSL https://api.github.com/repos/iamlukethedev/Herald-OS/releases/latest |
-    grep -o '"browser_download_url": *"[^"]*-aarch64\.qcow2\.zst"' | sed 's/.*"\(https[^"]*\)"/\1/' | head -n 1)"
-  [[ -n "$url" ]] || { echo "try.sh: the latest release has no VM disk; pass one you have" >&2; exit 1; }
-  disk="$BUILD/$(basename "$url")"
+  # The disk is over GitHub's 2 GiB limit for one file, so it may come in parts (.part0, .part1, …).
+  urls="$(curl -fsSL https://api.github.com/repos/iamlukethedev/Herald-OS/releases/latest |
+    grep -E -o '"browser_download_url": *"[^"]*-aarch64\.qcow2\.zst(\.part[0-9]+)?"' | sed 's/.*"\(https[^"]*\)"/\1/' | sort)"
+  [[ -n "$urls" ]] || { echo "try.sh: the latest release has no VM disk; pass one you have" >&2; exit 1; }
+  name="$(basename "$(head -n 1 <<<"$urls")")"
+  disk="$BUILD/${name%.part*}"
   if [[ ! -f "$disk" ]]; then
-    echo "==> Downloading $(basename "$url")"
-    curl -fL --progress-bar "$url" -o "$disk.part"
-    mv "$disk.part" "$disk"
+    pieces=()
+    for url in $urls; do
+      echo "==> Downloading $(basename "$url")"
+      curl -fL --progress-bar -C - "$url" -o "$BUILD/$(basename "$url").download"
+      pieces+=("$BUILD/$(basename "$url").download")
+    done
+    cat "${pieces[@]}" >"$disk.joining"
+    rm -f "${pieces[@]}"
+    mv "$disk.joining" "$disk"
   fi
 fi
 if [[ "$disk" == *.zst ]]; then

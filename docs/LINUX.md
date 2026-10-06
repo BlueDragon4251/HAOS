@@ -223,6 +223,9 @@ builds it for x86_64 and aarch64 on matching runners, pushes it to the repositor
   or `bash linux/vm/run-vf.sh --image <disk>` boot it, and `bash linux/vm/try.sh` fetches the latest
   release's disk and boots it in one command.
 
+Both are bigger than the 2 GiB GitHub takes for one release file, so they go up in parts (`.part0`,
+`.part1`) that `cat` joins again; the `.sha256` is the joined file's. `try.sh` joins them itself.
+
 On the image, apps install through Flatpak or into `~/.local` (the catalog picks those methods
 there); the system itself changes only by a whole new image.
 

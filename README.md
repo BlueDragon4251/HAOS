@@ -82,9 +82,18 @@ about the screen, typing an emoji into another app, or talking to Hermes.
 The whole operating system, for a 64-bit Intel or AMD PC: Fedora underneath, everything you see is
 Herald.
 
-1. Download `herald-os-<version>-x86_64.iso` from the
-   [releases page](https://github.com/iamlukethedev/Herald-OS/releases).
-2. Write it to a USB stick of 4 GB or more with
+1. Download both parts of the installer from the
+   [releases page](https://github.com/iamlukethedev/Herald-OS/releases),
+   `herald-os-<version>-x86_64.iso.part0` and `.part1` (GitHub takes files of up to 2 GB), and join
+   them. On macOS or Linux:
+
+   ```bash
+   cat herald-os-<version>-x86_64.iso.part* > herald-os-<version>-x86_64.iso
+   shasum -a 256 -c herald-os-<version>-x86_64.iso.sha256    # sha256sum -c on Linux
+   ```
+
+   On Windows: `copy /b herald-os-<version>-x86_64.iso.part0 + herald-os-<version>-x86_64.iso.part1 herald-os-<version>-x86_64.iso`.
+2. Write the ISO to a USB stick of 8 GB or more with
    [Fedora Media Writer](https://fedoraproject.org/workstation/download) or
    [balenaEtcher](https://etcher.balena.io).
 3. Start the PC from the stick and follow the installer. Its disk screen lets you erase the disk or
@@ -140,8 +149,8 @@ herald-os-app          # Herald OS as an app inside your desktop
 
 ### The whole OS in a virtual machine
 
-On an Apple Silicon Mac, one command downloads the latest release's VM disk (about 2 GB) and boots
-it with Apple's virtualization, so the graphics are accelerated:
+On an Apple Silicon Mac, one command downloads the latest release's VM disk (about 2.7 GB) and
+boots it with Apple's virtualization, so the graphics are accelerated:
 
 ```bash
 brew install qemu zstd
@@ -149,10 +158,11 @@ git clone https://github.com/iamlukethedev/Herald-OS.git && cd Herald-OS
 bash linux/vm/try.sh
 ```
 
-The first start sets itself up in a few minutes, Hermes Agent included. The disk,
-`herald-os-<version>-aarch64.qcow2.zst` on the releases page, also imports into
-[UTM](https://mac.getutm.app). To build the VM from your checkout instead and work on Herald OS
-Linux, see [Building from source](#herald-os-linux-in-a-virtual-machine).
+The first start sets itself up in a few minutes, Hermes Agent included. The disk is also on the
+releases page in two parts, `herald-os-<version>-aarch64.qcow2.zst.part0` and `.part1`: join them
+with `cat`, unpack with `zstd -d`, and it imports into [UTM](https://mac.getutm.app). To build the VM
+from your checkout instead and work on Herald OS Linux, see
+[Building from source](#herald-os-linux-in-a-virtual-machine).
 
 ## How Herald OS fits together
 
