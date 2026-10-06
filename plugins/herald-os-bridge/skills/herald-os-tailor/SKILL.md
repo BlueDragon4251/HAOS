@@ -208,8 +208,12 @@ niri lets a later bind replace an earlier one. To switch a key off, bind it to n
 binds the same key twice.
 
 Inside Omarchy (Herald OS as an app on Hyprland), Herald's keys are in
-`~/.config/hypr/herald-os.conf`, which `herald-os omarchy install` rewrites. Change them in the
-person's own Hyprland config instead: `unbind = SUPER ALT, H`, then their own `bind = …` line.
+`~/.config/hypr/herald-os.lua` on Omarchy 4 (`herald-os.conf` on Omarchy 3), which
+`herald-os omarchy install` rewrites. Change them in the person's own Hyprland config instead: on
+Omarchy 4, below the `require("hypr.herald-os")` line at the end of `~/.config/hypr/hyprland.lua`
+(it has to run after Herald's), `hl.unbind("SUPER + ALT + H")` and then their own
+`o.bind("KEYS", "description", "command")`; on Omarchy 3, `unbind = SUPER ALT, H` and then their
+own `bind = …` line. Check the result with `hyprctl configerrors` after `hyprctl reload`.
 
 ## Routines
 

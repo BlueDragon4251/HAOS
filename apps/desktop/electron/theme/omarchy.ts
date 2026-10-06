@@ -4,17 +4,25 @@ import path from 'node:path'
 import { isHexColor, mix, schemeOf, type ThemeColors, type ThemeSpec, themeSlug } from '../../shared/theme.ts'
 
 /*
- * Herald inside Omarchy follows Omarchy's theme: the active one is ~/.config/omarchy/current/theme
- * (a link to the theme's folder), whose colors.toml (or, in older themes, alacritty.toml) holds the
- * palette. Omarchy runs `herald-os theme omarchy` from its theme-set hook when the theme changes.
+ * Herald inside Omarchy follows Omarchy's theme: the active one is linked as current/theme (in
+ * ~/.local/state/omarchy on Omarchy 4, ~/.config/omarchy on Omarchy 3), and its colors.toml (or,
+ * in older themes, alacritty.toml) holds the palette. Omarchy runs `herald-os theme omarchy` from
+ * its theme-set hook when the theme changes.
  */
 
 export function omarchyDir(home = os.homedir()): string {
   return path.join(home, '.config', 'omarchy')
 }
 
-export function isOmarchy(home = os.homedir()): boolean {
-  return fs.existsSync(path.join(home, '.local', 'share', 'omarchy')) || fs.existsSync(path.join(omarchyDir(home), 'current', 'theme'))
+/** Where Omarchy links the active theme and background: Omarchy 4 first, then Omarchy 3. */
+export function omarchyCurrentDirs(home = os.homedir()): string[] {
+  return [path.join(home, '.local', 'state', 'omarchy', 'current'), path.join(omarchyDir(home), 'current')]
+}
+
+export function isOmarchy(home = os.homedir(), env: NodeJS.ProcessEnv = process.env): boolean {
+  const roots = [env.OMARCHY_PATH, '/usr/share/omarchy', path.join(home, '.local', 'share', 'omarchy')].filter((root): root is string => Boolean(root))
+
+  return roots.some(root => fs.existsSync(path.join(root, 'themes'))) || omarchyCurrentDirs(home).some(dir => fs.existsSync(path.join(dir, 'theme')))
 }
 
 /** `key = "value"` pairs from a TOML file, keyed both plainly and by section (`colors.primary.background`). */
@@ -73,13 +81,28 @@ export function themeColorsFromOmarchy(values: Record<string, string>): ThemeCol
   }
 }
 
+/** Omarchy 4 stages a copy of the theme as current/theme and writes its name beside it; Omarchy 3 links the theme's own folder. */
+function themeName(current: string, dir: string): string {
+  try {
+    const name = fs.readFileSync(path.join(current, 'theme.name'), 'utf8').trim()
+
+    if (name) {
+      return name
+    }
+  } catch {
+    // Omarchy 3.
+  }
+
+  return path.basename(dir)
+}
+
 /** The active Omarchy theme as a Herald theme, with Omarchy's background as the wallpaper. */
 export function readOmarchyTheme(home = os.homedir()): { spec: ThemeSpec; dir: string } | null {
-  const link = path.join(omarchyDir(home), 'current', 'theme')
+  const current = omarchyCurrentDirs(home).find(base => fs.existsSync(path.join(base, 'theme')))
   let dir: string
 
   try {
-    dir = fs.realpathSync(link)
+    dir = fs.realpathSync(path.join(current ?? '', 'theme'))
   } catch {
     return null
   }
@@ -99,11 +122,11 @@ export function readOmarchyTheme(home = os.homedir()): { spec: ThemeSpec; dir: s
       continue
     }
 
-    const name = path.basename(dir)
+    const name = themeName(current ?? '', dir)
     let wallpaper: string | undefined
 
     try {
-      wallpaper = fs.realpathSync(path.join(omarchyDir(home), 'current', 'background'))
+      wallpaper = fs.realpathSync(path.join(current ?? '', 'background'))
     } catch {
       wallpaper = undefined
     }

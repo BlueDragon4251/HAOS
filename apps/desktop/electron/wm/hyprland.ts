@@ -18,6 +18,8 @@ export class HyprlandClient implements Compositor {
   private listeners = new Set<(state: WmState) => void>()
   private stopped = false
   private refreshTimer: NodeJS.Timeout | null = null
+  /** Whether this Hyprland takes Lua dispatchers; unknown until one works. */
+  private lua: boolean | null = null
 
   get available(): boolean {
     return this.socket !== null
@@ -72,9 +74,45 @@ export class HyprlandClient implements Compositor {
       return
     }
 
+    if (action.type === 'raw') {
+      return this.raw(action.args)
+    }
+
+    // A Lua config (Hyprland 0.55+, Omarchy 4) takes only Lua dispatchers; hyprland.conf only the
+    // classic ones. Neither form does anything under the other, so trying Lua first is safe.
+    if (this.lua !== false) {
+      try {
+        for (const expression of dispatchLua(action)) {
+          await this.raw([expression])
+        }
+
+        this.lua = true
+
+        return
+      } catch (error) {
+        if (this.lua) {
+          throw error
+        }
+
+        try {
+          await this.classic(action)
+        } catch {
+          throw error
+        }
+
+        return
+      }
+    }
+
+    await this.classic(action)
+  }
+
+  private async classic(action: WmAction): Promise<void> {
     for (const args of dispatchArgs(action)) {
       await this.raw(args)
     }
+
+    this.lua = false
   }
 
   raw(args: string[]): Promise<void> {
@@ -287,7 +325,7 @@ export function toState(clients: unknown, workspaces: unknown, monitors: unknown
   const monitorList = Array.isArray(monitors) ? (monitors as HyprMonitor[]) : []
   const activeIds = new Map(monitorList.map(monitor => [monitor.activeWorkspace?.id, monitor]))
   const windows: WmWindow[] = (Array.isArray(clients) ? (clients as HyprClient[]) : [])
-    .filter(client => client.mapped !== false && !client.hidden && (client.workspace?.id ?? 0) > 0)
+    .filter(client => client.mapped !== false && !client.hidden && client.workspace?.id !== undefined && !isSpecial(client.workspace))
     .map(client => {
       const id = addressToId(client.address) ?? 0
 
@@ -306,14 +344,15 @@ export function toState(clients: unknown, workspaces: unknown, monitors: unknown
     .filter(window => window.id > 0)
     .sort((a, b) => a.id - b.id)
   const spaces: WmWorkspace[] = (Array.isArray(workspaces) ? (workspaces as HyprWorkspace[]) : [])
-    // Special (scratchpad) workspaces have negative ids.
-    .filter(space => typeof space.id === 'number' && space.id > 0)
+    .filter(space => typeof space.id === 'number' && !isSpecial(space))
     .map(space => {
       const monitor = activeIds.get(space.id)
+      const id = space.id as number
 
       return {
-        id: space.id as number,
-        idx: space.id as number,
+        id,
+        // Named workspaces count down from -1337; they go after the numbered ones, oldest first.
+        idx: id > 0 ? id : 1000 - id,
         name: space.name && space.name !== String(space.id) ? space.name : null,
         output: space.monitor ?? null,
         active: Boolean(monitor),
@@ -326,9 +365,52 @@ export function toState(clients: unknown, workspaces: unknown, monitors: unknown
   return { available: true, windows, workspaces: spaces, focusedWindowId: windows.some(w => w.id === focusedId) ? focusedId : null }
 }
 
+/** Scratchpads (`special:…`), which Herald leaves alone. Named workspaces have negative ids too. */
+function isSpecial(space: { id?: number; name?: string }): boolean {
+  return (space.name ?? '').startsWith('special:')
+}
+
 /** A workspace by number, or by name (Herald's Spaces are named). */
 function workspaceRef(ref: string | number): string {
   return /^\d+$/.test(String(ref)) ? String(ref) : `name:${ref}`
+}
+
+/** A Lua string literal (pure). */
+export function luaString(text: string): string {
+  return `"${text
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/[\u0000-\u001f]/g, '')}"`
+}
+
+/** The same actions as Lua dispatchers, for Hyprland's Lua config (pure; tested). */
+export function dispatchLua(action: WmAction): string[] {
+  const window = (id: number) => `window = ${luaString(idToAddress(id))}`
+  const workspace = (ref: string | number) => `workspace = ${luaString(workspaceRef(ref))}`
+
+  switch (action.type) {
+    case 'focus-window':
+      return [`hl.dsp.focus({ ${window(action.id)} })`]
+    case 'close-window':
+      return [`hl.dsp.window.close({ ${window(action.id)} })`]
+    case 'focus-workspace':
+      return [`hl.dsp.focus({ ${workspace(action.ref)} })`]
+    case 'move-window-to-workspace':
+      return [`hl.dsp.window.move({ ${workspace(action.ref)}, ${window(action.id)}, follow = false })`]
+    case 'toggle-floating':
+      return [`hl.dsp.window.float({ action = "toggle", ${window(action.id)} })`]
+    case 'fullscreen':
+      return [`hl.dsp.focus({ ${window(action.id)} })`, 'hl.dsp.window.fullscreen({ mode = "fullscreen" })']
+    case 'maximize-column':
+      return ['hl.dsp.window.fullscreen({ mode = "maximized" })']
+    case 'toggle-overview':
+      return ['hl.dsp.exec_cmd("herald-os applications")']
+    case 'screenshot':
+      return []
+    case 'raw':
+      return [action.args.join(' ')]
+  }
 }
 
 /** `hyprctl dispatch` argument lists for a shell action (pure; tested). */

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseTomlStrings, readOmarchyTheme, themeColorsFromOmarchy } from './omarchy.ts'
+import { isOmarchy, parseTomlStrings, readOmarchyTheme, themeColorsFromOmarchy } from './omarchy.ts'
 
 const ALACRITTY = `
 [colors.primary]
@@ -64,6 +64,20 @@ describe('readOmarchyTheme', () => {
     expect(found?.spec.colors.bg).toBe('#1a1b26')
     expect(found?.spec.wallpaper).toBe(fs.realpathSync(path.join(theme, 'wall.png')))
     expect(readOmarchyTheme(path.join(home, 'nobody'))).toBeNull()
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('reads Omarchy 4, which stages the theme under ~/.local/state and names it in theme.name', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omarchy-'))
+    const current = path.join(home, '.local', 'state', 'omarchy', 'current')
+    fs.mkdirSync(path.join(current, 'theme'), { recursive: true })
+    fs.writeFileSync(path.join(current, 'theme', 'colors.toml'), 'background = "#191724"\nforeground = "#e0def4"\naccent = "#c4a7e7"\n')
+    fs.writeFileSync(path.join(current, 'theme.name'), 'rose-pine\n')
+
+    expect(readOmarchyTheme(home)?.spec.name).toBe('omarchy-rose-pine')
+    expect(readOmarchyTheme(home)?.spec.colors.accent).toBe('#c4a7e7')
+    expect(isOmarchy(home, {})).toBe(true)
+    expect(isOmarchy(path.join(home, 'nobody'), {})).toBe(false)
     fs.rmSync(home, { recursive: true, force: true })
   })
 })

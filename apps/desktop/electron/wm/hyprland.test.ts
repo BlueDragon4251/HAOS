@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { detectCompositor } from './compositor.ts'
-import { addressToId, dispatchArgs, idToAddress, parseEvent, toState } from './hyprland.ts'
+import { addressToId, dispatchArgs, dispatchLua, idToAddress, luaString, parseEvent, toState } from './hyprland.ts'
 
 describe('detectCompositor', () => {
   it('reads the socket each compositor advertises', () => {
@@ -75,5 +75,36 @@ describe('dispatchArgs', () => {
     expect(dispatchArgs({ type: 'move-window-to-workspace', id: 0x20, ref: 'ideas' })).toEqual([['movetoworkspacesilent', 'name:ideas,address:0x20']])
     expect(dispatchArgs({ type: 'fullscreen', id: 0x20 })).toEqual([['focuswindow', 'address:0x20'], ['fullscreen', '0']])
     expect(dispatchArgs({ type: 'raw', args: ['exec', 'kitty'] })).toEqual([['exec', 'kitty']])
+  })
+
+  it('has a Lua form of each for a Lua config', () => {
+    expect(dispatchLua({ type: 'focus-workspace', ref: 'work' })).toEqual(['hl.dsp.focus({ workspace = "name:work" })'])
+    expect(dispatchLua({ type: 'move-window-to-workspace', id: 0x20, ref: 3 })).toEqual([
+      'hl.dsp.window.move({ workspace = "3", window = "address:0x20", follow = false })'
+    ])
+    expect(dispatchLua({ type: 'fullscreen', id: 0x20 })).toEqual(['hl.dsp.focus({ window = "address:0x20" })', 'hl.dsp.window.fullscreen({ mode = "fullscreen" })'])
+    expect(dispatchLua({ type: 'toggle-floating', id: 0x20 })).toEqual(['hl.dsp.window.float({ action = "toggle", window = "address:0x20" })'])
+  })
+
+  it('keeps a Space name a single Lua string', () => {
+    expect(luaString('Ideas "2"\\\n')).toBe('"Ideas \\"2\\"\\\\\\n"')
+    expect(dispatchLua({ type: 'focus-workspace', ref: 'a") os.exit() --' })).toEqual(['hl.dsp.focus({ workspace = "name:a\\") os.exit() --" })'])
+  })
+})
+
+describe('named workspaces', () => {
+  it('keeps them, after the numbered ones, and leaves scratchpads out', () => {
+    const clients = [{ address: '0x50', mapped: true, title: 'Notes', class: 'obsidian', pid: 5, workspace: { id: -1337, name: 'Ideas' } }]
+    const workspaces = [
+      { id: -1337, name: 'Ideas', monitor: 'eDP-1', lastwindow: '0x50' },
+      { id: 1, name: '1', monitor: 'eDP-1' },
+      { id: -98, name: 'special:scratchpad', monitor: 'eDP-1' }
+    ]
+    const state = toState(clients, workspaces, [{ name: 'eDP-1', focused: true, activeWorkspace: { id: -1337 } }], { address: '0x50' }, 1)
+    expect(state.workspaces.map(space => [space.id, space.name, space.focused])).toEqual([
+      [1, null, false],
+      [-1337, 'Ideas', true]
+    ])
+    expect(state.windows.map(w => [w.id, w.workspaceId])).toEqual([[0x50, -1337]])
   })
 })

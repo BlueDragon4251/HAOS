@@ -246,8 +246,8 @@ its apps and saved networks on the next restart and runs setup again; the system
 - **Sign-in:** `herald-os setup fingerprint` (fprintd) and `herald-os setup fido2` (a security key,
   pam-u2f) enrol it and turn it on for the lock screen and sudo: through authselect on Fedora and
   the image, by adding the rule to `/etc/pam.d/sudo` and `/etc/pam.d/swaylock` on Arch (each file
-  keeps a `.herald-os.bak` copy), and through Omarchy's own `omarchy-setup-fingerprint` and
-  `omarchy-setup-fido2` on Omarchy.
+  keeps a `.herald-os.bak` copy), and through Omarchy's own `omarchy-setup-security-fingerprint` and
+  `omarchy-setup-security-fido2` on Omarchy.
 - **Firmware:** `herald-os firmware check|update` (fwupd), also in the menu under Update.
 - **Image signatures:** the image workflow signs each image with the project's cosign key, never
   keyless (which would publish to a transparency log) and without a log upload. Once
@@ -280,22 +280,36 @@ Herald OS also runs as an app inside another compositor: `herald-os-app` starts 
 shell (fullscreen, as on macOS) and leaves the compositor's bar, keys and window rules alone. The
 shell finds the compositor from `NIRI_SOCKET` or `HYPRLAND_INSTANCE_SIGNATURE`; on Hyprland it mirrors
 windows through `hyprctl -j` and the event socket, so "ask about this window" works, and `herald-os
-wm` maps niri's action names to Hyprland dispatchers. The `herald-os` CLI reaches the one window
-through the same control socket the niri session uses, so every `herald-os` command works as a key.
+wm` maps niri's action names to Hyprland dispatchers: Lua ones (`hl.dsp.…`) for a Lua config
+(Hyprland 0.55 and later, as on Omarchy 4), the classic ones for `hyprland.conf`. The `herald-os` CLI
+reaches the one window through the same control socket the niri session uses, so every `herald-os`
+command works as a key.
 
-On Omarchy, `herald-os omarchy install` sets the rest up, and `herald-os omarchy remove` takes it out:
+On Omarchy, `herald-os omarchy install` sets the rest up, and `herald-os omarchy remove` takes it out
+again. It handles Omarchy 4 (the package in `/usr/share/omarchy`, a Lua Hyprland config, state in
+`~/.local/state/omarchy`) and Omarchy 3 (the checkout in `~/.local/share/omarchy`, `hyprland.conf`):
 
 - **Theme:** a hook in `~/.config/omarchy/hooks/theme-set.d/` runs `herald-os theme omarchy` when the
-  Omarchy theme changes, and Herald reads that theme's `colors.toml` (or `alacritty.toml`) and its
-  background. Herald's `theme list`, `set` and `current` hand off to Omarchy's commands there.
-- **Menu:** an entry in `~/.config/omarchy/extensions/omarchy-menu.jsonc`.
-- **Keys:** one chord, `Super+Alt+H`, then Return (open Herald OS), A (ask), C (command bar),
-  V (voice), X (dictate), E (emoji) or M (Missions), from `~/.config/hypr/herald-os.conf`.
+  Omarchy theme changes (Omarchy 4 runs that folder itself; on Omarchy 3 a small `theme-set` hook
+  does), and Herald takes the theme's colours from its `colors.toml` (or `alacritty.toml`) and its
+  background as the wallpaper. Herald's `theme list`, `set` and `current` hand off to Omarchy there.
+- **Menu:** on Omarchy 4, a "Herald OS" row on the Omarchy menu, from
+  `~/.config/omarchy/extensions/omarchy-menu.jsonc`. On Omarchy 3, Herald is in Applications.
+- **Keys:** on Omarchy 4, `Super+Alt+H` opens Herald OS and `Super+Alt+` A (ask about this window),
+  C (command bar), V (voice), X (dictate), E (emoji) and M (Missions) do the rest, from
+  `~/.config/hypr/herald-os.lua`, none of them taken by Omarchy. On Omarchy 3, the same keys come one
+  after `Super+Alt+H` (Return opens Herald OS), from `~/.config/hypr/herald-os.conf`.
+- **Sign-in:** `herald-os setup fingerprint` and `setup fido2` run Omarchy's own
+  `omarchy-setup-security-fingerprint` and `omarchy-setup-security-fido2`.
 - **Updates and installs:** `herald-os update` leaves the system to `omarchy-update` and catalog
   installs go through `omarchy-pkg-add` and the AUR helper Omarchy ships.
 
-Files that already exist (a `theme-set` hook, a menu file) are never overwritten; the command prints
-the line to add instead.
+Files that already exist (a `theme-set` hook, a menu file that isn't Omarchy 4's object of entries)
+are never overwritten; the command prints the line to add instead.
+
+This has been tested under Hyprland 0.56 with Omarchy 4's own config, theme scripts
+(`omarchy-theme-set`, `omarchy-hook`) and menu parser, including real key presses, but not yet on an
+Omarchy install on real hardware. Reports are welcome.
 
 **Sharing a Hermes home.** Omarchy's Hermes Desktop owns `~/.hermes` and runs its own backend and
 messaging gateway. A second backend from Herald is safe (Hermes takes a lock for every cron tick and

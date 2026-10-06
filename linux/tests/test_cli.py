@@ -2,6 +2,9 @@
 
 import importlib.machinery
 import importlib.util
+import json
+import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -67,22 +70,41 @@ def test_weather_url_for_a_place_or_the_network():
     assert cli.weather_url("a/b?c#d").startswith("https://wttr.in/a%2Fb%3Fc%23d?")
 
 
-def test_wm_maps_niri_actions_to_hyprland_dispatchers(monkeypatch):
+def fake_hyprctl(monkeypatch, lua_config):
+    """hyprctl that takes only Lua dispatchers (a Lua config) or only classic ones (hyprland.conf)."""
     calls = []
     monkeypatch.setenv("HYPRLAND_INSTANCE_SIGNATURE", "abc")
     monkeypatch.delenv("NIRI_SOCKET", raising=False)
     monkeypatch.setattr(cli.shutil, "which", lambda name: f"/usr/bin/{name}")
-    monkeypatch.setattr(cli.subprocess, "call", lambda argv: calls.append(argv) or 0)
-    cli.wm("close-window")
-    cli.wm("focus-workspace", "work")
-    cli.wm("focus-workspace", "3")
-    cli.wm("exec", "kitty")
-    assert calls == [
-        ["hyprctl", "dispatch", "killactive"],
-        ["hyprctl", "dispatch", "workspace", "name:work"],
-        ["hyprctl", "dispatch", "workspace", "3"],
-        ["hyprctl", "dispatch", "exec", "kitty"],
+
+    def run(argv, **kwargs):
+        calls.append(argv[2:])
+        works = argv[2].startswith("hl.") == lua_config
+        return subprocess.CompletedProcess(argv, 0 if works else 7, "ok\n" if works else "error: no such dispatcher\n", "")
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    return calls
+
+
+def test_wm_maps_niri_actions_to_hyprland_dispatchers(monkeypatch):
+    calls = fake_hyprctl(monkeypatch, lua_config=False)
+    for action in (["close-window"], ["focus-workspace", "work"], ["focus-workspace", "3"], ["exec", "kitty"]):
+        assert cli.wm(*action) == 0
+    assert [call for call in calls if not call[0].startswith("hl.")] == [
+        ["killactive"],
+        ["workspace", "name:work"],
+        ["workspace", "3"],
+        ["exec", "kitty"],
     ]
+
+
+def test_wm_speaks_lua_to_a_lua_config(monkeypatch, capsys):
+    calls = fake_hyprctl(monkeypatch, lua_config=True)
+    assert cli.wm("close-window") == 0 and cli.wm("focus-workspace", "work") == 0 and cli.wm("exec", "kitty --class a") == 0
+    assert calls == [["hl.dsp.window.close()"], ['hl.dsp.focus({ workspace = "name:work" })'], ['hl.dsp.exec_cmd("kitty --class a")']]
+    # A classic-only dispatcher fails with what Hyprland said.
+    assert cli.wm("togglesplit") == 1 and "no such dispatcher" in capsys.readouterr().err
+    assert cli.lua_string('a"b\\') == '"a\\"b\\\\"'
 
 
 def test_wm_uses_niri_under_niri(monkeypatch):
@@ -94,23 +116,93 @@ def test_wm_uses_niri_under_niri(monkeypatch):
     assert calls == [["niri", "msg", "action", "close-window"]]
 
 
-def omarchy_home(tmp_path, monkeypatch):
+def omarchy_home(tmp_path, monkeypatch, version=3):
+    """A home with Omarchy 3 (a checkout, hyprland.conf) or Omarchy 4 (Lua config, menu JSONC)."""
     home = tmp_path / "home"
-    (home / ".local" / "share" / "omarchy").mkdir(parents=True)
+    share = home / ".local" / "share" / "omarchy"
+    (share / "themes").mkdir(parents=True)
     (home / ".config" / "hypr").mkdir(parents=True)
-    (home / ".config" / "hypr" / "hyprland.conf").write_text("source = ~/.local/share/omarchy/default/hypr/bindings.conf\n")
+    if version == 3:
+        (home / ".config" / "hypr" / "hyprland.conf").write_text("source = ~/.local/share/omarchy/default/hypr/bindings.conf\n")
+    else:
+        (home / ".config" / "hypr" / "hyprland.lua").write_text('require("default.hypr.omarchy")\nrequire("hypr.bindings")\n')
+        (share / "bin").mkdir()
+        (share / "bin" / "omarchy-hook").write_text('HOOK_PATH="$HOME/.config/omarchy/hooks/$1"\nHOOK_DIR="$HOOK_PATH.d"\n')
+        menu = home / ".config" / "omarchy" / "extensions" / "omarchy-menu.jsonc"
+        menu.parent.mkdir(parents=True)
+        menu.write_text('{\n  // Extend the Quickshell Omarchy menu with JSONC.\n  // "personal": {"icon":"","label":"Personal"},\n}\n')
+    monkeypatch.delenv("OMARCHY_PATH", raising=False)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
     for name, value in {
-        "OMARCHY_SHARE": home / ".local" / "share" / "omarchy",
+        "OMARCHY_SHARE": share,
+        "OMARCHY_PACKAGE": tmp_path / "no-package",
         "OMARCHY_HOOKS": home / ".config" / "omarchy" / "hooks",
         "OMARCHY_MENU": home / ".config" / "omarchy" / "extensions" / "omarchy-menu.jsonc",
+        "OMARCHY_CURRENT": (home / ".local" / "state" / "omarchy" / "current", home / ".config" / "omarchy" / "current"),
         "HYPR_DIR": home / ".config" / "hypr",
         "HERALD_HYPR": home / ".config" / "hypr" / "herald-os.conf",
+        "HERALD_HYPR_LUA": home / ".config" / "hypr" / "herald-os.lua",
         "APP_DESKTOP": home / ".local" / "share" / "applications" / "herald-os-app.desktop",
         "APPS_DIR": home / ".local" / "share" / "applications",
     }.items():
         monkeypatch.setattr(cli, name, value)
     monkeypatch.setattr(cli, "relay", lambda *args, **kwargs: {"ok": True})
     return home
+
+
+def test_omarchy_4_gets_lua_keys_a_menu_row_and_no_dispatcher(tmp_path, monkeypatch, capsys):
+    home = omarchy_home(tmp_path, monkeypatch, version=4)
+    lua = home / ".config" / "hypr" / "hyprland.lua"
+    menu = home / ".config" / "omarchy" / "extensions" / "omarchy-menu.jsonc"
+    before = {lua: lua.read_text(), menu: menu.read_text()}
+    assert cli.omarchy_install() == 0
+    assert all(cli.omarchy_status().values())
+    assert cli.HYPR_REQUIRE in lua.read_text()
+    assert 'o.bind("SUPER + ALT + H", "Herald OS", "herald-os-app")' in (home / ".config" / "hypr" / "herald-os.lua").read_text()
+    # Omarchy 4 runs theme-set.d itself: no dispatcher, so the hook runs once.
+    assert not (home / ".config" / "omarchy" / "hooks" / "theme-set").exists()
+    assert (home / ".config" / "omarchy" / "hooks" / "theme-set.d" / "herald-os").exists()
+    # Omarchy's parser still reads the menu, with Herald as a root row.
+    assert omarchy_menu_parse(menu.read_text())["herald-os"]["action"] == "herald-os-app"
+    cli.omarchy_install()
+    assert menu.read_text().count('"herald-os"') == 1 and lua.read_text().count(cli.HYPR_REQUIRE) == 1
+    assert cli.omarchy_remove() == 0
+    assert lua.read_text() == before[lua] and menu.read_text() == before[menu]
+
+
+def omarchy_menu_parse(text):
+    """Omarchy's own reading of the menu (stripJsonc in MenuModel.js): only whole-line // comments
+    and trailing commas come out before JSON.parse."""
+    stripped = re.sub(r"^\s*//[^\n]*(\n|$)", "", text, flags=re.M)
+    return json.loads(re.sub(r",(\s*[}\]])", r"\1", stripped))
+
+
+def test_current_omarchy_theme_by_name(tmp_path, monkeypatch):
+    home = omarchy_home(tmp_path, monkeypatch, version=4)
+    assert cli.omarchy_current_theme() == ""
+    # Omarchy 4: a staged copy, named in theme.name.
+    current = home / ".local" / "state" / "omarchy" / "current"
+    (current / "theme").mkdir(parents=True)
+    (current / "theme.name").write_text("tokyo-night\n")
+    assert cli.omarchy_current_theme() == "tokyo-night"
+    # Omarchy 3: a link to the theme's folder.
+    (current / "theme.name").unlink()
+    (current / "theme").rmdir()
+    (home / "themes" / "nord").mkdir(parents=True)
+    (current / "theme").symlink_to(home / "themes" / "nord")
+    assert cli.omarchy_current_theme() == "nord"
+
+
+def test_menu_row_adds_the_comma_the_entry_before_needs():
+    text = '{\n  // Mine:\n  "mine": {"label": "Mine", "action": "x"}\n}\n'
+    updated = cli.menu_with_herald(text)
+    assert updated.splitlines()[2] == '  "mine": {"label": "Mine", "action": "x"},'
+    assert list(omarchy_menu_parse(updated)) == ["mine", "herald-os"]
+    assert cli.menu_with_herald(updated) is None
+    assert omarchy_menu_parse(cli.menu_without_herald(updated)) == {"mine": {"label": "Mine", "action": "x"}}
+    assert cli.menu_with_herald("[ { \"label\": \"Mine\" } ]\n") is None
+    # A // inside a string is not a comment.
+    assert cli.split_jsonc_comment('"url": "https://x"  // y') == ('"url": "https://x"  ', "// y")
 
 
 def test_omarchy_install_and_remove_leave_things_as_they_were(tmp_path, monkeypatch, capsys):
@@ -143,7 +235,7 @@ def test_omarchy_install_never_overwrites_the_persons_files(tmp_path, monkeypatc
     cli.omarchy_install()
     out = capsys.readouterr().out
     assert hook.read_text() == "#!/bin/sh\nnotify-send theme \"$1\"\n" and "theme-set.d" in out
-    assert menu.read_text() == "[ { \"label\": \"Mine\" } ]\n" and '"id": "herald-os"' in out
+    assert menu.read_text() == "[ { \"label\": \"Mine\" } ]\n" and '"herald-os"' in out
     cli.omarchy_remove()
     assert hook.exists() and menu.exists()
 

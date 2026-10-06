@@ -192,6 +192,39 @@ HYPR_ACTIONS = {
     "close-focused-window": ["killactive"],
 }
 
+# The same, for a Lua config (Hyprland 0.55+, Omarchy 4), which takes only Lua dispatchers.
+HYPR_LUA = {
+    "close-window": "hl.dsp.window.close()",
+    "fullscreen-window": 'hl.dsp.window.fullscreen({ mode = "fullscreen" })',
+    "maximize-column": 'hl.dsp.window.fullscreen({ mode = "maximized" })',
+    "toggle-window-floating": 'hl.dsp.window.float({ action = "toggle" })',
+    "focus-column-left": 'hl.dsp.focus({ direction = "l" })',
+    "focus-column-right": 'hl.dsp.focus({ direction = "r" })',
+    "focus-window-up": 'hl.dsp.focus({ direction = "u" })',
+    "focus-window-down": 'hl.dsp.focus({ direction = "d" })',
+    "close-focused-window": "hl.dsp.window.close()",
+}
+
+
+def lua_string(text: str) -> str:
+    """A Lua string literal (pure; tested)."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return '"' + re.sub(r"[\x00-\x1f]", "", escaped) + '"'
+
+
+def hypr_dispatches(name: str, rest: list[str]) -> tuple[str | None, list[str]]:
+    """The Lua and the classic dispatcher for a `wm` action (pure; tested)."""
+    if name in ("focus-workspace", "workspace") and rest:
+        ref = rest[0] if rest[0].lstrip("+-").isdigit() or name == "workspace" else f"name:{rest[0]}"
+        return f"hl.dsp.focus({{ workspace = {lua_string(ref)} }})", ["workspace", ref]
+    if name == "exec" and rest:
+        return f"hl.dsp.exec_cmd({lua_string(' '.join(rest))})", ["exec", *rest]
+    if name in HYPR_ACTIONS:
+        return HYPR_LUA[name], HYPR_ACTIONS[name]
+    # Anything else goes as given: a classic dispatcher, or a Lua one (`hl.dsp.…`).
+    raw = [name, *rest]
+    return (" ".join(raw) if name.startswith("hl.") else None), raw
+
 
 def wm(*action: str) -> int:
     """`herald-os wm <action>`: niri actions on niri; on Hyprland, the same names mapped to dispatchers
@@ -199,12 +232,16 @@ def wm(*action: str) -> int:
     if compositor() == "hyprland":
         if not shutil.which("hyprctl"):
             die("hyprctl is not installed", 2)
-        name, rest = action[0], list(action[1:])
-        if name == "focus-workspace" and rest:
-            dispatch = ["workspace", rest[0] if rest[0].isdigit() else f"name:{rest[0]}"]
-        else:
-            dispatch = HYPR_ACTIONS.get(name, [name]) + ([] if name in HYPR_ACTIONS else rest)
-        return subprocess.call(["hyprctl", "dispatch", *dispatch])
+        lua, classic = hypr_dispatches(action[0], list(action[1:]))
+        # Lua first: under hyprland.conf it is an unknown dispatcher, so nothing happens twice.
+        first = ""
+        for args in ([[lua]] if lua else []) + [classic]:
+            done = subprocess.run(["hyprctl", "dispatch", *args], capture_output=True, text=True)
+            if done.returncode == 0 and done.stdout.strip() == "ok":
+                return 0
+            first = first or (done.stdout.strip() or done.stderr.strip())
+        print(first or "hyprctl failed", file=sys.stderr)
+        return 1
     return niri(*action)
 
 
@@ -1254,10 +1291,13 @@ def setup_sign_in(kind: str) -> int:
     """Fingerprint (fprintd) or a security key (pam-u2f) for the lock screen and sudo."""
     if not sys.stdin.isatty():
         die(f"setup {kind} needs a terminal: you touch the sensor or the key while it runs", 2)
-    # Omarchy has its own setup for both, which also covers its lock screen and polkit.
-    omarchy_tool = shutil.which("omarchy-setup-fingerprint" if kind == "fingerprint" else "omarchy-setup-fido2")
-    if is_omarchy() and omarchy_tool:
-        return subprocess.call([omarchy_tool])
+    # Omarchy has its own setup for both, which also covers its lock screen and polkit (Omarchy 4's
+    # name first, then Omarchy 3's).
+    if is_omarchy():
+        names = ("omarchy-setup-security-fingerprint", "omarchy-setup-fingerprint") if kind == "fingerprint" else ("omarchy-setup-security-fido2", "omarchy-setup-fido2")
+        tool = next((found for found in map(omarchy_tool, names) if found), None)
+        if tool:
+            return subprocess.call([tool])
     if kind == "fingerprint":
         if not shutil.which("fprintd-enroll"):
             die("fprintd is not installed (sudo dnf install fprintd fprintd-pam, or pacman -S fprintd)", 127)
@@ -1396,20 +1436,38 @@ def reset(args: list[str]) -> int:
 
 # ---------------------------------------------------------------------------------------------
 # Omarchy: Herald OS as an app inside it (herald-os-app), wearing Omarchy's theme, in its menu, on
-# one key chord. Herald never overwrites a file Omarchy or the person owns; it prints what to add.
+# its own keys. Herald never overwrites a file Omarchy or the person owns: it adds one marked line
+# to theirs, or prints what to add. Omarchy 4 (Lua Hyprland config, its menu JSONC, state under
+# ~/.local/state) and Omarchy 3 (hyprland.conf, ~/.config/omarchy/current) are both handled.
 OMARCHY_SHARE = HOME / ".local" / "share" / "omarchy"
+OMARCHY_PACKAGE = Path("/usr/share/omarchy")
 OMARCHY_HOOKS = HOME / ".config" / "omarchy" / "hooks"
 OMARCHY_MENU = HOME / ".config" / "omarchy" / "extensions" / "omarchy-menu.jsonc"
+# Where the active theme is linked: Omarchy 4, then Omarchy 3.
+OMARCHY_CURRENT = (HOME / ".local" / "state" / "omarchy" / "current", HOME / ".config" / "omarchy" / "current")
 HYPR_DIR = HOME / ".config" / "hypr"
 HERALD_HYPR = HYPR_DIR / "herald-os.conf"
 HYPR_SOURCE = "source = ~/.config/hypr/herald-os.conf  # herald-os"
+HERALD_HYPR_LUA = HYPR_DIR / "herald-os.lua"
+HYPR_REQUIRE = 'require("hypr.herald-os")  -- herald-os'
 APP_DESKTOP = APPS_DIR / "herald-os-app.desktop"
 THEME_HOOK = "#!/bin/sh\n# Herald OS follows the Omarchy theme (herald-os omarchy remove takes this out).\nexec herald-os theme omarchy >/dev/null 2>&1\n"
 HOOK_DISPATCHER = (
     "#!/bin/sh\n# herald-os: runs every hook in theme-set.d with the theme's name.\n"
     'for hook in "$(dirname "$0")"/theme-set.d/*; do [ -x "$hook" ] && "$hook" "$@"; done\n'
 )
-MENU_ENTRY = '{ "id": "herald-os", "label": "Herald OS", "icon": "󰚩", "command": "herald-os-app" }'
+# Omarchy's menu parser drops whole-line // comments only: a comment after a row breaks the whole file.
+MENU_MARK = "  // Herald OS (herald-os omarchy remove takes it out):"
+MENU_LINE = '  "herald-os": {"icon": "󰚩", "label": "Herald OS", "action": "herald-os-app", "description": "Hermes as your desktop"},'
+HYPR_LUA_BINDS = """-- Herald OS (written by `herald-os omarchy install`; `herald-os omarchy remove` takes it out).
+o.bind("SUPER + ALT + H", "Herald OS", "herald-os-app")
+o.bind("SUPER + ALT + A", "Ask Hermes about this window", "herald-os ask")
+o.bind("SUPER + ALT + C", "Hermes command bar", "herald-os command")
+o.bind("SUPER + ALT + V", "Talk to Hermes", "herald-os voice")
+o.bind("SUPER + ALT + X", "Dictate into the focused app", "herald-os dictate")
+o.bind("SUPER + ALT + E", "Emoji", "herald-os emoji")
+o.bind("SUPER + ALT + M", "Hermes missions", "herald-os page missions")
+"""
 HYPR_BINDS = """# Herald OS (written by `herald-os omarchy install`; `herald-os omarchy remove` takes it out).
 # Super+Alt+H, then: Return opens Herald OS, A asks about this window, C opens the command bar,
 # V talks to Hermes, X dictates into the focused app, E picks an emoji, M shows Missions.
@@ -1427,8 +1485,14 @@ HYPR_BINDS += "".join(f"bind = , {key}, submap, reset\n" for key in ("Return", "
 HYPR_BINDS += "submap = reset\n"
 
 
+def omarchy_root() -> Path | None:
+    """Omarchy itself: $OMARCHY_PATH, Omarchy 4's package (/usr/share/omarchy), or Omarchy 3's checkout."""
+    roots = [Path(os.environ["OMARCHY_PATH"])] if os.environ.get("OMARCHY_PATH") else []
+    return next((root for root in (*roots, OMARCHY_PACKAGE, OMARCHY_SHARE) if (root / "bin").is_dir() or (root / "themes").is_dir()), None)
+
+
 def is_omarchy() -> bool:
-    return OMARCHY_SHARE.is_dir()
+    return omarchy_root() is not None
 
 
 def omarchy_app_mode() -> bool:
@@ -1437,7 +1501,19 @@ def omarchy_app_mode() -> bool:
 
 
 def omarchy_tool(name: str) -> str | None:
-    return shutil.which(name) or (str(OMARCHY_SHARE / "bin" / name) if (OMARCHY_SHARE / "bin" / name).exists() else None)
+    root = omarchy_root()
+    return shutil.which(name) or (str(root / "bin" / name) if root and (root / "bin" / name).exists() else None)
+
+
+def omarchy_current_theme() -> str:
+    """The active theme's name: Omarchy 4 stages a copy as current/theme and writes the name beside
+    it in theme.name; Omarchy 3 links the theme's own folder as current/theme."""
+    for base in OMARCHY_CURRENT:
+        if (base / "theme").exists():
+            named = base / "theme.name"
+            name = named.read_text(errors="replace").strip() if named.is_file() else ""
+            return name or (base / "theme").resolve().name
+    return ""
 
 
 def omarchy_theme(sub: str, name: str) -> int:
@@ -1446,77 +1522,151 @@ def omarchy_theme(sub: str, name: str) -> int:
         if not tool:
             die("omarchy-theme-set is missing; set the theme from Omarchy's menu", 127)
         return subprocess.call([tool, name])
-    current = HOME / ".config" / "omarchy" / "current" / "theme"
     if sub == "current":
-        print(current.resolve().name if current.exists() else "")
+        print(omarchy_current_theme())
         return 0
-    for base in (HOME / ".config" / "omarchy" / "themes", OMARCHY_SHARE / "themes"):
+    root = omarchy_root()
+    for base in (HOME / ".config" / "omarchy" / "themes", *([root / "themes"] if root else [])):
         if base.is_dir():
             for theme in sorted(p.name for p in base.iterdir() if p.is_dir()):
                 print(theme)
     return 0
 
 
+def omarchy_runs_hook_dirs() -> bool:
+    """Omarchy 4's omarchy-hook runs hooks/<name>.d/ itself; Omarchy 3 ran only hooks/<name>."""
+    tool = omarchy_tool("omarchy-hook")
+    try:
+        return bool(tool) and ".d" in Path(tool).read_text(errors="replace")
+    except OSError:
+        return False
+
+
+def split_jsonc_comment(line: str) -> tuple[str, str]:
+    """A JSONC line as (code, // comment), ignoring // inside strings (pure)."""
+    quoted = False
+    for i, char in enumerate(line):
+        if char == '"' and (i == 0 or line[i - 1] != "\\"):
+            quoted = not quoted
+        elif not quoted and line.startswith("//", i):
+            return line[:i], line[i:]
+    return line, ""
+
+
+def menu_with_herald(text: str) -> str | None:
+    """Omarchy 4's menu JSONC (an object of dotted ids) with Herald's row added before its closing
+    brace, or None when it is already there or the file is not such an object (pure; tested)."""
+    if '"herald-os"' in text:
+        return None
+    lines = text.rstrip().splitlines()
+    close = len(lines) - 1
+    if close < 0 or split_jsonc_comment(lines[close])[0].strip() != "}" or split_jsonc_comment(lines[0])[0].strip()[:1] not in ("{", ""):
+        return None
+    # The entry before ours needs its comma.
+    previous = next((i for i in range(close - 1, -1, -1) if split_jsonc_comment(lines[i])[0].strip()), None)
+    if previous is not None:
+        code, comment = split_jsonc_comment(lines[previous])
+        if not code.rstrip().endswith((",", "{")):
+            lines[previous] = code.rstrip() + "," + (f"  {comment}" if comment else "")
+    return "\n".join([*lines[:close], MENU_MARK, MENU_LINE, *lines[close:]]) + "\n"
+
+
+def menu_without_herald(text: str) -> str:
+    """The menu JSONC with Herald's row taken out again (pure; tested)."""
+    ours = (MENU_MARK.strip(), MENU_LINE.strip())
+    return "\n".join(line for line in text.splitlines() if line.strip() not in ours) + "\n"
+
+
+def without_line(text: str, line: str) -> str:
+    return "\n".join(existing for existing in text.splitlines() if existing.strip() != line).rstrip("\n") + "\n"
+
+
 def omarchy_status() -> dict[str, bool]:
-    return {
+    lua, conf = HYPR_DIR / "hyprland.lua", HYPR_DIR / "hyprland.conf"
+    lua_keys = HERALD_HYPR_LUA.exists() and lua.exists() and HYPR_REQUIRE in lua.read_text(errors="replace")
+    conf_keys = HERALD_HYPR.exists() and conf.exists() and HYPR_SOURCE in conf.read_text(errors="replace")
+    status = {
         "app entry": APP_DESKTOP.exists(),
         "theme hook": (OMARCHY_HOOKS / "theme-set.d" / "herald-os").exists(),
-        "menu entry": OMARCHY_MENU.exists() and '"herald-os"' in OMARCHY_MENU.read_text(errors="replace"),
-        "keys": HERALD_HYPR.exists() and (HYPR_DIR / "hyprland.conf").exists() and HYPR_SOURCE in (HYPR_DIR / "hyprland.conf").read_text(errors="replace"),
+        "keys": lua_keys or conf_keys,
     }
+    # Only Omarchy 4 has a menu Herald can add to.
+    if OMARCHY_MENU.exists():
+        status["menu entry"] = '"herald-os"' in OMARCHY_MENU.read_text(errors="replace")
+    return status
 
 
 def omarchy_install() -> int:
     if not is_omarchy():
-        die("this is not an Omarchy install (no ~/.local/share/omarchy)", 1)
+        die("this is not an Omarchy install (no /usr/share/omarchy or ~/.local/share/omarchy)", 1)
     notes: list[str] = []
     APPS_DIR.mkdir(parents=True, exist_ok=True)
     APP_DESKTOP.write_text(
         "[Desktop Entry]\nName=Herald OS\nComment=The AI-native desktop, as an app\nExec=herald-os-app\n"
         "Icon=herald-os\nType=Application\nCategories=System;Utility;\nTerminal=false\nStartupWMClass=herald-os\n"
     )
+    # Theme hook: Omarchy runs theme-set.d itself on 4; on 3 a small dispatcher does.
     hooks = OMARCHY_HOOKS / "theme-set.d"
     hooks.mkdir(parents=True, exist_ok=True)
     (hooks / "herald-os").write_text(THEME_HOOK)
     (hooks / "herald-os").chmod(0o755)
     dispatcher = OMARCHY_HOOKS / "theme-set"
-    if not dispatcher.exists():
+    if omarchy_runs_hook_dirs():
+        if dispatcher.exists() and dispatcher.read_text(errors="replace") == HOOK_DISPATCHER:
+            dispatcher.unlink()
+    elif not dispatcher.exists():
         dispatcher.write_text(HOOK_DISPATCHER)
         dispatcher.chmod(0o755)
-    elif "herald-os" not in dispatcher.read_text(errors="replace"):
+    elif "theme-set.d" not in dispatcher.read_text(errors="replace"):
         notes.append(f'Your {dispatcher} hook exists; add this line so Herald follows themes:\n  for hook in ~/.config/omarchy/hooks/theme-set.d/*; do [ -x "$hook" ] && "$hook" "$@"; done')
-    if not OMARCHY_MENU.exists():
-        OMARCHY_MENU.parent.mkdir(parents=True, exist_ok=True)
-        OMARCHY_MENU.write_text(f"// Added by Herald OS (herald-os omarchy remove takes it out).\n[\n  {MENU_ENTRY}\n]\n")
-    elif '"herald-os"' not in OMARCHY_MENU.read_text(errors="replace"):
-        notes.append(f"Add Herald OS to {OMARCHY_MENU}:\n  {MENU_ENTRY}")
+    # The menu: Omarchy 4's JSONC extensions (Omarchy 3 had none; Applications lists Herald there).
+    if OMARCHY_MENU.exists():
+        updated = menu_with_herald(OMARCHY_MENU.read_text(errors="replace"))
+        if updated is not None:
+            OMARCHY_MENU.write_text(updated)
+        elif '"herald-os"' not in OMARCHY_MENU.read_text(errors="replace"):
+            notes.append(f"Add this row to {OMARCHY_MENU}:\n{MENU_LINE}")
+    # Keys: Lua on Omarchy 4, hyprland.conf on Omarchy 3.
     HYPR_DIR.mkdir(parents=True, exist_ok=True)
-    HERALD_HYPR.write_text(HYPR_BINDS)
-    hyprland = HYPR_DIR / "hyprland.conf"
-    if hyprland.exists() and HYPR_SOURCE not in hyprland.read_text(errors="replace"):
-        with hyprland.open("a") as handle:
-            handle.write(f"\n{HYPR_SOURCE}\n")
-    elif not hyprland.exists():
-        notes.append(f"No {hyprland}; source {HERALD_HYPR} from your Hyprland config for Herald's keys.")
+    lua, conf = HYPR_DIR / "hyprland.lua", HYPR_DIR / "hyprland.conf"
+    if lua.exists():
+        HERALD_HYPR_LUA.write_text(HYPR_LUA_BINDS)
+        if HYPR_REQUIRE not in lua.read_text(errors="replace"):
+            with lua.open("a") as handle:
+                handle.write(f"\n{HYPR_REQUIRE}\n")
+        keys = "Super+Alt+H"
+    elif conf.exists():
+        HERALD_HYPR.write_text(HYPR_BINDS)
+        if HYPR_SOURCE not in conf.read_text(errors="replace"):
+            with conf.open("a") as handle:
+                handle.write(f"\n{HYPR_SOURCE}\n")
+        keys = "Super+Alt+H then Return"
+    else:
+        keys = "Applications"
+        notes.append(f"No Hyprland config in {HYPR_DIR}; Herald's keys were not added.")
     relay("theme-omarchy", [], quiet=True)
-    print("Herald OS is set up inside Omarchy: open it from Applications or with Super+Alt+H then Return.")
+    print(f"Herald OS is set up inside Omarchy: open it from the Omarchy menu, Applications or {keys}.")
     for note in notes:
         print(note)
     return 0
 
 
 def omarchy_remove() -> int:
-    for path in (APP_DESKTOP, OMARCHY_HOOKS / "theme-set.d" / "herald-os", HERALD_HYPR):
+    for path in (APP_DESKTOP, OMARCHY_HOOKS / "theme-set.d" / "herald-os", HERALD_HYPR, HERALD_HYPR_LUA):
         path.unlink(missing_ok=True)
     dispatcher = OMARCHY_HOOKS / "theme-set"
     if dispatcher.exists() and dispatcher.read_text(errors="replace") == HOOK_DISPATCHER:
         dispatcher.unlink()
-    if OMARCHY_MENU.exists() and OMARCHY_MENU.read_text(errors="replace").startswith("// Added by Herald OS"):
-        OMARCHY_MENU.unlink()
-    hyprland = HYPR_DIR / "hyprland.conf"
-    if hyprland.exists():
-        lines = [line for line in hyprland.read_text(errors="replace").splitlines() if line.strip() != HYPR_SOURCE]
-        hyprland.write_text("\n".join(lines).rstrip("\n") + "\n")
+    if OMARCHY_MENU.exists():
+        text = OMARCHY_MENU.read_text(errors="replace")
+        if text.startswith("// Added by Herald OS"):
+            # An earlier Herald OS wrote this whole file.
+            OMARCHY_MENU.unlink()
+        elif MENU_LINE.strip() in text or MENU_MARK.strip() in text:
+            OMARCHY_MENU.write_text(menu_without_herald(text))
+    for config, line in ((HYPR_DIR / "hyprland.conf", HYPR_SOURCE), (HYPR_DIR / "hyprland.lua", HYPR_REQUIRE)):
+        if config.exists() and line in config.read_text(errors="replace"):
+            config.write_text(without_line(config.read_text(errors="replace"), line))
     print("Herald OS is out of Omarchy's theme hook, menu and keys.")
     return 0
 

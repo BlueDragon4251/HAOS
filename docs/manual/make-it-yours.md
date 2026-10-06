@@ -200,9 +200,12 @@ later bind replaces an earlier one. To switch a key off, bind it to nothing, for
 `local.kdl` itself, because niri refuses a file that binds the same key twice;
 `niri validate -c ~/.config/niri/config.kdl` checks it.
 
-Running Herald OS as an app inside Omarchy, its keys live in `~/.config/hypr/herald-os.conf`,
-which `herald-os omarchy install` rewrites. Change them in your own Hyprland config instead:
-`unbind = SUPER ALT, H`, then a `bind = …` line of your own.
+Running Herald OS as an app inside Omarchy, its keys live in `~/.config/hypr/herald-os.lua` on
+Omarchy 4 (`herald-os.conf` on Omarchy 3), which `herald-os omarchy install` rewrites. Change them in
+your own Hyprland config instead. On Omarchy 4, below the `require("hypr.herald-os")` line at the end
+of `~/.config/hypr/hyprland.lua`, so it runs after Herald's: `hl.unbind("SUPER + ALT + H")`, then an
+`o.bind("SUPER + H", "Herald OS", "herald-os-app")` of your own. On Omarchy 3,
+`unbind = SUPER ALT, H`, then a `bind = …` line.
 
 ## When something happens
 
