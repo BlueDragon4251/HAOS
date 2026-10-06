@@ -22,7 +22,7 @@ export function MenuBarSurface() {
   const title = focused ? (focused.ours ? (focused.title === OUR_MAIN_TITLE ? 'Hermes' : null) : windowLabel(focused)) : null
 
   return (
-    <header className="flex h-full w-full items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, rgba(3,10,40,.72), rgba(3,10,40,.42))' }}>
+    <header className="flex h-full w-full items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, var(--menubar-from, rgba(3,10,40,.72)), var(--menubar-to, rgba(3,10,40,.42)))' }}>
       <div className="flex min-w-0 items-center gap-2.5">
         <HeraldLogo height={12} />
         <span className="font-semibold">Herald OS</span>
@@ -229,7 +229,7 @@ function SpacesSwitcher({ workspaces, available }: { workspaces: WmWorkspace[]; 
             onClick={() => focusWorkspace(ws)}
             className={cn('flex h-5 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-150', active ? 'bg-accent text-accent-fg shadow-[0_2px_10px_rgba(47,125,255,.45)]' : 'text-fg-2 hover:bg-white/10 hover:text-fg')}
           >
-            <span className="size-1.5 rounded-full" style={{ background: active ? 'rgba(255,255,255,.9)' : colorFor(ws) }} />
+            <span className="size-1.5 rounded-full" style={{ background: active ? 'var(--color-fg)' : colorFor(ws) }} />
             {labelFor(ws)}
           </button>
         )

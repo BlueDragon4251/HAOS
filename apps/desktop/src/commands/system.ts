@@ -36,7 +36,12 @@ const SECTION_ALIASES: Record<string, string> = {
   alerts: 'notifications',
   motion: 'accessibility',
   version: 'about',
-  update: 'about'
+  update: 'about',
+  billing: 'usage',
+  tokens: 'usage',
+  credits: 'usage',
+  limits: 'usage',
+  plan: 'usage'
 }
 
 function resolveSection(input: string | undefined): string | null {
@@ -129,7 +134,7 @@ export const systemCommands: readonly OsCommand[] = [
   {
     id: 'settings.open',
     title: 'Open Settings',
-    description: 'Open Settings, optionally at a section (general, appearance, agents, voice, privacy, notifications, network, storage, accessibility, about).',
+    description: 'Open Settings, optionally at a section (general, appearance, agents, usage, voice, privacy, notifications, network, storage, accessibility, about).',
     tier: 'read',
     args: [
       { name: 'section', type: 'string', description: 'Section name' },
@@ -150,19 +155,6 @@ export const systemCommands: readonly OsCommand[] = [
     }
   },
   {
-    id: 'theme.set',
-    title: 'Set the theme',
-    description: 'Switch the shell theme (ocean or graphite).',
-    tier: 'mutate',
-    args: [{ name: 'theme', type: 'string', description: 'Theme name', required: true, enum: ['ocean', 'graphite'] }],
-    phrases: ['set the theme to {theme}', 'switch to the {theme} theme', 'use the {theme} theme'],
-    run: async ({ theme }) => {
-      await updatePrefs({ theme: theme as HeraldOSPrefs['theme'] })
-
-      return ok(`Theme set to ${String(theme)}`, { highlight: { kind: 'setting', id: 'appearance' } })
-    }
-  },
-  {
     id: 'accent.set',
     title: 'Set the accent colour',
     description: 'Switch the accent colour (blue, ice or violet).',
@@ -170,7 +162,9 @@ export const systemCommands: readonly OsCommand[] = [
     args: [{ name: 'accent', type: 'string', description: 'Accent name', required: true, enum: ['blue', 'ice', 'violet'] }],
     phrases: ['set the accent to {accent}', 'make the accent {accent}', 'change the accent color to {accent}'],
     run: async ({ accent }) => {
-      await updatePrefs({ accent: accent as HeraldOSPrefs['accent'] })
+      // An accent belongs to the Ocean and Graphite presets; a theme with its own colours steps aside.
+      const preset = $prefs.get().theme
+      await updatePrefs({ accent: accent as HeraldOSPrefs['accent'], themeColors: undefined, themeScheme: undefined, themeName: `herald-${preset}` })
 
       return ok(`Accent set to ${String(accent)}`, { highlight: { kind: 'setting', id: 'appearance' } })
     }

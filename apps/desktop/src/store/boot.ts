@@ -16,6 +16,8 @@ import { refreshSessions } from './sessions.ts'
 import { bindShell } from './shell.ts'
 import { bindShellCommands } from './shell-commands.ts'
 import { bindStudioEvents } from './studio.ts'
+import { bindThemes } from './themes.ts'
+import { bindUsage } from './usage.ts'
 import { bindVoice } from './voice.ts'
 import { bindWake } from './wake.ts'
 
@@ -49,6 +51,8 @@ export function bootRenderer(): void {
   bindFollow()
   bindStudioEvents()
   bindContinuity()
+  bindThemes()
+  bindUsage()
 
   let lastEpoch = 0
   $connectionEpoch.subscribe(epoch => {

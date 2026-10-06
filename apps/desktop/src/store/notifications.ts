@@ -14,6 +14,13 @@ export interface DesktopNotificationRef {
   actions: Array<[string, string]>
 }
 
+/** A button on one of Herald OS's own notifications: an OS command, so it survives being saved. */
+export interface NotificationAction {
+  label: string
+  command: string
+  args?: Record<string, unknown>
+}
+
 export interface HermesNotification {
   id: string
   title: string
@@ -28,6 +35,7 @@ export interface HermesNotification {
   key?: string
   /** Set when this came from another app; clicks and dismissals are reported back to it. */
   desktop?: DesktopNotificationRef
+  actions?: NotificationAction[]
 }
 
 export const $notifications = atom<HermesNotification[]>([])
@@ -49,6 +57,7 @@ export interface NotifyInput {
   native?: boolean
   toast?: boolean
   desktop?: DesktopNotificationRef
+  actions?: NotificationAction[]
 }
 
 export function notify(input: NotifyInput): HermesNotification {
@@ -63,7 +72,8 @@ export function notify(input: NotifyInput): HermesNotification {
     read: false,
     surface: input.surface,
     key: input.key,
-    desktop: input.desktop
+    desktop: input.desktop,
+    actions: input.actions?.length ? input.actions : undefined
   }
   const rest = $notifications.get().filter(n => n.id !== item.id)
   $notifications.set([item, ...rest].slice(0, MAX))

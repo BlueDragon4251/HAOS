@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { afterExit, motion } from '../../lib/motion.ts'
-import { $backend } from '../../store/backend.ts'
+import { $backend, $prefs } from '../../store/backend.ts'
 import { bindDesktopNotifications } from '../../store/notifications.ts'
 import { toggleSidebar } from '../../store/sidebar.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../../store/surface.ts'
@@ -13,7 +13,7 @@ import { MainWindow } from '../MainWindow.tsx'
 import { NotificationsPanel } from '../NotificationsPanel.tsx'
 import { RequestHost } from '../RequestHost.tsx'
 import { Toasts } from '../Toasts.tsx'
-import { drawWallpaperFrame } from '../Wallpaper.tsx'
+import { drawWallpaperFrame, tintFor } from '../Wallpaper.tsx'
 import { HermesLoginCard } from '../../features/auth/HermesLoginCard.tsx'
 import { ActionHud, OsHighlighter } from '../../features/voice/ActionHud.tsx'
 import { VoiceOrb } from '../../features/voice/VoiceOrb.tsx'
@@ -123,6 +123,8 @@ export function MainSurface() {
 /** One still frame of the wallpaper behind the sidebar and page so the glass has something to sit on. */
 function StillWallpaper() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const prefs = useStore($prefs)
+  const tint = useMemo(() => tintFor(prefs), [prefs.themeColors, prefs.themeScheme])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -141,14 +143,14 @@ function StillWallpaper() {
     const draw = () => {
       canvas.width = Math.max(1, Math.floor(window.innerWidth * scale))
       canvas.height = Math.max(1, Math.floor(window.innerHeight * scale))
-      drawWallpaperFrame(ctx, canvas.width, canvas.height, 137.5, scale)
+      drawWallpaperFrame(ctx, canvas.width, canvas.height, 137.5, scale, tint)
     }
 
     draw()
     window.addEventListener('resize', draw)
 
     return () => window.removeEventListener('resize', draw)
-  }, [])
+  }, [tint])
 
   return <canvas ref={canvasRef} className="absolute inset-0 z-(--z-wallpaper) h-full w-full opacity-70" style={{ filter: 'blur(1.5px)' }} aria-hidden="true" />
 }

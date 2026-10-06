@@ -1,0 +1,38 @@
+# The Herald OS manual
+
+Herald OS is an operating system built around an AI agent, Hermes. You talk or type to it, and it
+works across the whole machine: it opens apps, finds and organises files, keeps an eye on what is
+running, remembers what matters to you, runs routines, and builds software while you watch. Anything
+that changes something asks first.
+
+This manual is for using Herald OS day to day. The [README](../../README.md) covers installing it;
+[docs/ARCHITECTURE.md](../ARCHITECTURE.md) covers how it is built.
+
+- [Coming from macOS](coming-from-macos.md): where your habits go.
+- [Hotkeys](hotkeys.md): every shortcut on macOS and on Herald OS Linux.
+- [Make it yours](make-it-yours.md): themes, fonts, the wallpaper, hooks and automations that run
+  when something happens.
+- [Troubleshooting](troubleshooting.md): when something does not work.
+- [FAQ](faq.md): short answers to common questions.
+
+## The first five minutes
+
+1. **Say hello.** Press `Cmd+K` on a Mac or `Super+Shift+Space` on Herald OS Linux and type what
+   you want, or press the voice key (`Alt+Space` on a Mac, `Super+V` on Linux) and say it.
+2. **Let Hermes catch you up.** The Overview offers to look at the names of your recent files,
+   projects and chats and suggest where to pick up. It is off until you turn it on.
+3. **Make it look like yours.** Settings > Appearance has twelve themes, and "Make a theme from an
+   image" turns any photo into one. Or just ask: "make me a calm green theme".
+4. **Hand Hermes a chore.** "Every weekday at 9, tell me what is on my calendar" becomes an
+   automation; "every time I log in, check my disk space" runs whenever you log in.
+5. **Look at what Hermes did.** Settings > Privacy has the audit log of every system action, and
+   Settings > Usage shows how much your model plan has used.
+
+## Asking about what is on screen
+
+- **Part of the screen:** `Cmd+Shift+S` (Mac) or `Super+Shift+S` (Linux), drag a rectangle, then
+  type your question. The selection goes to Hermes as an image.
+- **The window in front (Linux):** `Super+Space` asks about the focused window.
+- **A crash:** when a program crashes, a notification offers "Ask Hermes". Hermes reads the crash
+  report and tells you, in plain words, what went wrong and whether it is worth reporting. Mute a
+  program from the same notification if you do not care about it.

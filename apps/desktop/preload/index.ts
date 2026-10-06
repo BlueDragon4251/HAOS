@@ -7,6 +7,7 @@ import {
   type ClipboardEntry,
   type ContextReturn,
   type ContextSnapshot,
+  type CrashReport,
   type HeraldOsResult,
   type IncomingNotification,
   type PowerAction,
@@ -41,6 +42,8 @@ import {
   type WmAction,
   type WmState
 } from '../shared/ipc.ts'
+import type { HeraldEvent } from '../shared/events.ts'
+import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
 
 type Unsubscribe = () => void
 
@@ -125,6 +128,32 @@ const api = {
     snapshot: (): Promise<ContextSnapshot> => ipcRenderer.invoke(IPC.contextSnapshot),
     /** The user is back after sleep, a lock or a long idle stretch (fires in every window). */
     onReturned: (listener: (event: ContextReturn) => void): Unsubscribe => subscribe(IPC.contextReturned, listener)
+  },
+  crash: {
+    /** Programs that crashed since Herald OS started, newest first. */
+    recent: (): Promise<CrashReport[]> => ipcRenderer.invoke(IPC.crashRecent)
+  },
+  theme: {
+    list: (): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeList),
+    /** Apply an installed theme everywhere; resolves with the new preferences. */
+    apply: (name: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name),
+    /** Save a theme into ~/.config/herald-os/themes (with its wallpaper image copied in). */
+    save: (spec: ThemeSpec, imagePath?: string): Promise<string> => ipcRenderer.invoke(IPC.themeSave, spec, imagePath),
+    /** A small PNG data URL of an image, to take theme colours from (null when it is not an image). */
+    sample: (imagePath: string): Promise<string | null> => ipcRenderer.invoke(IPC.themeSample, imagePath),
+    /** Install the themes in a git repository; resolves with their names. */
+    install: (url: string): Promise<string[]> => ipcRenderer.invoke(IPC.themeInstall, url)
+  },
+  fonts: {
+    list: (): Promise<string[]> => ipcRenderer.invoke(IPC.fontsList)
+  },
+  capture: {
+    /** The person draws a rectangle on screen; resolves with the PNG's path, or null when cancelled. */
+    region: (): Promise<string | null> => ipcRenderer.invoke(IPC.captureRegion)
+  },
+  events: {
+    /** Events Herald OS saw lately (login, wake, crash, low battery, …), newest first. */
+    recent: (): Promise<HeraldEvent[]> => ipcRenderer.invoke(IPC.eventsRecent)
   },
   terminal: {
     create: (options: TerminalCreateOptions): Promise<TerminalHandle> => ipcRenderer.invoke(IPC.terminalCreate, options),

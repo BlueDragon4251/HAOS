@@ -1,6 +1,7 @@
 import { IconMessageChatbot, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
-import { GlassButton, GlassCard } from '../../components/ui/glass.tsx'
+import { HERALD_EVENTS, type HeraldEventName } from '../../../shared/events.ts'
+import { Chips, GlassButton, GlassCard } from '../../components/ui/glass.tsx'
 import { sendPrompt } from '../../store/chat.ts'
 import { showPage } from '../../store/windows.ts'
 import type { CronJobDraft, DeliveryTarget } from './api.ts'
@@ -9,22 +10,47 @@ import { FieldLabel, GlyphTile, Hint, SelectInput, TextArea, TextInput, isLocalD
 
 const DESCRIBE_PROMPT = 'Help me set up a new scheduled automation. Ask me what it should do and when, then create it with the cronjob tool.'
 
+/** Runs on an event instead of a schedule; the page turns it into a paused job plus a rule. */
+export interface EventTrigger {
+  event: HeraldEventName
+  match?: Record<string, string>
+}
+
+const TRIGGER_MODES = [
+  { id: 'schedule', label: 'On a schedule' },
+  { id: 'event', label: 'When something happens' }
+] as const
+
+const EVENT_CHOICES = HERALD_EVENTS.filter(event => event.automation)
+
+/** Events that can be narrowed down, and the detail they match on. */
+const MATCHES: Partial<Record<HeraldEventName, { key: string; label: string; placeholder: string }>> = {
+  crash: { key: 'app', label: 'Which program (optional)', placeholder: 'Any program' },
+  'network-change': { key: 'wifi', label: 'Wi-Fi network (optional)', placeholder: 'Any network' }
+}
+
 /** Inline "New automation" form shown in the detail column. */
-export function NewAutomationForm({ targets, creating, onCreate, onCancel }: { targets: readonly DeliveryTarget[]; creating: boolean; onCreate: (draft: CronJobDraft) => Promise<boolean>; onCancel: () => void }) {
+export function NewAutomationForm({ targets, creating, onCreate, onCancel }: { targets: readonly DeliveryTarget[]; creating: boolean; onCreate: (draft: CronJobDraft, trigger?: EventTrigger) => Promise<boolean>; onCancel: () => void }) {
   const [name, setName] = useState('')
+  const [mode, setMode] = useState<'schedule' | 'event'>('schedule')
   const [schedule, setSchedule] = useState('')
+  const [event, setEvent] = useState<HeraldEventName>('login')
+  const [matchValue, setMatchValue] = useState('')
   const [prompt, setPrompt] = useState('')
   const [deliver, setDeliver] = useState('local')
 
-  const canCreate = schedule.trim().length > 0 && prompt.trim().length > 0 && !creating
+  const canCreate = (mode === 'event' || schedule.trim().length > 0) && prompt.trim().length > 0 && !creating
   const preview = humanizeCronExpr(schedule.trim())
+  const matcher = MATCHES[event]
 
   const submit = async () => {
     if (!canCreate) {
       return
     }
 
-    await onCreate({ name: name.trim(), schedule: schedule.trim(), prompt: prompt.trim(), deliver })
+    const draft = { name: name.trim(), schedule: schedule.trim(), prompt: prompt.trim(), deliver }
+
+    await (mode === 'event' ? onCreate(draft, { event, match: matcher && matchValue.trim() ? { [matcher.key]: matchValue.trim() } : undefined }) : onCreate(draft))
   }
 
   return (
@@ -54,16 +80,33 @@ export function NewAutomationForm({ targets, creating, onCreate, onCancel }: { t
 
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="new-automation-schedule">When</FieldLabel>
-          <TextInput id="new-automation-schedule" value={schedule} onChange={e => setSchedule(e.target.value)} placeholder={SCHEDULE_PLACEHOLDER} required />
-          <Hint>
-            {preview ? (
-              <span className="text-accent-strong">{preview}</span>
-            ) : (
-              <>
-                Accepted: {SCHEDULE_FORMATS_HINT}.
-              </>
-            )}
-          </Hint>
+          <Chips items={TRIGGER_MODES} value={mode} onChange={setMode} className="self-start" />
+          {mode === 'schedule' ? (
+            <>
+              <TextInput id="new-automation-schedule" value={schedule} onChange={e => setSchedule(e.target.value)} placeholder={SCHEDULE_PLACEHOLDER} required />
+              <Hint>
+                {preview ? (
+                  <span className="text-accent-strong">{preview}</span>
+                ) : (
+                  <>
+                    Accepted: {SCHEDULE_FORMATS_HINT}.
+                  </>
+                )}
+              </Hint>
+            </>
+          ) : (
+            <>
+              <SelectInput id="new-automation-schedule" value={event} onChange={e => setEvent(e.target.value as HeraldEventName)}>
+                {EVENT_CHOICES.map(choice => (
+                  <option key={choice.name} value={choice.name}>
+                    {choice.label}
+                  </option>
+                ))}
+              </SelectInput>
+              {matcher && <TextInput aria-label={matcher.label} value={matchValue} onChange={e => setMatchValue(e.target.value)} placeholder={matcher.placeholder} />}
+              <Hint>Hermes runs it each time this happens on this computer while Herald OS is open.</Hint>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

@@ -4,6 +4,7 @@ import { $applicationsOpen, $commandBarOpen } from '../store/surface.ts'
 import { $prefs } from '../store/backend.ts'
 import { $windows, dockAutoHides, ensureMainWindow, MAIN_WINDOW_ID, type OSWindow, relayoutOnResize } from '../store/windows.ts'
 import { Window } from './wm/Window.tsx'
+import { AskOverlay } from './AskOverlay.tsx'
 import { CommandBar } from './CommandBar.tsx'
 import { Dock } from './Dock.tsx'
 import { MainWindow } from './MainWindow.tsx'
@@ -100,6 +101,7 @@ export function Desktop() {
         </Suspense>
       )}
       {commandBarOpen && <CommandBar />}
+      <AskOverlay />
     </div>
   )
 }

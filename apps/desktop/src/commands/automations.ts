@@ -1,12 +1,17 @@
+import { describeRule, eventLabel, HERALD_EVENTS, isEventName } from '../../shared/events.ts'
 import type { CronJob } from '../lib/rest.ts'
-import { createAutomation, deleteAutomation, findAutomation, isPaused, listAutomations, setAutomationEnabled, triggerAutomation } from '../store/automations.ts'
+import { automationEnabled, createAutomation, createEventAutomation, deleteAutomation, eventRuleFor, findAutomation, listAutomations, setAutomationEnabled, triggerAutomation } from '../store/automations.ts'
 import { fail, ok, type OsCommand } from '../store/os-commands.ts'
 import { showPage } from '../store/windows.ts'
 import { humanizeSchedule } from '../features/automations/cron-humanize.ts'
 
-/* Automations (Hermes cron jobs). */
+/* Automations (Hermes cron jobs, some fired by events instead of their schedule). */
 
-const summarise = (job: CronJob) => ({ id: job.id, name: job.name, schedule: humanizeSchedule(job), paused: isPaused(job), nextRun: job.next_run_at ?? null, lastStatus: job.last_status ?? null })
+const summarise = (job: CronJob) => {
+  const rule = eventRuleFor(job.id)
+
+  return { id: job.id, name: job.name, schedule: rule ? describeRule(rule) : humanizeSchedule(job), event: rule?.event ?? null, paused: !automationEnabled(job), nextRun: rule ? null : (job.next_run_at ?? null), lastStatus: job.last_status ?? null }
+}
 
 async function pick(name: string) {
   const { job, candidates } = await findAutomation(name)
@@ -29,7 +34,7 @@ export const automationCommands: readonly OsCommand[] = [
     run: async () => {
       showPage('automations')
       const jobs = await listAutomations()
-      const active = jobs.filter(job => !isPaused(job))
+      const active = jobs.filter(job => automationEnabled(job))
 
       return ok(`${jobs.length} automation${jobs.length === 1 ? '' : 's'}, ${active.length} active`, {
         page: 'automations',
@@ -54,7 +59,9 @@ export const automationCommands: readonly OsCommand[] = [
 
       showPage('automations')
 
-      return ok(`${job.name}: ${humanizeSchedule(job)}${isPaused(job) ? ' (paused)' : ''}`, { page: 'automations', highlight: { kind: 'automation', id: job.id }, data: summarise(job) })
+      const summary = summarise(job)
+
+      return ok(`${job.name}: ${summary.schedule}${summary.paused ? ' (off)' : ''}`, { page: 'automations', highlight: { kind: 'automation', id: job.id }, data: summary })
     }
   },
   {
@@ -120,14 +127,29 @@ export const automationCommands: readonly OsCommand[] = [
   {
     id: 'automation.create',
     title: 'Create an automation',
-    description: 'Schedule a prompt: `schedule` is natural ("every day at 9am", "every 30 minutes", "weekdays at 8:00") or cron.',
+    description:
+      'Make Hermes run a prompt on a schedule (`schedule`: natural like "every day at 9am", "weekdays at 8:00", or cron) or each time something happens on this computer (`event`: login, wake, unlock, returned, battery-low, network-change, crash, theme-set, after-update; `match` narrows it, e.g. a program name for crash or a Wi-Fi network for network-change).',
     tier: 'mutate',
     args: [
       { name: 'name', type: 'string', description: 'Short name', required: true },
-      { name: 'schedule', type: 'string', description: 'When it runs', required: true },
-      { name: 'prompt', type: 'string', description: 'What Hermes should do each run', required: true }
+      { name: 'prompt', type: 'string', description: 'What Hermes should do each run', required: true },
+      { name: 'schedule', type: 'string', description: 'When it runs (or give event)' },
+      { name: 'event', type: 'string', description: 'Run each time this happens instead of on a schedule', enum: ['', ...HERALD_EVENTS.filter(event => event.automation).map(event => event.name)] },
+      { name: 'match', type: 'string', description: 'For event: the program (crash) or Wi-Fi network (network-change) it is about' }
     ],
-    run: async ({ name, schedule, prompt }) => {
+    run: async ({ name, schedule, prompt, event, match }) => {
+      if (event && isEventName(event)) {
+        const key = event === 'crash' ? 'app' : event === 'network-change' ? 'wifi' : null
+        const created = await createEventAutomation({ name: String(name), prompt: String(prompt), deliver: 'local' }, event, key && match ? { [key]: String(match) } : undefined)
+        showPage('automations')
+
+        return ok(`Created "${created.name ?? String(name)}": ${eventLabel(event).toLowerCase()}${match ? ` (${String(match)})` : ''}`, { page: 'automations', highlight: { kind: 'automation', id: created.id }, data: summarise(created) })
+      }
+
+      if (!schedule) {
+        return fail('Say when it should run: a schedule ("every day at 9am") or an event (login, wake, battery-low, …).')
+      }
+
       const created = await createAutomation({ name: String(name), schedule: String(schedule), prompt: String(prompt), deliver: 'local' })
       showPage('automations')
 

@@ -673,19 +673,35 @@ def handle_system_control(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_LOGS_SCHEMA = _schema(
     "system_logs",
-    "Read the unified system log (diagnostics). minutes (default 10, max 240), level error|fault|any (default error), optional process name filter, limit (default 40, max 200). Returns the most recent matching lines, compact style. Read-only; can take several seconds.",
+    "Diagnostics. action=log (default) reads the system log: minutes (default 10, max 240), level error|fault|any (default error), optional process name filter, limit (default 40, max 200); returns the most recent matching lines. "
+    "action=crashes lists recent crashes of the user's programs (macOS crash reports, Linux core dumps), newest first. "
+    "action=crash_report reads one crash: report = the report path from action=crashes (macOS) or the crashed pid (Linux); returns the exception, termination reason, app messages and the crashed thread's top frames (macOS) or coredumpctl's summary with the stack trace (Linux). "
+    "Read-only; can take several seconds.",
     {
+        "action": _enum("log", "crashes", "crash_report", description="What to read (default log)."),
         "minutes": _INT,
         "level": _enum("error", "fault", "any"),
         "process": _desc(_STR, "Only lines from this process (e.g. WindowServer, kernel)."),
         "limit": _INT,
+        "report": _desc(_STR, "For action=crash_report: a crash report path or file name (macOS) or the crashed pid (Linux)."),
     },
 )
 
 
 def handle_system_logs(args: dict[str, Any], **_: Any) -> str:
-    minutes = _int(args, "minutes", 10, 1, 240)
+    action = str(args.get("action") or "log")
     limit = _int(args, "limit", 40, 1, 200)
+    if action == "crashes":
+        return _read("system_logs", "crashes", args, lambda: {"crashes": host().crash_reports(min(limit, 50))})
+    if action == "crash_report":
+        ref = str(args.get("report") or "").strip()
+        if not ref:
+            return fail("report is required for action=crash_report (see action=crashes)")
+        paths = (expand(ref),) if "/" in ref else ()
+        return _guarded("system_logs", Tier.READ, "crash_report", f"read the crash report {truncate(ref, 80)}", args, paths, lambda: host().crash_report(ref))
+    if action != "log":
+        return fail(f"unknown action '{action}'")
+    minutes = _int(args, "minutes", 10, 1, 240)
     level = str(args.get("level") or "error")
     process = (args.get("process") or None) and str(args["process"])
     return _read("system_logs", level, args, lambda: {"minutes": minutes, "level": level, "process": process, "lines": host().system_logs(minutes, level, process, limit)})

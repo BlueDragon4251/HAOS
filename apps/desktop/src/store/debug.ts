@@ -5,7 +5,7 @@ import { $hermesAuth, requestHermesLogin } from './hermes-auth.ts'
 import { $notifications } from './notifications.ts'
 import { $pendingRequests, resolveRequest } from './requests.ts'
 import { $sessions } from './sessions.ts'
-import { showSurface } from './surface.ts'
+import { openAsk, showSurface } from './surface.ts'
 import { matchIntent } from '../lib/voice/intents.ts'
 import { $commandLog, listCommands, runCommand } from './os-commands.ts'
 import { $voice, endConversation, runVoiceIntent, speakWithFreeFallback, startVoice, toggleMute } from './voice.ts'
@@ -26,6 +26,7 @@ export function installDebugHook(): void {
       interruptChat,
       gatewayRequest,
       showSurface,
+      openAsk,
       showPage,
       openApp,
       resolveRequest,

@@ -1,9 +1,10 @@
-import type { ShellCommand } from '../../shared/ipc.ts'
+import type { CrashReport, ShellCommand } from '../../shared/ipc.ts'
 import { PAGES, type PageId } from '../shell/apps.ts'
 import { composePrompt } from '../shell/surfaces/shell-utils.ts'
 import { runHeraldOsWithToast } from '../lib/herald-os-cli.ts'
 import { updatePrefs } from './backend.ts'
 import { openStoredSession, runSlash, sendPrompt } from './chat.ts'
+import { offerCrashHelp } from './crashes.ts'
 import { $notificationsOpen, notify } from './notifications.ts'
 import { runCommand } from './os-commands.ts'
 import { isMainSurface, onShellCommand, openSurface } from './shell.ts'
@@ -110,6 +111,16 @@ export function handleShellCommand(command: ShellCommand): void {
       void pickWallpaper()
 
       return
+    case 'crash': {
+      // Main's crash watcher found a crash worth offering help with.
+      const report = command.payload as unknown as CrashReport | undefined
+
+      if (report?.id && report.app) {
+        offerCrashHelp(report)
+      }
+
+      return
+    }
     case 'os': {
       // `herald-os os <command.id> [json args]`: run a registry command from the CLI.
       const id = command.args?.[0]

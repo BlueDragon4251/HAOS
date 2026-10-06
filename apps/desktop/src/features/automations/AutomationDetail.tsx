@@ -1,9 +1,13 @@
-import { IconBell, IconCalendar, IconClock, IconDatabase, IconDeviceFloppy, IconFileText, IconPencil, IconPlayerPlay } from '@tabler/icons-react'
+import { useStore } from '@nanostores/react'
+import { IconBell, IconBolt, IconCalendar, IconClock, IconDatabase, IconDeviceFloppy, IconFileText, IconPencil, IconPlayerPlay } from '@tabler/icons-react'
 import { type ReactNode, useEffect, useState } from 'react'
+import { describeRule, type EventAutomation, HERALD_EVENTS, type HeraldEventName } from '../../../shared/events.ts'
 import { GlassButton, GlassCard, Pill, Toggle } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatRelative } from '../../lib/format.ts'
 import type { CronJob } from '../../lib/rest.ts'
+import { eventRuleFor, updateEventRule } from '../../store/automations.ts'
+import { $prefs } from '../../store/backend.ts'
 import { type CronJobEdits, type CronRun, type DeliveryTarget, isFailedStatus, isPaused } from './api.ts'
 import { SCHEDULE_FORMATS_HINT, SCHEDULE_PLACEHOLDER, formatRunDuration, humanizeSchedule, localTimezoneCity, scheduleToString, toMs } from './cron-humanize.ts'
 import { JobMenu, type JobMenuAction } from './JobMenu.tsx'
@@ -52,7 +56,9 @@ export function AutomationDetail({ job, targets, lastRun, saving, onSave, onActi
     setNotifyPref(readNotifyPref(job.id))
   }, [job.id])
 
-  const paused = isPaused(job)
+  useStore($prefs)
+  const rule = eventRuleFor(job.id)
+  const paused = rule ? !rule.enabled : isPaused(job)
   const currentSchedule = edits.schedule ?? scheduleToString(job)
   const currentPrompt = edits.prompt ?? job.prompt ?? ''
   const currentDeliver = edits.deliver ?? job.deliver ?? 'local'
@@ -103,7 +109,7 @@ export function AutomationDetail({ job, targets, lastRun, saving, onSave, onActi
     }
   }
 
-  const whenSummary = `${edits.schedule !== undefined ? capitalize(edits.schedule) : humanizeSchedule(job)} · ${localTimezoneCity()}`
+  const whenSummary = rule ? describeRule(rule) : `${edits.schedule !== undefined ? capitalize(edits.schedule) : humanizeSchedule(job)} · ${localTimezoneCity()}`
   const selectableTargets = targets.some(t => t.id === currentDeliver) ? targets : [...targets, { id: currentDeliver, name: currentDeliver }]
 
   return (
@@ -113,7 +119,7 @@ export function AutomationDetail({ job, targets, lastRun, saving, onSave, onActi
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <h2 className="truncate text-[18px] leading-tight font-semibold text-fg">{job.name || 'Untitled automation'}</h2>
-            <Pill tone={job.state === 'error' ? 'danger' : paused ? 'muted' : 'ok'}>{job.state === 'error' ? 'Error' : paused ? 'Paused' : 'Active'}</Pill>
+            <Pill tone={job.state === 'error' ? 'danger' : paused ? 'muted' : 'ok'}>{job.state === 'error' ? 'Error' : paused ? (rule ? 'Off' : 'Paused') : 'Active'}</Pill>
           </div>
           <p className="mt-1 text-[12.5px] text-fg-3">{describeJob(previewJob)}</p>
         </div>
@@ -126,27 +132,33 @@ export function AutomationDetail({ job, targets, lastRun, saving, onSave, onActi
 
           <Step
             index={1}
-            icon={<IconCalendar />}
+            icon={rule ? <IconBolt /> : <IconCalendar />}
             title="When"
             summary={whenSummary}
             editing={editing === 'when'}
             onEdit={() => setEditing(editing === 'when' ? null : 'when')}
           >
-            <FieldLabel htmlFor="automation-schedule">Schedule</FieldLabel>
-            <TextInput
-              id="automation-schedule"
-              value={currentSchedule}
-              autoFocus
-              placeholder={SCHEDULE_PLACEHOLDER}
-              onChange={e => setField('schedule', e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  void saveStep('schedule')
-                }
-              }}
-            />
-            <Hint>Accepted: {SCHEDULE_FORMATS_HINT}.</Hint>
-            <StepActions disabled={saving || edits.schedule === undefined} onSave={() => void saveStep('schedule')} onCancel={() => cancelStep('schedule')} />
+            {rule ? (
+              <EventRuleEditor rule={rule} onDone={() => setEditing(null)} />
+            ) : (
+              <>
+                <FieldLabel htmlFor="automation-schedule">Schedule</FieldLabel>
+                <TextInput
+                  id="automation-schedule"
+                  value={currentSchedule}
+                  autoFocus
+                  placeholder={SCHEDULE_PLACEHOLDER}
+                  onChange={e => setField('schedule', e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      void saveStep('schedule')
+                    }
+                  }}
+                />
+                <Hint>Accepted: {SCHEDULE_FORMATS_HINT}.</Hint>
+                <StepActions disabled={saving || edits.schedule === undefined} onSave={() => void saveStep('schedule')} onCancel={() => cancelStep('schedule')} />
+              </>
+            )}
           </Step>
 
           <Step
@@ -244,6 +256,41 @@ function Step({ index, icon, title, summary, editing, onEdit, children }: { inde
         {editing && <div className="animate-rise mt-3 flex flex-col gap-2 border-t border-line pt-3">{children}</div>}
       </GlassCard>
     </li>
+  )
+}
+
+/** The event an automation waits for (and the program or network it narrows to). */
+function EventRuleEditor({ rule, onDone }: { rule: EventAutomation; onDone: () => void }) {
+  const [event, setEvent] = useState<HeraldEventName>(rule.event)
+  const matchKey = event === 'crash' ? 'app' : event === 'network-change' ? 'wifi' : null
+  const [matchValue, setMatchValue] = useState(matchKey ? (rule.match?.[matchKey] ?? '') : '')
+  const [saving, setSaving] = useState(false)
+  const changed = event !== rule.event || (matchKey ? matchValue.trim() !== (rule.match?.[matchKey] ?? '') : false)
+
+  const save = async () => {
+    setSaving(true)
+
+    try {
+      await updateEventRule(rule.jobId, { event, match: matchKey && matchValue.trim() ? { [matchKey]: matchValue.trim() } : undefined })
+      onDone()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <FieldLabel htmlFor="automation-event">When this happens</FieldLabel>
+      <SelectInput id="automation-event" value={event} onChange={e => setEvent(e.target.value as HeraldEventName)}>
+        {HERALD_EVENTS.filter(choice => choice.automation).map(choice => (
+          <option key={choice.name} value={choice.name}>
+            {choice.label}
+          </option>
+        ))}
+      </SelectInput>
+      {matchKey && <TextInput aria-label={matchKey === 'app' ? 'Which program' : 'Which Wi-Fi network'} value={matchValue} onChange={e => setMatchValue(e.target.value)} placeholder={matchKey === 'app' ? 'Any program' : 'Any network'} />}
+      <StepActions disabled={saving || !changed} onSave={() => void save()} onCancel={onDone} />
+    </>
   )
 }
 

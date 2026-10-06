@@ -76,6 +76,10 @@
       {
         "from": "../../NOTICE",
         "to": "NOTICE"
+      },
+      {
+        "from": "../../linux/themes",
+        "to": "themes"
       }
     ],
     "asar": true,

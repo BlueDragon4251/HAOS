@@ -95,7 +95,7 @@ export function HermesAvatar({ size = 40, className, rounded = 10 }: { size?: nu
       width={size}
       height={size}
       draggable={false}
-      className={cn('shrink-0 bg-white object-cover shadow-[0_2px_10px_rgba(0,10,60,.45)]', className)}
+      className={cn('shrink-0 bg-paper object-cover shadow-[0_2px_10px_rgba(0,10,60,.45)]', className)}
       style={{ borderRadius: rounded }}
     />
   )

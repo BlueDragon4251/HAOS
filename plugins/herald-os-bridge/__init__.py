@@ -19,7 +19,13 @@ from pathlib import Path
 from .bridge import tools as _tools
 from .bridge.host import host_available
 
-_SKILL_DIR = Path(__file__).parent / "skills" / "herald-os"
+_SKILLS_DIR = Path(__file__).parent / "skills"
+# Skill name -> one-line description for the skills index.
+SKILLS: dict[str, str] = {
+    "herald-os": "How Hermes acts as the operating environment on this computer.",
+    "diagnose-crash": "Explain why a program crashed from its crash report or core dump, and whether it is worth reporting.",
+    "herald-os-tailor": "Change Herald OS itself: make and switch themes, fonts, the wallpaper, keybindings, settings and routines.",
+}
 
 
 def _check_available() -> bool:
@@ -39,10 +45,9 @@ def register(ctx) -> None:
             emoji=spec.emoji,
             description=spec.schema["description"],
         )
-    skill_md = _SKILL_DIR / "SKILL.md"
-    if skill_md.exists() and hasattr(ctx, "register_skill"):
-        ctx.register_skill(
-            "herald-os",
-            skill_md,
-            description="How Hermes acts as the operating environment on this computer.",
-        )
+    if not hasattr(ctx, "register_skill"):
+        return
+    for name, description in SKILLS.items():
+        skill_md = _SKILLS_DIR / name / "SKILL.md"
+        if skill_md.exists():
+            ctx.register_skill(name, skill_md, description=description)

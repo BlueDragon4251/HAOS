@@ -151,6 +151,14 @@ class HostAdapter(ABC):
     @abstractmethod
     def system_logs(self, minutes: int, level: str, process: str | None, limit: int) -> list[str]: ...
 
+    def crash_reports(self, limit: int) -> list[dict[str, Any]]:
+        """Recent crashes of the user's programs, newest first."""
+        raise HostNotSupported(f"crash reports are not available on {self.platform}")
+
+    def crash_report(self, ref: str) -> dict[str, Any]:
+        """The facts of one crash: ``ref`` is a report path (macOS) or the crashed pid (Linux)."""
+        raise HostNotSupported(f"crash reports are not available on {self.platform}")
+
     # --- system control (act / mutate) ------------------------------------------------------
     @abstractmethod
     def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]: ...

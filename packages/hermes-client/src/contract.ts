@@ -5,6 +5,8 @@ export type {
   ApprovalChoice,
   ApprovalRequestParams,
   ApprovalResult,
+  BillingMonthlyCap,
+  BillingStateResult,
   ClarifyQuestion,
   ClarifyRequestParams,
   ClarifyResult,
@@ -13,6 +15,7 @@ export type {
   ErrorPayload,
   GatewayReadyPayload,
   InflightTurn,
+  InsightsGetResult,
   MessageCompletePayload,
   NotificationShowPayload,
   OpenRequestEntry,
@@ -44,5 +47,7 @@ export type {
   TranscriptMessage,
   TurnStatus,
   Usage,
+  UsageBar,
+  UsageModel,
   ValueResult
 } from '../../../upstream/hermes-agent/apps/shared/src/gateway-contract.generated.ts'

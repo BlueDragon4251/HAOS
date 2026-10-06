@@ -183,7 +183,7 @@ export function BrandLogo({ keys, size = 44, className }: { keys: readonly (stri
   }
 
   return (
-    <span className={cn('inline-flex shrink-0 items-center justify-center bg-white shadow-[0_2px_10px_rgba(0,10,60,.45)]', className)} style={{ width: size, height: size, borderRadius: radius }} aria-hidden="true">
+    <span className={cn('inline-flex shrink-0 items-center justify-center bg-paper shadow-[0_2px_10px_rgba(0,10,60,.45)]', className)} style={{ width: size, height: size, borderRadius: radius }} aria-hidden="true">
       <Logo size={Math.round(size * 0.62)} />
     </span>
   )

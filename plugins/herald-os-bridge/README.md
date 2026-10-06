@@ -8,16 +8,20 @@ Tools, permission tiers, protected paths, the policy file and the audit log are 
 [docs/SYSTEM-BRIDGE.md](../../docs/SYSTEM-BRIDGE.md).
 
 ```
-__init__.py          register(): the `herald_os` toolset and the bundled skill
+__init__.py          register(): the `herald_os` toolset and the bundled skills (SKILLS)
 plugin.yaml          manifest: name, version, tools, supported platforms
 bridge/
   tools.py           tool schemas and handlers (TOOL_SPECS)
   permissions.py     tiers, protected paths, the approval gate
   audit.py           one JSON line per call in $HERMES_HOME/herald-os/audit.jsonl
+  crash.py           crash report summaries for system_logs (macOS .ips, Linux core dumps)
   ui.py              client for the shell's control socket (the `os_ui` tool)
   util.py            shared helpers (data folder, HERALD_OS_* settings)
   host/              HostAdapter per OS: darwin.py, linux.py, posix.py, windows.py (stub)
-skills/herald-os/    SKILL.md, the skill that teaches Hermes when to use these tools
+skills/
+  herald-os/         when to use these tools
+  diagnose-crash/    how to explain a crash from its report
+  herald-os-tailor/  how to change Herald OS itself: themes, fonts, keybindings, settings
 tests/               pytest suite: `npm run test:bridge` from the repository root
 ```
 

@@ -103,7 +103,26 @@ preview of the site.
 | "Send me a notification" | `system_control` action=notify |
 | "Lock the screen" / "Sleep the display" | `system_control` action=lock_screen / sleep_display |
 | "Show recent system errors" | `system_logs` level=error minutes=10 |
+| "Why did Safari crash?" / "What crashed?" | `system_logs` action=crashes, then follow the `diagnose-crash` skill with action=crash_report report=... |
+| "Make me a calm green theme" / "Use a bigger font" / "Add a shortcut for…" | follow the `herald-os-tailor` skill (`theme.set`, `theme.generate`, a theme.json, `font.set`, niri's `local.kdl`) |
 | "Start my development environment" | `system_open` the editor on the project, `system_open` the browser on the dev URL, and use the `terminal` tool for `npm run dev` or the project's start command |
+
+## When something happens: event automations and hooks
+
+Herald OS notices these events: `login`, `wake`, `unlock`, `returned` (back after a break; details
+`reason`, `away_minutes`), `battery-low` (`percent`), `network-change` (`online`, `wifi`), `crash`
+(`app`, `pid`, `reason`), `theme-set` (`theme`), `after-update`, plus `lock` and `sleep` for scripts.
+
+- "Every time I log in, give me a briefing" / "When the battery is low, tell me what is draining it":
+  `os_ui action=run command=automation.create args={"name": …, "event": "login", "prompt": …}`.
+  For `crash` and `network-change`, `"match"` narrows it to a program or a Wi-Fi network. It shows
+  on the Automations page as "When I log in"; runs keep their history like scheduled ones.
+- Something that is not a Hermes task (a script, a sound, syncing a folder): a hook. Write an
+  executable script into `~/.config/herald-os/hooks/<event>.d/` (any name; files ending in
+  `.sample` are ignored). It runs with the event as `$1` and `HERALD_EVENT`, its details as
+  `HERALD_EVENT_<NAME>` (for example `HERALD_EVENT_APP`), and everything as JSON in
+  `HERALD_EVENT_JSON`; it has two minutes. On Herald OS Linux, `herald-os hook list` shows them
+  and `herald-os hook install <event> <script>` copies one in.
 
 ## Norms
 

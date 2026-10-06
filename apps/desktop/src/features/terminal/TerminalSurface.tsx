@@ -1,11 +1,16 @@
+import { useStore } from '@nanostores/react'
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { terminalColors } from '../../../shared/theme.ts'
 import { Button } from '../../components/ui/button.tsx'
 import { EmptyState } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
+import { $prefs } from '../../store/backend.ts'
+
+const MONO_STACK = 'SF Mono, JetBrains Mono, Menlo, monospace'
 
 interface Tab {
   id: string
@@ -152,6 +157,19 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const term = useRef<Terminal | null>(null)
   const fit = useRef<FitAddon | null>(null)
+  const prefs = useStore($prefs)
+  const theme = useMemo(() => (prefs.themeColors ? terminalColors(prefs.themeColors, prefs.themeScheme) : THEME), [prefs.themeColors, prefs.themeScheme])
+  const fontFamily = prefs.fonts?.mono ? `${JSON.stringify(prefs.fonts.mono)}, ${MONO_STACK}` : MONO_STACK
+  const initial = useRef({ theme, fontFamily })
+  initial.current = { theme, fontFamily }
+
+  useEffect(() => {
+    if (term.current) {
+      term.current.options.theme = theme
+      term.current.options.fontFamily = fontFamily
+      fit.current?.fit()
+    }
+  }, [theme, fontFamily])
 
   useEffect(() => {
     const el = host.current
@@ -161,8 +179,8 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
     }
 
     const terminal = new Terminal({
-      theme: THEME,
-      fontFamily: 'SF Mono, JetBrains Mono, Menlo, monospace',
+      theme: initial.current.theme,
+      fontFamily: initial.current.fontFamily,
       fontSize: 12.5,
       lineHeight: 1.25,
       cursorBlink: true,
@@ -217,5 +235,5 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
     }
   }, [active])
 
-  return <div ref={host} className={cn('absolute inset-x-3 inset-y-0 bottom-3 overflow-hidden rounded-lg hairline', !active && 'invisible')} style={{ background: '#050f33' }} />
+  return <div ref={host} className={cn('absolute inset-x-3 inset-y-0 bottom-3 overflow-hidden rounded-lg hairline', !active && 'invisible')} style={{ background: theme.background }} />
 }

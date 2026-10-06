@@ -1,11 +1,14 @@
 import { useStore } from '@nanostores/react'
-import { IconBattery, IconBattery1, IconBattery2, IconBattery3, IconBattery4, IconBatteryCharging, IconBell, IconCheck, IconChevronDown, IconSearch, IconWifi, IconWifiOff } from '@tabler/icons-react'
+import { IconBattery, IconBattery1, IconBattery2, IconBattery3, IconBattery4, IconBatteryCharging, IconBell, IconCheck, IconChevronDown, IconGauge, IconSearch, IconWifi, IconWifiOff } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { HeraldLogo } from '../components/herald-logo.tsx'
 import { cn } from '../lib/cn.ts'
-import { $backend } from '../store/backend.ts'
+import { planPercent } from '../lib/usage.ts'
+import { $backend, $prefs } from '../store/backend.ts'
 import { $connection } from '../store/gateway.ts'
 import { $notifications, $notificationsOpen } from '../store/notifications.ts'
+import { runCommand } from '../store/os-commands.ts'
+import { $usage, loadUsage } from '../store/usage.ts'
 import { $activeSpace, $spaces, setActiveSpace } from '../store/spaces.ts'
 import { toggleCommandBar } from '../store/surface.ts'
 import { $systemStats, useNetworkStatus, useSystemStats } from '../store/system.ts'
@@ -44,6 +47,7 @@ export function MenuBarStatus({ onSearch, onBell, bellActive }: { onSearch: () =
         <IconSearch size={15} />
       </button>
       <VoiceIndicator />
+      <UsageMeter />
       <span title={network?.wifi?.connected ? `Wi-Fi ${network.wifi.ssid ?? ''}`.trim() : network?.online ? 'Wired' : 'Offline'}>
         {network?.online === false ? <IconWifiOff size={15} className="text-fg-3" /> : <IconWifi size={15} />}
       </span>
@@ -60,6 +64,39 @@ export function MenuBarStatus({ onSearch, onBell, bellActive }: { onSearch: () =
       <span className="tabular-nums">{fmtDate(now)}</span>
       <span className="tabular-nums font-medium">{fmtTime(now)}</span>
     </div>
+  )
+}
+
+/** The model plan's usage, when the person turned it on and the plan reports a limit. */
+function UsageMeter() {
+  const prefs = useStore($prefs)
+  const usage = useStore($usage)
+  const connection = useStore($connection)
+  const enabled = Boolean(prefs.usageInMenuBar)
+
+  useEffect(() => {
+    if (!enabled || connection !== 'open') {
+      return
+    }
+
+    // The menu bar is its own window in panels mode, so it keeps its own copy fresh.
+    void loadUsage().catch(() => undefined)
+    const timer = setInterval(() => void loadUsage().catch(() => undefined), 15 * 60_000)
+
+    return () => clearInterval(timer)
+  }, [enabled, connection])
+
+  const pct = planPercent(usage?.plan)
+
+  if (!enabled || pct === null) {
+    return null
+  }
+
+  return (
+    <button type="button" aria-label={`Plan usage ${Math.round(pct)}%`} title={`${usage?.plan?.plan_name ?? 'Plan'}: ${Math.round(pct)}% used`} onClick={() => void runCommand('usage.show', {}, { source: 'ui' })} className={cn('flex items-center gap-1 rounded-md px-1 text-[12px] tabular-nums hover:bg-white/10', pct >= 90 && 'text-warn')}>
+      <IconGauge size={15} />
+      {Math.round(pct)}%
+    </button>
   )
 }
 
@@ -100,7 +137,7 @@ export function MenuBar() {
   }, [spaceMenu])
 
   return (
-    <header className="drag-region absolute inset-x-0 top-0 z-(--z-menubar) flex h-(--menubar-h) items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, rgba(3,10,40,.55), rgba(3,10,40,.15))' }}>
+    <header className="drag-region absolute inset-x-0 top-0 z-(--z-menubar) flex h-(--menubar-h) items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, var(--menubar-from, rgba(3,10,40,.55)), var(--menubar-to, rgba(3,10,40,.15)))' }}>
       <div className="flex items-center gap-2.5 pl-[74px]">
         <HeraldLogo height={12} />
         <span className="font-semibold">Herald OS</span>

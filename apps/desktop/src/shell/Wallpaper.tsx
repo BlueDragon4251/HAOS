@@ -1,5 +1,7 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import type { HeraldOSPrefs } from '../../shared/ipc.ts'
+import { wallpaperTint, type WallpaperTint } from '../../shared/theme.ts'
 import { $prefs, $windowState } from '../store/backend.ts'
 
 /**
@@ -25,24 +27,39 @@ const RIBBONS = Array.from({ length: 11 }, (_, i) => ({
   phase: i * 1.7
 }))
 
+const OCEAN_STOPS: WallpaperTint['stops'] = ['#1240c8', '#0a2a96', '#04113f']
+const OCEAN_HUE = 214
+
+/** The drawn wallpaper's tint for the current theme (null keeps the ocean blues). */
+export function tintFor(prefs: Pick<HeraldOSPrefs, 'themeColors' | 'themeScheme'>): WallpaperTint | null {
+  return wallpaperTint(prefs.themeColors, prefs.themeScheme)
+}
+
 /**
  * Draw one frame of the wallpaper at phase `t` onto `ctx`, covering `width` x `height` canvas pixels.
  * `scale` is canvas pixels per CSS pixel (the animated component renders at 0.5); ribbon widths are
- * expressed in CSS pixels so the picture looks the same at any resolution. Pure: no DOM, no state.
+ * expressed in CSS pixels so the picture looks the same at any resolution. `tint` recolours it for
+ * the theme; light themes draw darker ribbons over the field instead of adding light. Pure: no DOM,
+ * no state.
  */
-export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number, height: number, t: number, scale = 1): void {
+export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number, height: number, t: number, scale = 1, tint: WallpaperTint | null = null): void {
   const w = width
   const h = height
+  const stops = tint?.stops ?? OCEAN_STOPS
+  const light = tint?.light ?? false
+  const hueShift = tint ? tint.hue - OCEAN_HUE : 0
+  const sat = tint ? Math.round(tint.saturation * 95) : 95
+  const satHigh = Math.min(100, sat + 5)
 
   const base = ctx.createRadialGradient(w * 0.5, h * 0.5, h * 0.05, w * 0.5, h * 0.5, Math.max(w, h) * 0.8)
-  base.addColorStop(0, '#1240c8')
-  base.addColorStop(0.45, '#0a2a96')
-  base.addColorStop(1, '#04113f')
+  base.addColorStop(0, stops[0])
+  base.addColorStop(0.45, stops[1])
+  base.addColorStop(1, stops[2])
   ctx.fillStyle = base
   ctx.fillRect(0, 0, w, h)
 
   ctx.lineCap = 'round'
-  ctx.globalCompositeOperation = 'lighter'
+  ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'
 
   const tracePath = (r: (typeof RIBBONS)[number]) => {
     ctx.beginPath()
@@ -66,13 +83,17 @@ export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number,
   }
 
   for (const r of RIBBONS) {
+    const hue = r.hue + hueShift
+    const l = light ? r.light - 22 : r.light
+    const alpha = light ? r.alpha * 0.4 : r.alpha
+
     // Wide soft body.
     tracePath(r)
     const glow = ctx.createLinearGradient(0, 0, w, 0)
-    glow.addColorStop(0, `hsla(${r.hue}, 95%, ${r.light}%, 0)`)
-    glow.addColorStop(0.3, `hsla(${r.hue}, 95%, ${r.light + 10}%, ${r.alpha * 0.5})`)
-    glow.addColorStop(0.7, `hsla(${r.hue + 6}, 95%, ${r.light + 16}%, ${r.alpha * 0.45})`)
-    glow.addColorStop(1, `hsla(${r.hue}, 95%, ${r.light}%, 0)`)
+    glow.addColorStop(0, `hsla(${hue}, ${sat}%, ${l}%, 0)`)
+    glow.addColorStop(0.3, `hsla(${hue}, ${sat}%, ${l + 10}%, ${alpha * 0.5})`)
+    glow.addColorStop(0.7, `hsla(${hue + 6}, ${sat}%, ${l + 16}%, ${alpha * 0.45})`)
+    glow.addColorStop(1, `hsla(${hue}, ${sat}%, ${l}%, 0)`)
     ctx.strokeStyle = glow
     ctx.lineWidth = r.width * scale * 2.2 * (1 + 0.15 * Math.sin(t * 0.3 + r.phase))
     ctx.stroke()
@@ -80,10 +101,10 @@ export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number,
     // Bright silk highlight.
     tracePath(r)
     const grad = ctx.createLinearGradient(0, 0, w, 0)
-    grad.addColorStop(0, `hsla(${r.hue}, 100%, ${r.light + 10}%, 0)`)
-    grad.addColorStop(0.35, `hsla(${r.hue}, 100%, ${r.light + 26}%, ${r.alpha})`)
-    grad.addColorStop(0.62, `hsla(${r.hue + 8}, 100%, ${r.light + 34}%, ${r.alpha * 1.1})`)
-    grad.addColorStop(1, `hsla(${r.hue}, 100%, ${r.light + 10}%, 0)`)
+    grad.addColorStop(0, `hsla(${hue}, ${satHigh}%, ${l + 10}%, 0)`)
+    grad.addColorStop(0.35, `hsla(${hue}, ${satHigh}%, ${l + 26}%, ${alpha})`)
+    grad.addColorStop(0.62, `hsla(${hue + 8}, ${satHigh}%, ${l + 34}%, ${alpha * 1.1})`)
+    grad.addColorStop(1, `hsla(${hue}, ${satHigh}%, ${l + 10}%, 0)`)
     ctx.strokeStyle = grad
     ctx.lineWidth = r.width * scale * 0.55 * (1 + 0.2 * Math.sin(t * 0.3 + r.phase))
     ctx.stroke()
@@ -92,7 +113,7 @@ export function drawWallpaperFrame(ctx: CanvasRenderingContext2D, width: number,
   ctx.globalCompositeOperation = 'source-over'
   const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85)
   vignette.addColorStop(0, 'rgba(0,0,0,0)')
-  vignette.addColorStop(1, 'rgba(0,4,30,0.4)')
+  vignette.addColorStop(1, tint?.vignette ?? 'rgba(0,4,30,0.4)')
   ctx.fillStyle = vignette
   ctx.fillRect(0, 0, w, h)
 }
@@ -103,6 +124,7 @@ export function Wallpaper() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pausedRef = useRef(false)
   const custom = prefs.wallpaper
+  const tint = useMemo(() => tintFor(prefs), [prefs.themeColors, prefs.themeScheme])
 
   // Pausing must not restart the draw loop, otherwise a stale loop can survive cleanup and
   // alternate frames with the new one (visible as flicker).
@@ -143,7 +165,7 @@ export function Wallpaper() {
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0
       last = now
       phase += dt
-      drawWallpaperFrame(ctx, canvas.width, canvas.height, phase, scale)
+      drawWallpaperFrame(ctx, canvas.width, canvas.height, phase, scale, tint)
     }
 
     const loop = (now: number) => {
@@ -181,7 +203,7 @@ export function Wallpaper() {
       window.removeEventListener('resize', onResize)
       cancelAnimationFrame(raf)
     }
-  }, [custom, prefs.reduceMotion])
+  }, [custom, prefs.reduceMotion, tint])
 
   if (custom) {
     return <div className="absolute inset-0 z-(--z-wallpaper) bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(custom)})` }} />

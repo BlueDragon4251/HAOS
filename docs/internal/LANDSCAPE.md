@@ -75,8 +75,10 @@ Ranked by value to the "Hermes is the OS" thesis divided by cost, given the curr
 
 ## Not adopting
 
-- Custom compositors / bootable ISOs (SomaOS, TensorAgent, Naia, vinOS): out of scope by design
-  until the shell is proven on macOS and Windows.
+- Custom compositors (SomaOS, TensorAgent, Naia, vinOS): out of scope by design until the shell is
+  proven on macOS and Windows. Bootable images moved in scope in October 2026 (ADR-018): Fedora bootc
+  images, not a compositor of our own.
 - 3D avatars, pets, emotion engines: gimmicks by the project's own standard.
 - Unsandboxed shell plugins in the renderer process (Omarchy model): our extension model is the
-  Hermes plugin system on the backend, which already has a capability/consent layer.
+  Hermes plugin system on the backend, which already has a capability/consent layer. Widgets are
+  allowed since ADR-019, each in its own sandboxed view behind a narrow message API.

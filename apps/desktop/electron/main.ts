@@ -3,12 +3,19 @@ import os from 'node:os'
 import path from 'node:path'
 import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
 import { BackendManager } from './backend/manager.ts'
+import { CrashWatcher } from './crash/watch.ts'
+import { fireEventAutomations } from './events/automations.ts'
+import { events } from './events/bus.ts'
+import { runHooks } from './events/hooks.ts'
+import { startEventSources } from './events/sources.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
+import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerContextIpc } from './ipc/context.ts'
 import { registerFsIpc } from './ipc/fs.ts'
 import { registerSystemIpc } from './ipc/system.ts'
 import { registerTerminalIpc } from './ipc/terminal.ts'
+import { registerThemeIpc, syncHermesSkin } from './ipc/theme.ts'
 import { applyVoiceHotkey, registerVoiceIpc } from './ipc/voice.ts'
 import { registerEditIpc } from './ipc/edit.ts'
 import { registerWebIpc } from './ipc/web.ts'
@@ -39,18 +46,20 @@ const panels = mode === 'panels' ? new PanelShell(win => attachMainWindow(win)) 
 const wallpaper = panels ? new WallpaperService(panels) : null
 // The agent's `os_ui` tool and the CLI run registry commands in the Hermes window through this bridge.
 const osBridge = new OsCommandBridge(() => (panels ? panels.mainWindow() : mainWindow))
-const control = panels
-  ? new ControlSocket(
-      panels,
-      next => {
-        wallpaper?.apply(next.wallpaper)
+/** Preferences changed outside a renderer (the CLI, a theme): every window and the wallpaper follow. */
+function broadcastPrefs(next: HeraldOSPrefs): void {
+  wallpaper?.apply(next.wallpaper)
 
-        for (const win of BrowserWindow.getAllWindows()) {
-          win.webContents.send(IPC.prefsChanged, next)
-        }
-      },
-      osBridge
-    )
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC.prefsChanged, next)
+  }
+}
+
+const control = panels
+  ? new ControlSocket(panels, broadcastPrefs, osBridge, spec => {
+      syncHermesSkin(spec, backend)
+      events.emit('theme-set', { theme: spec.name })
+    })
   : null
 // Desktop mode has no compositor CLI socket; the OS control server gives it the same `ui*` surface.
 const osControlPath = panels ? path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`, 'herald-os', 'control.sock') : path.join(heraldOsDataDir(), 'control.sock')
@@ -100,6 +109,18 @@ const osControl = panels
 backend.setControl(osControlPath, osControlToken())
 // Serves org.freedesktop.Notifications so other apps' notifications reach the shell.
 const notifications = panels ? new NotificationDaemon(panels) : null
+/** Deliver a ShellCommand to the Hermes window; panels mode queues it until that window has loaded. */
+const toHermesWindow = (command: ShellCommand) => (panels ? panels.relay('main', command) : mainWindow?.webContents.send(IPC.shellCommand, command))
+const crashes = new CrashWatcher(
+  report => toHermesWindow({ type: 'crash', payload: { ...report } }),
+  () => [backend.childPid()].filter((pid): pid is number => pid !== null),
+  report => events.emit('crash', { app: report.app, pid: report.pid, reason: report.reason })
+)
+// Every event runs the person's hook scripts and fires the Hermes automations waiting for it.
+events.on(event => {
+  runHooks(event)
+  void fireEventAutomations(event, backend)
+})
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -178,7 +199,12 @@ function registerCoreIpc(): void {
   registerBridgeIpc()
   registerServiceIpc()
   registerSystemIpc(() => BrowserWindow.getAllWindows())
-  registerContextIpc(() => BrowserWindow.getAllWindows())
+  registerContextIpc(
+    () => BrowserWindow.getAllWindows(),
+    back => events.emit('returned', { reason: back.reason, away_minutes: Math.round(back.awayMs / 60_000) })
+  )
+  registerThemeIpc({ panels: Boolean(panels), broadcast: broadcastPrefs, backend })
+  registerCaptureIpc()
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.
@@ -225,6 +251,9 @@ app.whenReady().then(async () => {
   }
 
   registerCoreIpc()
+  events.registerIpc()
+  crashes.start()
+  startEventSources()
   backend.onState(state => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.backendState, state)
@@ -275,6 +304,7 @@ app.on('before-quit', event => {
   quitting = true
   event.preventDefault()
   globalShortcut.unregisterAll()
+  crashes.stop()
   control?.stop()
   osControl?.stop()
   wallpaper?.stop()

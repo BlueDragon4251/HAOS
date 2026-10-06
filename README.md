@@ -87,10 +87,23 @@ abilities as a regular Hermes plugin, `herald-os-bridge`.
   [docs/VOICE.md](docs/VOICE.md).
 - **Studio**: say "build a website for a hair salon" and watch it happen in one window: the
   project's files, the code as it is written, the commands it runs, and a live preview.
+- **Crash help**: when a program crashes, a notification offers to have Hermes read the crash
+  report and explain, in plain words, what went wrong and whether it is worth reporting.
+- **Make it yours**: twelve themes (two light) that also dress Hermes's own command line, a theme
+  made from any image, themes installed from git, your own fonts, and Hermes can design one from a
+  description. See [the manual](docs/manual/make-it-yours.md).
+- **Ask about the screen**: select part of the screen and ask Hermes about it.
+- **Usage**: what Hermes used this week and this month, and what is left on your model plan, with
+  a warning at 90%.
+- **When something happens**: automations that run when you log in, come back after a break, the
+  battery runs low or a program crashes, and hook scripts for the same moments.
 - **On Herald OS Linux, the rest of an OS**: a control menu to install and remove apps, change the
-  theme and update the system; four themes that recolour everything from the menu bar to the
-  terminal; a curated app set; web apps in their own windows; clipboard history, a lock screen and a
-  power menu; and one command, `herald-os update`, that updates Herald OS, Hermes and Fedora.
+  theme and update the system; themes that recolour everything from the menu bar to the terminal;
+  a curated app set; web apps in their own windows; clipboard history, a lock screen and a power
+  menu; and one command, `herald-os update`, that updates Herald OS, Hermes and Fedora.
+
+The [manual](docs/manual/README.md) covers using all of it, with every hotkey and a page for
+people coming from macOS.
 
 ## Getting started
 
@@ -292,10 +305,14 @@ npm run dist:mac
 
 This writes an Apple Silicon DMG and zip to `apps/desktop/release/`. Before installing, know that:
 
-- **The build is not notarized.** electron-builder signs it with a code-signing identity from your
-  keychain if it finds one, and leaves it unsigned otherwise. A copy that was downloaded or sent to
-  you will not open the first time: choose Open Anyway in System Settings → Privacy & Security, or
-  run `xattr -dr com.apple.quarantine "/Applications/Herald OS.app"`.
+- **A local build is not notarized.** electron-builder signs it with a code-signing identity from
+  your keychain if it finds one, and leaves it unsigned otherwise. A copy that was downloaded or sent
+  to you will not open the first time: choose Open Anyway in System Settings → Privacy & Security, or
+  run `xattr -dr com.apple.quarantine "/Applications/Herald OS.app"`. The release workflow
+  (`.github/workflows/release.yml`) builds a signed and notarized one when the repository has the
+  `MAC_CERTIFICATE_P12`, `MAC_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and
+  `APPLE_TEAM_ID` secrets; set the same variables locally (`CSC_LINK` and `CSC_KEY_PASSWORD` for the
+  certificate) to notarize from your Mac.
 - **macOS notifications need a signed build.** Notifications still appear inside Herald OS, but the
   macOS ones it sends while you are in another app only work when the build is code-signed.
 - **The system tools plugin is not bundled.** Run `npm run bootstrap` from a checkout once so

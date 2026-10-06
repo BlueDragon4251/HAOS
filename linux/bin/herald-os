@@ -8,10 +8,14 @@ call the tools directly.
   Hermes        ask [text] | command | applications | menu | page <id> | open <window> | launch <app>
   Software      install app <name|flatpak-id> | install webapp <name> <url> [icon-url]
                 remove app <name> | remove webapp <name> | update [--check]
-  Style         theme list | theme set <name> | theme current | wallpaper <image>
+  Style         theme list | theme set <name> | theme current | theme new <image> [name]
+                theme install <git-url> | font list | font set <family> [--mono] | wallpaper <image>
   Trigger       reminder <duration> <message> | reminder list | reminder clear
                 notice time|battery|weather | screenshot | ocr | clipboard | notify <title> [body]
+  Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
+  Events        event <name> [key=value ...] | hook list | hook install <event> <script> | hook dir
   System        lock | suspend | power | wm <niri action...> | state | debug | commands [--json]
+                os <command.id> [json args]: run any Herald OS command (the same ones Hermes uses)
 """
 
 from __future__ import annotations
@@ -20,9 +24,11 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.parse
 from datetime import datetime
@@ -49,14 +55,20 @@ COMMANDS: dict[str, str] = {
     "install": "install app <name|flatpak-id> | install webapp <name> <url> [icon-url]",
     "remove": "remove app <name> | remove webapp <name>",
     "update": "Update Herald OS, Hermes Agent and system packages (--check only reports)",
-    "theme": "theme list | theme set <name> | theme current",
+    "theme": "theme list | theme set <name> | theme current | theme new <image> [name] | theme install <git-url>",
+    "font": "font list | font set <family> [--mono]: the interface font, or the code and terminal font",
     "wallpaper": "Set the wallpaper image (path), or `wallpaper default`",
     "reminder": "reminder <duration> <message> (e.g. 20m, 1h30m) | reminder list | reminder clear",
     "notice": "notice time | battery | weather",
     "screenshot": "Screenshot the screen and hand it to Hermes",
+    "capture": "capture region [--ask]: select part of the screen (--ask hands it to Hermes with your question)",
     "ocr": "Select a screen region, extract its text (tesseract) to the clipboard",
     "clipboard": "Clipboard history picker",
     "notify": "Show a notification: notify <title> [body]",
+    "crash": "crash list | crash diagnose [pid|name] (Hermes explains it) | crash mute <name> [off]",
+    "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
+    "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
+    "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "lock": "Lock the session (needs an account password; see `herald-os password`)",
     "password": "Set the login password the lock screen asks for",
@@ -311,6 +323,106 @@ def theme_set(name: str) -> int:
     return 0
 
 
+THEME_COLOR_KEYS = ("bg", "bg2", "surface", "fg", "fg_dim", "accent", "accent_strong", "border_active", "border_inactive", "urgent", "ok", "warn")
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+THEME_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif"}
+MAX_THEME_IMAGE = 25 * 1024 * 1024
+
+
+def theme_problem(spec: object) -> str | None:
+    if not isinstance(spec, dict):
+        return "theme.json must be a JSON object"
+    if not THEME_NAME.match(str(spec.get("name") or "")):
+        return 'theme.json needs a "name" of lowercase letters, digits and dashes'
+    colors = spec.get("colors")
+    if not isinstance(colors, dict):
+        return 'theme.json needs "colors"'
+    bad = [key for key in THEME_COLOR_KEYS if not HEX_COLOR.match(str(colors.get(key) or ""))]
+    return f"theme.json colours must be #rrggbb; check {', '.join(bad)}" if bad else None
+
+
+def theme_install(url: str) -> int:
+    """Install the themes in a git repository, keeping only colours and images: a theme cannot run code."""
+    if not re.match(r"^https://[\w.-]+/[\w./-]+$", url):
+        die("theme install needs the https address of a git repository", 2)
+    if not shutil.which("git"):
+        die("git is not installed", 127)
+    user_dir = CONFIG_DIR / "themes"
+    builtin_dirs = [d for d in THEME_DIRS if d != user_dir]
+    installed: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="herald-theme-") as scratch:
+        result = sh(["git", "clone", "--depth", "1", "--quiet", url, scratch], timeout=180)
+        if result.returncode != 0:
+            die(result.stderr.strip() or "git clone failed", 1)
+        root = Path(scratch)
+        folders = [root] if (root / "theme.json").exists() else [d for d in sorted(root.iterdir()) if d.is_dir() and not d.name.startswith(".") and (d / "theme.json").exists()]
+        if not folders:
+            die("the repository has no theme.json", 1)
+        for folder in folders:
+            try:
+                spec = json.loads((folder / "theme.json").read_text())
+            except json.JSONDecodeError as exc:
+                die(f"{folder.name}: theme.json is not valid JSON ({exc})", 1)
+            problem = theme_problem(spec)
+            if problem:
+                die(f"{folder.name}: {problem}", 1)
+            name = spec["name"]
+            if any((base / name / "theme.json").exists() for base in builtin_dirs):
+                die(f"{name!r} is a built-in theme name", 1)
+            target = user_dir / name
+            shutil.rmtree(target, ignore_errors=True)
+            target.mkdir(parents=True)
+            for entry in folder.iterdir():
+                if entry.is_file() and not entry.is_symlink() and entry.suffix.lower() in IMAGE_EXTENSIONS and entry.stat().st_size <= MAX_THEME_IMAGE:
+                    shutil.copy2(entry, target / entry.name)
+            wallpaper_name = Path(str(spec.get("wallpaper") or "default")).name
+            clean = {key: spec[key] for key in ("name", "label", "description", "colors", "gtk", "terminal") if key in spec}
+            clean["wallpaper"] = wallpaper_name if (target / wallpaper_name).is_file() else "default"
+            scheme = (spec.get("shell") or {}).get("scheme") if isinstance(spec.get("shell"), dict) else None
+            if scheme in ("dark", "light"):
+                clean["shell"] = {"scheme": scheme}
+            (target / "theme.json").write_text(json.dumps(clean, indent=2) + "\n")
+            installed.append(name)
+    notify("Themes installed", ", ".join(installed))
+    print("\n".join(installed))
+    return 0
+
+
+def font(args: list[str]) -> int:
+    sub = args[0] if args else "list"
+    if sub == "list":
+        if not shutil.which("fc-list"):
+            die("fc-list is not installed (fontconfig)", 127)
+        families = sorted({line.split(",")[0].strip() for line in sh(["fc-list", ":", "family"], timeout=30).stdout.splitlines() if line.strip()})
+        print("\n".join(families))
+        return 0
+    if sub == "set":
+        mono = "--mono" in args
+        family = " ".join(a for a in args[1:] if a != "--mono").strip()
+        if not family:
+            die("font set <family> [--mono]  (default puts the built-in font back)", 2)
+        reset = family.lower() in ("default", "reset", "system")
+        if mono:
+            # The foot rescue terminal follows the code font; the theme engine reads this file.
+            marker = CONFIG_DIR / "font-mono"
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            if reset:
+                marker.unlink(missing_ok=True)
+            else:
+                marker.write_text(family + "\n")
+            if shutil.which("herald-os-theme"):
+                subprocess.run(["herald-os-theme", "set", theme_name_current()], check=False, capture_output=True)
+        return run_os("font.set", {"family": family, "kind": "mono" if mono else "ui"})
+    die("font list | font set <family> [--mono]", 2)
+    return 2
+
+
+def theme_name_current() -> str:
+    marker = CONFIG_DIR / "theme"
+    return marker.read_text().strip() if marker.exists() else "herald-ocean"
+
+
 def wallpaper(path: str) -> int:
     value = "" if path in ("default", "") else str(Path(path).expanduser().resolve())
     if value and not Path(value).is_file():
@@ -407,6 +519,36 @@ def screenshot() -> int:
     return 0
 
 
+CAPTURES = Path(tempfile.gettempdir()) / "herald-os-captures"
+
+
+def capture(args: list[str]) -> int:
+    sub = args[0] if args else ""
+    if sub == "region":
+        for tool in ("grim", "slurp"):
+            if not shutil.which(tool):
+                die(f"{tool} is not installed (dnf install grim slurp)", 127)
+        region = sh(["slurp"], timeout=300)
+        if region.returncode != 0 or not region.stdout.strip():
+            return 1
+        ask = "--ask" in args
+        out_dir = CAPTURES if ask else HOME / "Pictures" / "Screenshots"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"Screenshot {datetime.now():%Y-%m-%d %H-%M-%S}.png"
+        if subprocess.call(["grim", "-g", region.stdout.strip(), str(path)]) != 0 or not path.exists():
+            die("the screenshot failed", 1)
+        if ask:
+            # The command overlay opens with the picture attached; the person types the question.
+            reply = relay("ask", [], {"attachments": [str(path)]}, quiet=True)
+            if not reply.get("ok"):
+                print(str(path))
+            return 0
+        print(str(path))
+        return 0
+    die("capture region [--ask]", 2)
+    return 2
+
+
 def ocr() -> int:
     for tool in ("grim", "slurp", "tesseract", "wl-copy"):
         if not shutil.which(tool):
@@ -424,6 +566,129 @@ def ocr() -> int:
     notify("Text copied", preview[:120] + ("…" if len(preview) > 120 else ""))
     print(text)
     return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# Events and hooks: scripts in ~/.config/herald-os/hooks/<event>.d/ run when the event happens.
+EVENT_NAMES = ("login", "wake", "sleep", "lock", "unlock", "returned", "battery-low", "network-change", "theme-set", "crash", "after-update")
+HOOKS_DIR = CONFIG_DIR / "hooks"
+HOOK_TIMEOUT = 120
+
+
+def hook_scripts(event_name: str) -> list[Path]:
+    folder = HOOKS_DIR / f"{event_name}.d"
+    if not folder.is_dir():
+        return []
+    return [p for p in sorted(folder.iterdir()) if p.is_file() and os.access(p, os.X_OK) and not p.name.startswith(".") and not p.name.endswith((".sample", "~"))]
+
+
+def run_hooks_here(event_name: str, detail: dict[str, str]) -> None:
+    """The shell runs hooks itself; without it (a TTY, an update before login) they run from here."""
+    env = {**os.environ, "HERALD_EVENT": event_name, "HERALD_EVENT_AT": datetime.now().astimezone().isoformat(),
+           "HERALD_EVENT_JSON": json.dumps({"name": event_name, "detail": detail})}
+    env.update({f"HERALD_EVENT_{re.sub(r'[^A-Z0-9]+', '_', key.upper())}": value for key, value in detail.items()})
+    for script in hook_scripts(event_name):
+        try:
+            subprocess.run([str(script), event_name], env=env, timeout=HOOK_TIMEOUT, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"herald-os: hook {script.name}: {exc}", file=sys.stderr)
+
+
+def event_cmd(args: list[str]) -> int:
+    if not args or args[0] not in EVENT_NAMES:
+        die(f"event <name> [key=value ...]; names: {', '.join(EVENT_NAMES)}", 2)
+    name, pairs = args[0], args[1:]
+    reply = relay("event", [name, *pairs], quiet=True)
+    if not reply.get("ok"):
+        run_hooks_here(name, dict(pair.split("=", 1) for pair in pairs if "=" in pair))
+    return 0
+
+
+def hook_cmd(args: list[str]) -> int:
+    sub = args[0] if args else "list"
+    if sub == "dir":
+        print(HOOKS_DIR)
+        return 0
+    if sub == "list":
+        for name in EVENT_NAMES:
+            scripts = hook_scripts(name)
+            print(f"{name:<15} {', '.join(s.name for s in scripts) if scripts else '-'}")
+        return 0
+    if sub == "install" and len(args) == 3:
+        name, source = args[1], Path(args[2]).expanduser()
+        if name not in EVENT_NAMES:
+            die(f"no event called {name!r}; events: {', '.join(EVENT_NAMES)}", 2)
+        if not source.is_file():
+            die(f"no such script: {args[2]}", 1)
+        target = HOOKS_DIR / f"{name}.d" / source.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        target.chmod(target.stat().st_mode | 0o755)
+        print(f"installed {target}")
+        return 0
+    die("hook list | hook install <event> <script> | hook dir", 2)
+    return 2
+
+
+# ---------------------------------------------------------------------------------------------
+# Crashes: core dumps from systemd-coredump; the shell turns a diagnosis into a Hermes chat.
+def run_os(command: str, args: dict | None = None) -> int:
+    """Run a registry command in the Hermes window (fire and forget; the shell reports the result)."""
+    reply = relay("os", [command, json.dumps(args or {})])
+    if not reply.get("ok"):
+        die(reply.get("error") or f"the shell rejected {command}", 1)
+    return 0
+
+
+def signal_name(number: object) -> str:
+    try:
+        return signal.Signals(int(number)).name  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return str(number or "?")
+
+
+def coredumps() -> list[dict]:
+    if not shutil.which("coredumpctl"):
+        die("coredumpctl is not installed (it ships with systemd-coredump)", 127)
+    result = sh(["coredumpctl", "list", "--json=short", "--no-pager", "--since=-7d"], timeout=30)
+    try:
+        rows = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        rows = []
+    return sorted((r for r in rows if isinstance(r, dict)), key=lambda r: r.get("time") or 0, reverse=True)
+
+
+def crash(args: list[str]) -> int:
+    sub = args[0] if args else "list"
+    if sub == "list":
+        rows = coredumps()
+        if not rows:
+            print("No crashes in the last 7 days.")
+            return 0
+        for row in rows[:30]:
+            when = datetime.fromtimestamp(row["time"] / 1_000_000).strftime("%a %d %b %H:%M") if row.get("time") else "?"
+            print(f"{when:<16} {str(row.get('pid', '?')):>7}  {Path(str(row.get('exe') or '?')).name:<24} {signal_name(row.get('sig'))}")
+        return 0
+    if sub == "diagnose":
+        target = " ".join(args[1:]).strip()
+        if not target.isdigit():
+            return run_os("crash.diagnose", {"crash": target} if target else {})
+        row = next((r for r in coredumps() if str(r.get("pid")) == target), None)
+        details: dict = {"pid": int(target)}
+        if row:
+            details["app"] = Path(str(row.get("exe") or "")).name or None
+            details["reason"] = signal_name(row.get("sig"))
+            if row.get("time"):
+                details["at"] = datetime.fromtimestamp(row["time"] / 1_000_000).astimezone().isoformat()
+        return run_os("crash.diagnose", {k: v for k, v in details.items() if v})
+    if sub == "mute":
+        off = len(args) > 2 and args[-1] == "off"
+        name = " ".join(args[1:-1] if off else args[1:]).strip()
+        if not name:
+            die("crash mute <name> [off]", 2)
+        return run_os("crash.mute", {"app": name, "muted": not off})
+    die("crash list | crash diagnose [pid|name] | crash mute <name> [off]", 2)
+    return 2
 
 
 # ---------------------------------------------------------------------------------------------
@@ -559,7 +824,16 @@ def main(argv: list[str]) -> int:
             return theme_current()
         if sub == "set":
             return theme_set(" ".join(args[1:]))
-        die("theme list | theme set <name> | theme current", 2)
+        if sub == "install" and len(args) == 2:
+            return theme_install(args[1])
+        if sub == "new" and len(args) >= 2:
+            image = Path(args[1]).expanduser().resolve()
+            if not image.is_file():
+                die(f"no such image: {args[1]}", 1)
+            return run_os("theme.generate", {"image": str(image), **({"name": " ".join(args[2:])} if len(args) > 2 else {})})
+        die("theme list | theme set <name> | theme current | theme new <image> [name] | theme install <git-url>", 2)
+    if cmd == "font":
+        return font(args)
     if cmd == "wallpaper":
         return wallpaper(args[0] if args else "default")
     if cmd == "reminder":
@@ -568,8 +842,24 @@ def main(argv: list[str]) -> int:
         return notice(args[0] if args else "")
     if cmd == "screenshot":
         return screenshot()
+    if cmd == "capture":
+        return capture(args)
     if cmd == "ocr":
         return ocr()
+    if cmd == "crash":
+        return crash(args)
+    if cmd == "event":
+        return event_cmd(args)
+    if cmd == "hook":
+        return hook_cmd(args)
+    if cmd == "os":
+        if not args:
+            die("os <command.id> [json args]", 2)
+        try:
+            payload = json.loads(args[1]) if len(args) > 1 else {}
+        except json.JSONDecodeError:
+            die("os: the arguments must be a JSON object", 2)
+        return run_os(args[0], payload if isinstance(payload, dict) else {})
     if cmd == "lock":
         return lock()
     if cmd == "password":

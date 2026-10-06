@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from ..crash import MAC_REPORT_DIRS, is_crash_header, resolve_mac_report, summarise_ips
 from ..util import run
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, PortListener, ProcessRow
 from .posix import parse_du, parse_ps  # noqa: F401 - shared with Linux; re-exported for callers/tests.
@@ -458,6 +459,31 @@ class DarwinHost(HostAdapter):
         result = run(argv, timeout=60)
         lines = [ln for ln in result.stdout.splitlines() if ln.strip() and not ln.startswith(("Filtering", "Timestamp"))]
         return lines[-limit:]
+
+    def crash_reports(self, limit: int) -> list[dict[str, Any]]:
+        files: list[tuple[float, Path]] = []
+        for base in MAC_REPORT_DIRS:
+            try:
+                files.extend((entry.stat().st_mtime, entry) for entry in base.glob("*.ips"))
+            except OSError:
+                continue
+        out: list[dict[str, Any]] = []
+        for mtime, entry in sorted(files, reverse=True):
+            try:
+                with entry.open("r", errors="replace") as handle:
+                    header = json.loads(handle.readline() or "{}")
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(header, dict) or not is_crash_header(header):
+                continue
+            out.append({"report": str(entry), "app": header.get("app_name") or header.get("name"), "time": datetime.fromtimestamp(mtime).isoformat(timespec="seconds")})
+            if len(out) >= limit:
+                break
+        return out
+
+    def crash_report(self, ref: str) -> dict[str, Any]:
+        path = resolve_mac_report(ref)
+        return {"report": str(path), **summarise_ips(path.read_text(errors="replace"))}
 
     # --- system control ----------------------------------------------------------------------
     def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:

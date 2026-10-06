@@ -6,7 +6,7 @@ import { Dot, EmptyState } from '../components/ui/primitives.tsx'
 import { formatRelative } from '../lib/format.ts'
 import { $notifications, $notificationsOpen, activateDesktopNotification, clearNotifications, dismissNotification, type HermesNotification, markAllRead, type NotificationLevel } from '../store/notifications.ts'
 import { showSurface } from '../store/surface.ts'
-import { DesktopActions } from './Toasts.tsx'
+import { CommandActions, DesktopActions } from './Toasts.tsx'
 
 const TONE: Record<NotificationLevel, 'info' | 'ok' | 'warn' | 'danger'> = { info: 'info', success: 'ok', warn: 'warn', error: 'danger' }
 
@@ -74,6 +74,7 @@ export function NotificationsPanel() {
                     {item.body && <div className="mt-0.5 line-clamp-3 text-[12px] text-fg-3">{item.body}</div>}
                   </button>
                   {item.desktop && item.desktop.actions.length > 0 && <DesktopActions item={item} />}
+                  {item.actions && <CommandActions item={item} />}
                 </div>
                 {item.desktop && (
                   <button

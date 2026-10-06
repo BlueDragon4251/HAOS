@@ -44,6 +44,11 @@ export class BackendManager {
     return { ...this.state, logTail: this.tail.slice(-LOG_TAIL_LINES) }
   }
 
+  /** Process id of the running `hermes serve`, if any. */
+  childPid(): number | null {
+    return this.child?.pid ?? null
+  }
+
   onState(listener: BackendListener): () => void {
     this.listeners.add(listener)
     listener(this.getState())

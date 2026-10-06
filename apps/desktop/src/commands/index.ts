@@ -2,6 +2,7 @@ import { defineCommands } from '../store/os-commands.ts'
 import { automationCommands } from './automations.ts'
 import { connectionCommands } from './connections.ts'
 import { continuityCommands } from './continuity.ts'
+import { crashCommands } from './crash.ts'
 import { editCommands } from './edit.ts'
 import { filesCommands } from './files.ts'
 import { hermesCommands } from './hermes.ts'
@@ -9,7 +10,9 @@ import { memoryCommands } from './memory.ts'
 import { navigationCommands } from './navigation.ts'
 import { openCommands } from './open.ts'
 import { studioCommands } from './studio.ts'
+import { screenCommands } from './screen.ts'
 import { systemCommands } from './system.ts'
+import { themeCommands } from './themes.ts'
 
 let registered = false
 
@@ -22,7 +25,7 @@ export function registerOsCommands(): void {
   registered = true
 
   // A bad definition must not take the whole shell down with it; report and keep booting.
-  for (const group of [navigationCommands, editCommands, hermesCommands, memoryCommands, filesCommands, automationCommands, connectionCommands, systemCommands, studioCommands, openCommands, continuityCommands]) {
+  for (const group of [navigationCommands, editCommands, hermesCommands, memoryCommands, filesCommands, automationCommands, connectionCommands, systemCommands, studioCommands, openCommands, continuityCommands, crashCommands, themeCommands, screenCommands]) {
     try {
       defineCommands(group)
     } catch (error) {

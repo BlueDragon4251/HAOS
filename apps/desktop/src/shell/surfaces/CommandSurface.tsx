@@ -17,7 +17,7 @@ const MODES = new Set<Mode>(['ask', 'command', 'applications', 'menu', 'power', 
 const WINDOW_WIDTH = 680
 const MAX_HEIGHT = 560
 
-interface AskState {
+export interface AskState {
   text: string
   context: WmWindow | null
   attachments: string[]
@@ -118,7 +118,7 @@ export function CommandSurface() {
 }
 
 /** "Ask Hermes about this window": a prompt with the focused window as context, relayed to the Hermes window. */
-function AskPanel({ state, onClose }: { state: AskState; onClose: () => void }) {
+export function AskPanel({ state, onClose }: { state: AskState; onClose: () => void }) {
   const [text, setText] = useState(state.text)
   const textarea = useRef<HTMLTextAreaElement>(null)
 
@@ -186,7 +186,7 @@ function AskPanel({ state, onClose }: { state: AskState; onClose: () => void }) 
               submit()
             }
           }}
-          placeholder={state.context ? `Ask about ${windowLabel(state.context)}` : 'Ask Hermes anything'}
+          placeholder={state.context ? `Ask about ${windowLabel(state.context)}` : state.attachments.length > 0 ? 'What would you like to know about it?' : 'Ask Hermes anything'}
           aria-label="Ask Hermes"
           className="glass-input w-full resize-none rounded-lg px-3 py-2.5 text-[14px] leading-relaxed outline-none placeholder:text-fg-4"
         />

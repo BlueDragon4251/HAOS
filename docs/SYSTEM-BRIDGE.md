@@ -15,7 +15,7 @@ unrestricted machine access.
 | `system_find_files` | read | File search (Spotlight on macOS, `plocate`/`fd` on Linux): name, kind, screenshots, date ranges, scope |
 | `system_apps` | read | Installed applications and currently running applications |
 | `system_network` | read | Connectivity (interfaces, gateway, DNS, Wi-Fi link) and Bluetooth devices |
-| `system_logs` | read | Recent lines from the system log, filtered by level and process |
+| `system_logs` | read | Recent lines from the system log, filtered by level and process; recent crashes and one crash's facts (macOS crash reports, Linux core dumps) for the `diagnose-crash` skill |
 | `system_control` | read / act / mutate | Volume, dark mode, notifications, System Settings panes, display sleep, screen lock; switching Wi-Fi asks first |
 | `system_open` | act | Open an app, URL, file or folder; reveal in Finder; open a path in an editor |
 | `system_kill_process` | destructive | Terminate a process by pid or by listening port |

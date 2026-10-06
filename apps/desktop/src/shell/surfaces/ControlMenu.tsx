@@ -219,6 +219,7 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
             argv: values => ['reminder', values.duration, values.message]
           }
         },
+        { id: 'trigger-ask-region', label: 'Ask about part of the screen', hint: 'Select a region, then ask Hermes', icon: IconCamera, leaf: { kind: 'cli', argv: ['capture', 'region', '--ask'], detached: true } },
         { id: 'trigger-screenshot', label: 'Screenshot', hint: 'Whole screen, then ask Hermes', icon: IconCamera, leaf: { kind: 'cli', argv: ['screenshot'], detached: true } },
         { id: 'trigger-ocr', label: 'Text extraction (OCR)', hint: 'Select a region', icon: IconTextRecognition, leaf: { kind: 'cli', argv: ['ocr'], detached: true } },
         { id: 'trigger-notice-time', label: 'Notice: Time', icon: IconClock, leaf: { kind: 'cli', argv: ['notice', 'time'] } },

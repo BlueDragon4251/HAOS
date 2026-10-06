@@ -87,7 +87,7 @@ function PreviewCard({ artifact, data, loading, error }: { artifact: Artifact; d
 
   if (data?.type === 'text') {
     return (
-      <div className="max-h-64 overflow-hidden rounded-xl border border-line bg-white/95 px-4 py-3 text-black [&_*]:text-black [&_a]:text-accent-strong [&_code]:bg-black/6 [&_pre]:border-black/10 [&_pre]:bg-black/5 [&_th]:shadow-[0_0_0_1px_rgba(0,0,0,.12)] [&_td]:shadow-[0_0_0_1px_rgba(0,0,0,.12)]">
+      <div className="max-h-64 overflow-hidden rounded-xl border border-line bg-paper/95 px-4 py-3 text-ink [&_*]:text-ink [&_a]:text-accent-strong [&_code]:bg-ink/6 [&_pre]:border-ink/10 [&_pre]:bg-ink/5 [&_th]:shadow-[0_0_0_1px_rgba(0,0,0,.12)] [&_td]:shadow-[0_0_0_1px_rgba(0,0,0,.12)]">
         <Markdown text={data.text} className="text-[11.5px] leading-relaxed" />
         {data.truncated && <div className="mt-2 text-[10.5px] text-black/50">…</div>}
       </div>

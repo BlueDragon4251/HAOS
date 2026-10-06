@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 import { afterExit, motion } from '../lib/motion.ts'
 import { $backend } from '../store/backend.ts'
+import { runCommand } from '../store/os-commands.ts'
 import { toggleSidebar } from '../store/sidebar.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../store/surface.ts'
 import { $focusedWindowId, closeWindow, MAIN_WINDOW_ID, minimizeWindow, openApp } from '../store/windows.ts'
@@ -27,6 +28,14 @@ export function App() {
       if (meta && event.shiftKey && key === 'a') {
         event.preventDefault()
         $applicationsOpen.set(!$applicationsOpen.get())
+
+        return
+      }
+
+      // Cmd+Shift+S: select part of the screen and ask Hermes about it (Mod+Shift+S on Linux).
+      if (meta && event.shiftKey && key === 's') {
+        event.preventDefault()
+        void runCommand('screen.askRegion', {}, { source: 'shortcut' })
 
         return
       }

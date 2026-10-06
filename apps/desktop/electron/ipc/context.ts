@@ -11,7 +11,7 @@ const MIN_AWAY_MS = 10 * 60_000
 const IDLE_AWAY_S = 15 * 60
 const IDLE_POLL_MS = 60_000
 
-export function registerContextIpc(getWindows: () => BrowserWindow[]): void {
+export function registerContextIpc(getWindows: () => BrowserWindow[], onReturned?: (event: ContextReturn) => void): void {
   let inFlight: Promise<ContextSnapshot> | null = null
 
   ipcMain.handle(IPC.contextSnapshot, () => {
@@ -53,6 +53,7 @@ export function registerContextIpc(getWindows: () => BrowserWindow[]): void {
     }
 
     log('context', `back after ${Math.round(awayMs / 60_000)} min (${reason})`)
+    onReturned?.({ reason, awayMs })
 
     for (const win of getWindows()) {
       win.webContents.send(IPC.contextReturned, { reason, awayMs } satisfies ContextReturn)

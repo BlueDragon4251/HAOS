@@ -281,7 +281,8 @@ binds {
     Print hotkey-overlay-title="Screenshot (select)" { screenshot; }
     Mod+Print hotkey-overlay-title="Screenshot window" { screenshot-window; }
     Mod+Shift+Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
-    Mod+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "herald-os" "screenshot"; }
+    Mod+Shift+S hotkey-overlay-title="Ask Hermes about part of the screen" { spawn "herald-os" "capture" "region" "--ask"; }
+    Mod+Ctrl+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "herald-os" "screenshot"; }
 
     Mod+Ctrl+V hotkey-overlay-title="Clipboard history" { spawn "herald-os" "clipboard"; }
 

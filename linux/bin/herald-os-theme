@@ -23,9 +23,10 @@ HOME = Path.home()
 CONFIG = HOME / ".config"
 STATE = HOME / ".config" / "herald-os"
 THEME_DIRS = [
-    Path(os.environ.get("HERALD_OS_THEMES", "")),
+    *([Path(os.environ["HERALD_OS_THEMES"])] if os.environ.get("HERALD_OS_THEMES") else []),
     HOME / "Herald-OS" / "linux" / "themes",
     Path("/usr/local/share/herald-os-linux/themes"),
+    Path("/usr/share/herald-os/themes"),
     STATE / "themes",
 ]
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
@@ -78,6 +79,22 @@ def write(path: Path, text: str) -> None:
 def hexn(value: str) -> str:
     """#rrggbb -> rrggbb (swaylock wants bare hex)."""
     return value.lstrip("#")
+
+
+def luminance(value: str) -> float:
+    """WCAG relative luminance of #rrggbb."""
+    def channel(byte: int) -> float:
+        s = byte / 255
+        return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+
+    raw = hexn(value)
+    r, g, b = (int(raw[i:i + 2], 16) for i in (0, 2, 4))
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+
+
+def on_accent(c: dict) -> str:
+    """Button text on the accent: white while it keeps 3:1, else near-black (light accents)."""
+    return "#ffffff" if (1.05 / (luminance(c["accent"]) + 0.05)) >= 3 else "#111318"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -137,7 +154,7 @@ def render_gtk_css(c: dict) -> str:
     return f"""/* Written by herald-os-theme. */
 @define-color accent_color {c['accent']};
 @define-color accent_bg_color {c['accent']};
-@define-color accent_fg_color #ffffff;
+@define-color accent_fg_color {on_accent(c)};
 @define-color window_bg_color {c['bg2']};
 @define-color window_fg_color {c['fg']};
 @define-color view_bg_color {c['surface']};
@@ -157,10 +174,13 @@ def render_foot(t: dict) -> str:
     c = t["colors"]
     term = t.get("terminal", {})
     palette = term.get("palette") or []
+    # `herald-os font set <family> --mono` picks the code font; the terminal follows it.
+    marker = STATE / "font-mono"
+    family = marker.read_text().strip() if marker.exists() else ""
     lines = [
         "# Written by herald-os-theme.",
         "[main]",
-        "font=JetBrains Mono:size=11, Noto Sans Mono:size=11",
+        f"font={family or 'JetBrains Mono'}:size=11, Noto Sans Mono:size=11",
         "pad=12x12",
         "",
         "[colors]",
@@ -173,6 +193,30 @@ def render_foot(t: dict) -> str:
              "bright0", "bright1", "bright2", "bright3", "bright4", "bright5", "bright6", "bright7"]
     for key, colour in zip(names, palette):
         lines.append(f"{key}={hexn(colour)}")
+    return "\n".join(lines) + "\n"
+
+
+HERMES_SKIN = "herald-os"
+
+
+def render_hermes_skin(theme: dict) -> str:
+    """Hermes's own CLI and TUI skin in the theme's colours (the same mapping the shell writes)."""
+    c = theme["colors"]
+    label = str(theme.get("label") or theme.get("name") or "Herald OS").replace('"', "'")
+    colors = {
+        "banner_border": c["accent"], "banner_title": c["accent_strong"], "banner_accent": c["accent"],
+        "banner_dim": c["fg_dim"], "banner_text": c["fg"], "ui_accent": c["accent"], "ui_label": c["accent_strong"],
+        "ui_ok": c["ok"], "ui_error": c["urgent"], "ui_warn": c["warn"], "prompt": c["fg"], "input_rule": c["border_inactive"],
+        "response_border": c["accent"], "status_bar_bg": c["bg2"], "status_bar_text": c["fg_dim"],
+        "status_bar_strong": c["accent_strong"], "status_bar_dim": c["fg_dim"], "status_bar_good": c["ok"],
+        "status_bar_warn": c["warn"], "status_bar_bad": c["urgent"], "status_bar_critical": c["urgent"],
+        "session_label": c["accent"], "session_border": c["border_inactive"], "completion_menu_bg": c["bg2"],
+        "completion_menu_current_bg": c["surface"], "selection_bg": c["surface"], "shell_dollar": c["accent"],
+        "voice_status_bg": c["bg2"],
+    }
+    lines = [f'# Written by Herald OS from its "{label}" theme; Herald OS rewrites it when the theme changes.',
+             f"name: {HERMES_SKIN}", f'description: "Herald OS: {label}"', "colors:"]
+    lines += [f'  {key}: "{value}"' for key, value in colors.items()]
     return "\n".join(lines) + "\n"
 
 
@@ -205,12 +249,14 @@ def apply(name: str) -> int:
     shell = theme.get("shell", {})
     gtk = theme.get("gtk", {})
 
+    hermes_home = Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
     targets = {
         CONFIG / "niri" / "theme.kdl": render_niri(c),
         CONFIG / "swaylock" / "config": render_swaylock(c),
         CONFIG / "gtk-3.0" / "gtk.css": render_gtk_css(c),
         CONFIG / "gtk-4.0" / "gtk.css": render_gtk_css(c),
         CONFIG / "foot" / "foot.ini": render_foot(theme),
+        hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
     }
     backups = {path: (path.read_text() if path.exists() else None) for path in targets}
     try:

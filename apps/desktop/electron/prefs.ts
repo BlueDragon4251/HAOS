@@ -1,14 +1,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { ContinuityPrefs, HeraldOSPrefs } from '../shared/ipc.ts'
+import { type EventAutomation, isEventName } from '../shared/events.ts'
+import type { ContinuityPrefs, CrashHelpPrefs, HeraldOSPrefs } from '../shared/ipc.ts'
 import { normalizeVoicePrefs, VOICE_DEFAULTS } from '../shared/voice-prefs.ts'
 import { heraldOsDataDir } from './paths.ts'
 
 const CONTINUITY_DEFAULTS: ContinuityPrefs = { enabled: null, exclude: [] }
+const CRASH_HELP_DEFAULTS: CrashHelpPrefs = { enabled: true, muted: [] }
 
 const DEFAULTS: HeraldOSPrefs = {
   voice: VOICE_DEFAULTS,
   continuity: CONTINUITY_DEFAULTS,
+  crashHelp: CRASH_HELP_DEFAULTS,
   fullscreenOnLaunch: true,
   reduceMotion: false,
   accent: 'blue',
@@ -39,11 +42,33 @@ export function readPrefs(): HeraldOSPrefs {
       accent: (accent as HeraldOSPrefs['accent']) ?? DEFAULTS.accent,
       spaces: parsed.spaces?.length ? parsed.spaces : DEFAULTS.spaces,
       voice: normalizeVoicePrefs(parsed.voice),
-      continuity: normalizeContinuity(parsed.continuity)
+      continuity: normalizeContinuity(parsed.continuity),
+      crashHelp: normalizeCrashHelp(parsed.crashHelp),
+      eventAutomations: normalizeEventAutomations(parsed.eventAutomations)
     }
   } catch {
     return { ...DEFAULTS }
   }
+}
+
+function normalizeEventAutomations(value: unknown): EventAutomation[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  return value
+    .filter((rule): rule is EventAutomation => Boolean(rule) && typeof rule === 'object' && isEventName((rule as EventAutomation).event) && typeof (rule as EventAutomation).jobId === 'string')
+    .map(rule => {
+      const match = rule.match && typeof rule.match === 'object' ? Object.fromEntries(Object.entries(rule.match).filter(([, v]) => typeof v === 'string' && v.trim())) : undefined
+
+      return { event: rule.event, jobId: rule.jobId, enabled: rule.enabled !== false, ...(match && Object.keys(match).length ? { match } : {}) }
+    })
+}
+
+function normalizeCrashHelp(value: Partial<CrashHelpPrefs> | undefined): CrashHelpPrefs {
+  const muted = Array.isArray(value?.muted) ? [...new Set(value.muted.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '').map(entry => entry.trim()))] : []
+
+  return { enabled: typeof value?.enabled === 'boolean' ? value.enabled : CRASH_HELP_DEFAULTS.enabled, muted }
 }
 
 function normalizeContinuity(value: Partial<ContinuityPrefs> | undefined): ContinuityPrefs {
@@ -55,12 +80,13 @@ function normalizeContinuity(value: Partial<ContinuityPrefs> | undefined): Conti
 
 export function writePrefs(patch: Partial<HeraldOSPrefs>): HeraldOSPrefs {
   const current = readPrefs()
-  // `voice` and `continuity` are nested objects callers patch field by field; merge instead of replacing.
+  // Nested objects are patched field by field by their callers; merge instead of replacing.
   const next = {
     ...current,
     ...patch,
     voice: normalizeVoicePrefs({ ...current.voice, ...(patch.voice ?? {}) }),
-    continuity: normalizeContinuity({ ...current.continuity, ...(patch.continuity ?? {}) })
+    continuity: normalizeContinuity({ ...current.continuity, ...(patch.continuity ?? {}) }),
+    crashHelp: normalizeCrashHelp({ ...current.crashHelp, ...(patch.crashHelp ?? {}) })
   }
   fs.mkdirSync(heraldOsDataDir(), { recursive: true })
   fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2))

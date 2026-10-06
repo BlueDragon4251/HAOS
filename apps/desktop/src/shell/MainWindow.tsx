@@ -39,7 +39,7 @@ export function MainWindow() {
     <div className="flex h-full">
       <Sidebar />
       <div className="relative min-w-0 flex-1 py-3 pr-3">
-        <div className="glass-card relative h-full overflow-hidden rounded-xl" style={{ background: 'rgba(5, 18, 66, 0.42)' }}>
+        <div className="glass-card relative h-full overflow-hidden rounded-xl" style={{ background: 'var(--color-page, rgba(5, 18, 66, 0.42))' }}>
           {[...visited].map(id => {
             const View = PAGE_VIEW[id]
             const active = id === page

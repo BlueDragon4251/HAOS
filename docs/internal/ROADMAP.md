@@ -52,6 +52,32 @@ on the Mac (QEMU or UTM).
 - `hermes serve` as a systemd user unit on a Unix socket with peer credentials.
 - SELinux policy for the session.
 
-**Stage 3: a distribution.** Image-based atomic updates, signed ISO for x86 laptops and mini PCs,
-recovery partition, hardware enablement. Apple Silicon stays VM-only until Asahi covers the
-current chips.
+**Stage 3 (under way, ADR-018): a distribution.** Fedora bootc images: an x86_64 installer ISO
+(encrypted by default, dual boot, unattended through kickstart) and an aarch64 VM image, `bootc
+upgrade` and `bootc rollback` behind `herald-os update` and `herald-os rollback`, first-boot setup and
+reset, firewall and SSH off by default, fingerprint and security-key sign-in, firmware updates,
+signed images. Still to come: a recovery partition, an NVIDIA image, Fedora Asahi for M1 and M2.
+Apple Silicon M3 and later stay VM-only until Asahi covers them.
+
+## Arch and Omarchy (ADR-017)
+
+Fedora stays the base of Herald OS Linux; Arch gets a package. One Linux release tarball per
+architecture feeds both the Fedora images and `packaging/arch/` (`herald-os-bin`, `herald-os-git`).
+On Arch, Herald OS runs as its own session on niri or in app mode inside Hyprland, where it follows
+the Omarchy theme and defers updates to `omarchy update`. The AUR package is published only when the
+repository goes public.
+
+## Omarchy parity (October 2026)
+
+What Omarchy has that Herald OS lacked, in the order it is being built:
+
+1. Agent features on both platforms: crash help, "make it yours" themes and the tailoring skill,
+   asking about a screen region, a usage view, event-triggered automations and hooks, a notarized
+   Mac build and a short manual.
+2. Linux desktop basics: Wi-Fi, Bluetooth, audio, display and power panels; night light, do not
+   disturb, stay awake and the screensaver; the capture suite; dictation into any app.
+3. An install catalog: other agent CLIs, local models, developer stacks, editors, terminals,
+   games, a Windows VM, media and office apps, services and web apps.
+4. Arch and Omarchy support (above).
+5. The distribution (Stage 3, above).
+6. Sandboxed widget plugins (ADR-019), menu bar layout, menu extensions and branding.

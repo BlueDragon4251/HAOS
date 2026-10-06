@@ -1,17 +1,20 @@
+import { useStore } from '@nanostores/react'
 import { IconCheck, IconLoader2, IconPlus, IconRefresh, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
+import { describeRule } from '../../../shared/events.ts'
 import { EmptyGlass, GlassButton, GlassCard, LinkAction, PageHeader, Pill, type PillTone, SearchField, Section, Toggle } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import type { CronJob } from '../../lib/rest.ts'
 import { useBackendData } from '../../lib/use-async.ts'
 import { onGatewayEvent } from '../../store/gateway.ts'
-import { deleteAutomation, duplicateAutomation, setAutomationEnabled, triggerAutomation } from '../../store/automations.ts'
+import { automationEnabled, createEventAutomation, deleteAutomation, duplicateAutomation, eventRuleFor, setAutomationEnabled, triggerAutomation } from '../../store/automations.ts'
+import { $prefs } from '../../store/backend.ts'
 import { notify } from '../../store/notifications.ts'
-import { type CronJobDraft, type CronJobEdits, type CronRun, LOCAL_TARGET, cronApi, errorText, isFailedStatus, isPaused, jobKey } from './api.ts'
+import { type CronJobDraft, type CronJobEdits, type CronRun, LOCAL_TARGET, cronApi, errorText, isFailedStatus, jobKey } from './api.ts'
 import { AutomationDetail } from './AutomationDetail.tsx'
 import { formatNextRun, formatRunDuration, formatRunTimestamp, humanizeSchedule, toMs } from './cron-humanize.ts'
 import { type JobMenuAction, JobMenu } from './JobMenu.tsx'
-import { NewAutomationForm } from './NewAutomationForm.tsx'
+import { type EventTrigger, NewAutomationForm } from './NewAutomationForm.tsx'
 import { JobTile } from './presentation.tsx'
 
 const RUN_SOURCES = 5
@@ -31,9 +34,18 @@ const toast = (title: string, body: string, level: 'success' | 'error' | 'info' 
 
 const sortByNextRun = (a: CronJob, b: CronJob) => (toMs(a.next_run_at) ?? Infinity) - (toMs(b.next_run_at) ?? Infinity)
 
+/** What a card says about when it runs: its event for event automations, else the schedule. */
+const whenText = (job: CronJob) => {
+  const rule = eventRuleFor(job.id)
+
+  return rule ? describeRule(rule) : humanizeSchedule(job)
+}
+
 export function AutomationsPage() {
   const jobs = useBackendData(cronApi.list)
   const targets = useBackendData(cronApi.deliveryTargets)
+  // Event rules live in Herald OS's preferences; re-render when they change.
+  useStore($prefs)
 
   useEffect(() => onGatewayEvent('cron.changed', () => jobs.reload()), [jobs.reload])
 
@@ -51,7 +63,7 @@ export function AutomationsPage() {
   const all = useMemo(() => [...(jobs.data ?? [])].sort(sortByNextRun), [jobs.data])
   const needle = query.trim().toLowerCase()
   const filtered = useMemo(
-    () => (needle ? all.filter(job => [job.name, job.prompt, humanizeSchedule(job), job.deliver].some(field => (field ?? '').toLowerCase().includes(needle))) : all),
+    () => (needle ? all.filter(job => [job.name, job.prompt, whenText(job), job.deliver].some(field => (field ?? '').toLowerCase().includes(needle))) : all),
     [all, needle]
   )
 
@@ -179,12 +191,15 @@ export function AutomationsPage() {
     }
   }
 
-  const createJob = async (draft: CronJobDraft): Promise<boolean> => {
+  const createJob = async (draft: CronJobDraft, trigger?: EventTrigger): Promise<boolean> => {
     setCreating(true)
 
     try {
-      const created = await cronApi.create(draft)
-      toast(draft.name || 'Automation', 'Created')
+      const created = trigger ? await createEventAutomation(draft, trigger.event, trigger.match) : await cronApi.create(draft)
+
+      if (!trigger) {
+        toast(draft.name || 'Automation', 'Created')
+      }
 
       if (created?.id) {
         setSelectedKey(jobKey({ id: created.id, profile: created.profile }))
@@ -265,7 +280,7 @@ export function AutomationsPage() {
                 <ul className="stagger flex flex-col gap-3">
                   {filtered.map(job => {
                     const key = jobKey(job)
-                    const enabled = optimistic[key] ?? !isPaused(job)
+                    const enabled = optimistic[key] ?? automationEnabled(job)
                     const active = selected ? jobKey(selected) === key && mode === 'detail' : false
 
                     return (
@@ -331,7 +346,8 @@ export function AutomationsPage() {
 
 function JobCard({ job, enabled, selected, onSelect, onToggle, onAction }: { job: CronJob; enabled: boolean; selected: boolean; onSelect: () => void; onToggle: (value: boolean) => void; onAction: (action: JobMenuAction) => void }) {
   const name = job.name || job.prompt?.slice(0, 40) || job.id
-  const nextLine = enabled ? formatNextRun({ ...job, enabled: true, state: job.state === 'paused' ? 'scheduled' : job.state }) : 'Paused'
+  const event = Boolean(eventRuleFor(job.id))
+  const nextLine = event ? (enabled ? 'Runs each time it happens' : 'Off') : enabled ? formatNextRun({ ...job, enabled: true, state: job.state === 'paused' ? 'scheduled' : job.state }) : 'Paused'
 
   return (
     <GlassCard interactive selected={selected} onClick={onSelect} className="flex items-center gap-3.5 p-3.5" data-os-target={`automation:${job.id}`}>
@@ -339,7 +355,7 @@ function JobCard({ job, enabled, selected, onSelect, onToggle, onAction }: { job
         <JobTile job={job} size={44} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13.5px] font-medium text-fg">{name}</span>
-          <span className="block truncate text-[12px] text-fg-3">{humanizeSchedule(job)}</span>
+          <span className="block truncate text-[12px] text-fg-3">{whenText(job)}</span>
           <span className={cn('block truncate text-[12px]', job.state === 'error' ? 'text-danger' : 'text-fg-4')}>{nextLine}</span>
         </span>
       </button>

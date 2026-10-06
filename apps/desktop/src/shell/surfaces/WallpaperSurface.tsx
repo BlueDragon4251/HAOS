@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { drawWallpaperFrame } from '../Wallpaper.tsx'
+import type { WallpaperTint } from '../../../shared/theme.ts'
+import { drawWallpaperFrame, tintFor } from '../Wallpaper.tsx'
 
 /** A fixed phase that places the ribbons pleasantly: no crossings through the centre, highlights spread out. */
 const FRAME_PHASE = 137.5
@@ -13,8 +14,9 @@ const FRAME_BLUR_PX = 1.5
 export function WallpaperSurface() {
   useEffect(() => {
     let cancelled = false
+    let raf = 0
 
-    const render = () => {
+    const render = (tint: WallpaperTint | null) => {
       const width = Math.max(1, window.innerWidth)
       const height = Math.max(1, window.innerHeight)
 
@@ -28,7 +30,7 @@ export function WallpaperSurface() {
           return
         }
 
-        drawWallpaperFrame(sceneCtx, width, height, FRAME_PHASE, 1)
+        drawWallpaperFrame(sceneCtx, width, height, FRAME_PHASE, 1, tint)
 
         // Second pass through a blur filter so the export looks like the on-screen wallpaper.
         const output = document.createElement('canvas')
@@ -38,7 +40,7 @@ export function WallpaperSurface() {
         let source = scene
 
         if (outputCtx && 'filter' in outputCtx) {
-          outputCtx.fillStyle = '#04113f'
+          outputCtx.fillStyle = tint?.stops[2] ?? '#04113f'
           outputCtx.fillRect(0, 0, width, height)
           outputCtx.filter = `blur(${FRAME_BLUR_PX}px)`
           outputCtx.drawImage(scene, 0, 0)
@@ -56,8 +58,16 @@ export function WallpaperSurface() {
       }
     }
 
-    // One rAF so the window has its final size before we read it.
-    const raf = requestAnimationFrame(render)
+    // The theme decides the colours; then one rAF so the window has its final size before we read it.
+    void window.heraldOS.prefs
+      .get()
+      .then(prefs => tintFor(prefs))
+      .catch(() => null)
+      .then(tint => {
+        if (!cancelled) {
+          raf = requestAnimationFrame(() => render(tint))
+        }
+      })
 
     return () => {
       cancelled = true

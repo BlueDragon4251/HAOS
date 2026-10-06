@@ -1,10 +1,14 @@
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
+import { HERALD_EVENT_NAMES, isEventName } from '../../shared/events.ts'
 import type { HeraldOSPrefs, ShellCommand } from '../../shared/ipc.ts'
+import { isHexColor, THEME_COLOR_KEYS, type ThemeColors, type ThemeSpec } from '../../shared/theme.ts'
+import { events } from '../events/bus.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
 import { writePrefs } from '../prefs.ts'
+import { findTheme, prefsForTheme } from '../theme/themes.ts'
 import { handleUiRequest, isUiRequest, type OsCommandBridge, type UiControlRequest } from './os-control.ts'
 import type { PanelShell } from './panels.ts'
 
@@ -15,6 +19,8 @@ interface ControlRequest {
   /** `theme`: the shell part of a theme definition. */
   shell?: Record<string, unknown>
   wallpaper?: string
+  /** `theme`: the theme's colours. */
+  colors?: Record<string, unknown>
 }
 
 /** Commands that open the command overlay in a given mode, with the focused window as context. */
@@ -32,7 +38,9 @@ export class ControlSocket {
     /** Called after the CLI changes preferences so windows and the wallpaper follow. */
     private readonly onPrefsChanged?: (prefs: HeraldOSPrefs) => void,
     /** Runs registry commands in the Hermes window (`ui`, `ui-list`, `ui-state`; token-protected). */
-    private readonly osBridge?: OsCommandBridge
+    private readonly osBridge?: OsCommandBridge,
+    /** A theme was applied: Hermes's skin follows it. */
+    private readonly onTheme?: (spec: ThemeSpec) => void
   ) {}
 
   get socketPath(): string {
@@ -245,24 +253,68 @@ export class ControlSocket {
           return { ok: false, error: 'theme needs a name' }
         }
 
-        const shellSpec = (request.shell ?? {}) as { theme?: string; accent?: string }
-        const theme = shellSpec.theme === 'graphite' ? 'graphite' : shellSpec.theme === 'ocean' ? 'ocean' : name.includes('graphite') ? 'graphite' : 'ocean'
-        const accent = shellSpec.accent === 'ice' || shellSpec.accent === 'violet' ? shellSpec.accent : 'blue'
-        const patch: Partial<HeraldOSPrefs> = { theme, accent }
+        // The shell reads the same theme.json the engine applied; a theme only the engine can see
+        // (an unusual folder) still applies from the fields it sent.
+        const found = findTheme(name)
+        const patch: Partial<HeraldOSPrefs> = found ? prefsForTheme(found.spec, found.dir) : this.themeFromRequest(name, request)
 
-        if (typeof request.wallpaper === 'string') {
+        if (!found && typeof request.wallpaper === 'string') {
           patch.wallpaper = request.wallpaper || undefined
         }
 
         const next = writePrefs(patch)
         this.onPrefsChanged?.(next)
 
-        return { ok: true, theme: next.theme, accent: next.accent }
+        if (found) {
+          this.onTheme?.(found.spec)
+        }
+
+        return { ok: true, theme: next.themeName ?? next.theme, accent: next.accent }
       }
       case 'state':
         return { ok: true, ...this.shell.niri.state() }
+      case 'event': {
+        // `herald-os event <name> [key=value ...]`: the updater and scripts report events here.
+        const [name, ...pairs] = args
+
+        if (!isEventName(name)) {
+          return { ok: false, error: `unknown event ${name ?? ''}; events: ${HERALD_EVENT_NAMES.join(', ')}` }
+        }
+
+        const detail: Record<string, string> = {}
+
+        for (const pair of pairs) {
+          const at = pair.indexOf('=')
+
+          if (at > 0) {
+            detail[pair.slice(0, at)] = pair.slice(at + 1)
+          }
+        }
+
+        events.emit(name, detail)
+
+        return { ok: true }
+      }
       default:
         return { ok: false, error: `unknown command ${cmd}` }
     }
+  }
+
+  private themeFromRequest(name: string, request: ControlRequest): Partial<HeraldOSPrefs> {
+    const shellSpec = (request.shell ?? {}) as { theme?: string; accent?: string }
+
+    if (shellSpec.theme === 'ocean' || shellSpec.theme === 'graphite') {
+      const accent = shellSpec.accent === 'ice' || shellSpec.accent === 'violet' ? shellSpec.accent : 'blue'
+
+      return { themeName: name, theme: shellSpec.theme, accent, themeColors: undefined, themeScheme: undefined }
+    }
+
+    const colors = request.colors ?? {}
+
+    if (THEME_COLOR_KEYS.every(key => isHexColor(colors[key]))) {
+      return { themeName: name, theme: 'ocean', accent: 'blue', themeColors: colors as unknown as ThemeColors }
+    }
+
+    return { themeName: name, theme: name.includes('graphite') ? 'graphite' : 'ocean', accent: 'blue', themeColors: undefined }
   }
 }

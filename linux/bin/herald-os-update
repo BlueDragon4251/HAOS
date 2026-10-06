@@ -152,6 +152,11 @@ fi
 printf '{"channel":"%s","checkedAt":"%s","pending":0,"shell":0,"packages":0,"flatpaks":0}\n' "$CHANNEL" "$(date -Is)" >"$STATE/update-available.json"
 report 0 "up to date"
 
+# Hooks in ~/.config/herald-os/hooks/after-update.d/ and "after Herald OS updates" automations.
+if command -v herald-os >/dev/null; then
+  herald-os event after-update "problems=${failed[*]:-none}" >/dev/null 2>&1 || true
+fi
+
 if [[ ${#failed[@]} -gt 0 ]]; then
   notify "Update finished with problems" "${failed[*]}"
   echo "failed: ${failed[*]}" >&2

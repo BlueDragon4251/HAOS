@@ -1,6 +1,9 @@
 // Typed contract between Electron main, the preload bridge and the renderer.
 // Everything the renderer can ask the machine to do is declared here; nothing else is exposed.
 
+import type { EventAutomation } from './events.ts'
+import type { ColorScheme, ThemeColors } from './theme.ts'
+
 export type BackendPhase = 'idle' | 'resolving' | 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
 
 export interface BackendRuntime {
@@ -190,6 +193,30 @@ export interface ContinuityPrefs {
   dismissed?: string[]
 }
 
+/** A program on this computer crashed: a macOS crash report or a Linux core dump. */
+export interface CrashReport {
+  id: string
+  /** The program's name as people know it ("Safari", "firefox"). */
+  app: string
+  pid?: number
+  /** Executable path, when the report names it. */
+  exe?: string
+  /** macOS: the `.ips` crash report file. */
+  reportPath?: string
+  /** Signal or exception, e.g. "SIGSEGV" or "EXC_BAD_ACCESS (SIGSEGV)". */
+  reason?: string
+  /** Epoch ms. */
+  at: number
+  source: 'macos' | 'coredump'
+}
+
+export interface CrashHelpPrefs {
+  /** Offer to have Hermes diagnose crashes (on by default). */
+  enabled: boolean
+  /** Program names whose crashes stay quiet (compared case-insensitively). */
+  muted: string[]
+}
+
 export interface ImageInfo {
   width: number
   height: number
@@ -293,6 +320,19 @@ export interface HeraldOSPrefs {
   reduceMotion: boolean
   accent: 'blue' | 'ice' | 'violet'
   theme: 'ocean' | 'graphite'
+  /** The installed theme in use (a folder name under the theme directories). */
+  themeName?: string
+  /** Colours of a theme without a hand-tuned preset; the shell derives its whole palette from them. */
+  themeColors?: ThemeColors
+  themeScheme?: ColorScheme
+  /** Restyle Herald OS when Hermes's skin changes (`/skin` in a chat). */
+  followHermesSkin?: boolean
+  /** Font families for the interface and for code, tried before the built-in stacks. */
+  fonts?: { ui?: string; mono?: string }
+  /** Show the model plan's usage as a small meter in the menu bar. */
+  usageInMenuBar?: boolean
+  /** Hermes automations that run when something happens rather than on a schedule. */
+  eventAutomations?: EventAutomation[]
   /** Absolute path or file:// URL of a custom wallpaper image. */
   wallpaper?: string
   defaultCwd?: string
@@ -311,6 +351,7 @@ export interface HeraldOSPrefs {
   dockAutoHide?: boolean
   voice: VoicePrefs
   continuity: ContinuityPrefs
+  crashHelp: CrashHelpPrefs
 }
 
 export interface AuditEntry {
@@ -492,6 +533,28 @@ export const IPC = {
   contextSnapshot: 'herald-os:context:snapshot',
   /** Main tells the windows the user is back after sleep, a lock or a long idle stretch. */
   contextReturned: 'herald-os:context:returned',
+
+  /** The crashes seen since Herald OS started, newest first (offers arrive as a `crash` ShellCommand). */
+  crashRecent: 'herald-os:crash:recent',
+
+  /** Installed themes (built in and the user's own). */
+  themeList: 'herald-os:theme:list',
+  /** Apply a theme everywhere: the shell, Hermes's skin and, on Herald OS Linux, the whole session. */
+  themeApply: 'herald-os:theme:apply',
+  /** Save a theme the shell made (from an image) into the user's theme folder. */
+  themeSave: 'herald-os:theme:save',
+  /** A small PNG of an image (data URL) to take theme colours from. */
+  themeSample: 'herald-os:theme:sample',
+  /** Install a theme from a git repository (colours and images only). */
+  themeInstall: 'herald-os:theme:install',
+  /** Font families installed on this computer. */
+  fontsList: 'herald-os:fonts:list',
+
+  /** Let the person select part of the screen; resolves with the PNG's path, or null when cancelled. */
+  captureRegion: 'herald-os:capture:region',
+
+  /** The events main emitted lately (`HeraldEvent[]`, newest first), for Settings and the agent. */
+  eventsRecent: 'herald-os:events:recent',
 
   terminalCreate: 'herald-os:terminal:create',
   terminalWrite: 'herald-os:terminal:write',

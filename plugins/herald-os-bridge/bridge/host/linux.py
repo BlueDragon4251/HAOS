@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from ..crash import parse_coredumpctl_list
 from ..util import ExecResult, run
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, HostNotSupported, PortListener, ProcessRow
 from .desktop_entries import DesktopEntry, scan_desktop_entries
@@ -824,6 +825,23 @@ class LinuxHost(HostAdapter):
         result = run(argv, timeout=60)
         _missing(result, "systemd for journalctl")
         return [ln for ln in result.stdout.splitlines() if ln.strip() and not ln.startswith("-- ")][-limit:]
+
+    def crash_reports(self, limit: int) -> list[dict[str, Any]]:
+        result = run(["coredumpctl", "list", "--json=short", "--no-pager", "--since=-7d"], timeout=30)
+        _missing(result, "systemd-coredump for coredumpctl")
+        # "No coredumps found." is exit 1 with nothing on stdout.
+        return parse_coredumpctl_list(result.stdout)[:limit] if result.stdout.strip() else []
+
+    def crash_report(self, ref: str) -> dict[str, Any]:
+        pid = ref.strip()
+        if not pid.isdigit():
+            raise ValueError("on Linux, report is the crashed process id (see action=crashes)")
+        result = run(["coredumpctl", "info", "--no-pager", pid], timeout=60)
+        _missing(result, "systemd-coredump for coredumpctl")
+        text = result.stdout.strip() or result.stderr.strip()
+        if not result.ok and not result.stdout.strip():
+            raise RuntimeError(text or f"no core dump for pid {pid}")
+        return {"pid": int(pid), "info": text[:12000], "truncated": len(text) > 12000}
 
     # --- system control ----------------------------------------------------------------------
     def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:

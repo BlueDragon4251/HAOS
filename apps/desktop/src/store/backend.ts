@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 import type { BackendState, EnvInfo, HeraldOSPrefs, WindowState } from '../../shared/ipc.ts'
+import { PALETTE_PROPERTIES, paletteVars, schemeOf } from '../../shared/theme.ts'
 import { VOICE_DEFAULTS } from '../../shared/voice-prefs.ts'
 
 /** Cache of Electron's backend truth; Electron is authoritative. */
@@ -16,13 +17,44 @@ export const $prefs = atom<HeraldOSPrefs>({
   favorites: [],
   voice: VOICE_DEFAULTS,
   // Off until the real prefs arrive, so the Overview never flashes the catch-up offer.
-  continuity: { enabled: false, exclude: [] }
+  continuity: { enabled: false, exclude: [] },
+  crashHelp: { enabled: true, muted: [] }
 })
 
+/** A font family as a CSS value (quoted unless it is a generic family). */
+const cssFamily = (family: string) => (/^(serif|sans-serif|monospace|system-ui|ui-[a-z-]+)$/.test(family) ? family : JSON.stringify(family.trim()))
+
 export function applyPrefsToDocument(prefs: HeraldOSPrefs): void {
-  document.documentElement.dataset.accent = prefs.accent
-  document.documentElement.dataset.theme = prefs.theme
-  document.documentElement.dataset.reduceMotion = String(prefs.reduceMotion)
+  const root = document.documentElement
+  root.dataset.accent = prefs.accent
+  root.dataset.theme = prefs.theme
+  root.dataset.reduceMotion = String(prefs.reduceMotion)
+
+  // Presets live in styles.css; any other theme's palette is derived from its colours.
+  for (const property of PALETTE_PROPERTIES) {
+    root.style.removeProperty(property)
+  }
+
+  if (prefs.themeColors) {
+    const panels = window.heraldOS?.shell?.mode === 'panels'
+
+    for (const [property, value] of Object.entries(paletteVars(prefs.themeColors, { scheme: prefs.themeScheme, panels }))) {
+      root.style.setProperty(property, value)
+    }
+  }
+
+  root.dataset.scheme = prefs.themeColors ? schemeOf(prefs.themeColors, prefs.themeScheme) : 'dark'
+
+  for (const [property, family] of [
+    ['--user-font-ui', prefs.fonts?.ui],
+    ['--user-font-mono', prefs.fonts?.mono]
+  ] as const) {
+    if (family?.trim()) {
+      root.style.setProperty(property, cssFamily(family))
+    } else {
+      root.style.removeProperty(property)
+    }
+  }
 }
 
 export async function updatePrefs(patch: Partial<HeraldOSPrefs>): Promise<void> {

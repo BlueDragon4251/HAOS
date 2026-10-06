@@ -15,9 +15,11 @@ export interface OverviewComposerProps {
   placeholder?: string
   onSubmit: (text: string) => void | Promise<void>
   className?: string
+  /** A starter sentence to put in the field for the person to finish (a new `id` puts it in again). */
+  draft?: { text: string; id: number }
 }
 
-export function OverviewComposer({ disabled, placeholder, onSubmit, className }: OverviewComposerProps) {
+export function OverviewComposer({ disabled, placeholder, onSubmit, className, draft }: OverviewComposerProps) {
   const [value, setValue] = useState('')
   const [selected, setSelected] = useState(0)
   const [picking, setPicking] = useState(false)
@@ -25,6 +27,22 @@ export function OverviewComposer({ disabled, placeholder, onSubmit, className }:
   const catalog = useSlashCatalog()
   const slashQuery = value.startsWith('/') && !value.includes(' ') && !value.includes('\n') ? value.slice(1).toLowerCase() : null
   const completions = slashQuery !== null ? catalog.filter(entry => entry.name.toLowerCase().startsWith(slashQuery)).slice(0, 8) : []
+
+  useEffect(() => {
+    if (!draft) {
+      return
+    }
+
+    setValue(draft.text)
+    requestAnimationFrame(() => {
+      const el = textarea.current
+
+      if (el) {
+        el.focus()
+        el.setSelectionRange(draft.text.length, draft.text.length)
+      }
+    })
+  }, [draft?.id])
 
   useEffect(() => {
     const el = textarea.current

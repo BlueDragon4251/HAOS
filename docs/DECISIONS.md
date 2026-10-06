@@ -227,3 +227,80 @@ and `packages/hermes-client` (a client for the Hermes gateway) keep their names.
 - **Old names are still read where users set them.** `HERMES_OS_*` variables (Electron main, the
   bridge, the Linux session), the `hermes_os` config section, and sessions saved with
   `source: "hermes_os"` (listed alongside new ones).
+
+## ADR-017: Fedora stays the base of Herald OS Linux; Arch is a package target
+
+Omarchy showed how much an opinionated Linux can do, and it runs on Arch. Herald OS Linux stays on
+Fedora and reaches Arch, Omarchy included, with a package instead. Arch has no official ARM port (its
+aarch64 work is an unofficial testbed, and Arch Linux ARM is a separate distribution), while Herald OS
+is developed in an aarch64 VM on Apple Silicon and Fedora builds aarch64 and x86_64 from the same
+infrastructure. Fedora Asahi Remix is also the main way to run Linux natively on M1 and M2 Macs.
+
+- **One Linux release tarball.** `HeraldOS-<version>-linux-<arch>.tar.gz` holds the built shell and
+  everything the session needs: `linux/bin`, the session files, themes, the install catalog and the
+  bridge plugin. The Fedora images (ADR-018) and the Arch package (`packaging/arch/`) are both built
+  from it, so there is one artifact to test per architecture.
+- **The CLI is distro-neutral.** `herald-os` finds the system package manager (dnf, or pacman with an
+  AUR helper) and prefers Flatpak for apps. On Omarchy, system updates go through `omarchy update`,
+  because Omarchy stops a direct `pacman -Syu` that would skip its snapshot and migrations.
+- **Two ways to run on Arch.** The Herald OS session (niri plus the panels) is the same as on Fedora.
+  App mode runs inside Hyprland, Omarchy's compositor: one fullscreen window, as on macOS, Omarchy
+  keeps its own bar, Herald follows the Omarchy theme, and Herald's theme, update and install
+  commands defer to Omarchy's.
+- **A compositor interface.** `apps/desktop/electron/wm/` defines what the shell needs from a
+  compositor (windows, workspaces, focus, actions); niri and Hyprland implement it and the session
+  environment picks one.
+- **Rejected: moving the base to Arch.** It would lose the aarch64 VM the project is built in and
+  Asahi, and a rolling release needs its own package mirror, snapshots and migration guard to be
+  safe for people who are not Linux experts. **Rejected: a full Arch edition beside Fedora.** It
+  doubles the image and test matrix for one maintainer.
+
+## ADR-018: Herald OS Linux becomes a distribution built from Fedora bootc images
+
+This brings ADR-012's Stage 3 forward and supersedes the landscape note that put bootable images out
+of scope. Herald OS Linux is built as a bootable container image (`linux/image/Containerfile`, from
+`quay.io/fedora/fedora-bootc`), and `bootc-image-builder` turns it into an x86_64 installer ISO and
+an aarch64 qcow2 that boots straight into Herald OS.
+
+- **Provisioning splits in two.** What every machine needs (packages, the session, the CLI, themes,
+  Plymouth, greetd, the shell from the release tarball at `/usr/share/herald-os/app`) runs at image
+  build time (`linux/image/packages.sh`); what belongs to a person (Hermes, its sign-in, the default
+  apps) runs at first login (`linux/image/firstboot.sh`).
+- **Updates can be undone.** `herald-os update` runs `bootc upgrade`, which stages the new image for
+  the next boot; `herald-os rollback` runs `bootc rollback`, and the boot menu keeps the previous
+  image. This covers what Omarchy's snapshots cover (the system, not `/home`); `/etc` and per-user
+  changes still go through `linux/migrations/`. Channels are image tags: `stable` follows releases,
+  `edge` follows `main`.
+- **Software on an image.** `/usr` is read-only, so apps come from Flatpak, command-line tools go
+  into `~/.local` (npm, mise) or a toolbox container, and `dnf install` stays a development-VM tool.
+- **The installer asks little.** Anaconda with a kickstart that encrypts the disk by default and
+  offers installing beside Windows; a kickstart passed with `inst.ks=` installs unattended. The
+  first-boot setup in the shell (name, password, Wi-Fi, Hermes sign-in) also covers handing a machine
+  to a new owner, which `herald-os reset` returns to.
+- **Secure by default on release images.** firewalld with only LocalSend and mDNS open, SSH off,
+  Secure Boot through Fedora's signed shim, fingerprint (`fprintd`) and security keys (`pam-u2f`)
+  as opt-in setup commands, firmware through `fwupd`. SELinux stays permissive until the Stage 2
+  policy work (ADR-012).
+- **Signed with a key, not keylessly, while the repository is private.** Images are signed with a
+  cosign key pair held in CI secrets; keyless signing would publish the workflow's identity to the
+  public Rekor log.
+- **The development loop does not change.** The Fedora Cloud VM with cloud-init (ADR-012) stays the
+  fastest way to iterate; images are for releases and for trying Herald OS.
+
+## ADR-019: Plugins run sandboxed
+
+Omarchy's desktop is a set of QML plugins, and third-party ones run inside its shell process with
+everything the user can reach. The landscape review rejected that model for Herald OS, and this keeps
+the rule while adding widgets: each plugin is a folder with a `manifest.json` and web files, rendered
+in its own sandboxed view with no Node, no preload, its own partition and a strict Content Security
+Policy. The only way out is a message channel the shell answers.
+
+- **A narrow message API.** `stats` (read the system snapshot), `run` (an `OsCommand`, under the
+  command's own tier and approval), `notify`, and `storage` (the plugin's own key-value store). A
+  plugin cannot spawn processes, read files or reach the network unless its manifest names hosts the
+  user accepted when enabling it.
+- **Installed disabled.** `herald-os plugin add <git-url>` clones into
+  `~/.config/herald-os/plugins/<id>`, validates the manifest and leaves the plugin off until it is
+  enabled in Settings > Plugins, as Omarchy does. Saved files reload the plugin live.
+- **Hermes's extension model is unchanged.** Agent capabilities stay in backend Hermes plugins such as
+  the bridge, behind the approval gate; widgets are UI that Hermes can also write for you.

@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconAccessible, IconBell, IconCircleCheckFilled, IconDatabase, IconInfoCircle, IconListDetails, IconMicrophone, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
+import { IconAccessible, IconBell, IconCircleCheckFilled, IconDatabase, IconGauge, IconInfoCircle, IconListDetails, IconMicrophone, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
 import { type ComponentType, useEffect, useState } from 'react'
 import { GlassButton, PageHeader, SearchField } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -15,6 +15,7 @@ import { NotificationsSection } from './sections/NotificationsSection.tsx'
 import { PrivacySection } from './sections/PrivacySection.tsx'
 import { $settingsFocus, $settingsSavedAt, type SectionId, SettingsFilterContext } from './sections/shared.tsx'
 import { StorageSection } from './sections/StorageSection.tsx'
+import { UsageSection } from './sections/UsageSection.tsx'
 import { VoiceCommandsSection } from './sections/VoiceCommandsSection.tsx'
 import { VoiceSection } from './sections/VoiceSection.tsx'
 
@@ -28,6 +29,7 @@ const SECTIONS: { id: SectionId; label: string; icon: ComponentType<{ size?: num
   { id: 'general', label: 'General', icon: IconSettings, view: GeneralSection },
   { id: 'appearance', label: 'Appearance', icon: IconPalette, view: AppearanceSection },
   { id: 'agents', label: 'Hermes & agents', icon: IconRobot, view: AgentsSection },
+  { id: 'usage', label: 'Usage', icon: IconGauge, view: UsageSection },
   { id: 'voice', label: 'Voice', icon: IconMicrophone, view: VoiceSection },
   { id: 'commands', label: 'Voice commands', icon: IconListDetails, view: VoiceCommandsSection },
   { id: 'privacy', label: 'Privacy', icon: IconShield, view: PrivacySection },
