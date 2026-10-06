@@ -12,7 +12,8 @@ on:
         default: v0.1.0-alpha.1
 
 permissions:
-  contents: read
+  # Write, only so a draft release (visible with push access) can be tested before it is published.
+  contents: write
 
 jobs:
   install:
