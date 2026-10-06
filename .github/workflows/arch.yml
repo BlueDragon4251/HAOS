@@ -30,7 +30,7 @@ jobs:
       - name: Lint the PKGBUILDs
         run: namcap packaging/arch/herald-os-bin/PKGBUILD packaging/arch/herald-os-git/PKGBUILD
       - name: A user to build as (makepkg refuses root)
-        run: useradd -m builder && chown -R builder: "$GITHUB_WORKSPACE"
+        run: useradd -m builder && chown -R builder:builder "$GITHUB_WORKSPACE"
       - name: Build the tarball
         run: su builder -c 'cd "$GITHUB_WORKSPACE" && npm run sync-upstream && npm ci && npm run dist:linux --workspace apps/desktop -- --x64'
       - name: Package it
