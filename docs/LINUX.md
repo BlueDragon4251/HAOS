@@ -225,6 +225,8 @@ builds it for x86_64 and aarch64 on matching runners, pushes it to the repositor
 
 Both are bigger than the 2 GiB GitHub takes for one release file, so they go up in parts (`.part0`,
 `.part1`) that `cat` joins again; the `.sha256` is the joined file's. `try.sh` joins them itself.
+`.github/workflows/installer-test.yml` installs a release's ISO into a KVM machine (with an
+unattended disk layout added to the ISO's kickstart), boots it and screenshots its first start.
 
 On the image, apps install through Flatpak or into `~/.local` (the catalog picks those methods
 there); the system itself changes only by a whole new image.

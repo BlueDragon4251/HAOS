@@ -44,8 +44,8 @@ source_x86_64=("herald-os-${_version}-x64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/
 source_aarch64=("herald-os-${_version}-arm64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/releases/download/v${_version}/herald-os-${_version}-linux-arm64.tar.gz}")
 # From the release's .sha256 files; a tarball of your own (HERALD_OS_TARBALL_URL) needs --skipchecksums.
 sha256sums=('120a3b0922a8677c6790af4a93b04109030b5d7201bc85125b62031b152c247c')
-sha256sums_x86_64=('f7b6e13529d8fccd30ba614bdce621d9753136c9903bd644e57c7279c81eb5f9')
-sha256sums_aarch64=('e6ec8d17cf01f6ff9980f2bbf9e64737bd9686b74c1e98f0ffc62f750619d54d')
+sha256sums_x86_64=('6f8f5aa3f14fb30f8987958baaf55242474c1d0b443358b58ada5a6bebad7456')
+sha256sums_aarch64=('41a58962cfb9212a314a51e9dfe376945f82d2fdb9d35202a03ac55dced14b06')
 
 package() {
   source "$srcdir/herald-os-package.sh"
