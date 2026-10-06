@@ -11,4 +11,6 @@ autopart --type=btrfs --encrypted --passphrase=change-me
 ostreecontainer --url=ghcr.io/iamlukethedev/herald-os:stable
 # The first boot creates the session user; the shell's setup sets the name and password.
 rootpw --lock
+# The login screen needs graphical.target, which Anaconda does not pick for greetd by itself.
+xconfig --startxonboot
 reboot

@@ -44,6 +44,14 @@ system_phase() {
   loginctl enable-linger "$HERMES_USER" || true
   sed -i "s/^user = .*/user = \"$HERMES_USER\"/" /etc/greetd/config.toml
 
+  step "The login screen"
+  # Anaconda picks multi-user.target unless its kickstart says otherwise, because greetd provides
+  # no service(graphical-login); only graphical.target starts greetd and so the session.
+  if [[ "$(systemctl get-default)" != "graphical.target" ]]; then
+    systemctl set-default graphical.target
+    systemctl --no-block start graphical.target
+  fi
+
   step "Home folder"
   as_user mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.local/share" "$HOME_DIR/.local/state" "$HOME_DIR/.config/herald-os" "$HOME_DIR/.config/niri" "$HOME_DIR/.config/swaylock" "$HOME_DIR/.config/systemd/user"
   as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
