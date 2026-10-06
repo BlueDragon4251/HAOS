@@ -31,6 +31,8 @@ import {
   type ProcessInfo,
   type RecentFile,
   type RecordingState,
+  type CaptureTool,
+  type CaptureToolResult,
   type RestRequest,
   type ScreenshotMode,
   type ShellCommand,
@@ -168,6 +170,8 @@ const api = {
     screenshot: (mode: ScreenshotMode): Promise<string | null> => ipcRenderer.invoke(IPC.captureScreenshot, mode),
     record: (action: 'start' | 'stop' | 'toggle', options: { region?: boolean; audio?: boolean } = {}): Promise<RecordingState> => ipcRenderer.invoke(IPC.captureRecord, action, options),
     recordState: (): Promise<RecordingState> => ipcRenderer.invoke(IPC.captureRecordState),
+    /** macOS: the colour picker, a QR code or the text in part of the screen, copied to the clipboard. */
+    tool: (tool: CaptureTool): Promise<CaptureToolResult> => ipcRenderer.invoke(IPC.captureTool, tool),
     onRecordChanged: (listener: (state: RecordingState) => void): Unsubscribe => subscribe(IPC.captureRecordChanged, listener),
     readImage: (file: string): Promise<string> => ipcRenderer.invoke(IPC.captureReadImage, file),
     saveImage: (file: string, dataUrl: string): Promise<string> => ipcRenderer.invoke(IPC.captureSaveImage, file, dataUrl),

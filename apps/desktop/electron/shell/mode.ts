@@ -15,7 +15,8 @@ export const SURFACE_TITLE: Record<Exclude<ShellSurface, `window:${string}`>, st
   command: 'Herald OS · Command',
   panel: 'Herald OS · Panel',
   screensaver: 'Herald OS · Screensaver',
-  wallpaper: 'Herald OS · Wallpaper'
+  wallpaper: 'Herald OS · Wallpaper',
+  emoji: 'Herald OS · Emoji'
 }
 
 /** Floating Hermes apps that may open as their own window in panels mode. */

@@ -1,5 +1,6 @@
-import type { ScreenshotMode } from '../../shared/ipc.ts'
+import type { CaptureTool, ScreenshotMode } from '../../shared/ipc.ts'
 import { CLI_UNAVAILABLE_MESSAGE, runHeraldOs } from '../lib/herald-os-cli.ts'
+import { $env } from '../store/backend.ts'
 import { $recording, askAbout, offerCapture } from '../store/capture.ts'
 import { fail, ok, type OsCommand } from '../store/os-commands.ts'
 import { isPanels } from '../store/shell.ts'
@@ -16,6 +17,29 @@ async function linuxTool(argv: string[], title: string) {
   }
 
   return outcome.ok ? ok(outcome.output || title, { data: { output: outcome.output } }) : fail(outcome.output || `${title} did not work`)
+}
+
+const isMac = () => $env.get()?.platform === 'darwin'
+
+/** The colour picker, a QR code or text from the screen: macOS's own tools, through main. */
+async function screenTool(tool: CaptureTool, linuxArgv: string[], title: string) {
+  if (!isMac()) {
+    return linuxTool(linuxArgv, title)
+  }
+
+  const result = await window.heraldOS.capture.tool(tool)
+
+  if (result.cancelled) {
+    return fail(`${title}: cancelled.`)
+  }
+
+  if (!result.text) {
+    return fail(tool === 'qr' ? 'No QR code or barcode in that part of the screen.' : 'No text in that part of the screen.')
+  }
+
+  const summary = tool === 'colour' ? `Copied ${result.text}` : tool === 'qr' ? `Copied: ${result.text.length > 80 ? `${result.text.slice(0, 79)}…` : result.text}` : `Copied ${result.lines === 1 ? 'a line' : `${result.lines} lines`} of text`
+
+  return ok(summary, { data: { text: result.text } })
 }
 
 export const captureCommands: readonly OsCommand[] = [
@@ -107,29 +131,29 @@ export const captureCommands: readonly OsCommand[] = [
   {
     id: 'capture.color',
     title: 'Pick a colour from the screen',
-    description: 'Click anywhere on screen to copy that colour (#rrggbb) to the clipboard (Herald OS Linux).',
+    description: 'Click anywhere on screen to copy that colour (#rrggbb) to the clipboard.',
     tier: 'act',
     args: [],
     phrases: ['pick a colour', 'pick a color from the screen', 'what colour is this'],
-    run: () => linuxTool(['capture', 'color'], 'Colour picker')
+    run: () => screenTool('colour', ['capture', 'color'], 'Colour picker')
   },
   {
     id: 'capture.qr',
     title: 'Read a QR code',
-    description: 'Select a QR code or barcode on screen and copy what it says (Herald OS Linux).',
+    description: 'Select a QR code or barcode on screen and copy what it says.',
     tier: 'act',
     args: [],
     phrases: ['read this qr code', 'scan the qr code'],
-    run: () => linuxTool(['capture', 'qr'], 'QR code')
+    run: () => screenTool('qr', ['capture', 'qr'], 'QR code')
   },
   {
     id: 'capture.text',
     title: 'Copy text from the screen',
-    description: 'Select part of the screen and copy the text in it (OCR, Herald OS Linux).',
+    description: 'Select part of the screen and copy the text in it (OCR).',
     tier: 'act',
     args: [],
     phrases: ['copy the text on screen', 'read the text on screen'],
-    run: () => linuxTool(['capture', 'text'], 'Text from the screen')
+    run: () => screenTool('text', ['capture', 'text'], 'Text from the screen')
   },
   {
     id: 'capture.transcode',

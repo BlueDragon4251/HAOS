@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import { performEdit, rememberFocusedEditable } from './edit-target.ts'
 import { notify } from './notifications.ts'
-import { closeThisSurface, isPanels, openSurface } from './shell.ts'
+import { closeThisSurface, isPanels, openSurface, surface } from './shell.ts'
 
 const RECENT_KEY = 'herald-os:emoji-recent'
 const RECENT_LIMIT = 24
@@ -39,7 +39,8 @@ export function openEmojiPicker(): void {
 export async function insertEmoji(char: string): Promise<void> {
   remember(char)
 
-  if (isPanels) {
+  // Panels mode's overlay window, or the macOS panel over another app.
+  if (isPanels || surface === 'emoji') {
     // Main waits for the overlay to close so the keystrokes land in the app that had focus.
     const typing = window.heraldOS.dictation.type(char, { delayMs: 220 })
     closeThisSurface()

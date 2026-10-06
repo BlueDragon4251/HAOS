@@ -165,9 +165,9 @@ logs from `journalctl`, trash from `gio trash`, notifications from `notify-send`
   display, power, clock). Never ask for a Wi-Fi password you can avoid: a saved network needs none.
 - Capture (both platforms unless noted): `os_ui` run `capture.screenshot` (`mode` region, window or
   screen; you get the file back), `capture.record` (`action` toggle, start or stop, `audio`),
-  `camera.show`; on Linux also `capture.color`, `capture.qr`, `capture.text` (OCR),
-  `capture.transcode` (file, gif|mp4|webm) and `capture.share`. Use `screen.askRegion` to have the
-  person pick what to show you.
+  `camera.show`, `capture.color` (the person clicks a colour; you get #rrggbb), `capture.qr` and
+  `capture.text` (OCR; the person selects the area); on Linux also `capture.transcode` (file,
+  gif|mp4|webm) and `capture.share`. Use `screen.askRegion` to have the person pick what to show you.
 - Switches (both platforms): `os_ui` run `dnd.set`, `awake.set` (stay awake), `nightlight.set`
   (Linux) or `screensaver.set` with `{"enabled": true|false}`; `idle.set` changes when the screen
   locks, turns off and sleeps (minutes).

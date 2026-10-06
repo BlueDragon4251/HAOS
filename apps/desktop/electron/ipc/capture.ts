@@ -3,9 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { clipboard, ClipboardItem, ipcMain, nativeImage, systemPreferences } from 'electron'
-import { IPC, type RecordingState, type ScreenshotMode } from '../../shared/ipc.ts'
+import { type CaptureTool, type CaptureToolResult, IPC, type RecordingState, type ScreenshotMode } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
 import { run } from '../platform/exec.ts'
+import { pickColourMac, readImageMac } from '../platform/mac-tools.ts'
 
 /** Screen grabs handed to Hermes; they only need to outlive the question about them. */
 export function capturesDir(): string {
@@ -267,6 +268,43 @@ export function registerCaptureIpc(onRecording: (state: RecordingState) => void)
     return start ? recorder.start(options) : recorder.stop()
   })
   ipcMain.handle(IPC.captureRecordState, () => recorder.state())
+  // macOS: the colour picker, QR codes and text from the screen (Herald OS Linux runs them through its CLI).
+  ipcMain.handle(IPC.captureTool, async (_event, tool: CaptureTool): Promise<CaptureToolResult> => {
+    if (process.platform !== 'darwin') {
+      throw new Error('On Herald OS Linux the herald-os CLI runs these tools')
+    }
+
+    if (tool === 'colour') {
+      const hex = await pickColourMac()
+
+      if (!hex) {
+        return { cancelled: true }
+      }
+
+      clipboard.writeText(hex)
+
+      return { text: hex }
+    }
+
+    const file = await captureRegion()
+
+    if (!file) {
+      return { cancelled: true }
+    }
+
+    try {
+      const lines = await readImageMac(file, tool === 'qr' ? 'codes' : 'text')
+      const text = lines.join('\n')
+
+      if (text) {
+        clipboard.writeText(text)
+      }
+
+      return { text, lines: lines.length }
+    } finally {
+      fs.rmSync(file, { force: true })
+    }
+  })
   ipcMain.handle(IPC.captureReadImage, (_event, target: string) => nativeImage.createFromPath(userImagePath(target, true)).toDataURL())
   ipcMain.handle(IPC.captureSaveImage, (_event, target: string, dataUrl: string) => {
     const file = userImagePath(target, false)

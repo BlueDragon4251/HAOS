@@ -47,7 +47,12 @@ is the coding agents and local model apps.
 
 - **Dictation:** `Cmd+Ctrl+X` (Mac) or `Super+Ctrl+X` (Linux) in any app, speak, pause, and the
   words are typed where the cursor is. Say "comma", "new line" or "press enter".
-- **Emoji:** `Super+Ctrl+E` on Linux (`Cmd+Ctrl+E` inside Herald OS on a Mac).
+- **Emoji:** `Super+Ctrl+E` on Linux, `Cmd+Ctrl+E` on a Mac, in any app: search, press Return,
+  and the emoji is typed where you were.
+- **Colours, QR codes and text on screen:** "pick a colour", "read this QR code" or "copy the text
+  on screen" (the command bar, or ask Hermes). The colour picker copies `#rrggbb`; the other two ask
+  you to select the area and copy what they read. On a Mac they use macOS's own eyedropper and text
+  recognition.
 - **Part of the screen:** `Cmd+Shift+S` (Mac) or `Super+Shift+S` (Linux), drag a rectangle, then
   type your question. The selection goes to Hermes as an image.
 - **The window in front (Linux):** `Super+Space` asks about the focused window.

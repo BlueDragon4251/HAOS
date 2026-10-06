@@ -538,6 +538,17 @@ export interface HeraldOSPrefs {
 
 export type ScreenshotMode = 'region' | 'window' | 'screen'
 
+/** macOS capture tools (Herald OS Linux runs its own through the CLI). */
+export type CaptureTool = 'colour' | 'qr' | 'text'
+
+export interface CaptureToolResult {
+  /** What was copied: #rrggbb, the code's contents, or the text read. Empty when nothing was found. */
+  text?: string
+  lines?: number
+  /** Escape before anything was picked or selected. */
+  cancelled?: boolean
+}
+
 export interface RecordingState {
   recording: boolean
   /** The file being written, then the finished one. */
@@ -589,7 +600,7 @@ export interface WindowState {
 export type ShellMode = 'desktop' | 'panels'
 
 /** Which part of the shell a renderer window is. `window:<appId>` hosts one floating Hermes app. */
-export type ShellSurface = 'desktop' | 'menubar' | 'dock' | 'main' | 'command' | 'panel' | 'screensaver' | 'wallpaper' | `window:${string}`
+export type ShellSurface = 'desktop' | 'menubar' | 'dock' | 'main' | 'command' | 'panel' | 'screensaver' | 'wallpaper' | 'emoji' | `window:${string}`
 
 /** A window the compositor manages (any client, including the shell's own windows). */
 export interface WmWindow {
@@ -767,6 +778,7 @@ export const IPC = {
   /** Start, stop or toggle a screen recording; resolves with the recording state. */
   captureRecord: 'herald-os:capture:record',
   captureRecordState: 'herald-os:capture:record-state',
+  captureTool: 'herald-os:capture:tool',
   /** Main -> renderer: a recording started or stopped (`RecordingState`). */
   captureRecordChanged: 'herald-os:capture:record-changed',
   /** An image file as a data URL, for the markup editor. */

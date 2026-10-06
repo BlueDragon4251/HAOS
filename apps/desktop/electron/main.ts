@@ -41,6 +41,7 @@ import { NotificationDaemon } from './shell/notification-daemon.ts'
 import { handleUiRequest, OsCommandBridge, OsControlServer, osControlToken } from './shell/os-control.ts'
 import { PanelShell } from './shell/panels.ts'
 import { registerBrandingIpc } from './shell/branding.ts'
+import { EmojiPanel } from './shell/emoji-panel.ts'
 import { registerMenuExtensionsIpc } from './shell/menu-extensions.ts'
 import { registerServiceIpc } from './shell/services.ts'
 import { WallpaperService } from './shell/wallpaper.ts'
@@ -89,6 +90,8 @@ const switches = new SwitchService({
 // Linux without the panels session: Herald as an app inside Hyprland or Omarchy, or the cage kiosk.
 // The `herald-os` CLI (and so the compositor's hotkeys) reaches the one window through the same socket.
 const appHost = !panels && process.platform === 'linux' ? new DesktopHost(() => mainWindow, createCompositor(detectCompositor())) : null
+// macOS: Cmd+Ctrl+E opens the emoji picker over any app (Herald OS Linux binds it in niri).
+const emojiPanel = !panels && process.platform === 'darwin' ? new EmojiPanel(() => mainWindow) : null
 const shellHost: ShellHost | null = panels ?? appHost
 const control = shellHost
   ? new ControlSocket(
@@ -274,6 +277,7 @@ function registerCoreIpc(): void {
   plugins.registerIpc()
   plugins.registerProtocol()
   plugins.watch()
+  emojiPanel?.register()
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.
@@ -387,6 +391,7 @@ app.on('before-quit', event => {
   globalShortcut.unregisterAll()
   crashes.stop()
   plugins.stop()
+  emojiPanel?.stop()
   control?.stop()
   osControl?.stop()
   wallpaper?.stop()
