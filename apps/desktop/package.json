@@ -103,6 +103,18 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
+      "extraResources": [
+        {
+          "from": "../../plugins/herald-os-bridge",
+          "to": "herald-os-bridge",
+          "filter": [
+            "**/*",
+            "!tests/**",
+            "!**/__pycache__/**",
+            "!.pytest_cache/**"
+          ]
+        }
+      ],
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Herald OS controls applications on your behalf when you ask it to.",
         "NSMicrophoneUsageDescription": "Herald OS uses the microphone for voice input.",

@@ -13,10 +13,16 @@ mkdir -p "$BUILD"
 
 disk="${1:-}"
 if [[ -z "$disk" ]]; then
-  command -v gh >/dev/null || { echo "try.sh: needs the GitHub CLI (brew install gh) to fetch the release, or pass a disk" >&2; exit 1; }
-  echo "==> Fetching the latest Herald OS VM disk"
-  gh release download --repo iamlukethedev/Herald-OS --pattern 'herald-os-*-aarch64.qcow2.zst' --dir "$BUILD" --clobber
-  disk="$(ls -t "$BUILD"/herald-os-*-aarch64.qcow2.zst | head -n 1)"
+  echo "==> Finding the latest Herald OS VM disk"
+  url="$(curl -fsSL https://api.github.com/repos/iamlukethedev/Herald-OS/releases/latest |
+    grep -o '"browser_download_url": *"[^"]*-aarch64\.qcow2\.zst"' | sed 's/.*"\(https[^"]*\)"/\1/' | head -n 1)"
+  [[ -n "$url" ]] || { echo "try.sh: the latest release has no VM disk; pass one you have" >&2; exit 1; }
+  disk="$BUILD/$(basename "$url")"
+  if [[ ! -f "$disk" ]]; then
+    echo "==> Downloading $(basename "$url")"
+    curl -fL --progress-bar "$url" -o "$disk.part"
+    mv "$disk.part" "$disk"
+  fi
 fi
 if [[ "$disk" == *.zst ]]; then
   command -v zstd >/dev/null || { echo "try.sh: needs zstd to unpack the disk (brew install zstd)" >&2; exit 1; }

@@ -213,7 +213,7 @@ VM's provisioner also runs, so the VM and the image cannot drift apart:
 
 `linux/image/Containerfile` starts from `quay.io/fedora/fedora-bootc:44`; `.github/workflows/image.yml`
 builds it for x86_64 and aarch64 on matching runners, pushes it to the repository's GHCR package
-(`ghcr.io/iamlukethedev/herald-os`, private like the repository) and, for a release, turns it into:
+(`ghcr.io/iamlukethedev/herald-os`) and, for a release, turns it into:
 
 - **an x86_64 installer ISO** (bootc-image-builder `anaconda-iso`, `linux/image/iso.toml`): the
   storage screen stays interactive, so it installs next to another system and encrypts the disk
@@ -262,13 +262,16 @@ Fedora stays the base Herald OS builds and tests on (ADR-017); Arch gets a packa
 from source; both lay out the same files: the app in `/opt/herald-os`, the CLIs and session scripts
 in `/usr/bin`, shared data in `/usr/share/herald-os`, the session for the login screen in
 `/usr/share/wayland-sessions/herald-os.desktop`, and Herald OS as an app in the application menu.
-Neither is on the AUR yet; they are published once the project is public. Until then:
+Neither is on the AUR yet; build them from the repository:
 
 ```bash
 cd packaging/arch/herald-os-bin
-HERALD_OS_TARBALL_URL=file:///path/to/herald-os-0.1.0-alpha.1-linux-x64.tar.gz makepkg -si
+makepkg -si            # downloads the release tarball for this architecture
 herald-os setup        # once per user: Hermes Agent and the bridge plugin
 ```
+
+`HERALD_OS_TARBALL_URL=file:///path/to/herald-os-<version>-linux-x64.tar.gz makepkg -si` packages a
+tarball you built yourself instead.
 
 The session needs niri (and a login screen such as greetd); the optional dependencies list what
 each panel and feature uses. `.github/workflows/arch.yml` builds the package from a fresh tarball in

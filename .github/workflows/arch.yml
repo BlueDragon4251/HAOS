@@ -1,8 +1,7 @@
 name: Arch package
 
 # Builds herald-os-bin from a freshly built tarball in an Arch container, lints both PKGBUILDs and the
-# package with namcap, installs it and runs the CLIs. Nothing is published: the AUR packages go up
-# once the project is public.
+# package with namcap, installs it and runs the CLIs. Nothing is published to the AUR from here.
 
 on:
   push:

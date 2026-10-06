@@ -1,7 +1,7 @@
 name: Herald OS image
 
 # The Fedora bootc image (ADR-018) per architecture on matching runners, pushed to the repository's
-# GHCR package (private like the repository), joined into one multi-arch tag; then the installer ISO
+# GHCR package, joined into one multi-arch tag; then the installer ISO
 # (x86_64) and the VM disk (aarch64) from it. A tag attaches the disks to the draft release; nothing
 # here makes the image, the package or a release public.
 

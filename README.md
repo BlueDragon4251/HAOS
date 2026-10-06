@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/iamlukethedev/Herald-OS/releases"><img src="https://img.shields.io/github/v/release/iamlukethedev/Herald-OS?include_prereleases&label=release" alt="Latest release"></a>
   <a href="https://github.com/iamlukethedev/Herald-OS/actions/workflows/ci.yml"><img src="https://github.com/iamlukethedev/Herald-OS/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
@@ -30,6 +31,129 @@ permission system you control.
 > **Status: alpha (0.1).** Expect rough edges, and keep backups of anything you let an agent
 > touch.
 
+## Install
+
+Every download is on the [releases page](https://github.com/iamlukethedev/Herald-OS/releases).
+Pick the way that matches your machine:
+
+| Your machine | What to install |
+| --- | --- |
+| A Mac with Apple Silicon | [Herald OS for macOS](#macos) |
+| A PC you can give to Herald OS | [The Herald OS Linux installer](#herald-os-linux-on-a-pc) |
+| Arch Linux | [The Arch package](#arch-linux) |
+| Omarchy | [The Arch package, then one command](#omarchy) |
+| Another Linux | [The tarball](#another-linux) |
+| An Apple Silicon Mac, to try the whole OS | [The virtual machine](#the-whole-os-in-a-virtual-machine) |
+
+Hermes needs a model provider whichever you pick: a [Nous Portal](https://portal.nousresearch.com)
+account, or an API key for a provider Hermes supports (OpenRouter, OpenAI, Anthropic, a local model,
+and others). Herald OS shows a sign-in card the first time Hermes needs one.
+
+### macOS
+
+You need macOS 13 (Ventura) or later on Apple Silicon.
+
+**1. Install Hermes Agent** and choose a model, if you don't have it yet:
+
+```bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+source ~/.zshrc
+hermes setup
+```
+
+**2. Install Herald OS.** Download `HeraldOS-<version>-mac-arm64.dmg` from the
+[releases page](https://github.com/iamlukethedev/Herald-OS/releases), open it and drag Herald OS to
+Applications.
+
+**3. Let it open.** This build is not notarized by Apple yet, so macOS stops it the first time.
+Run this once, then open Herald OS from Applications:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Herald OS.app"
+```
+
+Herald OS takes over the screen: `Cmd+Ctrl+F` leaves or re-enters fullscreen and `Cmd+Q` quits. On
+its first start it adds its system tools to Hermes (`~/.hermes/plugins/herald-os-bridge`). macOS asks
+for Screen Recording, Accessibility or Microphone access the first time a feature needs it: asking
+about the screen, typing an emoji into another app, or talking to Hermes.
+
+### Herald OS Linux on a PC
+
+The whole operating system, for a 64-bit Intel or AMD PC: Fedora underneath, everything you see is
+Herald.
+
+1. Download `herald-os-<version>-x86_64.iso` from the
+   [releases page](https://github.com/iamlukethedev/Herald-OS/releases).
+2. Write it to a USB stick of 4 GB or more with
+   [Fedora Media Writer](https://fedoraproject.org/workstation/download) or
+   [balenaEtcher](https://etcher.balena.io).
+3. Start the PC from the stick and follow the installer. Its disk screen lets you erase the disk or
+   install next to Windows, and encrypt it. Secure Boot can stay on.
+4. The first start sets up Hermes Agent, then Herald OS asks for your name, a password and Wi-Fi.
+
+Updates come as a whole new version of the system: `herald-os update` installs one, and
+`herald-os rollback` goes back to the one before. Already on Fedora Silverblue or another bootc
+system? [docs/LINUX.md](docs/LINUX.md#the-herald-os-image-fedora-bootc) covers switching it to the
+Herald OS image instead.
+
+### Arch Linux
+
+```bash
+git clone https://github.com/iamlukethedev/Herald-OS.git
+cd Herald-OS/packaging/arch/herald-os-bin
+makepkg -si
+herald-os setup        # once per user: Hermes Agent and Herald's system tools
+```
+
+The package downloads the release build for your architecture (x86_64 or aarch64). Then choose
+Herald OS on your login screen for the full session (it needs `niri`; the package's optional
+dependencies list what each panel uses), or run `herald-os-app` to use Herald OS as an app inside
+your current desktop. The package is not on the AUR yet.
+
+### Omarchy
+
+Install [the Arch package](#arch-linux), then:
+
+```bash
+herald-os omarchy install
+```
+
+Herald OS becomes an app inside Omarchy. It follows Omarchy's theme and has a row on the Omarchy
+menu. `Super+Alt+H` opens it, and `Super+Alt+A`, `C`, `V`, `X`, `E` and `M` ask Hermes about the
+window, open the command bar, talk, dictate, pick an emoji and show Missions. `herald-os omarchy
+remove` takes it all out again. This has been tested against Omarchy 4's own configuration and
+scripts, but not yet on an Omarchy machine: [reports](https://github.com/iamlukethedev/Herald-OS/issues)
+are welcome.
+
+### Another Linux
+
+The tarball carries the app and its command-line tools. For x86_64 (use the `arm64` tarball on ARM):
+
+```bash
+sudo mkdir -p /opt/herald-os
+sudo tar -xzf herald-os-<version>-linux-x64.tar.gz -C /opt/herald-os --strip-components=1
+sudo chown root:root /opt/herald-os/chrome-sandbox && sudo chmod 4755 /opt/herald-os/chrome-sandbox
+sudo ln -sf /opt/herald-os/resources/herald-os-linux/bin/* /usr/local/bin/
+herald-os setup        # once per user: Hermes Agent and Herald's system tools
+herald-os-app          # Herald OS as an app inside your desktop
+```
+
+### The whole OS in a virtual machine
+
+On an Apple Silicon Mac, one command downloads the latest release's VM disk (about 2 GB) and boots
+it with Apple's virtualization, so the graphics are accelerated:
+
+```bash
+brew install qemu zstd
+git clone https://github.com/iamlukethedev/Herald-OS.git && cd Herald-OS
+bash linux/vm/try.sh
+```
+
+The first start sets itself up in a few minutes, Hermes Agent included. The disk,
+`herald-os-<version>-aarch64.qcow2.zst` on the releases page, also imports into
+[UTM](https://mac.getutm.app). To build the VM from your checkout instead and work on Herald OS
+Linux, see [Building from source](#herald-os-linux-in-a-virtual-machine).
+
 ## How Herald OS fits together
 
 **Herald OS Linux is the operating system.** Fedora supplies the kernel, drivers and packages, and
@@ -37,8 +161,11 @@ everything you see is Herald. The machine boots to the Herald splash screen and 
 in. The niri compositor arranges the windows, Herald draws the menu bar, dock, notifications, app
 launcher and system menus, and its theme styles the lock screen. Hermes starts with the session,
 with tools to see and operate the machine. Linux apps such as Firefox, LibreOffice and VS Code run
-as windows inside it, and a curated set comes preinstalled. Herald OS Linux is in development and
-runs in a virtual machine on Apple Silicon Macs; an installable image for PCs is planned.
+as windows inside it, and a curated set comes preinstalled. It installs on a PC from the installer
+image or runs in a virtual machine, and it updates as a whole system you can roll back.
+
+**On Arch Linux and Omarchy,** Herald OS is a package: the full session from the login screen, or
+Herald as an app inside Hyprland and Omarchy, following Omarchy's theme and keys.
 
 **Herald OS also runs on a Mac,** fullscreen over macOS: the same interface, agent and tools, with
 macOS underneath handling the hardware and your Mac apps. It is the quickest way to try Herald OS,
@@ -95,32 +222,34 @@ abilities as a regular Hermes plugin, `herald-os-bridge`.
   the permissions you grant, and Hermes can write them for you. Arrange the menu bar and its clock,
   add your own control-menu entries, and put your logo in About and your picture on the lock
   screen. See [the manual](docs/manual/make-it-yours.md).
-- **Ask about the screen**: select part of the screen and ask Hermes about it.
+- **The screen**: select part of the screen and ask Hermes about it; pick a colour, read a QR code
+  or copy the text from anywhere on it; and type an emoji into any app (`Cmd+Ctrl+E` on the Mac,
+  `Super+Ctrl+E` on Linux).
 - **Usage**: what Hermes used this week and this month, and what is left on your model plan, with
   a warning at 90%.
 - **When something happens**: automations that run when you log in, come back after a break, the
   battery runs low or a program crashes, and hook scripts for the same moments.
 - **On Herald OS Linux, the rest of an OS**: a control menu to install and remove apps, change the
-  theme and update the system; themes that recolour everything from the menu bar to the terminal;
-  a curated app set; web apps in their own windows; clipboard history, a lock screen and a power
-  menu; and one command, `herald-os update`, that updates Herald OS, Hermes and Fedora.
+  theme and update the system; one-click installs for AI tools such as Claude Code, Codex and local
+  models; themes that recolour everything from the menu bar to the terminal; Wi-Fi, Bluetooth,
+  sound, display and battery panels; screenshots, screen recording, night light and do not disturb;
+  web apps in their own windows; clipboard history, a lock screen and a power menu; fingerprint and
+  security-key sign-in; a firewall that refuses incoming connections; and one command,
+  `herald-os update`, that updates Herald OS, Hermes and Fedora, with `herald-os rollback` to undo
+  it.
 
 The [manual](docs/manual/README.md) covers using all of it, with every hotkey and a page for
 people coming from macOS.
 
-## Getting started
+## Building from source
 
-There are two ways to run Herald OS:
+To work on Herald OS, or to run what is on `main`:
 
-- **Herald OS Linux in a virtual machine** gives you the whole operating system. The first setup
-  takes about half an hour, most of it downloads.
-- **Herald OS on macOS** is ready in a few minutes if you already have Node.js.
+- **Herald OS Linux in a virtual machine** gives you the whole operating system, built from your
+  checkout. The first setup takes about half an hour, most of it downloads.
+- **Herald OS on macOS** runs from your checkout in a few minutes if you already have Node.js.
 
-Either way, Hermes needs a model provider: a [Nous Portal](https://portal.nousresearch.com) account,
-or an API key for a provider Hermes supports (OpenRouter, OpenAI, Anthropic, a local model, and
-others).
-
-### Herald OS Linux (virtual machine)
+### Herald OS Linux in a virtual machine
 
 You need an Apple Silicon Mac with [Homebrew](https://brew.sh) and about 20 GB of free disk space.
 The virtual machine gets 4 cores and 8 GB of memory; on a Mac with 8 GB in total, start it with
@@ -169,7 +298,7 @@ starts it again, straight into Herald OS. After you change the code on your Mac,
 `bash linux/dev/push.sh` installs it. [docs/LINUX.md](docs/LINUX.md) covers UTM, display scaling on
 Retina screens, the session model and the dev loop.
 
-### Herald OS on macOS
+### Herald OS on macOS from source
 
 You need:
 
@@ -261,6 +390,7 @@ shortcut. In the virtual machine the system key is `Alt` (`Option` on a Mac keyb
 | Settings | `Super+,` | `Cmd+,` |
 | Terminal | `Super+Return` | `Cmd+8` |
 | Close window | `Super+Q` | `Cmd+W` |
+| Emoji, typed into any app | `Super+Ctrl+E` | `Cmd+Ctrl+E` |
 | Clipboard history | `Super+Ctrl+V` | |
 | Lock, power menu | `Super+Ctrl+L`, `Super+Escape` | |
 | Toggle fullscreen, quit | | `Cmd+Ctrl+F`, `Cmd+Q` |
@@ -318,10 +448,10 @@ This writes an Apple Silicon DMG and zip to `apps/desktop/release/`. Before inst
   certificate) to notarize from your Mac.
 - **macOS notifications need a signed build.** Notifications still appear inside Herald OS, but the
   macOS ones it sends while you are in another app only work when the build is code-signed.
-- **The system tools plugin is not bundled.** Run `npm run bootstrap` from a checkout once so
-  Hermes loads `herald-os-bridge`.
-- **Hermes Agent is not bundled either.** The build finds it as in development:
-  `HERALD_OS_HERMES_ROOT`, then `~/.hermes/hermes-agent`, then `hermes` on your PATH.
+- **The system tools plugin comes with the app.** On its first start the app links its copy into
+  `~/.hermes/plugins` and enables it. A link from a checkout (`npm run bootstrap`) stays as it is.
+- **Hermes Agent is not bundled.** The app finds it as in development: `HERALD_OS_HERMES_ROOT`,
+  then `~/.hermes/hermes-agent`, then `hermes` on your PATH.
 
 ## Building a Linux release
 
@@ -367,16 +497,13 @@ CI runs all of these on Ubuntu and macOS. [CONTRIBUTING.md](CONTRIBUTING.md) has
 
 ## Updating
 
-On macOS:
-
-```bash
-git pull
-npm run bootstrap
-hermes update         # Hermes itself, whenever you like
-```
-
-For the Linux VM, run `git pull` on the Mac and then `bash linux/dev/push.sh`. Inside Herald OS
-Linux, `herald-os update` upgrades Hermes Agent, the Fedora packages and the Flatpak apps.
+- **Herald OS Linux:** `herald-os update` (or Update in the Herald OS menu) installs the new system,
+  Hermes Agent and the Flatpak apps, and `herald-os rollback` goes back.
+- **The Mac app:** download the new DMG and replace the app in Applications. `hermes update` updates
+  Hermes itself, whenever you like.
+- **Arch and Omarchy:** run `git pull` and `makepkg -si` again in `packaging/arch/herald-os-bin`.
+- **From source on macOS:** `git pull`, then `npm run bootstrap`.
+- **The development VM:** `git pull` on the Mac, then `bash linux/dev/push.sh`.
 
 The shell compiles against a pinned Hermes version (`upstream/UPSTREAM.lock`), so updating Hermes
 does not change the shell's code. Moving the pin is described in [upstream/README.md](upstream/README.md).
@@ -387,8 +514,11 @@ does not change the shell's code. Moving the pin is described in [upstream/READM
   lives somewhere other than `~/.hermes/hermes-agent` and is not on your PATH, start with
   `HERALD_OS_HERMES_ROOT=/path/to/hermes-agent npm run dev`. The cause is usually in
   `~/.hermes/logs/herald-os.log`.
-- **Hermes uses shell commands instead of its system tools.** Re-run `npm run bootstrap`, then
-  restart Herald OS. `hermes plugins list` should show `herald-os-bridge` as enabled.
+- **macOS says Herald OS "is damaged" or "cannot be opened".** The build is not notarized yet: run
+  `xattr -dr com.apple.quarantine "/Applications/Herald OS.app"` and open it again.
+- **Hermes uses shell commands instead of its system tools.** `hermes plugins list` should show
+  `herald-os-bridge` as enabled; `hermes plugins enable herald-os-bridge` turns it on. From a
+  checkout, re-run `npm run bootstrap`; on Linux, `herald-os setup`. Then restart Herald OS.
 - **The VM's first boot fails or never finishes.** A failed step prints
   `==> Provisioning FAILED at line N`, and `bash linux/vm/run-qemu.sh console` shows where it
   stopped. `/var/log/herald-os-provision.log` in the VM has the whole run (`bash linux/dev/push.sh ssh`

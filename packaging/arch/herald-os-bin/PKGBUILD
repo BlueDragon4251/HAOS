@@ -1,6 +1,6 @@
 # Maintainer: Luke The Dev <252071647+iamlukethedev@users.noreply.github.com>
 #
-# Herald OS from the release tarball. Not on the AUR yet: it is published once the project is public.
+# Herald OS from the release tarball. Not on the AUR yet: build it from the repository with makepkg -si.
 # A local tarball builds too: HERALD_OS_TARBALL_URL=file:///path/herald-os-<v>-linux-x64.tar.gz makepkg -si
 
 pkgname=herald-os-bin

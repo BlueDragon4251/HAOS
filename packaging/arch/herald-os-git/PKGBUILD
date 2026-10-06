@@ -1,6 +1,6 @@
 # Maintainer: Luke The Dev <252071647+iamlukethedev@users.noreply.github.com>
 #
-# Herald OS built from the main branch. Not on the AUR yet: it is published once the project is public.
+# Herald OS built from the main branch. Not on the AUR yet: build it from the repository with makepkg -si.
 
 pkgname=herald-os-git
 pkgver=0.1.0alpha.1.r0.g0000000

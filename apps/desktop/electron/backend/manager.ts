@@ -7,6 +7,7 @@ import type { AudioWsKind, BackendRuntime, BackendState, RestRequest } from '../
 import { osEnv } from '../env.ts'
 import { log } from '../log.ts'
 import { hermesHome, heraldOsDataDir } from '../paths.ts'
+import { ensureBridgePlugin } from './bridge-plugin.ts'
 import { type AttachTarget, attachTarget, foreignGateway } from './coexist.ts'
 import { waitForStatus } from './probe.ts'
 import { LineBuffer, parseReadyLine, readyFileName, staleReadyFiles } from './ready.ts'
@@ -176,6 +177,7 @@ export class BackendManager {
     this.update({ runtime, phase: 'starting' })
 
     try {
+      await ensureBridgePlugin(runtime)
       const port = await this.spawnServe(runtime, generation)
 
       if (generation !== this.startGeneration) {
