@@ -270,8 +270,8 @@ makepkg -si            # downloads the release tarball for this architecture
 herald-os setup        # once per user: Hermes Agent and the bridge plugin
 ```
 
-`HERALD_OS_TARBALL_URL=file:///path/to/herald-os-<version>-linux-x64.tar.gz makepkg -si` packages a
-tarball you built yourself instead.
+`HERALD_OS_TARBALL_URL=file:///path/to/herald-os-<version>-linux-x64.tar.gz makepkg -si --skipchecksums`
+packages a tarball you built yourself instead.
 
 The session needs niri (and a login screen such as greetd); the optional dependencies list what
 each panel and feature uses. `.github/workflows/arch.yml` builds the package from a fresh tarball in
