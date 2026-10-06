@@ -25,7 +25,8 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 echo "sync-upstream: fetching $repo@$sha"
-curl -fsSL "https://github.com/$repo/archive/$sha.tar.gz" -o "$tmp/upstream.tar.gz"
+# Retries ride out GitHub's rate limit (429), which many builds fetching at once can hit.
+curl -fsSL --retry 6 --retry-delay 20 --retry-all-errors "https://github.com/$repo/archive/$sha.tar.gz" -o "$tmp/upstream.tar.gz"
 mkdir -p "$tmp/extract"
 tar -xzf "$tmp/upstream.tar.gz" -C "$tmp/extract" --strip-components=1
 
