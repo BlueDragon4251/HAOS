@@ -10,7 +10,12 @@ import { log } from '../log.ts'
 import { readPrefs, writePrefs } from '../prefs.ts'
 import { readOmarchyTheme } from '../theme/omarchy.ts'
 import { findTheme, prefsForTheme } from '../theme/themes.ts'
+import { describePermissions } from '../../shared/plugins.ts'
+import type { PluginHost } from '../plugins/host.ts'
 import type { ShellHost } from './host.ts'
+import { menuFile, readMenuExtensions } from './menu-extensions.ts'
+import { brandingView, setBranding } from './branding.ts'
+import type { BrandingPatch, BrandingView } from '../../shared/branding.ts'
 import { handleUiRequest, isUiRequest, type OsCommandBridge, type UiControlRequest } from './os-control.ts'
 
 interface ControlRequest {
@@ -43,7 +48,9 @@ export class ControlSocket {
     /** A theme was applied: Hermes's skin follows it. */
     private readonly onTheme?: (spec: ThemeSpec) => void,
     /** The CLI changed a switch (night light, staying awake): the menu bar follows. */
-    private readonly onSwitches?: () => void
+    private readonly onSwitches?: () => void,
+    /** `herald-os plugin …`: the same plugin host Settings uses. */
+    private readonly plugins?: PluginHost
   ) {}
 
   get socketPath(): string {
@@ -144,6 +151,24 @@ export class ControlSocket {
       this.shell.relay('main', { type: 'os', args: [id], payload: json ? (JSON.parse(json) as Record<string, unknown>) : undefined })
 
       return { ok: true }
+    }
+
+    if (cmd === 'os-run') {
+      // Like `os`, but waits for the result (`herald-os bar list` prints it).
+      const [id, json] = args
+
+      if (!id || !this.osBridge) {
+        return { ok: false, error: id ? 'the command registry is not available' : 'os-run needs a command id' }
+      }
+
+      const reply = await this.osBridge.run(id, json ? (JSON.parse(json) as Record<string, unknown>) : {}, 'cli')
+      const result = reply.result as { ok?: boolean; summary?: string; error?: string; data?: unknown } | undefined
+
+      if (reply.error || !result) {
+        return { ok: false, error: reply.error ?? 'no result' }
+      }
+
+      return { ok: result.ok !== false, summary: result.summary, data: result.data, ...(result.ok === false ? { error: result.error ?? result.summary } : {}) }
     }
 
     if (OVERLAY_MODES.has(cmd)) {
@@ -278,6 +303,69 @@ export class ControlSocket {
         }
 
         return { ok: true, theme: next.themeName ?? next.theme, accent: next.accent }
+      }
+      case 'branding': {
+        // show | set <json patch> | reset [all|logo|lock|name]
+        const [action = 'show', value = ''] = args
+        const summary = (view: BrandingView) => ({ name: view.name, logo: Boolean(view.logo), lock: view.lock })
+
+        try {
+          if (action === 'set') {
+            return { ok: true, branding: summary(setBranding(JSON.parse(value || '{}') as BrandingPatch)) }
+          }
+
+          if (action === 'reset') {
+            const part = value || 'all'
+
+            if (!['all', 'logo', 'lock', 'name'].includes(part)) {
+              return { ok: false, error: 'branding reset [all|logo|lock|name]' }
+            }
+
+            return { ok: true, branding: summary(setBranding(part === 'all' ? { logo: null, lock: null, name: null } : { [part]: null })) }
+          }
+
+          return { ok: true, branding: summary(brandingView()) }
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : String(error) }
+        }
+      }
+      case 'menu-check': {
+        // `herald-os menu check`: what the control menu makes of ~/.config/herald-os/menu.json.
+        const { entries, errors } = readMenuExtensions()
+
+        return { ok: true, file: menuFile(), entries: entries.map(entry => ({ label: entry.label, group: entry.group ?? 'yours', kind: entry.action.kind })), errors }
+      }
+      case 'plugin': {
+        // list | add <url> | enable <id> | disable <id> | update <id> | remove <id>
+        if (!this.plugins) {
+          return { ok: false, error: 'plugins are not available in this shell' }
+        }
+
+        const [action = 'list', target = ''] = args
+
+        try {
+          switch (action) {
+            case 'list':
+              return { ok: true, plugins: this.plugins.list().map(plugin => ({ ...plugin.manifest, enabled: plugin.enabled, errors: plugin.errors, grants: describePermissions(plugin.manifest) })) }
+            case 'add':
+              return { ok: true, plugin: (await this.plugins.add(target)).manifest }
+            case 'enable':
+            case 'disable':
+              this.plugins.setEnabled(target, action === 'enable')
+
+              return { ok: true }
+            case 'update':
+              return { ok: true, plugin: (await this.plugins.update(target)).manifest }
+            case 'remove':
+              await this.plugins.remove(target)
+
+              return { ok: true }
+            default:
+              return { ok: false, error: 'plugin list | add <url> | enable <id> | disable <id> | update <id> | remove <id>' }
+          }
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : String(error) }
+        }
       }
       case 'theme-omarchy': {
         // Omarchy's theme-set hook (herald-os omarchy install): Herald's colours follow Omarchy's.

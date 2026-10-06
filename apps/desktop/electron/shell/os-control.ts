@@ -38,7 +38,7 @@ export class OsCommandBridge {
     })
   }
 
-  private send(request: { kind: 'run'; command: string; args: Record<string, unknown>; source: 'agent' | 'cli' } | { kind: 'list' } | { kind: 'state' }): Promise<OsControlReply> {
+  private send(request: { kind: 'run'; command: string; args: Record<string, unknown>; source: 'agent' | 'cli' | 'plugin' } | { kind: 'list' } | { kind: 'state' }): Promise<OsControlReply> {
     const win = this.getWindow()
 
     if (!win || win.isDestroyed()) {
@@ -58,7 +58,7 @@ export class OsCommandBridge {
     })
   }
 
-  run(command: string, args: Record<string, unknown>, source: 'agent' | 'cli'): Promise<OsControlReply> {
+  run(command: string, args: Record<string, unknown>, source: 'agent' | 'cli' | 'plugin'): Promise<OsControlReply> {
     return this.send({ kind: 'run', command, args, source })
   }
 

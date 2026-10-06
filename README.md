@@ -91,7 +91,10 @@ abilities as a regular Hermes plugin, `herald-os-bridge`.
   report and explain, in plain words, what went wrong and whether it is worth reporting.
 - **Make it yours**: twelve themes (two light) that also dress Hermes's own command line, a theme
   made from any image, themes installed from git, your own fonts, and Hermes can design one from a
-  description. See [the manual](docs/manual/make-it-yours.md).
+  description. Widgets for the menu bar, the Overview or their own window run sandboxed with only
+  the permissions you grant, and Hermes can write them for you. Arrange the menu bar and its clock,
+  add your own control-menu entries, and put your logo in About and your picture on the lock
+  screen. See [the manual](docs/manual/make-it-yours.md).
 - **Ask about the screen**: select part of the screen and ask Hermes about it.
 - **Usage**: what Hermes used this week and this month, and what is left on your model plan, with
   a warning at 90%.
@@ -341,6 +344,7 @@ apps/desktop/               The Herald shell: Electron main (electron/), preload
 packages/hermes-client/     Typed client for the Hermes gateway (JSON-RPC over WebSocket, REST)
 plugins/herald-os-bridge/   Hermes plugin: system tools, permission tiers, audit log, UI control
 linux/                      Herald OS Linux: provisioning, session, niri config, themes, apps, VM tooling
+examples/widgets/           sample widget plugins (ADR-019)
 scripts/                    bootstrap, upstream sync, bridge tests, secret scan
 upstream/                   UPSTREAM.lock, the pinned Hermes version the shell builds against
 docs/                       architecture, decisions, system bridge, voice, Linux

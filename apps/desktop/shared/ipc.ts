@@ -2,6 +2,7 @@
 // Everything the renderer can ask the machine to do is declared here; nothing else is exposed.
 
 import type { EventAutomation } from './events.ts'
+import type { MenuBarLayout } from './menu-bar.ts'
 import type { ColorScheme, ThemeColors } from './theme.ts'
 
 export type BackendPhase = 'idle' | 'resolving' | 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
@@ -470,7 +471,7 @@ export type EditAction =
 
 /** Main -> renderer: run a registry command, list the catalogue, or describe the shell state. */
 export type OsControlRequest =
-  | { requestId: string; kind: 'run'; command: string; args: Record<string, unknown>; source: 'agent' | 'cli' }
+  | { requestId: string; kind: 'run'; command: string; args: Record<string, unknown>; source: 'agent' | 'cli' | 'plugin' }
   | { requestId: string; kind: 'list' }
   | { requestId: string; kind: 'state' }
 
@@ -500,6 +501,8 @@ export interface HeraldOSPrefs {
   fonts?: { ui?: string; mono?: string }
   /** Show the model plan's usage as a small meter in the menu bar. */
   usageInMenuBar?: boolean
+  /** The menu bar's items (order, hidden ones) and clock; `normalizeMenuBar` fills the gaps. */
+  menuBar?: MenuBarLayout
   /** Hermes automations that run when something happens rather than on a schedule. */
   eventAutomations?: EventAutomation[]
   /** Toasts, system notifications and spoken announcements stay quiet; the bell still collects them. */
@@ -785,6 +788,16 @@ export const IPC = {
   /** Models a local server (Ollama, LM Studio) has, for "Use with Hermes". */
   catalogLocalModels: 'herald-os:catalog:local-models',
 
+  /** Widget plugins (ADR-019): the installed ones, turning one on or off, git installs, and their messages. */
+  pluginsList: 'herald-os:plugins:list',
+  pluginsSetEnabled: 'herald-os:plugins:set-enabled',
+  pluginsAdd: 'herald-os:plugins:add',
+  pluginsUpdate: 'herald-os:plugins:update',
+  pluginsRemove: 'herald-os:plugins:remove',
+  pluginCall: 'herald-os:plugins:call',
+  /** main → renderer: the plugin list changed (installed, enabled, files saved). */
+  pluginsChanged: 'herald-os:plugins:changed',
+
   /** First-boot setup on the Herald OS image: whether it is due, the name, the password, done. */
   setupState: 'herald-os:setup:state',
   setupName: 'herald-os:setup:name',
@@ -876,6 +889,11 @@ export const IPC = {
   // Phase 2: system services reachable from any surface.
   /** Run a `herald-os` CLI command (install, reminder, notice, ocr, …); resolves with its output. */
   shellHeraldOs: 'herald-os:shell:herald-os',
+  menuExtensions: 'herald-os:menu:extensions',
+  menuExtensionRun: 'herald-os:menu:extension-run',
+  brandingGet: 'herald-os:branding:get',
+  brandingSet: 'herald-os:branding:set',
+  brandingChanged: 'herald-os:branding:changed',
   /** Power actions: suspend | reboot | poweroff | logout | lock. */
   shellPower: 'herald-os:shell:power',
   /** Clipboard history (cliphist): list entries / paste one back to the clipboard. */

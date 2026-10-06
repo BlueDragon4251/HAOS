@@ -1,6 +1,6 @@
 ---
 name: herald-os-tailor
-description: Change Herald OS itself - make and switch themes, fonts and the wallpaper, keybindings, settings, routines and hooks
+description: Change Herald OS itself - make and switch themes, fonts and the wallpaper, widgets, the menu bar, control-menu entries, branding, keybindings, settings, routines and hooks
 metadata:
   hermes:
     tags: [herald-os, customise, themes, settings, linux, macos]
@@ -67,6 +67,116 @@ compositor, GTK apps, the lock screen and the terminal.
   `{"family": "JetBrains Mono", "kind": "mono"}` for code and the terminal. `"default"` resets.
 - `wallpaper.set args={"image": "<path>"}`, or `"default"` for the drawn wallpaper.
 
+## Widgets
+
+A widget is a small web page that sits in the menu bar (a 24 px strip), on the Overview (a card)
+or in its own window. Make one when they want something to glance at: "a strip with the weather",
+"a CPU meter", "a countdown to Friday".
+
+1. Write it into `~/.config/herald-os/plugins/<id>/` with `write_file`. `<id>` is lowercase
+   letters, digits and dashes, and is the folder name.
+2. `manifest.json`:
+
+```json
+{
+  "id": "weather-strip",
+  "name": "Weather strip",
+  "version": "1.0.0",
+  "description": "The temperature here, in the menu bar.",
+  "entry": "index.html",
+  "placement": ["menubar"],
+  "size": { "width": 90, "height": 96 },
+  "permissions": ["storage"],
+  "hosts": ["api.open-meteo.com"]
+}
+```
+
+   - `placement`: any of `menubar`, `overview`, `panel`. `size.width` is its menu-bar width (up
+     to 240), `size.height` its Overview card height.
+   - `permissions`: only what it needs. `stats` (CPU, memory, disks, battery), `notify`,
+     `storage` (its own small key-value store) and `run:<command.id>` for each Herald OS command
+     it runs, such as `run:page.open`. Commands that change things still ask the person.
+   - `hosts`: the HTTPS hosts it fetches from. Nothing else is reachable, and the API must allow
+     cross-origin requests (most public JSON APIs do).
+3. `index.html` loads the SDK and its own script file. Inline `<script>` is blocked; inline styles
+   are fine. Keep the background transparent so it sits on the shell's glass.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="herald-plugin://sdk/widget.js"></script>
+    <script src="widget.js" defer></script>
+  </head>
+  <body style="margin: 0; font: 500 11px/24px system-ui; color: var(--herald-fg)">
+    <span id="out">…</span>
+  </body>
+</html>
+```
+
+4. The SDK in `widget.js`:
+   - `await herald.stats()` gives `{ cpuPercent, memoryUsed, memoryTotal, disks, battery, uptimeSeconds }`.
+   - `herald.notify(title, body)`, `herald.storage.get(key)` and `herald.storage.set(key, value)`.
+   - `herald.run('page.open', { name: 'missions' })` runs a Herald OS command it was granted.
+   - `herald.placement` is where it sits (`menubar`, `overview` or `panel`), also set as
+     `data-placement` on `<html>` for CSS.
+   - The theme arrives as CSS variables: `--herald-bg`, `--herald-surface`, `--herald-fg`,
+     `--herald-fg-dim`, `--herald-accent`, `--herald-line`, `--herald-ok`, `--herald-warn`,
+     `--herald-urgent`; `herald.onTheme(colors => …)` hears changes.
+5. Never turn it on yourself. Say: "It's in Settings > Plugins; turn on Weather strip there after
+   checking what it asks for." `os_ui action=run command=plugin.manage` shows that page. Once it is
+   on, every saved change reloads it, so iterate by editing the files.
+6. To share it, the folder is a git repository; others install it with `herald-os plugin add <url>`
+   (it arrives turned off for them too).
+
+## The menu bar
+
+- `bar.layout` lists the items left to right (search, widgets, voice, indicators, usage, wifi,
+  bluetooth, sound, battery, notifications, clock) and which are shown.
+- `bar.hide item=bluetooth`, `bar.show item=battery`. The status lights (`indicators`: recording,
+  dictation, switches that are on) always show; say why if asked to hide them.
+- `bar.move item=clock position=first` (also `last`, a number with 1 leftmost, or `before=` /
+  `after=` another item).
+- `bar.clock hours=24` (`12`, `system`), `seconds=true`, `date=none` (`short`, `long`).
+- `bar.reset` puts it all back. Settings > Appearance > Menu bar shows the result.
+
+## Control-menu entries
+
+The control menu (`Mod+M`) takes the person's own entries from `~/.config/herald-os/menu.json`.
+Write it with `write_file`, keeping any entries already there:
+
+```json
+{
+  "entries": [
+    { "label": "Notes", "hint": "Obsidian", "icon": "notes", "herald-os": ["launch", "obsidian"] },
+    { "label": "Back up photos", "group": "trigger", "exec": ["rsync", "-a", "~/Pictures/", "/mnt/backup/Pictures/"] },
+    { "label": "Standup doc", "icon": "world", "url": "https://docs.example.com/standup" },
+    { "label": "Missions", "command": "page.open", "args": { "name": "missions" } }
+  ]
+}
+```
+
+- Each entry has a `label` and exactly one action: `herald-os` (a `herald-os` command as a list of
+  words), `exec` (a program and its arguments, as a list; `~/` is the home folder; no shell, so no
+  pipes), `url` (http or https) or `command` (a Herald OS command id and its `args`).
+- `group` puts it in an existing group (`install`, `remove`, `update`, `style`, `trigger`,
+  `capture`, `toggle`, `system`, `hermes`); otherwise it sits under "Yours". `icon` is one of star,
+  app, terminal, world, bolt, folder, notes, music, camera, code, calendar, mail, chat, heart,
+  home, rocket.
+- The menu reads the file each time it opens. `herald-os menu check` shows what it understood and
+  any problems.
+
+## Branding
+
+- `branding.set args={"logo": "<image path>"}` puts a PNG, JPEG, WebP or SVG logo at the top of
+  Settings > About; `"name": "Acme Corp"` adds a line under it. The image is copied, so the
+  original can move.
+- `branding.set args={"lock": "<image path>"}` (PNG or JPEG) is the picture behind the password
+  ring on the Herald OS Linux lock screen.
+- `branding.reset` (or `what=logo`, `lock`, `name`) goes back to the Herald logo and the theme's
+  lock screen.
+
 ## Settings
 
 The shell's settings are commands: `accent.set`, `dock.autoHide`, `motion.reduce`,
@@ -91,6 +201,15 @@ niri reloads the file as soon as it is saved. Check it with
 `niri validate -c ~/.config/niri/config.kdl` in the terminal, and read the hotkey overlay
 (`Mod+K`) before reusing a key: Herald OS already binds many `Mod+…` combinations. Any
 `herald-os` command can be a bind (`spawn "herald-os" "theme" "set" "herald-dusk"`).
+
+To change one of Herald OS's own keys, bind the same key in `local.kdl`: it is included last, and
+niri lets a later bind replace an earlier one. To switch a key off, bind it to nothing:
+`Mod+Q { spawn "true"; }`. Only bind a key once inside `local.kdl` itself; niri refuses a file that
+binds the same key twice.
+
+Inside Omarchy (Herald OS as an app on Hyprland), Herald's keys are in
+`~/.config/hypr/herald-os.conf`, which `herald-os omarchy install` rewrites. Change them in the
+person's own Hyprland config instead: `unbind = SUPER ALT, H`, then their own `bind = …` line.
 
 ## Routines
 

@@ -189,3 +189,82 @@ def test_unknown_keymap_falls_back_to_herald(tmp_path, monkeypatch):
     assert cli.current_keymap() == "herald"
     (tmp_path / "keymap").write_text("omarchy\n")
     assert cli.current_keymap() == "omarchy"
+
+
+def test_bar_words_become_registry_commands():
+    assert cli.bar_args([]) == ("bar.layout", {})
+    assert cli.bar_args(["hide", "bluetooth"]) == ("bar.hide", {"item": "bluetooth"})
+    assert cli.bar_args(["move", "clock", "first"]) == ("bar.move", {"item": "clock", "position": "first"})
+    assert cli.bar_args(["move", "clock", "3"]) == ("bar.move", {"item": "clock", "position": "3"})
+    assert cli.bar_args(["move", "battery", "after", "wifi"]) == ("bar.move", {"item": "battery", "after": "wifi"})
+    assert cli.bar_args(["clock", "24h", "seconds", "date", "none"]) == ("bar.clock", {"hours": "24", "seconds": True, "date": "none"})
+    assert cli.bar_args(["clock", "System", "no-seconds"]) == ("bar.clock", {"hours": "system", "seconds": False})
+    assert cli.bar_args(["reset"]) == ("bar.reset", {})
+    for bad in (["move", "clock"], ["move", "clock", "middle"], ["clock"], ["clock", "25h"], ["hide"], ["reset", "now"], ["paint"]):
+        with pytest.raises(SystemExit) as stopped:
+            cli.bar_args(bad)
+        assert stopped.value.code == 2, bad
+
+
+def test_lock_draws_the_branded_picture_behind_the_ring(tmp_path):
+    cfg, image = tmp_path / "config", tmp_path / "lock.jpg"
+    assert cli.lock_command(cfg, None) == ["swaylock", "-f", "-C", str(cfg)]
+    assert cli.lock_command(None, image) == ["swaylock", "-f", "--color", "04113f", "--image", str(image), "--scaling", "fill"]
+
+
+def test_branding_lock_image_stays_inside_the_branding_folder(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "BRANDING_DIR", tmp_path)
+    assert cli.branding_lock_image() is None
+    (tmp_path / "lock.png").write_bytes(b"png")
+    (tmp_path / "branding.json").write_text('{"lock": "lock.png"}')
+    assert cli.branding_lock_image() == tmp_path / "lock.png"
+    (tmp_path / "branding.json").write_text('{"lock": "../lock.png"}')
+    assert cli.branding_lock_image() is None
+
+
+def test_branding_set_makes_paths_absolute(tmp_path):
+    patch = cli.branding_patch(["--logo", "art/logo.svg", "--name", "Acme Corp", "--lock", "/srv/beach.jpg"], tmp_path)
+    assert patch == {"logo": str((tmp_path / "art" / "logo.svg").resolve()), "name": "Acme Corp", "lock": str(Path("/srv/beach.jpg").resolve())}
+    for bad in ([], ["--logo"], ["--colour", "red"], ["logo.png"]):
+        with pytest.raises(SystemExit) as stopped:
+            cli.branding_patch(bad, tmp_path)
+        assert stopped.value.code == 2, bad
+
+
+class _Stdin:
+    def __init__(self, tty: bool):
+        self.tty = tty
+
+    def isatty(self) -> bool:
+        return self.tty
+
+
+def test_plugin_enable_asks_the_person_and_never_runs_unattended(monkeypatch, capsys):
+    sent = []
+    listing = {"ok": True, "plugins": [{"id": "weather-strip", "name": "Weather strip", "errors": [], "grants": ["Connect to api.open-meteo.com"]}]}
+    monkeypatch.setattr(cli, "relay", lambda cmd, args, *rest, **kwargs: sent.append(args) or (listing if args == ["list"] else {"ok": True}))
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(False))
+    with pytest.raises(SystemExit) as stopped:
+        cli.plugin_cmd(["enable", "weather-strip"])
+    assert stopped.value.code == 2 and sent == [["list"]]
+    # At a terminal it lists what the plugin may do, and turns it on only after a yes.
+    monkeypatch.setattr(cli.sys, "stdin", _Stdin(True))
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
+    assert cli.plugin_cmd(["enable", "weather-strip"]) == 1
+    assert ["enable", "weather-strip"] not in sent
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    assert cli.plugin_cmd(["enable", "weather-strip"]) == 0
+    assert sent[-1] == ["enable", "weather-strip"]
+    assert "Connect to api.open-meteo.com" in capsys.readouterr().out
+
+
+def test_plugin_add_waits_for_the_clone_and_says_it_is_off(monkeypatch, capsys):
+    calls = []
+    reply = {"ok": True, "plugin": {"id": "weather-strip", "name": "Weather strip", "version": "1.0.0"}}
+    monkeypatch.setattr(cli, "relay", lambda cmd, args, *rest, **kwargs: calls.append((cmd, args, kwargs.get("timeout"))) or reply)
+    assert cli.plugin_cmd(["add", "https://example.com/weather-strip.git"]) == 0
+    assert calls == [("plugin", ["add", "https://example.com/weather-strip.git"], 180)]
+    assert "turned off (herald-os plugin enable weather-strip)" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as stopped:
+        cli.plugin_cmd(["remove"])
+    assert stopped.value.code == 2

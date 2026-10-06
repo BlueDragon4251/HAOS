@@ -5,6 +5,7 @@ import { appById, type FloatingAppId, FLOATING_APPS } from '../apps.ts'
 import { RequestHost } from '../RequestHost.tsx'
 import { Toasts } from '../Toasts.tsx'
 import { useShellCommands } from './shell-utils.ts'
+import { WidgetWindow } from '../../features/plugins/PluginSlots.tsx'
 
 const TerminalSurface = lazy(() => import('../../features/terminal/TerminalSurface.tsx').then(m => ({ default: m.TerminalSurface })))
 const SystemSurface = lazy(() => import('../../features/system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
@@ -30,6 +31,8 @@ function FloatingContent({ appId, payload }: { appId: FloatingAppId; payload: Re
       return <CaptureEditor file={typeof payload.file === 'string' ? payload.file : undefined} />
     case 'camera':
       return <CameraBubble />
+    case 'widget':
+      return <WidgetWindow pluginId={typeof payload.plugin === 'string' ? payload.plugin : undefined} />
     default:
       return null
   }

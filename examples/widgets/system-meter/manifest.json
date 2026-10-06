@@ -1,0 +1,11 @@
+{
+  "id": "system-meter",
+  "name": "System meter",
+  "version": "1.0.0",
+  "description": "CPU and memory at a glance, in the menu bar, the Overview or its own window.",
+  "author": "Herald OS",
+  "entry": "index.html",
+  "placement": ["menubar", "overview", "panel"],
+  "size": { "width": 150, "height": 96 },
+  "permissions": ["stats"]
+}

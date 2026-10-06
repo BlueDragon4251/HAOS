@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { IconBattery, IconBattery1, IconBattery2, IconBattery3, IconBattery4, IconBatteryCharging, IconBell, IconBluetooth, IconCheck, IconChevronDown, IconCoffee, IconGauge, IconMoon, IconSearch, IconSunset2, IconVolume, IconWifi, IconWifiOff } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { StatusPanelId, SwitchName } from '../../shared/ipc.ts'
+import { clockText, type MenuBarItem, normalizeMenuBar, visibleMenuBarItems } from '../../shared/menu-bar.ts'
 import { HeraldLogo } from '../components/herald-logo.tsx'
 import { cn } from '../lib/cn.ts'
 import { planPercent } from '../lib/usage.ts'
@@ -15,20 +16,21 @@ import { $statusPanel, openStatusPanel } from '../store/status-panel.ts'
 import { $switches, setSwitch, SWITCH_LABELS } from '../store/switches.ts'
 import { $recording } from '../store/capture.ts'
 import { $dictation, toggleDictation } from '../store/dictation.ts'
+import { MenuBarWidgets } from '../features/plugins/PluginSlots.tsx'
 import { isMainSurface, relayToMain } from '../store/shell.ts'
 import { toggleCommandBar } from '../store/surface.ts'
 import { $systemStats, useNetworkStatus, useSystemStats } from '../store/system.ts'
 import { $focusedTitle } from '../store/windows.ts'
 import { VoiceIndicator } from '../features/voice/VoiceIndicator.tsx'
 
-export function useClock(): Date {
+export function useClock(intervalMs = 10_000): Date {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 10_000)
+    const timer = setInterval(() => setNow(new Date()), intervalMs)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [intervalMs])
 
   return now
 }
@@ -36,50 +38,76 @@ export function useClock(): Date {
 export const fmtTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 export const fmtDate = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 
-/** Right-hand status cluster: search, network, sound, battery, notifications bell and the clock. Shared with the panels-mode menu bar. */
+/**
+ * Right-hand status cluster: search, widgets, voice, status lights, network, sound, battery, the
+ * notifications bell and the clock, in the order and with the clock format the person chose.
+ * Shared with the panels-mode menu bar.
+ */
 export function MenuBarStatus({ onSearch, onBell, bellActive }: { onSearch: () => void; onBell: () => void; bellActive?: boolean }) {
+  const prefs = useStore($prefs)
   const notifications = useStore($notifications)
   const stats = useStore($systemStats)
   const network = useNetworkStatus()
   const openPanel = useStore($statusPanel)
-  const now = useClock()
+  const layout = normalizeMenuBar(prefs.menuBar)
+  const now = useClock(layout.clock.seconds ? 1000 : 10_000)
   useSystemStats()
 
   const unread = notifications.filter(n => !n.read).length
   const battery = stats?.battery
+  const clock = clockText(now, layout.clock)
   const iconButton = (panel: StatusPanelId) => cn('flex h-6 items-center justify-center gap-1.5 rounded-md px-1 hover:bg-white/10', openPanel === panel && 'bg-white/10')
 
-  return (
-    <div className="no-drag flex items-center gap-3">
+  const items: Record<MenuBarItem, ReactNode> = {
+    search: (
       <button type="button" aria-label="Search" onClick={onSearch} className="flex size-6 items-center justify-center rounded-md hover:bg-white/10">
         <IconSearch size={15} />
       </button>
-      <VoiceIndicator />
-      <SwitchIndicators />
-      <UsageMeter />
+    ),
+    widgets: <MenuBarWidgets />,
+    voice: <VoiceIndicator />,
+    indicators: <SwitchIndicators />,
+    usage: <UsageMeter />,
+    wifi: (
       <button type="button" aria-label="Wi-Fi" title={network?.wifi?.connected ? `Wi-Fi ${network.wifi.ssid ?? ''}`.trim() : network?.online ? 'Wired' : 'Offline'} onClick={() => openStatusPanel('wifi')} className={iconButton('wifi')}>
         {network?.online === false ? <IconWifiOff size={15} className="text-fg-3" /> : <IconWifi size={15} />}
       </button>
+    ),
+    bluetooth: (
       <button type="button" aria-label="Bluetooth" onClick={() => openStatusPanel('bluetooth')} className={iconButton('bluetooth')}>
         <IconBluetooth size={15} />
       </button>
+    ),
+    sound: (
       <button type="button" aria-label="Sound" onClick={() => openStatusPanel('audio')} className={iconButton('audio')}>
         <IconVolume size={15} />
       </button>
-      {battery?.present && (
-        <button type="button" aria-label={`Battery ${battery.percent ?? ''}%`} onClick={() => openStatusPanel('power')} className={cn(iconButton('power'), 'tabular-nums')}>
-          {battery.charging ? <IconBatteryCharging size={17} /> : (battery.percent ?? 0) > 80 ? <IconBattery4 size={17} /> : (battery.percent ?? 0) > 55 ? <IconBattery3 size={17} /> : (battery.percent ?? 0) > 30 ? <IconBattery2 size={17} /> : (battery.percent ?? 0) > 10 ? <IconBattery1 size={17} /> : <IconBattery size={17} />}
-          <span className="text-[12px]">{battery.percent}%</span>
-        </button>
-      )}
+    ),
+    battery: battery?.present ? (
+      <button type="button" aria-label={`Battery ${battery.percent ?? ''}%`} onClick={() => openStatusPanel('power')} className={cn(iconButton('power'), 'tabular-nums')}>
+        {battery.charging ? <IconBatteryCharging size={17} /> : (battery.percent ?? 0) > 80 ? <IconBattery4 size={17} /> : (battery.percent ?? 0) > 55 ? <IconBattery3 size={17} /> : (battery.percent ?? 0) > 30 ? <IconBattery2 size={17} /> : (battery.percent ?? 0) > 10 ? <IconBattery1 size={17} /> : <IconBattery size={17} />}
+        <span className="text-[12px]">{battery.percent}%</span>
+      </button>
+    ) : null,
+    notifications: (
       <button type="button" aria-label="Notifications" onClick={onBell} className={cn('relative flex size-6 items-center justify-center rounded-md hover:bg-white/10', bellActive && 'bg-white/10')}>
         <IconBell size={15} />
         {unread > 0 && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent-strong" />}
       </button>
+    ),
+    clock: (
       <button type="button" aria-label="Calendar" onClick={() => openStatusPanel('clock')} className={cn(iconButton('clock'), 'gap-2 tabular-nums')}>
-        <span>{fmtDate(now)}</span>
-        <span className="font-medium">{fmtTime(now)}</span>
+        {clock.date && <span>{clock.date}</span>}
+        <span className="font-medium">{clock.time}</span>
       </button>
+    )
+  }
+
+  return (
+    <div className="no-drag flex items-center gap-3">
+      {visibleMenuBarItems(layout).map(item => (
+        <Fragment key={item}>{items[item]}</Fragment>
+      ))}
     </div>
   )
 }

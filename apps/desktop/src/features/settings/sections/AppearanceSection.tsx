@@ -7,6 +7,7 @@ import { cn } from '../../../lib/cn.ts'
 import { $prefs, updatePrefs } from '../../../store/backend.ts'
 import { notify } from '../../../store/notifications.ts'
 import { $themes, applyTheme, generateTheme, installThemes, loadThemes } from '../../../store/themes.ts'
+import { MenuBarSettings } from './MenuBarSettings.tsx'
 import { errorText, Filterable, InlineNote, markSaved, SectionTitle, SettingsGroup, SettingsRow } from './shared.tsx'
 
 const ACCENTS: { id: 'blue' | 'ice' | 'violet'; label: string; color: string }[] = [
@@ -43,7 +44,7 @@ export function AppearanceSection() {
 
   return (
     <>
-      <SectionTitle title="Appearance" subtitle="Theme, accent, wallpaper and fonts." />
+      <SectionTitle title="Appearance" subtitle="Theme, accent, wallpaper, fonts and the menu bar." />
 
       <ThemeGallery />
       <ThemeTools />
@@ -82,6 +83,8 @@ export function AppearanceSection() {
       </SettingsGroup>
 
       <FontSettings />
+
+      <MenuBarSettings />
 
       <SettingsGroup title="Dock">
         <SettingsRow icon={<IconLayoutBottombar />} label="Automatically hide the Dock" description="The Dock slides away and returns when the cursor reaches the bottom edge." keywords="dock autohide hide show">

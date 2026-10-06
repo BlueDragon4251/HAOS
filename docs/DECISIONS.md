@@ -292,15 +292,21 @@ an aarch64 qcow2 that boots straight into Herald OS.
 Omarchy's desktop is a set of QML plugins, and third-party ones run inside its shell process with
 everything the user can reach. The landscape review rejected that model for Herald OS, and this keeps
 the rule while adding widgets: each plugin is a folder with a `manifest.json` and web files, rendered
-in its own sandboxed view with no Node, no preload, its own partition and a strict Content Security
-Policy. The only way out is a message channel the shell answers.
+in a sandboxed frame (`sandbox="allow-scripts"`, so an opaque origin with no reach into the shell's
+page, storage or cookies) with no Node and no preload, served from `herald-plugin://<id>/` under a
+strict Content Security Policy. The only way out is a message channel the shell answers, and main
+checks every call against the manifest and what the user granted.
 
-- **A narrow message API.** `stats` (read the system snapshot), `run` (an `OsCommand`, under the
-  command's own tier and approval), `notify`, and `storage` (the plugin's own key-value store). A
-  plugin cannot spawn processes, read files or reach the network unless its manifest names hosts the
-  user accepted when enabling it.
+- **A narrow message API.** `stats` (read the system snapshot), `run` (an `OsCommand` the manifest
+  names as `run:<id>`, under the command's own tier: anything that changes something asks each
+  time), `notify`, and `storage` (the plugin's own key-value store, 256 KB). A plugin cannot spawn
+  processes, read files or reach the network unless its manifest names hosts the user accepted
+  when enabling it.
 - **Installed disabled.** `herald-os plugin add <git-url>` clones into
   `~/.config/herald-os/plugins/<id>`, validates the manifest and leaves the plugin off until it is
-  enabled in Settings > Plugins, as Omarchy does. Saved files reload the plugin live.
+  enabled in Settings > Plugins (or at a terminal, with `herald-os plugin enable`), as Omarchy does.
+  Enabling grants exactly what the manifest asks for then; a later manifest that asks for more turns
+  the plugin off until the user agrees again. Hermes can install, update and remove plugins but not
+  turn them on. Saved files reload the plugin live.
 - **Hermes's extension model is unchanged.** Agent capabilities stay in backend Hermes plugins such as
   the bridge, behind the approval gate; widgets are UI that Hermes can also write for you.

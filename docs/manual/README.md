@@ -10,8 +10,8 @@ This manual is for using Herald OS day to day. The [README](../../README.md) cov
 
 - [Coming from macOS](coming-from-macos.md): where your habits go.
 - [Hotkeys](hotkeys.md): every shortcut on macOS and on Herald OS Linux.
-- [Make it yours](make-it-yours.md): themes, fonts, the wallpaper, hooks and automations that run
-  when something happens.
+- [Make it yours](make-it-yours.md): themes, fonts, widgets, the menu bar, your own menu entries,
+  branding, keyboard shortcuts, and hooks and automations that run when something happens.
 - [Troubleshooting](troubleshooting.md): when something does not work.
 - [FAQ](faq.md): short answers to common questions.
 

@@ -1,0 +1,74 @@
+/* The shell pushes its palette as --herald-* variables; the fallbacks cover the first frame. */
+:root {
+  font: 500 11px/1 system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--herald-fg, #e6e9ef);
+}
+
+body {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
+}
+
+/* A card or its own window: one meter per line, a little larger. */
+[data-placement='overview'] body,
+[data-placement='panel'] body {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 12px;
+}
+
+.meter {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-placement='overview'] .meter,
+[data-placement='panel'] .meter {
+  flex: none;
+}
+
+.label {
+  color: var(--herald-fg-dim, #9aa3b2);
+}
+
+.bar {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--herald-line, rgb(255 255 255 / 12%));
+}
+
+.bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--herald-accent, #5aa9ff);
+  transition: width 0.4s ease;
+}
+
+.high .bar i {
+  background: var(--herald-warn, #f2c25e);
+}
+
+.value {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

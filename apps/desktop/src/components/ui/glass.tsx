@@ -151,7 +151,7 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
       onClick={() => onChange(!checked)}
       className={cn('relative h-[22px] w-10 shrink-0 rounded-full border transition-colors duration-150 disabled:opacity-40', checked ? 'border-accent-strong bg-accent shadow-[0_0_12px_rgba(47,125,255,.5)]' : 'border-line bg-black/25')}
     >
-      <span className={cn('absolute top-[2px] size-4 rounded-full bg-paper shadow transition-transform duration-150', checked ? 'translate-x-[19px]' : 'translate-x-[2px]')} />
+      <span className={cn('absolute top-[2px] left-0 size-4 rounded-full bg-paper shadow transition-transform duration-150', checked ? 'translate-x-[19px]' : 'translate-x-[2px]')} />
     </button>
   )
 }

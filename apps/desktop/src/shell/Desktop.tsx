@@ -21,6 +21,7 @@ import { $screensaverUp } from '../store/switches.ts'
 import { ActionHud, OsHighlighter } from '../features/voice/ActionHud.tsx'
 import { VoiceOrb } from '../features/voice/VoiceOrb.tsx'
 import { FirstRunSetup } from '../features/setup/FirstRunSetup.tsx'
+import { WidgetWindow } from '../features/plugins/PluginSlots.tsx'
 
 const TerminalSurface = lazy(() => import('../features/terminal/TerminalSurface.tsx').then(m => ({ default: m.TerminalSurface })))
 const SystemSurface = lazy(() => import('../features/system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
@@ -47,6 +48,8 @@ function FloatingContent({ win }: { win: OSWindow }) {
       return <CaptureEditor file={typeof win.payload?.file === 'string' ? win.payload.file : undefined} />
     case 'camera':
       return <CameraBubble />
+    case 'widget':
+      return <WidgetWindow pluginId={typeof win.payload?.plugin === 'string' ? win.payload.plugin : undefined} />
     default:
       return null
   }

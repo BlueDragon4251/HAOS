@@ -158,6 +158,22 @@ Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores 
   recolours the shell, niri borders/backdrop (`~/.config/niri/theme.kdl`), swaylock, GTK 3/4
   (`gtk.css` + `gsettings`), and the `foot` rescue terminal in one step; a theme may also ship a
   wallpaper. Add a theme by dropping a folder into `~/.config/herald-os/themes/`.
+- **Widgets** (ADR-019) live in `~/.config/herald-os/plugins/<id>/`: a `manifest.json` and web
+  files, shown in the menu bar, on the Overview or in their own window. `herald-os plugin add
+  <git-url>` clones one turned off; `herald-os plugin list | enable | disable | update | remove`
+  manage them, and `enable` prints what the widget may do and asks at the terminal. Settings >
+  Plugins does the same, and Hermes's `system_os plugin_*` actions can do everything except turn
+  one on. Each runs in a sandboxed frame served from `herald-plugin://<id>/`, under a Content
+  Security Policy that allows only its own files and the hosts it was granted. The manual's
+  [Make it yours](manual/make-it-yours.md#widgets) explains how to write one.
+- **The menu bar, the menu and branding.** `herald-os bar` shows, hides and moves menu-bar items
+  and sets the clock (the `bar.*` commands behind Settings > Appearance > Menu bar).
+  `~/.config/herald-os/menu.json` adds entries to the control menu, read each time it opens;
+  `herald-os menu check` reports what it understood. `herald-os branding set --logo <image>
+  --lock <image> --name <text>` copies the images into `~/.config/herald-os/branding/`; About
+  shows the logo and name, and `herald-os lock` passes the picture to swaylock (`--image`,
+  `--scaling fill`). Your own keys go in `~/.config/niri/local.kdl`, included last, where a bind
+  replaces Herald's bind for the same key.
 - **The install catalog** (`linux/catalog/*.json`, run by `herald-os-catalog`) is everything else
   worth one click: coding agents (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI through npm
   in `~/.local`), Ollama and LM Studio with "Use with Hermes", languages through mise, editors,

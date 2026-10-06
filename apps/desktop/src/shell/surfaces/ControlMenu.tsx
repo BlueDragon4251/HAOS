@@ -6,32 +6,42 @@ import {
   IconBattery,
   IconBolt,
   IconBrush,
+  IconCalendar,
   IconCamera,
   IconCheck,
   IconChevronLeft,
   IconChevronRight,
   IconClock,
   IconCloud,
+  IconCode,
   IconCoffee,
   IconColorPicker,
   IconCpu,
+  IconHeart,
   IconHistory,
+  IconHome,
   IconDeviceDesktop,
   IconDownload,
   IconFolder,
   IconKeyboard,
   IconLock,
   IconLogout,
+  IconMail,
+  IconMessage,
   IconMicrophone,
   IconMoon,
+  IconMusic,
+  IconNotes,
   IconPalette,
   IconPhoto,
   IconPower,
   IconQrcode,
   IconRefresh,
+  IconRocket,
   IconRotateClockwise,
   IconSearch,
   IconSettings,
+  IconStar,
   IconSunset2,
   IconTerminal2,
   IconTextRecognition,
@@ -44,6 +54,7 @@ import {
 import { useStore } from '@nanostores/react'
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { CatalogEntryView, PowerAction } from '../../../shared/ipc.ts'
+import type { MenuExtension, MenuExtensionIcon, MenuExtensions } from '../../../shared/menu-extensions.ts'
 import { HermesAvatar } from '../../components/app-icon.tsx'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { Kbd, Spinner } from '../../components/ui/primitives.tsx'
@@ -85,6 +96,9 @@ type Leaf =
   | { kind: 'local'; run: () => void }
   /** Pick from the install catalog (herald-os catalog list), then run `install <id>` or `remove <id>`. */
   | { kind: 'catalog'; mode: 'install' | 'remove' }
+  /** A menu.json program: main starts it by the entry's id. */
+  | { kind: 'exec'; id: string }
+  | { kind: 'message'; text: string }
 
 export interface MenuItem {
   id: string
@@ -342,6 +356,82 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
   ]
 }
 
+const EXTENSION_ICONS: Record<MenuExtensionIcon, Icon> = {
+  star: IconStar,
+  app: IconAppWindow,
+  terminal: IconTerminal2,
+  world: IconWorld,
+  bolt: IconBolt,
+  folder: IconFolder,
+  notes: IconNotes,
+  music: IconMusic,
+  camera: IconCamera,
+  code: IconCode,
+  calendar: IconCalendar,
+  mail: IconMail,
+  chat: IconMessage,
+  heart: IconHeart,
+  home: IconHome,
+  rocket: IconRocket
+}
+
+function extensionItem(entry: MenuExtension, close: () => void): MenuItem {
+  const base = { id: entry.id, label: entry.label, hint: entry.hint, icon: EXTENSION_ICONS[entry.icon ?? 'star'] }
+  const { action } = entry
+
+  switch (action.kind) {
+    case 'herald-os':
+      return { ...base, leaf: { kind: 'cli', argv: action.argv } }
+    case 'exec':
+      return { ...base, leaf: { kind: 'exec', id: entry.id } }
+    case 'url':
+      return {
+        ...base,
+        leaf: {
+          kind: 'local',
+          run: () => {
+            void window.heraldOS.shell.openExternal(action.url)
+            close()
+          }
+        }
+      }
+    case 'command':
+      return {
+        ...base,
+        leaf: {
+          kind: 'local',
+          run: () => {
+            relayToMain({ type: 'os', args: [action.command], payload: action.args })
+            close()
+          }
+        }
+      }
+  }
+}
+
+/** The menu with the person's menu.json entries: in the group they name, or under "Yours". */
+export function withExtensions(menu: MenuItem[], extensions: MenuExtensions, close: () => void): MenuItem[] {
+  const groups = menu.map(group => ({ ...group, children: group.children ? [...group.children] : undefined }))
+  const yours: MenuItem[] = []
+
+  for (const entry of extensions.entries) {
+    const item = extensionItem(entry, close)
+    const group = entry.group ? groups.find(candidate => candidate.id === entry.group) : undefined
+
+    if (group?.children) {
+      group.children.push(item)
+    } else {
+      yours.push(item)
+    }
+  }
+
+  if (extensions.errors.length > 0) {
+    yours.push({ id: 'yours-problems', label: 'menu.json has problems', hint: extensions.errors[0], icon: IconAlertTriangle, danger: true, leaf: { kind: 'message', text: extensions.errors.join('\n') } })
+  }
+
+  return yours.length > 0 ? [...groups, { id: 'yours', label: 'Yours', hint: 'Your entries from menu.json', icon: IconStar, children: yours }] : groups
+}
+
 interface FlatItem {
   item: MenuItem
   /** Group labels above the item, for the filtered (flattened) view. */
@@ -394,7 +484,16 @@ export interface ControlMenuProps {
 }
 
 export function ControlMenu({ onClose, onApplications, initialItem }: ControlMenuProps) {
-  const menu = useMemo(() => buildMenu({ applications: onApplications, close: onClose }), [onApplications, onClose])
+  const [extensions, setExtensions] = useState<MenuExtensions>({ entries: [], errors: [] })
+  const menu = useMemo(() => withExtensions(buildMenu({ applications: onApplications, close: onClose }), extensions, onClose), [onApplications, onClose, extensions])
+
+  // Read menu.json each time the menu opens, so an edit shows up without a restart.
+  useEffect(() => {
+    void window.heraldOS.shell
+      .menuExtensions?.()
+      .then(setExtensions)
+      .catch(() => undefined)
+  }, [])
   const [path, setPath] = useState<MenuItem[]>([])
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -489,6 +588,16 @@ export function ControlMenu({ onClose, onApplications, initialItem }: ControlMen
         return
       case 'local':
         leaf.run()
+
+        return
+      case 'exec':
+        void window.heraldOS.shell.runMenuExtension(leaf.id).then(onClose, (error: unknown) =>
+          setStep({ kind: 'message', title: item.label, text: error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error), tone: 'danger' })
+        )
+
+        return
+      case 'message':
+        setStep({ kind: 'message', title: item.label, text: leaf.text, tone: 'danger' })
 
         return
       default:

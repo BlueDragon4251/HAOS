@@ -53,6 +53,9 @@ import {
   type WmAction,
   type WmState
 } from '../shared/ipc.ts'
+import type { BrandingPatch, BrandingView } from '../shared/branding.ts'
+import type { MenuExtensions } from '../shared/menu-extensions.ts'
+import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
 import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
 
@@ -179,6 +182,24 @@ const api = {
     /** The models a local server has (for "Use with Hermes"); rejects with what to do when it is not running. */
     localModels: (kind: 'ollama' | 'lmstudio'): Promise<string[]> => ipcRenderer.invoke(IPC.catalogLocalModels, kind)
   },
+  plugins: {
+    /** Installed widget plugins: manifest, enabled, problems, and a revision that bumps on saves. */
+    list: (): Promise<PluginView[]> => ipcRenderer.invoke(IPC.pluginsList),
+    setEnabled: (id: string, enabled: boolean): Promise<PluginView[]> => ipcRenderer.invoke(IPC.pluginsSetEnabled, id, enabled),
+    add: (url: string): Promise<PluginView> => ipcRenderer.invoke(IPC.pluginsAdd, url),
+    update: (id: string): Promise<PluginView> => ipcRenderer.invoke(IPC.pluginsUpdate, id),
+    remove: (id: string): Promise<PluginView[]> => ipcRenderer.invoke(IPC.pluginsRemove, id),
+    /** One message from a widget frame, answered (and permission-checked) by main. */
+    call: (id: string, method: PluginMethod, params: Record<string, unknown>): Promise<unknown> => ipcRenderer.invoke(IPC.pluginCall, id, method, params),
+    onChanged: (listener: (plugins: PluginView[]) => void): Unsubscribe => subscribe(IPC.pluginsChanged, listener)
+  },
+  branding: {
+    /** About's logo and name, and the Linux lock-screen picture. */
+    get: (): Promise<BrandingView> => ipcRenderer.invoke(IPC.brandingGet),
+    /** Image paths are copied into ~/.config/herald-os/branding; null removes one. */
+    set: (patch: BrandingPatch): Promise<BrandingView> => ipcRenderer.invoke(IPC.brandingSet, patch),
+    onChanged: (listener: (branding: BrandingView) => void): Unsubscribe => subscribe(IPC.brandingChanged, listener)
+  },
   setup: {
     /** First-boot setup on the Herald OS image: due or not, the account, the name so far. */
     state: (): Promise<SetupState> => ipcRenderer.invoke(IPC.setupState),
@@ -258,6 +279,10 @@ const api = {
     wallpaperFrame: (dataUrl: string): Promise<void> => ipcRenderer.invoke(IPC.shellWallpaperFrame, dataUrl),
     /** Run a `herald-os` CLI command from the shell (Linux; rejects elsewhere). */
     heraldOs: (args: string[]): Promise<HeraldOsResult> => ipcRenderer.invoke(IPC.shellHeraldOs, args),
+    /** The person's control-menu entries from ~/.config/herald-os/menu.json. */
+    menuExtensions: (): Promise<MenuExtensions> => ipcRenderer.invoke(IPC.menuExtensions),
+    /** Start a menu.json entry's program (main reads it from the file; only the id crosses). */
+    runMenuExtension: (id: string): Promise<void> => ipcRenderer.invoke(IPC.menuExtensionRun, id),
     /** Suspend, reboot, power off, log out, or lock. */
     power: (action: PowerAction): Promise<void> => ipcRenderer.invoke(IPC.shellPower, action)
   },

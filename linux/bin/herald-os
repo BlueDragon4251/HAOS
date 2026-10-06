@@ -10,6 +10,9 @@ call the tools directly.
                 remove app <name> | remove webapp <name> | update [--check]
   Style         theme list | theme set <name> | theme current | theme new <image> [name]
                 theme install <git-url> | font list | font set <family> [--mono] | wallpaper <image>
+                plugin list | plugin add <git-url> | plugin enable|disable|update|remove <id>
+                bar list | bar show|hide <item> | bar move <item> <where> | bar clock 24h [seconds] | bar reset
+                branding set [--logo <image>] [--lock <image>] [--name <text>] | branding reset
   Trigger       reminder <duration> <message> | reminder list | reminder clear
                 notice time|battery|weather | screenshot | ocr | clipboard | notify <title> [body]
   Capture       capture screenshot [region|window|screen] | capture record [region] [audio] | capture stop
@@ -53,7 +56,7 @@ COMMANDS: dict[str, str] = {
     "ask": "Ask Hermes about the focused window, or about the given text",
     "command": "Open the Hermes command bar",
     "applications": "Open the application launcher",
-    "menu": "Open the Herald OS control menu",
+    "menu": "Open the Herald OS control menu; `menu check` reads your own entries in ~/.config/herald-os/menu.json",
     "page": "Show a Hermes page: overview hermes missions memory files automations connections settings",
     "open": "Open a Hermes window: terminal system chat-popout",
     "launch": "Launch an installed application by name or desktop id",
@@ -85,6 +88,9 @@ COMMANDS: dict[str, str] = {
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
     "keymap": "keymap show | keymap herald | keymap omarchy (Super+C, X and V copy, cut and paste everywhere) | keymap apply",
+    "plugin": "plugin list [--json] | add <git-url> | enable|disable|update|remove <id> | dir: widgets for the menu bar, the Overview and their own windows",
+    "bar": "bar [list] | show|hide <item> | move <item> first|last|<n>|before <item>|after <item> | clock [12h|24h|system] [seconds|no-seconds] [date short|long|none] | reset: the menu bar",
+    "branding": "branding [show] | set [--logo <image>] [--lock <image>] [--name <text>] | reset [all|logo|lock|name]: About's logo and name, and the lock-screen picture",
     "lock": "Lock the session (needs an account password; see `herald-os password`)",
     "password": "Set the login password the lock screen asks for",
     "suspend": "Suspend the machine",
@@ -123,7 +129,7 @@ def sh(argv: list[str], *, timeout: float = 60, check: bool = False, input_: str
     return subprocess.CompletedProcess(argv, 1)  # unreachable, keeps type checkers calm
 
 
-def relay(cmd: str, args: list[str], extra: dict | None = None, *, quiet: bool = False) -> dict:
+def relay(cmd: str, args: list[str], extra: dict | None = None, *, quiet: bool = False, timeout: float = 15) -> dict:
     """Send one JSON line to the shell and return its JSON reply."""
     if not SOCKET.exists():
         if quiet:
@@ -132,7 +138,7 @@ def relay(cmd: str, args: list[str], extra: dict | None = None, *, quiet: bool =
     payload = {"cmd": cmd, "args": args, **(extra or {})}
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(15)
+            s.settimeout(timeout)
             s.connect(str(SOCKET))
             s.sendall((json.dumps(payload) + "\n").encode())
             buf = b""
@@ -934,6 +940,14 @@ def run_os(command: str, args: dict | None = None) -> int:
     return 0
 
 
+def run_os_wait(command: str, args: dict | None = None) -> dict:
+    """Run a registry command and return its result ({ok, summary, data}); exits on failure."""
+    reply = relay("os-run", [command, json.dumps(args or {})], timeout=30)
+    if not reply.get("ok"):
+        die(reply.get("error") or reply.get("summary") or f"the shell rejected {command}", 1)
+    return reply
+
+
 def signal_name(number: object) -> str:
     try:
         return signal.Signals(int(number)).name  # type: ignore[arg-type]
@@ -1004,9 +1018,66 @@ def lock() -> int:
         return 1
     if shutil.which("swaylock"):
         cfg = HOME / ".config" / "swaylock" / "config"
-        args = ["swaylock", "-f"] + (["-C", str(cfg)] if cfg.exists() else ["--color", "04113f"])
-        return subprocess.call(args)
+        return subprocess.call(lock_command(cfg if cfg.exists() else None, branding_lock_image()))
     return subprocess.call(["loginctl", "lock-session"])
+
+
+BRANDING_DIR = CONFIG_DIR / "branding"
+BRANDING_USAGE = "branding [show] | branding set [--logo <image>] [--lock <image>] [--name <text>] | branding reset [all|logo|lock|name]"
+
+
+def branding_lock_image() -> Path | None:
+    """The lock-screen picture `herald-os branding set --lock` chose, while it is still there."""
+    try:
+        stored = json.loads((BRANDING_DIR / "branding.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    name = stored.get("lock") if isinstance(stored, dict) else None
+    if not isinstance(name, str) or not name or Path(name).name != name:
+        return None
+    image = BRANDING_DIR / name
+    return image if image.is_file() else None
+
+
+def lock_command(cfg: Path | None, image: Path | None) -> list[str]:
+    """swaylock's argv: the theme's config, and the branded picture behind the ring (pure; tested)."""
+    args = ["swaylock", "-f"] + (["-C", str(cfg)] if cfg else ["--color", "04113f"])
+    if image:
+        args += ["--image", str(image), "--scaling", "fill"]
+    return args
+
+
+def branding_patch(args: list[str], cwd: Path) -> dict:
+    """`branding set --logo <image> --lock <image> --name <text>` as a patch, paths made absolute (pure; tested)."""
+    flags = {"--logo": "logo", "--lock": "lock", "--name": "name"}
+    patch: dict = {}
+    pairs = list(zip(args[::2], args[1::2]))
+    if not args or len(args) % 2 or any(flag not in flags for flag, _ in pairs):
+        die(BRANDING_USAGE, 2)
+    for flag, value in pairs:
+        key = flags[flag]
+        patch[key] = value if key == "name" else str((cwd / Path(value).expanduser()).resolve())
+    return patch
+
+
+def branding_cmd(args: list[str]) -> int:
+    """About's logo and name and the lock-screen picture; the shell keeps them (the same as Settings > About)."""
+    action = args[0] if args else "show"
+    if action == "set":
+        reply = relay("branding", ["set", json.dumps(branding_patch(args[1:], Path.cwd()))])
+    elif action == "reset" and len(args) <= 2:
+        reply = relay("branding", ["reset", args[1] if len(args) > 1 else "all"])
+    elif action == "show" and len(args) <= 1:
+        reply = relay("branding", ["show"])
+    else:
+        die(BRANDING_USAGE, 2)
+    if not reply.get("ok"):
+        die(reply.get("error") or "the shell rejected the command", 1)
+    view = reply.get("branding") or {}
+    print(f"name:  {view.get('name') or '(none)'}")
+    print(f"logo:  {'yours' if view.get('logo') else 'the Herald logo'}")
+    print(f"lock:  {view.get('lock') or 'the theme colours'}")
+    return 0
 
 
 def password() -> int:
@@ -1431,6 +1502,125 @@ def omarchy_cmd(args: list[str]) -> int:
 
 
 # ---------------------------------------------------------------------------------------------
+BAR_USAGE = (
+    "bar [list] | bar show|hide <item> | bar move <item> first|last|<n>|before <item>|after <item> "
+    "| bar clock [12h|24h|system] [seconds|no-seconds] [date short|long|none] | bar reset"
+)
+
+
+def bar_args(args: list[str]) -> tuple[str, dict]:
+    """`herald-os bar …` as a registry command and its arguments (pure; tested)."""
+    action = args[0] if args else "list"
+    rest = args[1:]
+    if action == "list" and not rest:
+        return "bar.layout", {}
+    if action in ("show", "hide") and len(rest) == 1:
+        return f"bar.{action}", {"item": rest[0]}
+    if action == "move" and len(rest) == 3 and rest[1] in ("before", "after"):
+        return "bar.move", {"item": rest[0], rest[1]: rest[2]}
+    if action == "move" and len(rest) == 2 and (rest[1] in ("first", "last") or rest[1].isdigit()):
+        return "bar.move", {"item": rest[0], "position": rest[1]}
+    if action == "clock" and rest:
+        clock: dict = {}
+        tokens = [token.lower() for token in rest]
+        while tokens:
+            token = tokens.pop(0)
+            if token in ("12h", "12", "24h", "24", "system"):
+                clock["hours"] = token.removesuffix("h")
+            elif token in ("seconds", "no-seconds"):
+                clock["seconds"] = token == "seconds"
+            elif token == "date" and tokens and tokens[0] in ("short", "long", "none"):
+                clock["date"] = tokens.pop(0)
+            else:
+                die(BAR_USAGE, 2)
+        return "bar.clock", clock
+    if action == "reset" and not rest:
+        return "bar.reset", {}
+    die(BAR_USAGE, 2)
+    return "", {}
+
+
+def bar_cmd(args: list[str]) -> int:
+    """The menu bar's items and clock, through the shell's registry (the same commands as Settings)."""
+    command, payload = bar_args(args)
+    reply = run_os_wait(command, payload)
+    if command != "bar.layout":
+        print(reply.get("summary") or "done")
+        return 0
+    data = reply.get("data") or {}
+    for item in data.get("items", []):
+        state = "pinned" if item.get("pinned") else "shown" if item.get("shown") else "hidden"
+        print(f"  {item.get('id', '?'):<14} {state:<7} {item.get('label', '')}")
+    clock = data.get("clock") or {}
+    print(f"  clock: {clock.get('hours', 'system')} hours, seconds {'on' if clock.get('seconds') else 'off'}, date {clock.get('date', 'short')}")
+    return 0
+
+
+def menu_check() -> int:
+    """What the control menu makes of ~/.config/herald-os/menu.json (your own entries)."""
+    reply = relay("menu-check", [])
+    if not reply.get("ok"):
+        die(reply.get("error") or "the shell rejected the command", 1)
+    entries = reply.get("entries", [])
+    print(f"{reply.get('file', 'menu.json')}: {len(entries)} {'entry' if len(entries) == 1 else 'entries'}")
+    for entry in entries:
+        print(f"  {entry.get('group', 'yours'):<9} {entry.get('kind', ''):<10} {entry.get('label', '')}")
+    for problem in reply.get("errors", []):
+        print(f"  problem: {problem}")
+    return 1 if reply.get("errors") else 0
+
+
+PLUGIN_ACTIONS = ("list", "add", "enable", "disable", "update", "remove")
+
+
+def plugin_cmd(args: list[str]) -> int:
+    """Widget plugins (ADR-019), through the running shell so Settings > Plugins sees the same state."""
+    action = args[0] if args else "list"
+    target = args[1] if len(args) > 1 else ""
+    if action == "dir":
+        print(CONFIG_DIR / "plugins")
+        return 0
+    if action not in PLUGIN_ACTIONS or (action != "list" and not target):
+        die("plugin list [--json] | plugin add <git-url> | plugin enable|disable|update|remove <id> | plugin dir", 2)
+    if action == "enable":
+        # The person turns a plugin on after reading what it may do; scripts and agents cannot.
+        listing = relay("plugin", ["list"])
+        found = next((plugin for plugin in listing.get("plugins", []) if plugin.get("id") == target), None)
+        if not found:
+            die(f"no plugin {target!r} (herald-os plugin list)", 1)
+        if found.get("errors"):
+            die(f"{target} cannot load: " + "; ".join(found["errors"]), 1)
+        if not sys.stdin.isatty():
+            die("turning a plugin on asks you first; run this in a terminal, or use Settings > Plugins", 2)
+        print(f"Turn on {found.get('name') or target}? It will be able to:")
+        for line in found.get("grants", []):
+            print(f"  - {line}")
+        if input("Turn it on? [y/N] ").strip().lower() not in ("y", "yes"):
+            print("left off")
+            return 1
+    reply = relay("plugin", [action, target], timeout=180 if action in ("add", "update") else 15)
+    if not reply.get("ok"):
+        die(reply.get("error") or "the shell rejected the command", 1)
+    if action == "list":
+        plugins = reply.get("plugins", [])
+        if "--json" in args:
+            print(json.dumps(plugins, indent=2))
+            return 0
+        if not plugins:
+            print(f"no plugins (herald-os plugin add <git-url>, or make a folder in {CONFIG_DIR / 'plugins'})")
+        for plugin in plugins:
+            state = "broken" if plugin.get("errors") else "on" if plugin.get("enabled") else "off"
+            print(f"  {plugin.get('id', '?'):<24} {state:<7} {', '.join(plugin.get('placement', [])):<20} {plugin.get('name', '')}")
+        return 0
+    if action in ("add", "update"):
+        plugin = reply.get("plugin", {})
+        name = f"{plugin.get('name') or target} {plugin.get('version', '')}".strip()
+        print(f"{name} installed, turned off (herald-os plugin enable {plugin.get('id', '')})" if action == "add" else f"{name} updated")
+        return 0
+    print(f"{target}: {action}d")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if not argv or argv[0] in {"-h", "--help", "help"}:
         print(__doc__.strip())
@@ -1469,6 +1659,8 @@ def main(argv: list[str]) -> int:
         if not tool:
             die("herald-os-omakase is not installed", 127)
         return subprocess.call([tool, *(args or ["install"])])
+    if cmd == "menu" and args[:1] == ["check"]:
+        return menu_check()
     if cmd in OVERLAY or cmd in {"page", "open", "launch", "notify", "voice", "dictate", "state", "update-available", "panel"}:
         reply = relay(cmd, args)
         if cmd == "state":
@@ -1553,6 +1745,12 @@ def main(argv: list[str]) -> int:
         return idle_cmd(args)
     if cmd == "keymap":
         return keymap_cmd(args)
+    if cmd == "plugin":
+        return plugin_cmd(args)
+    if cmd == "bar":
+        return bar_cmd(args)
+    if cmd == "branding":
+        return branding_cmd(args)
     if cmd == "weather":
         return weather_cmd(args)
     if cmd == "omarchy":

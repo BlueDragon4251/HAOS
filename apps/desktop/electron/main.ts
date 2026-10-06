@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, Notification, protocol, shell } from 'electron'
 import os from 'node:os'
 import path from 'node:path'
 import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
@@ -15,6 +15,7 @@ import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerControlsIpc } from './ipc/controls.ts'
 import { registerCatalogIpc } from './ipc/catalog.ts'
 import { registerSetupIpc } from './ipc/setup.ts'
+import { PluginHost } from './plugins/host.ts'
 import { registerDictationIpc } from './ipc/dictation.ts'
 import { registerContextIpc } from './ipc/context.ts'
 import { registerFsIpc } from './ipc/fs.ts'
@@ -39,11 +40,15 @@ import { createCompositor, detectCompositor } from './wm/compositor.ts'
 import { NotificationDaemon } from './shell/notification-daemon.ts'
 import { handleUiRequest, OsCommandBridge, OsControlServer, osControlToken } from './shell/os-control.ts'
 import { PanelShell } from './shell/panels.ts'
+import { registerBrandingIpc } from './shell/branding.ts'
+import { registerMenuExtensionsIpc } from './shell/menu-extensions.ts'
 import { registerServiceIpc } from './shell/services.ts'
 import { WallpaperService } from './shell/wallpaper.ts'
 import { appIconPath, createMainWindow } from './window.ts'
 
 app.setName('Herald OS')
+// Widget plugins load from herald-plugin://<id>/ (registered before the app is ready, as Electron requires).
+protocol.registerSchemesAsPrivileged([{ scheme: 'herald-plugin', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 // Electron shows a modal dialog for an uncaught main-process error and waits on it: the whole
 // shell, the Linux session included, would freeze behind a box nobody may see. Log it and go on.
@@ -61,6 +66,11 @@ const panels = mode === 'panels' ? new PanelShell(win => attachMainWindow(win)) 
 const wallpaper = panels ? new WallpaperService(panels) : null
 // The agent's `os_ui` tool and the CLI run registry commands in the Hermes window through this bridge.
 const osBridge = new OsCommandBridge(() => (panels ? panels.mainWindow() : mainWindow))
+const plugins = new PluginHost(
+  () => BrowserWindow.getAllWindows(),
+  () => (panels ? panels.mainWindow() : mainWindow),
+  osBridge
+)
 /** Preferences changed outside a renderer (the CLI, a theme): every window and the wallpaper follow. */
 function broadcastPrefs(next: HeraldOSPrefs): void {
   wallpaper?.apply(next.wallpaper)
@@ -89,7 +99,8 @@ const control = shellHost
         syncHermesSkin(spec, backend)
         events.emit('theme-set', { theme: spec.name })
       },
-      () => void switches.broadcast()
+      () => void switches.broadcast(),
+      plugins
     )
   : null
 // Desktop mode has no compositor CLI socket; the OS control server gives it the same `ui*` surface.
@@ -242,6 +253,8 @@ function registerCoreIpc(): void {
   registerAppsIpc()
   registerBridgeIpc()
   registerServiceIpc()
+  registerMenuExtensionsIpc()
+  registerBrandingIpc()
   registerSystemIpc(() => BrowserWindow.getAllWindows())
   registerContextIpc(
     () => BrowserWindow.getAllWindows(),
@@ -258,6 +271,9 @@ function registerCoreIpc(): void {
   registerDictationIpc(() => (panels ? panels.mainWindow() : mainWindow))
   registerCatalogIpc()
   registerSetupIpc()
+  plugins.registerIpc()
+  plugins.registerProtocol()
+  plugins.watch()
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.
@@ -370,6 +386,7 @@ app.on('before-quit', event => {
   event.preventDefault()
   globalShortcut.unregisterAll()
   crashes.stop()
+  plugins.stop()
   control?.stop()
   osControl?.stop()
   wallpaper?.stop()

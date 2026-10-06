@@ -7,6 +7,7 @@ import { setPanelCollapsed, togglePanel, usePanelCollapsed } from '../../store/p
 import { $pendingRequests } from '../../store/requests.ts'
 import { showPage } from '../../store/windows.ts'
 import { Attention } from './Attention.tsx'
+import { OverviewWidgets } from '../plugins/PluginSlots.tsx'
 import { MemoryCard } from './MemoryCard.tsx'
 import { WorkingWithYou } from './WorkingWithYou.tsx'
 import { YourDay } from './YourDay.tsx'
@@ -78,6 +79,7 @@ export function TodayPanel({ now, stacked = false }: { now: Date; stacked?: bool
             <YourDay now={now} />
             <Attention />
             <WorkingWithYou />
+            <OverviewWidgets />
             <div className="mt-auto pt-2">
               <MemoryCard />
             </div>

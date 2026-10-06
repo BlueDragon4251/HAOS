@@ -25,7 +25,8 @@ export const FLOATING_APPS: Record<string, { title: string; width: number; heigh
   'chat-popout': { title: 'Herald OS · Chat', width: 520, height: 720 },
   studio: { title: 'Herald OS · Studio', width: 1280, height: 800 },
   'capture-editor': { title: 'Herald OS · Markup', width: 960, height: 680 },
-  camera: { title: 'Herald OS · Camera', width: 240, height: 240 }
+  camera: { title: 'Herald OS · Camera', width: 240, height: 240 },
+  widget: { title: 'Herald OS · Widget', width: 360, height: 280 }
 }
 
 export function surfaceTitle(surface: ShellSurface): string {

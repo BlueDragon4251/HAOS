@@ -9,7 +9,7 @@ import type { PageId } from '../shell/apps.ts'
  */
 
 export type CommandTier = 'read' | 'act' | 'mutate' | 'destructive'
-export type CommandSource = 'voice' | 'agent' | 'palette' | 'cli' | 'shortcut' | 'ui' | 'follow'
+export type CommandSource = 'voice' | 'agent' | 'palette' | 'cli' | 'shortcut' | 'ui' | 'follow' | 'plugin'
 
 export interface CommandArg {
   name: string

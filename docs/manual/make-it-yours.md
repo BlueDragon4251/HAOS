@@ -57,6 +57,129 @@ Settings > Appearance > Fonts sets the interface font and the code font (the ter
 views); leave a field empty for the default. "Use the font Inter" works too. On Herald OS Linux,
 `herald-os font list` shows what is installed and `herald-os font set <family> [--mono]` sets it.
 
+## Widgets
+
+Widgets are small pages Herald OS shows in the menu bar, on the Overview or in a window of their
+own: a CPU meter, the weather, a countdown to Friday. Each one is sealed off from the rest of the
+system and can do only what you allowed when you turned it on.
+
+- **Ask Hermes for one.** "Make me a widget that shows the weather in the menu bar". Settings >
+  Plugins > Make a widget starts the sentence for you. Hermes writes it into your plugins folder,
+  and you turn it on.
+- **Install one.** Paste a git address into Settings > Plugins > From git (on Herald OS Linux,
+  `herald-os plugin add <url>`). It arrives turned off.
+- **Turn it on.** Flip its switch in Settings > Plugins. Herald OS lists what it will be able to do
+  (see system stats, show notifications, keep its own settings, run a named Herald OS command,
+  connect to a named website) and turns it on only when you agree. If an update asks for more, it
+  turns itself off until you agree again.
+- **Open one in a window.** Widgets that can live in a window have an Open button in Settings >
+  Plugins, or say "open the System meter widget".
+- **Remove one.** Remove in Settings > Plugins turns it off and moves its folder to the Trash.
+
+### Writing a widget
+
+A widget is a folder, `~/.config/herald-os/plugins/<id>/`, with a `manifest.json` and web files.
+[examples/widgets/system-meter](../../examples/widgets/system-meter) is a complete one:
+
+```json
+{
+  "id": "system-meter",
+  "name": "System meter",
+  "version": "1.0.0",
+  "description": "CPU and memory at a glance.",
+  "entry": "index.html",
+  "placement": ["menubar", "overview", "panel"],
+  "size": { "width": 150, "height": 96 },
+  "permissions": ["stats"],
+  "hosts": []
+}
+```
+
+- `id` is lowercase letters, digits and dashes, and is also the folder's name.
+- `placement` is where it may sit: `menubar` (a strip 24 pixels tall and `size.width` wide, up to
+  240), `overview` (a card `size.height` tall) and `panel` (its own window).
+- `permissions` are `stats` (CPU, memory, disks, battery), `notify`, `storage` (its own small
+  settings store) and `run:<command>` for each Herald OS command it may run, such as
+  `run:page.open`. A command that changes something still asks you each time.
+- `hosts` are the websites it may fetch from, over HTTPS. It can reach nothing else.
+
+The page loads `<script src="herald-plugin://sdk/widget.js"></script>`, then its own script files
+(scripts written inline in the page are blocked). The SDK gives it:
+
+- `await herald.stats()`, `herald.notify(title, body)`, `herald.storage.get(key)` and
+  `herald.storage.set(key, value)`.
+- `herald.run('page.open', { name: 'missions' })` for the commands it was granted.
+- `herald.placement` (`menubar`, `overview` or `panel`), also set as `data-placement` on `<html>`
+  for your CSS.
+- The theme's colours as CSS variables (`--herald-bg`, `--herald-surface`, `--herald-fg`,
+  `--herald-fg-dim`, `--herald-accent`, `--herald-line`, `--herald-ok`, `--herald-warn`,
+  `--herald-urgent`), and `herald.onTheme(colors => …)` when they change.
+
+While a widget is on, saving any of its files reloads it. It keeps up to 256 KB in its store and
+cannot see your files, other apps or the rest of Herald OS. To share it, put the folder in a git
+repository. On Herald OS Linux, `herald-os plugin list`, `enable`, `disable`, `update` and `remove`
+manage widgets from the terminal; `enable` shows the same list and asks you first.
+
+## The menu bar
+
+Settings > Appearance > Menu bar lists the menu bar's items from left to right. Drag one (or use
+its arrows) to move it, and flip its switch to show or hide it. The status lights for recording,
+dictation and switches that are on always show, so you can tell when the screen is recorded or
+the microphone is typing for you. The same page sets the clock: 12 or 24 hours (or your region's
+choice), seconds, and a short, long or no date.
+
+Or ask: "hide the Bluetooth icon", "use a 24-hour clock", "put the clock first". On Herald OS
+Linux, `herald-os bar` does the same:
+
+```sh
+herald-os bar                          # the items, in order, and which are shown
+herald-os bar hide bluetooth
+herald-os bar move clock first         # or last, a position (1 is leftmost), before/after an item
+herald-os bar clock 24h seconds date none
+herald-os bar reset
+```
+
+## Your own menu entries
+
+The control menu (`Super+M` on Herald OS Linux) takes entries of your own from
+`~/.config/herald-os/menu.json`. Each entry has a label and one thing to do: a `herald-os`
+command, a program to start, a web address, or a Herald OS command.
+
+```json
+{
+  "entries": [
+    { "label": "Notes", "hint": "Obsidian", "icon": "notes", "herald-os": ["launch", "obsidian"] },
+    { "label": "Back up photos", "group": "trigger", "exec": ["rsync", "-a", "~/Pictures/", "/mnt/backup/Pictures/"] },
+    { "label": "Standup doc", "icon": "world", "url": "https://docs.example.com/standup" },
+    { "label": "Missions", "command": "page.open", "args": { "name": "missions" } }
+  ]
+}
+```
+
+- `exec` is the program and its arguments as a list; `~/` means your home folder. It does not go
+  through a shell, so pipes and `&&` need a script of their own.
+- `group` puts the entry into one of the menu's groups (`install`, `remove`, `update`, `style`,
+  `trigger`, `capture`, `toggle`, `system`, `hermes`); without one it goes under Yours.
+- `icon` is one of star, app, terminal, world, bolt, folder, notes, music, camera, code, calendar,
+  mail, chat, heart, home or rocket.
+
+The menu reads the file every time it opens, so there is nothing to restart. `herald-os menu check`
+shows what it understood, and a "menu.json has problems" entry appears under Yours when something
+is wrong. Hermes can write the file for you: "add my backup script to the menu".
+
+## Branding
+
+Settings > About > Branding puts your own logo (PNG, JPEG, WebP or SVG) at the top of About, with
+a name under it such as your company. On Herald OS Linux it also sets the picture behind the
+password on the lock screen (PNG or JPEG). The images are copied, so the originals can move.
+On Herald OS Linux, `herald-os branding` does the same:
+
+```sh
+herald-os branding set --logo ~/Pictures/acme.svg --name "Acme Corp"
+herald-os branding set --lock ~/Pictures/beach.jpg
+herald-os branding reset lock              # or logo, name, all
+```
+
 ## Keyboard shortcuts
 
 On Herald OS Linux, your own binds go in `~/.config/niri/local.kdl`, which Herald OS never
@@ -70,6 +193,16 @@ binds {
 ```
 
 Check a bind is free in the hotkey overlay (`Super+K`) first.
+
+To change one of Herald OS's own keys, bind the same key in `local.kdl`. It is read last, and a
+later bind replaces an earlier one. To switch a key off, bind it to nothing, for example
+`Mod+Q { spawn "true"; }` so `Super+Q` no longer closes windows. Bind each key only once inside
+`local.kdl` itself, because niri refuses a file that binds the same key twice;
+`niri validate -c ~/.config/niri/config.kdl` checks it.
+
+Running Herald OS as an app inside Omarchy, its keys live in `~/.config/hypr/herald-os.conf`,
+which `herald-os omarchy install` rewrites. Change them in your own Hyprland config instead:
+`unbind = SUPER ALT, H`, then a `bind = …` line of your own.
 
 ## When something happens
 

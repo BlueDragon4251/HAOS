@@ -6,6 +6,7 @@ import { type HermesStatusPayload, rest } from '../../../lib/rest.ts'
 import { useBackendData, useLocalData } from '../../../lib/use-async.ts'
 import { $backend, $env } from '../../../store/backend.ts'
 import { openApp } from '../../../store/windows.ts'
+import { AboutIdentity, BrandingSettings } from './BrandingSettings.tsx'
 import { LogView, SectionTitle, SettingsGroup, SettingsRow } from './shared.tsx'
 
 export function AboutSection() {
@@ -17,17 +18,21 @@ export function AboutSection() {
 
   return (
     <>
-      <SectionTitle title="About" subtitle="Versions, the runtime underneath, and where to look when something is off." />
+      <SectionTitle title="About" subtitle="Versions, the runtime underneath, your branding, and where to look when something is off." />
+
+      <AboutIdentity />
 
       <SettingsGroup title="Versions">
         <SettingsRow icon={<IconInfoCircle />} label="Herald OS" description={env?.isDev ? 'Development build.' : 'Agent-native operating system.'} keywords="version build shell">
           <Pill tone="accent">{env?.version ?? '—'}</Pill>
         </SettingsRow>
         <SettingsRow icon={<IconServer />} label="Hermes runtime" description={<span className="selectable">{backend.runtime?.label ?? 'Not resolved yet.'}</span>} keywords="hermes agent version runtime">
-          <Pill>{status.data?.version ? `v${String(status.data.version).replace(/^v/, '')}` : status.loading ? '…' : 'unknown'}</Pill>
+          <Pill>{status.data?.version && status.data.version !== 'unknown' ? `v${String(status.data.version).replace(/^v/, '')}` : status.loading ? '…' : 'unknown'}</Pill>
           {backend.runtime && <Pill>{backend.runtime.kind}</Pill>}
         </SettingsRow>
       </SettingsGroup>
+
+      <BrandingSettings />
 
       <SettingsGroup title="Maintenance">
         <SettingsRow icon={<IconDownload />} label="Check for updates" description="Herald OS runs whatever Hermes is installed. Run “hermes update” in Terminal, then restart Hermes from Network." keywords="upgrade update hermes update terminal">

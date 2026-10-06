@@ -6,6 +6,8 @@ import { bindBackendStores } from './backend.ts'
 import { bindChatEvents, resetChats } from './chat.ts'
 import { bindContinuity } from './continuity.ts'
 import { bindDictation } from './dictation.ts'
+import { bindBranding } from './branding.ts'
+import { bindPlugins } from './plugins.ts'
 import { $connectionEpoch, bindGatewayToBackend } from './gateway.ts'
 import { bindFollow } from './follow.ts'
 import { bindHermesAuth } from './hermes-auth.ts'
@@ -60,6 +62,8 @@ export function bootRenderer(): void {
   bindSwitches()
   bindRecording()
   bindDictation()
+  bindPlugins()
+  bindBranding()
 
   // The Hermes window owns the notification list; the history follows it.
   if (isMainSurface) {

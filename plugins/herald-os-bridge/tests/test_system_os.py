@@ -79,6 +79,11 @@ CASES = {
     "close_focused_window": ({}, ["wm", "close-window"], "act"),
     "catalog_install": ({"id": "claude-code"}, ["catalog", "install", "claude-code"], "mutate"),
     "catalog_remove": ({"id": "Steam"}, ["catalog", "remove", "steam"], "destructive"),
+    "plugin_list": ({}, ["plugin", "list"], "read"),
+    "plugin_add": ({"url": "https://example.com/me/weather-strip.git"}, ["plugin", "add", "https://example.com/me/weather-strip.git"], "mutate"),
+    "plugin_update": ({"id": "weather-strip"}, ["plugin", "update", "weather-strip"], "mutate"),
+    "plugin_disable": ({"id": "Weather-Strip"}, ["plugin", "disable", "weather-strip"], "act"),
+    "plugin_remove": ({"id": "weather-strip"}, ["plugin", "remove", "weather-strip"], "destructive"),
 }
 # Actions whose result is not plain output; each has its own test below.
 SEPARATE = {"catalog_list"}
@@ -134,6 +139,27 @@ def test_catalog_ids_are_validated(plugin, linux, entry):
     result = json.loads(tools.system_os_handler({"action": "catalog_install", "id": entry}))
     assert not result["success"] and "catalog id" in result["error"]
     assert linux.argv is None
+
+
+@pytest.mark.parametrize(("args", "needle"), [
+    ({"action": "plugin_add", "url": "file:///etc"}, "git repository"),
+    ({"action": "plugin_add", "url": "--upload-pack=x"}, "git repository"),
+    ({"action": "plugin_remove", "id": "../x"}, "plugin id"),
+    ({"action": "plugin_update", "id": "-f"}, "plugin id"),
+])
+def test_plugin_arguments_are_validated(plugin, linux, args, needle):
+    tools = _mod(plugin, "tools")
+    result = json.loads(tools.system_os_handler(args))
+    assert not result["success"] and needle in result["error"]
+    assert linux.argv is None
+
+
+def test_plugins_cannot_be_turned_on_by_hermes(plugin):
+    tools = _mod(plugin, "tools")
+    actions = tools.SYSTEM_OS_SCHEMA["parameters"]["properties"]["action"]["enum"]
+    assert "plugin_enable" not in actions
+    with pytest.raises(ValueError):
+        tools.plan_system_os({"action": "plugin_enable", "id": "weather-strip"})
 
 
 def test_install_and_update_get_the_long_timeout(plugin, linux):

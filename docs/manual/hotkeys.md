@@ -76,5 +76,6 @@ back.
 ## Your own shortcuts
 
 On Herald OS Linux, add binds to `~/.config/niri/local.kdl`, which Herald OS never overwrites; any
-`herald-os` command can be a bind. [Make it yours](make-it-yours.md#keyboard-shortcuts) has an
-example, and Hermes can write them for you: "add a shortcut that opens Obsidian".
+`herald-os` command can be a bind, and binding a key Herald OS already uses replaces it.
+[Make it yours](make-it-yours.md#keyboard-shortcuts) has examples, including switching a key off,
+and Hermes can write them for you: "add a shortcut that opens Obsidian".

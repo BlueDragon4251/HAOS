@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { type EventAutomation, isEventName } from '../shared/events.ts'
 import type { ContinuityPrefs, CrashHelpPrefs, HeraldOSPrefs } from '../shared/ipc.ts'
+import { normalizeMenuBar } from '../shared/menu-bar.ts'
 import { normalizeVoicePrefs, VOICE_DEFAULTS } from '../shared/voice-prefs.ts'
 import { heraldOsDataDir } from './paths.ts'
 
@@ -44,7 +45,8 @@ export function readPrefs(): HeraldOSPrefs {
       voice: normalizeVoicePrefs(parsed.voice),
       continuity: normalizeContinuity(parsed.continuity),
       crashHelp: normalizeCrashHelp(parsed.crashHelp),
-      eventAutomations: normalizeEventAutomations(parsed.eventAutomations)
+      eventAutomations: normalizeEventAutomations(parsed.eventAutomations),
+      ...(parsed.menuBar ? { menuBar: normalizeMenuBar(parsed.menuBar) } : {})
     }
   } catch {
     return { ...DEFAULTS }
@@ -86,7 +88,8 @@ export function writePrefs(patch: Partial<HeraldOSPrefs>): HeraldOSPrefs {
     ...patch,
     voice: normalizeVoicePrefs({ ...current.voice, ...(patch.voice ?? {}) }),
     continuity: normalizeContinuity({ ...current.continuity, ...(patch.continuity ?? {}) }),
-    crashHelp: normalizeCrashHelp({ ...current.crashHelp, ...(patch.crashHelp ?? {}) })
+    crashHelp: normalizeCrashHelp({ ...current.crashHelp, ...(patch.crashHelp ?? {}) }),
+    ...(patch.menuBar ? { menuBar: normalizeMenuBar({ ...current.menuBar, ...patch.menuBar }) } : {})
   }
   fs.mkdirSync(heraldOsDataDir(), { recursive: true })
   fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2))

@@ -21,7 +21,7 @@ unrestricted machine access.
 | `system_kill_process` | destructive | Terminate a process by pid or by listening port |
 | `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`); `dry_run` plans |
 | `os_ui` | per command | Operate the Herald OS interface: open pages and apps, add memories, run automations, start missions and Studio builds. Each command carries its own tier |
-| `system_os` | act / mutate | Herald OS Linux only: install apps and anything in the install catalog (`catalog_list`, `catalog_install`, `catalog_remove`), reminders, themes, screenshots, lock, suspend, update |
+| `system_os` | act / mutate | Herald OS Linux only: install apps and anything in the install catalog (`catalog_list`, `catalog_install`, `catalog_remove`), widget plugins (`plugin_list`, `plugin_add`, `plugin_update`, `plugin_disable`, `plugin_remove`; turning one on is left to the user), reminders, themes, screenshots, lock, suspend, update |
 
 "Start my development environment" is a skill: it composes `system_open` with Hermes's existing
 `terminal` tool rather than adding another core-shaped tool.
