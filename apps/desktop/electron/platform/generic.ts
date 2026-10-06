@@ -1,6 +1,6 @@
 import { shell } from 'electron'
 import os from 'node:os'
-import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, StatusPanelState, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { type EditorTarget, type HostPlatform, HostNotSupported } from './types.ts'
 
 /**
@@ -88,5 +88,13 @@ export class GenericPlatform implements HostPlatform {
 
   async thumbnail(): Promise<Buffer | null> {
     return null
+  }
+
+  async controlStatus(): Promise<StatusPanelState> {
+    throw new HostNotSupported('quick panels')
+  }
+
+  async controlAction(): Promise<void> {
+    throw new HostNotSupported('quick panels')
   }
 }

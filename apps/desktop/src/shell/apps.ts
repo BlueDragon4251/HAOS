@@ -5,7 +5,7 @@ import type { InstalledApp } from '../../shared/ipc.ts'
 export type PageId = 'overview' | 'hermes' | 'missions' | 'memory' | 'files' | 'automations' | 'connections' | 'settings'
 
 /** Apps that open in their own floating window. */
-export type FloatingAppId = 'terminal' | 'system' | 'chat-popout' | 'web' | 'studio'
+export type FloatingAppId = 'terminal' | 'system' | 'chat-popout' | 'web' | 'studio' | 'capture-editor' | 'camera'
 
 export type HermesAppId = PageId | FloatingAppId
 
@@ -59,11 +59,14 @@ export const FLOATING_APPS: readonly HermesAppDef<FloatingAppId>[] = [
   // Opened by the shell for a specific page (e.g. the provider sign-in); not launchable on its own.
   { id: 'web', name: 'Web', tagline: 'A page inside Herald OS.', category: 'productivity', kind: 'window', icon: 'grid', defaultSize: { width: 960, height: 680 } },
   // One per Hermes session; opened with "build …" or "show me the code".
-  { id: 'studio', name: 'Studio', tagline: 'Watch Hermes build.', category: 'development', kind: 'window', icon: 'studio', defaultSize: { width: 1280, height: 800 } }
+  { id: 'studio', name: 'Studio', tagline: 'Watch Hermes build.', category: 'development', kind: 'window', icon: 'studio', defaultSize: { width: 1280, height: 800 } },
+  // Opens on a screenshot (the capture preview's Edit).
+  { id: 'capture-editor', name: 'Markup', tagline: 'Draw on a screenshot, hide what is private.', category: 'creative', kind: 'window', icon: 'documents', defaultSize: { width: 960, height: 680 } },
+  { id: 'camera', name: 'Camera', tagline: 'Your camera in a bubble, for screen recordings.', category: 'creative', kind: 'window', icon: 'system', defaultSize: { width: 260, height: 290 } }
 ]
 
 /** Floating apps the launcher and command bar offer; the rest open only with a payload. */
-export const LAUNCHABLE_APPS: readonly HermesAppDef[] = [...PAGES, ...FLOATING_APPS].filter(app => app.id !== 'chat-popout' && app.id !== 'web' && app.id !== 'studio')
+export const LAUNCHABLE_APPS: readonly HermesAppDef[] = [...PAGES, ...FLOATING_APPS].filter(app => app.id !== 'chat-popout' && app.id !== 'web' && app.id !== 'studio' && app.id !== 'capture-editor')
 
 export const HERMES_APPS: readonly HermesAppDef[] = [...PAGES, ...FLOATING_APPS]
 

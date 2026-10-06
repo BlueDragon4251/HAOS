@@ -1,5 +1,6 @@
 // Herald OS: niri compositor configuration.
-// Installed to ~/.config/niri/config.kdl by linux/dev/build.sh (managed; edits are overwritten).
+// The template `herald-os keymap apply` renders into ~/.config/niri/config.kdl (managed; edits are
+// overwritten; `herald-os keymap omarchy` rewrites Super+C, X and V as copy, cut and paste).
 // Put machine-specific settings (output scale, extra binds) in ~/.config/niri/local.kdl, which
 // is included at the end and never touched by Herald OS.
 //
@@ -158,6 +159,41 @@ window-rule {
     clip-to-geometry false
 }
 
+// Quick panels (Wi-Fi, Bluetooth, sound, displays, power, calendar): under the menu bar, top right.
+window-rule {
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Panel$"
+    open-floating true
+    open-focused true
+    default-floating-position x=10 y=36 relative-to="top-right"
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+    geometry-corner-radius 0
+    clip-to-geometry false
+}
+
+// Camera bubble: a round floating window in the bottom-right corner, never taking focus.
+window-rule {
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Camera$"
+    open-floating true
+    open-focused false
+    default-floating-position x=24 y=24 relative-to="bottom-right"
+    border { off; }
+    focus-ring { off; }
+    geometry-corner-radius 120
+    clip-to-geometry true
+}
+
+// Screensaver: fullscreen over everything until the next key or pointer move.
+window-rule {
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Screensaver$"
+    open-fullscreen true
+    open-focused true
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+}
+
 // Wallpaper renderer: an offscreen helper that must never be shown.
 window-rule {
     match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Wallpaper$"
@@ -278,13 +314,27 @@ binds {
     Mod+Escape hotkey-overlay-title="Power menu" { spawn "herald-os" "power"; }
     Mod+Shift+Escape hotkey-overlay-title="Quit Herald OS session" { quit; }
 
-    Print hotkey-overlay-title="Screenshot (select)" { screenshot; }
-    Mod+Print hotkey-overlay-title="Screenshot window" { screenshot-window; }
-    Mod+Shift+Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
+    Print hotkey-overlay-title="Screenshot (select)" { spawn "herald-os" "capture" "screenshot" "region"; }
+    Mod+Print hotkey-overlay-title="Screenshot window" { spawn "herald-os" "capture" "screenshot" "window"; }
+    Mod+Shift+Print hotkey-overlay-title="Screenshot screen" { spawn "herald-os" "capture" "screenshot" "screen"; }
+    Mod+Alt+Print hotkey-overlay-title="Record the screen (again to stop)" { spawn "herald-os" "capture" "record"; }
+    Mod+Ctrl+Print hotkey-overlay-title="Pick a colour" { spawn "herald-os" "capture" "color"; }
     Mod+Shift+S hotkey-overlay-title="Ask Hermes about part of the screen" { spawn "herald-os" "capture" "region" "--ask"; }
     Mod+Ctrl+Shift+S hotkey-overlay-title="Screenshot to Hermes" { spawn "herald-os" "screenshot"; }
 
     Mod+Ctrl+V hotkey-overlay-title="Clipboard history" { spawn "herald-os" "clipboard"; }
+    Mod+Ctrl+X hotkey-overlay-title="Dictate into the focused app (again to stop)" repeat=false { spawn "herald-os" "dictate"; }
+    Mod+Ctrl+E hotkey-overlay-title="Emoji" repeat=false { spawn "herald-os" "emoji"; }
+
+    Mod+Ctrl+N hotkey-overlay-title="Night light on or off" repeat=false { spawn "herald-os" "toggle" "nightlight"; }
+    Mod+Ctrl+I hotkey-overlay-title="Stay awake on or off" repeat=false { spawn "herald-os" "toggle" "idle"; }
+    Mod+Ctrl+Comma hotkey-overlay-title="Do not disturb on or off" repeat=false { spawn "herald-os" "toggle" "dnd"; }
+
+    Mod+Ctrl+W hotkey-overlay-title="Wi-Fi" { spawn "herald-os" "panel" "wifi"; }
+    Mod+Ctrl+B hotkey-overlay-title="Bluetooth" { spawn "herald-os" "panel" "bluetooth"; }
+    Mod+Ctrl+A hotkey-overlay-title="Sound" { spawn "herald-os" "panel" "audio"; }
+    Mod+Ctrl+D hotkey-overlay-title="Displays" { spawn "herald-os" "panel" "display"; }
+    Mod+Ctrl+P hotkey-overlay-title="Battery and power" { spawn "herald-os" "panel" "power"; }
 
     XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
@@ -302,4 +352,6 @@ binds {
 // Colours from the active theme (written by herald-os-theme), then machine-specific overrides
 // (output scale, extra binds; created by herald-os-compositor and never overwritten).
 include "theme.kdl"
+// Display settings chosen in the shell's Display panel (resolution, scale, on or off).
+include "outputs.kdl"
 include "local.kdl"

@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 import { afterExit, motion } from '../lib/motion.ts'
 import { $backend } from '../store/backend.ts'
+import { openEmojiPicker } from '../store/emoji.ts'
 import { runCommand } from '../store/os-commands.ts'
 import { toggleSidebar } from '../store/sidebar.ts'
 import { $applicationsOpen, $commandBarOpen, toggleCommandBar } from '../store/surface.ts'
@@ -36,6 +37,14 @@ export function App() {
       if (meta && event.shiftKey && key === 's') {
         event.preventDefault()
         void runCommand('screen.askRegion', {}, { source: 'shortcut' })
+
+        return
+      }
+
+      // Cmd+Ctrl+E: the emoji picker (Mod+Ctrl+E in niri on Linux).
+      if (event.metaKey && event.ctrlKey && key === 'e') {
+        event.preventDefault()
+        openEmojiPicker()
 
         return
       }

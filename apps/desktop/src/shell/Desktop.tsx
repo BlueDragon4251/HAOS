@@ -5,15 +5,19 @@ import { $prefs } from '../store/backend.ts'
 import { $windows, dockAutoHides, ensureMainWindow, MAIN_WINDOW_ID, type OSWindow, relayoutOnResize } from '../store/windows.ts'
 import { Window } from './wm/Window.tsx'
 import { AskOverlay } from './AskOverlay.tsx'
+import { EmojiOverlay } from '../features/emoji/EmojiPicker.tsx'
 import { CommandBar } from './CommandBar.tsx'
 import { Dock } from './Dock.tsx'
 import { MainWindow } from './MainWindow.tsx'
 import { MenuBar } from './MenuBar.tsx'
 import { NotificationsPanel } from './NotificationsPanel.tsx'
 import { RequestHost } from './RequestHost.tsx'
+import { StatusPanelPopover } from './StatusPanelPopover.tsx'
 import { Toasts } from './Toasts.tsx'
 import { Wallpaper } from './Wallpaper.tsx'
 import { HermesLoginCard } from '../features/auth/HermesLoginCard.tsx'
+import { Screensaver } from '../features/screensaver/Screensaver.tsx'
+import { $screensaverUp } from '../store/switches.ts'
 import { ActionHud, OsHighlighter } from '../features/voice/ActionHud.tsx'
 import { VoiceOrb } from '../features/voice/VoiceOrb.tsx'
 
@@ -23,6 +27,8 @@ const ChatPopout = lazy(() => import('../features/hermes/ChatPopout.tsx').then(m
 const ApplicationsOverlay = lazy(() => import('../features/applications/ApplicationsOverlay.tsx').then(m => ({ default: m.ApplicationsOverlay })))
 const WebWindow = lazy(() => import('../features/web/WebWindow.tsx').then(m => ({ default: m.WebWindow })))
 const StudioWindow = lazy(() => import('../features/studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
+const CaptureEditor = lazy(() => import('../features/capture/CaptureEditor.tsx').then(m => ({ default: m.CaptureEditor })))
+const CameraBubble = lazy(() => import('../features/capture/CameraBubble.tsx').then(m => ({ default: m.CameraBubble })))
 
 function FloatingContent({ win }: { win: OSWindow }) {
   switch (win.appId) {
@@ -36,6 +42,10 @@ function FloatingContent({ win }: { win: OSWindow }) {
       return <WebWindow win={win} />
     case 'studio':
       return <StudioWindow win={win} />
+    case 'capture-editor':
+      return <CaptureEditor file={typeof win.payload?.file === 'string' ? win.payload.file : undefined} />
+    case 'camera':
+      return <CameraBubble />
     default:
       return null
   }
@@ -46,6 +56,7 @@ export function Desktop() {
   const windows = useStore($windows)
   const commandBarOpen = useStore($commandBarOpen)
   const applicationsOpen = useStore($applicationsOpen)
+  const screensaverUp = useStore($screensaverUp)
 
   useEffect(() => {
     ensureMainWindow()
@@ -95,6 +106,7 @@ export function Desktop() {
       <RequestHost />
       <Toasts />
       <NotificationsPanel />
+      <StatusPanelPopover />
       {applicationsOpen && (
         <Suspense fallback={null}>
           <ApplicationsOverlay />
@@ -102,6 +114,8 @@ export function Desktop() {
       )}
       {commandBarOpen && <CommandBar />}
       <AskOverlay />
+      <EmojiOverlay />
+      {screensaverUp && <Screensaver onDismiss={() => $screensaverUp.set(false)} />}
     </div>
   )
 }

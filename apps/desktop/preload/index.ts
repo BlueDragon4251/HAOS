@@ -4,9 +4,12 @@ import {
   type AuditEntry,
   type BackendState,
   type CalendarResult,
+  type CatalogGroupView,
+  type CatalogResult,
   type ClipboardEntry,
   type ContextReturn,
   type ContextSnapshot,
+  type ControlAction,
   type CrashReport,
   type HeraldOsResult,
   type IncomingNotification,
@@ -25,10 +28,16 @@ import {
   type OsControlRequest,
   type ProcessInfo,
   type RecentFile,
+  type RecordingState,
   type RestRequest,
+  type ScreenshotMode,
   type ShellCommand,
   type ShellMode,
   type ShellSurface,
+  type StatusPanelId,
+  type StatusPanelState,
+  type SwitchName,
+  type SwitchState,
   type SystemInfo,
   type SystemStats,
   type TerminalCreateOptions,
@@ -149,11 +158,49 @@ const api = {
   },
   capture: {
     /** The person draws a rectangle on screen; resolves with the PNG's path, or null when cancelled. */
-    region: (): Promise<string | null> => ipcRenderer.invoke(IPC.captureRegion)
+    region: (): Promise<string | null> => ipcRenderer.invoke(IPC.captureRegion),
+    /** A screenshot saved where screenshots go (null when the selection was cancelled). */
+    screenshot: (mode: ScreenshotMode): Promise<string | null> => ipcRenderer.invoke(IPC.captureScreenshot, mode),
+    record: (action: 'start' | 'stop' | 'toggle', options: { region?: boolean; audio?: boolean } = {}): Promise<RecordingState> => ipcRenderer.invoke(IPC.captureRecord, action, options),
+    recordState: (): Promise<RecordingState> => ipcRenderer.invoke(IPC.captureRecordState),
+    onRecordChanged: (listener: (state: RecordingState) => void): Unsubscribe => subscribe(IPC.captureRecordChanged, listener),
+    readImage: (file: string): Promise<string> => ipcRenderer.invoke(IPC.captureReadImage, file),
+    saveImage: (file: string, dataUrl: string): Promise<string> => ipcRenderer.invoke(IPC.captureSaveImage, file, dataUrl),
+    copyImage: (source: string): Promise<void> => ipcRenderer.invoke(IPC.captureCopyImage, source),
+    requestCamera: (): Promise<boolean> => ipcRenderer.invoke(IPC.cameraRequest)
+  },
+  catalog: {
+    /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */
+    list: (): Promise<CatalogGroupView[]> => ipcRenderer.invoke(IPC.catalogList),
+    install: (id: string): Promise<CatalogResult> => ipcRenderer.invoke(IPC.catalogInstall, id),
+    remove: (id: string): Promise<CatalogResult> => ipcRenderer.invoke(IPC.catalogRemove, id),
+    /** The models a local server has (for "Use with Hermes"); rejects with what to do when it is not running. */
+    localModels: (kind: 'ollama' | 'lmstudio'): Promise<string[]> => ipcRenderer.invoke(IPC.catalogLocalModels, kind)
+  },
+  dictation: {
+    /** Type text into the focused app (any app); `copied` when it could only be left on the clipboard. */
+    type: (text: string, options: { submit?: boolean; delayMs?: number } = {}): Promise<{ typed: boolean; copied: boolean }> => ipcRenderer.invoke(IPC.dictationType, text, options)
   },
   events: {
     /** Events Herald OS saw lately (login, wake, crash, low battery, …), newest first. */
     recent: (): Promise<HeraldEvent[]> => ipcRenderer.invoke(IPC.eventsRecent)
+  },
+  switches: {
+    get: (): Promise<SwitchState> => ipcRenderer.invoke(IPC.switchesGet),
+    /** Night light, do not disturb, staying awake, the screensaver; resolves with every switch. */
+    set: (name: SwitchName, enabled: boolean): Promise<SwitchState> => ipcRenderer.invoke(IPC.switchesSet, name, enabled),
+    onChanged: (listener: (state: SwitchState) => void): Unsubscribe => subscribe(IPC.switchesChanged, listener)
+  },
+  notificationHistory: {
+    /** The last week of notifications, kept across restarts. */
+    load: (): Promise<unknown[]> => ipcRenderer.invoke(IPC.notificationsLoad),
+    save: (items: unknown[]): Promise<void> => ipcRenderer.invoke(IPC.notificationsSave, items)
+  },
+  controls: {
+    /** A quick panel's state: Wi-Fi networks, Bluetooth devices, audio devices, displays, power. */
+    status: (panel: StatusPanelId): Promise<StatusPanelState> => ipcRenderer.invoke(IPC.controlsStatus, panel),
+    /** Change something from a quick panel; resolves with that panel's new state. */
+    act: (action: ControlAction): Promise<StatusPanelState> => ipcRenderer.invoke(IPC.controlsAction, action)
   },
   terminal: {
     create: (options: TerminalCreateOptions): Promise<TerminalHandle> => ipcRenderer.invoke(IPC.terminalCreate, options),

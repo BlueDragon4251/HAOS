@@ -362,7 +362,7 @@ let announcing: { stopped: boolean } | null = null
 async function announce(text: string): Promise<void> {
   const prefs = $prefs.get().voice
 
-  if (!prefs.enabled || !prefs.announceNotifications || engine || announcing) {
+  if (!prefs.enabled || !prefs.announceNotifications || $prefs.get().doNotDisturb || engine || announcing) {
     return
   }
 

@@ -60,6 +60,10 @@ PACKAGES=(
   grim python3-pyyaml socat
   # Phase 2 services: OCR, Flatpak software, boot splash.
   tesseract tesseract-langpack-eng flatpak plymouth plymouth-scripts plymouth-plugin-script
+  # The menu bar's quick panels and switches: power modes, pactl for the sound panel, night light.
+  power-profiles-daemon pulseaudio-utils wlsunset
+  # The capture suite: screen recording, QR codes, re-encoding (the colour picker uses slurp and grim).
+  wf-recorder zbar ffmpeg-free
   # Rescue terminal shown by herald-os-session when the shell is not built.
   foot
   # A browser, a file manager and an editor so the Dock and `system_open` have real targets.
@@ -90,7 +94,7 @@ step "Herald OS session"
 install -m 0755 "$PAYLOAD/session/herald-os-compositor" /usr/local/bin/herald-os-compositor
 install -m 0755 "$PAYLOAD/session/herald-os-session" /usr/local/bin/herald-os-session
 install -m 0755 "$PAYLOAD/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
-install -m 0755 "$PAYLOAD/bin/herald-os" "$PAYLOAD/bin/herald-os-theme" "$PAYLOAD/bin/herald-os-omakase" "$PAYLOAD/bin/herald-os-update" /usr/local/bin/
+install -m 0755 "$PAYLOAD/bin/herald-os" "$PAYLOAD/bin/herald-os-theme" "$PAYLOAD/bin/herald-os-omakase" "$PAYLOAD/bin/herald-os-update" "$PAYLOAD/bin/herald-os-idle" "$PAYLOAD/bin/herald-os-catalog" /usr/local/bin/
 # foot's client and server entries are for scripts; Applications keeps Foot next to Herald's Terminal.
 install -d /usr/local/share/applications
 for entry in footclient foot-server; do
@@ -101,19 +105,21 @@ done
 # Themes and omakase lists for machines without the repo checked out. The cloud-init payload is
 # unpacked in this very folder, and cp refuses to copy a folder onto itself.
 SHARE=/usr/local/share/herald-os-linux
-install -d "$SHARE/themes" "$SHARE/omakase"
+install -d "$SHARE/themes" "$SHARE/omakase" "$SHARE/niri" "$SHARE/catalog"
 if [[ "$(realpath "$PAYLOAD")" != "$(realpath "$SHARE")" ]]; then
   cp -R "$PAYLOAD"/themes/. "$SHARE/themes/"
   cp -R "$PAYLOAD"/omakase/. "$SHARE/omakase/"
+  cp -R "$PAYLOAD"/catalog/. "$SHARE/catalog/"
+  cp "$PAYLOAD/niri/config.kdl" "$SHARE/niri/config.kdl"
 fi
 # Daily update check (user timer) and the default theme.
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/systemd/user"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/herald-os-update-check.service" "$PAYLOAD/session/herald-os-update-check.timer" "$HERMES_UID_HOME/.config/systemd/user/"
 sudo -u "$HERMES_USER" -H env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
 sudo -u "$HERMES_USER" -H herald-os-theme set "$(sudo -u "$HERMES_USER" -H herald-os-theme current)" || true
-# niri config for the session user (managed copy; local.kdl is the user's).
+# niri config for the session user, rendered with their keymap (managed; local.kdl is the user's).
 sudo -u "$HERMES_USER" -H mkdir -p "$HERMES_UID_HOME/.config/niri" "$HERMES_UID_HOME/.config/swaylock"
-install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
+sudo -u "$HERMES_USER" -H herald-os keymap apply || install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/niri/config.kdl" "$HERMES_UID_HOME/.config/niri/config.kdl"
 install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$PAYLOAD/session/swaylock.conf" "$HERMES_UID_HOME/.config/swaylock/config"
 
 # ---------------------------------------------------------------------------------------------

@@ -44,13 +44,9 @@ function installMediaPermissions(): void {
       return false
     }
 
-    // Pinned web apps share this session; only the shell itself may capture audio.
-    if (!isShellPage(requestingUrl)) {
-      return false
-    }
-
-    // `media` with a video request is not something the shell asks for.
-    return !mediaTypes || mediaTypes.every(type => type === 'audio')
+    // Pinned web apps share this session; only the shell itself may use the microphone or the
+    // camera (the camera bubble for screen recordings).
+    return isShellPage(requestingUrl) && (!mediaTypes || mediaTypes.every(type => type === 'audio' || type === 'video'))
   }
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {

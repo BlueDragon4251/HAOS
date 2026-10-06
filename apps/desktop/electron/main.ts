@@ -7,10 +7,14 @@ import { CrashWatcher } from './crash/watch.ts'
 import { fireEventAutomations } from './events/automations.ts'
 import { events } from './events/bus.ts'
 import { runHooks } from './events/hooks.ts'
+import { run } from './platform/exec.ts'
 import { startEventSources } from './events/sources.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
 import { registerCaptureIpc } from './ipc/capture.ts'
+import { registerControlsIpc } from './ipc/controls.ts'
+import { registerCatalogIpc } from './ipc/catalog.ts'
+import { registerDictationIpc } from './ipc/dictation.ts'
 import { registerContextIpc } from './ipc/context.ts'
 import { registerFsIpc } from './ipc/fs.ts'
 import { registerSystemIpc } from './ipc/system.ts'
@@ -21,6 +25,8 @@ import { registerEditIpc } from './ipc/edit.ts'
 import { registerWebIpc } from './ipc/web.ts'
 import { log, logTail } from './log.ts'
 import { migrateLegacyData } from './migrate.ts'
+import { registerNotificationHistoryIpc } from './notifications-history.ts'
+import { SwitchService } from './switches.ts'
 import { hermesHome, heraldOsDataDir, isDev } from './paths.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
 import { ControlSocket } from './shell/control-socket.ts'
@@ -55,11 +61,23 @@ function broadcastPrefs(next: HeraldOSPrefs): void {
   }
 }
 
+const switches = new SwitchService({
+  session: Boolean(panels),
+  getWindows: () => BrowserWindow.getAllWindows(),
+  onPrefs: broadcastPrefs,
+  showScreensaver: () => mainWindow?.webContents.send(IPC.shellCommand, { type: 'screensaver' } satisfies ShellCommand)
+})
 const control = panels
-  ? new ControlSocket(panels, broadcastPrefs, osBridge, spec => {
-      syncHermesSkin(spec, backend)
-      events.emit('theme-set', { theme: spec.name })
-    })
+  ? new ControlSocket(
+      panels,
+      broadcastPrefs,
+      osBridge,
+      spec => {
+        syncHermesSkin(spec, backend)
+        events.emit('theme-set', { theme: spec.name })
+      },
+      () => void switches.broadcast()
+    )
   : null
 // Desktop mode has no compositor CLI socket; the OS control server gives it the same `ui*` surface.
 const osControlPath = panels ? path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`, 'herald-os', 'control.sock') : path.join(heraldOsDataDir(), 'control.sock')
@@ -179,6 +197,19 @@ function registerCoreIpc(): void {
       applyVoiceHotkey(next.voice.enabled ? next.voice.hotkey : '', () => BrowserWindow.getAllWindows())
     }
 
+    if ('idle' in patch || 'screensaver' in patch) {
+      void switches.applyIdle(next)
+    }
+
+    if ('doNotDisturb' in patch || 'screensaver' in patch) {
+      void switches.broadcast()
+    }
+
+    // The keymap lives in niri's config, which the CLI renders (niri reloads it by itself).
+    if ('keymap' in patch && process.platform === 'linux') {
+      void run('herald-os', ['keymap', next.keymap === 'omarchy' ? 'omarchy' : 'herald'], 10_000).then(result => result.code !== 0 && log('keymap', result.stderr.trim()))
+    }
+
     // Every surface window sees the same preferences.
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.webContents !== _event.sender) {
@@ -204,7 +235,15 @@ function registerCoreIpc(): void {
     back => events.emit('returned', { reason: back.reason, away_minutes: Math.round(back.awayMs / 60_000) })
   )
   registerThemeIpc({ panels: Boolean(panels), broadcast: broadcastPrefs, backend })
-  registerCaptureIpc()
+  registerCaptureIpc(state => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.captureRecordChanged, state)
+    }
+  })
+  registerControlsIpc()
+  registerNotificationHistoryIpc()
+  registerDictationIpc(() => (panels ? panels.mainWindow() : mainWindow))
+  registerCatalogIpc()
   registerTerminalIpc(() => mainWindow)
   registerVoiceIpc(backend)
   // Desktop mode layers pages over the shell window; panels mode gives them compositor windows.
@@ -254,6 +293,7 @@ app.whenReady().then(async () => {
   events.registerIpc()
   crashes.start()
   startEventSources()
+  switches.start()
   backend.onState(state => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.backendState, state)

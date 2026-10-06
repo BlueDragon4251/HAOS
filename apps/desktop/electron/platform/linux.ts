@@ -3,10 +3,11 @@ import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { BatteryStatus, CalendarResult, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { BatteryStatus, CalendarResult, ControlAction, DiskUsage, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, StatusPanelId, StatusPanelState, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { findCodeEditor } from './editors.ts'
 import { MISSING_BINARY, run, runBuffer } from './exec.ts'
 import { normaliseFileQuery, rankFiles } from './find.ts'
+import { linuxControlAction, linuxControlStatus } from './linux-controls.ts'
 import { parseDf, parsePs } from './posix.ts'
 import { type EditorTarget, type HostPlatform, HostNotSupported } from './types.ts'
 
@@ -989,5 +990,13 @@ export class LinuxPlatform implements HostPlatform {
     }
 
     return null
+  }
+
+  controlStatus(panel: StatusPanelId): Promise<StatusPanelState> {
+    return linuxControlStatus(panel, () => this.sampleStats())
+  }
+
+  controlAction(action: ControlAction): Promise<void> {
+    return linuxControlAction(action)
   }
 }

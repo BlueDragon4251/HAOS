@@ -287,6 +287,58 @@ def parse_bluetoothctl_devices(text: str) -> list[str]:
     return names
 
 
+def parse_bluetoothctl_device_rows(text: str) -> list[tuple[str, str]]:
+    """``bluetoothctl devices`` -> [(address, name)]; an unnamed device is called by its address."""
+    rows: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        match = re.match(r"^Device\s+([0-9A-Fa-f:]{17})(?:\s+(.+))?$", line.strip())
+        if match:
+            rows.append((match[1].upper(), (match[2] or match[1]).strip()))
+    return rows
+
+
+def pick_device(rows: Sequence[tuple[str, str]], query: str) -> tuple[str, str] | None:
+    """The one (id, name) the query means: an exact id or name, else the only name containing it."""
+    needle = query.strip().lower()
+    exact = [row for row in rows if row[0].lower() == needle or row[1].lower() == needle]
+    if exact:
+        return exact[0]
+    partial = [row for row in rows if needle and needle in row[1].lower()]
+    return partial[0] if len(partial) == 1 else None
+
+
+def parse_pactl_json(text: str, default_name: str) -> list[dict[str, Any]]:
+    """``pactl -f json list sinks|sources`` -> devices (monitor sources skipped), volume averaged."""
+    try:
+        nodes = json.loads(text or "[]")
+    except json.JSONDecodeError:
+        return []
+    devices: list[dict[str, Any]] = []
+    for node in nodes if isinstance(nodes, list) else []:
+        name = str(node.get("name") or "")
+        if not name or name.endswith(".monitor"):
+            continue
+        levels = [int(str(ch.get("value_percent", "")).rstrip("%")) for ch in (node.get("volume") or {}).values() if str(ch.get("value_percent", "")).rstrip("%").isdigit()]
+        devices.append({
+            "id": name, "name": node.get("description") or name, "default": name == default_name.strip(),
+            "volume": round(sum(levels) / len(levels)) if levels else None, "muted": bool(node.get("mute")),
+        })
+    return devices
+
+
+def parse_power_profiles(text: str) -> dict[str, Any]:
+    """``powerprofilesctl list`` -> {active, profiles}; the active profile is starred."""
+    profiles: list[str] = []
+    active: str | None = None
+    for line in text.splitlines():
+        match = re.match(r"^(\*)?\s*([a-z][a-z-]*):\s*$", line)
+        if match:
+            profiles.append(match[2])
+            if match[1]:
+                active = match[2]
+    return {"active": active, "profiles": profiles}
+
+
 def parse_wpctl_volume(text: str) -> tuple[int | None, bool]:
     """``wpctl get-volume`` (``Volume: 0.45 [MUTED]``) -> (percent, muted)."""
     match = re.search(r"Volume:\s*([\d.]+)", text)
@@ -913,6 +965,77 @@ class LinuxHost(HostAdapter):
         _missing(result, "network-manager")
         if not result.ok:
             raise RuntimeError(result.stderr.strip() or "could not change Wi-Fi power")
+
+    # --- the menu bar's quick panels ------------------------------------------------------------
+    def wifi_networks(self) -> list[dict[str, Any]]:
+        result = run(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,CHAN,RATE,SECURITY", "dev", "wifi", "list"], timeout=25)
+        _missing(result, "network-manager")
+        best: dict[str, dict[str, Any]] = {}
+        for network in parse_nmcli_wifi(result.stdout):
+            ssid = network.get("ssid")
+            if ssid and (ssid not in best or (network.get("signal") or 0) > (best[ssid].get("signal") or 0) or network["active"]):
+                best[ssid] = {**network, "active": network["active"] or best.get(ssid, {}).get("active", False)}
+        return sorted(best.values(), key=lambda n: (not n["active"], -(n.get("signal") or 0)))
+
+    def wifi_connect(self, ssid: str, password: str | None) -> None:
+        result = run(["nmcli", "device", "wifi", "connect", ssid, *(["password", password] if password else [])], timeout=60)
+        _missing(result, "network-manager")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"could not join {ssid}")
+
+    def bluetooth_set_power(self, enabled: bool) -> None:
+        result = run(["bluetoothctl", "power", "on" if enabled else "off"], timeout=15)
+        _missing(result, "bluez")
+        if not result.ok or "fail" in result.stdout.lower():
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "could not switch Bluetooth")
+
+    def bluetooth_connect(self, device: str, connect: bool) -> dict[str, Any]:
+        listed = run(["bluetoothctl", "devices"], timeout=10)
+        _missing(listed, "bluez")
+        rows = parse_bluetoothctl_device_rows(listed.stdout)
+        match = pick_device(rows, device)
+        if match is None:
+            raise ValueError(f"no Bluetooth device matches {device!r}; known: {', '.join(name for _, name in rows) or 'none'}")
+        address, name = match
+        result = run(["bluetoothctl", "connect" if connect else "disconnect", address], timeout=40)
+        if not result.ok or "failed" in result.stdout.lower():
+            raise RuntimeError(result.stdout.strip() or result.stderr.strip() or f"could not reach {name}")
+        return {"device": name, "address": address, "connected": connect}
+
+    def audio_devices(self) -> dict[str, Any]:
+        sinks = run(["pactl", "-f", "json", "list", "sinks"], timeout=10)
+        _missing(sinks, "pulseaudio-utils for pactl")
+        sources = run(["pactl", "-f", "json", "list", "sources"], timeout=10)
+        default_sink = run(["pactl", "get-default-sink"], timeout=5).stdout
+        default_source = run(["pactl", "get-default-source"], timeout=5).stdout
+        return {"outputs": parse_pactl_json(sinks.stdout, default_sink), "inputs": parse_pactl_json(sources.stdout, default_source)}
+
+    def set_audio_output(self, device: str) -> dict[str, Any]:
+        outputs = self.audio_devices()["outputs"]
+        match = pick_device([(o["id"], o["name"]) for o in outputs], device)
+        if match is None:
+            raise ValueError(f"no sound output matches {device!r}; outputs: {', '.join(o['name'] for o in outputs) or 'none'}")
+        result = run(["pactl", "set-default-sink", match[0]], timeout=10)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "could not switch the output")
+        return {"output": match[1]}
+
+    def set_brightness(self, percent: int) -> None:
+        result = run(["brightnessctl", "--class=backlight", "set", f"{max(1, min(100, int(percent)))}%"], timeout=10)
+        _missing(result, "brightnessctl")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or "this screen has no adjustable backlight")
+
+    def power_profiles(self) -> dict[str, Any]:
+        result = run(["powerprofilesctl", "list"], timeout=10)
+        _missing(result, "power-profiles-daemon")
+        return parse_power_profiles(result.stdout)
+
+    def set_power_profile(self, profile: str) -> None:
+        result = run(["powerprofilesctl", "set", profile], timeout=10)
+        _missing(result, "power-profiles-daemon")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or f"could not switch to {profile}")
 
     # --- destructive ------------------------------------------------------------------------
     def kill(self, pid: int, force: bool) -> None:

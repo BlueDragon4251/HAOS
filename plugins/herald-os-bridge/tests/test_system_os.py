@@ -77,7 +77,11 @@ CASES = {
     "notify_no_body": ({"action": "notify", "title": "Ping"}, ["notify", "Ping"], "act"),
     "focus_workspace": ({"name": "work"}, ["wm", "focus-workspace", "work"], "read"),
     "close_focused_window": ({}, ["wm", "close-window"], "act"),
+    "catalog_install": ({"id": "claude-code"}, ["catalog", "install", "claude-code"], "mutate"),
+    "catalog_remove": ({"id": "Steam"}, ["catalog", "remove", "steam"], "destructive"),
 }
+# Actions whose result is not plain output; each has its own test below.
+SEPARATE = {"catalog_list"}
 
 
 @pytest.mark.parametrize("case", sorted(CASES))
@@ -99,8 +103,37 @@ def test_every_schema_action_is_covered(plugin):
     actions = set(tools.SYSTEM_OS_SCHEMA["parameters"]["properties"]["action"]["enum"])
     assert actions == set(tools.SYSTEM_OS_TIERS)
     covered = {CASES[c][0].get("action", c) for c in CASES}
-    assert actions == covered
+    assert actions == covered | SEPARATE
     assert "system_os" in [spec.name for spec in tools.TOOL_SPECS]
+
+
+def test_catalog_list_is_compacted_per_group(plugin, linux):
+    tools = _mod(plugin, "tools")
+    listing = {
+        "groups": [
+            {"id": "ai", "label": "AI", "entries": [
+                {"id": "codex", "label": "Codex", "installed": True, "available": True},
+                {"id": "ollama", "label": "Ollama", "installed": False, "available": True},
+            ]},
+            {"id": "gaming", "label": "Gaming", "entries": [{"id": "steam", "label": "Steam", "installed": False, "available": False, "reason": "needs an x86_64 PC"}]},
+        ]
+    }
+    linux.result = linux.util.ExecResult(0, json.dumps(listing), "")
+    result = json.loads(tools.system_os_handler({"action": "catalog_list"}))
+    assert result["success"], result
+    assert linux.argv == ["herald-os", "catalog", "list", "--json"] and linux.tier.value == "read"
+    assert result["catalog"] == {
+        "AI": ["codex: Codex (installed)", "ollama: Ollama (available)"],
+        "Gaming": ["steam: Steam (unavailable: needs an x86_64 PC)"],
+    }
+
+
+@pytest.mark.parametrize("entry", ["", "--purge", "claude code", "../x", "a" * 70])
+def test_catalog_ids_are_validated(plugin, linux, entry):
+    tools = _mod(plugin, "tools")
+    result = json.loads(tools.system_os_handler({"action": "catalog_install", "id": entry}))
+    assert not result["success"] and "catalog id" in result["error"]
+    assert linux.argv is None
 
 
 def test_install_and_update_get_the_long_timeout(plugin, linux):

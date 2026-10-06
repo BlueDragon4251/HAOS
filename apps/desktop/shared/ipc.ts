@@ -84,6 +84,119 @@ export interface ProcessInfo {
   name: string
 }
 
+/** The menu bar's quick panels. */
+export type StatusPanelId = 'wifi' | 'bluetooth' | 'audio' | 'display' | 'power' | 'clock'
+
+export interface WifiNetwork {
+  ssid: string
+  /** 0 to 100. */
+  signal: number
+  secure: boolean
+  active: boolean
+  /** A saved connection exists, so it joins without a password. */
+  known: boolean
+}
+
+export interface WifiState {
+  /** False when there is no Wi-Fi hardware or no NetworkManager. */
+  available: boolean
+  enabled: boolean
+  connected?: string
+  networks: WifiNetwork[]
+}
+
+export interface BluetoothDevice {
+  address: string
+  name: string
+  paired: boolean
+  connected: boolean
+  /** freedesktop icon name such as audio-headphones or input-mouse. */
+  icon?: string
+  battery?: number
+}
+
+export interface BluetoothState {
+  available: boolean
+  powered: boolean
+  devices: BluetoothDevice[]
+}
+
+export interface AudioDevice {
+  /** The PipeWire/PulseAudio node name (what the default and volume calls take). */
+  id: string
+  name: string
+  isDefault: boolean
+  /** 0 to 150. */
+  volume: number
+  muted: boolean
+}
+
+export interface AudioState {
+  available: boolean
+  outputs: AudioDevice[]
+  inputs: AudioDevice[]
+}
+
+export interface DisplayMode {
+  width: number
+  height: number
+  /** Hz. */
+  refresh: number
+}
+
+export interface DisplayInfo {
+  name: string
+  label: string
+  enabled: boolean
+  width: number
+  height: number
+  refresh: number
+  scale: number
+  modes: DisplayMode[]
+}
+
+export interface DisplayState {
+  available: boolean
+  displays: DisplayInfo[]
+  /** Built-in backlight, 0 to 100, when there is one. */
+  brightness?: number
+}
+
+export interface PowerState {
+  available: boolean
+  battery: BatteryStatus
+  /** e.g. "about 3 hours left" or "full in 40 minutes". */
+  timeRemaining?: string
+  /** power-profiles-daemon: performance, balanced, power-saver. */
+  profile?: string
+  profiles: string[]
+}
+
+export type StatusPanelState =
+  | { panel: 'wifi'; wifi: WifiState }
+  | { panel: 'bluetooth'; bluetooth: BluetoothState }
+  | { panel: 'audio'; audio: AudioState }
+  | { panel: 'display'; display: DisplayState }
+  | { panel: 'power'; power: PowerState }
+
+/** What the quick panels can change. */
+export type ControlAction =
+  | { panel: 'wifi'; action: 'enable'; enabled: boolean }
+  | { panel: 'wifi'; action: 'scan' }
+  | { panel: 'wifi'; action: 'connect'; ssid: string; password?: string }
+  | { panel: 'wifi'; action: 'disconnect' }
+  | { panel: 'wifi'; action: 'forget'; ssid: string }
+  | { panel: 'bluetooth'; action: 'power'; enabled: boolean }
+  | { panel: 'bluetooth'; action: 'scan' }
+  | { panel: 'bluetooth'; action: 'connect' | 'disconnect' | 'pair' | 'remove'; address: string }
+  | { panel: 'audio'; action: 'default'; kind: 'output' | 'input'; id: string }
+  | { panel: 'audio'; action: 'volume'; kind: 'output' | 'input'; id?: string; percent?: number; muted?: boolean }
+  | { panel: 'display'; action: 'brightness'; percent: number }
+  | { panel: 'display'; action: 'scale'; name: string; scale: number }
+  | { panel: 'display'; action: 'mode'; name: string; mode: DisplayMode }
+  | { panel: 'display'; action: 'enable'; name: string; enabled: boolean }
+  | { panel: 'power'; action: 'profile'; profile: string }
+
 export interface InstalledApp {
   name: string
   path: string
@@ -246,6 +359,47 @@ export interface TerminalCreateOptions {
   cwd?: string
   cols: number
   rows: number
+  /** A coding agent from the install catalog (its id) to run in the tab instead of a bare shell. */
+  program?: string
+}
+
+/** One entry of the install catalog (linux/catalog/*.json), with its state on this machine. */
+export interface CatalogEntryView {
+  id: string
+  label: string
+  description: string
+  group: string
+  installed: boolean
+  /** Installed by one of the catalog's own methods, so removing it from here works. */
+  removable?: boolean
+  /** It can be installed here (the right OS, architecture, package manager). */
+  available: boolean
+  /** How it would install: flatpak, dnf, pacman, aur, npm, mise, script, webapp, link, brew, brew-cask. */
+  method: string | null
+  /** Why it cannot be installed here. */
+  reason?: string
+  /** A coding agent that runs in the Terminal. */
+  terminal?: boolean
+  /** A terminal app Super+Return can open instead of Herald's terminal. */
+  terminalApp?: string
+  /** A local model server Hermes can use. */
+  hermes?: 'ollama' | 'lmstudio'
+  bin?: string
+  /** For `link` installs: the download page. */
+  url?: string
+}
+
+export interface CatalogGroupView {
+  id: string
+  label: string
+  description: string
+  entries: CatalogEntryView[]
+}
+
+export interface CatalogResult {
+  ok: boolean
+  /** The last lines of the installer's output. */
+  output: string
 }
 
 export interface TerminalHandle {
@@ -333,6 +487,16 @@ export interface HeraldOSPrefs {
   usageInMenuBar?: boolean
   /** Hermes automations that run when something happens rather than on a schedule. */
   eventAutomations?: EventAutomation[]
+  /** Toasts, system notifications and spoken announcements stay quiet; the bell still collects them. */
+  doNotDisturb?: boolean
+  /** The drawn wallpaper and a clock after this many idle minutes. */
+  screensaver?: { enabled: boolean; afterMinutes: number }
+  /** Herald OS Linux: minutes of inactivity before locking, turning the screens off and suspending (0 = never). */
+  idle?: IdleTimings
+  /** Herald OS Linux: Herald's keys, or Omarchy-style Super+C, X and V for copy, cut and paste everywhere. */
+  keymap?: 'herald' | 'omarchy'
+  /** Herald OS Linux: the terminal Super+Return opens: Herald's own, or a catalog terminal (ghostty, alacritty, kitty, foot). */
+  defaultTerminal?: string
   /** Absolute path or file:// URL of a custom wallpaper image. */
   wallpaper?: string
   defaultCwd?: string
@@ -352,6 +516,34 @@ export interface HeraldOSPrefs {
   voice: VoicePrefs
   continuity: ContinuityPrefs
   crashHelp: CrashHelpPrefs
+}
+
+export type ScreenshotMode = 'region' | 'window' | 'screen'
+
+export interface RecordingState {
+  recording: boolean
+  /** The file being written, then the finished one. */
+  file?: string
+  startedAt?: number
+  audio?: boolean
+}
+
+export interface IdleTimings {
+  lockAfter: number
+  screenOffAfter: number
+  suspendAfter: number
+}
+
+/** Quick switches in the menu bar and the control menu. */
+export type SwitchName = 'nightLight' | 'doNotDisturb' | 'stayAwake' | 'screensaver'
+
+export interface SwitchState {
+  /** Warmer colours: wlsunset on Herald OS Linux; null where Herald OS cannot switch it (macOS has Night Shift). */
+  nightLight: boolean | null
+  doNotDisturb: boolean
+  /** The screens stay on and nothing locks or sleeps on its own. */
+  stayAwake: boolean
+  screensaver: boolean
 }
 
 export interface AuditEntry {
@@ -379,7 +571,7 @@ export interface WindowState {
 export type ShellMode = 'desktop' | 'panels'
 
 /** Which part of the shell a renderer window is. `window:<appId>` hosts one floating Hermes app. */
-export type ShellSurface = 'desktop' | 'menubar' | 'dock' | 'main' | 'command' | 'wallpaper' | `window:${string}`
+export type ShellSurface = 'desktop' | 'menubar' | 'dock' | 'main' | 'command' | 'panel' | 'screensaver' | 'wallpaper' | `window:${string}`
 
 /** A window the compositor manages (any client, including the shell's own windows). */
 export interface WmWindow {
@@ -552,9 +744,49 @@ export const IPC = {
 
   /** Let the person select part of the screen; resolves with the PNG's path, or null when cancelled. */
   captureRegion: 'herald-os:capture:region',
+  /** A screenshot of a region, the focused window or the whole screen, saved where screenshots go. */
+  captureScreenshot: 'herald-os:capture:screenshot',
+  /** Start, stop or toggle a screen recording; resolves with the recording state. */
+  captureRecord: 'herald-os:capture:record',
+  captureRecordState: 'herald-os:capture:record-state',
+  /** Main -> renderer: a recording started or stopped (`RecordingState`). */
+  captureRecordChanged: 'herald-os:capture:record-changed',
+  /** An image file as a data URL, for the markup editor. */
+  captureReadImage: 'herald-os:capture:read-image',
+  /** Write a PNG (data URL) inside the home folder. */
+  captureSaveImage: 'herald-os:capture:save-image',
+  /** Put an image (a file or a data URL) on the clipboard. */
+  captureCopyImage: 'herald-os:capture:copy-image',
+  /** Ask the OS for camera access (macOS), for the camera bubble. */
+  cameraRequest: 'herald-os:camera:request',
+
+  /** Type text into whatever app is focused (wtype on Wayland, a paste on macOS). */
+  dictationType: 'herald-os:dictation:type',
+
+  /** The install catalog: groups of software with their state here, and installing or removing one. */
+  catalogList: 'herald-os:catalog:list',
+  catalogInstall: 'herald-os:catalog:install',
+  catalogRemove: 'herald-os:catalog:remove',
+  /** Models a local server (Ollama, LM Studio) has, for "Use with Hermes". */
+  catalogLocalModels: 'herald-os:catalog:local-models',
 
   /** The events main emitted lately (`HeraldEvent[]`, newest first), for Settings and the agent. */
   eventsRecent: 'herald-os:events:recent',
+
+  /** A quick panel's state (Wi-Fi networks, Bluetooth devices, audio devices, displays, power). */
+  controlsStatus: 'herald-os:controls:status',
+  /** Change something from a quick panel (`ControlAction`); resolves with the panel's new state. */
+  controlsAction: 'herald-os:controls:action',
+
+  switchesGet: 'herald-os:switches:get',
+  /** Turn one switch on or off; resolves with every switch's state. */
+  switchesSet: 'herald-os:switches:set',
+  /** Main -> renderer: a switch changed (from the CLI, a hotkey or another window). */
+  switchesChanged: 'herald-os:switches:changed',
+
+  /** The notification history (the last week), kept across restarts. */
+  notificationsLoad: 'herald-os:notifications:load',
+  notificationsSave: 'herald-os:notifications:save',
 
   terminalCreate: 'herald-os:terminal:create',
   terminalWrite: 'herald-os:terminal:write',

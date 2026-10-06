@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import type { IncomingNotification } from '../../shared/ipc.ts'
 import type { SurfaceId } from './surface.ts'
-import { $windowState } from './backend.ts'
+import { $prefs, $windowState } from './backend.ts'
 import { onGatewayEvent } from './gateway.ts'
 
 export type NotificationLevel = 'info' | 'success' | 'warn' | 'error'
@@ -77,17 +77,67 @@ export function notify(input: NotifyInput): HermesNotification {
   }
   const rest = $notifications.get().filter(n => n.id !== item.id)
   $notifications.set([item, ...rest].slice(0, MAX))
+  // Do not disturb: the bell still collects everything, nothing pops up or makes a sound.
+  const quiet = Boolean($prefs.get().doNotDisturb)
 
-  if (input.toast !== false) {
+  if (input.toast !== false && !quiet) {
     $toasts.set([item, ...$toasts.get().filter(t => t.id !== item.id)].slice(0, 3))
     setTimeout(() => $toasts.set($toasts.get().filter(t => t.id !== item.id)), 6000)
   }
 
-  if (input.native && !$windowState.get().focused) {
+  if (input.native && !quiet && !$windowState.get().focused) {
     void window.heraldOS.notifications.native(item.title, item.body ?? '')
   }
 
   return item
+}
+
+let historyBound = false
+
+/**
+ * Keep the notification list across restarts (the Hermes window only): load the last week once,
+ * then save after every change. Other apps' notifications come back as plain entries, since the
+ * app that sent them can no longer be told what was clicked.
+ */
+export function bindNotificationHistory(): () => void {
+  const history = window.heraldOS?.notificationHistory
+
+  if (historyBound || !history) {
+    return () => undefined
+  }
+
+  historyBound = true
+  let ready = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  void history
+    .load()
+    .then(saved => {
+      const known = new Set($notifications.get().map(n => n.id))
+      const restored = (saved as HermesNotification[]).filter(n => !known.has(n.id)).map(n => ({ ...n, read: true, desktop: undefined }))
+      $notifications.set([...$notifications.get(), ...restored].sort((a, b) => b.ts - a.ts).slice(0, MAX))
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      ready = true
+    })
+
+  const off = $notifications.listen(items => {
+    if (!ready) {
+      return
+    }
+
+    if (timer) {
+      clearTimeout(timer)
+    }
+
+    timer = setTimeout(() => void history.save(items.map(({ desktop: _desktop, ...item }) => item)).catch(() => undefined), 800)
+  })
+
+  return () => {
+    off()
+    historyBound = false
+  }
 }
 
 export function dismissToast(id: string): void {

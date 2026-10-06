@@ -4,8 +4,9 @@ import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { BatteryStatus, CalendarEvent, CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { BatteryStatus, CalendarEvent, CalendarResult, ControlAction, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, StatusPanelId, StatusPanelState, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 import { heraldOsDataDir } from '../paths.ts'
+import { darwinControlAction, darwinControlStatus } from './darwin-controls.ts'
 import { run } from './exec.ts'
 import { normaliseFileQuery, rankFiles } from './find.ts'
 import { parseDf, parsePs } from './posix.ts'
@@ -448,5 +449,17 @@ export class DarwinPlatform implements HostPlatform {
     if (result.code !== 0) {
       throw new Error(result.stderr.trim() || `open failed with code ${result.code}`)
     }
+  }
+
+  controlStatus(panel: StatusPanelId): Promise<StatusPanelState> {
+    return darwinControlStatus(
+      panel,
+      () => this.sampleStats(),
+      () => this.networkStatus()
+    )
+  }
+
+  controlAction(action: ControlAction): Promise<void> {
+    return darwinControlAction(action)
   }
 }

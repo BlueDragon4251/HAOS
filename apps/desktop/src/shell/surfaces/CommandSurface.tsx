@@ -6,14 +6,16 @@ import { GlassButton, Pill } from '../../components/ui/glass.tsx'
 import { Kbd } from '../../components/ui/primitives.tsx'
 import { closeThisSurface, openSurface, relayToMain } from '../../store/shell.ts'
 import { ApplicationsPanel } from '../../features/applications/ApplicationsOverlay.tsx'
+import { EmojiPicker } from '../../features/emoji/EmojiPicker.tsx'
+import { insertEmoji } from '../../store/emoji.ts'
 import { CommandPalette } from '../CommandBar.tsx'
 import { ClipboardPanel } from './ClipboardPanel.tsx'
 import { ControlMenu, PowerCard } from './ControlMenu.tsx'
 import { useShellCommands, windowLabel } from './shell-utils.ts'
 
-type Mode = 'ask' | 'command' | 'applications' | 'menu' | 'power' | 'clipboard'
+type Mode = 'ask' | 'command' | 'applications' | 'menu' | 'power' | 'clipboard' | 'emoji'
 
-const MODES = new Set<Mode>(['ask', 'command', 'applications', 'menu', 'power', 'clipboard'])
+const MODES = new Set<Mode>(['ask', 'command', 'applications', 'menu', 'power', 'clipboard', 'emoji'])
 const WINDOW_WIDTH = 680
 const MAX_HEIGHT = 560
 
@@ -26,7 +28,7 @@ export interface AskState {
 /**
  * Panels mode: one transparent overlay window (680 wide) niri centres over everything. The inbound
  * command picks what it shows: ask (about the focused window), the command palette, the launcher,
- * the Herald OS menu, power actions or clipboard history. Escape (or losing focus) closes it.
+ * the Herald OS menu, power actions, clipboard history or emoji. Escape (or losing focus) closes it.
  */
 export function CommandSurface() {
   const [mode, setMode] = useState<Mode | null>(null)
@@ -112,6 +114,7 @@ export function CommandSurface() {
         {mode === 'menu' && <ControlMenu onClose={close} onApplications={() => setMode('applications')} initialItem={menuItem} />}
         {mode === 'power' && <PowerCard onClose={close} />}
         {mode === 'clipboard' && <ClipboardPanel onClose={close} />}
+        {mode === 'emoji' && <EmojiPicker onPick={char => void insertEmoji(char)} onClose={close} />}
       </div>
     </div>
   )

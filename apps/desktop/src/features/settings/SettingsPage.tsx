@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconAccessible, IconBell, IconCircleCheckFilled, IconDatabase, IconGauge, IconInfoCircle, IconListDetails, IconMicrophone, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
+import { IconAccessible, IconApps, IconBell, IconCircleCheckFilled, IconDatabase, IconGauge, IconInfoCircle, IconListDetails, IconMicrophone, IconPalette, IconPlayerPause, IconRobot, IconSettings, IconShield, IconWifi } from '@tabler/icons-react'
 import { type ComponentType, useEffect, useState } from 'react'
 import { GlassButton, PageHeader, SearchField } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -14,6 +14,7 @@ import { NetworkSection } from './sections/NetworkSection.tsx'
 import { NotificationsSection } from './sections/NotificationsSection.tsx'
 import { PrivacySection } from './sections/PrivacySection.tsx'
 import { $settingsFocus, $settingsSavedAt, type SectionId, SettingsFilterContext } from './sections/shared.tsx'
+import { SoftwareSection } from './sections/SoftwareSection.tsx'
 import { StorageSection } from './sections/StorageSection.tsx'
 import { UsageSection } from './sections/UsageSection.tsx'
 import { VoiceCommandsSection } from './sections/VoiceCommandsSection.tsx'
@@ -28,6 +29,7 @@ import { VoiceSection } from './sections/VoiceSection.tsx'
 const SECTIONS: { id: SectionId; label: string; icon: ComponentType<{ size?: number; stroke?: number }>; view: ComponentType }[] = [
   { id: 'general', label: 'General', icon: IconSettings, view: GeneralSection },
   { id: 'appearance', label: 'Appearance', icon: IconPalette, view: AppearanceSection },
+  { id: 'software', label: 'Software', icon: IconApps, view: SoftwareSection },
   { id: 'agents', label: 'Hermes & agents', icon: IconRobot, view: AgentsSection },
   { id: 'usage', label: 'Usage', icon: IconGauge, view: UsageSection },
   { id: 'voice', label: 'Voice', icon: IconMicrophone, view: VoiceSection },

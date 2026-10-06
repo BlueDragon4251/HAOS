@@ -12,12 +12,16 @@ from .util import data_dir, truncate
 _lock = threading.Lock()
 _MAX_ARG_CHARS = 400
 _MAX_FILE_BYTES = 5 * 1024 * 1024
+# Arguments that carry a secret (a Wi-Fi password) are logged as present, never by value.
+_SECRET_KEYS = ("password", "passphrase", "secret", "token", "psk")
 
 
 def _compact_args(args: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in args.items():
-        if isinstance(value, str):
+        if any(word in key.lower() for word in _SECRET_KEYS) and value not in (None, ""):
+            out[key] = "[redacted]"
+        elif isinstance(value, str):
             out[key] = truncate(value, _MAX_ARG_CHARS)
         elif isinstance(value, (int, float, bool)) or value is None:
             out[key] = value

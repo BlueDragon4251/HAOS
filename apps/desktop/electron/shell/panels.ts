@@ -9,7 +9,7 @@ import { NiriClient } from '../wm/niri.ts'
 import { FLOATING_APPS, shellMode, surfaceTitle } from './mode.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const PANEL_TITLES = new Set((['menubar', 'dock', 'command', 'wallpaper'] as const).map(surfaceTitle))
+const PANEL_TITLES = new Set((['menubar', 'dock', 'command', 'panel', 'screensaver', 'wallpaper'] as const).map(surfaceTitle))
 
 /** The menu bar, dock, overlays and wallpaper renderer: our windows that are not apps. */
 function isPanel(win: WmWindow): boolean {
@@ -19,6 +19,8 @@ function isPanel(win: WmWindow): boolean {
 const MENUBAR_HEIGHT = 30
 const DOCK_SIZE = { width: 720, height: 84 }
 const COMMAND_SIZE = { width: 680, height: 560 }
+/** The menu bar's quick panels; the renderer shrinks the window to its content. */
+const PANEL_SIZE = { width: 380, height: 560 }
 const MAIN_SIZE = { width: 1280, height: 800 }
 
 interface SurfaceWindowOptions {
@@ -114,7 +116,7 @@ export class PanelShell {
 
     if (!win || win.isDestroyed()) {
       win = this.create(surface)
-    } else if (surface === 'command' || surface.startsWith('window:')) {
+    } else if (surface === 'command' || surface === 'panel' || surface.startsWith('window:')) {
       win.show()
       win.focus()
     }
@@ -300,9 +302,14 @@ export class PanelShell {
       win.webContents.send(IPC.wmState, this.niri.state())
     })
 
-    if (surface === 'command') {
+    if (surface === 'command' || surface === 'panel') {
       // Overlays dismiss when focus leaves them (the renderer also closes on Escape).
       win.on('blur', () => setTimeout(() => !win.isDestroyed() && !win.isFocused() && win.close(), 150))
+      win.on('closed', () => setTimeout(() => void this.restoreAppFocus(), 100))
+    }
+
+    if (surface === 'screensaver') {
+      // The renderer closes it on the first key or pointer move; focus goes back to where it was.
       win.on('closed', () => setTimeout(() => void this.restoreAppFocus(), 100))
     }
 
@@ -331,6 +338,10 @@ export class PanelShell {
         return { ...DOCK_SIZE, transparent: true, resizable: false }
       case 'command':
         return { ...COMMAND_SIZE, transparent: true, resizable: false }
+      case 'panel':
+        return { ...PANEL_SIZE, transparent: true, resizable: false }
+      case 'screensaver':
+        return { width: size.width, height: size.height, resizable: false }
       case 'wallpaper':
         return { width: size.width, height: size.height, show: false, offscreen: true, focusable: false }
       case 'main':

@@ -45,13 +45,17 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   sudo install -m 0755 "$REPO/linux/session/herald-os-session" /usr/local/bin/herald-os-session
   sudo install -m 0755 "$REPO/linux/session/herald-os-niri-nested" /usr/local/bin/herald-os-niri-nested
   sudo install -m 0644 "$REPO/linux/session/herald-os.desktop" /usr/share/wayland-sessions/herald-os.desktop
-  sudo install -m 0755 "$REPO/linux/bin/herald-os" "$REPO/linux/bin/herald-os-theme" "$REPO/linux/bin/herald-os-omakase" "$REPO/linux/bin/herald-os-update" /usr/local/bin/
+  sudo install -m 0755 "$REPO/linux/bin/herald-os" "$REPO/linux/bin/herald-os-theme" "$REPO/linux/bin/herald-os-omakase" "$REPO/linux/bin/herald-os-update" "$REPO/linux/bin/herald-os-idle" "$REPO/linux/bin/herald-os-catalog" /usr/local/bin/
   mkdir -p "$HOME/.config/systemd/user"
   install -m 0644 "$REPO/linux/session/herald-os-update-check.service" "$REPO/linux/session/herald-os-update-check.timer" "$HOME/.config/systemd/user/"
   systemctl --user daemon-reload 2>/dev/null || true
   systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
   mkdir -p "$HOME/.config/niri" "$HOME/.config/swaylock"
-  install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
+  # niri reloads config.kdl as soon as it changes, so every file it includes must already exist.
+  [[ -f "$HOME/.config/niri/outputs.kdl" ]] || echo "// Written by the Herald OS Display panel." >"$HOME/.config/niri/outputs.kdl"
+  sudo install -D -m 0644 "$REPO/linux/niri/config.kdl" /usr/local/share/herald-os-linux/niri/config.kdl
+  # config.kdl is rendered from the template with the chosen keymap (herald-os keymap herald|omarchy).
+  herald-os keymap apply || install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
   install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"
   if [[ -d /usr/share/plymouth/themes ]]; then
     sudo install -d /usr/share/plymouth/themes/herald-os
@@ -67,9 +71,10 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   for f in build.sh sync.sh restart-shell.sh shot.sh; do
     install -m 0755 "$REPO/linux/dev/$f" "$HOME/.local/bin/herald-os-${f%.sh}"
   done
-  sudo install -d /usr/local/share/herald-os-linux/themes /usr/local/share/herald-os-linux/omakase
+  sudo install -d /usr/local/share/herald-os-linux/themes /usr/local/share/herald-os-linux/omakase /usr/local/share/herald-os-linux/catalog
   sudo cp -R "$REPO"/linux/themes/. /usr/local/share/herald-os-linux/themes/
   sudo cp -R "$REPO"/linux/omakase/. /usr/local/share/herald-os-linux/omakase/
+  sudo cp -R "$REPO"/linux/catalog/. /usr/local/share/herald-os-linux/catalog/
 
   echo "==> one-shot migrations"
   HERALD_OS_REPO="$REPO" bash "$REPO/linux/bin/herald-os-update" --migrate || echo "WARNING: a migration failed; see above"

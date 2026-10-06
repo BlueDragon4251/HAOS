@@ -13,6 +13,8 @@ export const SURFACE_TITLE: Record<Exclude<ShellSurface, `window:${string}`>, st
   menubar: 'Herald OS · Menu Bar',
   dock: 'Herald OS · Dock',
   command: 'Herald OS · Command',
+  panel: 'Herald OS · Panel',
+  screensaver: 'Herald OS · Screensaver',
   wallpaper: 'Herald OS · Wallpaper'
 }
 
@@ -21,7 +23,9 @@ export const FLOATING_APPS: Record<string, { title: string; width: number; heigh
   terminal: { title: 'Herald OS · Terminal', width: 900, height: 560 },
   system: { title: 'Herald OS · System', width: 980, height: 640 },
   'chat-popout': { title: 'Herald OS · Chat', width: 520, height: 720 },
-  studio: { title: 'Herald OS · Studio', width: 1280, height: 800 }
+  studio: { title: 'Herald OS · Studio', width: 1280, height: 800 },
+  'capture-editor': { title: 'Herald OS · Markup', width: 960, height: 680 },
+  camera: { title: 'Herald OS · Camera', width: 240, height: 240 }
 }
 
 export function surfaceTitle(surface: ShellSurface): string {

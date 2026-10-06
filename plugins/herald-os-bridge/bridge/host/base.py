@@ -178,6 +178,34 @@ class HostAdapter(ABC):
     @abstractmethod
     def set_wifi_power(self, enabled: bool) -> None: ...
 
+    # --- the menu bar's quick panels (Herald OS Linux; other hosts say so) ------------------
+    def wifi_networks(self) -> list[dict[str, Any]]:
+        raise HostNotSupported(f"listing Wi-Fi networks is not available on {self.platform}")
+
+    def wifi_connect(self, ssid: str, password: str | None) -> None:
+        raise HostNotSupported(f"joining Wi-Fi networks is not available on {self.platform}; use the system's network settings")
+
+    def bluetooth_set_power(self, enabled: bool) -> None:
+        raise HostNotSupported(f"switching Bluetooth is not available on {self.platform}")
+
+    def bluetooth_connect(self, device: str, connect: bool) -> dict[str, Any]:
+        raise HostNotSupported(f"connecting Bluetooth devices is not available on {self.platform}")
+
+    def audio_devices(self) -> dict[str, Any]:
+        raise HostNotSupported(f"listing sound devices is not available on {self.platform}")
+
+    def set_audio_output(self, device: str) -> dict[str, Any]:
+        raise HostNotSupported(f"choosing the sound output is not available on {self.platform}")
+
+    def set_brightness(self, percent: int) -> None:
+        raise HostNotSupported(f"setting the brightness is not available on {self.platform}")
+
+    def power_profiles(self) -> dict[str, Any]:
+        raise HostNotSupported(f"power modes are not available on {self.platform}")
+
+    def set_power_profile(self, profile: str) -> None:
+        raise HostNotSupported(f"power modes are not available on {self.platform}")
+
     # --- destructive ------------------------------------------------------------------------
     @abstractmethod
     def kill(self, pid: int, force: bool) -> None: ...

@@ -12,33 +12,43 @@ import {
   IconChevronRight,
   IconClock,
   IconCloud,
+  IconCoffee,
+  IconColorPicker,
+  IconDeviceDesktop,
   IconDownload,
   IconFolder,
   IconKeyboard,
   IconLock,
   IconLogout,
+  IconMicrophone,
   IconMoon,
   IconPalette,
   IconPhoto,
   IconPower,
+  IconQrcode,
   IconRefresh,
   IconRotateClockwise,
   IconSearch,
   IconSettings,
+  IconSunset2,
   IconTerminal2,
   IconTextRecognition,
+  IconToggleRight,
   IconTrash,
+  IconVideo,
   IconWorld,
   type Icon
 } from '@tabler/icons-react'
+import { useStore } from '@nanostores/react'
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
-import type { PowerAction } from '../../../shared/ipc.ts'
+import type { CatalogEntryView, PowerAction } from '../../../shared/ipc.ts'
 import { HermesAvatar } from '../../components/app-icon.tsx'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { Kbd, Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { CLI_UNAVAILABLE_MESSAGE, type CliOutcome, parseThemeList, runHeraldOs, runHeraldOsWithToast } from '../../lib/herald-os-cli.ts'
 import { $env } from '../../store/backend.ts'
+import { $catalog, loadCatalog } from '../../store/catalog.ts'
 import { openSurface, relayToMain } from '../../store/shell.ts'
 import { openApp, showPage } from '../../store/windows.ts'
 
@@ -71,6 +81,8 @@ type Leaf =
   | { kind: 'theme' }
   | { kind: 'wallpaper' }
   | { kind: 'local'; run: () => void }
+  /** Pick from the install catalog (herald-os catalog list), then run `install <id>` or `remove <id>`. */
+  | { kind: 'catalog'; mode: 'install' | 'remove' }
 
 export interface MenuItem {
   id: string
@@ -138,9 +150,10 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
     {
       id: 'install',
       label: 'Install',
-      hint: 'Apps and web apps',
+      hint: 'Apps, tools and web apps',
       icon: IconDownload,
       children: [
+        { id: 'install-catalog', label: 'From the catalog…', hint: 'AI agents, languages, editors, games, Windows', icon: IconApps, leaf: { kind: 'catalog', mode: 'install' } },
         {
           id: 'install-app',
           label: 'App…',
@@ -168,6 +181,7 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
       hint: 'Uninstall',
       icon: IconTrash,
       children: [
+        { id: 'remove-catalog', label: 'From the catalog…', hint: 'What you installed from it', icon: IconApps, leaf: { kind: 'catalog', mode: 'remove' } },
         {
           id: 'remove-app',
           label: 'App…',
@@ -220,11 +234,39 @@ function buildMenu(actions: { applications: () => void; close: () => void }): Me
           }
         },
         { id: 'trigger-ask-region', label: 'Ask about part of the screen', hint: 'Select a region, then ask Hermes', icon: IconCamera, leaf: { kind: 'cli', argv: ['capture', 'region', '--ask'], detached: true } },
-        { id: 'trigger-screenshot', label: 'Screenshot', hint: 'Whole screen, then ask Hermes', icon: IconCamera, leaf: { kind: 'cli', argv: ['screenshot'], detached: true } },
-        { id: 'trigger-ocr', label: 'Text extraction (OCR)', hint: 'Select a region', icon: IconTextRecognition, leaf: { kind: 'cli', argv: ['ocr'], detached: true } },
         { id: 'trigger-notice-time', label: 'Notice: Time', icon: IconClock, leaf: { kind: 'cli', argv: ['notice', 'time'] } },
         { id: 'trigger-notice-battery', label: 'Notice: Battery', icon: IconBattery, leaf: { kind: 'cli', argv: ['notice', 'battery'] } },
         { id: 'trigger-notice-weather', label: 'Notice: Weather', icon: IconCloud, leaf: { kind: 'cli', argv: ['notice', 'weather'] } }
+      ]
+    },
+    {
+      id: 'capture',
+      label: 'Capture',
+      hint: 'Screenshots, recording, colour, QR, text',
+      icon: IconCamera,
+      children: [
+        { id: 'capture-region', label: 'Screenshot a region', hint: 'Print', icon: IconCamera, leaf: { kind: 'cli', argv: ['capture', 'screenshot', 'region'], detached: true } },
+        { id: 'capture-window', label: 'Screenshot the window', hint: 'Super+Print', icon: IconAppWindow, leaf: { kind: 'cli', argv: ['capture', 'screenshot', 'window'], detached: true } },
+        { id: 'capture-screen', label: 'Screenshot the screen', hint: 'Super+Shift+Print', icon: IconDeviceDesktop, leaf: { kind: 'cli', argv: ['capture', 'screenshot', 'screen'], detached: true } },
+        { id: 'capture-record', label: 'Record the screen', hint: 'Again to stop · Super+Alt+Print', icon: IconVideo, leaf: { kind: 'cli', argv: ['capture', 'record'], detached: true } },
+        { id: 'capture-record-audio', label: 'Record with the microphone', hint: 'Again to stop', icon: IconMicrophone, leaf: { kind: 'cli', argv: ['capture', 'record', 'audio'], detached: true } },
+        { id: 'capture-camera', label: 'Camera bubble', hint: 'Your face in the corner', icon: IconCamera, leaf: { kind: 'local', run: () => openApp('camera') } },
+        { id: 'capture-color', label: 'Pick a colour', hint: 'Copies #rrggbb · Super+Ctrl+Print', icon: IconColorPicker, leaf: { kind: 'cli', argv: ['capture', 'color'], detached: true } },
+        { id: 'capture-qr', label: 'Read a QR code', hint: 'Copies what it says', icon: IconQrcode, leaf: { kind: 'cli', argv: ['capture', 'qr'], detached: true } },
+        { id: 'capture-text', label: 'Copy text (OCR)', hint: 'Select a region', icon: IconTextRecognition, leaf: { kind: 'cli', argv: ['capture', 'text'], detached: true } }
+      ]
+    },
+    {
+      id: 'toggle',
+      label: 'Toggle',
+      hint: 'Night light, do not disturb, stay awake',
+      icon: IconToggleRight,
+      children: [
+        { id: 'toggle-nightlight', label: 'Night light', hint: 'Warmer colours', icon: IconSunset2, leaf: { kind: 'cli', argv: ['toggle', 'nightlight'] } },
+        { id: 'toggle-dnd', label: 'Do not disturb', hint: 'Notifications stay in the bell', icon: IconMoon, leaf: { kind: 'cli', argv: ['toggle', 'dnd'] } },
+        { id: 'toggle-idle', label: 'Stay awake', hint: 'No lock, no sleep, screens on', icon: IconCoffee, leaf: { kind: 'cli', argv: ['toggle', 'idle'] } },
+        { id: 'toggle-screensaver', label: 'Screensaver', hint: 'After a few idle minutes', icon: IconDeviceDesktop, leaf: { kind: 'cli', argv: ['toggle', 'screensaver'] } },
+        { id: 'toggle-screensaver-now', label: 'Show the screensaver', hint: 'Now', icon: IconDeviceDesktop, leaf: { kind: 'cli', argv: ['screensaver'], detached: true } }
       ]
     },
     {
@@ -334,6 +376,7 @@ type Step =
   | { kind: 'confirm'; item: MenuItem; action: PowerAction }
   | { kind: 'run'; title: string; argv: string[] }
   | { kind: 'theme' }
+  | { kind: 'catalog'; mode: 'install' | 'remove' }
   | { kind: 'message'; title: string; text: string; tone: 'muted' | 'danger' }
 
 export interface ControlMenuProps {
@@ -424,6 +467,10 @@ export function ControlMenu({ onClose, onApplications, initialItem }: ControlMen
         return
       case 'theme':
         setStep({ kind: 'theme' })
+
+        return
+      case 'catalog':
+        setStep({ kind: 'catalog', mode: leaf.mode })
 
         return
       case 'wallpaper':
@@ -602,6 +649,8 @@ function StepView({ step, onBack, onClose, onRun }: { step: Step; onBack: () => 
       return <RunStep title={step.title} argv={step.argv} onClose={onClose} onBack={onBack} />
     case 'theme':
       return <ThemeStep onBack={onBack} onRun={onRun} />
+    case 'catalog':
+      return <CatalogStep mode={step.mode} onBack={onBack} onRun={onRun} />
     case 'message':
       return <MessageStep title={step.title} text={step.text} tone={step.tone} onBack={onBack} />
     default:
@@ -891,6 +940,100 @@ function ThemeStep({ onBack, onRun }: { onBack: () => void; onRun: (title: strin
             </span>
             <span className="flex-1 truncate text-left">{name}</span>
             {name === current && <IconCheck size={14} className="text-accent-strong" aria-label="Current theme" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The install catalog as a filterable list: what can be installed here, or what is installed. */
+function CatalogStep({ mode, onBack, onRun }: { mode: 'install' | 'remove'; onBack: () => void; onRun: (title: string, argv: string[]) => void }) {
+  const catalog = useStore($catalog)
+  const [active, setActive] = useState(0)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    void loadCatalog().then(() => inputRef.current?.focus())
+  }, [])
+
+  const trimmed = query.trim().toLowerCase()
+  const rows = catalog.groups.flatMap(group =>
+    group.entries
+      .filter(entry => (mode === 'install' ? entry.available && !entry.installed : entry.removable))
+      .filter(entry => !trimmed || `${group.label} ${entry.label} ${entry.id} ${entry.description}`.toLowerCase().includes(trimmed))
+      .map(entry => ({ entry, group: group.label }))
+  )
+
+  useEffect(() => {
+    setActive(0)
+  }, [trimmed])
+
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+
+  const choose = (entry: CatalogEntryView) => onRun(`${mode === 'install' ? 'Install' : 'Remove'} ${entry.label}`, [mode, entry.id])
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+
+      if (rows.length > 0) {
+        setActive(index => (index + (event.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length)
+      }
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      const row = rows[active]
+
+      if (row) {
+        choose(row.entry)
+      }
+    } else if (event.key === 'Backspace' && !query) {
+      event.preventDefault()
+      onBack()
+    }
+  }
+
+  if (!catalog.loaded) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-6 text-[12.5px] text-fg-3">
+        <Spinner /> Checking what is installed…
+      </div>
+    )
+  }
+
+  if (catalog.error) {
+    return <MessageStep title="Catalog" text={catalog.error} tone="danger" onBack={onBack} />
+  }
+
+  return (
+    <div className="flex flex-col" onKeyDown={onKeyDown}>
+      <label className="mx-3 mt-3 flex h-9 items-center gap-2.5 rounded-lg px-3 glass-input">
+        <IconSearch size={15} className="shrink-0 text-fg-3" />
+        <input ref={inputRef} value={query} onChange={event => setQuery(event.target.value)} placeholder={mode === 'install' ? 'Filter: claude, node, steam, windows…' : 'Filter installed'} aria-label="Filter the catalog" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-4" />
+      </label>
+      <div ref={listRef} className="flex max-h-[360px] flex-col gap-0.5 overflow-y-auto p-2" role="listbox" aria-label="Catalog">
+        {rows.length === 0 && <div className="px-3 py-6 text-center text-[12.5px] text-fg-4">{trimmed ? `Nothing matches "${query.trim()}"` : mode === 'install' ? 'Everything here is installed.' : 'Nothing from the catalog is installed yet.'}</div>}
+        {rows.map(({ entry, group }, index) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="option"
+            aria-selected={index === active}
+            data-active={index === active}
+            onMouseEnter={() => setActive(index)}
+            onClick={() => choose(entry)}
+            className={cn('flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] text-fg-2', index === active && 'bg-white/10 text-fg')}
+          >
+            <span className="flex size-6 items-center justify-center text-fg-3">{mode === 'install' ? <IconDownload size={16} /> : <IconTrash size={16} />}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+              <span className="truncate text-fg-4">{group} ›</span>
+              <span className="truncate">{entry.label}</span>
+            </span>
+            <span className="truncate text-[11px] text-fg-4">{entry.method === 'link' ? 'download page' : entry.method}</span>
           </button>
         ))}
       </div>

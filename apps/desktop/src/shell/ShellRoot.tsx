@@ -7,6 +7,8 @@ const MenuBarSurface = lazy(() => import('./surfaces/MenuBarSurface.tsx').then(m
 const DockSurface = lazy(() => import('./surfaces/DockSurface.tsx').then(m => ({ default: m.DockSurface })))
 const MainSurface = lazy(() => import('./surfaces/MainSurface.tsx').then(m => ({ default: m.MainSurface })))
 const CommandSurface = lazy(() => import('./surfaces/CommandSurface.tsx').then(m => ({ default: m.CommandSurface })))
+const StatusPanelSurface = lazy(() => import('./surfaces/StatusPanelSurface.tsx').then(m => ({ default: m.StatusPanelSurface })))
+const ScreensaverSurface = lazy(() => import('./surfaces/ScreensaverSurface.tsx').then(m => ({ default: m.ScreensaverSurface })))
 const WallpaperSurface = lazy(() => import('./surfaces/WallpaperSurface.tsx').then(m => ({ default: m.WallpaperSurface })))
 const FloatingSurface = lazy(() => import('./surfaces/FloatingSurface.tsx').then(m => ({ default: m.FloatingSurface })))
 
@@ -15,6 +17,8 @@ const SURFACES: Record<string, ComponentType> = {
   dock: DockSurface,
   main: MainSurface,
   command: CommandSurface,
+  panel: StatusPanelSurface,
+  screensaver: ScreensaverSurface,
   wallpaper: WallpaperSurface
 }
 

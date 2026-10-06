@@ -1,4 +1,4 @@
-import type { CalendarResult, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, SystemInfo, SystemStats } from '../../shared/ipc.ts'
+import type { CalendarResult, ControlAction, InstalledApp, NetworkStatus, ProcessInfo, RecentFile, StatusPanelId, StatusPanelState, SystemInfo, SystemStats } from '../../shared/ipc.ts'
 
 /** `editor` is the first installed of `CODE_EDITORS`; `finder` shows the item in the file manager. */
 export type EditorTarget = 'editor' | 'finder' | 'terminal'
@@ -28,6 +28,10 @@ export interface HostPlatform {
   findFiles(query: string, limit: number): Promise<RecentFile[]>
   /** PNG thumbnail bytes for any file (QuickLook on macOS), or null. */
   thumbnail(filePath: string, size: number): Promise<Buffer | null>
+  /** A menu-bar quick panel's state: Wi-Fi, Bluetooth, audio, displays, power (read-only on macOS). */
+  controlStatus(panel: StatusPanelId): Promise<StatusPanelState>
+  /** Change something from a quick panel; HostNotSupported where the platform keeps that for itself. */
+  controlAction(action: ControlAction): Promise<void>
 }
 
 export class HostNotSupported extends Error {

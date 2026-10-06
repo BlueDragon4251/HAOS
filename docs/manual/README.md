@@ -28,8 +28,26 @@ This manual is for using Herald OS day to day. The [README](../../README.md) cov
 5. **Look at what Hermes did.** Settings > Privacy has the audit log of every system action, and
    Settings > Usage shows how much your model plan has used.
 
-## Asking about what is on screen
+## Installing software
 
+Settings > Software (or Install in the `Super+M` menu on Linux, or just "install Steam") lists what
+Herald OS can install in one step: coding agents for the terminal (Claude Code, Codex, OpenCode,
+Gemini CLI, Copilot CLI), local models with Ollama and LM Studio, languages (Node, Python, Go, Rust,
+Ruby and Rails, PHP and Laravel, and more), editors, terminals, games, a Windows 11 virtual machine,
+media apps, password managers and web apps. Each one installs the right way for your machine, and
+says why when it cannot (Steam needs an x86_64 PC, Windows needs virtualization). On a Mac the list
+is the coding agents and local model apps.
+
+- **Coding agents** open from the Terminal's new-tab menu (the arrow next to `+`).
+- **Local models:** once Ollama or LM Studio has a model, "Use with Hermes" makes Hermes use it.
+- **Windows** asks how much memory, how many cores and how much disk to give it, installs itself in
+  10 to 20 minutes, and shares `~/Windows` with your files. Open it from Applications.
+
+## Asking about what is on screen, and typing anywhere
+
+- **Dictation:** `Cmd+Ctrl+X` (Mac) or `Super+Ctrl+X` (Linux) in any app, speak, pause, and the
+  words are typed where the cursor is. Say "comma", "new line" or "press enter".
+- **Emoji:** `Super+Ctrl+E` on Linux (`Cmd+Ctrl+E` inside Herald OS on a Mac).
 - **Part of the screen:** `Cmd+Shift+S` (Mac) or `Super+Shift+S` (Linux), drag a rectangle, then
   type your question. The selection goes to Hermes as an image.
 - **The window in front (Linux):** `Super+Space` asks about the focused window.

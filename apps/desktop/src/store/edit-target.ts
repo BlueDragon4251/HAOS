@@ -46,19 +46,15 @@ export function bindEditTarget(): () => void {
   }
 
   bound = true
-  const onFocus = (event: FocusEvent) => {
-    if (isEditable(event.target as Element)) {
-      lastEditable = event.target as HTMLElement
+  // Pickers that type into the field the person was in (the emoji picker) opt out with data-edit-ignore.
+  const remember = (element: Element | null) => {
+    if (isEditable(element) && !element.closest('[data-edit-ignore]')) {
+      lastEditable = element
     }
   }
+  const onFocus = (event: FocusEvent) => remember(event.target as Element)
   // A press on a field also counts: focus events do not fire while the window is in the background.
-  const onPointer = (event: PointerEvent) => {
-    const field = (event.target as Element | null)?.closest?.('textarea, input, [contenteditable="true"]')
-
-    if (isEditable(field ?? null)) {
-      lastEditable = field as HTMLElement
-    }
-  }
+  const onPointer = (event: PointerEvent) => remember((event.target as Element | null)?.closest?.('textarea, input, [contenteditable="true"]') ?? null)
   document.addEventListener('focusin', onFocus, true)
   document.addEventListener('pointerdown', onPointer, true)
 
@@ -112,7 +108,7 @@ function frontWebView(): string | null {
 function currentEditable(): HTMLElement | null {
   const active = document.activeElement
 
-  if (isEditable(active)) {
+  if (isEditable(active) && !active.closest('[data-edit-ignore]')) {
     return active
   }
 

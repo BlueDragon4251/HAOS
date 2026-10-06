@@ -80,6 +80,10 @@
       {
         "from": "../../linux/themes",
         "to": "themes"
+      },
+      {
+        "from": "../../linux/catalog",
+        "to": "catalog"
       }
     ],
     "asar": true,
@@ -100,7 +104,8 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Herald OS controls applications on your behalf when you ask it to.",
-        "NSMicrophoneUsageDescription": "Herald OS uses the microphone for voice input."
+        "NSMicrophoneUsageDescription": "Herald OS uses the microphone for voice input.",
+        "NSCameraUsageDescription": "Herald OS shows your camera in a bubble while you record the screen, when you turn it on."
       }
     },
     "dmg": {

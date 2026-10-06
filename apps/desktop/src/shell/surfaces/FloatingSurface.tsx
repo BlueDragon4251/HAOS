@@ -10,6 +10,8 @@ const TerminalSurface = lazy(() => import('../../features/terminal/TerminalSurfa
 const SystemSurface = lazy(() => import('../../features/system/SystemSurface.tsx').then(m => ({ default: m.SystemSurface })))
 const ChatPopout = lazy(() => import('../../features/hermes/ChatPopout.tsx').then(m => ({ default: m.ChatPopout })))
 const StudioWindow = lazy(() => import('../../features/studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
+const CaptureEditor = lazy(() => import('../../features/capture/CaptureEditor.tsx').then(m => ({ default: m.CaptureEditor })))
+const CameraBubble = lazy(() => import('../../features/capture/CameraBubble.tsx').then(m => ({ default: m.CameraBubble })))
 
 const isFloatingAppId = (value: string): value is FloatingAppId => FLOATING_APPS.some(app => app.id === value)
 
@@ -24,6 +26,10 @@ function FloatingContent({ appId, payload }: { appId: FloatingAppId; payload: Re
     case 'studio':
       // The compositor owns this window; the preview opens as its own window there.
       return <StudioWindow win={{ id: 'panel-studio', appId: 'studio', title: 'Studio', bounds: { x: 0, y: 0, width: 0, height: 0 }, z: 0, phase: 'open', maximized: true, payload }} />
+    case 'capture-editor':
+      return <CaptureEditor file={typeof payload.file === 'string' ? payload.file : undefined} />
+    case 'camera':
+      return <CameraBubble />
     default:
       return null
   }

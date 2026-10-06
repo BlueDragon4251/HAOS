@@ -66,6 +66,8 @@ if [[ ! -f "$HOME/.config/niri/theme.kdl" ]] && command -v herald-os-theme >/dev
   herald-os-theme set "$(herald-os-theme current)" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
 fi
 [[ -f "$HOME/.config/niri/theme.kdl" ]] || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
+# The Display panel writes outputs.kdl; the managed config includes it, so it must exist.
+[[ -f "$HOME/.config/niri/outputs.kdl" ]] || echo "// Written by the Herald OS Display panel." >"$HOME/.config/niri/outputs.kdl"
 
 # The shell scales through the compositor under niri; do not also zoom the page.
 unset HERALD_OS_ZOOM

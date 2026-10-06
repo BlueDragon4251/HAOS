@@ -616,18 +616,30 @@ def handle_system_network(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_CONTROL_SCHEMA = _schema(
     "system_control",
-    "Read or change device settings. Reads: audio (output/input/alert volume, mute), appearance (dark mode, displays). Actions: set_volume (percent and/or muted), set_dark_mode (enabled), notify (title, body: a system notification), open_settings (pane, e.g. privacy_and_security, screen_recording, wifi, bluetooth, sound, displays, notifications), sleep_display, lock_screen, set_wifi (enabled). Actions run immediately and are audited; set_wifi asks first.",
+    "Read or change device settings. Reads: audio (output/input/alert volume, mute), appearance (dark mode, displays). Actions: set_volume (percent and/or muted), set_dark_mode (enabled), notify (title, body: a system notification), open_settings (pane, e.g. privacy_and_security, screen_recording, wifi, bluetooth, sound, displays, notifications), sleep_display, lock_screen, set_wifi (enabled). "
+    "Herald OS Linux also has: wifi_networks (networks in range), wifi_connect (ssid, password for a new secured network), bluetooth_power (enabled), bluetooth_connect / bluetooth_disconnect (device: a name), audio_devices (outputs and inputs), set_audio_output (device: part of its name, e.g. headphones, HDMI), set_brightness (percent), power_profile (read the power mode), set_power_profile (profile: performance, balanced or power-saver). "
+    "Actions run immediately and are audited; set_wifi, wifi_connect and bluetooth_power ask first.",
     {
-        "action": _enum("audio", "appearance", "set_volume", "set_dark_mode", "notify", "open_settings", "sleep_display", "lock_screen", "set_wifi"),
-        "percent": _desc(_INT, "For set_volume: 0-100."),
+        "action": _enum(
+            "audio", "appearance", "set_volume", "set_dark_mode", "notify", "open_settings", "sleep_display", "lock_screen", "set_wifi",
+            "wifi_networks", "wifi_connect", "bluetooth_power", "bluetooth_connect", "bluetooth_disconnect",
+            "audio_devices", "set_audio_output", "set_brightness", "power_profile", "set_power_profile",
+        ),
+        "percent": _desc(_INT, "For set_volume (0-100) and set_brightness (1-100)."),
         "muted": _desc(_BOOL, "For set_volume."),
-        "enabled": _desc(_BOOL, "For set_dark_mode / set_wifi."),
+        "enabled": _desc(_BOOL, "For set_dark_mode / set_wifi / bluetooth_power."),
         "title": _desc(_STR, "For notify."),
         "body": _desc(_STR, "For notify."),
         "pane": _desc(_STR, "For open_settings: a System Settings pane name."),
+        "ssid": _desc(_STR, "For wifi_connect: the network name."),
+        "password": _desc(_STR, "For wifi_connect: only for a secured network not joined before."),
+        "device": _desc(_STR, "For bluetooth_connect / bluetooth_disconnect / set_audio_output: the device name (or part of it)."),
+        "profile": _enum("performance", "balanced", "power-saver", description="For set_power_profile."),
     },
     required=("action",),
 )
+
+_CONTROL_NAME = re.compile(r"^[^-\s][^\n]{0,127}$")
 
 
 def handle_system_control(args: dict[str, Any], **_: Any) -> str:
@@ -664,6 +676,38 @@ def handle_system_control(args: dict[str, Any], **_: Any) -> str:
     if action == "set_wifi":
         enabled = bool(args.get("enabled", True))
         return _guarded("system_control", Tier.MUTATE, action, f"turn Wi-Fi {'on' if enabled else 'off'}", args, (), lambda: (adapter.set_wifi_power(enabled), {"wifi": enabled})[1])
+    if action == "wifi_networks":
+        return _read("system_control", action, args, lambda: {"networks": adapter.wifi_networks()})
+    if action == "audio_devices":
+        return _read("system_control", action, args, adapter.audio_devices)
+    if action == "power_profile":
+        return _read("system_control", action, args, adapter.power_profiles)
+    # Names end up as command-line arguments; one that starts with "-" could be taken for an option.
+    name_key = {"wifi_connect": "ssid", "bluetooth_connect": "device", "bluetooth_disconnect": "device", "set_audio_output": "device"}.get(action)
+    name = str(args.get(name_key) or "").strip() if name_key else ""
+    if name_key and not _CONTROL_NAME.match(name):
+        return fail(f"{name_key} is required for action={action} and must not start with '-'")
+    if action == "wifi_connect":
+        password = str(args.get("password") or "") or None
+        return _guarded("system_control", Tier.MUTATE, action, f"join the Wi-Fi network {name}", args, (), lambda: (adapter.wifi_connect(name, password), {"connected": name})[1])
+    if action == "bluetooth_power":
+        enabled = bool(args.get("enabled", True))
+        return _guarded("system_control", Tier.MUTATE, action, f"turn Bluetooth {'on' if enabled else 'off'}", args, (), lambda: (adapter.bluetooth_set_power(enabled), {"bluetooth": enabled})[1])
+    if action in ("bluetooth_connect", "bluetooth_disconnect"):
+        connect = action == "bluetooth_connect"
+        return _guarded("system_control", Tier.ACT, action, f"{'connect' if connect else 'disconnect'} {name}", args, (), lambda: adapter.bluetooth_connect(name, connect))
+    if action == "set_audio_output":
+        return _guarded("system_control", Tier.ACT, action, f"play sound through {name}", args, (), lambda: adapter.set_audio_output(name))
+    if action == "set_brightness":
+        if args.get("percent") is None:
+            return fail("set_brightness needs percent")
+        percent = _int(args, "percent", 50, 1, 100)
+        return _guarded("system_control", Tier.ACT, action, f"set the brightness to {percent}%", args, (), lambda: (adapter.set_brightness(percent), {"brightness": percent})[1])
+    if action == "set_power_profile":
+        profile = str(args.get("profile") or "")
+        if profile not in ("performance", "balanced", "power-saver"):
+            return fail("profile must be performance, balanced or power-saver")
+        return _guarded("system_control", Tier.ACT, action, f"switch to the {profile} power mode", args, (), lambda: (adapter.set_power_profile(profile), {"profile": profile})[1])
     return fail(f"unknown action '{action}'")
 
 
@@ -715,6 +759,8 @@ SYSTEM_OS_SCHEMA = _schema(
     "system_os",
     "Herald OS Linux's control surface: the same `herald-os` commands the user's hotkeys and menu run. "
     "Software: install_app (name: a dnf package or Flatpak id), install_webapp (name, url, icon_url?: pins a website as an app), remove_app, remove_webapp. "
+    "The install catalog (curated, works on Fedora, Arch and the image): catalog_list (JSON of groups: AI coding agents and local models, languages through mise, editors, terminals, games, the Windows VM, media, services, web apps; each entry says installed / available / why not), "
+    "catalog_install (id), catalog_remove (id). Prefer the catalog over install_app when the software is in it. "
     "Reminders: reminder (duration like 20m or 1h30m, message), reminders_list, reminders_clear. "
     "notice (kind=time|battery|weather) shows a status notice. screenshot captures the screen and hands it to Hermes; ocr reads the text on screen. "
     "lock locks the session; suspend puts the computer to sleep. Themes: theme_list, theme_set (name), theme_current. update updates Herald OS. "
@@ -724,6 +770,7 @@ SYSTEM_OS_SCHEMA = _schema(
     {
         "action": _enum(
             "install_app", "install_webapp", "remove_app", "remove_webapp",
+            "catalog_list", "catalog_install", "catalog_remove",
             "reminder", "reminders_list", "reminders_clear", "notice",
             "screenshot", "ocr", "lock", "suspend",
             "theme_list", "theme_set", "theme_current", "update",
@@ -732,6 +779,7 @@ SYSTEM_OS_SCHEMA = _schema(
             description="What to do.",
         ),
         "name": _desc(_STR, "For install_app / remove_app (package or Flatpak id), install_webapp / remove_webapp (web app name), theme_set (theme name), launch (app name or desktop id), focus_workspace (Space name)."),
+        "id": _desc(_STR, "For catalog_install / catalog_remove: the catalog id from catalog_list, e.g. claude-code, node, zed, steam, windows."),
         "url": _desc(_STR, "For install_webapp: the site to pin (http:// or https://)."),
         "icon_url": _desc(_STR, "For install_webapp: optional icon image URL (http:// or https://)."),
         "duration": _desc(_STR, "For reminder: how long from now, e.g. 90s, 20m, 1h, 1h30m, or a plain number of minutes."),
@@ -746,14 +794,16 @@ SYSTEM_OS_SCHEMA = _schema(
 )
 
 HERALD_OS_BIN = "herald-os"
-_LONG_RUNNING_OS_ACTIONS = frozenset({"install_app", "install_webapp", "remove_app", "update"})
+_LONG_RUNNING_OS_ACTIONS = frozenset({"install_app", "install_webapp", "remove_app", "update", "catalog_install", "catalog_remove"})
+_CATALOG_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 _OS_TIMEOUT_LONG = 1200.0
 _OS_TIMEOUT_SHORT = 60.0
 _OS_OUTPUT_LIMIT = 4000
 _DURATION = re.compile(r"^\d+(s|m|h)(\d+(m|s))?$")
 
 SYSTEM_OS_TIERS: dict[str, Tier] = {
-    "theme_list": Tier.READ, "theme_current": Tier.READ, "reminders_list": Tier.READ, "notice": Tier.READ,
+    "theme_list": Tier.READ, "theme_current": Tier.READ, "reminders_list": Tier.READ, "notice": Tier.READ, "catalog_list": Tier.READ,
+    "catalog_install": Tier.MUTATE, "catalog_remove": Tier.DESTRUCTIVE,
     "show_page": Tier.READ, "open_window": Tier.READ, "focus_workspace": Tier.READ,
     "launch": Tier.ACT, "notify": Tier.ACT, "screenshot": Tier.ACT, "ocr": Tier.ACT, "lock": Tier.ACT,
     "reminder": Tier.ACT, "theme_set": Tier.ACT, "close_focused_window": Tier.ACT,
@@ -797,6 +847,24 @@ def normalise_duration(raw: Any) -> str:
     return text
 
 
+def compact_catalog(stdout: str) -> dict[str, list[str]]:
+    """`herald-os catalog list --json` as one short line per entry, grouped (pure; tested).
+
+    The full listing is too long for a tool result; "id: Label (state)" is what choosing needs."""
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"catalog list returned unreadable output: {exc}") from exc
+    out: dict[str, list[str]] = {}
+    for group in data.get("groups", []):
+        lines = []
+        for entry in group.get("entries", []):
+            state = "installed" if entry.get("installed") else ("available" if entry.get("available") else f"unavailable: {entry.get('reason', 'not here')}")
+            lines.append(f"{entry.get('id')}: {entry.get('label')} ({state})")
+        out[str(group.get("label") or group.get("id"))] = lines
+    return out
+
+
 def plan_system_os(args: dict[str, Any]) -> tuple[list[str], str]:
     """Map the tool arguments to a ``herald-os`` argv and a human summary (pure; tested).
 
@@ -814,6 +882,14 @@ def plan_system_os(args: dict[str, Any]) -> tuple[list[str], str]:
     if action == "remove_webapp":
         name = _os_arg(args, "name")
         return ["remove", "webapp", name], f"remove web app {name}"
+    if action == "catalog_list":
+        return ["catalog", "list", "--json"], "list the install catalog"
+    if action in ("catalog_install", "catalog_remove"):
+        entry = str(args.get("id") or "").strip().lower()
+        if not _CATALOG_ID.match(entry):
+            raise ValueError("id must be a catalog id from catalog_list (lowercase letters, digits and dashes)")
+        verb = "install" if action == "catalog_install" else "remove"
+        return ["catalog", verb, entry], f"{verb} {entry} from the catalog"
     if action == "reminder":
         duration = normalise_duration(args.get("duration"))
         message = _os_arg(args, "message")
@@ -885,6 +961,8 @@ def system_os_handler(args: dict[str, Any], **_: Any) -> str:
             raise HostNotSupported("The herald-os command is not installed (it ships with Herald OS Linux as /usr/local/bin/herald-os).")
         if not result.ok:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"herald-os exited {result.code}")
+        if action == "catalog_list":
+            return {"action": action, "catalog": compact_catalog(result.stdout)}
         return {"action": action, "output": truncate(result.stdout.strip(), _OS_OUTPUT_LIMIT)}
 
     return _guarded("system_os", tier, action, summary, args, (), execute)

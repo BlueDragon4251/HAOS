@@ -7,7 +7,7 @@ import { isHexColor, THEME_COLOR_KEYS, type ThemeColors, type ThemeSpec } from '
 import { events } from '../events/bus.ts'
 import { hostPlatform } from '../platform/index.ts'
 import { log } from '../log.ts'
-import { writePrefs } from '../prefs.ts'
+import { readPrefs, writePrefs } from '../prefs.ts'
 import { findTheme, prefsForTheme } from '../theme/themes.ts'
 import { handleUiRequest, isUiRequest, type OsCommandBridge, type UiControlRequest } from './os-control.ts'
 import type { PanelShell } from './panels.ts'
@@ -24,7 +24,7 @@ interface ControlRequest {
 }
 
 /** Commands that open the command overlay in a given mode, with the focused window as context. */
-const OVERLAY_MODES = new Set(['ask', 'command', 'applications', 'menu', 'power', 'clipboard'])
+const OVERLAY_MODES = new Set(['ask', 'command', 'applications', 'menu', 'power', 'clipboard', 'emoji'])
 
 /**
  * Unix socket the `herald-os` CLI (and therefore every compositor hotkey) talks to:
@@ -40,7 +40,9 @@ export class ControlSocket {
     /** Runs registry commands in the Hermes window (`ui`, `ui-list`, `ui-state`; token-protected). */
     private readonly osBridge?: OsCommandBridge,
     /** A theme was applied: Hermes's skin follows it. */
-    private readonly onTheme?: (spec: ThemeSpec) => void
+    private readonly onTheme?: (spec: ThemeSpec) => void,
+    /** The CLI changed a switch (night light, staying awake): the menu bar follows. */
+    private readonly onSwitches?: () => void
   ) {}
 
   get socketPath(): string {
@@ -178,37 +180,42 @@ export class ControlSocket {
           return { ok: false, error: 'open needs an app id (terminal, system, chat-popout)' }
         }
 
+        // Super+Return honours Settings > General > Terminal (Ghostty, Kitty, …); Herald's own otherwise.
+        const external = appId === 'terminal' ? readPrefs().defaultTerminal : undefined
+
+        if (external && external !== 'herald') {
+          const launched = await this.launchByName(external)
+
+          if (launched) {
+            return { ok: true, launched }
+          }
+        }
+
         this.shell.open(`window:${appId}`)
 
         return { ok: true }
       }
       case 'launch': {
-        const query = args.join(' ').trim().toLowerCase()
+        const query = args.join(' ').trim()
 
         if (!query) {
           return { ok: false, error: 'launch needs an application name' }
         }
 
-        const apps = await hostPlatform().listInstalledApps()
-        const match =
-          apps.find(a => a.name.toLowerCase() === query) ??
-          apps.find(a => (a.bundleId ?? '').toLowerCase() === query) ??
-          apps.find(a => a.name.toLowerCase().includes(query)) ??
-          apps.find(a => (a.bundleId ?? '').toLowerCase().includes(query))
+        const launched = await this.launchByName(query)
 
-        if (!match) {
-          return { ok: false, error: `no application matches ${query}` }
-        }
-
-        await hostPlatform().launchApp(match.path)
-
-        return { ok: true, launched: match.name }
+        return launched ? { ok: true, launched } : { ok: false, error: `no application matches ${query.toLowerCase()}` }
       }
       case 'notify': {
         this.shell.relay('main', { type: 'notify', args })
 
         return { ok: true }
       }
+      case 'dictate':
+        // Mod+Ctrl+X: start or finish dictation into the focused app (see store/dictation.ts).
+        this.shell.relay('main', { type: 'dictate' })
+
+        return { ok: true }
       case 'voice': {
         // toggle | start | stop | mute: the Hermes window owns the conversation (see store/voice.ts).
         const action = args[0] ?? 'toggle'
@@ -273,6 +280,27 @@ export class ControlSocket {
       }
       case 'state':
         return { ok: true, ...this.shell.niri.state() }
+      case 'switches':
+        this.onSwitches?.()
+
+        return { ok: true }
+      case 'screensaver':
+        // swayidle's screensaver timeout (linux/bin/herald-os-idle) lands here.
+        this.shell.open('screensaver')
+
+        return { ok: true }
+      case 'panel': {
+        // `herald-os panel wifi|bluetooth|audio|display|power|clock`: the menu bar's quick panels.
+        const panel = args[0]
+
+        if (!panel || !['wifi', 'bluetooth', 'audio', 'display', 'power', 'clock'].includes(panel)) {
+          return { ok: false, error: 'panel needs wifi, bluetooth, audio, display, power or clock' }
+        }
+
+        this.shell.open('panel', { type: 'panel', args: [panel] })
+
+        return { ok: true }
+      }
       case 'event': {
         // `herald-os event <name> [key=value ...]`: the updater and scripts report events here.
         const [name, ...pairs] = args
@@ -298,6 +326,25 @@ export class ControlSocket {
       default:
         return { ok: false, error: `unknown command ${cmd}` }
     }
+  }
+
+  /** Launch an installed application by name or desktop id; the name it launched, or null. */
+  private async launchByName(name: string): Promise<string | null> {
+    const query = name.trim().toLowerCase()
+    const apps = await hostPlatform().listInstalledApps()
+    const match =
+      apps.find(a => a.name.toLowerCase() === query) ??
+      apps.find(a => (a.bundleId ?? '').toLowerCase() === query) ??
+      apps.find(a => a.name.toLowerCase().includes(query)) ??
+      apps.find(a => (a.bundleId ?? '').toLowerCase().includes(query))
+
+    if (!match) {
+      return null
+    }
+
+    await hostPlatform().launchApp(match.path)
+
+    return match.name
   }
 
   private themeFromRequest(name: string, request: ControlRequest): Partial<HeraldOSPrefs> {

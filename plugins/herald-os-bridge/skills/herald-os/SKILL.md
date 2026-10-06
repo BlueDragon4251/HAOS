@@ -105,6 +105,11 @@ preview of the site.
 | "Show recent system errors" | `system_logs` level=error minutes=10 |
 | "Why did Safari crash?" / "What crashed?" | `system_logs` action=crashes, then follow the `diagnose-crash` skill with action=crash_report report=... |
 | "Make me a calm green theme" / "Use a bigger font" / "Add a shortcut for…" | follow the `herald-os-tailor` skill (`theme.set`, `theme.generate`, a theme.json, `font.set`, niri's `local.kdl`) |
+| "Install Claude Code" / "Get me Steam" / "Set up a Windows VM" / "What can I install?" | `os_ui` run `software.install name=...` (or `software.list`); on Linux `system_os` action=catalog_list / catalog_install id=... does the same. Say why when an entry is unavailable (the listing gives the reason) |
+| "Use my local model" / "Run Hermes on Ollama" | `os_ui` run `software.local_model server=ollama` to list models, then again with `model=...` |
+| "Open Codex in the terminal" | `os_ui` run `software.agent name=codex` |
+| "Let me dictate into this app" / "I want to type an emoji" | `os_ui` run `dictation.toggle` / `emoji.pick` (the hotkeys are Super+Ctrl+X and Super+Ctrl+E, Cmd+Ctrl on a Mac) |
+| "Make Super+C copy like on Omarchy" | `os_ui` run `keymap.set keymap=omarchy` (Herald OS Linux; voice moves to Super+Shift+V) |
 | "Start my development environment" | `system_open` the editor on the project, `system_open` the browser on the dev URL, and use the `terminal` tool for `npm run dev` or the project's start command |
 
 ## When something happens: event automations and hooks
@@ -148,6 +153,20 @@ logs from `journalctl`, trash from `gio trash`, notifications from `notify-send`
 - If a tool reports that a program is not installed, relay the package it names (for example
   `network-manager`, `pipewire`, `libnotify`) instead of improvising a shell workaround.
 - `sleep_display` turns the screens off through niri; any key or mouse move wakes them.
+- Wi-Fi, Bluetooth, sound, brightness and power modes: `system_control` action=wifi_networks /
+  wifi_connect (ssid, password only for a new secured network) / bluetooth_power /
+  bluetooth_connect / bluetooth_disconnect (device) / audio_devices / set_audio_output (device) /
+  set_brightness (percent) / power_profile / set_power_profile (profile). To show the person the
+  panel instead, `os_ui action=run command=panel.open args={"panel": "wifi"}` (bluetooth, audio,
+  display, power, clock). Never ask for a Wi-Fi password you can avoid: a saved network needs none.
+- Capture (both platforms unless noted): `os_ui` run `capture.screenshot` (`mode` region, window or
+  screen; you get the file back), `capture.record` (`action` toggle, start or stop, `audio`),
+  `camera.show`; on Linux also `capture.color`, `capture.qr`, `capture.text` (OCR),
+  `capture.transcode` (file, gif|mp4|webm) and `capture.share`. Use `screen.askRegion` to have the
+  person pick what to show you.
+- Switches (both platforms): `os_ui` run `dnd.set`, `awake.set` (stay awake), `nightlight.set`
+  (Linux) or `screensaver.set` with `{"enabled": true|false}`; `idle.set` changes when the screen
+  locks, turns off and sleeps (minutes).
 - In process lists, `niri` is the compositor (it draws every window), the `electron` processes are
   the Herald OS shell (menu bar, dock and the Hermes window) and `hermes` is you. Name them that way:
   this is the operating system, not an app running on one.

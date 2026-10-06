@@ -12,6 +12,8 @@ work everywhere.
 | Command bar | `Cmd+K` | `Super+Shift+Space` or `Ctrl+K` |
 | All applications | `Cmd+Shift+A` | `Super+A` |
 | Talk to Hermes | `Alt+Space` | `Super+V` |
+| Dictate into any app (again, or a pause, to finish) | `Cmd+Ctrl+X` | `Super+Ctrl+X` |
+| Emoji | `Cmd+Ctrl+E` in Herald OS, `Ctrl+Cmd+Space` elsewhere | `Super+Ctrl+E` |
 | Ask about part of the screen | `Cmd+Shift+S` | `Super+Shift+S` |
 | Ask about the focused window | | `Super+Space` |
 | Screenshot of the whole screen, to Hermes | | `Super+Ctrl+Shift+S` |
@@ -45,13 +47,31 @@ work everywhere.
 | Spaces: Personal, Work, Ideas | `Super+1`, `Super+2`, `Super+3` (with `Shift` to move the window there) |
 | Previous window | `Super+Tab` |
 
+## Quick panels and switches (Herald OS Linux)
+
+| Action | Keys |
+| --- | --- |
+| Wi-Fi, Bluetooth, sound | `Super+Ctrl+W`, `Super+Ctrl+B`, `Super+Ctrl+A` |
+| Displays, battery and power | `Super+Ctrl+D`, `Super+Ctrl+P` |
+| Night light, stay awake, do not disturb | `Super+Ctrl+N`, `Super+Ctrl+I`, `Super+Ctrl+,` |
+| Turn the screens off | `Super+Shift+P` |
+
 ## Capture (Herald OS Linux)
 
 | Action | Keys |
 | --- | --- |
 | Screenshot of a selection | `Print` |
 | Screenshot of the window, of the screen | `Super+Print`, `Super+Shift+Print` |
+| Record the screen (again to stop) | `Super+Alt+Print` |
+| Pick a colour from the screen | `Super+Ctrl+Print` |
 | Ask Hermes about part of the screen | `Super+Shift+S` |
+
+## Omarchy keys (Herald OS Linux)
+
+Coming from Omarchy? Settings > General > Keymap, or `herald-os keymap omarchy`, makes `Super+C`,
+`Super+X` and `Super+V` copy, cut and paste in every app, terminals included. Talking to Hermes
+moves to `Super+Shift+V` and centring a column to `Super+Ctrl+C`; `herald-os keymap herald` switches
+back.
 
 ## Your own shortcuts
 

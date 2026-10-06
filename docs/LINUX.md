@@ -129,9 +129,11 @@ inside the VM by `scripts/bootstrap.sh`.
 ## Services (niri session)
 
 `herald-os-session` starts, as transient user units: `wl-paste --watch cliphist store` (text and
-images; `Mod+Ctrl+V` opens the picker), and `swayidle` (display off after 15 min; lock after 10 min
-only when the account has a password). Notifications from other apps arrive through the shell's
-own `org.freedesktop.Notifications` daemon. The `hermes` VM user has no password by default, so
+images; `Mod+Ctrl+V` opens the picker), and `herald-os-idle`, which runs `swayidle` with the timings
+from Settings > General (`~/.config/herald-os/idle.conf`: screensaver, lock after 10 min only when
+the account has a password, screens off after 15, no sleep by default; "stay awake" stops the
+unit). Night light is `wlsunset` as the `herald-os-nightlight` unit. Notifications from other apps
+arrive through the shell's own `org.freedesktop.Notifications` daemon. The `hermes` VM user has no password by default, so
 `herald-os lock` refuses until you run `herald-os password` in a terminal; a lock nobody can undo
 would leave the compositor's session lock engaged.
 
@@ -141,6 +143,14 @@ can do the same. `Mod` is `Super` on real hardware and `Alt` when niri runs nest
 where `Mod+Alt+Space` is only `Alt+Space` and `Mod+M` is the way in. `Mod+K` lists every hotkey.
 Web apps (`herald-os install webapp <name> <url>`) open as their own frameless windows.
 
+The menu bar's status items open quick panels (`herald-os panel wifi|bluetooth|audio|display|power|clock`,
+backed by `nmcli`, `bluetoothctl`, `pactl`, `niri msg output`, `powerprofilesctl` and `upower`).
+Dictation (`Mod+Ctrl+X`, `herald-os dictate`) records until a pause, transcribes through Hermes's
+speech-to-text and types the words into the focused app with `wtype`; the emoji picker
+(`Mod+Ctrl+E`) types its pick the same way. `herald-os keymap omarchy` renders
+`~/.config/niri/config.kdl` from the template in `/usr/local/share/herald-os-linux/niri/` with
+Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores Herald's keys.
+
 ## Themes, omakase, updates
 
 - **Themes** live in `linux/themes/<name>/theme.json` (ocean, ice, violet, graphite). `herald-os
@@ -148,6 +158,16 @@ Web apps (`herald-os install webapp <name> <url>`) open as their own frameless w
   recolours the shell, niri borders/backdrop (`~/.config/niri/theme.kdl`), swaylock, GTK 3/4
   (`gtk.css` + `gsettings`), and the `foot` rescue terminal in one step; a theme may also ship a
   wallpaper. Add a theme by dropping a folder into `~/.config/herald-os/themes/`.
+- **The install catalog** (`linux/catalog/*.json`, run by `herald-os-catalog`) is everything else
+  worth one click: coding agents (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI through npm
+  in `~/.local`), Ollama and LM Studio with "Use with Hermes", languages through mise, editors,
+  terminals, games, a Windows 11 VM (`herald-os install windows`, dockur/windows under Podman), media
+  apps, services and web apps. Each entry lists install methods in order (Flatpak, dnf, pacman, AUR,
+  npm, mise, a recipe, a web app, a download page); the first one the machine can use wins, so the
+  same catalog serves Fedora, Arch and Omarchy, and the image (Flatpak and `~/.local` only). It
+  backs Settings > Software, Install and Remove in the control menu, `herald-os install <id>`, and
+  Hermes's `system_os catalog_*` actions. On macOS the shell installs the entries that have a Mac
+  method (npm, Homebrew, a download page).
 - **Omakase** (`linux/omakase/{packages,flatpaks,webapps}.txt`) is the curated software set every
   install gets: Firefox, Nautilus, Text Editor, LibreOffice, Loupe, Papers, Calculator, Calendar,
   VLC, developer tools, fonts; Obsidian, Spotify, LocalSend, VS Code, Signal from Flathub; and web

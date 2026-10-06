@@ -8,6 +8,7 @@ import { offerCrashHelp } from './crashes.ts'
 import { $notificationsOpen, notify } from './notifications.ts'
 import { runCommand } from './os-commands.ts'
 import { isMainSurface, onShellCommand, openSurface } from './shell.ts'
+import { $screensaverUp } from './switches.ts'
 import { $applicationsOpen, toggleCommandBar } from './surface.ts'
 import { showPage } from './windows.ts'
 
@@ -109,6 +110,11 @@ export function handleShellCommand(command: ShellCommand): void {
     }
     case 'pick-wallpaper':
       void pickWallpaper()
+
+      return
+    case 'screensaver':
+      // Desktop mode: main noticed the idle time (panels mode opens its own window instead).
+      $screensaverUp.set(true)
 
       return
     case 'crash': {
