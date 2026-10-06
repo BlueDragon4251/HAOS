@@ -54,6 +54,22 @@ describe('ensureBridgePlugin', () => {
     expect(fs.readFileSync(calls, 'utf8').trim().split('\n')).toHaveLength(3)
   })
 
+  it('tries the enabling again on the next start when Hermes failed', async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-'))
+    const resources = path.join(root, 'Herald OS.app', 'Contents', 'Resources')
+    fs.mkdirSync(path.join(resources, 'herald-os-bridge'), { recursive: true })
+    fs.writeFileSync(path.join(resources, 'herald-os-bridge', 'plugin.yaml'), 'name: herald-os-bridge\n')
+    process.env.HERMES_HOME = path.join(root, 'hermes')
+    const calls = path.join(root, 'calls.txt')
+    const failing = { kind: 'path' as const, label: 'test', command: ['/bin/sh', '-c', `echo "$*" >> '${calls}'; exit 1`, 'hermes'] }
+
+    await ensureBridgePlugin(failing, resources)
+    await ensureBridgePlugin(failing, resources)
+    // It stops at the first failure, and the second start tries again.
+    expect(fs.readFileSync(calls, 'utf8').trim().split('\n')).toEqual(['plugins enable herald-os-bridge', 'plugins enable herald-os-bridge'])
+    expect(fs.existsSync(path.join(root, 'hermes', 'herald-os', 'bridge-enabled'))).toBe(false)
+  })
+
   it('does nothing without a bundled copy (development)', async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-'))
     process.env.HERMES_HOME = path.join(root, 'hermes')

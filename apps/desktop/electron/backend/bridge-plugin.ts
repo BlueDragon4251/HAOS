@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { BackendRuntime } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
-import { hermesHome } from '../paths.ts'
+import { hermesHome, heraldOsDataDir } from '../paths.ts'
 
 /*
  * A packaged Herald OS carries the herald-os-bridge plugin in its resources. Hermes loads user
@@ -45,22 +45,23 @@ function readEntry(link: string): PluginEntry {
   return { kind: 'link', target, exists: fs.existsSync(target) }
 }
 
-function hermes(runtime: BackendRuntime, args: string[]): Promise<void> {
+function hermes(runtime: BackendRuntime, args: string[]): Promise<boolean> {
   const [command, ...head] = runtime.command
 
   return new Promise(resolve => {
     if (!command) {
-      resolve()
+      resolve(false)
 
       return
     }
 
-    const child = execFile(command, [...head, ...args], { cwd: runtime.root ?? undefined, env: { ...process.env, HERMES_HOME: hermesHome() }, timeout: 60_000 }, error => {
+    // Generous: the first Hermes command after an update finishes that update (its builds) first.
+    const child = execFile(command, [...head, ...args], { cwd: runtime.root ?? undefined, env: { ...process.env, HERMES_HOME: hermesHome() }, timeout: 10 * 60_000 }, error => {
       if (error) {
         log('bridge', `hermes ${args.join(' ')}: ${error.message}`)
       }
 
-      resolve()
+      resolve(!error)
     })
     // A closed stdin answers Hermes's override prompt "no": the bridge never replaces built-in tools.
     child.stdin?.end()
@@ -75,34 +76,47 @@ export async function ensureBridgePlugin(runtime: BackendRuntime, resources: str
   }
 
   const link = path.join(hermesHome(), 'plugins', 'herald-os-bridge')
-  let plan: ReturnType<typeof bridgeLinkPlan>
 
   try {
-    plan = bridgeLinkPlan(readEntry(link), bundled)
+    const entry = readEntry(link)
+    const plan = bridgeLinkPlan(entry, bundled)
 
-    if (plan === 'keep') {
+    // A folder of the person's own, or a checkout's link: theirs to manage.
+    if (plan === 'keep' && !(entry.kind === 'link' && path.resolve(entry.target) === path.resolve(bundled))) {
       return
     }
 
-    fs.mkdirSync(path.dirname(link), { recursive: true })
-    fs.rmSync(link, { force: true })
-    fs.symlinkSync(bundled, link)
-    log('bridge', `${plan === 'create' ? 'linked' : 'relinked'} ${link} -> ${bundled}`)
+    if (plan !== 'keep') {
+      fs.mkdirSync(path.dirname(link), { recursive: true })
+      fs.rmSync(link, { force: true })
+      fs.symlinkSync(bundled, link)
+      log('bridge', `${plan === 'create' ? 'linked' : 'relinked'} ${link} -> ${bundled}`)
+    }
   } catch (error) {
     log('bridge', `could not link the bridge plugin: ${error instanceof Error ? error.message : String(error)}`)
 
     return
   }
 
-  // A new link is a first start: enable the plugin and its tools, and keep them directly callable
-  // (tool search would hide them behind a lookup). A relink keeps whatever the person chose since.
-  if (plan === 'create') {
-    for (const args of [
-      ['plugins', 'enable', 'herald-os-bridge'],
-      ['tools', 'enable', 'herald_os'],
-      ['config', 'set', 'tools.tool_search.enabled', 'off']
-    ]) {
-      await hermes(runtime, args)
+  // Once: enable the plugin and its tools, and keep them directly callable (tool search would hide
+  // them behind a lookup). The marker means it worked, so a failed try runs again on the next start
+  // and a person who turns the plugin off later is left alone.
+  const enabled = path.join(heraldOsDataDir(), 'bridge-enabled')
+
+  if (fs.existsSync(enabled)) {
+    return
+  }
+
+  for (const args of [
+    ['plugins', 'enable', 'herald-os-bridge'],
+    ['tools', 'enable', 'herald_os'],
+    ['config', 'set', 'tools.tool_search.enabled', 'off']
+  ]) {
+    if (!(await hermes(runtime, args))) {
+      return
     }
   }
+
+  fs.mkdirSync(path.dirname(enabled), { recursive: true })
+  fs.writeFileSync(enabled, `${new Date().toISOString()}\n`)
 }
