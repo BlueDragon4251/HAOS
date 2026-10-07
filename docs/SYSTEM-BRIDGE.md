@@ -65,11 +65,51 @@ for shell commands, because it is the same gate.
 
 ## Enabling
 
-`scripts/bootstrap.sh` links the plugin into `$HERMES_HOME/plugins/herald-os-bridge`, then runs
-`hermes plugins enable herald-os-bridge`, `hermes tools enable herald_os` (a saved platform toolset
-list is authoritative upstream), and `hermes config set tools.tool_search.enabled off` so the tools
-are directly callable rather than deferred behind Hermes's tool-search bridge (see
-`DECISIONS.md`, ADR-010). Settings -> Privacy edits the policy file below and shows the audit log.
+Three setups make the same changes: `npm run bootstrap` for a checkout, the app's first start for a
+packaged build, and `herald-os setup` for the Linux packages. Each links the plugin into
+`$HERMES_HOME/plugins/herald-os-bridge`, then runs `hermes plugins enable herald-os-bridge`,
+`hermes tools enable herald_os` (a saved platform toolset list is authoritative upstream), and
+`hermes config set tools.tool_search.enabled off` so the tools are directly callable rather than
+deferred behind Hermes's tool-search bridge (see `DECISIONS.md`, ADR-010). Each says what a step
+changes and stops at the first `hermes` step that fails, counting the `✗` line `hermes tools enable`
+prints with exit 0 for an unknown toolset: the terminal setups print Hermes's output and exit
+non-zero; the app shows a notification and a note under Settings > Hermes & agents > Tool search,
+and tries again at its next start. Settings -> Privacy edits the policy file below and shows the
+audit log.
+
+## What Herald OS changes in your Hermes
+
+Herald OS runs on the person's own Hermes, so these changes reach Hermes's other sessions too:
+
+| Change | Made by | Outside Herald OS |
+| --- | --- | --- |
+| The link `$HERMES_HOME/plugins/herald-os-bridge` | setup | Inert until the plugin is enabled |
+| `herald-os-bridge` in `plugins.enabled` | setup | Hermes loads the plugin everywhere; its tools stay hidden and refuse to run (see Where the tools run) |
+| `herald_os` in `platform_toolsets.cli`; `hermes tools enable` saves the whole `cli` list, with `known_plugin_toolsets` and `known_builtin_toolsets` | setup | The `hermes` CLI uses the same list |
+| `tools.tool_search.enabled: off`, the value before kept in `$HERMES_HOME/herald-os/tool-search-before` | setup; Settings > Hermes & agents > Tool search turns it back on | Every session lists its plugin and MCP tools directly instead of searching for them |
+| `display.skin: herald-os` and `$HERMES_HOME/skins/herald-os.yaml` | applying a theme, unless another skin was chosen | Hermes's own interfaces wear the theme |
+| `stt.provider: local`, `tts.provider: edge` | the voice fallback, when the configured provider cannot run (no key, a missing package), with a notice | Every voice surface uses the free provider |
+
+The record of Tool Search's earlier value is written once, before the first change, by whichever
+setup makes it; setups before it existed kept none.
+
+**Undo.** `herald-os setup --undo` turns the toolset off while Hermes still knows it, then the
+plugin, puts Tool Search back to the recorded value when it is still off (to Hermes's default, `auto`,
+when there is no record), removes the link, and writes the app's `bridge-enabled` marker so the app
+does not set it all up again. By hand, on macOS:
+
+```bash
+hermes tools disable herald_os
+hermes plugins disable herald-os-bridge
+hermes config set tools.tool_search.enabled "$(cat ~/.hermes/herald-os/tool-search-before 2>/dev/null || echo auto)"
+rm -f ~/.hermes/plugins/herald-os-bridge ~/.hermes/herald-os/tool-search-before
+touch ~/.hermes/herald-os/bridge-enabled
+```
+
+What stays: the `cli` toolset list remains an explicit saved list, and the plugin is listed under
+`plugins.disabled`. `hermes config set display.skin default` brings back Hermes's own skin, and
+`hermes tools` or Settings > Voice picks the speech providers. To set the bridge up again, run
+`herald-os setup`, or on macOS delete `~/.hermes/herald-os/bridge-enabled` and start Herald OS.
 
 ## Protected paths
 

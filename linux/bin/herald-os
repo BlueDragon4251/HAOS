@@ -104,7 +104,7 @@ COMMANDS: dict[str, str] = {
     "omakase": "Install the curated software set (omakase install | omakase list)",
     "wm": "A window-manager action: wm <niri action> [args] (on Hyprland the same names, or a dispatcher)",
     "omarchy": "omarchy install | remove | status: run Herald OS inside Omarchy (theme hook, menu entry, keys)",
-    "setup": "setup [--yes]: once per user after installing (Hermes Agent and the bridge plugin) | setup fingerprint | setup fido2",
+    "setup": "setup [--yes]: once per user after installing (Hermes Agent and the bridge plugin) | setup --undo: take back its changes to Hermes | setup fingerprint | setup fido2",
     "state": "Dump the shell's window-manager state",
     "debug": "Print diagnostics for bug reports",
     "commands": "List commands",
@@ -1248,8 +1248,101 @@ def hermes_command() -> list[str] | None:
     return [found] if found else None
 
 
+TOOL_SEARCH = "tools.tool_search.enabled"
+# `hermes tools enable` reports an unknown toolset as a ✗ line and still exits 0.
+HERMES_ERROR = re.compile(r"^\s*✗", re.M)
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def tool_search_before() -> Path:
+    """Every Herald OS setup (this command, the app's first start, scripts/bootstrap.sh) writes the value
+    it found here before turning Tool Search off, and only the first time, so `setup --undo` can put it back."""
+    return HERMES_HOME / "herald-os" / "tool-search-before"
+
+
+def hermes_run(hermes: list[str], args: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run([*hermes, *args], stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False, env={**os.environ, "NO_COLOR": "1"})
+
+
+def hermes_step(hermes: list[str], args: list[str], change: str, gone: str | None = None) -> None:
+    """Run one `hermes` command and say what it changes; a failure stops here with Hermes's output.
+    Output matching `gone` means there was nothing left to change."""
+    command = "hermes " + " ".join(args)
+    print(f"==> {command}: {change}")
+    result = hermes_run(hermes, args)
+    output = ANSI.sub("", f"{result.stdout or ''}\n{result.stderr or ''}").strip()
+    if gone and re.search(gone, output):
+        print("    nothing to change")
+        return
+    if result.returncode != 0 or HERMES_ERROR.search(output):
+        die(f"`{command}` failed (exit {result.returncode}){': ' + output if output else ''}\nRun herald-os setup again once it is fixed, or herald-os setup --undo to take back what was already changed.", 1)
+
+
+def hermes_value(hermes: list[str], key: str) -> str:
+    """A setting as `hermes config get` prints it, which `hermes config set` reads back unchanged."""
+    result = hermes_run(hermes, ["config", "get", key])
+    lines = [line.strip() for line in ANSI.sub("", result.stdout or "").splitlines() if line.strip()]
+    if result.returncode != 0 or not lines:
+        die(f"`hermes config get {key}` failed (exit {result.returncode}): {(result.stderr or result.stdout or '').strip()}", 1)
+    return lines[-1]
+
+
+def enable_bridge(hermes: list[str]) -> None:
+    """User plugins are opt-in and a saved toolset list is authoritative, so both are recorded. Tool
+    Search would hide plugin tools behind a lookup, and it has no per-plugin switch (ADR-010)."""
+    hermes_step(hermes, ["plugins", "enable", "herald-os-bridge"], f"adds it to plugins.enabled in {HERMES_HOME / 'config.yaml'}")
+    hermes_step(hermes, ["tools", "enable", "herald_os"], "saves platform_toolsets.cli with herald_os in it (Herald OS's sessions share that list with the hermes CLI; the tools run only in Herald OS sessions)")
+    before, record = hermes_value(hermes, TOOL_SEARCH), tool_search_before()
+    if before == "off":
+        print(f"==> {TOOL_SEARCH} is off already")
+        return
+    if not record.exists():
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(before + "\n")
+    hermes_step(hermes, ["config", "set", TOOL_SEARCH, "off"], f"turns Tool Search off for every Hermes session, so the system tools stay directly callable (it was {before}; saved in {record}, and Settings > Hermes & agents > Tool search turns it back on)")
+
+
+def setup_undo() -> int:
+    """Take back what setup changed in Hermes: the toolset, the plugin, Tool Search and the link."""
+    hermes = hermes_command()
+    link = HERMES_HOME / "plugins" / "herald-os-bridge"
+    if hermes:
+        # Hermes knows the toolset only while the plugin is linked and enabled, so it goes first.
+        hermes_step(hermes, ["tools", "disable", "herald_os"], "takes herald_os out of platform_toolsets.cli", gone="Unknown toolset")
+        hermes_step(hermes, ["plugins", "disable", "herald-os-bridge"], "moves it from plugins.enabled to plugins.disabled", gone="No plugin named")
+        restore_tool_search(hermes)
+    else:
+        print("Hermes Agent is not installed, so only the plugin link is removed.")
+    if link.is_symlink():
+        link.unlink()
+        print(f"==> removed the plugin link {link}")
+    elif link.exists():
+        print(f"==> {link} is a folder Herald OS did not make; left alone")
+    # The app turns the bridge on at its first start unless this marker says that happened already.
+    marker = HERMES_HOME / "herald-os" / "bridge-enabled"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    print("Herald OS no longer changes your Hermes; `herald-os setup` makes the changes again.")
+    return 0
+
+
+def restore_tool_search(hermes: list[str]) -> None:
+    current, record = hermes_value(hermes, TOOL_SEARCH), tool_search_before()
+    if current != "off":
+        print(f"==> {TOOL_SEARCH} is {current}, not off; left as it is")
+    elif record.exists():
+        before = record.read_text().strip()
+        hermes_step(hermes, ["config", "set", TOOL_SEARCH, before], f"back to {before}, its value before Herald OS")
+    else:
+        # Setups before the record existed turned it off without one; Hermes's default is the likely value.
+        hermes_step(hermes, ["config", "set", TOOL_SEARCH, "auto"], f"back to Hermes's default, auto (Herald OS kept no record of the value before; hermes config set {TOOL_SEARCH} off if you had it off yourself)")
+    record.unlink(missing_ok=True)
+
+
 def setup(args: list[str]) -> int:
     """Link the bridge plugin into Hermes, turn on its tools, and install Hermes if it is missing."""
+    if args[:1] == ["--undo"]:
+        return setup_undo()
     if args[:1] == ["fingerprint"]:
         return setup_sign_in("fingerprint")
     if args[:1] == ["fido2"]:
@@ -1276,11 +1369,9 @@ def setup(args: list[str]) -> int:
         die(f"{link} exists and is not a link Herald OS made; move it aside and run setup again", 1)
     link.symlink_to(bridge)
     print(f"==> bridge plugin: {link} -> {bridge}")
-    # User plugins are opt-in and a saved toolset list is authoritative, so both are recorded. Plugin
-    # tools stay directly callable (tool search would hide them behind a lookup).
-    for step in (["plugins", "enable", "herald-os-bridge"], ["tools", "enable", "herald_os"], ["config", "set", "tools.tool_search.enabled", "off"]):
-        subprocess.run([*hermes, *step], stdin=subprocess.DEVNULL, capture_output=True, check=False)
+    enable_bridge(hermes)
     print("==> Hermes can now use the system (files, apps, settings), asking before anything that changes it")
+    print("    To take these changes back: herald-os setup --undo")
     if is_omarchy():
         print("Omarchy: `herald-os omarchy install` adds Herald OS to its menu, theme and keys.")
     print("Start the full session from your login screen (Herald OS), or run herald-os-app inside your desktop.")

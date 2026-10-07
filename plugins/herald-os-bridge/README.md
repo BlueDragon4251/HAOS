@@ -38,3 +38,7 @@ hermes tools enable herald_os
 
 To switch the tools off without uninstalling, set `herald_os.bridge.enabled: false` in
 `~/.hermes/config.yaml`, or `HERALD_OS_BRIDGE_DISABLED=1` in the backend's environment for one run.
+
+To take it all back, `herald-os setup --undo` on Linux; elsewhere the steps, and the list of what
+Herald OS changes in Hermes, are in
+[docs/SYSTEM-BRIDGE.md](../../docs/SYSTEM-BRIDGE.md#what-herald-os-changes-in-your-hermes).

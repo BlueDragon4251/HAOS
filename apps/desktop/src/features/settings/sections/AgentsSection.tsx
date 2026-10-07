@@ -14,6 +14,7 @@ import { $hermesAuth, loginTarget, refreshHermesAuth, requestHermesLogin } from 
 import { notify } from '../../../store/notifications.ts'
 import { readTier, withTier } from './policy.ts'
 import { errorText, InlineNote, markSaved, MenuDropdown, RadioCard, SectionTitle, SettingsBlock, SettingsGroup, SettingsRow, Stepper, useDismiss } from './shared.tsx'
+import { ToolSearchRow } from './ToolSearchRow.tsx'
 
 /*
  * Hermes & agents: the default Settings section. Every control here binds to real Hermes state:
@@ -58,6 +59,7 @@ export function AgentsSection() {
         <PreferredModelRow ready={ready} />
         <RunOnRow />
         <BackgroundAgentsRow />
+        <ToolSearchRow />
       </SettingsGroup>
 
       <SettingsGroup title="Privacy & control">

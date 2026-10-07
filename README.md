@@ -441,6 +441,25 @@ A few options come from environment variables, mostly for development: starting 
 throwaway Hermes home (`HERMES_HOME=/tmp/herald-test`). [.env.example](.env.example) lists them
 all.
 
+#### What Herald OS changes in your Hermes
+
+Herald OS runs on your own Hermes, so a few of its changes reach Hermes's other sessions too:
+
+- **The system bridge plugin.** Setup (the Mac app's first start, `herald-os setup`, or
+  `npm run bootstrap`) links it into `~/.hermes/plugins/herald-os-bridge`, adds it to
+  `plugins.enabled`, and saves the `cli` platform's toolset list with `herald_os` in it. Its tools
+  run only in sessions Herald OS starts; Telegram, Discord, cron and the `hermes` CLI never get them.
+- **Tool search off** (`tools.tool_search.enabled: off`), so Hermes calls the system tools directly.
+  Hermes has one switch for every session, so plugin and MCP tools are listed directly everywhere.
+  The earlier value is kept in `~/.hermes/herald-os/tool-search-before`, and Settings > Hermes &
+  agents > Tool search turns it back on.
+- **Your theme** becomes Hermes's skin (`display.skin: herald-os`) unless you picked another one.
+- **Voice** switches speech-to-text to `local` or text-to-speech to `edge` (`stt.provider`,
+  `tts.provider`) when the provider you had cannot run, and tells you when it does.
+
+To undo it on Linux, run `herald-os setup --undo`. On macOS, the steps are in
+[docs/SYSTEM-BRIDGE.md](docs/SYSTEM-BRIDGE.md#what-herald-os-changes-in-your-hermes).
+
 ## Building a macOS release
 
 ```bash

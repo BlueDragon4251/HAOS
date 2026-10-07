@@ -177,7 +177,7 @@ export class BackendManager {
     this.update({ runtime, phase: 'starting' })
 
     try {
-      await ensureBridgePlugin(runtime)
+      const bridgeError = (await ensureBridgePlugin(runtime)) ?? undefined
       const port = await this.spawnServe(runtime, generation)
 
       if (generation !== this.startGeneration) {
@@ -192,7 +192,7 @@ export class BackendManager {
       }
 
       const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(this.token)}`
-      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined, sharedGateway: this.sharedGateway()?.pid })
+      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined, sharedGateway: this.sharedGateway()?.pid, bridgeError })
       log('backend', `ready on ${baseUrl} via ${runtime.label}`)
     } catch (error) {
       if (generation !== this.startGeneration) {
@@ -228,7 +228,7 @@ export class BackendManager {
 
       const url = new URL(target.baseUrl)
       const port = Number(url.port) || 80
-      this.update({ phase: 'ready', port, baseUrl: target.baseUrl, wsUrl: `ws://${url.host}/api/ws?token=${encodeURIComponent(this.token)}`, error: undefined, sharedGateway: undefined })
+      this.update({ phase: 'ready', port, baseUrl: target.baseUrl, wsUrl: `ws://${url.host}/api/ws?token=${encodeURIComponent(this.token)}`, error: undefined, sharedGateway: undefined, bridgeError: undefined })
       log('backend', `attached to ${target.baseUrl}`)
     } catch (error) {
       if (generation === this.startGeneration) {

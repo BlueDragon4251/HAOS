@@ -240,7 +240,27 @@ def test_omarchy_install_never_overwrites_the_persons_files(tmp_path, monkeypatc
     assert hook.exists() and menu.exists()
 
 
-def test_setup_links_the_bridge_and_enables_it(tmp_path, monkeypatch, capsys):
+class FakeHermes:
+    """`hermes` as setup sees it: replies by command, and a config that `config set` changes."""
+
+    def __init__(self, replies: dict[str, tuple[int, str]] | None = None, tool_search: str = "auto"):
+        self.replies = replies or {}
+        self.tool_search = tool_search
+        self.ran: list[list[str]] = []
+
+    def __call__(self, argv, **kwargs):
+        args = argv[1:]
+        self.ran.append(args)
+        if args[:2] == ["config", "get"]:
+            return subprocess.CompletedProcess(argv, 0, f"{self.tool_search}\n", "")
+        if args[:2] == ["config", "set"]:
+            self.tool_search = args[3]
+        code, out = self.replies.get(" ".join(args), (0, "✓ done"))
+        return subprocess.CompletedProcess(argv, code, out, "")
+
+
+@pytest.fixture
+def hermes_setup(tmp_path, monkeypatch):
     bridge = tmp_path / "share" / "bridge"
     bridge.mkdir(parents=True)
     (bridge / "plugin.yaml").write_text("name: herald-os-bridge\n")
@@ -249,15 +269,84 @@ def test_setup_links_the_bridge_and_enables_it(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "HERMES_HOME", hermes_home)
     monkeypatch.setattr(cli, "hermes_command", lambda: ["/usr/bin/hermes"])
     monkeypatch.setattr(cli, "is_omarchy", lambda: False)
-    ran = []
-    monkeypatch.setattr(cli.subprocess, "run", lambda argv, **kwargs: ran.append(argv))
+
+    def install(hermes: FakeHermes) -> FakeHermes:
+        monkeypatch.setattr(cli.subprocess, "run", hermes)
+        return hermes
+
+    return bridge, hermes_home, install
+
+
+def test_setup_links_the_bridge_enables_it_and_says_what_changed(hermes_setup, capsys):
+    bridge, hermes_home, install = hermes_setup
+    hermes = install(FakeHermes())
     assert cli.setup([]) == 0
     link = hermes_home / "plugins" / "herald-os-bridge"
     assert link.is_symlink() and link.resolve() == bridge.resolve()
-    assert ["/usr/bin/hermes", "plugins", "enable", "herald-os-bridge"] in ran
-    assert ["/usr/bin/hermes", "tools", "enable", "herald_os"] in ran
-    # Running it again replaces its own link.
+    assert ["plugins", "enable", "herald-os-bridge"] in hermes.ran and ["tools", "enable", "herald_os"] in hermes.ran
+    assert ["config", "set", "tools.tool_search.enabled", "off"] in hermes.ran
+    assert (hermes_home / "herald-os" / "tool-search-before").read_text() == "auto\n"
+    out = capsys.readouterr().out
+    assert "plugins.enabled" in out and "platform_toolsets.cli" in out and "it was auto" in out and "setup --undo" in out
+    # Running it again replaces its own link and keeps the value from before Herald OS.
     assert cli.setup([]) == 0 and link.is_symlink()
+    assert hermes.ran.count(["config", "set", "tools.tool_search.enabled", "off"]) == 1
+    assert (hermes_home / "herald-os" / "tool-search-before").read_text() == "auto\n"
+
+
+@pytest.mark.parametrize("step, reply", [
+    ("plugins enable herald-os-bridge", (1, "No plugin named 'herald-os-bridge'.")),
+    # An unknown toolset is a ✗ line with exit 0.
+    ("tools enable herald_os", (0, "✗ Unknown toolset 'herald_os'")),
+])
+def test_setup_stops_at_a_failed_hermes_step(hermes_setup, capsys, step, reply):
+    _, hermes_home, install = hermes_setup
+    hermes = install(FakeHermes({step: reply}))
+    with pytest.raises(SystemExit) as stopped:
+        cli.setup([])
+    assert stopped.value.code == 1
+    assert ["config", "set", "tools.tool_search.enabled", "off"] not in hermes.ran
+    assert reply[1] in capsys.readouterr().err
+    assert not (hermes_home / "herald-os" / "tool-search-before").exists()
+
+
+def test_setup_undo_takes_back_every_change(hermes_setup, capsys):
+    _, hermes_home, install = hermes_setup
+    hermes = install(FakeHermes(tool_search="on"))
+    cli.setup([])
+
+    assert cli.setup(["--undo"]) == 0
+
+    assert hermes.ran[-4:] == [["tools", "disable", "herald_os"], ["plugins", "disable", "herald-os-bridge"], ["config", "get", "tools.tool_search.enabled"], ["config", "set", "tools.tool_search.enabled", "on"]]
+    assert not (hermes_home / "plugins" / "herald-os-bridge").exists()
+    assert not (hermes_home / "herald-os" / "tool-search-before").exists()
+    # The app's first start must not turn it all back on.
+    assert (hermes_home / "herald-os" / "bridge-enabled").exists()
+
+
+def test_setup_undo_finishes_what_is_left(hermes_setup, capsys):
+    _, hermes_home, install = hermes_setup
+    hermes = install(FakeHermes({"tools disable herald_os": (0, "✗ Unknown toolset 'herald_os'"), "plugins disable herald-os-bridge": (1, "No plugin named 'herald-os-bridge'.")}, tool_search="off"))
+
+    assert cli.setup(["--undo"]) == 0
+
+    out = capsys.readouterr().out
+    assert out.count("nothing to change") == 2
+    # No record (a setup from before it was kept): back to Hermes's default, saying how to undo that.
+    assert ["config", "set", "tools.tool_search.enabled", "auto"] in hermes.ran and "hermes config set tools.tool_search.enabled off" in out
+
+
+def test_setup_undo_leaves_tool_search_the_person_changed_since(hermes_setup, capsys):
+    _, hermes_home, install = hermes_setup
+    hermes = install(FakeHermes())
+    cli.setup([])
+    hermes.tool_search = "auto"
+
+    assert cli.setup(["--undo"]) == 0
+
+    assert hermes.ran.count(["config", "set", "tools.tool_search.enabled", "auto"]) == 0
+    assert "left as it is" in capsys.readouterr().out
+    assert not (hermes_home / "herald-os" / "tool-search-before").exists()
 
 
 def test_setup_leaves_a_foreign_plugin_folder_alone(tmp_path, monkeypatch):
