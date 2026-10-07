@@ -1,5 +1,5 @@
 import {
-  IconAdjustments,
+  IconAdjustmentsPlus,
   IconChevronDown,
   IconChevronRight,
   IconCopy,
@@ -10,22 +10,32 @@ import {
   IconFolderOpen,
   IconFolderPlus,
   IconLetterT,
+  IconLink,
+  IconLinkOff,
   IconMask,
   IconPlus,
   IconShape,
   IconTrash
 } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
-import { BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
+import { ADJUSTMENT_KINDS, BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
-import { addFolder, addLayer, addMask, deletePicked, duplicatePicked, rename, setBlendMode, toggleClipping, toggleVisible } from './actions.ts'
+import { Menu } from '../files/Menu.tsx'
+import { addAdjustmentLayer, addFolder, addLayer, addMask, deletePicked, duplicatePicked, maskAction, rename, setBlendMode, toggleClipping, toggleVisible } from './actions.ts'
+import { ADJUSTMENT_ICONS } from './adjustment-icons.tsx'
 import { selectLayerPixels } from './editing.ts'
-import { type CanvasDocument, type CanvasLayer, childrenOf, type DocState, moveLayer, withLayer } from './engine/document.ts'
+import { type CanvasDocument, type CanvasLayer, childrenOf, type DocState, moveLayer, setClipped, withLayer } from './engine/document.ts'
+import { effectKinds } from './engine/layer-effects.ts'
 import type { Raster } from './engine/raster.ts'
 import { useRevision } from './hooks.ts'
 import { isMac } from './platform.ts'
 
 const DRAG_TYPE = 'application/x-herald-canvas-layer'
+
+/** How close to the line between two rows (in pixels) an Alt-click clips the upper layer to the lower. */
+const CLIP_EDGE = 6
+
+type Edge = 'top' | 'bottom'
 
 /** Blend modes in their usual families, each family after a divider. */
 const FAMILIES: BlendMode[][] = [BLEND_MODES.slice(0, 1), BLEND_MODES.slice(1, 5), BLEND_MODES.slice(5, 9), BLEND_MODES.slice(9, 16), BLEND_MODES.slice(16, 20), BLEND_MODES.slice(20)]
@@ -104,6 +114,18 @@ function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raste
   return <canvas ref={ref} width={size * 2} height={size * 2} className={cn('shrink-0 rounded-[4px]', targeted ? 'ring-2 ring-white/85' : 'ring-1 ring-line')} style={{ width: size, height: size, background: CHECKER }} />
 }
 
+/** Which line between rows an Alt-press at this point means, if it is close enough to one. */
+function edgeAt(event: React.MouseEvent): Edge | null {
+  if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+    return null
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect()
+  const y = event.clientY - rect.top
+
+  return y <= CLIP_EDGE ? 'top' : y >= rect.height - CLIP_EDGE ? 'bottom' : null
+}
+
 function LayerRow({
   doc,
   row,
@@ -114,7 +136,10 @@ function LayerRow({
   onToggleCollapsed,
   drop,
   onDragOver,
-  onDrop
+  onDrop,
+  clipEdge,
+  onClipEdge,
+  onClipHint
 }: {
   doc: CanvasDocument
   row: Row
@@ -126,10 +151,17 @@ function LayerRow({
   drop: 'above' | 'below' | 'into' | null
   onDragOver: (event: React.DragEvent, layer: CanvasLayer) => void
   onDrop: (event: React.DragEvent) => void
+  /** The line of this row an Alt-click would clip across, while the pointer is near it. */
+  clipEdge: Edge | null
+  onClipEdge: (layer: CanvasLayer, edge: Edge) => void
+  onClipHint: (edge: Edge | null) => void
 }) {
   const { layer, depth } = row
   const [draft, setDraft] = useState(layer.name)
   const clipped = Boolean(layer.maskSourceID)
+  const effects = effectKinds(layer.effects)
+  const effectsHidden = effects.length > 0 && effects.every((kind) => (layer.effects?.[kind] as { enabled?: boolean }).enabled === false)
+  const AdjustmentIcon = layer.adjustment ? ADJUSTMENT_ICONS[layer.adjustment.kind] : null
 
   useEffect(() => {
     if (renaming) {
@@ -146,11 +178,14 @@ function LayerRow({
   }
 
   // A thumbnail picks what painting changes (the pixels or the mask); with ⌘ it loads a selection from it (⇧ adds, ⌥ takes away).
+  // ⇧ on the mask's thumbnail switches the mask off and on.
   const onThumb = (event: React.MouseEvent, mask: boolean) => {
     event.stopPropagation()
 
     if (isMac ? event.metaKey : event.ctrlKey) {
       selectLayerPixels(doc, layer, mask, event.shiftKey ? 'add' : event.altKey ? 'subtract' : 'new')
+    } else if (mask && event.shiftKey) {
+      maskAction(doc, layer.maskEnabled === false ? 'enable' : 'disable', layer)
     } else {
       doc.select(layer.id, false, mask)
     }
@@ -170,17 +205,30 @@ function LayerRow({
       }}
       onDragOver={(event) => onDragOver(event, layer)}
       onDrop={onDrop}
-      onClick={(event) => doc.select(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)}
-      onDoubleClick={() => onRename(layer.id)}
+      onClick={(event) => {
+        // ⌥-click on the line between two rows clips the upper layer to the lower one (or releases it).
+        const edge = edgeAt(event)
+
+        if (edge) {
+          onClipEdge(layer, edge)
+        } else {
+          doc.select(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)
+        }
+      }}
+      onMouseMove={(event) => onClipHint(edgeAt(event))}
+      onMouseLeave={() => onClipHint(null)}
+      onDoubleClick={(event) => !event.altKey && onRename(layer.id)}
       className={cn(
         'group relative flex h-11 shrink-0 cursor-default items-center gap-1.5 border-b border-line/50 pr-2 text-[12px]',
         picked ? 'bg-accent/18 text-fg' : 'text-fg-2 hover:bg-white/5',
-        drop === 'into' && 'bg-accent/25 ring-1 ring-inset ring-accent'
+        drop === 'into' && 'bg-accent/25 ring-1 ring-inset ring-accent',
+        clipEdge && 'cursor-alias'
       )}
-      style={{ paddingLeft: 4 + depth * 14 }}
+      style={{ paddingLeft: 4 + depth * 14 + (clipped ? 12 : 0) }}
     >
       {drop === 'above' && <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-accent" />}
       {drop === 'below' && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-accent" />}
+      {clipEdge && <div className={cn('pointer-events-none absolute inset-x-2 h-0 border-t border-dashed border-accent', clipEdge === 'top' ? 'top-0' : 'bottom-0')} />}
       <button
         type="button"
         aria-label={layer.isVisible ? 'Hide layer' : 'Show layer'}
@@ -211,9 +259,9 @@ function LayerRow({
       )}
       {layer.isGroup ? (
         <span className="grid size-8 shrink-0 place-items-center text-fg-3">{collapsed ? <IconFolder size={20} /> : <IconFolderOpen size={20} />}</span>
-      ) : layer.adjustment ? (
-        <span className="grid size-8 shrink-0 place-items-center rounded-[4px] bg-white/6 text-fg-2 ring-1 ring-line">
-          <IconAdjustments size={17} />
+      ) : AdjustmentIcon ? (
+        <span className="grid size-8 shrink-0 place-items-center rounded-[4px] bg-white/6 text-fg-2 ring-1 ring-line" title={layer.adjustment?.kind}>
+          <AdjustmentIcon size={17} />
         </span>
       ) : (
         <span onClick={(event) => onThumb(event, false)} title="Paint on the pixels (⌘-click selects them)">
@@ -221,9 +269,34 @@ function LayerRow({
         </span>
       )}
       {layer.mask && (
-        <span onClick={(event) => onThumb(event, true)} className={cn(layer.maskEnabled === false && 'opacity-35')} title={layer.maskEnabled === false ? 'Mask turned off (click to paint on it)' : 'Mask: click to paint on it, ⌘-click to select from it'}>
-          <Thumb raster={layer.mask} version={layer.mask.version} size={24} targeted={editingMask} />
-        </span>
+        <>
+          <button
+            type="button"
+            title={layer.maskLinked === false ? 'The mask stays put when the layer moves: click to link it' : 'The mask moves with the layer: click to unlink it'}
+            aria-label={layer.maskLinked === false ? 'Link the mask' : 'Unlink the mask'}
+            onClick={(event) => {
+              event.stopPropagation()
+              maskAction(doc, layer.maskLinked === false ? 'link' : 'unlink', layer)
+            }}
+            className="-mx-1 grid size-4 shrink-0 place-items-center text-fg-3 hover:text-fg"
+          >
+            {layer.maskLinked === false ? <IconLinkOff size={11} className="opacity-60" /> : <IconLink size={11} />}
+          </button>
+          <span
+            onClick={(event) => onThumb(event, true)}
+            className="relative"
+            title={layer.maskEnabled === false ? 'Mask turned off (⇧-click turns it on, click paints on it)' : 'Mask: click to paint on it, ⇧-click turns it off, ⌘-click selects from it'}
+          >
+            <span className={cn(layer.maskEnabled === false && 'opacity-35')}>
+              <Thumb raster={layer.mask} version={layer.mask.version} size={24} targeted={editingMask} />
+            </span>
+            {layer.maskEnabled === false && (
+              <svg viewBox="0 0 24 24" className="pointer-events-none absolute inset-0 size-6 text-danger" aria-hidden>
+                <path d="M3 3 L21 21 M21 3 L3 21" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+              </svg>
+            )}
+          </span>
+        </>
       )}
       <div className="min-w-0 flex-1 pl-1">
         {renaming ? (
@@ -249,6 +322,11 @@ function LayerRow({
             {layer.text && <IconLetterT size={12} className="shrink-0 text-fg-3" aria-label="Text layer" />}
             {layer.shape && <IconShape size={12} className="shrink-0 text-fg-3" aria-label="Shape layer" />}
             <span className="truncate">{layer.name}</span>
+            {effects.length > 0 && (
+              <span className={cn('ml-auto shrink-0 pl-1 text-[10.5px] font-semibold text-fg-3 italic', effectsHidden && 'line-through opacity-60')} title={effectsHidden ? 'Layer effects (hidden)' : 'Layer effects'}>
+                fx
+              </span>
+            )}
           </div>
         )}
         {!renaming && ((layer.opacity ?? 1) < 1 || (layer.blendMode && layer.blendMode !== 'Normal')) && (
@@ -329,10 +407,28 @@ export function LayersPanel({ doc }: { doc: CanvasDocument }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [renaming, setRenaming] = useState<string | null>(null)
   const [drop, setDrop] = useState<{ id: string; where: 'above' | 'below' | 'into' } | null>(null)
+  const [clipHint, setClipHint] = useState<{ id: string; edge: Edge } | null>(null)
+  const [adjustments, setAdjustments] = useState(false)
   const { state } = doc
   const rows = rowsOf(state, collapsed)
   const picked = new Set(doc.picked.map((layer) => layer.id))
   const active = doc.active
+
+  // The line below a row clips that row's layer; the line above it, the row above's.
+  const onClipEdge = (layer: CanvasLayer, edge: Edge) => {
+    const index = rows.findIndex((entry) => entry.layer.id === layer.id)
+    const upper = edge === 'bottom' ? layer : rows[index - 1]?.layer
+
+    if (!upper || upper.isGroup) {
+      return
+    }
+
+    const next = setClipped(state, upper.id, !upper.maskSourceID)
+
+    if (next !== state) {
+      doc.commit(upper.maskSourceID ? 'Release Clipping Mask' : 'Create Clipping Mask', next)
+    }
+  }
 
   const onDragOver = (event: React.DragEvent, layer: CanvasLayer) => {
     if (!event.dataTransfer.types.includes(DRAG_TYPE)) {
@@ -402,11 +498,40 @@ export function LayersPanel({ doc }: { doc: CanvasDocument }) {
             drop={drop?.id === row.layer.id ? drop.where : null}
             onDragOver={onDragOver}
             onDrop={onDrop}
+            clipEdge={clipHint?.id === row.layer.id ? clipHint.edge : null}
+            onClipEdge={onClipEdge}
+            onClipHint={(edge) => setClipHint((current) => (edge ? (current?.id === row.layer.id && current.edge === edge ? current : { id: row.layer.id, edge }) : current?.id === row.layer.id ? null : current))}
           />
         ))}
         {!rows.length && <div className="p-4 text-center text-[12px] text-fg-3">No layers</div>}
       </div>
       <div className="flex h-9 shrink-0 items-center justify-end gap-0.5 border-t border-line px-1.5">
+        <div className="relative">
+          <button
+            type="button"
+            title="New adjustment layer"
+            aria-label="New adjustment layer"
+            aria-haspopup="menu"
+            aria-expanded={adjustments}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={() => setAdjustments(!adjustments)}
+            className={cn('grid size-7 place-items-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg', adjustments && 'bg-white/10 text-fg')}
+          >
+            <IconAdjustmentsPlus size={15} />
+          </button>
+          {adjustments && (
+            <Menu
+              align="left"
+              className="bottom-full mb-1 max-h-[60vh] overflow-y-auto"
+              onClose={() => setAdjustments(false)}
+              items={ADJUSTMENT_KINDS.map((kind, i) => {
+                const Icon = ADJUSTMENT_ICONS[kind]
+
+                return { id: kind, label: kind, icon: <Icon />, dividerBefore: i === 3 || i === 9, onSelect: () => addAdjustmentLayer(doc, kind) }
+              })}
+            />
+          )}
+        </div>
         {[
           { label: 'Clip to the layer below', icon: <IconCornerLeftDown size={15} />, run: () => toggleClipping(doc), disabled: !active || active.isGroup },
           { label: 'Add a mask', icon: <IconMask size={15} />, run: () => addMask(doc), disabled: !active || Boolean(active.mask) },

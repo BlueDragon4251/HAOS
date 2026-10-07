@@ -23,8 +23,8 @@ export interface PaintTarget {
   state: DocState
 }
 
-/** Painting goes into the active layer's mask when it is targeted on its thumbnail, or when the layer is an adjustment (which has no pixels). */
-export const paintsMask = (doc: CanvasDocument): boolean => Boolean(doc.active?.mask) && (doc.editingMask || Boolean(doc.active?.adjustment))
+/** Painting goes into the active layer's mask when it is targeted on its thumbnail, or when the layer is a folder or an adjustment (which have no pixels). */
+export const paintsMask = (doc: CanvasDocument): boolean => Boolean(doc.active?.mask) && (doc.editingMask || Boolean(doc.active?.adjustment) || Boolean(doc.active?.isGroup))
 
 /** Why the active layer cannot be painted on, or null when it can. */
 export function cannotPaint(doc: CanvasDocument): string | null {
@@ -35,7 +35,7 @@ export function cannotPaint(doc: CanvasDocument): string | null {
   }
 
   if (layer.isGroup && !paintsMask(doc)) {
-    return `${layer.name} is a folder: pick a layer inside it`
+    return `${layer.name} is a folder: pick a layer inside it, or add a mask to paint on`
   }
 
   if (layer.adjustment && !paintsMask(doc)) {

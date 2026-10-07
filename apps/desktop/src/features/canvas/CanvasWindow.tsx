@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { canOpenInCanvas, isProjectPath, projectContaining } from '../../../shared/canvas/files.ts'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
-import { Menu } from '../files/Menu.tsx'
+import { Menu, type MenuItemDef } from '../files/Menu.tsx'
 import { nudge, placeImage, setLayer } from './actions.ts'
 import { CloseDialog, NewDocumentDialog } from './dialogs.tsx'
 import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, TrimDialog } from './edit-dialogs.tsx'
@@ -12,8 +12,9 @@ import type { CanvasDocument } from './engine/document.ts'
 import type { Raster, Rect } from './engine/raster.ts'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
-import { $dialog, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
+import { $dialog, type CanvasCommand, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
 import { OptionsBar } from './OptionsBar.tsx'
+import { PropertiesPanel } from './PropertiesPanel.tsx'
 import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
 import { HANDLERS } from './tools/index.ts'
 import { settleTools } from './tools/sessions.ts'
@@ -65,6 +66,20 @@ function setOpacityFromKey(doc: CanvasDocument | null, digit: string): void {
 
 const isTyping = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
+/** A menu's commands as the menu shows them, submenus included. */
+function menuItems(commands: CanvasCommand[], doc: CanvasDocument | null): MenuItemDef[] {
+  return commands.map((command) => ({
+    id: command.id,
+    label: commandLabel(command, doc),
+    hint: command.keys ? keysLabel(command.keys) : undefined,
+    disabled: !isEnabled(command, doc),
+    checked: command.checked?.(doc),
+    dividerBefore: command.dividerBefore,
+    submenu: command.submenu && menuItems(command.submenu, doc),
+    onSelect: () => runCommand(command, doc)
+  }))
+}
+
 function MenuBar({ doc }: { doc: CanvasDocument | null }) {
   const [open, setOpen] = useState<string | null>(null)
 
@@ -85,20 +100,7 @@ function MenuBar({ doc }: { doc: CanvasDocument | null }) {
             {menu.label}
           </button>
           {open === menu.id && (
-            <Menu
-              align="left"
-              className="top-full mt-1 min-w-60"
-              onClose={() => setOpen(null)}
-              items={menu.items.map((command) => ({
-                id: command.id,
-                label: commandLabel(command, doc),
-                hint: command.keys ? keysLabel(command.keys) : undefined,
-                disabled: !isEnabled(command, doc),
-                checked: command.checked?.(),
-                dividerBefore: command.dividerBefore,
-                onSelect: () => runCommand(command, doc)
-              }))}
-            />
+            <Menu align="left" className="top-full mt-1 min-w-60" onClose={() => setOpen(null)} items={menuItems(menu.items, doc)} />
           )}
         </div>
       ))}
@@ -211,6 +213,44 @@ function ConflictBar() {
         Load theirs
       </GlassButton>
     </div>
+  )
+}
+
+const PROPERTIES_HEIGHT_KEY = 'herald-canvas.properties-height'
+
+/** Layers above and Properties below, with a divider to share the height between them. */
+function SidePanels({ doc }: { doc: CanvasDocument }) {
+  const [height, setHeight] = useState(() => Number(globalThis.localStorage?.getItem(PROPERTIES_HEIGHT_KEY)) || 340)
+  const aside = useRef<HTMLElement>(null)
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const handle = event.currentTarget
+    handle.setPointerCapture(event.pointerId)
+    const startY = event.clientY
+    const start = height
+    const total = aside.current?.clientHeight ?? 800
+    let last = start
+    const move = (e: PointerEvent) => {
+      last = Math.round(Math.max(140, Math.min(total - 180, start - (e.clientY - startY))))
+      setHeight(last)
+    }
+    const up = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      globalThis.localStorage?.setItem(PROPERTIES_HEIGHT_KEY, String(last))
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+  }
+
+  return (
+    <aside ref={aside} className="flex w-72 shrink-0 flex-col border-l border-line" aria-label="Panels">
+      <LayersPanel doc={doc} />
+      <div role="separator" aria-orientation="horizontal" aria-label="Resize the Properties panel" onPointerDown={onPointerDown} className="h-1.5 shrink-0 cursor-row-resize border-t border-line hover:bg-accent/30" />
+      <div className="flex min-h-0 shrink-0 flex-col" style={{ height, maxHeight: '65%' }}>
+        <PropertiesPanel doc={doc} />
+      </div>
+    </aside>
   )
 }
 
@@ -452,11 +492,7 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       <div className="flex min-h-0 flex-1">
         <ToolPalette />
         {doc ? <Viewport doc={doc} /> : <StartScreen />}
-        {doc && (
-          <aside className="flex w-64 shrink-0 flex-col border-l border-line" aria-label="Panels">
-            <LayersPanel doc={doc} />
-          </aside>
-        )}
+        {doc && <SidePanels doc={doc} />}
       </div>
       <StatusBar doc={doc} />
       {dialog?.kind === 'new' && <NewDocumentDialog />}

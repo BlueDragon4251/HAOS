@@ -6,20 +6,24 @@
 
 import { atom } from 'nanostores'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { ADJUSTMENT_KINDS, defaultEffect } from '../../../shared/canvas/comp-format.ts'
 import {
+  addAdjustmentLayer,
   addFolder,
   addLayer,
   addMask,
   arrange,
-  deleteMask,
+  clearEffects,
   deletePicked,
   duplicatePicked,
   flattenImage,
   groupPicked,
+  maskAction,
   mergeDown,
   mergeTarget,
+  setEffect,
+  showEffects,
   toggleClipping,
-  toggleMask,
   ungroupActive
 } from './actions.ts'
 import {
@@ -41,6 +45,7 @@ import {
   selectLayerPixels
 } from './editing.ts'
 import type { CanvasDocument } from './engine/document.ts'
+import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
 import { isMac } from './platform.ts'
 import { $autosave, exportDocument, notify, openPath, save, setAutosave } from './store.ts'
 import { hasOpenWork, settleTools } from './tools/sessions.ts'
@@ -74,10 +79,12 @@ export interface CanvasCommand {
   /** Off when it cannot apply; commands that need a document are off without one. */
   enabled?: (doc: CanvasDocument) => boolean
   needsDocument?: boolean
-  checked?: () => boolean
+  checked?: (doc: CanvasDocument | null) => boolean
   dividerBefore?: boolean
   /** Works on an open Free Transform rather than putting it in first. */
   inSession?: boolean
+  /** Commands in a submenu of this one (which then runs nothing itself). */
+  submenu?: CanvasCommand[]
 }
 
 export interface CanvasMenu {
@@ -98,6 +105,77 @@ const openFile = async (): Promise<void> => {
 
 const selected = (doc: CanvasDocument): boolean => Boolean(doc.state.selection)
 const hasLayer = (doc: CanvasDocument): boolean => Boolean(doc.active)
+const hasMask = (doc: CanvasDocument): boolean => Boolean(doc.active?.mask)
+const nothing = (): void => {}
+
+const ADJUSTMENT_ITEMS: CanvasCommand[] = ADJUSTMENT_KINDS.map((kind, i) => ({
+  id: `adjustment-${kind}`,
+  label: kind,
+  needsDocument: true,
+  dividerBefore: i === 3 || i === 9,
+  run: onDoc((doc) => addAdjustmentLayer(doc, kind))
+}))
+
+const MASK_ITEMS: CanvasCommand[] = [
+  { id: 'mask-reveal', label: 'Reveal All', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => maskAction(doc, 'reveal')) },
+  { id: 'mask-hide', label: 'Hide All', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => maskAction(doc, 'hide')) },
+  { id: 'mask-reveal-selection', label: 'Reveal Selection', needsDocument: true, enabled: (doc) => hasLayer(doc) && selected(doc), run: onDoc((doc) => maskAction(doc, 'revealSelection')) },
+  { id: 'mask-hide-selection', label: 'Hide Selection', needsDocument: true, enabled: (doc) => hasLayer(doc) && selected(doc), run: onDoc((doc) => maskAction(doc, 'hideSelection')) },
+  { id: 'mask-invert', label: 'Invert', needsDocument: true, enabled: hasMask, run: onDoc((doc) => maskAction(doc, 'invert')), dividerBefore: true },
+  { id: 'mask-apply', label: 'Apply', needsDocument: true, enabled: (doc) => hasMask(doc) && !doc.active?.isGroup && !doc.active?.adjustment, run: onDoc((doc) => maskAction(doc, 'apply')) },
+  {
+    id: 'mask-toggle',
+    label: (doc) => (doc?.active?.maskEnabled === false ? 'Enable' : 'Disable'),
+    needsDocument: true,
+    enabled: hasMask,
+    run: onDoc((doc) => maskAction(doc, doc.active?.maskEnabled === false ? 'enable' : 'disable'))
+  },
+  {
+    id: 'mask-link',
+    label: (doc) => (doc?.active?.maskLinked === false ? 'Link' : 'Unlink'),
+    needsDocument: true,
+    enabled: hasMask,
+    run: onDoc((doc) => maskAction(doc, doc.active?.maskLinked === false ? 'link' : 'unlink'))
+  },
+  { id: 'mask-delete', label: 'Delete', needsDocument: true, enabled: hasMask, run: onDoc((doc) => maskAction(doc, 'remove')), dividerBefore: true }
+]
+
+const EFFECT_ITEMS: CanvasCommand[] = [
+  ...EFFECT_ORDER.map(
+    (kind): CanvasCommand => ({
+      id: `effect-${kind}`,
+      label: EFFECT_NAMES[kind],
+      needsDocument: true,
+      enabled: (doc) => takesEffects(doc.active),
+      checked: (doc) => Boolean(doc?.active?.effects?.[kind]),
+      // Picking one the layer lacks adds it; the Properties panel then shows its settings.
+      run: onDoc((doc) => {
+        const layer = doc.active
+
+        if (layer && !layer.effects?.[kind]) {
+          setEffect(doc, layer, kind, defaultEffect[kind]())
+        } else if (layer) {
+          setEffect(doc, layer, kind, undefined)
+        }
+      })
+    })
+  ),
+  {
+    id: 'effects-visible',
+    label: (doc) => (effectKinds(doc?.active?.effects).every((kind) => (doc?.active?.effects?.[kind] as { enabled?: boolean }).enabled === false) ? 'Show All Effects' : 'Hide All Effects'),
+    needsDocument: true,
+    enabled: (doc) => effectKinds(doc.active?.effects).length > 0,
+    dividerBefore: true,
+    run: onDoc((doc) => {
+      const layer = doc.active
+
+      if (layer) {
+        showEffects(doc, layer, effectKinds(layer.effects).every((kind) => (layer.effects?.[kind] as { enabled?: boolean }).enabled === false))
+      }
+    })
+  },
+  { id: 'effects-clear', label: 'Clear Layer Effects', needsDocument: true, enabled: (doc) => effectKinds(doc.active?.effects).length > 0, run: onDoc((doc) => doc.active && clearEffects(doc, doc.active)) }
+]
 
 export const MENUS: CanvasMenu[] = [
   {
@@ -190,6 +268,7 @@ export const MENUS: CanvasMenu[] = [
     items: [
       { id: 'new-layer', label: 'New Layer', keys: 'mod+shift+n', needsDocument: true, run: onDoc(addLayer) },
       { id: 'new-folder', label: 'New Folder', needsDocument: true, run: onDoc(addFolder) },
+      { id: 'new-adjustment', label: 'New Adjustment Layer', needsDocument: true, run: nothing, submenu: ADJUSTMENT_ITEMS },
       {
         id: 'duplicate',
         label: (doc) => (doc?.state.selection ? 'New Layer via Copy' : 'Duplicate'),
@@ -204,15 +283,8 @@ export const MENUS: CanvasMenu[] = [
       { id: 'group', label: 'Group Layers', keys: 'mod+g', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(groupPicked), dividerBefore: true },
       { id: 'ungroup', label: 'Ungroup', keys: 'mod+shift+g', needsDocument: true, enabled: (doc) => Boolean(doc.active?.isGroup), run: onDoc(ungroupActive) },
       { id: 'mask', label: 'Add Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active && !doc.active.mask), run: onDoc((doc) => addMask(doc)), dividerBefore: true },
-      { id: 'mask-hide', label: 'Add Mask Hiding All', needsDocument: true, enabled: (doc) => Boolean(doc.active && !doc.active.mask), run: onDoc((doc) => addMask(doc, true)) },
-      {
-        id: 'mask-toggle',
-        label: (doc) => (doc?.active?.maskEnabled === false ? 'Turn Mask On' : 'Turn Mask Off'),
-        needsDocument: true,
-        enabled: (doc) => Boolean(doc.active?.mask),
-        run: onDoc(toggleMask)
-      },
-      { id: 'mask-delete', label: 'Delete Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active?.mask), run: onDoc(deleteMask) },
+      { id: 'layer-mask', label: 'Layer Mask', needsDocument: true, enabled: hasLayer, run: nothing, submenu: MASK_ITEMS },
+      { id: 'layer-effects', label: 'Layer Effects', needsDocument: true, enabled: (doc) => takesEffects(doc.active), run: nothing, submenu: EFFECT_ITEMS },
       {
         id: 'clip',
         label: (doc) => (doc?.active?.maskSourceID ? 'Release Clipping Mask' : 'Create Clipping Mask'),
@@ -316,10 +388,13 @@ export function matches(event: KeyboardEvent | ReactKeyboardEvent, keys: string)
   return (aliases[key] ?? [key]).includes(pressed) || (key === '=' && code === 'Equal') || (key === '-' && code === 'Minus') || (key === ']' && code === 'BracketRight') || (key === '[' && code === 'BracketLeft')
 }
 
+/** Commands with the ones in their submenus. */
+const everyCommand = (commands: readonly CanvasCommand[]): CanvasCommand[] => commands.flatMap((command) => [command, ...everyCommand(command.submenu ?? [])])
+
 /** Run the command a key press is for; true when one ran. */
 export function runShortcut(event: KeyboardEvent | ReactKeyboardEvent, doc: CanvasDocument | null): boolean {
   for (const menu of MENUS) {
-    for (const command of menu.items) {
+    for (const command of everyCommand(menu.items)) {
       if ([command.keys, ...(command.also ?? [])].some((keys) => keys && matches(event, keys)) && isEnabled(command, doc)) {
         runCommand(command, doc)
 

@@ -3,8 +3,9 @@
  * step named the way the History shows it.
  */
 
-import { type BlendMode, defaultTransform } from '../../../shared/canvas/comp-format.ts'
+import { type AdjustmentKind, type BlendMode, defaultTransform, type EffectKind, type LayerEffects } from '../../../shared/canvas/comp-format.ts'
 import {
+  adjustmentLayer,
   blankLayer,
   type CanvasDocument,
   type CanvasLayer,
@@ -27,8 +28,12 @@ import {
 } from './engine/document.ts'
 import { baseName } from '../../../shared/canvas/files.ts'
 import { apply, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
+import { EFFECT_NAMES, withAllShown, withEffect, withoutKnownEffects } from './engine/layer-effects.ts'
+import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
 import { offscreen, toRaster } from './engine/project.ts'
 import { Raster } from './engine/raster.ts'
+import { notify } from './store.ts'
+import { $background, $foreground } from './tools/state.ts'
 
 /** An image file as a new layer, centred, shrunk to fit when it is larger than the canvas (pixels kept). */
 export async function placeImage(doc: CanvasDocument, file: string): Promise<void> {
@@ -51,6 +56,31 @@ export function addLayer(doc: CanvasDocument): void {
 export function addFolder(doc: CanvasDocument): void {
   const { state } = doc
   doc.commit('New Folder', insertLayer(state, folderLayer(nextName(state, 'Folder'), state.width, state.height), placementFor(state)))
+}
+
+const unitColour = ([red, green, blue]: [number, number, number]) => ({ red: red / 255, green: green / 255, blue: blue / 255 })
+
+/** A seed of its own, so two Grain or Noise layers do not repeat each other's pattern. */
+const freshSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]
+
+/**
+ * An adjustment layer above the active layer (or at the top of the active folder). A gradient map
+ * runs from the foreground colour to the background one, as photo editors start it.
+ */
+export function addAdjustmentLayer(doc: CanvasDocument, kind: AdjustmentKind): void {
+  const { state } = doc
+  const layer = adjustmentLayer(kind, state.width, state.height)
+  const adjustment = layer.adjustment!
+
+  if (kind === 'Gradient Map') {
+    adjustment.gradientMapSettings = { shadows: unitColour($foreground.get()), highlights: unitColour($background.get()), reversed: false }
+  } else if (kind === 'Grain') {
+    adjustment.grainSettings = { ...adjustment.grainSettings!, seed: freshSeed() }
+  } else if (kind === 'Add Noise') {
+    adjustment.noiseSeed = freshSeed()
+  }
+
+  doc.commit(`New ${kind} Layer`, insertLayer(state, layer, placementFor(state)))
 }
 
 /** Put the picked layers (or the active one) in a new folder. */
@@ -116,7 +146,10 @@ export const setBlendMode = (doc: CanvasDocument, layer: CanvasLayer, mode: Blen
   }
 }
 
-/** A mask showing everything, or hiding everything; a uniform 1×1 mask until something is painted. */
+/**
+ * A mask showing everything, or hiding everything (a uniform 1×1 mask until something is painted);
+ * with a selection, one showing (or hiding) just the selection.
+ */
 export function addMask(doc: CanvasDocument, hideAll = false): void {
   const active = doc.active
 
@@ -124,8 +157,49 @@ export function addMask(doc: CanvasDocument, hideAll = false): void {
     return
   }
 
+  if (doc.state.selection) {
+    maskAction(doc, hideAll ? 'hideSelection' : 'revealSelection')
+
+    return
+  }
+
   doc.commit(hideAll ? 'Add Mask (Hide All)' : 'Add Mask', withLayer(doc.state, active.id, { mask: Raster.filled(1, 1, hideAll ? 0 : 255, 1), maskEnabled: true, maskLinked: true, maskPlacement: undefined }))
 }
+
+/** Layer > Layer Mask: one step on the layer's mask (making one where the action does); what stands in the way is shown as a notice. */
+export function maskAction(doc: CanvasDocument, action: MaskAction, layer: CanvasLayer | undefined = doc.active): void {
+  if (!layer) {
+    return
+  }
+
+  let next: DocState
+
+  try {
+    next = withMaskAction(doc.state, layer.id, action)
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error), 'error')
+
+    return
+  }
+
+  if (next !== doc.state) {
+    if ((action === 'remove' || action === 'apply') && doc.active?.id === layer.id) {
+      doc.maskTargeted = false
+    }
+
+    doc.commit(MASK_LABELS[action], next)
+  }
+}
+
+/** One effect on a layer set to a record, or removed with undefined, as one step. */
+export function setEffect<K extends EffectKind>(doc: CanvasDocument, layer: CanvasLayer, kind: K, record: LayerEffects[K] | undefined, label = record ? `${EFFECT_NAMES[kind]}` : `Remove ${EFFECT_NAMES[kind]}`): void {
+  setLayer(doc, layer.id, { effects: withEffect(layer.effects, kind, record) }, label)
+}
+
+/** Every effect on the layer hidden or shown, settings kept. */
+export const showEffects = (doc: CanvasDocument, layer: CanvasLayer, shown: boolean): void => setLayer(doc, layer.id, { effects: withAllShown(layer.effects, shown) }, shown ? 'Show Layer Effects' : 'Hide Layer Effects')
+
+export const clearEffects = (doc: CanvasDocument, layer: CanvasLayer): void => setLayer(doc, layer.id, { effects: withoutKnownEffects(layer.effects) }, 'Clear Layer Effects')
 
 export function deleteMask(doc: CanvasDocument): void {
   const active = doc.active
