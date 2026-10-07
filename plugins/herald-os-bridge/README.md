@@ -12,6 +12,7 @@ __init__.py          register(): the `herald_os` toolset and the bundled skills 
 plugin.yaml          manifest: name, version, tools, supported platforms
 bridge/
   tools.py           tool schemas and handlers (TOOL_SPECS)
+  scope.py           where the tools are offered and run: Herald OS sessions only
   permissions.py     tiers, protected paths, the approval gate
   audit.py           one JSON line per call in $HERMES_HOME/herald-os/audit.jsonl
   crash.py           crash report summaries for system_logs (macOS .ips, Linux core dumps)

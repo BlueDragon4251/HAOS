@@ -165,6 +165,7 @@ See [`SYSTEM-BRIDGE.md`](SYSTEM-BRIDGE.md).
 - Only `apps/shared/src` is compiled into Herald OS, from a pinned snapshot
   (`upstream/UPSTREAM.lock`, fetched by `scripts/sync-upstream.sh`).
 - The plugin uses only public plugin APIs (`register`, `ctx.register_tool`, `ctx.register_skill`,
-  `tools.approval.request_tool_approval`).
+  `tools.approval.request_tool_approval`), and reads each turn's session source the way Hermes's own
+  tools do (`gateway.session_context.get_session_env`) to keep its tools to Herald OS sessions.
 - Anything Herald OS needs from core that does not exist yet (for example a generic plugin
   server-request hook for client-side execution) is proposed upstream rather than patched locally.
