@@ -3,7 +3,7 @@
  * texture cache that uploads a raster once and afterwards only the part that changed.
  */
 
-import type { Raster } from '../raster.ts'
+import type { Raster, Rect } from '../raster.ts'
 
 export interface Target {
   texture: WebGLTexture
@@ -12,6 +12,8 @@ export interface Target {
   height: number
   /** Mipmap levels allocated (1 for none). */
   levels: number
+  /** What it holds: colour, or whole-number pixel positions (jump flooding's nearest seeds). */
+  format: 'precise' | 'bytes' | 'seeds'
 }
 
 export class Program {
@@ -44,6 +46,25 @@ export class Program {
 
   float(name: string, value: number): this {
     this.gl.uniform1f(this.at(name), value)
+
+    return this
+  }
+
+  /** A whole uniform array from its first element. */
+  floats(name: string, values: Float32Array | number[]): this {
+    this.gl.uniform1fv(this.at(name), values)
+
+    return this
+  }
+
+  uint(name: string, value: number): this {
+    this.gl.uniform1ui(this.at(name), value >>> 0)
+
+    return this
+  }
+
+  ivec2(name: string, x: number, y: number): this {
+    this.gl.uniform2i(this.at(name), x, y)
 
     return this
   }
@@ -167,25 +188,73 @@ export class Gpu {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, sampling === 'nearest' ? gl.NEAREST : gl.LINEAR)
   }
 
-  /** A texture to render into, transparent; `mipmaps` allocates levels for zoomed-out drawing. */
-  createTarget(width: number, height: number, options: { mipmaps?: boolean; precise?: boolean } = {}): Target {
+  /**
+   * A texture to render into, transparent; `mipmaps` allocates levels for zoomed-out drawing. `seeds`
+   * holds whole numbers (four 16-bit channels) rather than colour, and is only read with texelFetch.
+   */
+  createTarget(width: number, height: number, options: { mipmaps?: boolean; precise?: boolean; seeds?: boolean } = {}): Target {
     const { gl } = this
     const levels = options.mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
+    const format: Target['format'] = options.seeds ? 'seeds' : options.precise !== false && this.halfFloat ? 'precise' : 'bytes'
     const texture = gl.createTexture()!
     this.bindScratch(texture)
-    gl.texStorage2D(gl.TEXTURE_2D, levels, options.precise !== false && this.halfFloat ? gl.RGBA16F : gl.RGBA8, width, height)
+    gl.texStorage2D(gl.TEXTURE_2D, levels, format === 'seeds' ? gl.RGBA16UI : format === 'precise' ? gl.RGBA16F : gl.RGBA8, width, height)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    this.setSampling(texture, 'linear')
+    // Whole-number textures cannot be filtered: anything but nearest leaves them unreadable.
+    this.setSampling(texture, format === 'seeds' ? 'nearest' : 'linear')
 
     const framebuffer = gl.createFramebuffer()!
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer)
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
-    gl.clearColor(0, 0, 0, 0)
-    gl.clear(gl.COLOR_BUFFER_BIT)
+    const target: Target = { texture, framebuffer, width, height, levels, format }
+    this.clearBound(target)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
 
-    return { texture, framebuffer, width, height, levels }
+    return target
+  }
+
+  private clearBound(target: Target | null): void {
+    const { gl } = this
+
+    if (target?.format === 'seeds') {
+      gl.clearBufferuiv(gl.COLOR, 0, new Uint32Array(4))
+    } else {
+      gl.clearColor(0, 0, 0, 0)
+      gl.clear(gl.COLOR_BUFFER_BIT)
+    }
+  }
+
+  /** A one-channel float texture of exact values (lookup tables), read with texelFetch. */
+  floatTexture(width: number, height: number, data: Float32Array, reuse?: WebGLTexture | null): WebGLTexture {
+    const { gl } = this
+    const texture = reuse ?? gl.createTexture()!
+    this.bindScratch(texture)
+
+    if (!reuse) {
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R32F, width, height)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      this.setSampling(texture, 'nearest')
+    }
+
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.FLOAT, data)
+
+    return texture
+  }
+
+  /** Limit drawing to a rectangle of the bound target (in its pixels, rows from the top), or lift the limit. */
+  scissor(rect: Rect | null): void {
+    const { gl } = this
+
+    if (!rect) {
+      gl.disable(gl.SCISSOR_TEST)
+
+      return
+    }
+
+    gl.enable(gl.SCISSOR_TEST)
+    gl.scissor(rect.x, rect.y, rect.width, rect.height)
   }
 
   deleteTarget(target: Target | null | undefined): void {
@@ -195,15 +264,15 @@ export class Gpu {
     }
   }
 
-  /** Draw into a target (or the screen when null), clearing it first unless told otherwise. */
+  /** Draw into a target (or the screen when null), clearing it first unless told otherwise; any scissor limit is lifted. */
   bindTarget(target: Target | null, width: number, height: number, clear = true): void {
     const { gl } = this
+    gl.disable(gl.SCISSOR_TEST)
     gl.bindFramebuffer(gl.FRAMEBUFFER, target?.framebuffer ?? null)
     gl.viewport(0, 0, width, height)
 
     if (clear) {
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT)
+      this.clearBound(target)
     }
   }
 

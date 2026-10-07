@@ -33,7 +33,8 @@ void main() {
 }
 `
 
-const COVERAGE = `
+/** How much of a layer reaches a pixel: its mask, opacity, enclosing folders' masks and clipping base. */
+export const COVERAGE = `
 uniform int u_maskMode;          // 0 none, 1 linked to the layer, 2 placed on its own
 uniform sampler2D u_mask;
 uniform mat3 u_docToMask;        // document pixels to the placed mask's unit square
@@ -90,7 +91,8 @@ void main() {
 }
 `
 
-const BLEND_FUNCTIONS = `
+/** The blend modes on straight colour (`blendColor`), and `composite` for premultiplied layers. */
+export const BLEND_FUNCTIONS = `
 float lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
 vec3 clipColor(vec3 c) {
   float l = lum(c);

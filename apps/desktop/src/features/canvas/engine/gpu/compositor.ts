@@ -10,6 +10,9 @@ import { LIMITS } from '../../../../../shared/canvas/comp-format.ts'
 import { ancestorsOf, type CanvasLayer, type DocState, findLayer, isShown } from '../document.ts'
 import { invert, type Mat, multiply, scale as scaleMat, toMat3, unitToDocument } from '../geometry.ts'
 import { Raster, type Rect } from '../raster.ts'
+import { AdjustmentPass } from './adjustments.ts'
+import { EffectsPass } from './effects.ts'
+import { Filters } from './filters.ts'
 import { Gpu, type Program, RasterTextures, type Sampling, type Target } from './gl.ts'
 import { BLEND_FRAGMENT, blendModeIndex, COPY_FRAGMENT, COVERAGE_FRAGMENT, FULL_VERTEX, LAYER_FRAGMENT, PLACE_VERTEX } from './shaders.ts'
 
@@ -40,12 +43,27 @@ export interface FrameInfo {
   height: number
   scale: number
   docToTarget: Mat
+  /** Whether work targets of this size hold half floats (smaller renders) or bytes (huge ones, to save memory). */
+  precise: boolean
+  /** The document position of the target's pixel 0, for a target that holds only part of the frame. */
+  docOffset?: [number, number]
 }
 
-/** Draws a layer kind the base compositor does not (adjustments, effects) into the bound target. */
+/** What reaches a layer from outside it: its opacity (folders' included), its folders' masks and its clipping base. */
+export interface LayerCoverage {
+  opacity: number
+  folderMask: Target | null
+  clip: Target | null
+}
+
+/** Draws a layer kind the base compositor does not (adjustments, effects). */
 export interface LayerPass {
-  /** Draw `layer` over `backdrop` into the bound target; false when this pass does not handle it. */
-  draw(layer: CanvasLayer, backdrop: Target, frame: FrameInfo, coverage: { opacity: number; folderMask: Target | null; clip: Target | null }): boolean
+  /**
+   * Draw `layer` over `backdrop` into `into`. True only when every pixel of `into` was written (the
+   * backdrop with this layer on it); false leaves the layer to the plain path.
+   */
+  draw(layer: CanvasLayer, backdrop: Target, into: Target, frame: FrameInfo, coverage: LayerCoverage): boolean
+  dispose?(): void
 }
 
 interface FrameState extends FrameInfo {
@@ -56,10 +74,16 @@ interface FrameState extends FrameInfo {
 
 const PRECISE_PIXELS = 16_777_216
 
+/** GPU memory work targets kept between renders may take; past it the oldest go. */
+const SPARE_BYTES = 384 * 1024 * 1024
+
+const bytesOf = (target: Target): number => target.width * target.height * (target.format === 'bytes' ? 4 : 8)
+
 export class Compositor {
   readonly textures: RasterTextures
+  readonly filters: Filters
   private targets: { a: Target; b: Target; source: Target; width: number; height: number } | null = null
-  private pool: Target[] = []
+  private spares: Target[] = []
   private readonly white: WebGLTexture
   private readonly layerProgram: Program
   private readonly coverageProgram: Program
@@ -79,11 +103,44 @@ export class Compositor {
     this.coverageProgram = gpu.program(PLACE_VERTEX, COVERAGE_FRAGMENT)
     this.blendProgram = gpu.program(FULL_VERTEX, BLEND_FRAGMENT)
     this.copyProgram = gpu.program(FULL_VERTEX, COPY_FRAGMENT)
+    this.filters = new Filters(this)
+    this.passes.push(new AdjustmentPass(this), new EffectsPass(this))
   }
 
   /** A 1×1 white texture, bound to samplers a draw does not use. */
   get blank(): WebGLTexture {
     return this.white
+  }
+
+  /** The program that draws a layer's pixels through its mask and coverage (premultiplied out). */
+  get layerShader(): Program {
+    return this.layerProgram
+  }
+
+  /** A cleared work target of any size, bound for drawing; give it back with `release` once done. */
+  temporary(width: number, height: number, format: Target['format'] = 'precise'): Target {
+    const wanted = format === 'precise' && !this.gpu.halfFloat ? 'bytes' : format
+    const index = this.spares.findIndex((target) => target.width === width && target.height === height && target.format === wanted)
+    const target = index >= 0 ? this.spares.splice(index, 1)[0] : this.gpu.createTarget(width, height, { precise: wanted === 'precise', seeds: wanted === 'seeds' })
+    this.gpu.bindTarget(target, width, height)
+
+    return target
+  }
+
+  release(...targets: (Target | null | undefined)[]): void {
+    for (const target of targets) {
+      if (target && !this.spares.includes(target)) {
+        this.spares.push(target)
+      }
+    }
+
+    let bytes = this.spares.reduce((sum, target) => sum + bytesOf(target), 0)
+
+    while (bytes > SPARE_BYTES && this.spares.length) {
+      const oldest = this.spares.shift()!
+      bytes -= bytesOf(oldest)
+      this.gpu.deleteTarget(oldest)
+    }
   }
 
   private ensure(width: number, height: number) {
@@ -105,7 +162,7 @@ export class Compositor {
   }
 
   private borrow(frame: FrameState): Target {
-    const target = this.pool.pop() ?? this.gpu.createTarget(frame.width, frame.height, { precise: false })
+    const target = this.temporary(frame.width, frame.height, 'bytes')
     frame.borrowed.push(target)
 
     return target
@@ -118,7 +175,7 @@ export class Compositor {
     const width = Math.max(1, Math.round(state.width * scale))
     const height = Math.max(1, Math.round(state.height * scale))
     const targets = this.ensure(width, height)
-    const frame: FrameState = { width, height, scale, docToTarget: scaleMat(scale), folders: new Map(), clips: new Map(), borrowed: [] }
+    const frame: FrameState = { width, height, scale, docToTarget: scaleMat(scale), precise: width * height <= PRECISE_PIXELS, folders: new Map(), clips: new Map(), borrowed: [] }
     const overrides = options.overrides
     const view: DocState = overrides?.size ? { ...state, layers: state.layers.map((layer) => (overrides.has(layer.id) ? { ...layer, ...overrides.get(layer.id) } : layer)) } : state
     let current = targets.a
@@ -152,9 +209,7 @@ export class Compositor {
       const clip = layer.maskSourceID ? this.clipCoverage(view, layer.maskSourceID, frame, new Set([layer.id])) : null
 
       if (this.passes.length && (layer.adjustment || layer.effects)) {
-        this.gpu.bindTarget(other, width, height, false)
-
-        if (this.passes.some((pass) => pass.draw(layer, current, frame, { opacity, folderMask, clip }))) {
+        if (this.passes.some((pass) => pass.draw(layer, current, other, frame, { opacity, folderMask, clip }))) {
           ;[current, other] = [other, current]
           continue
         }
@@ -179,7 +234,7 @@ export class Compositor {
       }
     }
 
-    this.pool.push(...frame.borrowed)
+    this.release(...frame.borrowed)
     this.textures.sweep()
 
     return { target: current, width, height, scale }
@@ -195,7 +250,8 @@ export class Compositor {
   /** Set the uniforms every placed draw shares, and draw the layer's quad. */
   drawLayer(program: Program, layer: CanvasLayer, frame: FrameInfo, opacity: number, folderMask: Target | null, clip: Target | null): void {
     const place = multiply(frame.docToTarget, unitToDocument(layer.transform))
-    program.use().mat3('u_place', toMat3(place)).vec2('u_size', frame.width, frame.height).float('u_scale', frame.scale).vec2('u_docOffset', 0, 0).float('u_opacity', opacity)
+    const [offsetX, offsetY] = frame.docOffset ?? [0, 0]
+    program.use().mat3('u_place', toMat3(place)).vec2('u_size', frame.width, frame.height).float('u_scale', frame.scale).vec2('u_docOffset', offsetX, offsetY).float('u_opacity', opacity)
 
     if (layer.pixels) {
       const onTarget = (Math.abs(layer.transform.size[0]) * frame.scale) / layer.pixels.width
@@ -318,13 +374,14 @@ export class Compositor {
       this.targets = null
     }
 
-    this.pool.forEach((target) => this.gpu.deleteTarget(target))
-    this.pool = []
+    this.spares.forEach((target) => this.gpu.deleteTarget(target))
+    this.spares = []
   }
 
   dispose(): void {
     this.disposeTargets()
     this.textures.clear()
+    this.passes.forEach((pass) => pass.dispose?.())
     this.gpu.gl.deleteTexture(this.white)
   }
 }
