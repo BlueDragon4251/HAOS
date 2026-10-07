@@ -45,7 +45,8 @@ export const TOOL_ICONS: Record<ToolId, React.ReactNode> = {
   type: <IconTypography size={17} />,
   shape: <IconShape size={17} />,
   hand: <IconHandStop size={17} />,
-  zoom: <IconZoomIn size={17} />
+  zoom: <IconZoomIn size={17} />,
+  refine: <IconBrush size={17} />
 }
 
 /** A tool's name with its key, for tooltips: "Brush (B)", "Gradient (G, again for the next)". */

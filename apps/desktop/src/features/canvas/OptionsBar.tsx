@@ -55,6 +55,7 @@ import {
   $heal,
   $marquee,
   $objectSelect,
+  $refineBrush,
   $selectionMode,
   $shape,
   $showTransform,
@@ -499,6 +500,7 @@ export function OptionsBar({ doc }: { doc: CanvasDocument }) {
   const gradient = useStore($gradient)
   const eyedropper = useStore($eyedropper)
   const shape = useStore($shape)
+  const refineBrush = useStore($refineBrush)
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-3 overflow-x-auto border-b border-line px-3 text-[12px] whitespace-nowrap text-fg-2">
@@ -526,6 +528,12 @@ export function OptionsBar({ doc }: { doc: CanvasDocument }) {
       )}
       {tool === 'object-select' && <ObjectSelectFields doc={doc} />}
       {tool === 'heal' && <HealFields />}
+      {tool === 'refine' && (
+        <>
+          <NumberField label="Size" title="Size ([ and ])" value={refineBrush.size} min={1} max={2000} unit="px" onChange={(size) => $refineBrush.set({ size })} />
+          <span className="text-fg-3">Paint over hair and fur to work their edge out again; Alt-paint takes a stroke back. Enter applies, Esc cancels.</span>
+        </>
+      )}
       {tool === 'crop' && <CropFields doc={doc} />}
       {tool === 'eyedropper' && (
         <Segmented

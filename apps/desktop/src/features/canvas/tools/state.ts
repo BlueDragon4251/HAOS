@@ -28,6 +28,7 @@ export type ToolId =
   | 'shape'
   | 'hand'
   | 'zoom'
+  | 'refine'
 
 export interface ToolDef {
   id: ToolId
@@ -59,7 +60,10 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'zoom', label: 'Zoom', key: 'z', group: 'zoom' }
 ]
 
-export const toolDef = (id: ToolId): ToolDef => TOOLS.find((def) => def.id === id)!
+/** Tools a workspace puts in hand for itself (Select and Mask's Refine Edge brush), not on the palette. */
+const WORKSPACE_TOOLS: readonly ToolDef[] = [{ id: 'refine', label: 'Refine Edge Brush', key: '', group: 'refine' }]
+
+export const toolDef = (id: ToolId): ToolDef => TOOLS.find((def) => def.id === id) ?? WORKSPACE_TOOLS.find((def) => def.id === id)!
 
 /** The palette's buttons in order, each a group. */
 export const GROUPS: readonly string[] = [...new Set(TOOLS.map((def) => def.group))]
@@ -76,7 +80,7 @@ export function setTool(id: ToolId): void {
 
 /** A tool's key: its group's tool, or with the group already in hand (or Shift held), the next one in the group. */
 export function toolForKey(key: string, cycle: boolean): ToolId | null {
-  const inGroup = TOOLS.filter((def) => def.key === key)
+  const inGroup = key ? TOOLS.filter((def) => def.key === key) : []
 
   if (!inGroup.length) {
     return null
@@ -157,6 +161,9 @@ export interface TypeOptions {
 }
 
 export const $type = atom<TypeOptions>({ family: 'Helvetica', weight: 400, italic: false, size: 72, alignment: 'Left', tracking: 0, leading: 0 })
+
+/** Select and Mask's Refine Edge brush: its diameter in document pixels. */
+export const $refineBrush = atom({ size: 40 })
 
 /** The painting tool's options atom, for the keys that change size and opacity. */
 export function paintOptionsFor(tool: ToolId): typeof $brush | null {

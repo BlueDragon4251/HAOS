@@ -11,12 +11,14 @@ import { healTool } from './heal.ts'
 import { moveTool } from './move.ts'
 import { objectSelectTool } from './object-select.ts'
 import { lassoTool, marqueeTools, polygonLassoTool, wandTool } from './select.ts'
+import { refineTool } from '../select-mask.ts'
 import { shapeTool } from './shape.ts'
 import type { ToolId } from './state.ts'
 import { typeTool } from './type.ts'
 import type { ToolHandler } from './types.ts'
 
 export const HANDLERS: Partial<Record<ToolId, ToolHandler>> = {
+  refine: refineTool,
   move: moveTool,
   marquee: marqueeTools.rect,
   'ellipse-marquee': marqueeTools.ellipse,

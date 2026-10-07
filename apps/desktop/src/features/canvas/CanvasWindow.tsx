@@ -25,10 +25,11 @@ import { $dialog, type CanvasCommand, commandLabel, isEnabled, keysLabel, MENUS,
 import { OptionsBar } from './OptionsBar.tsx'
 import { PropertiesPanel } from './PropertiesPanel.tsx'
 import { Rulers } from './Rulers.tsx'
+import { SelectMaskPanel } from './SelectMaskPanel.tsx'
 import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
 import { HANDLERS } from './tools/index.ts'
 import { settleTools } from './tools/sessions.ts'
-import { $bucket, $gradient, $heal, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
+import { $bucket, $gradient, $heal, $refineBrush, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
 import { ToolPalette } from './ToolPalette.tsx'
 import { $panelTab, $pointer, $views, forgetView, type PanelTab, showPanel, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
@@ -466,6 +467,8 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
         options.set(event.shiftKey ? { ...current, hardness: Math.max(0, Math.min(1, Math.round((current.hardness + direction * 0.25) * 4) / 4)) } : { ...current, size: stepSize(current.size, direction) })
       } else if ($tool.get() === 'heal') {
         $heal.set({ size: stepSize($heal.get().size, direction) })
+      } else if ($tool.get() === 'refine') {
+        $refineBrush.set({ size: stepSize($refineBrush.get().size, direction) })
       }
 
       return
@@ -559,6 +562,7 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {doc && dialog?.kind === 'generate' && <GenerateDialog doc={doc} mode={dialog.mode} />}
       {dialog?.kind === 'models' && <ModelsDialog />}
       {dialog?.kind === 'notes' && <NotesDialog title={dialog.title} notes={dialog.notes} />}
+      {doc && <SelectMaskPanel />}
       <ModelPrompt />
     </div>
   )

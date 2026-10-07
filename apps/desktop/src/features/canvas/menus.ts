@@ -52,6 +52,7 @@ import { cannotSegment, selectSubject } from './ai/remove-background.ts'
 import { ALIGN_EDGES, ALIGN_LABELS, DISTRIBUTE_LABELS, DISTRIBUTE_MODES } from './engine/align.ts'
 import { FILTER_NAMES, type FilterKind } from './engine/filters.ts'
 import { applyFilterToDocument, lastFilter } from './filter-run.ts'
+import { startSelectMask } from './select-mask.ts'
 import { cannotPaint } from './tools/target.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
@@ -407,6 +408,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'reselect', label: 'Reselect', keys: 'mod+shift+d', needsDocument: true, enabled: (doc) => Boolean(doc.lastSelection && !doc.state.selection), run: onDoc(reselect) },
       { id: 'inverse', label: 'Inverse', keys: 'mod+shift+i', needsDocument: true, enabled: selected, run: onDoc(invertSelected) },
       { id: 'subject', label: 'Subject', needsDocument: true, enabled: (doc) => doc.state.layers.length > 0, run: onDoc((doc) => void subject(doc)) },
+      { id: 'select-and-mask', label: 'Select and Mask…', keys: 'mod+alt+r', needsDocument: true, enabled: (doc) => selected(doc) || Boolean(doc.editingMask), run: onDoc(startSelectMask) },
       { id: 'feather', label: 'Feather…', keys: 'shift+f6', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'feather' }), dividerBefore: true },
       { id: 'expand', label: 'Expand…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'expand' }) },
       { id: 'contract', label: 'Contract…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'contract' }) },
