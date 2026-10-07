@@ -1,6 +1,7 @@
 /*
  * Herald Canvas's menus and their shortcuts, in one table so the two never disagree. Shortcuts
- * follow the usual photo-editor keys (⌘J duplicates, ⌘E merges down, ⌘G groups).
+ * follow the usual photo-editor keys (⌘J duplicates or copies the selection to a layer, ⌘E merges
+ * down, ⌘G groups, ⌘T transforms, ⇧F5 fills).
  */
 
 import { atom } from 'nanostores'
@@ -21,14 +22,44 @@ import {
   toggleMask,
   ungroupActive
 } from './actions.ts'
+import {
+  clearSelection,
+  copySelection,
+  cropToSelection,
+  cutSelection,
+  deselect,
+  fillSelection,
+  flipCanvasWay,
+  invertSelected,
+  layerViaCopy,
+  paste,
+  rasterize,
+  reselect,
+  rotateCanvasBy,
+  selectEverything,
+  type SelectionChange,
+  selectLayerPixels
+} from './editing.ts'
 import type { CanvasDocument } from './engine/document.ts'
+import { isMac } from './platform.ts'
 import { $autosave, exportDocument, notify, openPath, save, setAutosave } from './store.ts'
+import { hasOpenWork, settleTools } from './tools/sessions.ts'
+import { $background, $foreground, setTool } from './tools/state.ts'
+import { startTransform, turnPicked } from './tools/transform.ts'
 import { actualPixels, fitToScreen, zoomStep } from './view-state.ts'
 
-export const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
+export { isMac }
 
 /** Dialogs the window shows on request. */
-export type CanvasDialog = { kind: 'new' } | { kind: 'close'; key: string } | null
+export type CanvasDialog =
+  | { kind: 'new' }
+  | { kind: 'close'; key: string }
+  | { kind: 'canvas-size' }
+  | { kind: 'image-size' }
+  | { kind: 'trim' }
+  | { kind: 'fill' }
+  | { kind: 'modify-selection'; change: SelectionChange }
+  | null
 
 export const $dialog = atom<CanvasDialog>(null)
 
@@ -37,12 +68,16 @@ export interface CanvasCommand {
   label: string | ((doc: CanvasDocument | null) => string)
   /** `mod` is ⌘ on the Mac and Ctrl elsewhere: `mod+shift+z`. */
   keys?: string
+  /** Other keys that run it, not shown in the menu. */
+  also?: string[]
   run: (doc: CanvasDocument | null) => void
   /** Off when it cannot apply; commands that need a document are off without one. */
   enabled?: (doc: CanvasDocument) => boolean
   needsDocument?: boolean
   checked?: () => boolean
   dividerBefore?: boolean
+  /** Works on an open Free Transform rather than putting it in first. */
+  inSession?: boolean
 }
 
 export interface CanvasMenu {
@@ -60,6 +95,9 @@ const openFile = async (): Promise<void> => {
     openPath(file).catch((error: unknown) => notify(`Could not open ${file.split('/').pop()}: ${error instanceof Error ? error.message : String(error)}`, 'error'))
   }
 }
+
+const selected = (doc: CanvasDocument): boolean => Boolean(doc.state.selection)
+const hasLayer = (doc: CanvasDocument): boolean => Boolean(doc.active)
 
 export const MENUS: CanvasMenu[] = [
   {
@@ -82,13 +120,69 @@ export const MENUS: CanvasMenu[] = [
     label: 'Edit',
     items: [
       { id: 'undo', label: (doc) => (doc?.history.undoLabel ? `Undo ${doc.history.undoLabel}` : 'Undo'), keys: 'mod+z', needsDocument: true, enabled: (doc) => doc.history.canUndo, run: onDoc((doc) => doc.undo()) },
-      { id: 'redo', label: (doc) => (doc?.history.redoLabel ? `Redo ${doc.history.redoLabel}` : 'Redo'), keys: 'mod+shift+z', needsDocument: true, enabled: (doc) => doc.history.canRedo, run: onDoc((doc) => doc.redo()) }
+      { id: 'redo', label: (doc) => (doc?.history.redoLabel ? `Redo ${doc.history.redoLabel}` : 'Redo'), keys: 'mod+shift+z', needsDocument: true, enabled: (doc) => doc.history.canRedo, run: onDoc((doc) => doc.redo()) },
+      { id: 'cut', label: 'Cut', keys: 'mod+x', needsDocument: true, enabled: selected, run: onDoc(cutSelection), dividerBefore: true },
+      { id: 'copy', label: 'Copy', keys: 'mod+c', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => copySelection(doc)) },
+      { id: 'copy-merged', label: 'Copy Merged', keys: 'mod+shift+c', needsDocument: true, run: onDoc((doc) => copySelection(doc, true)) },
+      { id: 'paste', label: 'Paste', keys: 'mod+v', needsDocument: true, run: onDoc((doc) => void paste(doc).catch((error: unknown) => notify(`Could not paste: ${error instanceof Error ? error.message : String(error)}`, 'error'))) },
+      { id: 'fill', label: 'Fill…', keys: 'shift+f5', also: ['shift+backspace'], needsDocument: true, enabled: hasLayer, run: () => $dialog.set({ kind: 'fill' }), dividerBefore: true },
+      { id: 'fill-foreground', label: 'Fill with Foreground', keys: 'alt+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$foreground.get(), 255])) },
+      { id: 'fill-background', label: 'Fill with Background', keys: 'mod+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$background.get(), 255])) },
+      {
+        id: 'clear',
+        label: (doc) => (doc?.state.selection ? 'Clear' : 'Delete Layer'),
+        keys: 'backspace',
+        also: ['delete'],
+        needsDocument: true,
+        enabled: (doc) => doc.picked.length > 0,
+        run: onDoc((doc) => clearSelection(doc) || deletePicked(doc))
+      },
+      {
+        id: 'free-transform',
+        label: 'Free Transform',
+        keys: 'mod+t',
+        needsDocument: true,
+        enabled: hasLayer,
+        inSession: true,
+        run: onDoc((doc) => {
+          setTool('move')
+          startTransform(doc)
+        }),
+        dividerBefore: true
+      },
+      {
+        id: 'distort',
+        label: 'Distort',
+        needsDocument: true,
+        enabled: hasLayer,
+        inSession: true,
+        run: onDoc((doc) => {
+          setTool('move')
+          startTransform(doc, { distort: true })
+        })
+      },
+      { id: 'flip-horizontal', label: 'Flip Horizontal', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { flip: 'horizontal' }, 'Flip Horizontal')) },
+      { id: 'flip-vertical', label: 'Flip Vertical', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { flip: 'vertical' }, 'Flip Vertical')) },
+      { id: 'rotate-180', label: 'Rotate 180°', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: 180 }, 'Rotate 180°')) },
+      { id: 'rotate-cw', label: 'Rotate 90° Clockwise', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: 90 }, 'Rotate 90° Clockwise')) },
+      { id: 'rotate-ccw', label: 'Rotate 90° Counter Clockwise', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: -90 }, 'Rotate 90° Counter Clockwise')) }
     ]
   },
   {
     id: 'image',
     label: 'Image',
-    items: [{ id: 'flatten', label: 'Flatten Image', needsDocument: true, enabled: (doc) => doc.state.layers.length > 0, run: onDoc(flattenImage) }]
+    items: [
+      { id: 'image-size', label: 'Image Size…', keys: 'mod+alt+i', needsDocument: true, run: () => $dialog.set({ kind: 'image-size' }) },
+      { id: 'canvas-size', label: 'Canvas Size…', keys: 'mod+alt+c', needsDocument: true, run: () => $dialog.set({ kind: 'canvas-size' }) },
+      { id: 'crop', label: 'Crop to Selection', needsDocument: true, enabled: selected, run: onDoc(cropToSelection), dividerBefore: true },
+      { id: 'trim', label: 'Trim…', needsDocument: true, run: () => $dialog.set({ kind: 'trim' }) },
+      { id: 'rotate-canvas-180', label: 'Rotate Canvas 180°', needsDocument: true, run: onDoc((doc) => rotateCanvasBy(doc, 2)), dividerBefore: true },
+      { id: 'rotate-canvas-cw', label: 'Rotate Canvas 90° Clockwise', needsDocument: true, run: onDoc((doc) => rotateCanvasBy(doc, 1)) },
+      { id: 'rotate-canvas-ccw', label: 'Rotate Canvas 90° Counter Clockwise', needsDocument: true, run: onDoc((doc) => rotateCanvasBy(doc, 3)) },
+      { id: 'flip-canvas-horizontal', label: 'Flip Canvas Horizontal', needsDocument: true, run: onDoc((doc) => flipCanvasWay(doc, true)) },
+      { id: 'flip-canvas-vertical', label: 'Flip Canvas Vertical', needsDocument: true, run: onDoc((doc) => flipCanvasWay(doc, false)) },
+      { id: 'flatten', label: 'Flatten Image', needsDocument: true, enabled: (doc) => doc.state.layers.length > 0, run: onDoc(flattenImage), dividerBefore: true }
+    ]
   },
   {
     id: 'layer',
@@ -96,8 +190,17 @@ export const MENUS: CanvasMenu[] = [
     items: [
       { id: 'new-layer', label: 'New Layer', keys: 'mod+shift+n', needsDocument: true, run: onDoc(addLayer) },
       { id: 'new-folder', label: 'New Folder', needsDocument: true, run: onDoc(addFolder) },
-      { id: 'duplicate', label: 'Duplicate', keys: 'mod+j', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(duplicatePicked) },
+      {
+        id: 'duplicate',
+        label: (doc) => (doc?.state.selection ? 'New Layer via Copy' : 'Duplicate'),
+        keys: 'mod+j',
+        needsDocument: true,
+        enabled: (doc) => doc.picked.length > 0,
+        run: onDoc((doc) => (doc.state.selection ? layerViaCopy(doc) : duplicatePicked(doc)))
+      },
+      { id: 'via-cut', label: 'New Layer via Cut', keys: 'mod+shift+j', needsDocument: true, enabled: (doc) => selected(doc) && Boolean(doc.active?.pixels), run: onDoc((doc) => layerViaCopy(doc, true)) },
       { id: 'delete', label: 'Delete', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(deletePicked) },
+      { id: 'rasterize', label: 'Rasterize', needsDocument: true, enabled: (doc) => Boolean(doc.active?.text || doc.active?.shape), run: onDoc(rasterize) },
       { id: 'group', label: 'Group Layers', keys: 'mod+g', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(groupPicked), dividerBefore: true },
       { id: 'ungroup', label: 'Ungroup', keys: 'mod+shift+g', needsDocument: true, enabled: (doc) => Boolean(doc.active?.isGroup), run: onDoc(ungroupActive) },
       { id: 'mask', label: 'Add Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active && !doc.active.mask), run: onDoc((doc) => addMask(doc)), dividerBefore: true },
@@ -127,6 +230,21 @@ export const MENUS: CanvasMenu[] = [
     ]
   },
   {
+    id: 'select',
+    label: 'Select',
+    items: [
+      { id: 'select-all', label: 'All', keys: 'mod+a', needsDocument: true, run: onDoc(selectEverything) },
+      { id: 'deselect', label: 'Deselect', keys: 'mod+d', needsDocument: true, enabled: selected, run: onDoc(deselect) },
+      { id: 'reselect', label: 'Reselect', keys: 'mod+shift+d', needsDocument: true, enabled: (doc) => Boolean(doc.lastSelection && !doc.state.selection), run: onDoc(reselect) },
+      { id: 'inverse', label: 'Inverse', keys: 'mod+shift+i', needsDocument: true, enabled: selected, run: onDoc(invertSelected) },
+      { id: 'feather', label: 'Feather…', keys: 'shift+f6', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'feather' }), dividerBefore: true },
+      { id: 'expand', label: 'Expand…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'expand' }) },
+      { id: 'contract', label: 'Contract…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'contract' }) },
+      { id: 'layer-pixels', label: 'Layer Pixels', needsDocument: true, enabled: (doc) => Boolean(doc.active?.pixels), run: onDoc((doc) => selectLayerPixels(doc)), dividerBefore: true },
+      { id: 'layer-mask', label: 'Layer Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active?.mask), run: onDoc((doc) => selectLayerPixels(doc, doc.active, true)) }
+    ]
+  },
+  {
     id: 'view',
     label: 'View',
     items: [
@@ -142,11 +260,26 @@ export const commandLabel = (command: CanvasCommand, doc: CanvasDocument | null)
 
 export const isEnabled = (command: CanvasCommand, doc: CanvasDocument | null): boolean => (command.needsDocument ? Boolean(doc) && (command.enabled?.(doc!) ?? true) : true)
 
+/** Run a command, putting a tool's open work in first; Undo with work open drops that work and stops there. */
+export function runCommand(command: CanvasCommand, doc: CanvasDocument | null): void {
+  if (command.id === 'undo' && hasOpenWork(doc)) {
+    settleTools(doc, 'cancel')
+
+    return
+  }
+
+  if (!command.inSession) {
+    settleTools(doc)
+  }
+
+  command.run(doc)
+}
+
 /** How a shortcut reads on this system: ⇧⌘S on the Mac, Ctrl+Shift+S elsewhere. */
 export function keysLabel(keys: string): string {
   const parts = keys.split('+')
   const key = parts.pop()!
-  const named: Record<string, string> = { '=': '+', '-': '−' }
+  const named: Record<string, string> = isMac ? { '=': '+', '-': '−', backspace: '⌫', delete: '⌦' } : { '=': '+', '-': '−', backspace: 'Backspace', delete: 'Delete' }
   const shown = named[key] ?? key.toUpperCase()
 
   if (isMac) {
@@ -187,8 +320,8 @@ export function matches(event: KeyboardEvent | ReactKeyboardEvent, keys: string)
 export function runShortcut(event: KeyboardEvent | ReactKeyboardEvent, doc: CanvasDocument | null): boolean {
   for (const menu of MENUS) {
     for (const command of menu.items) {
-      if (command.keys && matches(event, command.keys) && isEnabled(command, doc)) {
-        command.run(doc)
+      if ([command.keys, ...(command.also ?? [])].some((keys) => keys && matches(event, keys)) && isEnabled(command, doc)) {
+        runCommand(command, doc)
 
         return true
       }

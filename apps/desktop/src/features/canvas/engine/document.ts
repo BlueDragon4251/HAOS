@@ -444,6 +444,12 @@ export class CanvasDocument {
   readonly savedAssets = new Map<string, { raster: Raster; version: number }>()
   /** Layers picked in the Layers panel along with the active one (not saved). */
   selectedIds: string[] = []
+  /** Painting goes into the active layer's mask rather than its pixels (picked on its mask thumbnail). */
+  maskTargeted = false
+  /** A stroke, drag or text edit is under way: saving waits until it is done. */
+  interacting = false
+  /** The selection before the last Deselect, for Reselect. */
+  lastSelection: Raster | null = null
   /** Bumps on every change, for anything that redraws. */
   revision = 0
   private readonly listeners = new Set<() => void>()
@@ -463,6 +469,11 @@ export class CanvasDocument {
 
   get active(): CanvasLayer | undefined {
     return findLayer(this.state, this.state.activeLayerId)
+  }
+
+  /** Whether painting changes the active layer's mask rather than its pixels. */
+  get editingMask(): boolean {
+    return this.maskTargeted && Boolean(this.active?.mask)
   }
 
   layer(id: string | null | undefined): CanvasLayer | undefined {
@@ -524,8 +535,10 @@ export class CanvasDocument {
     this.changed()
   }
 
-  /** Pick a layer (not a history step: picking is not an edit). */
-  select(id: string | null, extend = false): void {
+  /** Pick a layer, and whether painting goes into its mask (not a history step: picking is not an edit). */
+  select(id: string | null, extend = false, mask = false): void {
+    this.maskTargeted = mask && Boolean(findLayer(this.state, id)?.mask)
+
     if (extend && id) {
       const current = new Set([...this.selectedIds, this.state.activeLayerId ?? ''].filter(Boolean))
 

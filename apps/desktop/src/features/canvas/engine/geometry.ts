@@ -120,3 +120,44 @@ export const rounded = (t: LayerTransform): LayerTransform => ({
 
 /** A column-major 3×3 for GLSL `mat3`. */
 export const toMat3 = (m: Mat): Float32Array => new Float32Array([m.a, m.b, 0, m.c, m.d, 0, m.e, m.f, 1])
+
+/** A number rounded to a few decimals, so placements stay tidy in the manifest. */
+export const tidy = (value: number, places = 4): number => Math.round(value * 10 ** places) / 10 ** places
+
+/** The whole-pixel offset when `m` only moves pixels (1:1, unturned), else null; floating-point noise is forgiven. */
+export function pixelOffset(m: Mat): Vec2 | null {
+  const near = (value: number, target: number) => Math.abs(value - target) < 1e-6
+
+  if (!near(m.a, 1) || !near(m.d, 1) || !near(m.b, 0) || !near(m.c, 0) || !near(m.e, Math.round(m.e)) || !near(m.f, Math.round(m.f))) {
+    return null
+  }
+
+  return [Math.round(m.e), Math.round(m.f)]
+}
+
+/**
+ * The placement whose unit square lands where `m` puts it. A mirror can be read as a horizontal
+ * or a vertical flip (and two flips as a half turn), so the reading follows `like` where both fit.
+ * Shear, which a placement cannot hold, is dropped.
+ */
+export function decompose(m: Mat, like?: LayerTransform): LayerTransform {
+  const [cx, cy] = apply(m, [0.5, 0.5])
+  const width = Math.hypot(m.a, m.b)
+  const height = Math.hypot(m.c, m.d)
+  const mirrored = m.a * m.d - m.b * m.c < 0
+  const flipY = mirrored ? Boolean(like?.flipY && !like.flipX) : Boolean(like?.flipX && like.flipY)
+  const flipX = mirrored ? !flipY : flipY
+  // The unit square's y axis lands on height × (−sin θ, cos θ), negated by a vertical flip.
+  const sign = flipY ? -1 : 1
+  const rotation = (Math.atan2(-m.c * sign, m.d * sign) * 180) / Math.PI
+
+  return {
+    ...like,
+    origin: [tidy(cx - width / 2), tidy(cy - height / 2)],
+    size: [tidy(width), tidy(height)],
+    rotation: tidy(rotation),
+    flipX,
+    flipY,
+    sampling: like?.sampling ?? 'High quality'
+  }
+}

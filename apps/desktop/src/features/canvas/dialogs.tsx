@@ -39,13 +39,15 @@ const PRESETS: { label: string; width: number; height: number; resolution?: numb
   { label: 'Icon', width: 1024, height: 1024 }
 ]
 
-function NumberField({ label, value, onChange, unit, min = 1, max = LIMITS.side }: { label: string; value: number; onChange: (value: number) => void; unit: string; min?: number; max?: number }) {
+export function NumberField({ label, value, onChange, unit, min = 1, max = LIMITS.side, autoFocus }: { label: string; value: number; onChange: (value: number) => void; unit: string; min?: number; max?: number; autoFocus?: boolean }) {
   return (
     <label className="flex flex-col gap-1 text-[11.5px] text-fg-3">
       {label}
       <div className="flex items-center gap-1.5">
         <input
           type="number"
+          autoFocus={autoFocus}
+          onFocus={(event) => autoFocus && event.target.select()}
           min={min}
           max={max}
           value={Number.isFinite(value) ? value : ''}

@@ -1,28 +1,67 @@
 import { useStore } from '@nanostores/react'
-import { IconFolderOpen, IconHandStop, IconPhotoPlus, IconPointer, IconX, IconZoomIn } from '@tabler/icons-react'
+import { IconFolderOpen, IconPhotoPlus, IconX } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { canOpenInCanvas, isProjectPath, projectContaining } from '../../../shared/canvas/files.ts'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Menu } from '../files/Menu.tsx'
-import { deletePicked, nudge, placeImage } from './actions.ts'
+import { nudge, placeImage, setLayer } from './actions.ts'
 import { CloseDialog, NewDocumentDialog } from './dialogs.tsx'
+import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, TrimDialog } from './edit-dialogs.tsx'
 import type { CanvasDocument } from './engine/document.ts'
+import type { Raster, Rect } from './engine/raster.ts'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
-import { $dialog, commandLabel, isEnabled, keysLabel, MENUS, runShortcut } from './menus.ts'
+import { $dialog, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
+import { OptionsBar } from './OptionsBar.tsx'
 import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
-import { $autoSelect, $spaceHeld, $tool, type ToolId, TOOLS } from './tools.ts'
-import { $pointer, $views, actualPixels, fitToScreen, forgetView, zoomLabel } from './view-state.ts'
+import { HANDLERS } from './tools/index.ts'
+import { settleTools } from './tools/sessions.ts'
+import { $bucket, $gradient, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
+import { ToolPalette } from './ToolPalette.tsx'
+import { $pointer, $views, forgetView, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
 
-const TOOL_ICONS: Record<ToolId, React.ReactNode> = {
-  move: <IconPointer size={17} />,
-  hand: <IconHandStop size={17} />,
-  zoom: <IconZoomIn size={17} />
+const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+/** Number keys set an opacity: 1 is 10%, 0 is 100%, two quick digits (4 then 5) 45%. */
+const typedOpacity = { digits: '', at: 0 }
+
+function opacityFromKey(digit: string): number {
+  const now = Date.now()
+  const quick = now - typedOpacity.at < 600 && typedOpacity.digits.length === 1
+  typedOpacity.digits = quick ? typedOpacity.digits + digit : digit
+  typedOpacity.at = now
+
+  if (typedOpacity.digits.length === 2) {
+    const value = Number(typedOpacity.digits)
+
+    return (value === 0 ? 100 : value) / 100
+  }
+
+  return (digit === '0' ? 100 : Number(digit) * 10) / 100
 }
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+/** Set the opacity of the tool in hand (or the active layer's, with the Move tool) from a number key. */
+function setOpacityFromKey(doc: CanvasDocument | null, digit: string): void {
+  const opacity = opacityFromKey(digit)
+  const tool = $tool.get()
+  const options = paintOptionsFor(tool)
+
+  if (options) {
+    options.set({ ...options.get(), opacity })
+  } else if (tool === 'bucket') {
+    $bucket.set({ ...$bucket.get(), opacity })
+  } else if (tool === 'gradient') {
+    $gradient.set({ ...$gradient.get(), opacity })
+  } else if (doc?.active && (tool === 'move' || !options)) {
+    setLayer(doc, doc.active.id, { opacity }, 'Opacity Change')
+
+    return
+  }
+
+  notify(`Opacity ${Math.round(opacity * 100)}%`)
+}
 
 const isTyping = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
@@ -57,7 +96,7 @@ function MenuBar({ doc }: { doc: CanvasDocument | null }) {
                 disabled: !isEnabled(command, doc),
                 checked: command.checked?.(),
                 dividerBefore: command.dividerBefore,
-                onSelect: () => command.run(doc)
+                onSelect: () => runCommand(command, doc)
               }))}
             />
           )}
@@ -98,53 +137,19 @@ function Tabs({ documents, active }: { documents: CanvasDocument[]; active: Canv
   )
 }
 
-function ToolPalette() {
-  const tool = useStore($tool)
+const bounds = new WeakMap<Raster, Rect | null>()
 
-  return (
-    <div className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line py-2" role="toolbar" aria-orientation="vertical" aria-label="Tools">
-      {TOOLS.map((def) => (
-        <button
-          key={def.id}
-          type="button"
-          title={`${def.label} (${def.key.toUpperCase()})`}
-          aria-label={def.label}
-          aria-pressed={tool === def.id}
-          onClick={() => $tool.set(def.id)}
-          className={cn('grid size-8 place-items-center rounded-lg', tool === def.id ? 'bg-accent/20 text-fg ring-1 ring-accent/50' : 'text-fg-3 hover:bg-white/8 hover:text-fg')}
-        >
-          {TOOL_ICONS[def.id]}
-        </button>
-      ))}
-    </div>
-  )
-}
+/** A selection's bounds, worked out once per selection. */
+function selectionBounds(selection: Raster | null): Rect | null {
+  if (!selection) {
+    return null
+  }
 
-function OptionsBar({ doc }: { doc: CanvasDocument }) {
-  const tool = useStore($tool)
-  const autoSelect = useStore($autoSelect)
+  if (!bounds.has(selection)) {
+    bounds.set(selection, selection.opaqueBounds())
+  }
 
-  return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b border-line px-3 text-[12px] text-fg-2">
-      <span className="text-fg-3">{TOOLS.find((def) => def.id === tool)?.label}</span>
-      {tool === 'move' && (
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={autoSelect} onChange={(event) => $autoSelect.set(event.target.checked)} />
-          Pick the layer under the pointer
-        </label>
-      )}
-      {(tool === 'zoom' || tool === 'hand') && (
-        <div className="flex items-center gap-1.5">
-          <GlassButton size="sm" variant="ghost" onClick={() => fitToScreen(doc)}>
-            Fit on screen
-          </GlassButton>
-          <GlassButton size="sm" variant="ghost" onClick={() => actualPixels(doc)}>
-            100%
-          </GlassButton>
-        </div>
-      )}
-    </div>
-  )
+  return bounds.get(selection) ?? null
 }
 
 function StatusBar({ doc }: { doc: CanvasDocument | null }) {
@@ -166,6 +171,7 @@ function StatusBar({ doc }: { doc: CanvasDocument | null }) {
   }, [notice])
 
   const view = doc ? views[doc.key] : undefined
+  const selection = selectionBounds(doc?.state.selection ?? null)
 
   return (
     <div className="flex h-7 shrink-0 items-center gap-4 border-t border-line px-3 text-[11.5px] text-fg-3 tabular-nums">
@@ -178,6 +184,11 @@ function StatusBar({ doc }: { doc: CanvasDocument | null }) {
           {pointer && (
             <span>
               {pointer.x}, {pointer.y}
+            </span>
+          )}
+          {selection && (
+            <span>
+              Selection {selection.width} × {selection.height}
             </span>
           )}
         </>
@@ -294,8 +305,33 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
     }
   }, [documents])
 
+  // A dialog closed: the window takes the keys back.
+  useEffect(() => {
+    if (!dialog && (!document.activeElement || document.activeElement === document.body)) {
+      root.current?.focus({ preventScroll: true })
+    }
+  }, [dialog])
+
+  // Another document in front: what a tool had open on the last one is put in first.
+  const shown = useRef(doc)
+  useEffect(() => {
+    if (shown.current && shown.current !== doc) {
+      settleTools(shown.current)
+    }
+
+    shown.current = doc
+  }, [doc])
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (isTyping(event.target) || dialog) {
+      return
+    }
+
+    // The tool in hand first: Enter and Escape end a transform or a crop, Backspace takes back a lasso corner.
+    if (doc && !event.metaKey && !event.ctrlKey && HANDLERS[$tool.get()]?.key?.(doc, event.nativeEvent)) {
+      event.preventDefault()
+      event.stopPropagation()
+
       return
     }
 
@@ -317,22 +353,47 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       return
     }
 
-    const tool = TOOLS.find((def) => def.key === event.key.toLowerCase())
+    const code = event.code
+    const letter = /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase() : event.key.toLowerCase()
+    const tool = toolForKey(letter, event.shiftKey)
 
     if (tool) {
-      $tool.set(tool.id)
+      setTool(tool)
+
+      return
+    }
+
+    if (letter === 'x') {
+      swapColours()
+
+      return
+    }
+
+    if (letter === 'd') {
+      resetColours()
+
+      return
+    }
+
+    if (code === 'BracketLeft' || code === 'BracketRight') {
+      const options = paintOptionsFor($tool.get())
+      const direction = code === 'BracketRight' ? 1 : -1
+
+      if (options) {
+        const current = options.get()
+        options.set(event.shiftKey ? { ...current, hardness: Math.max(0, Math.min(1, Math.round((current.hardness + direction * 0.25) * 4) / 4)) } : { ...current, size: stepSize(current.size, direction) })
+      }
+
+      return
+    }
+
+    if (/^Digit\d$/.test(code)) {
+      setOpacityFromKey(doc, code.slice(5))
 
       return
     }
 
     if (!doc) {
-      return
-    }
-
-    if (event.key === 'Backspace' || event.key === 'Delete') {
-      event.preventDefault()
-      deletePicked(doc)
-
       return
     }
 
@@ -400,6 +461,11 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       <StatusBar doc={doc} />
       {dialog?.kind === 'new' && <NewDocumentDialog />}
       {dialog?.kind === 'close' && <CloseDialog docKey={dialog.key} />}
+      {doc && dialog?.kind === 'canvas-size' && <CanvasSizeDialog doc={doc} />}
+      {doc && dialog?.kind === 'image-size' && <ImageSizeDialog doc={doc} />}
+      {doc && dialog?.kind === 'trim' && <TrimDialog doc={doc} />}
+      {doc && dialog?.kind === 'fill' && <FillDialog doc={doc} />}
+      {doc && dialog?.kind === 'modify-selection' && <ModifySelectionDialog doc={doc} change={dialog.change} />}
     </div>
   )
 }

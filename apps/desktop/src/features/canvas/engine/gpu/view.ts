@@ -4,8 +4,9 @@
  * mipmaps), crisp pixels when zoomed in.
  */
 
-import type { CanvasDocument } from '../document.ts'
+import type { CanvasDocument, CanvasLayer } from '../document.ts'
 import { type Mat, multiply, scale, toMat3, translate } from '../geometry.ts'
+import type { Raster, Rect } from '../raster.ts'
 import { Compositor, type Rendered } from './compositor.ts'
 import { Gpu, type Program } from './gl.ts'
 import { DISPLAY_FRAGMENT, PLACE_VERTEX } from './shaders.ts'
@@ -52,6 +53,7 @@ export class ScreenRenderer {
   private rendered: Rendered | null = null
   private drawnKey = ''
   private drawnRevision = -1
+  private drawnOverrides: ReadonlyMap<string, Partial<CanvasLayer>> | undefined
   private mipmapped = false
 
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -71,7 +73,33 @@ export class ScreenRenderer {
     this.drawnRevision = -1
   }
 
-  draw(doc: CanvasDocument | null, view: View, look: Look, dpr: number): void {
+  /** The composite as the screen shows it, rendered again when the document (or what is hidden while editing) changed. */
+  private current(doc: CanvasDocument, overrides?: ReadonlyMap<string, Partial<CanvasLayer>>): Rendered {
+    if (!this.rendered || doc.key !== this.drawnKey || doc.revision !== this.drawnRevision || overrides !== this.drawnOverrides) {
+      this.rendered = this.compositor.render(doc.state, { overrides })
+      this.drawnKey = doc.key
+      this.drawnRevision = doc.revision
+      this.drawnOverrides = overrides
+      this.mipmapped = false
+    }
+
+    return this.rendered
+  }
+
+  /** The composite's pixels over a document area (all of it by default), straight alpha; null when the GPU is gone. */
+  read(doc: CanvasDocument, area?: Rect): Raster | null {
+    if (this.gpu.gl.isContextLost()) {
+      return null
+    }
+
+    const rendered = this.current(doc, this.drawnKey === doc.key ? this.drawnOverrides : undefined)
+    const s = rendered.scale
+    const box = area ? { x: Math.floor(area.x * s), y: Math.floor(area.y * s), width: Math.max(1, Math.round(area.width * s)), height: Math.max(1, Math.round(area.height * s)) } : undefined
+
+    return this.compositor.read(rendered, null, box)
+  }
+
+  draw(doc: CanvasDocument | null, view: View, look: Look, dpr: number, overrides?: ReadonlyMap<string, Partial<CanvasLayer>>): void {
     const { gl } = this.gpu
     const { width, height } = this.canvas
 
@@ -93,14 +121,7 @@ export class ScreenRenderer {
       return
     }
 
-    if (!this.rendered || doc.key !== this.drawnKey || doc.revision !== this.drawnRevision) {
-      this.rendered = this.compositor.render(doc.state)
-      this.drawnKey = doc.key
-      this.drawnRevision = doc.revision
-      this.mipmapped = false
-    }
-
-    const rendered = this.rendered
+    const rendered = this.current(doc, overrides)
     // Device pixels per rendered pixel decides the filtering.
     const density = (view.zoom * dpr) / rendered.scale
     const sampling = density >= 2 ? 'nearest' : density < 1 ? 'mipmap' : 'linear'

@@ -9,7 +9,7 @@
 import { LIMITS } from '../../../../../shared/canvas/comp-format.ts'
 import { ancestorsOf, type CanvasLayer, type DocState, findLayer, isShown } from '../document.ts'
 import { invert, type Mat, multiply, scale as scaleMat, toMat3, unitToDocument } from '../geometry.ts'
-import { Raster } from '../raster.ts'
+import { Raster, type Rect } from '../raster.ts'
 import { Gpu, type Program, RasterTextures, type Sampling, type Target } from './gl.ts'
 import { BLEND_FRAGMENT, blendModeIndex, COPY_FRAGMENT, COVERAGE_FRAGMENT, FULL_VERTEX, LAYER_FRAGMENT, PLACE_VERTEX } from './shaders.ts'
 
@@ -293,16 +293,18 @@ export class Compositor {
     this.gpu.drawQuad()
   }
 
-  /** A render's pixels: straight alpha, rows from the top; a background fills transparency (for JPEG). */
-  read(rendered: Rendered, background: [number, number, number] | null = null): Raster {
-    const { width, height } = rendered
-    const target = this.gpu.createTarget(width, height, { precise: false })
+  /** A render's pixels (or an `area` of them, in its own pixels): straight alpha, rows from the top; a background fills transparency (for JPEG). */
+  read(rendered: Rendered, background: [number, number, number] | null = null, area?: Rect): Raster {
+    const box = area ?? { x: 0, y: 0, width: rendered.width, height: rendered.height }
+    const target = this.gpu.createTarget(box.width, box.height, { precise: false })
 
     try {
-      this.gpu.bindTarget(target, width, height)
+      this.gpu.bindTarget(target, box.width, box.height)
+      // The whole render, offset so the area lands on the target.
+      this.gpu.gl.viewport(-box.x, -box.y, rendered.width, rendered.height)
       this.copy(rendered.target.texture, { unpremultiply: true, background })
 
-      return new Raster(width, height, 4, this.gpu.readPixels(target))
+      return new Raster(box.width, box.height, 4, this.gpu.readPixels(target))
     } finally {
       this.gpu.deleteTarget(target)
     }

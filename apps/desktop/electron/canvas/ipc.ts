@@ -1,11 +1,11 @@
-import { BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
+import { BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, type WebContents } from 'electron'
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { parseManifest } from '../../shared/canvas/comp-format.ts'
 import { CANVAS_IMAGE_EXTENSIONS, CONVERTED_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION, projectContaining } from '../../shared/canvas/files.ts'
-import { type CanvasChangedEvent, type CanvasFetched, type CanvasPresence, type CanvasProject, type CanvasRawImage, type CanvasSaveKind, type CanvasWrite, IPC } from '../../shared/ipc.ts'
+import { type CanvasChangedEvent, type CanvasFetched, type CanvasPasted, type CanvasPresence, type CanvasProject, type CanvasRawImage, type CanvasSaveKind, type CanvasWrite, IPC } from '../../shared/ipc.ts'
 import { assertWritable, normalizeUserPath } from '../ipc/fs.ts'
 import { log } from '../log.ts'
 import { convertToPng } from './convert.ts'
@@ -205,6 +205,48 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle(IPC.canvasPresence, () => [...presence.values()].sort((a, b) => b.at - a.at))
+
+  ipcMain.handle(IPC.canvasCopyImage, async (_event, image: CanvasRawImage) => {
+    const png = encodePng({ width: image.width, height: image.height, channels: image.channels === 1 ? 1 : 4, data: image.data })
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })])
+    // Read back the way Paste reads, so the comparison holds however the system stores images.
+    ownCopy = digestOf(await clipboardImage())
+  })
+
+  ipcMain.handle(IPC.canvasPasteImage, async (): Promise<CanvasPasted | null> => {
+    const bytes = await clipboardImage()
+
+    if (!bytes) {
+      return null
+    }
+
+    return { image: pixelsOrBytes(bytes, 4), own: ownCopy !== null && digestOf(bytes) === ownCopy }
+  })
+}
+
+/** A digest of what Herald Canvas last put on the clipboard, to tell its own copies from other apps'. */
+let ownCopy: string | null = null
+
+const digestOf = (bytes: Uint8Array | null): string | null => (bytes ? crypto.createHash('sha256').update(bytes).digest('hex') : null)
+
+/** The clipboard's image as PNG bytes, or null when it holds none. */
+async function clipboardImage(): Promise<Uint8Array | null> {
+  for (const item of await clipboard.read()) {
+    const type = item.types.find((entry) => entry === 'image/png') ?? item.types.find((entry) => entry.startsWith('image/'))
+
+    if (type) {
+      const blob = (await item.getType(type)) as Blob
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+
+      if (bytes.byteLength > MAX_IMAGE_BYTES) {
+        throw new Error('The image on the clipboard is too large')
+      }
+
+      return bytes
+    }
+  }
+
+  return null
 }
 
 /** What each Canvas window has open, by its web contents. */

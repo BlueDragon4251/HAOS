@@ -6,6 +6,7 @@ import {
   type CalendarResult,
   type CanvasChangedEvent,
   type CanvasFetched,
+  type CanvasPasted,
   type CanvasPresence,
   type CanvasProject,
   type CanvasRawImage,
@@ -209,7 +210,11 @@ const api = {
     /** Tell main what this window has open, for Hermes's commands. */
     report: (presence: Omit<CanvasPresence, 'at'> & { focused?: boolean }): void => ipcRenderer.send(IPC.canvasReport, presence),
     /** Every Canvas window's open documents, the most recently used window first. */
-    presence: (): Promise<CanvasPresence[]> => ipcRenderer.invoke(IPC.canvasPresence)
+    presence: (): Promise<CanvasPresence[]> => ipcRenderer.invoke(IPC.canvasPresence),
+    /** Put copied pixels on the system clipboard as a PNG, for other apps. */
+    copyImage: (image: CanvasRawImage): Promise<void> => ipcRenderer.invoke(IPC.canvasCopyImage, image),
+    /** The image on the system clipboard (null when there is none), and whether Herald Canvas put it there. */
+    pasteImage: (): Promise<CanvasPasted | null> => ipcRenderer.invoke(IPC.canvasPasteImage)
   },
   catalog: {
     /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */

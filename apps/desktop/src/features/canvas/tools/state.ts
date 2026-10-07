@@ -1,0 +1,161 @@
+/*
+ * The tool in hand and every tool's options, shared by the tool palette, the options bar, the
+ * viewport and the shortcuts. Tools that share a key (the marquees, the lassos, the bucket and the
+ * gradient) form a group: the palette shows the one used last, and the key again moves to the next.
+ */
+
+import { atom } from 'nanostores'
+import type { TextAlignment } from '../../../../shared/canvas/comp-format.ts'
+import type { SelectionMode } from '../engine/selection.ts'
+
+export type ToolId =
+  | 'move'
+  | 'marquee'
+  | 'ellipse-marquee'
+  | 'lasso'
+  | 'polygon-lasso'
+  | 'wand'
+  | 'crop'
+  | 'eyedropper'
+  | 'brush'
+  | 'eraser'
+  | 'bucket'
+  | 'gradient'
+  | 'type'
+  | 'shape'
+  | 'hand'
+  | 'zoom'
+
+export interface ToolDef {
+  id: ToolId
+  label: string
+  /** The key that picks it. */
+  key: string
+  /** Tools sharing a palette button. */
+  group: string
+}
+
+export const TOOLS: readonly ToolDef[] = [
+  { id: 'move', label: 'Move', key: 'v', group: 'move' },
+  { id: 'marquee', label: 'Rectangular Marquee', key: 'm', group: 'marquee' },
+  { id: 'ellipse-marquee', label: 'Elliptical Marquee', key: 'm', group: 'marquee' },
+  { id: 'lasso', label: 'Lasso', key: 'l', group: 'lasso' },
+  { id: 'polygon-lasso', label: 'Polygonal Lasso', key: 'l', group: 'lasso' },
+  { id: 'wand', label: 'Magic Wand', key: 'w', group: 'wand' },
+  { id: 'crop', label: 'Crop', key: 'c', group: 'crop' },
+  { id: 'eyedropper', label: 'Eyedropper', key: 'i', group: 'eyedropper' },
+  { id: 'brush', label: 'Brush', key: 'b', group: 'brush' },
+  { id: 'eraser', label: 'Eraser', key: 'e', group: 'eraser' },
+  { id: 'bucket', label: 'Paint Bucket', key: 'g', group: 'fill' },
+  { id: 'gradient', label: 'Gradient', key: 'g', group: 'fill' },
+  { id: 'type', label: 'Type', key: 't', group: 'type' },
+  { id: 'shape', label: 'Shape', key: 'u', group: 'shape' },
+  { id: 'hand', label: 'Hand', key: 'h', group: 'hand' },
+  { id: 'zoom', label: 'Zoom', key: 'z', group: 'zoom' }
+]
+
+export const toolDef = (id: ToolId): ToolDef => TOOLS.find((def) => def.id === id)!
+
+/** The palette's buttons in order, each a group. */
+export const GROUPS: readonly string[] = [...new Set(TOOLS.map((def) => def.group))]
+
+export const $tool = atom<ToolId>('move')
+
+/** The tool each group shows: the one used last. */
+export const $groupTools = atom<Record<string, ToolId>>(Object.fromEntries(GROUPS.map((group) => [group, TOOLS.find((def) => def.group === group)!.id])))
+
+export function setTool(id: ToolId): void {
+  $groupTools.set({ ...$groupTools.get(), [toolDef(id).group]: id })
+  $tool.set(id)
+}
+
+/** A tool's key: its group's tool, or with the group already in hand (or Shift held), the next one in the group. */
+export function toolForKey(key: string, cycle: boolean): ToolId | null {
+  const inGroup = TOOLS.filter((def) => def.key === key)
+
+  if (!inGroup.length) {
+    return null
+  }
+
+  const current = $tool.get()
+  const index = inGroup.findIndex((def) => def.id === current)
+
+  if (index >= 0 && (cycle || inGroup.length > 1)) {
+    return inGroup[(index + 1) % inGroup.length].id
+  }
+
+  return $groupTools.get()[inGroup[0].group] ?? inGroup[0].id
+}
+
+/** Move tool: pick the layer under the pointer instead of moving the active one. */
+export const $autoSelect = atom(false)
+
+/** Move tool: show the transform frame around the picked layers. */
+export const $showTransform = atom(false)
+
+/** Space held: the Hand tool for as long as it is down. */
+export const $spaceHeld = atom(false)
+
+export type RGB = [number, number, number]
+
+export const $foreground = atom<RGB>([0, 0, 0])
+export const $background = atom<RGB>([255, 255, 255])
+
+export const swapColours = (): void => {
+  const foreground = $foreground.get()
+  $foreground.set($background.get())
+  $background.set(foreground)
+}
+
+export const resetColours = (): void => {
+  $foreground.set([0, 0, 0])
+  $background.set([255, 255, 255])
+}
+
+export interface BrushOptions {
+  /** Diameter in document pixels. */
+  size: number
+  hardness: number
+  opacity: number
+  flow: number
+  spacing: number
+}
+
+export const $brush = atom<BrushOptions>({ size: 30, hardness: 0.8, opacity: 1, flow: 1, spacing: 0.12 })
+export const $eraser = atom<BrushOptions>({ size: 50, hardness: 0.8, opacity: 1, flow: 1, spacing: 0.12 })
+
+/** How a new selection goes with the one there is (Shift adds, Alt takes away, both intersect). */
+export const $selectionMode = atom<SelectionMode>('new')
+export const $marquee = atom({ feather: 0 })
+export const $wand = atom({ tolerance: 32, contiguous: true, allLayers: false })
+export const $bucket = atom({ tolerance: 32, contiguous: true, allLayers: false, opacity: 1 })
+export const $gradient = atom({ kind: 'linear' as 'linear' | 'radial', toTransparent: false, reverse: false, opacity: 1 })
+export const $eyedropper = atom({ allLayers: true })
+
+export type ShapeTool = 'rectangle' | 'rounded' | 'ellipse' | 'line'
+export const $shape = atom({ kind: 'rectangle' as ShapeTool, radius: 24, lineWidth: 6 })
+
+export interface TypeOptions {
+  family: string
+  weight: number
+  italic: boolean
+  size: number
+  alignment: TextAlignment
+  tracking: number
+  leading: number
+}
+
+export const $type = atom<TypeOptions>({ family: 'Helvetica', weight: 400, italic: false, size: 72, alignment: 'Left', tracking: 0, leading: 0 })
+
+/** The painting tool's options atom, for the keys that change size and opacity. */
+export function paintOptionsFor(tool: ToolId): typeof $brush | null {
+  return tool === 'brush' ? $brush : tool === 'eraser' ? $eraser : null
+}
+
+/** The next brush size for `[` and `]`, in steps that grow with the size. */
+export function stepSize(size: number, direction: 1 | -1): number {
+  const step = size < 10 ? 1 : size < 50 ? 5 : size < 100 ? 10 : size < 300 ? 25 : 50
+  const next = direction > 0 ? Math.floor(size / step) * step + step : Math.ceil(size / step) * step - step
+
+  return Math.max(1, Math.min(5000, next))
+}

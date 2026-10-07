@@ -929,6 +929,9 @@ export const IPC = {
   canvasFetch: 'herald-os:canvas:fetch',
   canvasReport: 'herald-os:canvas:report',
   canvasPresence: 'herald-os:canvas:presence',
+  /** Copied pixels onto the system clipboard as a PNG, and an image off it for Paste. */
+  canvasCopyImage: 'herald-os:canvas:copy-image',
+  canvasPasteImage: 'herald-os:canvas:paste-image',
   /** Main -> renderer: an open project changed on disk (Hermes, a script, Compositor). */
   canvasChanged: 'herald-os:canvas:changed'
 } as const
@@ -981,6 +984,12 @@ export interface CanvasPresence {
 export interface CanvasFetched {
   image: CanvasRawImage | Uint8Array
   svg: boolean
+}
+
+/** The image on the system clipboard, and whether it is still what Herald Canvas copied there last. */
+export interface CanvasPasted {
+  image: CanvasRawImage | Uint8Array
+  own: boolean
 }
 
 export interface CanvasChangedEvent {

@@ -1,0 +1,32 @@
+/*
+ * Every tool the viewport hands pointer events to. The Hand and Zoom tools move the view rather
+ * than the document, so the viewport handles them itself.
+ */
+
+import { brushTool, eraserTool } from './brush.ts'
+import { cropTool } from './crop.ts'
+import { eyedropperTool } from './eyedropper.ts'
+import { bucketTool, gradientTool } from './fill.ts'
+import { moveTool } from './move.ts'
+import { lassoTool, marqueeTools, polygonLassoTool, wandTool } from './select.ts'
+import { shapeTool } from './shape.ts'
+import type { ToolId } from './state.ts'
+import { typeTool } from './type.ts'
+import type { ToolHandler } from './types.ts'
+
+export const HANDLERS: Partial<Record<ToolId, ToolHandler>> = {
+  move: moveTool,
+  marquee: marqueeTools.rect,
+  'ellipse-marquee': marqueeTools.ellipse,
+  lasso: lassoTool,
+  'polygon-lasso': polygonLassoTool,
+  wand: wandTool,
+  crop: cropTool,
+  eyedropper: eyedropperTool,
+  brush: brushTool,
+  eraser: eraserTool,
+  bucket: bucketTool,
+  gradient: gradientTool,
+  type: typeTool,
+  shape: shapeTool
+}

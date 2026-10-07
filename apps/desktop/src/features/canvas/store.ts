@@ -114,6 +114,13 @@ function scheduleAutosave(doc: CanvasDocument): void {
       return
     }
 
+    // Mid-stroke or mid-transform the document shows a preview: save once it is settled.
+    if (doc.interacting) {
+      scheduleAutosave(doc)
+
+      return
+    }
+
     if (doc.modified && doc.path && $conflict.get()?.key !== doc.key) {
       void save(doc).catch(() => {})
     }

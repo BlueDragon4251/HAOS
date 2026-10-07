@@ -110,7 +110,8 @@ export function combine(label: string, entries: HistoryEntry[]): HistoryEntry {
   }
 }
 
-const TILE = 128
+/** The side of the square tiles pixel history keeps. */
+export const TILE = 128
 
 /**
  * Pixel history for one raster: call `prepare` with each area before changing it, then `finish`
@@ -150,6 +151,11 @@ export class PixelEdit {
   /** Every pixel is about to change (a fill or a filter over the whole layer). */
   prepareAll(): void {
     this.prepare(this.raster.bounds)
+  }
+
+  /** What the tile holding pixel (x, y) held before the edit, once that tile is prepared (a brush redraws from it). */
+  original(x: number, y: number): { rect: Rect; pixels: Uint8ClampedArray } | undefined {
+    return this.before.get(Math.floor(y / TILE) * this.columns + Math.floor(x / TILE))
   }
 
   /** The history step, or null when no pixels were touched. */

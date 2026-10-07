@@ -12,15 +12,18 @@ import {
   IconLetterT,
   IconMask,
   IconPlus,
+  IconShape,
   IconTrash
 } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
 import { addFolder, addLayer, addMask, deletePicked, duplicatePicked, rename, setBlendMode, toggleClipping, toggleVisible } from './actions.ts'
+import { selectLayerPixels } from './editing.ts'
 import { type CanvasDocument, type CanvasLayer, childrenOf, type DocState, moveLayer, withLayer } from './engine/document.ts'
 import type { Raster } from './engine/raster.ts'
 import { useRevision } from './hooks.ts'
+import { isMac } from './platform.ts'
 
 const DRAG_TYPE = 'application/x-herald-canvas-layer'
 
@@ -51,7 +54,7 @@ function rowsOf(state: DocState, collapsed: ReadonlySet<string>, parentID?: stri
 }
 
 /** A small preview of a raster, fitted and sampled (cheap enough to redraw on every stroke). */
-function Thumb({ raster, version, size = 32 }: { raster: Raster | null; version: number; size?: number }) {
+function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raster | null; version: number; size?: number; targeted?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -98,7 +101,7 @@ function Thumb({ raster, version, size = 32 }: { raster: Raster | null; version:
     context.putImageData(image, Math.floor((side - width) / 2), Math.floor((side - height) / 2))
   }, [raster, version])
 
-  return <canvas ref={ref} width={size * 2} height={size * 2} className="shrink-0 rounded-[4px] ring-1 ring-line" style={{ width: size, height: size, background: CHECKER }} />
+  return <canvas ref={ref} width={size * 2} height={size * 2} className={cn('shrink-0 rounded-[4px]', targeted ? 'ring-2 ring-white/85' : 'ring-1 ring-line')} style={{ width: size, height: size, background: CHECKER }} />
 }
 
 function LayerRow({
@@ -141,6 +144,19 @@ function LayerRow({
 
     onRename(null)
   }
+
+  // A thumbnail picks what painting changes (the pixels or the mask); with ⌘ it loads a selection from it (⇧ adds, ⌥ takes away).
+  const onThumb = (event: React.MouseEvent, mask: boolean) => {
+    event.stopPropagation()
+
+    if (isMac ? event.metaKey : event.ctrlKey) {
+      selectLayerPixels(doc, layer, mask, event.shiftKey ? 'add' : event.altKey ? 'subtract' : 'new')
+    } else {
+      doc.select(layer.id, false, mask)
+    }
+  }
+
+  const editingMask = picked && doc.editingMask && doc.active?.id === layer.id
 
   return (
     <div
@@ -200,11 +216,13 @@ function LayerRow({
           <IconAdjustments size={17} />
         </span>
       ) : (
-        <Thumb raster={layer.pixels} version={layer.pixels?.version ?? 0} />
+        <span onClick={(event) => onThumb(event, false)} title="Paint on the pixels (⌘-click selects them)">
+          <Thumb raster={layer.pixels} version={layer.pixels?.version ?? 0} targeted={Boolean(layer.mask) && picked && !editingMask && doc.active?.id === layer.id} />
+        </span>
       )}
       {layer.mask && (
-        <span className={cn(layer.maskEnabled === false && 'opacity-35')} title={layer.maskEnabled === false ? 'Mask turned off' : 'Mask'}>
-          <Thumb raster={layer.mask} version={layer.mask.version} size={24} />
+        <span onClick={(event) => onThumb(event, true)} className={cn(layer.maskEnabled === false && 'opacity-35')} title={layer.maskEnabled === false ? 'Mask turned off (click to paint on it)' : 'Mask: click to paint on it, ⌘-click to select from it'}>
+          <Thumb raster={layer.mask} version={layer.mask.version} size={24} targeted={editingMask} />
         </span>
       )}
       <div className="min-w-0 flex-1 pl-1">
@@ -228,7 +246,8 @@ function LayerRow({
           />
         ) : (
           <div className={cn('flex items-center gap-1 truncate', !layer.isVisible && 'opacity-55')}>
-            {layer.text && <IconLetterT size={12} className="shrink-0 text-fg-3" />}
+            {layer.text && <IconLetterT size={12} className="shrink-0 text-fg-3" aria-label="Text layer" />}
+            {layer.shape && <IconShape size={12} className="shrink-0 text-fg-3" aria-label="Shape layer" />}
             <span className="truncate">{layer.name}</span>
           </div>
         )}
