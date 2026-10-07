@@ -1,22 +1,26 @@
+import { useStore } from '@nanostores/react'
 import { IconChevronRight, IconShieldCheck } from '@tabler/icons-react'
+import { useEffect } from 'react'
 import { GlassCard } from '../../components/ui/glass.tsx'
-import { rest } from '../../lib/rest.ts'
-import { useBackendData } from '../../lib/use-async.ts'
+import { $env } from '../../store/backend.ts'
 import { showPage } from '../../store/windows.ts'
+import { $memory, loadMemory } from '../memory/memory-store.ts'
+import { useMemoryToolset } from '../memory/use-memory-toolset.ts'
+import { memorySummary } from './memory-summary.ts'
 import { IconTile, Shimmer } from './shared.tsx'
 
-interface MemoryStatus {
-  builtin_files?: { memory?: number; user?: number; [key: string]: unknown }
-  [key: string]: unknown
-}
-
-/** One-line memory health: the backend reports how many built-in memory entries it holds. */
+/** One-line memory health: the entries the Memory page lists, and whether memory is paused. */
 export function MemoryCard() {
-  const memory = useBackendData(() => rest.get<MemoryStatus>('/api/memory'))
-  const count = memory.data?.builtin_files?.memory
-  const known = typeof count === 'number' && count > 0
-  const label = memory.loading && !memory.data ? null : known ? 'Memory up to date' : 'Memory paused'
-  const detail = known ? `${count} ${count === 1 ? 'entry' : 'entries'} remembered` : memory.error ? 'Hermes is not reachable yet' : 'Nothing remembered yet'
+  const hermesHome = useStore($env)?.hermesHome ?? null
+  const memory = useStore($memory)
+  const toolset = useMemoryToolset()
+  const summary = memorySummary(memory, toolset.paused)
+
+  useEffect(() => {
+    if (hermesHome) {
+      void loadMemory(hermesHome)
+    }
+  }, [hermesHome])
 
   return (
     <GlassCard as="button" interactive onClick={() => showPage('memory')} className="flex w-full items-center gap-3 p-3">
@@ -24,10 +28,10 @@ export function MemoryCard() {
         <IconShieldCheck />
       </IconTile>
       <div className="min-w-0 flex-1">
-        {label ? (
+        {summary ? (
           <>
-            <div className="truncate text-[13px] font-medium text-fg">{label}</div>
-            <div className="truncate text-[11.5px] text-fg-3">{detail}</div>
+            <div className="truncate text-[13px] font-medium text-fg">{summary.label}</div>
+            <div className="truncate text-[11.5px] text-fg-3">{summary.detail}</div>
           </>
         ) : (
           <div className="flex flex-col gap-1.5">
