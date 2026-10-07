@@ -12,9 +12,11 @@ import {
   addFolder,
   addLayer,
   addMask,
+  alignPicked,
   arrange,
   clearEffects,
   deletePicked,
+  distributePicked,
   duplicatePicked,
   flattenImage,
   groupPicked,
@@ -46,6 +48,7 @@ import {
 } from './editing.ts'
 import { ensureModel } from './ai/models.ts'
 import { cannotSegment, selectSubject } from './ai/remove-background.ts'
+import { ALIGN_EDGES, ALIGN_LABELS, DISTRIBUTE_LABELS, DISTRIBUTE_MODES } from './engine/align.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
 import { messageOf } from './errors.ts'
@@ -54,7 +57,7 @@ import { $autosave, exportDocument, notify, openPath, save, setAutosave } from '
 import { hasOpenWork, settleTools } from './tools/sessions.ts'
 import { $background, $foreground, setTool } from './tools/state.ts'
 import { startTransform, turnPicked } from './tools/transform.ts'
-import { actualPixels, fitToScreen, zoomStep } from './view-state.ts'
+import { $panelTab, actualPixels, fitToScreen, showPanel, zoomStep } from './view-state.ts'
 
 export { isMac }
 
@@ -201,6 +204,24 @@ const EFFECT_ITEMS: CanvasCommand[] = [
   { id: 'effects-clear', label: 'Clear Layer Effects', needsDocument: true, enabled: (doc) => effectKinds(doc.active?.effects).length > 0, run: onDoc((doc) => doc.active && clearEffects(doc, doc.active)) }
 ]
 
+const ALIGN_ITEMS: CanvasCommand[] = ALIGN_EDGES.map((edge, i) => ({
+  id: `align-${edge}`,
+  label: ALIGN_LABELS[edge].replace('Align ', ''),
+  needsDocument: true,
+  enabled: (doc) => doc.picked.length > 0,
+  dividerBefore: i === 3,
+  run: onDoc((doc) => alignPicked(doc, edge))
+}))
+
+const DISTRIBUTE_ITEMS: CanvasCommand[] = DISTRIBUTE_MODES.map((mode, i) => ({
+  id: `distribute-${mode}`,
+  label: DISTRIBUTE_LABELS[mode].replace('Distribute ', ''),
+  needsDocument: true,
+  enabled: (doc) => doc.picked.length >= 3,
+  dividerBefore: i === 3 || i === 6,
+  run: onDoc((doc) => distributePicked(doc, mode))
+}))
+
 export const MENUS: CanvasMenu[] = [
   {
     id: 'file',
@@ -224,6 +245,8 @@ export const MENUS: CanvasMenu[] = [
     items: [
       { id: 'undo', label: (doc) => (doc?.history.undoLabel ? `Undo ${doc.history.undoLabel}` : 'Undo'), keys: 'mod+z', needsDocument: true, enabled: (doc) => doc.history.canUndo, run: onDoc((doc) => doc.undo()) },
       { id: 'redo', label: (doc) => (doc?.history.redoLabel ? `Redo ${doc.history.redoLabel}` : 'Redo'), keys: 'mod+shift+z', needsDocument: true, enabled: (doc) => doc.history.canRedo, run: onDoc((doc) => doc.redo()) },
+      { id: 'toggle-last', label: 'Toggle Last State', keys: 'mod+alt+z', needsDocument: true, enabled: (doc) => doc.history.canUndo || doc.history.canRedo, run: onDoc((doc) => doc.toggleLast()) },
+      { id: 'history', label: 'History', needsDocument: true, checked: () => $panelTab.get() === 'history', run: () => showPanel($panelTab.get() === 'history' ? 'properties' : 'history') },
       { id: 'cut', label: 'Cut', keys: 'mod+x', needsDocument: true, enabled: selected, run: onDoc(cutSelection), dividerBefore: true },
       { id: 'copy', label: 'Copy', keys: 'mod+c', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => copySelection(doc)) },
       { id: 'copy-merged', label: 'Copy Merged', keys: 'mod+shift+c', needsDocument: true, run: onDoc((doc) => copySelection(doc, true)) },
@@ -328,6 +351,8 @@ export const MENUS: CanvasMenu[] = [
       { id: 'backward', label: 'Send Backward', keys: 'mod+[', needsDocument: true, run: onDoc((doc) => arrange(doc, 'down')) },
       { id: 'front', label: 'Bring to Front', keys: 'mod+shift+]', needsDocument: true, run: onDoc((doc) => arrange(doc, 'top')) },
       { id: 'back', label: 'Send to Back', keys: 'mod+shift+[', needsDocument: true, run: onDoc((doc) => arrange(doc, 'bottom')) },
+      { id: 'align', label: (doc) => (doc?.state.selection ? 'Align Layers to Selection' : 'Align'), needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: nothing, submenu: ALIGN_ITEMS, dividerBefore: true },
+      { id: 'distribute', label: 'Distribute', needsDocument: true, enabled: (doc) => doc.picked.length >= 3, run: nothing, submenu: DISTRIBUTE_ITEMS },
       { id: 'merge-down', label: 'Merge Down', keys: 'mod+e', needsDocument: true, enabled: (doc) => Boolean(mergeTarget(doc)), run: onDoc(mergeDown), dividerBefore: true }
     ]
   },

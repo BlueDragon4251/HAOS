@@ -11,12 +11,16 @@ import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
 import {
   adjustmentWith,
+  alignEdgesFrom,
   alignFrom,
+  alignToFrom,
   backgroundModeFrom,
   blendFrom,
   cropBox,
+  describeHistory,
   describeLayer,
   describeLayers,
+  distributeFrom,
   effectKindFrom,
   effectsWith,
   fillBox,
@@ -37,8 +41,11 @@ import {
   resizePlan,
   resolvePath,
   shapeKindFrom,
-  shapeWith
+  shapeWith,
+  stepCount,
+  stepThrough
 } from './agent-model.ts'
+import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
 import { anchorOffset, cropCanvas, resizeCanvas, scaleImage } from './engine/canvas-size.ts'
 import {
   adjustmentLayer,
@@ -136,9 +143,14 @@ export async function target(project?: unknown): Promise<Target> {
   throw new Error('No image is open in Herald Canvas: open one (canvas.open) or start one (canvas.new)')
 }
 
-/** Record a change as one undoable step, and save it where it lives. */
+/** Record a change as one undoable step (marked as a command's in the History panel), and save it where it lives. */
 export async function apply(on: Target, label: string, next: DocState): Promise<void> {
+  const before = on.doc.history.position
   on.doc.commit(label, next)
+
+  if (on.doc.history.position !== before) {
+    on.doc.history.tagLast('command')
+  }
 
   if (!on.doc.path) {
     return
@@ -794,6 +806,48 @@ export async function resize(args: Record<string, unknown>): Promise<Outcome> {
   }
 }
 
+/** Line layers up by an edge or their centres (to the canvas, each other or the selection), or spread three or more evenly. */
+export async function align(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+  const refs = String(args.layers ?? '')
+    .split(',')
+    .map((ref) => ref.trim())
+    .filter(Boolean)
+  const ids = refs.length ? refs.map((ref) => findByRef(state, ref).id) : on.live ? on.doc.picked.map((layer) => layer.id) : []
+
+  if (!ids.length) {
+    throw new Error('Say which layers: layers="Logo", or layers="Title,Date,Button" to line several up')
+  }
+
+  const names = ids.map((id) => findLayer(state, id)!.name).join(', ')
+  const described = () => ({ layers: ids.map((id) => describeLayer(on.doc.state, findLayer(on.doc.state, id)!)) })
+
+  if (args.distribute !== undefined && args.distribute !== '') {
+    const mode = distributeFrom(args.distribute)
+    const { state: next, moved } = distributeState(state, ids, mode)
+    await apply(on, DISTRIBUTE_LABELS[mode], next)
+
+    return { summary: `${DISTRIBUTE_LABELS[mode]}: ${names}${moved ? '' : ' (they were even already)'}`, data: described() }
+  }
+
+  const edges = alignEdgesFrom(args.edge)
+  const to = alignToFrom(args.to, movableLayers(state, ids).length)
+  const selection = to === 'selection' && on.live ? (state.selection?.opaqueBounds() ?? null) : null
+
+  if (to === 'selection' && !selection) {
+    throw new Error('Nothing is selected in the open Canvas window to align to: use to=canvas or to=layers')
+  }
+
+  const margin = finite(args.margin)
+  const { state: next, moved } = alignState(state, ids, { edges, to, margin, selection })
+  const label = edges.length === 1 ? ALIGN_LABELS[edges[0]] : 'Align'
+  await apply(on, label, next)
+  const where = to === 'canvas' ? `the canvas${margin ? ` (${margin} pixels in)` : ''}` : to === 'selection' ? 'the selection' : 'each other'
+
+  return { summary: `${names}: ${edges.map((edge) => (edge === 'center' ? 'centred across' : edge === 'middle' ? 'centred down' : edge)).join(' and ')} on ${where}${moved ? '' : ' (already there)'}`, data: described() }
+}
+
 /** Crop the canvas to a box; layers keep their pixels. */
 export async function crop(args: Record<string, unknown>): Promise<Outcome> {
   const on = await target(args.project)
@@ -1005,24 +1059,25 @@ export async function contentFill(args: Record<string, unknown>): Promise<Outcom
   return { summary: `Filled ${area.width}×${area.height} at (${area.x}, ${area.y}) ${onNew ? 'on a new layer above' : 'in'} ${layer.name}, from the pixels around it`, data: { box: area } }
 }
 
-/** Undo or redo in the image in front (it has to be open in a Canvas window). */
+/** Undo or redo `steps` steps (one by default) in the image in front (it has to be open in a Canvas window). */
 export async function step(direction: 'undo' | 'redo', args: Record<string, unknown>): Promise<Outcome> {
   const on = await target(args.project)
+  const count = stepCount(args.steps)
 
   if (!on.live) {
     if (isPanels) {
       // The Canvas window is its own process there: it takes the request as its payload.
-      await window.heraldOS.shell.open('window:canvas', { type: 'payload', payload: { command: direction, path: on.doc.path, at: Date.now() } })
+      await window.heraldOS.shell.open('window:canvas', { type: 'payload', payload: { command: direction, path: on.doc.path, steps: count, at: Date.now() } })
 
-      return { summary: `Asked Herald Canvas to ${direction} in ${on.doc.name}` }
+      return { summary: `Asked Herald Canvas to ${direction} ${count === 1 ? 'a step' : `${count} steps`} in ${on.doc.name}` }
     }
 
     throw new Error('Undo works in the open Canvas window: open the project first')
   }
 
-  const label = direction === 'undo' ? on.doc.undo() : on.doc.redo()
+  const labels = stepThrough(on.doc, direction, count)
 
-  if (!label) {
+  if (!labels.length) {
     throw new Error(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo')
   }
 
@@ -1032,5 +1087,22 @@ export async function step(direction: 'undo' | 'redo', args: Record<string, unkn
     await saveDocument(on.doc)
   }
 
-  return { summary: `${direction === 'undo' ? 'Undid' : 'Redid'} ${label}` }
+  return { summary: `${direction === 'undo' ? 'Undid' : 'Redid'} ${labels.join(', ')}`, data: { applied: on.doc.history.applied, steps: on.doc.history.steps.length } }
+}
+
+/** The steps in the open image's history, oldest first: which are applied, and which a command made. */
+export async function history(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+
+  if (!on.live) {
+    throw new Error('The history lives in the open Canvas window: open the project there first (canvas.open)')
+  }
+
+  const { history: kept } = on.doc
+  const steps = describeHistory(kept.steps, kept.applied)
+
+  return {
+    summary: `${on.doc.name}: ${kept.applied} of ${steps.length} step${steps.length === 1 ? '' : 's'} applied${kept.dropped ? ` (the ${kept.dropped} oldest were let go of to save memory)` : ''}`,
+    data: { applied: kept.applied, steps, ...(kept.dropped ? { dropped: kept.dropped } : {}) }
+  }
 }

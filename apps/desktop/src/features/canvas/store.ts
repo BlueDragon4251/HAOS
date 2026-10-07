@@ -20,6 +20,7 @@ import {
   watchProject
 } from './engine/project.ts'
 import { messageOf } from './errors.ts'
+import { thumbnailOf } from './tools/screen.ts'
 
 export const $documents = atom<CanvasDocument[]>([])
 export const $activeKey = atom<string | null>(null)
@@ -135,6 +136,9 @@ function scheduleAutosave(doc: CanvasDocument): void {
   }, AUTOSAVE_DELAY)
 }
 
+/** How long after a document opens its picture is taken for the History panel (the window has drawn it by then). */
+const OPENING_THUMB_MS = 400
+
 export function addDocument(doc: CanvasDocument): CanvasDocument {
   tracked.set(doc.key, {
     unsubscribe: doc.subscribe(() => scheduleAutosave(doc)),
@@ -144,6 +148,17 @@ export function addDocument(doc: CanvasDocument): CanvasDocument {
   })
   $documents.set([...$documents.get(), doc])
   $activeKey.set(doc.key)
+  setTimeout(() => {
+    // Only the opening state itself: once something has changed, there is none to take.
+    if (tracked.has(doc.key) && !doc.history.applied && !doc.history.canRedo && !doc.interacting) {
+      try {
+        doc.openingThumb = thumbnailOf(doc)
+        doc.changed()
+      } catch {
+        // No picture, no harm: the panel shows the row without one.
+      }
+    }
+  }, OPENING_THUMB_MS)
 
   return doc
 }

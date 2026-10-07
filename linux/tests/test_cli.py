@@ -56,7 +56,13 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     assert cli.canvas_request(["remove-background"]) == ("canvas.removeBackground", {})
     assert cli.canvas_request(["remove-background", "Band", "photo", "--cutout"]) == ("canvas.removeBackground", {"layer": "Band photo", "mode": "cutout"})
     assert cli.canvas_request(["fill", "10", "20", "300", "200", "--layer", "Photo", "--new-layer"]) == ("canvas.contentFill", {"x": 10, "y": 20, "width": 300, "height": 200, "layer": "Photo", "newLayer": True})
-    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"], ["fill", "1", "2", "3"]):
+    assert cli.canvas_request(["align", "bottom", "right", "--layers", "Logo", "--margin", "48"]) == ("canvas.align", {"edge": "bottom,right", "layers": "Logo", "margin": 48.0})
+    assert cli.canvas_request(["align", "center", "--to", "canvas"]) == ("canvas.align", {"edge": "center", "to": "canvas"})
+    assert cli.canvas_request(["distribute", "horizontal", "--layers", "A,B,C"]) == ("canvas.align", {"distribute": "horizontal", "layers": "A,B,C"})
+    assert cli.canvas_request(["history"]) == ("canvas.history", {})
+    assert cli.canvas_request(["undo", "--steps", "3"]) == ("canvas.undo", {"steps": 3})
+    assert cli.canvas_request(["redo", "Poster.comp"]) == ("canvas.redo", {"project": str(here / "Poster.comp")})
+    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"], ["fill", "1", "2", "3"], ["align"], ["distribute"]):
         with pytest.raises(SystemExit):
             cli.canvas_request(wrong)
 

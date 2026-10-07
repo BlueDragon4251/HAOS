@@ -6,6 +6,7 @@ import { GlassButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Menu, type MenuItemDef } from '../files/Menu.tsx'
 import { nudge, placeImage, setLayer } from './actions.ts'
+import { stepThrough } from './agent-model.ts'
 import { ContentFillDialog } from './ai/ContentFillDialog.tsx'
 import { AskHermesField, GenerateDialog } from './ai/HermesPrompts.tsx'
 import { ModelPrompt, ModelsDialog } from './ai/ModelDialogs.tsx'
@@ -16,6 +17,7 @@ import type { CanvasDocument } from './engine/document.ts'
 import { loadFonts } from './fonts.ts'
 import type { Raster, Rect } from './engine/raster.ts'
 import { messageOf } from './errors.ts'
+import { HistoryPanel } from './HistoryPanel.tsx'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
 import { $dialog, type CanvasCommand, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
@@ -26,7 +28,7 @@ import { HANDLERS } from './tools/index.ts'
 import { settleTools } from './tools/sessions.ts'
 import { $bucket, $gradient, $heal, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
 import { ToolPalette } from './ToolPalette.tsx'
-import { $pointer, $views, forgetView, zoomLabel } from './view-state.ts'
+import { $panelTab, $pointer, $views, forgetView, type PanelTab, showPanel, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
 
 const describe = messageOf
@@ -225,9 +227,36 @@ function ConflictBar() {
 
 const PROPERTIES_HEIGHT_KEY = 'herald-canvas.properties-height'
 
-/** Layers above and Properties below, with a divider to share the height between them. */
+const PANEL_TABS: { id: PanelTab; label: string }[] = [
+  { id: 'properties', label: 'Properties' },
+  { id: 'history', label: 'History' }
+]
+
+function PanelTabs() {
+  const tab = useStore($panelTab)
+
+  return (
+    <div role="tablist" aria-label="Panels" className="flex shrink-0 items-center gap-0.5">
+      {PANEL_TABS.map((entry) => (
+        <button
+          key={entry.id}
+          type="button"
+          role="tab"
+          aria-selected={tab === entry.id}
+          onClick={() => showPanel(entry.id)}
+          className={cn('h-6 rounded-md px-2 text-[11px] font-medium tracking-wide uppercase', tab === entry.id ? 'bg-white/10 text-fg-2' : 'text-fg-3 hover:text-fg-2')}
+        >
+          {entry.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Layers above, and Properties or History below, with a divider to share the height between them. */
 function SidePanels({ doc }: { doc: CanvasDocument }) {
   const [height, setHeight] = useState(() => Number(globalThis.localStorage?.getItem(PROPERTIES_HEIGHT_KEY)) || 340)
+  const tab = useStore($panelTab)
   const aside = useRef<HTMLElement>(null)
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -255,7 +284,7 @@ function SidePanels({ doc }: { doc: CanvasDocument }) {
       <LayersPanel doc={doc} />
       <div role="separator" aria-orientation="horizontal" aria-label="Resize the Properties panel" onPointerDown={onPointerDown} className="h-1.5 shrink-0 cursor-row-resize border-t border-line hover:bg-accent/30" />
       <div className="flex min-h-0 shrink-0 flex-col" style={{ height, maxHeight: '65%' }}>
-        <PropertiesPanel doc={doc} />
+        {tab === 'history' ? <HistoryPanel doc={doc} header={<PanelTabs />} /> : <PropertiesPanel doc={doc} header={<PanelTabs />} />}
       </div>
     </aside>
   )
@@ -301,15 +330,16 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
 
   // A file handed over by Herald (Edit in Canvas, Hermes, the launcher), or Hermes's undo and redo.
   const command = typeof payload?.command === 'string' ? payload.command : null
+  const steps = typeof payload?.steps === 'number' ? payload.steps : 1
   useEffect(() => {
     if (command === 'undo' || command === 'redo') {
       const target = $documents.get().find((entry) => entry.path === requested) ?? $documents.get().find((entry) => entry.key === $activeKey.get())
-      const label = command === 'undo' ? target?.undo() : target?.redo()
-      notify(label ? `${command === 'undo' ? 'Undid' : 'Redid'} ${label}` : command === 'undo' ? 'Nothing to undo' : 'Nothing to redo')
+      const labels = target ? stepThrough(target, command, steps) : []
+      notify(labels.length ? `${command === 'undo' ? 'Undid' : 'Redid'} ${labels.join(', ')}` : command === 'undo' ? 'Nothing to undo' : 'Nothing to redo')
     } else if (requested) {
       openPath(requested).catch((error: unknown) => notify(`Could not open ${requested.split('/').pop()}: ${describe(error)}`, 'error'))
     }
-  }, [command, requested, requestedAt])
+  }, [command, requested, requestedAt, steps])
 
   // Views of closed documents go with them.
   useEffect(() => {

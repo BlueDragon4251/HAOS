@@ -116,7 +116,7 @@ function drawThumb(canvas: HTMLCanvasElement | null, raster: Raster | null): voi
  * processor draws everything: there it redraws at most every so often while the raster changes,
  * and once more when it stops.
  */
-function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raster | null; version: number; size?: number; targeted?: boolean }) {
+export function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raster | null; version: number; size?: number; targeted?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const drawnAt = useRef(0)
 

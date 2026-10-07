@@ -10,6 +10,14 @@ import {
   IconLayersIntersect,
   IconLayersSubtract,
   IconLayersUnion,
+  IconLayoutAlignBottom,
+  IconLayoutAlignCenter,
+  IconLayoutAlignLeft,
+  IconLayoutAlignMiddle,
+  IconLayoutAlignRight,
+  IconLayoutAlignTop,
+  IconLayoutDistributeHorizontal,
+  IconLayoutDistributeVertical,
   IconLine,
   IconSquare,
   IconSquareRounded,
@@ -26,11 +34,14 @@ import type { CanvasDocument } from './engine/document.ts'
 import { $fontFamilies, loadFonts } from './fonts.ts'
 import type { SelectionMode } from './engine/selection.ts'
 import { useRevision } from './hooks.ts'
+import { alignPicked, distributePicked } from './actions.ts'
 import { cannotSegment } from './ai/subject.ts'
+import { ALIGN_LABELS, type AlignEdge, type AlignTo, DISTRIBUTE_LABELS, type DistributeMode } from './engine/align.ts'
 import { $dialog } from './menus.ts'
 import { applyCrop, cancelCrop, $crop, cropRect } from './tools/crop.ts'
 import { warmObjectSelect } from './tools/object-select.ts'
 import {
+  $alignTo,
   $autoSelect,
   $brush,
   $bucket,
@@ -307,6 +318,56 @@ function Confirm({ onApply, onCancel }: { onApply: () => void; onCancel: () => v
   )
 }
 
+const ALIGN_BUTTONS: { edge: AlignEdge; icon: React.ReactNode }[] = [
+  { edge: 'left', icon: <IconLayoutAlignLeft size={14} /> },
+  { edge: 'center', icon: <IconLayoutAlignCenter size={14} /> },
+  { edge: 'right', icon: <IconLayoutAlignRight size={14} /> },
+  { edge: 'top', icon: <IconLayoutAlignTop size={14} /> },
+  { edge: 'middle', icon: <IconLayoutAlignMiddle size={14} /> },
+  { edge: 'bottom', icon: <IconLayoutAlignBottom size={14} /> }
+]
+
+const DISTRIBUTE_BUTTONS: { mode: DistributeMode; icon: React.ReactNode }[] = [
+  { mode: 'horizontal', icon: <IconLayoutDistributeVertical size={14} /> },
+  { mode: 'vertical', icon: <IconLayoutDistributeHorizontal size={14} /> }
+]
+
+function IconButton({ title, disabled, onClick, children }: { title: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick} className="grid size-6 place-items-center rounded-md text-fg-3 hover:bg-white/8 hover:text-fg disabled:opacity-35 disabled:hover:bg-transparent">
+      {children}
+    </button>
+  )
+}
+
+/** The Move tool's align and distribute buttons, and what the layers line up with. */
+function AlignControls({ doc }: { doc: CanvasDocument }) {
+  const to = useStore($alignTo)
+  const count = doc.picked.length
+
+  return (
+    <div className="flex items-center gap-0.5" role="group" aria-label="Align and distribute">
+      {ALIGN_BUTTONS.map(({ edge, icon }) => (
+        <IconButton key={edge} title={ALIGN_LABELS[edge]} disabled={!count} onClick={() => alignPicked(doc, edge)}>
+          {icon}
+        </IconButton>
+      ))}
+      <span className="mx-1 h-4 w-px bg-line" />
+      {DISTRIBUTE_BUTTONS.map(({ mode, icon }) => (
+        <IconButton key={mode} title={`${DISTRIBUTE_LABELS[mode]} (three or more layers)`} disabled={count < 3} onClick={() => distributePicked(doc, mode)}>
+          {icon}
+        </IconButton>
+      ))}
+      <select aria-label="Align to" title="What the layers line up with" value={to} onChange={(event) => $alignTo.set(event.target.value as AlignTo | 'auto')} className="glass-input ml-1 h-6 rounded-md px-1 text-[12px] text-fg outline-none">
+        <option value="auto">To: automatic</option>
+        <option value="layers">To: each other</option>
+        <option value="selection">To: the selection</option>
+        <option value="canvas">To: the canvas</option>
+      </select>
+    </div>
+  )
+}
+
 function MoveFields({ doc }: { doc: CanvasDocument }) {
   const autoSelect = useStore($autoSelect)
   const showTransform = useStore($showTransform)
@@ -334,6 +395,7 @@ function MoveFields({ doc }: { doc: CanvasDocument }) {
     <>
       <Check label="Pick the layer under the pointer" checked={autoSelect} onChange={(checked) => $autoSelect.set(checked)} />
       <Check label="Show transform controls" checked={showTransform} onChange={(checked) => $showTransform.set(checked)} />
+      <AlignControls doc={doc} />
       <GlassButton size="sm" variant="ghost" disabled={Boolean(cannotSegment(doc.active))} title="Hide the background with a mask (Layer > Remove Background)" onClick={() => $dialog.set({ kind: 'remove-background' })}>
         <IconBackground size={14} /> Remove Background
       </GlassButton>

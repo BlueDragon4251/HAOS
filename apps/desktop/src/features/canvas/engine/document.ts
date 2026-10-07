@@ -450,9 +450,16 @@ export class CanvasDocument {
   interacting = false
   /** The selection before the last Deselect, for Reselect. */
   lastSelection: Raster | null = null
+  /** A small picture of the document as it opened, for the top of the History panel. */
+  openingThumb: Raster | null = null
   /** Bumps on every change, for anything that redraws. */
   revision = 0
   private readonly listeners = new Set<() => void>()
+  /** `history.position` right after Toggle Last State undid a step, so the next toggle redoes it. */
+  private toggled: number | null = null
+  /** While above 0, redraws wait (several steps undone at once redraw once). */
+  private holding = 0
+  private held = false
 
   constructor(init: DocumentInit) {
     this.state = normalized(init.state)
@@ -495,6 +502,12 @@ export class CanvasDocument {
 
   /** Something visible changed (pixels included): redraw. */
   changed(): void {
+    if (this.holding) {
+      this.held = true
+
+      return
+    }
+
     this.revision++
     this.listeners.forEach((listener) => listener())
   }
@@ -574,6 +587,39 @@ export class CanvasDocument {
     if (label) {
       this.changed()
     }
+
+    return label
+  }
+
+  /** Go back or forward to the state after `applied` steps (0 is the opening state); answers the labels passed over. */
+  goTo(applied: number): string[] {
+    let passed: string[]
+    this.holding++
+
+    try {
+      passed = this.history.goTo(applied)
+    } finally {
+      this.holding--
+    }
+
+    if (passed.length || this.held) {
+      this.held = false
+      this.changed()
+    }
+
+    return passed
+  }
+
+  /** Toggle Last State: undo the last step, or redo it when the last toggle undid it. */
+  toggleLast(): string | null {
+    if (this.toggled !== null && this.toggled === this.history.position && this.history.canRedo) {
+      this.toggled = null
+
+      return this.redo()
+    }
+
+    const label = this.undo()
+    this.toggled = label ? this.history.position : null
 
     return label
   }

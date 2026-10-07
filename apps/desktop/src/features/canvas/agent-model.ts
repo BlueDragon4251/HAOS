@@ -21,9 +21,11 @@ import {
   type TextAlignment,
   type Vec2
 } from '../../../shared/canvas/comp-format.ts'
+import type { AlignEdge, AlignTo, DistributeMode } from './engine/align.ts'
 import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
+import type { HistoryStep } from './engine/history.ts'
 import { MASK_ACTIONS, type MaskAction } from './engine/masks.ts'
 import type { Rect } from './engine/raster.ts'
 import { postScriptName } from './engine/text.ts'
@@ -794,6 +796,134 @@ export function maskActionFrom(value: unknown): MaskAction {
   }
 
   return action
+}
+
+/**
+ * The edges to align by, however they were written ("left", "bottom right", "center,middle",
+ * "centre"): at most one each way. A second "center" (or one after left or right) is the vertical
+ * centre, so "center center" centres both ways.
+ */
+export function alignEdgesFrom(value: unknown): AlignEdge[] {
+  const parts = words(value).split(/[\s,;+/_-]+/).filter(Boolean)
+  let across: AlignEdge | undefined
+  let down: AlignEdge | undefined
+
+  if (!parts.length) {
+    throw new Error('edge is left, center, right, top, middle or bottom; two (like "bottom,right" or "center,middle") align both ways')
+  }
+
+  for (const part of parts) {
+    if (part === 'left' || part === 'right') {
+      if (across === 'center' && !down) {
+        down = 'middle'
+      }
+
+      across = part
+    } else if (part === 'top' || part === 'bottom') {
+      down = part
+    } else if (part === 'middle') {
+      down = 'middle'
+    } else if (part === 'center' || part === 'centre') {
+      if (across) {
+        down = 'middle'
+      } else {
+        across = 'center'
+      }
+    } else {
+      throw new Error(`edge is left, center, right, top, middle or bottom (“${part}” is not one)`)
+    }
+  }
+
+  return [across, down].filter((edge): edge is AlignEdge => Boolean(edge))
+}
+
+/** What layers align to, however it was written; the canvas for one layer and each other for several when not given. */
+export function alignToFrom(value: unknown, count: number): AlignTo {
+  const text = words(value).replace(/[^a-z]/g, '')
+
+  if (!text) {
+    return count >= 2 ? 'layers' : 'canvas'
+  }
+
+  if (['canvas', 'document', 'page', 'image'].includes(text)) {
+    return 'canvas'
+  }
+
+  if (['layers', 'eachother', 'each', 'together', 'group'].includes(text)) {
+    return 'layers'
+  }
+
+  if (['selection', 'selected'].includes(text)) {
+    return 'selection'
+  }
+
+  throw new Error('to is canvas, layers (each other) or selection')
+}
+
+/** How to distribute, however it was written: equal gaps across or down, or even edges or centres. */
+export function distributeFrom(value: unknown): DistributeMode {
+  const text = words(value).replace(/[^a-z]/g, '')
+  const aliases: Record<string, DistributeMode> = {
+    horizontal: 'horizontal',
+    horizontally: 'horizontal',
+    across: 'horizontal',
+    horizontalspacing: 'horizontal',
+    vertical: 'vertical',
+    vertically: 'vertical',
+    down: 'vertical',
+    verticalspacing: 'vertical',
+    left: 'left',
+    center: 'center',
+    centre: 'center',
+    right: 'right',
+    top: 'top',
+    middle: 'middle',
+    bottom: 'bottom'
+  }
+  const mode = aliases[text]
+
+  if (!mode) {
+    throw new Error('distribute is horizontal or vertical (equal gaps), or left, center, right, top, middle or bottom (even edges or centres)')
+  }
+
+  return mode
+}
+
+/** How many steps an undo or redo takes: one when not given, at most a thousand. */
+export function stepCount(value: unknown): number {
+  const number = finite(value)
+
+  if (number === undefined) {
+    return 1
+  }
+
+  if (number < 1) {
+    throw new Error('steps is how many steps to take: 1 or more')
+  }
+
+  return Math.min(1000, Math.round(number))
+}
+
+/** Undo or redo up to `count` steps; the labels of the steps taken (fewer when the history runs out). */
+export function stepThrough(doc: { undo(): string | null; redo(): string | null }, direction: 'undo' | 'redo', count: number): string[] {
+  const labels: string[] = []
+
+  for (let i = 0; i < count; i++) {
+    const label = direction === 'undo' ? doc.undo() : doc.redo()
+
+    if (!label) {
+      break
+    }
+
+    labels.push(label)
+  }
+
+  return labels
+}
+
+/** History steps the way Hermes reads them: numbered from 1, who made them, and which are undone. */
+export function describeHistory(steps: readonly HistoryStep[], applied: number): Record<string, unknown>[] {
+  return steps.map((step, i) => ({ step: i + 1, label: step.label, ...(step.origin ? { by: step.origin === 'command' ? 'Hermes or a command' : 'outside the window' } : {}), ...(i + 1 > applied ? { undone: true } : {}) }))
 }
 
 /** Settings over an adjustment's defaults: nested objects merge, the rest replaces. */

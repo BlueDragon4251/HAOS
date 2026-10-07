@@ -6,12 +6,23 @@
 
 import { clipRect, type Raster, type Rect } from './raster.ts'
 
+/** Who made a step, when it was not the person's own edit in the window. */
+export type StepOrigin = 'command' | 'outside'
+
 export interface HistoryEntry {
   label: string
   /** Roughly how much memory the entry holds. */
   bytes: number
   undo(): void
   redo(): void
+  origin?: StepOrigin
+}
+
+/** One step as the History panel lists it. */
+export interface HistoryStep {
+  id: number
+  label: string
+  origin?: StepOrigin
 }
 
 const DEFAULT_LIMIT = 768 * 1024 * 1024
@@ -22,6 +33,8 @@ export class History {
   private past: (HistoryEntry & { id: number })[] = []
   private future: (HistoryEntry & { id: number })[] = []
   private bytes = 0
+  /** Steps let go of to stay within memory: the oldest state left is then not the opening one. */
+  dropped = 0
 
   constructor(private readonly limitBytes = DEFAULT_LIMIT) {}
 
@@ -46,9 +59,19 @@ export class History {
     return this.future.at(-1)?.label ?? null
   }
 
-  /** The applied steps, oldest first (for a History panel). */
+  /** The applied steps, oldest first. */
   get labels(): string[] {
     return this.past.map((entry) => entry.label)
+  }
+
+  /** Every step oldest first: the applied ones, then the undone ones in the order redo takes them. */
+  get steps(): HistoryStep[] {
+    return [...this.past, ...[...this.future].reverse()].map(({ id, label, origin }) => ({ id, label, ...(origin ? { origin } : {}) }))
+  }
+
+  /** How many of `steps` are applied. */
+  get applied(): number {
+    return this.past.length
   }
 
   /** Record a change that has already happened. */
@@ -64,7 +87,33 @@ export class History {
     // The oldest steps go first; the newest always stays even when it alone is over the limit.
     while (this.bytes > this.limitBytes && this.past.length > 1) {
       this.bytes -= this.past.shift()!.bytes
+      this.dropped++
     }
+  }
+
+  /** Say who made the newest step (Hermes's commands, a change from outside the window). */
+  tagLast(origin: StepOrigin): void {
+    const last = this.past.at(-1)
+
+    if (last) {
+      last.origin = origin
+    }
+  }
+
+  /** Undo or redo until `applied` steps are applied; answers the labels passed over. */
+  goTo(applied: number): string[] {
+    const target = Math.max(0, Math.min(this.past.length + this.future.length, Math.round(applied)))
+    const passed: string[] = []
+
+    while (this.past.length > target) {
+      passed.push(this.undo()!)
+    }
+
+    while (this.past.length < target) {
+      passed.push(this.redo()!)
+    }
+
+    return passed
   }
 
   undo(): string | null {
@@ -97,6 +146,7 @@ export class History {
     this.past = []
     this.future = []
     this.bytes = 0
+    this.dropped = 0
   }
 }
 

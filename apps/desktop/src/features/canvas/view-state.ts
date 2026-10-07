@@ -15,6 +15,18 @@ export const viewport = { width: 800, height: 600 }
 /** The document position under the pointer, for the status bar; null when it is outside. */
 export const $pointer = atom<{ x: number; y: number } | null>(null)
 
+export type PanelTab = 'properties' | 'history'
+
+const PANEL_TAB_KEY = 'herald-canvas.panel-tab'
+
+/** Which panel shares the side with the Layers panel. */
+export const $panelTab = atom<PanelTab>(globalThis.localStorage?.getItem(PANEL_TAB_KEY) === 'history' ? 'history' : 'properties')
+
+export function showPanel(tab: PanelTab): void {
+  $panelTab.set(tab)
+  globalThis.localStorage?.setItem(PANEL_TAB_KEY, tab)
+}
+
 export function viewOf(doc: CanvasDocument): View {
   return $views.get()[doc.key] ?? fitView(viewport.width, viewport.height, doc.state.width, doc.state.height)
 }

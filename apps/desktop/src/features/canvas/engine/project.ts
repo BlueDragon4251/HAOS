@@ -201,6 +201,7 @@ export async function reloadProject(doc: CanvasDocument, project: CanvasProject,
   const keep = loaded.state.layers.some((layer) => layer.id === doc.state.activeLayerId) ? doc.state.activeLayerId : loaded.state.activeLayerId
   doc.extra = loaded.extra
   doc.commit(label, { ...loaded.state, activeLayerId: keep })
+  doc.history.tagLast('outside')
   rememberAssets(doc, doc.state.layers)
   doc.markSaved(project.digest)
 }

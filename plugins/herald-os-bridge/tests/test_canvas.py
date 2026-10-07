@@ -145,6 +145,24 @@ def test_export_takes_a_layered_psd(plugin):
     assert "psd" in tools.CANVAS_SCHEMA["parameters"]["properties"]["format"]["enum"]
 
 
+def test_align_lines_layers_up_or_distributes_them(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "align", "layers": "Logo", "edge": "bottom,right", "to": "canvas", "margin": 48, "kind": "x"})
+    assert (command, args) == ("canvas.align", {"layers": "Logo", "edge": "bottom,right", "to": "canvas", "margin": 48})
+    _, command, args = tools.canvas_command({"action": "align", "layers": "A,B,C", "distribute": "horizontal"})
+    assert (command, args) == ("canvas.align", {"layers": "A,B,C", "distribute": "horizontal"})
+    properties = tools.CANVAS_SCHEMA["parameters"]["properties"]
+    assert "align" in properties["action"]["enum"] and "enum" not in properties["edge"]
+
+
+def test_history_lists_steps_and_undo_takes_several(plugin):
+    tools = _mod(plugin, "tools")
+    assert tools.canvas_command({"action": "history", "project": "~/P.comp", "steps": 2}) == ("history", "canvas.history", {"project": "~/P.comp"})
+    assert tools.canvas_command({"action": "undo", "steps": 3, "layer": "x"}) == ("undo", "canvas.undo", {"steps": 3})
+    assert tools.canvas_command({"action": "redo", "steps": 2}) == ("redo", "canvas.redo", {"steps": 2})
+    assert "history" in tools.CANVAS_SCHEMA["parameters"]["properties"]["action"]["enum"]
+
+
 def test_replacing_a_file_asks_first(plugin, tmp_path):
     tools = _mod(plugin, "tools")
     catalogue = {entry["id"]: entry for entry in CATALOGUE}

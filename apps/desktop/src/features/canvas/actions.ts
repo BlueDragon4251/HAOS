@@ -27,6 +27,7 @@ import {
   withLayer
 } from './engine/document.ts'
 import { baseName } from '../../../shared/canvas/files.ts'
+import { ALIGN_LABELS, type AlignEdge, type AlignTo, alignState, automaticTarget, DISTRIBUTE_LABELS, type DistributeMode, distributeState, movableLayers } from './engine/align.ts'
 import { apply, boundsOf, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
 import { visibleEffects } from './engine/gpu/effects.ts'
 import { EFFECT_NAMES, withAllShown, withEffect, withoutKnownEffects } from './engine/layer-effects.ts'
@@ -34,7 +35,7 @@ import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
 import { flatten, readPicture } from './engine/project.ts'
 import { clipRect, Raster, type Rect, unionRect } from './engine/raster.ts'
 import { notify } from './store.ts'
-import { $background, $foreground } from './tools/state.ts'
+import { $alignTo, $background, $foreground } from './tools/state.ts'
 
 /** An image file as a new layer, centred, shrunk to fit when it is larger than the canvas (pixels kept). */
 export async function placeImage(doc: CanvasDocument, file: string): Promise<void> {
@@ -258,6 +259,38 @@ export function movedState(state: DocState, ids: readonly string[], dx: number, 
   }
 
   return { ...state, layers: state.layers.map((layer) => (moving.has(layer.id) ? { ...layer, transform: moved(layer.transform, dx, dy) } : layer)) }
+}
+
+/** Layer > Align: the picked layers lined up by an edge or their centres, to the selection, each other or the canvas, as one step. */
+export function alignPicked(doc: CanvasDocument, edge: AlignEdge, to: AlignTo | 'auto' = $alignTo.get()): void {
+  const ids = doc.picked.map((layer) => layer.id)
+  const selection = doc.state.selection?.opaqueBounds() ?? null
+
+  if (!ids.length) {
+    return
+  }
+
+  try {
+    const target = to === 'auto' ? automaticTarget(movableLayers(doc.state, ids).length, Boolean(selection)) : to
+    const { state } = alignState(doc.state, ids, { edges: [edge], to: target, selection })
+    doc.commit(ALIGN_LABELS[edge], state)
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error), 'error')
+  }
+}
+
+/** Layer > Distribute: three or more picked layers spread evenly, as one step. */
+export function distributePicked(doc: CanvasDocument, mode: DistributeMode): void {
+  try {
+    const { state } = distributeState(
+      doc.state,
+      doc.picked.map((layer) => layer.id),
+      mode
+    )
+    doc.commit(DISTRIBUTE_LABELS[mode], state)
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error), 'error')
+  }
 }
 
 export function nudge(doc: CanvasDocument, dx: number, dy: number): void {

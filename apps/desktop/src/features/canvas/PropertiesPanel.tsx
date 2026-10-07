@@ -885,18 +885,18 @@ function LayerProperties({ doc, layer }: { doc: CanvasDocument; layer: CanvasLay
   return <div className="px-3 py-2 text-[12px] text-fg-3">A folder passes through: its opacity and mask apply to everything inside it.</div>
 }
 
-export function PropertiesPanel({ doc }: { doc: CanvasDocument }) {
+export function PropertiesPanel({ doc, header }: { doc: CanvasDocument; header?: React.ReactNode }) {
   useRevision(doc)
   const layer = doc.active
   const Icon = layer?.adjustment ? ADJUSTMENT_ICONS[layer.adjustment.kind] : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-8 shrink-0 items-center gap-1.5 px-3 text-[11px] font-medium tracking-wide text-fg-3 uppercase">
-        Properties
+      <div className="flex h-8 shrink-0 items-center gap-1.5 px-2 text-[11px] text-fg-3">
+        {header}
         {layer && (
-          <span className="flex min-w-0 items-center gap-1 truncate font-normal tracking-normal normal-case">
-            · {Icon && <Icon size={12} className="shrink-0" />}
+          <span className="flex min-w-0 items-center gap-1 truncate">
+            {Icon && <Icon size={12} className="shrink-0" />}
             <span className="truncate">{layer.adjustment ? layer.adjustment.kind : layer.shape ? `${layer.name}: shape and effects` : takesEffects(layer) ? `${layer.name}: effects` : layer.name}</span>
           </span>
         )}

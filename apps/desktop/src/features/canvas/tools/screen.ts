@@ -54,6 +54,15 @@ export function compositeArea(doc: CanvasDocument, area?: Rect): Raster {
 /** Every visible layer together, document sized, straight alpha. */
 export const compositeOf = (doc: CanvasDocument): Raster => compositeArea(doc)
 
+/** A small picture of the document as it is, at most `side` pixels on its long side. */
+export function thumbnailOf(doc: CanvasDocument, side = 64): Raster {
+  const scale = Math.min(1, side / Math.max(doc.state.width, doc.state.height))
+  const raster = flatten(doc.state, scale, null, { compositor: screen?.compositor })
+  screen?.borrowed()
+
+  return raster
+}
+
 /** The composite's colour at a document pixel (straight RGBA), or null outside the canvas. */
 export function compositeAt(doc: CanvasDocument, x: number, y: number): [number, number, number, number] | null {
   const px = Math.floor(x)

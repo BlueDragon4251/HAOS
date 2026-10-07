@@ -1041,8 +1041,11 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         return "canvas.new", payload
     if sub == "status":
         return "canvas.status", {}
-    if sub in ("layers", "undo", "redo"):
-        return f"canvas.{sub}", ({"project": _absolute(words[0])} if words else {})
+    if sub in ("layers", "undo", "redo", "history"):
+        payload = {"project": _absolute(words[0])} if words else {}
+        if sub in ("undo", "redo") and "steps" in flags:
+            payload["steps"] = int(str(flags["steps"]))
+        return f"canvas.{sub}", payload
     if sub == "preview":
         payload = {"project": _absolute(words[0])} if words else {}
         if "size" in flags:
@@ -1084,6 +1087,18 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if "project" in flags:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.crop", payload
+    if sub in ("align", "distribute"):
+        if not words:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"edge" if sub == "align" else "distribute": ",".join(words)}
+        for key in ("layers", "to"):
+            if key in flags:
+                payload[key] = str(flags[key])
+        if "margin" in flags:
+            payload["margin"] = float(str(flags["margin"]))
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.align", payload
     if sub == "export":
         if not words:
             die(f"herald-os {CANVAS_USAGE}", 2)
@@ -1142,6 +1157,13 @@ def canvas_cmd(args: list[str]) -> int:
         for layer in data.get("layers") or []:
             marks = [str(layer.get("kind"))] + ([] if layer.get("visible", True) else ["hidden"]) + ([f"{round(layer['opacity'] * 100)}%"] if layer.get("opacity", 1) < 1 else [])
             print(f"  {layer.get('name')}  ({', '.join(marks)})")
+        return 0
+    if command == "canvas.history":
+        print(reply.get("summary") or "")
+        for step in data.get("steps") or []:
+            mark = "*" if step.get("step") == data.get("applied") else " "
+            notes = [note for note in (step.get("by"), "undone" if step.get("undone") else None) if note]
+            print(f"{mark} {step.get('step'):>3}  {step.get('label')}{'  (' + ', '.join(notes) + ')' if notes else ''}")
         return 0
     if command == "canvas.status":
         for doc in data.get("documents") or []:

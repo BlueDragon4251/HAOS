@@ -232,6 +232,22 @@ export const canvasCommands: readonly OsCommand[] = [
     run: async (args) => done((await canvas()).resize(args))
   },
   {
+    id: 'canvas.align',
+    title: 'Align or distribute layers',
+    description:
+      'Line layers up by an edge or their centres: edge is left, center, right, top, middle or bottom, and two align both ways ("bottom,right" for a corner, "center,middle" to centre). to is canvas (the default for one layer; margin keeps that many pixels from its edges), layers (each other, the default for several) or selection (what the person selected in the window). Or space three or more layers evenly with distribute: horizontal or vertical for equal gaps, or an edge or centre. Layers are measured by what they show, not their boxes. One undoable step.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layers', type: 'string', description: 'Comma-separated layer ids or names (the layers picked in the open window when left out)' },
+      { name: 'edge', type: 'string', description: 'left, center, right, top, middle or bottom; two separated by a comma align both ways' },
+      { name: 'to', type: 'string', description: 'canvas, layers (each other) or selection' },
+      { name: 'margin', type: 'number', description: 'With to=canvas: pixels to keep from the canvas edges' },
+      { name: 'distribute', type: 'string', description: 'Instead of aligning: horizontal or vertical (equal gaps), or left, center, right, top, middle or bottom (even edges or centres)' }
+    ],
+    run: async (args) => done((await canvas()).align(args))
+  },
+  {
     id: 'canvas.crop',
     title: 'Crop an image',
     description: 'Crop the canvas to a box (canvas pixels from the top-left). Layers keep their pixels, so it can be undone without loss.',
@@ -386,18 +402,26 @@ export const canvasCommands: readonly OsCommand[] = [
   {
     id: 'canvas.undo',
     title: 'Undo in Herald Canvas',
-    description: 'Undo the last change to the image in front (or project), whoever made it.',
+    description: 'Undo the last change to the image in front (or project), whoever made it; steps undoes several. canvas.history lists the steps.',
     tier: 'act',
-    args: [project],
+    args: [project, { name: 'steps', type: 'number', description: 'How many steps to undo (1)' }],
     phrases: ['undo in canvas'],
     run: async (args) => done((await canvas()).step('undo', args))
   },
   {
     id: 'canvas.redo',
     title: 'Redo in Herald Canvas',
-    description: 'Redo what was last undone in the image in front (or project).',
+    description: 'Redo what was last undone in the image in front (or project); steps redoes several.',
     tier: 'act',
-    args: [project],
+    args: [project, { name: 'steps', type: 'number', description: 'How many steps to redo (1)' }],
     run: async (args) => done((await canvas()).step('redo', args))
+  },
+  {
+    id: 'canvas.history',
+    title: 'List the history of an image',
+    description: 'The steps in the open image’s history (the History panel), oldest first: their names, which ones Hermes or a command made, how many are applied and which are undone. Undo or redo with steps to move through them.',
+    tier: 'read',
+    args: [project],
+    run: async (args) => done((await canvas()).history(args))
   }
 ]

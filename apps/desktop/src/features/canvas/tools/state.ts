@@ -6,6 +6,7 @@
 
 import { atom } from 'nanostores'
 import type { TextAlignment } from '../../../../shared/canvas/comp-format.ts'
+import type { AlignTo } from '../engine/align.ts'
 import type { SelectionMode } from '../engine/selection.ts'
 
 export type ToolId =
@@ -96,6 +97,9 @@ export const $autoSelect = atom(false)
 
 /** Move tool: show the transform frame around the picked layers. */
 export const $showTransform = atom(false)
+
+/** Move tool and Layer > Align: what layers line up with; automatic picks the selection, then each other, then the canvas. */
+export const $alignTo = atom<AlignTo | 'auto'>('auto')
 
 /** Space held: the Hand tool for as long as it is down. */
 export const $spaceHeld = atom(false)
