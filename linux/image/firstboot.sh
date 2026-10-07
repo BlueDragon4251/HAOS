@@ -56,8 +56,8 @@ system_phase() {
   as_user mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.local/share" "$HOME_DIR/.local/state" "$HOME_DIR/.config/herald-os" "$HOME_DIR/.config/niri" "$HOME_DIR/.config/swaylock" "$HOME_DIR/.config/systemd/user"
   as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
   as_user herald-os-theme set "$(as_user herald-os-theme current)" || true
-  # niri's config, rendered with the person's keymap (managed; local.kdl is theirs).
-  as_user herald-os keymap apply || install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/niri/config.kdl" "$HOME_DIR/.config/niri/config.kdl"
+  # Herald's niri config, rendered with the person's keymap (managed; local.kdl is theirs).
+  as_user herald-os keymap apply || install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/niri/config.kdl" "$HOME_DIR/.config/niri/herald-os.kdl"
   install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/session/swaylock.conf" "$HOME_DIR/.config/swaylock/config"
 
   step "Hermes Agent for $HERMES_USER"

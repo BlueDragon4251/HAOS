@@ -9,7 +9,8 @@ linux/
   bin/                    herald-os (the CLI every hotkey and menu calls), -theme, -omakase, -update
   session/                greetd config, compositor + session launchers, wayland-sessions entry,
                           update-check timer, lock-screen style
-  niri/config.kdl         the managed niri config: hotkeys, window rules, workspaces
+  niri/config.kdl         the managed niri config (rendered to ~/.config/niri/herald-os.kdl): hotkeys,
+                          window rules, workspaces
   themes/                 whole-desktop themes (shell, niri, terminal, wallpaper): herald-*
   omakase/                the default app set: dnf packages, Flatpaks, web apps
   plymouth/herald-os/     boot splash

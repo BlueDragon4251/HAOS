@@ -94,7 +94,7 @@ hermes config set model.default <model>  # a Portal model id, as in the Mac's co
 | Piece | Role |
 | --- | --- |
 | `/etc/greetd/config.toml` | Logs `hermes` in on VT1 and runs `herald-os-compositor`. Respawns when it exits. |
-| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, then starts niri with the managed config. Without hardware GL (QEMU and Apple Virtualization without virgl) niri runs windowed inside `cage` (`herald-os-niri-nested`). `HERALD_OS_COMPOSITOR=cage` runs the Stage 1 kiosk instead. |
+| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, renders Herald's niri config (`~/.config/niri/herald-os.kdl`, from the installed template and your keymap) and starts niri with it. A `~/.config/niri/config.kdl` of your own is never read or changed, so the session also starts on a fresh account; Herald's other files beside it are `theme.kdl`, `outputs.kdl` and `local.kdl` (yours to edit). Without hardware GL (QEMU and Apple Virtualization without virgl) niri runs windowed inside `cage` (`herald-os-niri-nested`). `HERALD_OS_COMPOSITOR=cage` runs the Stage 1 kiosk instead. |
 | `herald-os-session` | Publishes `WAYLAND_DISPLAY` to systemd/D-Bus, starts PipeWire + portals and the session services below, runs Electron on Wayland (Ozone) as panels: the menu bar, dock and Hermes window are separate windows niri places. Restarts the shell on a crash (5 per minute), exits on a clean quit. |
 | `herald-os.desktop` | `wayland-sessions` entry so a normal greeter can also start Herald OS. |
 
@@ -148,8 +148,9 @@ backed by `nmcli`, `bluetoothctl`, `pactl`, `niri msg output`, `powerprofilesctl
 Dictation (`Mod+Ctrl+X`, `herald-os dictate`) records until a pause, transcribes through Hermes's
 speech-to-text and types the words into the focused app with `wtype`; the emoji picker
 (`Mod+Ctrl+E`) types its pick the same way. `herald-os keymap omarchy` renders
-`~/.config/niri/config.kdl` from the template in `/usr/local/share/herald-os-linux/niri/` with
-Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores Herald's keys.
+`~/.config/niri/herald-os.kdl` from the installed template (`linux/niri/config.kdl`) with Omarchy's
+`Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores Herald's keys. Every session
+start renders it again, so an update's new template takes effect at the next login.
 
 ## Themes, omakase, updates
 

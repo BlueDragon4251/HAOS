@@ -1,8 +1,9 @@
 // Herald OS: niri compositor configuration.
-// The template `herald-os keymap apply` renders into ~/.config/niri/config.kdl (managed; edits are
-// overwritten; `herald-os keymap omarchy` rewrites Super+C, X and V as copy, cut and paste).
-// Put machine-specific settings (output scale, extra binds) in ~/.config/niri/local.kdl, which
-// is included at the end and never touched by Herald OS.
+// The template `herald-os keymap apply` renders into ~/.config/niri/herald-os.kdl, the config the
+// Herald OS session starts niri with (managed; edits are overwritten; `herald-os keymap omarchy`
+// rewrites Super+C, X and V as copy, cut and paste). A personal ~/.config/niri/config.kdl is left
+// alone. Put machine-specific settings (output scale, extra binds) in ~/.config/niri/local.kdl,
+// which is included at the end and never touched by Herald OS.
 //
 // Reference: /usr/share/doc/niri/default-config.kdl and the niri wiki.
 
