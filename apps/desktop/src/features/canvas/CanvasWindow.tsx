@@ -11,7 +11,7 @@ import type { CanvasDocument } from './engine/document.ts'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
 import { $dialog, commandLabel, isEnabled, keysLabel, MENUS, runShortcut } from './menus.ts'
-import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, resolveConflict } from './store.ts'
+import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
 import { $autoSelect, $spaceHeld, $tool, type ToolId, TOOLS } from './tools.ts'
 import { $pointer, $views, actualPixels, fitToScreen, forgetView, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
@@ -241,12 +241,17 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
   const requested = typeof payload?.path === 'string' ? payload.path : null
   const requestedAt = payload?.at
 
-  // A file handed over by Herald (Edit in Canvas, Hermes, the launcher).
+  // A file handed over by Herald (Edit in Canvas, Hermes, the launcher), or Hermes's undo and redo.
+  const command = typeof payload?.command === 'string' ? payload.command : null
   useEffect(() => {
-    if (requested) {
+    if (command === 'undo' || command === 'redo') {
+      const target = $documents.get().find((entry) => entry.path === requested) ?? $documents.get().find((entry) => entry.key === $activeKey.get())
+      const label = command === 'undo' ? target?.undo() : target?.redo()
+      notify(label ? `${command === 'undo' ? 'Undid' : 'Redid'} ${label}` : command === 'undo' ? 'Nothing to undo' : 'Nothing to redo')
+    } else if (requested) {
       openPath(requested).catch((error: unknown) => notify(`Could not open ${requested.split('/').pop()}: ${describe(error)}`, 'error'))
     }
-  }, [requested, requestedAt])
+  }, [command, requested, requestedAt])
 
   // Views of closed documents go with them.
   useEffect(() => {
@@ -261,6 +266,26 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
     window.addEventListener('blur', release)
 
     return () => window.removeEventListener('blur', release)
+  }, [])
+
+  // Main keeps track of what each Canvas window has open (Hermes's commands work on the image in front).
+  const revision = doc?.revision
+  useEffect(() => {
+    const timer = setTimeout(() => reportPresence(), 300)
+
+    return () => clearTimeout(timer)
+  }, [documents, doc, revision])
+
+  useEffect(() => {
+    const element = root.current
+    const focused = () => reportPresence(true)
+    reportPresence(true)
+    element?.addEventListener('focusin', focused)
+
+    return () => {
+      element?.removeEventListener('focusin', focused)
+      window.heraldOS.canvas.report({ active: null, documents: [] })
+    }
   }, [])
 
   useEffect(() => {

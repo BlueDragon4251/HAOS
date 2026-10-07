@@ -385,7 +385,7 @@ export function watchProject(doc: CanvasDocument, onChange: (project: CanvasProj
   let watchId: string | null = null
   let stopped = false
   void api()
-    .watch(file)
+    .watch(file, doc.digest)
     .then((id) => {
       if (stopped) {
         void api().unwatch(id)

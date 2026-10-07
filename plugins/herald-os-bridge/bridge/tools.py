@@ -1082,8 +1082,151 @@ def handle_os_ui(args: dict[str, Any], **_: Any) -> str:
         return fail(str(exc))
 
 
+# ---------------------------------------------------------------------------------------------
+# canvas: Herald Canvas, the layered image editor, through the shell's canvas.* commands
+# ---------------------------------------------------------------------------------------------
+
+_NUM = {"type": "number"}
+
+CANVAS_ACTIONS: dict[str, str] = {
+    "status": "canvas.status",
+    "open": "canvas.open",
+    "new": "canvas.new",
+    "layers": "canvas.layers",
+    "add_layer": "canvas.addLayer",
+    "set_layer": "canvas.setLayer",
+    "remove_layer": "canvas.removeLayer",
+    "group": "canvas.group",
+    "add_adjustment": "canvas.addAdjustment",
+    "export": "canvas.export",
+    "save": "canvas.save",
+    "preview": "canvas.preview",
+    "undo": "canvas.undo",
+    "redo": "canvas.redo",
+}
+
+# What each action passes on; anything else in the call is dropped.
+CANVAS_ARGS: dict[str, tuple[str, ...]] = {
+    "status": (),
+    "open": ("path",),
+    "new": ("name", "width", "height", "background", "resolution", "folder"),
+    "layers": ("project",),
+    "add_layer": ("project", "source", "color", "gradient", "angle", "fit", "x", "y", "width", "height", "name", "opacity", "blend", "above", "folder", "clip"),
+    "set_layer": ("project", "layer", "name", "visible", "opacity", "blend", "x", "y", "width", "height", "rotation", "flipX", "flipY", "clip", "order", "folder"),
+    "remove_layer": ("project", "layer"),
+    "group": ("project", "layers", "name", "above", "folder"),
+    "add_adjustment": ("project", "kind", "settings", "name", "opacity", "blend", "above", "folder", "clip"),
+    "export": ("project", "to", "format", "quality", "scale", "overwrite"),
+    "save": ("project", "to", "overwrite"),
+    "preview": ("project", "size"),
+    "undo": ("project",),
+    "redo": ("project",),
+}
+
+# Loading, rendering and saving a large image can take a while.
+CANVAS_TIMEOUT = 100.0
+
+CANVAS_SCHEMA = _schema(
+    "canvas",
+    "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
+    "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, set_layer, add_adjustment, group and remove_layer. "
+    "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=export writes PNG, JPEG or WebP. "
+    "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
+    {
+        "action": _enum(*CANVAS_ACTIONS, description="What to do"),
+        "project": _desc(_STR, "The .comp project (full path or ~/...); the image in front when left out"),
+        "path": _desc(_STR, "open: an image or .comp project to show"),
+        "name": _desc(_STR, "new: the project name; add_layer, group, add_adjustment: the layer name; set_layer: a new name"),
+        "width": _desc(_NUM, "new: canvas width (1920); add_layer, set_layer: width in canvas pixels"),
+        "height": _desc(_NUM, "new: canvas height (1080); add_layer, set_layer: height in canvas pixels"),
+        "background": _desc(_STR, "new: white, black, transparent or any CSS colour"),
+        "resolution": _desc(_NUM, "new: pixels per inch (72)"),
+        "source": _desc(_STR, "add_layer: an image file or an http(s) URL"),
+        "color": _desc(_STR, "add_layer: a solid fill, any CSS colour"),
+        "gradient": _desc(_STR, "add_layer: comma-separated colours of a linear gradient"),
+        "angle": _desc(_NUM, "add_layer: gradient direction in degrees (0 left to right, 90 top to bottom)"),
+        "fit": _enum("contain", "cover", "none", "stretch", description="add_layer: how a picture fills the canvas when no box is given"),
+        "x": _desc(_NUM, "Left edge in canvas pixels"),
+        "y": _desc(_NUM, "Top edge in canvas pixels"),
+        "rotation": _desc(_NUM, "set_layer: degrees clockwise around the layer's centre"),
+        "flipX": _desc(_BOOL, "set_layer: mirror left to right"),
+        "flipY": _desc(_BOOL, "set_layer: mirror top to bottom"),
+        "opacity": _desc(_NUM, "0 to 1"),
+        "blend": _desc(_STR, "Blend mode, e.g. Normal, Multiply, Screen, Overlay, Soft Light, Color, Luminosity"),
+        "layer": _desc(_STR, "set_layer, remove_layer: the layer's id or name"),
+        "layers": _desc(_STR, "group: comma-separated layer ids or names"),
+        "visible": _desc(_BOOL, "set_layer: show or hide"),
+        "order": _enum("up", "down", "top", "bottom", description="set_layer: move among its neighbours"),
+        "above": _desc(_STR, "Put the new layer right above this one"),
+        "folder": _desc(_STR, "new: where the project goes; add_layer, add_adjustment: put it in this folder; set_layer: move into it (\"none\" takes it out)"),
+        "clip": _desc(_BOOL, "Clip to the layer below (shows only where it has pixels); false lets go"),
+        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise"),
+        "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}", "additionalProperties": True},
+        "to": _desc(_STR, "export: the file to write; save: a new project path"),
+        "format": _enum("png", "jpeg", "webp", description="export: the format (from the file name when left out)"),
+        "quality": _desc(_NUM, "export: JPEG or WebP quality, 0 to 1"),
+        "scale": _desc(_NUM, "export: size relative to the canvas"),
+        "overwrite": _desc(_BOOL, "export, save: replace an existing file (asks the person first)"),
+        "size": _desc(_INT, "preview: longest side in pixels (1024)"),
+    },
+    ["action"],
+)
+
+
+def canvas_command(args: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """``(action, command id, command args)`` for a canvas call (pure; tested)."""
+    action = str(args.get("action") or "").strip().lower()
+    if action not in CANVAS_ACTIONS:
+        raise ValueError(f"action must be one of {', '.join(CANVAS_ACTIONS)}")
+    command_args = {key: args[key] for key in CANVAS_ARGS[action] if key in args and args[key] not in (None, "")}
+    # The shell takes adjustment settings as JSON text.
+    if isinstance(command_args.get("settings"), (dict, list)):
+        command_args["settings"] = json.dumps(command_args["settings"])
+    return action, CANVAS_ACTIONS[action], command_args
+
+
+_TIER_ORDER = [Tier.READ, Tier.ACT, Tier.MUTATE, Tier.DESTRUCTIVE]
+
+
+def canvas_tier(action: str, command: str, command_args: dict[str, Any], catalogue: dict[str, dict[str, Any]]) -> Tier:
+    """The registry's tier, raised to mutate when the call would replace a file the person has (pure; tested)."""
+    tier = ui_tier_for(command, catalogue)
+    target = command_args.get("to")
+    replaces = action in ("export", "save") and (command_args.get("overwrite") is True or (isinstance(target, str) and target.strip() and expand(target).exists()))
+    if replaces and _TIER_ORDER.index(tier) < _TIER_ORDER.index(Tier.MUTATE):
+        return Tier.MUTATE
+    return tier
+
+
+def handle_canvas(args: dict[str, Any], **_: Any) -> str:
+    try:
+        action, command, command_args = canvas_command(args)
+    except ValueError as exc:
+        return fail(str(exc))
+    try:
+        catalogue = _ui_catalogue()
+        if catalogue and command not in catalogue:
+            return fail("Herald Canvas is not in this version of Herald OS; update Herald OS first")
+        tier = canvas_tier(action, command, command_args, catalogue)
+        summary = ui_summary(command, command_args, catalogue)
+
+        def execute() -> dict[str, Any]:
+            reply = ui.run_command(command, command_args, timeout=CANVAS_TIMEOUT)
+            if not reply.get("ok"):
+                raise RuntimeError(str(reply.get("error") or reply.get("summary") or "Herald Canvas refused that"))
+            payload = {k: v for k, v in reply.items() if k not in ("ok", "summary")}
+            payload["result"] = reply.get("summary")
+            return payload
+
+        return _guarded("canvas", tier, action, summary, {"action": action, **command_args}, (), execute)
+    except ui.ShellUnavailable as exc:
+        return fail(str(exc))
+
+
 TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("os_ui", OS_UI_SCHEMA, handle_os_ui, "🪟"),
+    ToolSpec("canvas", CANVAS_SCHEMA, handle_canvas, "🎨"),
     ToolSpec("system_network", SYSTEM_NETWORK_SCHEMA, handle_system_network, "📶"),
     ToolSpec("system_control", SYSTEM_CONTROL_SCHEMA, handle_system_control, "🎛️"),
     ToolSpec("system_logs", SYSTEM_LOGS_SCHEMA, handle_system_logs, "📜"),
@@ -1098,4 +1241,4 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_os", SYSTEM_OS_SCHEMA, system_os_handler, "🐧"),
 )
 
-__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "handle_os_ui", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "ui_summary", "ui_tier_for", "json"]
+__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "canvas_command", "canvas_tier", "handle_canvas", "handle_os_ui", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "ui_summary", "ui_tier_for", "json"]

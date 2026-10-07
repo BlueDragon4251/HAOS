@@ -10,6 +10,7 @@ platforms:
   - windows
 provides_tools:
   - os_ui
+  - canvas
   - system_network
   - system_control
   - system_logs

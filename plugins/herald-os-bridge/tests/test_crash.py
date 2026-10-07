@@ -96,7 +96,7 @@ def test_register_adds_both_skills(plugin):
             registered[name] = path
 
     plugin.register(Ctx())
-    assert set(registered) == {"herald-os", "diagnose-crash", "herald-os-tailor"}
+    assert set(registered) == {"herald-os", "diagnose-crash", "herald-os-tailor", "herald-canvas"}
     assert all(path.exists() for path in registered.values())
 
 

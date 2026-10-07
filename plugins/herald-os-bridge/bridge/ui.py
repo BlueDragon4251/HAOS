@@ -80,8 +80,8 @@ def request(payload: dict[str, Any], *, timeout: float = DEFAULT_TIMEOUT) -> dic
     return reply
 
 
-def run_command(command: str, args: dict[str, Any] | None = None, *, source: str = "agent") -> dict[str, Any]:
-    return request({"cmd": "ui", "command": command, "args": args or {}, "source": source})
+def run_command(command: str, args: dict[str, Any] | None = None, *, source: str = "agent", timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
+    return request({"cmd": "ui", "command": command, "args": args or {}, "source": source}, timeout=timeout)
 
 
 def list_commands() -> list[dict[str, Any]]:

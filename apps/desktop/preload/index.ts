@@ -5,6 +5,8 @@ import {
   type BackendState,
   type CalendarResult,
   type CanvasChangedEvent,
+  type CanvasFetched,
+  type CanvasPresence,
   type CanvasProject,
   type CanvasRawImage,
   type CanvasSaveKind,
@@ -196,9 +198,18 @@ const api = {
     readImage: (file: string): Promise<CanvasRawImage | Uint8Array> => ipcRenderer.invoke(IPC.canvasReadImage, file),
     /** Write an export: encoded bytes, or raw pixels to save as PNG. */
     writeFile: (file: string, data: Uint8Array | CanvasRawImage, ppi?: number): Promise<string> => ipcRenderer.invoke(IPC.canvasWriteFile, file, data, ppi),
-    watch: (project: string): Promise<string> => ipcRenderer.invoke(IPC.canvasWatch, project),
+    /** Follow a project; `loaded` is the digest of the version this window has, so nothing slips by. */
+    watch: (project: string, loaded?: string | null): Promise<string> => ipcRenderer.invoke(IPC.canvasWatch, project, loaded ?? undefined),
     unwatch: (watchId: string): Promise<void> => ipcRenderer.invoke(IPC.canvasUnwatch, watchId),
-    onChanged: (listener: (event: CanvasChangedEvent) => void): Unsubscribe => subscribe(IPC.canvasChanged, listener)
+    onChanged: (listener: (event: CanvasChangedEvent) => void): Unsubscribe => subscribe(IPC.canvasChanged, listener),
+    /** Is something at this path: a file, a folder (projects on Linux), or nothing? */
+    exists: (target: string): Promise<'file' | 'directory' | null> => ipcRenderer.invoke(IPC.canvasExists, target),
+    /** An image from an http(s) address, downloaded by main. */
+    fetchImage: (url: string): Promise<CanvasFetched> => ipcRenderer.invoke(IPC.canvasFetch, url),
+    /** Tell main what this window has open, for Hermes's commands. */
+    report: (presence: Omit<CanvasPresence, 'at'> & { focused?: boolean }): void => ipcRenderer.send(IPC.canvasReport, presence),
+    /** Every Canvas window's open documents, the most recently used window first. */
+    presence: (): Promise<CanvasPresence[]> => ipcRenderer.invoke(IPC.canvasPresence)
   },
   catalog: {
     /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */

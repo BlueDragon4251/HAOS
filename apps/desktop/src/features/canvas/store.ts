@@ -67,6 +67,15 @@ const tracked = new Map<string, Tracked>()
 
 export const activeDocument = (): CanvasDocument | null => $documents.get().find((doc) => doc.key === $activeKey.get()) ?? null
 
+/** Tell main what is open here, so Hermes's commands know which image is in front. */
+export function reportPresence(focused = false): void {
+  window.heraldOS.canvas.report({
+    focused,
+    active: $activeKey.get(),
+    documents: $documents.get().map((doc) => ({ key: doc.key, path: doc.path, name: doc.name, width: doc.state.width, height: doc.state.height, modified: doc.modified, layers: doc.state.layers.length }))
+  })
+}
+
 export function activate(key: string): void {
   if ($documents.get().some((doc) => doc.key === key)) {
     $activeKey.set(key)

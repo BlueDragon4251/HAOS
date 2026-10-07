@@ -925,6 +925,10 @@ export const IPC = {
   canvasWriteFile: 'herald-os:canvas:write-file',
   canvasWatch: 'herald-os:canvas:watch',
   canvasUnwatch: 'herald-os:canvas:unwatch',
+  canvasExists: 'herald-os:canvas:exists',
+  canvasFetch: 'herald-os:canvas:fetch',
+  canvasReport: 'herald-os:canvas:report',
+  canvasPresence: 'herald-os:canvas:presence',
   /** Main -> renderer: an open project changed on disk (Hermes, a script, Compositor). */
   canvasChanged: 'herald-os:canvas:changed'
 } as const
@@ -954,6 +958,30 @@ export interface CanvasWrite {
 }
 
 export type CanvasSaveKind = 'project' | 'png' | 'jpeg' | 'webp' | 'psd'
+
+/** An open Herald Canvas document, as a window reports it (for Hermes's commands). */
+export interface CanvasDocSummary {
+  key: string
+  path: string | null
+  name: string
+  width: number
+  height: number
+  modified: boolean
+  layers: number
+}
+
+/** What one Canvas window has open; `at` is when it was last used. */
+export interface CanvasPresence {
+  at: number
+  active: string | null
+  documents: CanvasDocSummary[]
+}
+
+/** A downloaded image: exact pixels when it is a PNG, otherwise the bytes to decode. */
+export interface CanvasFetched {
+  image: CanvasRawImage | Uint8Array
+  svg: boolean
+}
 
 export interface CanvasChangedEvent {
   watchId: string

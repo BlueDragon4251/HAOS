@@ -36,6 +36,20 @@ def binds(config: str) -> dict[str, str]:
     return out
 
 
+def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    here = tmp_path.resolve()
+    assert cli.canvas_request([]) == ("canvas.open", {})
+    assert cli.canvas_request(["open", "photo.jpg"]) == ("canvas.open", {"path": str(here / "photo.jpg")})
+    assert cli.canvas_request(["new", "Gig", "poster", "1080x1350"]) == ("canvas.new", {"name": "Gig poster", "width": 1080, "height": 1350})
+    assert cli.canvas_request(["preview", "--size", "640"]) == ("canvas.preview", {"size": 640})
+    command, payload = cli.canvas_request(["export", "out.png", "--project", "Poster.comp", "--scale", "0.5", "--overwrite"])
+    assert command == "canvas.export"
+    assert payload == {"to": str(here / "out.png"), "project": str(here / "Poster.comp"), "scale": 0.5, "overwrite": True}
+    with pytest.raises(SystemExit):
+        cli.canvas_request(["paint"])
+
+
 def test_herald_keymap_is_the_template():
     assert cli.render_keymap(TEMPLATE, "herald") == TEMPLATE
 

@@ -18,6 +18,8 @@ call the tools directly.
   Capture       capture screenshot [region|window|screen] | capture record [region] [audio] | capture stop
                 capture region --ask | capture color | capture qr | capture text
                 capture transcode <file> [gif|mp4|webm] | capture share <file>
+  Canvas        canvas open [file] | canvas new [name] [WxH] | canvas status | canvas layers [project]
+                canvas preview [project] | canvas export <file> [--project <project>] | canvas undo|redo
   Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
   Events        event <name> [key=value ...] | hook list | hook install <event> <script> | hook dir
   System        lock | suspend | power | wm <niri action...> | state | debug | commands [--json]
@@ -84,6 +86,7 @@ COMMANDS: dict[str, str] = {
     "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
     "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
     "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
+    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | preview [project] | export <file> [--project …] [--overwrite] | undo | redo: Herald Canvas, the image editor",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
@@ -977,12 +980,100 @@ def run_os(command: str, args: dict | None = None) -> int:
     return 0
 
 
-def run_os_wait(command: str, args: dict | None = None) -> dict:
+def run_os_wait(command: str, args: dict | None = None, timeout: float = 30) -> dict:
     """Run a registry command and return its result ({ok, summary, data}); exits on failure."""
-    reply = relay("os-run", [command, json.dumps(args or {})], timeout=30)
+    reply = relay("os-run", [command, json.dumps(args or {})], timeout=timeout)
     if not reply.get("ok"):
         die(reply.get("error") or reply.get("summary") or f"the shell rejected {command}", 1)
     return reply
+
+
+# ---------------------------------------------------------------------------------------------
+# Herald Canvas: the image editor, through the same canvas.* commands Hermes uses.
+CANVAS_USAGE = "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] | preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo"
+
+
+def _absolute(value: str) -> str:
+    return str(Path(value).expanduser().resolve())
+
+
+def canvas_request(args: list[str]) -> tuple[str, dict]:
+    """(command id, arguments) for `herald-os canvas ...` (pure; tested)."""
+    sub, rest = (args[0], args[1:]) if args else ("open", [])
+    flags: dict[str, str | bool] = {}
+    words: list[str] = []
+    i = 0
+    while i < len(rest):
+        token = rest[i]
+        if token in ("--overwrite", "--json"):
+            flags[token[2:]] = True
+        elif token.startswith("--") and i + 1 < len(rest):
+            flags[token[2:]] = rest[i + 1]
+            i += 1
+        else:
+            words.append(token)
+        i += 1
+    if sub == "open":
+        return "canvas.open", ({"path": _absolute(words[0])} if words else {})
+    if sub == "new":
+        payload: dict = {}
+        for word in words:
+            size = re.fullmatch(r"(\d+)[x×](\d+)", word)
+            if size:
+                payload["width"], payload["height"] = int(size.group(1)), int(size.group(2))
+            else:
+                payload["name"] = f"{payload['name']} {word}" if "name" in payload else word
+        if "background" in flags:
+            payload["background"] = flags["background"]
+        return "canvas.new", payload
+    if sub == "status":
+        return "canvas.status", {}
+    if sub in ("layers", "undo", "redo"):
+        return f"canvas.{sub}", ({"project": _absolute(words[0])} if words else {})
+    if sub == "preview":
+        payload = {"project": _absolute(words[0])} if words else {}
+        if "size" in flags:
+            payload["size"] = int(str(flags["size"]))
+        return "canvas.preview", payload
+    if sub == "export":
+        if not words:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"to": _absolute(words[0])}
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        for key in ("scale", "quality"):
+            if key in flags:
+                payload[key] = float(str(flags[key]))
+        if "format" in flags:
+            payload["format"] = flags["format"]
+        if flags.get("overwrite"):
+            payload["overwrite"] = True
+        return "canvas.export", payload
+    die(f"herald-os {CANVAS_USAGE}", 2)
+    return "", {}
+
+
+def canvas_cmd(args: list[str]) -> int:
+    command, payload = canvas_request(args)
+    reply = run_os_wait(command, payload, timeout=120)
+    data = reply.get("data") or {}
+    if "--json" in args:
+        print(json.dumps(data, indent=2))
+        return 0
+    if command == "canvas.layers":
+        print(f"{data.get('name')}: {data.get('width')}×{data.get('height')}")
+        for layer in data.get("layers") or []:
+            marks = [str(layer.get("kind"))] + ([] if layer.get("visible", True) else ["hidden"]) + ([f"{round(layer['opacity'] * 100)}%"] if layer.get("opacity", 1) < 1 else [])
+            print(f"  {layer.get('name')}  ({', '.join(marks)})")
+        return 0
+    if command == "canvas.status":
+        for doc in data.get("documents") or []:
+            print(f"{'*' if doc.get('active') else ' '} {doc.get('name')}  {doc.get('width')}×{doc.get('height')}  {doc.get('path') or 'not saved'}{'  (edited)' if doc.get('modified') else ''}")
+        if not data.get("documents"):
+            print("Nothing is open in Herald Canvas.")
+        return 0
+    print(reply.get("summary") or "done")
+    return 0
 
 
 def signal_name(number: object) -> str:
@@ -1948,6 +2039,8 @@ def main(argv: list[str]) -> int:
         return event_cmd(args)
     if cmd == "hook":
         return hook_cmd(args)
+    if cmd == "canvas":
+        return canvas_cmd(args)
     if cmd == "os":
         if not args:
             die("os <command.id> [json args]", 2)

@@ -5,8 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { parseManifest } from '../../shared/canvas/comp-format.ts'
 import { CANVAS_IMAGE_EXTENSIONS, CONVERTED_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION, projectContaining } from '../../shared/canvas/files.ts'
-import { type CanvasChangedEvent, type CanvasProject, type CanvasRawImage, type CanvasSaveKind, type CanvasWrite, IPC } from '../../shared/ipc.ts'
-import { assertWritable } from '../ipc/fs.ts'
+import { type CanvasChangedEvent, type CanvasFetched, type CanvasPresence, type CanvasProject, type CanvasRawImage, type CanvasSaveKind, type CanvasWrite, IPC } from '../../shared/ipc.ts'
+import { assertWritable, normalizeUserPath } from '../ipc/fs.ts'
 import { log } from '../log.ts'
 import { convertToPng } from './convert.ts'
 import { type PackageContents, PackageWatcher, readAsset, readPackage, writePackage } from './package-io.ts'
@@ -149,17 +149,23 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
     return file
   })
 
-  ipcMain.handle(IPC.canvasWatch, async (event, target: string) => {
+  ipcMain.handle(IPC.canvasWatch, async (event, target: string, loaded?: string) => {
     const dir = projectPath(target)
     const owner = event.sender
     const watchId = crypto.randomUUID()
     const contents = await readPackage(dir)
-    const watcher = new PackageWatcher(dir, contents.digest, changed => {
+    const send = (changed: PackageContents) => {
       if (!owner.isDestroyed()) {
         owner.send(IPC.canvasChanged, { watchId, project: toProject(dir, changed) } satisfies CanvasChangedEvent)
       }
-    })
+    }
+    // Compared with the version the window loaded, so a save landing between its read and this watch still arrives.
+    const watcher = new PackageWatcher(dir, typeof loaded === 'string' && loaded ? loaded : contents.digest, send)
     watcher.start()
+
+    if (typeof loaded === 'string' && loaded && loaded !== contents.digest) {
+      setTimeout(() => void watcher.check(), 0)
+    }
     watches.set(watchId, { watcher, owner, dir })
     owner.once('destroyed', () => {
       watcher.stop()
@@ -174,4 +180,89 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
     watches.get(watchId)?.watcher.stop()
     watches.delete(watchId)
   })
+
+  ipcMain.handle(IPC.canvasExists, async (_event, target: string) => {
+    try {
+      const stat = await fs.stat(normalizeUserPath(String(target)))
+
+      return stat.isDirectory() ? 'directory' : 'file'
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle(IPC.canvasFetch, async (_event, address: string) => fetchImage(String(address)))
+
+  ipcMain.on(IPC.canvasReport, (event, report: Omit<CanvasPresence, 'at'> & { focused?: boolean }) => {
+    const id = event.sender.id
+    const known = presence.get(id)
+
+    if (!known) {
+      event.sender.once('destroyed', () => presence.delete(id))
+    }
+
+    presence.set(id, { active: report.active ?? null, documents: Array.isArray(report.documents) ? report.documents : [], at: report.focused || !known ? Date.now() : known.at })
+  })
+
+  ipcMain.handle(IPC.canvasPresence, () => [...presence.values()].sort((a, b) => b.at - a.at))
+}
+
+/** What each Canvas window has open, by its web contents. */
+const presence = new Map<number, CanvasPresence>()
+
+const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
+
+/** An image from the web for a new layer: http(s) only, limited in size and time. */
+export async function fetchImage(address: string): Promise<CanvasFetched> {
+  const url = new URL(address)
+
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('Images come from http or https addresses')
+  }
+
+  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(60_000) })
+
+  if (!response.ok || !response.body) {
+    throw new Error(`${url.host} answered ${response.status}`)
+  }
+
+  const declared = Number(response.headers.get('content-length') ?? 0)
+
+  if (declared > MAX_DOWNLOAD_BYTES) {
+    throw new Error('That image is larger than 100 MB')
+  }
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+  const reader = response.body.getReader()
+
+  for (;;) {
+    const { done, value } = await reader.read()
+
+    if (done) {
+      break
+    }
+
+    total += value.byteLength
+
+    if (total > MAX_DOWNLOAD_BYTES) {
+      await reader.cancel()
+      throw new Error('That image is larger than 100 MB')
+    }
+
+    chunks.push(value)
+  }
+
+  const bytes = new Uint8Array(total)
+  let offset = 0
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  const type = response.headers.get('content-type') ?? ''
+  const svg = type.includes('svg') || url.pathname.toLowerCase().endsWith('.svg')
+
+  return { image: svg ? bytes : pixelsOrBytes(bytes, 4), svg }
 }
