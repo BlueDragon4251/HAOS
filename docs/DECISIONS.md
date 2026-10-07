@@ -77,6 +77,16 @@ Spotlight screenshot query). There is no per-plugin "keep direct" knob upstream,
 eight schemas, cache-stable across a conversation. Proposed upstream: let a plugin manifest declare
 `direct_toolsets`, or extend `_DIRECT_SURFACE_TOOLSETS` with session-source-gated toolsets.
 
+Amendment (visible and reversible): the setting stays global, because upstream still has no
+per-session or per-plugin switch and `tools.tool_search.defer` can only add tools to the deferred
+set. With the tools kept to Herald OS sessions (ADR-004 amendment) it no longer puts Herald OS's
+schemas into other sessions; what it still changes there is that their own plugin and MCP tools are
+listed directly. So every setup (bootstrap, the app's first start, `herald-os setup`) says what each
+step changes, stops at the first `hermes` step that fails, and writes the value it found to
+`$HERMES_HOME/herald-os/tool-search-before` before turning it off; Settings > Hermes & agents > Tool
+search (and the `toolSearch.set` command) is the promised switch, and `herald-os setup --undo` puts
+the value back with the rest. docs/SYSTEM-BRIDGE.md lists everything Herald OS changes in Hermes.
+
 ## ADR-011: Backend is spawned with HERMES_DESKTOP=1
 
 Upstream keys three behaviours on this flag: the loopback token-auth exemption when a public

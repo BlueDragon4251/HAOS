@@ -23,6 +23,7 @@ import { bindStudioEvents } from './studio.ts'
 import { isMainSurface } from './shell.ts'
 import { bindSwitches } from './switches.ts'
 import { bindThemes } from './themes.ts'
+import { bindBridgeSetupNotice } from './tool-search.ts'
 import { bindUsage } from './usage.ts'
 import { bindVoice } from './voice.ts'
 import { bindWake } from './wake.ts'
@@ -68,6 +69,7 @@ export function bootRenderer(): void {
   // The Hermes window owns the notification list; the history follows it.
   if (isMainSurface) {
     bindNotificationHistory()
+    bindBridgeSetupNotice()
   }
 
   let lastEpoch = 0
