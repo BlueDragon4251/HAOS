@@ -104,12 +104,28 @@ export function ModelsDialog() {
   useEffect(() => void refreshModels(), [])
 
   return (
-    <Modal title="AI models" onClose={close} className="max-w-lg">
+    <Modal title="AI models" onClose={close} className="max-w-xl">
       <p className="mb-3 text-[12px] text-fg-3">These run on this computer. They download when a tool first needs one, after you allow it, and are checked against their published checksums before they run.</p>
       <div className="flex flex-col divide-y divide-line rounded-xl ring-1 ring-line">
         {MODELS.map((model) => {
           const status = models[model.id]
           const downloading = status?.state === 'downloading' || (downloads[model.id] && !downloads[model.id]?.outcome)
+          // A stopped download keeps the files it finished (checked again before they run).
+          const partial = status?.state === 'missing' && status.bytes > 0
+          const remove = (
+            <GlassButton
+              size="sm"
+              variant="ghost"
+              disabled={busy === model.id}
+              aria-label={`Remove ${model.name}`}
+              onClick={() => {
+                setBusy(model.id)
+                void removeModel(model.id).finally(() => setBusy(null))
+              }}
+            >
+              <IconTrash size={14} /> Remove
+            </GlassButton>
+          )
 
           return (
             <div key={model.id} className="flex items-center gap-3 px-3 py-2.5">
@@ -125,28 +141,22 @@ export function ModelsDialog() {
                   </div>
                 )}
               </div>
-              <div className="shrink-0 text-right text-[11.5px] text-fg-3 tabular-nums">{status?.state === 'ready' ? sizeLabel(status.bytes) : downloading ? '' : `Not downloaded (${sizeLabel(modelBytes(model))})`}</div>
+              <div className="shrink-0 text-right text-[11.5px] text-fg-3 tabular-nums">
+                {status?.state === 'ready' ? sizeLabel(status.bytes) : downloading ? '' : partial ? `${sizeLabel(status.bytes)} of ${sizeLabel(modelBytes(model))}` : `Not downloaded (${sizeLabel(modelBytes(model))})`}
+              </div>
               {status?.state === 'ready' ? (
-                <GlassButton
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === model.id}
-                  aria-label={`Remove ${model.name}`}
-                  onClick={() => {
-                    setBusy(model.id)
-                    void removeModel(model.id).finally(() => setBusy(null))
-                  }}
-                >
-                  <IconTrash size={14} /> Remove
-                </GlassButton>
+                remove
               ) : downloading ? (
                 <GlassButton size="sm" variant="ghost" onClick={() => void cancelDownload(model.id)}>
                   Cancel
                 </GlassButton>
               ) : (
-                <GlassButton size="sm" variant="ghost" aria-label={`Download ${model.name}`} onClick={() => void download(model.id)}>
-                  <IconDownload size={14} /> Download
-                </GlassButton>
+                <>
+                  <GlassButton size="sm" variant="ghost" aria-label={`Download ${model.name}`} onClick={() => void download(model.id)}>
+                    <IconDownload size={14} /> {partial ? 'Resume' : 'Download'}
+                  </GlassButton>
+                  {partial && remove}
+                </>
               )}
             </div>
           )

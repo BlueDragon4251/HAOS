@@ -23,4 +23,8 @@ by Nous Research.
 Third-party npm and Python packages keep their own licenses. A packaged build
 includes Electron (MIT, https://github.com/electron/electron/blob/main/LICENSE)
 and Chromium, whose component licenses are listed in LICENSES.chromium.html in
-every Electron release.
+every Electron release. It also includes ONNX Runtime Web (MIT,
+https://github.com/microsoft/onnxruntime), which runs Herald Canvas's on-device
+models. The models themselves are not distributed with Herald OS: Herald Canvas
+downloads each from where its publisher put it, only after the person allows
+it, and each keeps its own license (listed in apps/desktop/shared/canvas/models.ts).
