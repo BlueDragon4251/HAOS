@@ -198,7 +198,7 @@ To change one of Herald OS's own keys, bind the same key in `local.kdl`. It is r
 later bind replaces an earlier one. To switch a key off, bind it to nothing, for example
 `Mod+Q { spawn "true"; }` so `Super+Q` no longer closes windows. Bind each key only once inside
 `local.kdl` itself, because niri refuses a file that binds the same key twice;
-`niri validate -c ~/.config/niri/config.kdl` checks it.
+`niri validate -c ~/.config/niri/herald-os.kdl` checks it.
 
 Running Herald OS as an app inside Omarchy, its keys live in `~/.config/hypr/herald-os.lua` on
 Omarchy 4 (`herald-os.conf` on Omarchy 3), which `herald-os omarchy install` rewrites. Change them in

@@ -1163,12 +1163,22 @@ def debug() -> int:
 
 
 # ---------------------------------------------------------------------------------------------
-# Keymaps. ~/.config/niri/config.kdl is rendered from Herald's template; the Omarchy keymap makes
-# Super+C, X and V copy, cut and paste in every app (terminals included, through Ctrl+Insert and
+# Keymaps. Herald's niri config, ~/.config/niri/herald-os.kdl (the session starts niri with it), is
+# rendered from its template; a personal ~/.config/niri/config.kdl is never touched. The Omarchy keymap
+# makes Super+C, X and V copy, cut and paste in every app (terminals included, through Ctrl+Insert and
 # Shift+Insert), and moves the Herald binds they replace one modifier over.
 KEYMAP_FILE = CONFIG_DIR / "keymap"
 KEYMAPS = ("herald", "omarchy")
-NIRI_TEMPLATES = [HOME / "Herald-OS" / "linux" / "niri" / "config.kdl", Path("/usr/local/share/herald-os-linux/niri/config.kdl"), Path("/usr/share/herald-os/niri/config.kdl")]
+NIRI_CONFIG = HOME / ".config" / "niri" / "herald-os.kdl"
+# The template that came with this command comes first: a checkout's, or the app's own when the
+# command is a link into /opt/herald-os (the Arch package, the release tarball). Copies installed
+# elsewhere (the image, the development VM) fall through to the folders after it.
+NIRI_TEMPLATES = [
+    Path(__file__).resolve().parent.parent / "niri" / "config.kdl",
+    HOME / "Herald-OS" / "linux" / "niri" / "config.kdl",
+    Path("/usr/local/share/herald-os-linux/niri/config.kdl"),
+    Path("/usr/share/herald-os/niri/config.kdl"),
+]
 OMARCHY_BINDS = {
     "Mod+C": 'Mod+C hotkey-overlay-title="Copy" { spawn "wtype" "-M" "ctrl" "-k" "Insert" "-m" "ctrl"; }',
     "Mod+X": 'Mod+X hotkey-overlay-title="Cut" { spawn "wtype" "-M" "ctrl" "x" "-m" "ctrl"; }',
@@ -1221,13 +1231,14 @@ def keymap_cmd(args: list[str]) -> int:
     template = next((path for path in NIRI_TEMPLATES if path.is_file()), None)
     if not template:
         die("the niri template is missing; reinstall Herald OS or run herald-os-build")
-    target = HOME / ".config" / "niri" / "config.kdl"
-    target.parent.mkdir(parents=True, exist_ok=True)
     rendered = render_keymap(template.read_text(), current_keymap())
-    # niri reloads on every write; write once, atomically, so it never reads half a file.
-    staging = target.with_suffix(".kdl.new")
-    staging.write_text(rendered)
-    staging.replace(target)
+    # niri reloads on every write: only a changed config is written, once and atomically, so it
+    # never reads half a file.
+    if not NIRI_CONFIG.is_file() or NIRI_CONFIG.read_text(errors="replace") != rendered:
+        NIRI_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        staging = NIRI_CONFIG.with_suffix(".kdl.new")
+        staging.write_text(rendered)
+        staging.replace(NIRI_CONFIG)
     if action != "apply":
         print(f"keymap: {current_keymap()}" + (" (Super+C, X and V copy, cut and paste; voice moved to Super+Shift+V)" if current_keymap() == "omarchy" else ""))
     return 0

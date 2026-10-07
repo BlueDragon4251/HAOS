@@ -35,7 +35,16 @@ mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/compositor.log" 2>&1
 echo "$(date -Is) starting $COMPOSITOR (renderer=${WLR_RENDERER:-gpu})"
 
-if [[ "$COMPOSITOR" == "cage" ]] || ! command -v niri >/dev/null 2>&1; then
+# Herald's own niri config, rendered at every start from the installed template and the person's
+# keymap (and written only when that changed, as after an update). niri is given it by path, so a
+# personal ~/.config/niri/config.kdl is never read or rewritten. Without it niri would start bare,
+# without Herald OS, so the shell runs under cage instead.
+NIRI_KDL="$HOME/.config/niri/herald-os.kdl"
+if [[ "$COMPOSITOR" != "cage" ]] && command -v niri >/dev/null 2>&1 && ! herald-os keymap apply; then
+  echo "could not render $NIRI_KDL (herald-os keymap apply)"
+fi
+
+if [[ "$COMPOSITOR" == "cage" ]] || ! command -v niri >/dev/null 2>&1 || [[ ! -f "$NIRI_KDL" ]]; then
   export HERALD_OS_SHELL_MODE=desktop
   exec cage -s -- "$(command -v herald-os-session)"
 fi
@@ -92,4 +101,4 @@ if [[ "$nested" == "1" ]]; then
   exec cage -s -- "$(command -v herald-os-niri-nested)"
 fi
 
-exec niri --session --config "$HOME/.config/niri/config.kdl"
+exec niri --session --config "$NIRI_KDL"
