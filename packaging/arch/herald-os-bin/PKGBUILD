@@ -31,6 +31,8 @@ optdepends=(
   'ffmpeg: converting recordings'
   'zbar: reading QR codes from the screen'
   'tesseract: copying text from the screen'
+  'libheif: opening HEIC photos in Herald Canvas'
+  'imagemagick: opening TIFF and camera RAW files in Herald Canvas'
   'flatpak: installing apps from the catalog'
   'podman: the Windows VM and containers'
   'yay: AUR installs from the catalog'

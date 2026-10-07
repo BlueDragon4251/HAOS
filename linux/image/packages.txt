@@ -68,6 +68,9 @@ util-linux
 grim
 socat
 curl
+# Herald Canvas converts HEIC (libheif) and TIFF, camera RAW and the like (ImageMagick) before opening them.
+libheif-tools
+ImageMagick
 # OCR, Flatpak software, the boot splash.
 tesseract
 tesseract-langpack-eng
