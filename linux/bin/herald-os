@@ -1018,7 +1018,7 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
     i = 0
     while i < len(rest):
         token = rest[i]
-        if token in ("--overwrite", "--json", "--image", "--cutout", "--new-layer"):
+        if token in ("--overwrite", "--json", "--image", "--cutout", "--new-layer", "--center"):
             flags[token[2:]] = True
         elif token.startswith("--") and i + 1 < len(rest):
             flags[token[2:]] = rest[i + 1]
@@ -1093,6 +1093,23 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if "project" in flags:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.crop", payload
+    if sub == "guides":
+        action = words[0] if words else "list"
+        if action not in ("add", "remove", "clear", "list") or (action in ("clear", "list") and len(words) > 1):
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"action": action}
+        if len(words) == 3:
+            payload["axis"], payload["position"] = words[1], words[2]
+        elif len(words) > 1:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        for key in ("margins", "columns", "gutter"):
+            if key in flags:
+                payload[key] = str(flags[key]) if key == "margins" else float(str(flags[key]))
+        if flags.get("center"):
+            payload["center"] = True
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.guides", payload
     if sub == "auto":
         if len(words) > 1:
             die(f"herald-os {CANVAS_USAGE}", 2)
@@ -1172,6 +1189,11 @@ def canvas_cmd(args: list[str]) -> int:
         for layer in data.get("layers") or []:
             marks = [str(layer.get("kind"))] + ([] if layer.get("visible", True) else ["hidden"]) + ([f"{round(layer['opacity'] * 100)}%"] if layer.get("opacity", 1) < 1 else [])
             print(f"  {layer.get('name')}  ({', '.join(marks)})")
+        return 0
+    if command == "canvas.guides" and payload.get("action") == "list":
+        print(reply.get("summary") or "")
+        for guide in data.get("guides") or []:
+            print(f"  {guide.get('axis'):<10} {guide.get('position')}")
         return 0
     if command == "canvas.history":
         print(reply.get("summary") or "")

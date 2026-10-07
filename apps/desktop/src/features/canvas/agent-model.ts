@@ -916,6 +916,21 @@ export function distributeFrom(value: unknown): DistributeMode {
   return mode
 }
 
+/** Which way a guide runs, however it was written: vertical (a line down, at an x) or horizontal (across, at a y). */
+export function guideAxisFrom(value: unknown): 'vertical' | 'horizontal' {
+  const text = words(value)
+
+  if (['vertical', 'v', 'x', 'column', 'down'].includes(text)) {
+    return 'vertical'
+  }
+
+  if (['horizontal', 'h', 'y', 'row', 'across'].includes(text)) {
+    return 'horizontal'
+  }
+
+  throw new Error('axis is vertical (a line down the canvas, at an x) or horizontal (a line across, at a y)')
+}
+
 /** Which automatic fix, however it was written ("tone", "Auto Contrast", "colour"); tone when not given. */
 export function autoModeFrom(value: unknown): AutoMode {
   const text = words(value).replace(/^auto\s*/, '').replace(/[^a-z]/g, '')

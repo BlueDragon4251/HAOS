@@ -1109,6 +1109,7 @@ CANVAS_ACTIONS: dict[str, str] = {
     "resize": "canvas.resize",
     "crop": "canvas.crop",
     "align": "canvas.align",
+    "guides": "canvas.guides",
     "export": "canvas.export",
     "save": "canvas.save",
     "preview": "canvas.preview",
@@ -1142,6 +1143,7 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "resize": ("project", "width", "height", "anchor", "scale", "image", "resample"),
     "crop": ("project", "x", "y", "width", "height", "ratio", "angle"),
     "align": ("project", "layers", "edge", "to", "margin", "distribute"),
+    "guides": ("project", "guide", "axis", "position", "margins", "columns", "gutter", "center"),
     "export": ("project", "to", "format", "quality", "scale", "overwrite"),
     "save": ("project", "to", "overwrite"),
     "preview": ("project", "size"),
@@ -1160,7 +1162,7 @@ CANVAS_SCHEMA = _schema(
     "canvas",
     "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
-    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; guides lays out margins, columns and centre lines; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=history lists every step (undo or redo with steps to move through them); action=export writes PNG, JPEG, WebP or a layered PSD; action=open takes .psd files with their layers. "
     "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something). place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
@@ -1230,6 +1232,13 @@ CANVAS_SCHEMA = _schema(
         "newLayer": _desc(_BOOL, "content_fill: put the fill on a new layer above instead of into the layer"),
         "sampling": _enum("around", "all", description="content_fill: copy from around the box (around, the default) or from anywhere in the layer"),
         "steps": _desc(_NUM, "undo, redo: how many steps to take (1); action=history lists them"),
+        "guide": _enum("add", "remove", "clear", "list", description="guides: what to do with the guides (lines layers, crops and selections snap to; they never export)"),
+        "axis": _enum("vertical", "horizontal", description="guides: vertical is a line down the canvas at an x, horizontal a line across at a y"),
+        "position": _desc(_STR, "guides: pixels from the left (vertical) or top (horizontal), or a percentage like \"50%\""),
+        "margins": _desc(_STR, "guides add: four guides this far in from the edges, pixels or a percentage of the short side"),
+        "columns": _desc(_NUM, "guides add: equal columns between the margins"),
+        "gutter": _desc(_NUM, "guides add: pixels between columns"),
+        "center": _desc(_BOOL, "guides add: lines through the middle, both ways"),
     },
     ["action"],
 )
@@ -1248,6 +1257,9 @@ def canvas_command(args: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     # `action` already names the tool's action, so the mask's own one travels as `mask`.
     if action == "mask" and "mask" in command_args:
         command_args["action"] = command_args.pop("mask")
+    # The guides' own action travels as `guide` for the same reason.
+    if action == "guides" and "guide" in command_args:
+        command_args["action"] = command_args.pop("guide")
     # `mask` is taken by the mask action, so place_image's mask file travels as `mask_image`.
     if action == "place_image" and "mask_image" in command_args:
         command_args["mask"] = command_args.pop("mask_image")

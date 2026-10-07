@@ -15,6 +15,38 @@ export const viewport = { width: 800, height: 600 }
 /** The document position under the pointer, for the status bar; null when it is outside. */
 export const $pointer = atom<{ x: number; y: number } | null>(null)
 
+/** View menu switches, kept between sessions. */
+export interface ViewOptions {
+  rulers: boolean
+  guides: boolean
+  lockGuides: boolean
+  snap: boolean
+  snapGuides: boolean
+  snapLayers: boolean
+  snapCanvas: boolean
+  smartGuides: boolean
+}
+
+const VIEW_OPTIONS_KEY = 'herald-canvas.view'
+
+const DEFAULT_VIEW: ViewOptions = { rulers: false, guides: true, lockGuides: false, snap: true, snapGuides: true, snapLayers: true, snapCanvas: true, smartGuides: true }
+
+function storedView(): ViewOptions {
+  try {
+    return { ...DEFAULT_VIEW, ...JSON.parse(globalThis.localStorage?.getItem(VIEW_OPTIONS_KEY) ?? '{}') }
+  } catch {
+    return DEFAULT_VIEW
+  }
+}
+
+export const $viewOptions = atom<ViewOptions>(storedView())
+
+export function setViewOption<K extends keyof ViewOptions>(key: K, value: ViewOptions[K]): void {
+  const next = { ...$viewOptions.get(), [key]: value }
+  $viewOptions.set(next)
+  globalThis.localStorage?.setItem(VIEW_OPTIONS_KEY, JSON.stringify(next))
+}
+
 export type PanelTab = 'properties' | 'history'
 
 const PANEL_TAB_KEY = 'herald-canvas.panel-tab'

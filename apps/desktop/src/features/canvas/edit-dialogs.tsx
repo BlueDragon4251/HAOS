@@ -10,6 +10,7 @@ import { canvasSize, fillSelection, imageSize, modifySelection, type SelectionCh
 import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import type { TrimBy } from './engine/canvas-size.ts'
+import { type GuideAxis, onCanvas, positionFrom, withGuides } from './engine/guides.ts'
 import { $dialog } from './menus.ts'
 import { $background, $foreground } from './tools/state.ts'
 
@@ -203,6 +204,50 @@ export function ModifySelectionDialog({ doc, change }: { doc: CanvasDocument; ch
       >
         <NumberField label={label} value={radius} onChange={setRadius} unit="px" min={1} max={2000} autoFocus />
         <Buttons disabled={radius <= 0} />
+      </Form>
+    </Modal>
+  )
+}
+
+/** View > New Guide: a guide across or down the canvas, in pixels or as a percentage. */
+export function NewGuideDialog({ doc }: { doc: CanvasDocument }) {
+  const [axis, setAxis] = useState<GuideAxis>('vertical')
+  const [position, setPosition] = useState('50%')
+  const length = axis === 'vertical' ? doc.state.width : doc.state.height
+  let value: number | undefined
+
+  try {
+    value = positionFrom(position, length)
+  } catch {
+    value = undefined
+  }
+
+  const valid = value !== undefined && onCanvas(doc.state, axis, value)
+
+  return (
+    <Modal title="New Guide" onClose={close} className="max-w-xs">
+      <Form
+        onSubmit={() => {
+          if (valid) {
+            doc.commit('New Guide', withGuides(doc.state, [{ axis, position: value! }]).state)
+            close()
+          }
+        }}
+      >
+        <div className="flex gap-4 text-[12.5px] text-fg-2">
+          {(['vertical', 'horizontal'] as const).map((entry) => (
+            <label key={entry} className="flex items-center gap-2 capitalize">
+              <input type="radio" name="guide-axis" checked={axis === entry} onChange={() => setAxis(entry)} />
+              {entry}
+            </label>
+          ))}
+        </div>
+        <label className="flex flex-col gap-1 text-[11.5px] text-fg-3">
+          Position (pixels from the {axis === 'vertical' ? 'left' : 'top'}, or a percentage)
+          <input autoFocus value={position} onChange={(event) => setPosition(event.target.value)} className="glass-input h-8 rounded-lg px-2 text-[13px] text-fg tabular-nums outline-none" />
+        </label>
+        {value !== undefined && <p className="text-[11.5px] text-fg-3">{valid ? `At ${Math.round(value * 100) / 100} px of ${length}.` : `That is off the ${length}-pixel canvas.`}</p>}
+        <Buttons disabled={!valid} />
       </Form>
     </Modal>
   )

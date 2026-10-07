@@ -248,6 +248,24 @@ export const canvasCommands: readonly OsCommand[] = [
     run: async (args) => done((await canvas()).align(args))
   },
   {
+    id: 'canvas.guides',
+    title: 'Add or remove guides',
+    description:
+      'Guides are lines over the canvas that layers, crops and selections snap to; they never show in exports. action=add puts one at a position (axis vertical for a line down the canvas at an x, horizontal for a line across at a y; position in pixels or a percentage like "50%"), or a layout: margins (pixels or a percentage of the short side; four guides that far in), columns (equal columns between the margins, with gutter pixels between them) and center=true (lines through the middle). action=remove takes axis and position; clear removes them all; list shows them.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'action', type: 'string', description: 'add, remove, clear or list', required: true, enum: ['add', 'remove', 'clear', 'list'] },
+      { name: 'axis', type: 'string', description: 'vertical (a line down, at an x) or horizontal (a line across, at a y)' },
+      { name: 'position', type: 'string', description: 'Pixels from the left (vertical) or top (horizontal), or a percentage like "50%"' },
+      { name: 'margins', type: 'string', description: 'Guides this far in from each edge: pixels, or a percentage of the short side' },
+      { name: 'columns', type: 'number', description: 'Equal columns between the margins' },
+      { name: 'gutter', type: 'number', description: 'Pixels between columns' },
+      { name: 'center', type: 'boolean', description: 'Guides through the middle of the canvas, both ways' }
+    ],
+    run: async (args) => done((await canvas()).guides(args))
+  },
+  {
     id: 'canvas.crop',
     title: 'Crop an image',
     description:

@@ -30,6 +30,7 @@ import {
   fitPicture,
   fontNameFrom,
   fractionFrom,
+  guideAxisFrom,
   holeBox,
   jsonObject,
   lineEnds,
@@ -49,6 +50,7 @@ import {
 import { autoAdjustState } from './auto-adjust.ts'
 import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
 import { AUTO_LABELS } from './engine/auto-levels.ts'
+import { guideNear, layoutGuides, onCanvas, positionFrom, withGuides, withoutGuides } from './engine/guides.ts'
 import { anchorOffset, cropCanvas, resizeCanvas, rotateLayers, scaleImage } from './engine/canvas-size.ts'
 import {
   adjustmentLayer,
@@ -873,6 +875,77 @@ export async function align(args: Record<string, unknown>): Promise<Outcome> {
   const where = to === 'canvas' ? `the canvas${margin ? ` (${margin} pixels in)` : ''}` : to === 'selection' ? 'the selection' : 'each other'
 
   return { summary: `${names}: ${edges.map((edge) => (edge === 'center' ? 'centred across' : edge === 'middle' ? 'centred down' : edge)).join(' and ')} on ${where}${moved ? '' : ' (already there)'}`, data: described() }
+}
+
+/** Add, remove, clear or list guides: one at a position, or margins, columns and centre lines. */
+export async function guides(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+  const action = String(args.action ?? 'list').toLowerCase()
+  const listed = () => ({ guides: on.doc.state.guides.map((guide) => ({ id: guide.id, axis: guide.axis, position: guide.position })) })
+
+  if (action === 'list') {
+    return { summary: `${on.doc.name} has ${state.guides.length || 'no'} guide${state.guides.length === 1 ? '' : 's'}`, data: listed() }
+  }
+
+  if (action === 'clear') {
+    if (!state.guides.length) {
+      return { summary: 'There are no guides to clear', data: listed() }
+    }
+
+    await apply(on, 'Clear Guides', { ...state, guides: [] })
+
+    return { summary: `Cleared ${state.guides.length} guide${state.guides.length === 1 ? '' : 's'}`, data: listed() }
+  }
+
+  const axis = args.axis !== undefined && args.axis !== '' ? guideAxisFrom(args.axis) : undefined
+  const position = axis ? positionFrom(args.position, axis === 'vertical' ? state.width : state.height) : undefined
+
+  if (action === 'remove') {
+    if (!axis || position === undefined) {
+      throw new Error('Say which guide to remove: axis (vertical or horizontal) and position')
+    }
+
+    const guide = guideNear(state, axis, position, 1)
+
+    if (!guide) {
+      throw new Error(`There is no ${axis} guide at ${position}; the guides: ${state.guides.map((entry) => `${entry.axis} ${entry.position}`).join(', ') || 'none'}`)
+    }
+
+    await apply(on, 'Delete Guide', withoutGuides(state, [guide.id]))
+
+    return { summary: `Removed the ${axis} guide at ${guide.position}`, data: listed() }
+  }
+
+  if (action !== 'add') {
+    throw new Error('action is add, remove, clear or list')
+  }
+
+  if (args.position !== undefined && args.position !== '' && !axis) {
+    throw new Error('Say which way the guide runs: axis=vertical (a line down, at an x) or axis=horizontal (a line across, at a y)')
+  }
+
+  const margins = positionFrom(args.margins, Math.min(state.width, state.height), 'margins')
+  const layout = layoutGuides(state, { margins, columns: finite(args.columns), gutter: finite(args.gutter), center: args.center === true })
+  const wanted = [...(axis && position !== undefined ? [{ axis, position }] : []), ...layout]
+
+  if (!wanted.length) {
+    throw new Error('Say where: axis and position, or margins, columns (with margins and gutter) or center=true')
+  }
+
+  if (wanted.some((guide) => !onCanvas(state, guide.axis, guide.position))) {
+    throw new Error(`Guides go on the canvas: from 0 to ${state.width} across and 0 to ${state.height} down`)
+  }
+
+  const { state: next, added } = withGuides(state, wanted)
+
+  if (!added.length) {
+    return { summary: 'Those guides are there already', data: listed() }
+  }
+
+  await apply(on, added.length === 1 ? 'New Guide' : 'New Guides', next)
+
+  return { summary: `Added ${added.length} guide${added.length === 1 ? '' : 's'}: ${added.map((guide) => `${guide.axis} at ${guide.position}`).join(', ')}`, data: listed() }
 }
 
 /** Crop the canvas to a box (held to a ratio, after turning the picture level when asked); layers keep their pixels. */

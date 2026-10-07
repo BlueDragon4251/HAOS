@@ -58,7 +58,7 @@ import { $autosave, exportDocument, notify, openPath, save, setAutosave } from '
 import { hasOpenWork, settleTools } from './tools/sessions.ts'
 import { $background, $foreground, setTool } from './tools/state.ts'
 import { startTransform, turnPicked } from './tools/transform.ts'
-import { $panelTab, actualPixels, fitToScreen, showPanel, zoomStep } from './view-state.ts'
+import { $panelTab, $viewOptions, actualPixels, fitToScreen, setViewOption, showPanel, zoomStep } from './view-state.ts'
 
 export { isMac }
 
@@ -76,6 +76,7 @@ export type CanvasDialog =
   | { kind: 'generate'; mode: 'fill' | 'layer' }
   | { kind: 'models' }
   | { kind: 'notes'; title: string; notes: string[] }
+  | { kind: 'new-guide' }
   | null
 
 export const $dialog = atom<CanvasDialog>(null)
@@ -222,6 +223,14 @@ const DISTRIBUTE_ITEMS: CanvasCommand[] = DISTRIBUTE_MODES.map((mode, i) => ({
   dividerBefore: i === 3 || i === 6,
   run: onDoc((doc) => distributePicked(doc, mode))
 }))
+
+const SNAP_ITEMS: CanvasCommand[] = (
+  [
+    ['snapGuides', 'Guides'],
+    ['snapLayers', 'Layers'],
+    ['snapCanvas', 'Canvas Edges and Centre']
+  ] as const
+).map(([key, label]) => ({ id: `snap-${key}`, label, checked: () => $viewOptions.get()[key], run: () => setViewOption(key, !$viewOptions.get()[key]) }))
 
 export const MENUS: CanvasMenu[] = [
   {
@@ -383,7 +392,15 @@ export const MENUS: CanvasMenu[] = [
       { id: 'zoom-in', label: 'Zoom In', keys: 'mod+=', needsDocument: true, run: onDoc((doc) => zoomStep(doc, 1)) },
       { id: 'zoom-out', label: 'Zoom Out', keys: 'mod+-', needsDocument: true, run: onDoc((doc) => zoomStep(doc, -1)) },
       { id: 'fit', label: 'Fit on Screen', keys: 'mod+0', needsDocument: true, run: onDoc((doc) => fitToScreen(doc)) },
-      { id: 'actual', label: 'Actual Pixels', keys: 'mod+1', needsDocument: true, run: onDoc(actualPixels) }
+      { id: 'actual', label: 'Actual Pixels', keys: 'mod+1', needsDocument: true, run: onDoc(actualPixels) },
+      { id: 'rulers', label: 'Rulers', keys: 'mod+r', checked: () => $viewOptions.get().rulers, run: () => setViewOption('rulers', !$viewOptions.get().rulers), dividerBefore: true },
+      { id: 'show-guides', label: 'Guides', keys: 'mod+;', checked: () => $viewOptions.get().guides, run: () => setViewOption('guides', !$viewOptions.get().guides) },
+      { id: 'lock-guides', label: 'Lock Guides', keys: 'mod+alt+;', checked: () => $viewOptions.get().lockGuides, run: () => setViewOption('lockGuides', !$viewOptions.get().lockGuides) },
+      { id: 'new-guide', label: 'New Guide…', needsDocument: true, run: () => $dialog.set({ kind: 'new-guide' }) },
+      { id: 'clear-guides', label: 'Clear Guides', needsDocument: true, enabled: (doc) => doc.state.guides.length > 0, run: onDoc((doc) => doc.commit('Clear Guides', { ...doc.state, guides: [] })) },
+      { id: 'snap', label: 'Snap', keys: 'mod+shift+;', checked: () => $viewOptions.get().snap, run: () => setViewOption('snap', !$viewOptions.get().snap), dividerBefore: true },
+      { id: 'snap-to', label: 'Snap To', run: nothing, submenu: SNAP_ITEMS },
+      { id: 'smart-guides', label: 'Smart Guides', checked: () => $viewOptions.get().smartGuides, run: () => setViewOption('smartGuides', !$viewOptions.get().smartGuides) }
     ]
   }
 ]
@@ -443,9 +460,16 @@ export function matches(event: KeyboardEvent | ReactKeyboardEvent, keys: string)
   // Shifted and option layers change event.key, so letters and digits match on the physical key.
   const code = event.code
   const pressed = /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase() : /^Digit\d$/.test(code) ? code.slice(5) : event.key.toLowerCase()
-  const aliases: Record<string, string[]> = { '=': ['=', '+'], '-': ['-', '_'], ']': [']', '}'], '[': ['[', '{'] }
+  const aliases: Record<string, string[]> = { '=': ['=', '+'], '-': ['-', '_'], ']': [']', '}'], '[': ['[', '{'], ';': [';', ':'] }
 
-  return (aliases[key] ?? [key]).includes(pressed) || (key === '=' && code === 'Equal') || (key === '-' && code === 'Minus') || (key === ']' && code === 'BracketRight') || (key === '[' && code === 'BracketLeft')
+  return (
+    (aliases[key] ?? [key]).includes(pressed) ||
+    (key === '=' && code === 'Equal') ||
+    (key === '-' && code === 'Minus') ||
+    (key === ']' && code === 'BracketRight') ||
+    (key === '[' && code === 'BracketLeft') ||
+    (key === ';' && code === 'Semicolon')
+  )
 }
 
 /** Commands with the ones in their submenus. */

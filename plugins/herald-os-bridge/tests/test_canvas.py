@@ -147,6 +147,16 @@ def test_export_takes_a_layered_psd(plugin):
     assert "psd" in tools.CANVAS_SCHEMA["parameters"]["properties"]["format"]["enum"]
 
 
+def test_guides_take_their_action_as_guide(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "guides", "guide": "add", "margins": "6%", "columns": 12, "gutter": 20, "center": True, "mask": "hide"})
+    assert (command, args) == ("canvas.guides", {"action": "add", "margins": "6%", "columns": 12, "gutter": 20, "center": True})
+    _, command, args = tools.canvas_command({"action": "guides", "guide": "remove", "axis": "vertical", "position": 540})
+    assert (command, args) == ("canvas.guides", {"action": "remove", "axis": "vertical", "position": 540})
+    properties = tools.CANVAS_SCHEMA["parameters"]["properties"]
+    assert properties["guide"]["enum"] == ["add", "remove", "clear", "list"] and "guides" in properties["action"]["enum"]
+
+
 def test_auto_adjust_adds_a_levels_layer(plugin):
     tools = _mod(plugin, "tools")
     _, command, args = tools.canvas_command({"action": "auto_adjust", "kind": "color", "cutoff": 0.2, "clip": True, "settings": {"x": 1}})

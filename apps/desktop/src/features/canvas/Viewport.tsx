@@ -9,12 +9,14 @@ import { traceOutline } from './engine/selection.ts'
 import { HANDLERS } from './tools/index.ts'
 import { registerScreen } from './tools/screen.ts'
 import { movingSelection } from './tools/select.ts'
+import { dragGuide, guideAt } from './tools/guides.ts'
+import { $draftGuide, $snapMarks, drawSnapMarks } from './tools/snap.ts'
 import { $spaceHeld, $tool } from './tools/state.ts'
-import { $transform } from './tools/transform.ts'
+import { $transform, sessionFor } from './tools/transform.ts'
 import { $typing } from './tools/type.ts'
 import { $overlayTick, modKey, type PointerInfo, type ToolDrag } from './tools/types.ts'
 import { TypeEditor } from './TypeEditor.tsx'
-import { $pointer, $views, setView, viewOf, viewport, zoomStep } from './view-state.ts'
+import { $pointer, $viewOptions, $views, setView, viewOf, viewport, zoomStep } from './view-state.ts'
 
 const LOOK: Look = { workspace: null, checkerLight: [0.4, 0.4, 0.42], checkerDark: [0.31, 0.31, 0.33] }
 const OUTLINE = '#4da3ff'
@@ -77,6 +79,9 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
   const tick = useStore($overlayTick)
   const typing = useStore($typing)
   const transform = useStore($transform)
+  const viewOptions = useStore($viewOptions)
+  const snapMarks = useStore($snapMarks)
+  const draftGuide = useStore($draftGuide)
   docRef.current = doc
 
   // The text layer being typed into is hidden: its words show in the editor instead.
@@ -180,7 +185,7 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
     return doc.subscribe(schedule)
   }, [doc, schedule])
 
-  useEffect(schedule, [views, tool, tick, typing, transform, schedule])
+  useEffect(schedule, [views, tool, tick, typing, transform, viewOptions, snapMarks, draftGuide, schedule])
 
   // The tool put down (or the document left) finishes what it had under way.
   useEffect(() => {
@@ -319,6 +324,16 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
       return
     }
 
+    // A guide drags with the Move tool, or with ⌘ held whatever the tool.
+    const guide = ($tool.get() === 'move' || at.mod) && !sessionFor(current) ? guideAt(current, at) : null
+
+    if (guide) {
+      const guideDrag = dragGuide(current, guide)
+      begin({ move: (e) => guideDrag.move(pointerInfo(e), []), up: (e) => guideDrag.up(pointerInfo(e)), cancel: () => guideDrag.cancel?.() }, event)
+
+      return
+    }
+
     const handler = HANDLERS[$tool.get()]
     const toolDrag: ToolDrag | null | void = handler?.down(current, at)
 
@@ -356,10 +371,14 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
     const current = docRef.current
     const name = $tool.get()
 
+    const guide = at && !drag.current && (name === 'move' || at.mod) && !sessionFor(current) ? guideAt(current, at) : null
+
     if ($spaceHeld.get() || name === 'hand') {
       element.style.cursor = drag.current ? 'grabbing' : 'grab'
     } else if (name === 'zoom') {
       element.style.cursor = 'zoom-in'
+    } else if (guide) {
+      element.style.cursor = guide.axis === 'vertical' ? 'col-resize' : 'row-resize'
     } else {
       element.style.cursor = HANDLERS[name]?.cursor?.(current, at) ?? 'default'
     }
@@ -441,9 +460,11 @@ function drawOverlay(canvas: HTMLCanvasElement | null, doc: CanvasDocument, view
   context.lineWidth = 1
   context.strokeRect(Math.round(view.panX) - 0.5, Math.round(view.panY) - 0.5, Math.round(width * view.zoom) + 1, Math.round(height * view.zoom) + 1)
 
-  context.strokeStyle = 'rgba(0, 220, 255, 0.85)'
+  const draft = $draftGuide.get()
+  const guides = [...($viewOptions.get().guides ? doc.state.guides : []), ...(draft?.docKey === doc.key ? [draft] : [])]
 
-  for (const guide of doc.state.guides) {
+  for (const guide of guides) {
+    context.strokeStyle = guide === draft ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 220, 255, 0.85)'
     context.beginPath()
 
     if (guide.axis === 'vertical') {
@@ -458,6 +479,8 @@ function drawOverlay(canvas: HTMLCanvasElement | null, doc: CanvasDocument, view
 
     context.stroke()
   }
+
+  drawSnapMarks(context, doc, view, { width: canvas.width / dpr, height: canvas.height / dpr })
 
   const tool = $tool.get()
 

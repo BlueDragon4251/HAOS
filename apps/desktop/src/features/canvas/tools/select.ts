@@ -14,6 +14,7 @@ import { Raster, type Rect } from '../engine/raster.ts'
 import { toDocumentPixels } from '../engine/sampling.ts'
 import { combineSelection, ellipsePoints, featherSelection, polygonMask, rectPoints, type SelectionMode, shiftSelection } from '../engine/selection.ts'
 import { compositeOf } from './screen.ts'
+import { snapPoint } from './snap.ts'
 import { $marquee, $selectionMode, $wand } from './state.ts'
 import { type PointerInfo, redraw, type ToolDrag, type ToolHandler } from './types.ts'
 
@@ -151,12 +152,12 @@ function marqueeTool(ellipse: boolean): ToolHandler {
         return moveSelection(doc, at)
       }
 
-      const from: Vec2 = [at.x, at.y]
+      const from: Vec2 = snapPoint(doc, [at.x, at.y], at.view)
       let box: Rect | null = null
 
       return {
         move: (now) => {
-          box = marqueeBox(from, [now.x, now.y], now.shift, now.alt)
+          box = marqueeBox(from, snapPoint(doc, [now.x, now.y], now.view), now.shift, now.alt)
           drawing = { docKey: doc.key, outline: ellipse ? ellipsePoints(box) : rectPoints(box) }
           redraw()
         },

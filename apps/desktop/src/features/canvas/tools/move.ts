@@ -29,6 +29,7 @@ import {
   type TransformSession,
   transformable
 } from './transform.ts'
+import { moveSnapper, snapPoint } from './snap.ts'
 import { editTextLayer } from './type.ts'
 import type { PointerInfo, ToolDrag, ToolHandler } from './types.ts'
 
@@ -120,6 +121,9 @@ function transformDrag(doc: CanvasDocument, at: PointerInfo, grab: Grab): ToolDr
   const startQuad = session.quad
   const start: Vec2 = [at.x, at.y]
   const transient = session.transient
+  // The frame's box snaps when it moves; a handle of an unturned frame snaps on its own.
+  const snapper = grab.kind === 'frame' && grab.hit === 'move' ? moveSnapper(doc, session.ids) : null
+  const square = Math.abs(startFrame.rotation % 90) < 1e-6
 
   return {
     move: (now) => {
@@ -130,17 +134,30 @@ function transformDrag(doc: CanvasDocument, at: PointerInfo, grab: Grab): ToolDr
       }
 
       if (grab.kind === 'frame') {
-        dragTo(doc, current, startFrame, grab.hit, start, [now.x, now.y], { constrain: now.shift, fromCentre: now.alt })
+        let to: Vec2 = [now.x, now.y]
+
+        if (snapper) {
+          const [dx, dy] = snapper.offset([now.x - start[0], now.y - start[1]], now.view)
+          to = [start[0] + dx, start[1] + dy]
+        } else if (grab.hit !== 'rotate' && square) {
+          to = snapPoint(doc, to, now.view)
+        }
+
+        dragTo(doc, current, startFrame, grab.hit, start, to, { constrain: now.shift, fromCentre: now.alt })
       } else if (startQuad) {
         distortTo(doc, current, startQuad, grab.kind === 'corner' ? grab.corner : 'move', [now.x - start[0], now.y - start[1]])
       }
     },
     up: () => {
+      snapper?.done()
+
       if (transient) {
         commitTransform(doc)
       }
     },
     cancel: () => {
+      snapper?.done()
+
       if (transient) {
         cancelTransform(doc)
       }
@@ -166,20 +183,26 @@ function moveDrag(doc: CanvasDocument, at: PointerInfo): ToolDrag | null {
 
   const before = doc.state
   let offset: Vec2 = [0, 0]
+  const snapper = moveSnapper(doc, ids)
   doc.interacting = true
 
   return {
     move: (now) => {
       let dx = Math.round(now.x - at.x)
       let dy = Math.round(now.y - at.y)
+      let free: 'x' | 'y' | undefined
 
       if (now.shift) {
         if (Math.abs(dx) > Math.abs(dy)) {
           dy = 0
+          free = 'x'
         } else {
           dx = 0
+          free = 'y'
         }
       }
+
+      ;[dx, dy] = snapper.offset([dx, dy], now.view, free)
 
       if (dx !== offset[0] || dy !== offset[1]) {
         offset = [dx, dy]
@@ -187,6 +210,7 @@ function moveDrag(doc: CanvasDocument, at: PointerInfo): ToolDrag | null {
       }
     },
     up: () => {
+      snapper.done()
       doc.interacting = false
 
       if (offset[0] || offset[1]) {
@@ -194,6 +218,7 @@ function moveDrag(doc: CanvasDocument, at: PointerInfo): ToolDrag | null {
       }
     },
     cancel: () => {
+      snapper.done()
       doc.interacting = false
       doc.preview(before)
     }

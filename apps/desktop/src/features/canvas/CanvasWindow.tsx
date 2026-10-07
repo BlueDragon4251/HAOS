@@ -12,7 +12,7 @@ import { AskHermesField, GenerateDialog } from './ai/HermesPrompts.tsx'
 import { ModelPrompt, ModelsDialog } from './ai/ModelDialogs.tsx'
 import { RemoveBackgroundDialog } from './ai/RemoveBackgroundDialog.tsx'
 import { CloseDialog, NewDocumentDialog, NotesDialog } from './dialogs.tsx'
-import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, TrimDialog } from './edit-dialogs.tsx'
+import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, NewGuideDialog, TrimDialog } from './edit-dialogs.tsx'
 import type { CanvasDocument } from './engine/document.ts'
 import { loadFonts } from './fonts.ts'
 import type { Raster, Rect } from './engine/raster.ts'
@@ -23,6 +23,7 @@ import { LayersPanel } from './LayersPanel.tsx'
 import { $dialog, type CanvasCommand, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
 import { OptionsBar } from './OptionsBar.tsx'
 import { PropertiesPanel } from './PropertiesPanel.tsx'
+import { Rulers } from './Rulers.tsx'
 import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
 import { HANDLERS } from './tools/index.ts'
 import { settleTools } from './tools/sessions.ts'
@@ -533,7 +534,13 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {conflict && conflict.key === doc?.key && <ConflictBar />}
       <div className="flex min-h-0 flex-1">
         <ToolPalette />
-        {doc ? <Viewport doc={doc} /> : <StartScreen />}
+        {doc ? (
+          <Rulers doc={doc}>
+            <Viewport doc={doc} />
+          </Rulers>
+        ) : (
+          <StartScreen />
+        )}
         {doc && <SidePanels doc={doc} />}
       </div>
       <StatusBar doc={doc} />
@@ -543,6 +550,7 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {doc && dialog?.kind === 'image-size' && <ImageSizeDialog doc={doc} />}
       {doc && dialog?.kind === 'trim' && <TrimDialog doc={doc} />}
       {doc && dialog?.kind === 'fill' && <FillDialog doc={doc} />}
+      {doc && dialog?.kind === 'new-guide' && <NewGuideDialog doc={doc} />}
       {doc && dialog?.kind === 'modify-selection' && <ModifySelectionDialog doc={doc} change={dialog.change} />}
       {doc && dialog?.kind === 'remove-background' && <RemoveBackgroundDialog doc={doc} />}
       {doc && dialog?.kind === 'content-fill' && <ContentFillDialog doc={doc} />}
