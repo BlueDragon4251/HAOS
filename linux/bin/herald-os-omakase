@@ -6,7 +6,10 @@
 set -euo pipefail
 
 LISTS="${HERALD_OS_OMAKASE_DIR:-}"
-for candidate in "$LISTS" "$HOME/Herald-OS/linux/omakase" /usr/local/share/herald-os-linux/omakase /usr/share/herald-os/omakase; do
+# The lists that came with this command come first: a checkout's, or the app's when the command is a
+# link into it (/opt/herald-os: the Arch package, the release tarball).
+HERE="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+for candidate in "$LISTS" "$HERE/../omakase" "$HOME/Herald-OS/linux/omakase" /usr/local/share/herald-os-linux/omakase /usr/share/herald-os/omakase /opt/herald-os/resources/herald-os-linux/omakase; do
   if [[ -n "$candidate" && -d "$candidate" ]]; then
     LISTS="$candidate"
     break

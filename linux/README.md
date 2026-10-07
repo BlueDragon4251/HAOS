@@ -6,7 +6,8 @@ your Mac). Full guide: [docs/LINUX.md](../docs/LINUX.md).
 ```
 linux/
   provision.sh            first-boot provisioner (root, idempotent)
-  bin/                    herald-os (the CLI every hotkey and menu calls), -theme, -omakase, -update
+  bin/                    herald-os (the CLI every hotkey and menu calls), -theme, -omakase, -update,
+                          -tarball (installs and updates the release tarball in /opt/herald-os)
   session/                greetd config, compositor + session launchers, wayland-sessions entry,
                           update-check timer, lock-screen style
   niri/config.kdl         the managed niri config (rendered to ~/.config/niri/herald-os.kdl): hotkeys,

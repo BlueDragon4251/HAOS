@@ -49,7 +49,18 @@ STATE_DIR = HOME / ".local" / "state" / "herald-os"
 CONFIG_DIR = HOME / ".config" / "herald-os"
 APPS_DIR = HOME / ".local" / "share" / "applications"
 ICONS_DIR = HOME / ".local" / "share" / "icons" / "hermes-webapps"
-THEME_DIRS = [HOME / "Herald-OS" / "linux" / "themes", Path("/usr/local/share/herald-os-linux/themes"), Path("/usr/share/herald-os/themes"), HOME / ".config" / "herald-os" / "themes"]
+# The themes that came with this command come first: a checkout's linux/themes, or the app's
+# resources/themes when the command is a link into it (/opt/herald-os: the Arch package, the release
+# tarball). Copies installed elsewhere (the image, the development VM) use the folders after them.
+_SOURCE = Path(__file__).resolve().parent.parent
+THEME_DIRS = [
+    (_SOURCE.parent if _SOURCE.name == "herald-os-linux" else _SOURCE) / "themes",
+    HOME / "Herald-OS" / "linux" / "themes",
+    Path("/usr/local/share/herald-os-linux/themes"),
+    Path("/usr/share/herald-os/themes"),
+    Path("/opt/herald-os/resources/themes"),
+    HOME / ".config" / "herald-os" / "themes",
+]
 
 # name -> help
 COMMANDS: dict[str, str] = {
@@ -98,7 +109,7 @@ COMMANDS: dict[str, str] = {
     "webapp-open": "Internal: open a web app window: webapp-open <url> <name>",
     "update-available": "Internal: tell the menu bar how many updates are pending",
     "channel": "Show or set the update channel: channel [stable|edge] (on the image, the image tag it follows)",
-    "rollback": "The Herald OS image: go back to the previous version on the next start (it stays in the boot menu)",
+    "rollback": "Go back to the previous version: the Herald OS image's on the next start (it stays in the boot menu), a release tarball's at once",
     "firmware": "firmware [check|update]: device firmware through fwupd (the BIOS, the dock, the SSD)",
     "reset": "reset: erase this computer's account, apps and files and start setup again (asks to confirm)",
     "omakase": "Install the curated software set (omakase install | omakase list)",
@@ -1137,6 +1148,19 @@ def update(check_only: bool) -> int:
     return 1
 
 
+SESSION_ENTRIES = (Path("/usr/share/wayland-sessions/herald-os.desktop"), Path("/usr/local/share/wayland-sessions/herald-os.desktop"))
+
+
+def session_hint() -> str:
+    """How to start Herald OS, from what this machine has: the login-screen entry and niri."""
+    listed = any(entry.exists() for entry in SESSION_ENTRIES)
+    if listed and shutil.which("niri"):
+        return "Start the full session from your login screen (Herald OS), or run herald-os-app inside your desktop."
+    if listed:
+        return "Run herald-os-app inside your desktop. The full session (Herald OS on your login screen) also needs niri."
+    return "Run herald-os-app inside your desktop. For the full session, install niri; then `sudo herald-os-tarball install` puts Herald OS on your login screen (docs/LINUX.md)."
+
+
 def debug() -> int:
     def line(label: str, argv: list[str]) -> None:
         try:
@@ -1385,7 +1409,7 @@ def setup(args: list[str]) -> int:
     print("    To take these changes back: herald-os setup --undo")
     if is_omarchy():
         print("Omarchy: `herald-os omarchy install` adds Herald OS to its menu, theme and keys.")
-    print("Start the full session from your login screen (Herald OS), or run herald-os-app inside your desktop.")
+    print(session_hint())
     return 0
 
 
@@ -1488,7 +1512,11 @@ def image_switch(channel: str) -> int:
 
 def rollback() -> int:
     if not is_image():
-        die("rollback is for the Herald OS image; on this system, use your package manager's history", 2)
+        # A release tarball keeps the version its last update replaced in /opt/herald-os.previous.
+        tarball = shutil.which("herald-os-tarball")
+        if tarball and Path("/opt/herald-os.previous/resources/app.asar").is_file():
+            return subprocess.call(["sudo", *([] if sys.stdin.isatty() else ["-n"]), tarball, "rollback"])
+        die("rollback is for the Herald OS image and the release tarball; on this system, use your package manager's history", 2)
     code = subprocess.call(["sudo", "bootc", "rollback"])
     if code == 0:
         notify("Rollback ready", "Restart to use the previous version of Herald OS; this one stays in the boot menu.")

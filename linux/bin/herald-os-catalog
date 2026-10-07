@@ -31,11 +31,17 @@ LOCAL = HOME / ".local"
 APPS_DIR = LOCAL / "share" / "applications"
 MISE_DATA = LOCAL / "share" / "mise"
 CONFIG_DIR = HOME / ".config" / "herald-os"
+# The catalog that came with this command comes first: a checkout's linux/catalog, or the app's
+# resources/catalog when the command is a link into it (/opt/herald-os: the Arch package, the release
+# tarball). Copies installed elsewhere (the image, the development VM) use the folders after it.
+_SOURCE = Path(__file__).resolve().parent.parent
 CATALOG_DIRS = [
     Path(os.environ["HERALD_OS_CATALOG_DIR"]) if os.environ.get("HERALD_OS_CATALOG_DIR") else None,
+    (_SOURCE.parent if _SOURCE.name == "herald-os-linux" else _SOURCE) / "catalog",
     HOME / "Herald-OS" / "linux" / "catalog",
     Path("/usr/local/share/herald-os-linux/catalog"),
     Path("/usr/share/herald-os/catalog"),
+    Path("/opt/herald-os/resources/catalog"),
 ]
 LINUX_KINDS = {"flatpak", "dnf", "pacman", "aur", "npm", "mise", "script", "webapp", "link"}
 

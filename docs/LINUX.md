@@ -197,7 +197,9 @@ start renders it again, so an update's new template takes effect at the next log
   the Herald OS image updates as a whole with `bootc upgrade`) and Flatpaks, updates Hermes Agent,
   rebuilds the shell and restarts it. A daily user timer runs `herald-os update
   --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
-  (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
+  (no `.git`) skips the shell step; use `linux/dev/push.sh` there. A release tarball in
+  `/opt/herald-os` updates from GitHub releases instead
+  ([Another Linux](#another-linux-the-release-tarball)).
 
 ## The Herald OS image (Fedora bootc)
 
@@ -282,6 +284,63 @@ packages a tarball you built yourself instead.
 The session needs niri (and a login screen such as greetd); the optional dependencies list what
 each panel and feature uses. `.github/workflows/arch.yml` builds the package from a fresh tarball in
 an Arch container, lints it with namcap, installs it and runs the CLIs.
+
+## Another Linux (the release tarball)
+
+Every release has `herald-os-<version>-linux-x64.tar.gz` and `-linux-arm64.tar.gz`, each with a
+`.sha256`: the app, and under `resources/` the `herald-os` commands, the session scripts, the niri
+template, themes, the install catalog and the bridge plugin. It goes in `/opt/herald-os`:
+
+```bash
+sha256sum -c herald-os-<version>-linux-x64.tar.gz.sha256
+sudo mkdir -p /opt/herald-os
+sudo tar -xzf herald-os-<version>-linux-x64.tar.gz -C /opt/herald-os --strip-components=1
+sudo /opt/herald-os/resources/herald-os-linux/bin/herald-os-tarball install
+herald-os setup        # once per user: Hermes Agent and the bridge plugin
+```
+
+`herald-os-tarball install` lays out what the Arch package does, under `/usr/local`, which package
+managers leave alone:
+
+- the `herald-os` commands and the session scripts in `/usr/local/bin`, as links into
+  `/opt/herald-os` (the commands find the catalog, themes, niri template and migrations there);
+- Herald OS on the login screen, `/usr/share/wayland-sessions/herald-os.desktop`, only when niri is
+  installed (install niri, then run the command again). On Silverblue and other ostree systems,
+  whose `/usr` is read-only, the entry goes in `/usr/local/share/wayland-sessions`, which GDM and
+  SDDM read too;
+- `herald-os-app` in the application menu (`/usr/local/share/applications/herald-os.desktop`), with
+  its icon;
+- the update-check user units in `/usr/local/lib/systemd/user`; `systemctl --user enable --now
+  herald-os-update-check.timer` turns the daily check (the menu bar's update dot) on for an account;
+- `chrome-sandbox` owned by root and setuid, which Electron needs where unprivileged user namespaces
+  are off.
+
+It is safe to run again, never replaces a file that is not one of its own links, and leaves a
+`/opt/herald-os` that a package installed (`herald-os-bin`) to the package. `herald-os-tarball
+status` shows the version and what is in place; `sudo herald-os-tarball remove` takes it all out
+again, and `sudo rm -rf /opt/herald-os /opt/herald-os.previous` then deletes the app.
+
+**The full session** needs niri and what the menu bar, dock and panels call: swaybg, swaylock,
+swayidle, cliphist, wl-clipboard, wtype, grim, slurp, brightnessctl, playerctl, PipeWire,
+NetworkManager, BlueZ, UPower, power-profiles-daemon and the portals, the rest of
+[linux/image/packages.txt](../linux/image/packages.txt) (Fedora's names; the Arch package's optional
+dependencies give Arch's). A login screen that lists `wayland-sessions` starts it (GDM, SDDM and
+LightDM do). The session applies Herald's theme to the account that runs it, rewriting
+`~/.config/gtk-3.0/gtk.css`, `~/.config/gtk-4.0/gtk.css`, `~/.config/foot/foot.ini` and
+`~/.config/swaylock/config`, and setting GNOME's `color-scheme` and `gtk-theme`, which your usual
+desktop reads as well. On a machine you already use, try the session from a second account
+(`sudo useradd -m herald && sudo passwd herald`). Picking a theme in `herald-os-app`'s Settings
+inside your own desktop changes none of those files.
+
+**Updates.** `herald-os update` asks GitHub for the newest release with a tarball for this
+architecture (releases on the `stable` channel; `edge` also takes pre-releases), downloads it with
+its `.sha256` and checks it, unpacks it beside `/opt/herald-os`, and then swaps the two folders, so
+the version in use is never half replaced. The version before stays in `/opt/herald-os.previous`,
+and `herald-os rollback` swaps back; both take effect at the next login, or the next start of
+`herald-os-app`. Replacing `/opt/herald-os` needs sudo: in a terminal it asks for your password,
+while Update in the menu bar can only use sudo without one. The checksum proves the download is the
+file the release published, not who published it, so a release is trusted as far as GitHub is.
+`herald-os update` also updates the system's packages as before (`dnf upgrade` on Fedora).
 
 ## Inside Hyprland and Omarchy (app mode)
 

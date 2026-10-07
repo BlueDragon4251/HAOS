@@ -144,7 +144,9 @@ herald-os setup        # once per user: Hermes Agent and Herald's system tools
 The package downloads the release build for your architecture (x86_64 or aarch64). Then choose
 Herald OS on your login screen for the full session (it needs `niri`; the package's optional
 dependencies list what each panel uses), or run `herald-os-app` to use Herald OS as an app inside
-your current desktop. The package is not on the AUR yet.
+your current desktop. The session applies Herald's theme to GTK apps, foot and GNOME's colour
+scheme for the account that runs it, so on a desktop you already use, try it from a second account.
+The package is not on the AUR yet.
 
 ### Omarchy
 
@@ -163,16 +165,29 @@ are welcome.
 
 ### Another Linux
 
-The tarball carries the app and its command-line tools. For x86_64 (use the `arm64` tarball on ARM):
+The tarball carries the app, its command-line tools and the full session. Download
+`herald-os-<version>-linux-x64.tar.gz` and its `.sha256` from the
+[releases page](https://github.com/iamlukethedev/Herald-OS/releases) (the `arm64` ones on ARM), then:
 
 ```bash
+sha256sum -c herald-os-<version>-linux-x64.tar.gz.sha256
 sudo mkdir -p /opt/herald-os
 sudo tar -xzf herald-os-<version>-linux-x64.tar.gz -C /opt/herald-os --strip-components=1
-sudo chown root:root /opt/herald-os/chrome-sandbox && sudo chmod 4755 /opt/herald-os/chrome-sandbox
-sudo ln -sf /opt/herald-os/resources/herald-os-linux/bin/* /usr/local/bin/
+sudo /opt/herald-os/resources/herald-os-linux/bin/herald-os-tarball install
 herald-os setup        # once per user: Hermes Agent and Herald's system tools
 herald-os-app          # Herald OS as an app inside your desktop
 ```
+
+`herald-os-tarball install` puts the `herald-os` commands in `/usr/local/bin` and Herald OS in your
+application menu, and, if niri is installed, on your login screen; `sudo herald-os-tarball remove`
+takes them out again. `herald-os update` installs a new release once its checksum matches, and
+`herald-os rollback` goes back to the version before.
+
+The full session needs niri and the tools its menu bar and panels use (Fedora's package names are
+in [linux/image/packages.txt](linux/image/packages.txt)). It also applies Herald's theme to the
+account that runs it: GTK 3 and 4 apps (`gtk.css`), the foot terminal (`foot.ini`) and GNOME's
+colour scheme and GTK theme. On a desktop you already use, try it from a second account.
+[docs/LINUX.md](docs/LINUX.md#another-linux-the-release-tarball) has the details.
 
 ### The whole OS in a virtual machine
 
@@ -520,8 +535,9 @@ This writes `herald-os-<version>-linux-<arch>.tar.gz` to `apps/desktop/release/`
 `herald-os` CLIs, the niri session, themes, the install catalog and the bridge plugin under
 `resources/`. Build on the target architecture (node-pty is compiled, not cross-built); the release
 workflow builds x64 and arm64 on matching runners. The tarball is what the Arch package and the
-Herald OS image install; on its own, unpack it to `/opt/herald-os`, make `chrome-sandbox` root-owned
-and mode 4755, and the session finds it there.
+Herald OS image install; on its own, unpack it to `/opt/herald-os` and run
+`sudo /opt/herald-os/resources/herald-os-linux/bin/herald-os-tarball install`, as in
+[Another Linux](#another-linux).
 
 ## Project layout
 
@@ -558,6 +574,9 @@ CI runs all of these on Ubuntu and macOS. [CONTRIBUTING.md](CONTRIBUTING.md) has
 - **The Mac app:** download the new DMG and replace the app in Applications. `hermes update` updates
   Hermes itself, whenever you like.
 - **Arch and Omarchy:** run `git pull` and `makepkg -si` again in `packaging/arch/herald-os-bin`.
+- **The tarball on another Linux:** `herald-os update` downloads the newest release for your
+  architecture, checks it against its `.sha256` and swaps it into `/opt/herald-os`, keeping the
+  version before in `/opt/herald-os.previous` for `herald-os rollback`. Log out and back in to use it.
 - **From source on macOS:** `git pull`, then `npm run bootstrap`.
 - **The development VM:** `git pull` on the Mac, then `bash linux/dev/push.sh`.
 
