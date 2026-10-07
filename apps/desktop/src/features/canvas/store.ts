@@ -5,7 +5,7 @@
  */
 
 import { atom } from 'nanostores'
-import { isProjectPath, projectContaining } from '../../../shared/canvas/files.ts'
+import { isLayeredImage, isProjectPath, projectContaining } from '../../../shared/canvas/files.ts'
 import type { CanvasProject } from '../../../shared/ipc.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import {
@@ -41,6 +41,13 @@ export interface Notice {
 export const $notice = atom<Notice | null>(null)
 
 export const notify = (message: string, tone: Notice['tone'] = 'info'): void => $notice.set({ message, tone, at: Date.now() })
+
+/** List what an import or export approximated, in a dialog the person dismisses. */
+export function showNotes(title: string, notes: string[]): void {
+  if (notes.length) {
+    void import('./menus.ts').then(({ $dialog }) => $dialog.set({ kind: 'notes', title, notes }))
+  }
+}
 
 const AUTOSAVE_KEY = 'herald-canvas.autosave'
 export const $autosave = atom<boolean>(globalThis.localStorage?.getItem(AUTOSAVE_KEY) !== 'off')
@@ -151,7 +158,21 @@ export async function openPath(file: string): Promise<CanvasDocument> {
     return existing
   }
 
-  return addDocument(project ? await openProject(project) : await documentFromImage(file))
+  if (project) {
+    return addDocument(await openProject(project))
+  }
+
+  // A Photoshop document opens with its layers; what could not be carried over is listed.
+  if (isLayeredImage(file)) {
+    const { documentFromPsd } = await import('./psd/psd.ts')
+    const { doc, notes } = await documentFromPsd(file)
+    addDocument(doc)
+    showNotes(`Opened ${doc.name}`, notes)
+
+    return doc
+  }
+
+  return addDocument(await documentFromImage(file))
 }
 
 export function createDocument(width: number, height: number, background: Background = 'white', resolution = 72): CanvasDocument {
@@ -201,7 +222,7 @@ export async function save(doc: CanvasDocument | null = activeDocument(), option
   return true
 }
 
-export async function exportDocument(doc: CanvasDocument | null, kind: ExportKind, options: { quality?: number; scale?: number } = {}): Promise<string | null> {
+export async function exportDocument(doc: CanvasDocument | null, kind: ExportKind | 'psd', options: { quality?: number; scale?: number } = {}): Promise<string | null> {
   if (!doc) {
     return null
   }
@@ -212,7 +233,19 @@ export async function exportDocument(doc: CanvasDocument | null, kind: ExportKin
     return null
   }
 
+  notify(`Exporting ${file.split('/').pop()}…`)
+
   try {
+    if (kind === 'psd') {
+      const { exportPsd } = await import('./psd/psd.ts')
+      const { file: written, notes } = await exportPsd(doc.state, file)
+      const name = written.split('/').pop() ?? written
+      notify(`Exported ${name}`)
+      showNotes(`Exported ${name}`, notes)
+
+      return written
+    }
+
     const written = await exportImage(doc.state, file, kind, options)
     notify(`Exported ${written.split('/').pop()}`)
 

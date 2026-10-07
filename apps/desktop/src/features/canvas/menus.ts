@@ -70,6 +70,7 @@ export type CanvasDialog =
   | { kind: 'content-fill' }
   | { kind: 'generate'; mode: 'fill' | 'layer' }
   | { kind: 'models' }
+  | { kind: 'notes'; title: string; notes: string[] }
   | null
 
 export const $dialog = atom<CanvasDialog>(null)
@@ -212,6 +213,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'export-png', label: 'Export as PNG…', keys: 'mod+alt+shift+w', needsDocument: true, run: onDoc((doc) => void exportDocument(doc, 'png')), dividerBefore: true },
       { id: 'export-jpeg', label: 'Export as JPEG…', needsDocument: true, run: onDoc((doc) => void exportDocument(doc, 'jpeg')) },
       { id: 'export-webp', label: 'Export as WebP…', needsDocument: true, run: onDoc((doc) => void exportDocument(doc, 'webp')) },
+      { id: 'export-psd', label: 'Export as PSD…', needsDocument: true, run: onDoc((doc) => void exportDocument(doc, 'psd')) },
       { id: 'close', label: 'Close', keys: 'mod+w', needsDocument: true, run: onDoc((doc) => $dialog.set({ kind: 'close', key: doc.key })), dividerBefore: true }
     ]
   },

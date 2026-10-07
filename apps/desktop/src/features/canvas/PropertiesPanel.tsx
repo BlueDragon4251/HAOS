@@ -12,10 +12,13 @@ import {
   type LayerEffects,
   type LevelRange,
   RANGES,
-  type RGB
+  type RGB,
+  type ShapeKind,
+  type ShapeStyle
 } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
 import { maskAction } from './actions.ts'
+import { MAX_LINE_WIDTH, shapeWith } from './agent-model.ts'
 import { cannotSegment } from './ai/subject.ts'
 import { ADJUSTMENT_ICONS, EFFECT_ICONS } from './adjustment-icons.tsx'
 import { cssOf, type RGB as Bytes } from './color.ts'
@@ -25,6 +28,7 @@ import { type CanvasDocument, type CanvasLayer, type DocState, findLayer, withLa
 import { EFFECT_NAMES, EFFECT_ORDER, takesEffects, withEffect } from './engine/layer-effects.ts'
 import { useRevision } from './hooks.ts'
 import { $dialog } from './menus.ts'
+import { restyleShape } from './text-layers.ts'
 
 /*
  * The Properties panel: the active layer's settings. An adjustment layer shows its own controls; a
@@ -804,6 +808,50 @@ function MaskControls({ doc, layer }: { doc: CanvasDocument; layer: CanvasLayer 
   )
 }
 
+// Shapes.
+
+const SHAPE_KINDS: { id: ShapeKind; label: string }[] = [
+  { id: 'Rectangle', label: 'Rectangle' },
+  { id: 'Ellipse', label: 'Ellipse' },
+  { id: 'Line', label: 'Line' }
+]
+
+/** A shape layer's kind, colour, corner radius or line width, drawn again in its box on each change. */
+function ShapeControls({ layer, edit }: { layer: CanvasLayer; edit: Edit }) {
+  const shape = layer.shape!
+  const box = { width: Math.abs(layer.transform.size[0]), height: Math.abs(layer.transform.size[1]) }
+  const restyle = (label: string, change: (current: ShapeStyle) => ShapeStyle) => edit.change(label, (current) => (current.shape ? restyleShape(current, change(current.shape)) : {}))
+
+  return (
+    <div className="border-b border-line/40 pb-1">
+      <Segmented
+        label="Shape"
+        value={shape.kind}
+        options={SHAPE_KINDS}
+        onChange={(kind) => kind !== shape.kind && restyle('Shape', (current) => shapeWith(current, { kind: kind.toLowerCase() }, box, () => current).style)}
+      />
+      <Row label="Colour">
+        <Swatch label="Shape colour" colour={shape} edit={edit} onChange={(colour) => restyle('Shape Colour', (current) => ({ ...current, ...colour }))} />
+      </Row>
+      {shape.kind === 'Rectangle' && (
+        <Slider
+          label="Corner radius"
+          value={shape.cornerRadius}
+          min={0}
+          max={Math.max(1, Math.floor(Math.min(box.width, box.height) / 2))}
+          unit="px"
+          curve="square"
+          edit={edit}
+          onChange={(cornerRadius) => restyle('Corner Radius', (current) => ({ ...current, cornerRadius }))}
+        />
+      )}
+      {shape.kind === 'Line' && (
+        <Slider label="Line width" value={shape.lineWidth ?? 1} min={1} max={MAX_LINE_WIDTH} unit="px" curve="log" edit={edit} onChange={(lineWidth) => restyle('Line Width', (current) => ({ ...current, lineWidth }))} />
+      )}
+    </div>
+  )
+}
+
 // The panel.
 
 function LayerProperties({ doc, layer }: { doc: CanvasDocument; layer: CanvasLayer }) {
@@ -828,6 +876,7 @@ function LayerProperties({ doc, layer }: { doc: CanvasDocument; layer: CanvasLay
             </button>
           </div>
         )}
+        {layer.shape && <ShapeControls layer={layer} edit={edit} />}
         <EffectsList layer={layer} edit={edit} />
       </>
     )
@@ -848,7 +897,7 @@ export function PropertiesPanel({ doc }: { doc: CanvasDocument }) {
         {layer && (
           <span className="flex min-w-0 items-center gap-1 truncate font-normal tracking-normal normal-case">
             · {Icon && <Icon size={12} className="shrink-0" />}
-            <span className="truncate">{layer.adjustment ? layer.adjustment.kind : takesEffects(layer) ? `${layer.name}: effects` : layer.name}</span>
+            <span className="truncate">{layer.adjustment ? layer.adjustment.kind : layer.shape ? `${layer.name}: shape and effects` : takesEffects(layer) ? `${layer.name}: effects` : layer.name}</span>
           </span>
         )}
       </div>

@@ -29,7 +29,8 @@ import {
   rangedArg,
   resizePlan,
   resolvePath,
-  shapeKindFrom
+  shapeKindFrom,
+  shapeWith
 } from './agent-model.ts'
 import { adjustmentLayer, blankLayer, type DocState, folderLayer, insertLayer, pixelLayer, setClipped } from './engine/document.ts'
 import { Raster } from './engine/raster.ts'
@@ -307,5 +308,37 @@ describe('adjustments, effects and masks for Hermes', () => {
     const photo = pixelLayer('Photo', new Raster(10, 10))
     state = insertLayer(state, photo, { above: grade.id })
     expect(setClipped(state, photo.id, true)).toBe(state)
+  })
+})
+
+describe('restyling shapes', () => {
+  const box = { width: 400, height: 100 }
+  const colour = (value: unknown) => (value === '#ff0000' ? { red: 1, green: 0, blue: 0 } : { red: 0, green: 0, blue: 0 })
+  const rectangle = { kind: 'Rectangle' as const, cornerRadius: 0, red: 0, green: 0, blue: 0 }
+
+  it('changes the kind, keeping the box: rounded gets a radius, a line runs corner to corner inside it', () => {
+    expect(shapeWith(rectangle, { kind: 'rounded' }, box, colour).style).toMatchObject({ kind: 'Rectangle', cornerRadius: 15 })
+    const line = shapeWith(rectangle, { kind: 'line' }, box, colour)
+    expect(line.style).toMatchObject({ kind: 'Line', cornerRadius: 0, lineWidth: 4 })
+    expect(line.style.start![0]).toBeCloseTo(3 / 400)
+    expect(line.style.end![1]).toBeCloseTo(1 - 3 / 100)
+    expect(line.changes).toEqual(['a line'])
+    const back = shapeWith(line.style, { kind: 'ellipse' }, box, colour).style
+    expect(back).toEqual({ kind: 'Ellipse', cornerRadius: 0, red: 0, green: 0, blue: 0 })
+  })
+
+  it('changes the colour, radius and line width within their bounds, and says what fits which kind', () => {
+    expect(shapeWith(rectangle, { color: '#ff0000', radius: 500 }, box, colour)).toEqual({ style: { ...rectangle, red: 1, cornerRadius: 50 }, changes: ['colour', 'corner radius 50'] })
+    const line = { kind: 'Line' as const, cornerRadius: 0, red: 0, green: 0, blue: 0, lineWidth: 4, start: [0, 0.5] as [number, number], end: [1, 0.5] as [number, number] }
+    expect(shapeWith(line, { lineWidth: 0 }, box, colour).style.lineWidth).toBe(1)
+    expect(() => shapeWith(rectangle, { lineWidth: 3 }, box, colour)).toThrow(/lineWidth is for lines/)
+    expect(() => shapeWith(line, { radius: 3 }, box, colour)).toThrow(/radius rounds a rectangle/)
+    expect(() => shapeWith(rectangle, {}, box, colour)).toThrow(/Nothing to change/)
+  })
+
+  it('describes a shape’s style for Hermes', () => {
+    const layer = { ...pixelLayer('Panel', new Raster(40, 20), defaultTransform(40, 20)), shape: { kind: 'Rectangle' as const, cornerRadius: 6, red: 1, green: 0.5, blue: 0 } }
+    const state: DocState = { width: 100, height: 100, resolution: 72, layers: [layer], activeLayerId: null, guides: [], selection: null }
+    expect(describeLayer(state, layer)).toMatchObject({ kind: 'shape', shape: 'rounded rectangle', color: '#ff8000', radius: 6 })
   })
 })

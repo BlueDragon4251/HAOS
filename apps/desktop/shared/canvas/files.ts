@@ -6,24 +6,12 @@ export const PROJECT_EXTENSION = '.comp'
 export const DIRECT_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif', '.svg', '.ico'])
 
 /** Converted to PNG by the system first (macOS reads all of them; Linux uses the tools it has). */
-export const CONVERTED_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
-  '.heic',
-  '.heif',
-  '.tif',
-  '.tiff',
-  '.dng',
-  '.cr2',
-  '.cr3',
-  '.nef',
-  '.arw',
-  '.raf',
-  '.orf',
-  '.rw2',
-  '.psd',
-  '.psb'
-])
+export const CONVERTED_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['.heic', '.heif', '.tif', '.tiff', '.dng', '.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2'])
 
-export const CANVAS_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([...DIRECT_IMAGE_EXTENSIONS, ...CONVERTED_IMAGE_EXTENSIONS])
+/** Photoshop documents, read by Herald Canvas itself: they open with their layers. */
+export const LAYERED_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['.psd', '.psb'])
+
+export const CANVAS_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([...DIRECT_IMAGE_EXTENSIONS, ...CONVERTED_IMAGE_EXTENSIONS, ...LAYERED_IMAGE_EXTENSIONS])
 
 const extension = (file: string): string => {
   const match = /(\.[^./\\]+)$/.exec(file)
@@ -33,6 +21,7 @@ const extension = (file: string): string => {
 
 export const isProjectPath = (file: string): boolean => extension(file.replace(/[/\\]+$/, '')) === PROJECT_EXTENSION
 export const isCanvasImage = (file: string): boolean => CANVAS_IMAGE_EXTENSIONS.has(extension(file))
+export const isLayeredImage = (file: string): boolean => LAYERED_IMAGE_EXTENSIONS.has(extension(file))
 export const canOpenInCanvas = (file: string): boolean => isProjectPath(file) || isCanvasImage(file)
 
 /** The `.comp` folder a path lies in (a manifest or an image picked inside one), or null. */

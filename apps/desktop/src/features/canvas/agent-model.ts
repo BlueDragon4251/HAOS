@@ -17,6 +17,7 @@ import {
   type RangeName,
   type RGB,
   type ShapeKind,
+  type ShapeStyle,
   type TextAlignment,
   type Vec2
 } from '../../../shared/canvas/comp-format.ts'
@@ -108,9 +109,19 @@ export function describeLayer(state: DocState, layer: CanvasLayer): Record<strin
     ...(layer.adjustment ? { adjustment: layer.adjustment.kind, settings: adjustmentSettings(layer.adjustment) } : {}),
     ...(layer.effects && EFFECT_KINDS.some((kind) => layer.effects?.[kind]) ? { effects: Object.fromEntries(EFFECT_KINDS.filter((kind) => layer.effects?.[kind]).map((kind) => [kind, layer.effects![kind]])) } : {}),
     ...(layer.text ? { text: layer.text.content, font: layer.text.fontName, size: layer.text.fontSize, align: layer.text.alignment.toLowerCase() } : {}),
-    ...(layer.shape ? { shape: layer.shape.kind === 'Rectangle' && layer.shape.cornerRadius > 0 ? 'rounded rectangle' : layer.shape.kind.toLowerCase() } : {})
+    ...(layer.shape
+      ? {
+          shape: layer.shape.kind === 'Rectangle' && layer.shape.cornerRadius > 0 ? 'rounded rectangle' : layer.shape.kind.toLowerCase(),
+          color: hexOf(layer.shape),
+          ...(layer.shape.kind === 'Rectangle' && layer.shape.cornerRadius > 0 ? { radius: round(layer.shape.cornerRadius, 1) } : {}),
+          ...(layer.shape.kind === 'Line' ? { lineWidth: round(layer.shape.lineWidth ?? 1, 1) } : {})
+        }
+      : {})
   }
 }
+
+/** A colour as #rrggbb. */
+const hexOf = ({ red, green, blue }: RGB): string => `#${[red, green, blue].map((value) => Math.round(Math.min(1, Math.max(0, value)) * 255).toString(16).padStart(2, '0')).join('')}`
 
 /** The layers top to bottom, as the Layers panel lists them, with folders' contents after each folder. */
 export function describeLayers(state: DocState): Record<string, unknown>[] {
@@ -375,6 +386,82 @@ export function shapeKindFrom(value: unknown): { kind: ShapeKind; rounded: boole
   }
 
   throw new Error('kind is rectangle, rounded, ellipse or line')
+}
+
+/** The thickest line a shape layer draws, in pixels. */
+export const MAX_LINE_WIDTH = 2000
+
+/** The ends of a line across a box, corner to corner, inset so its width stays inside (fractions of the box). */
+export function diagonalEnds(box: { width: number; height: number }, lineWidth: number): [Vec2, Vec2] {
+  const reach = lineWidth / 2 + 1
+  const inset = (span: number) => Math.min(0.5, reach / Math.max(1, span))
+
+  return [
+    [inset(box.width), inset(box.height)],
+    [1 - inset(box.width), 1 - inset(box.height)]
+  ]
+}
+
+/**
+ * A shape layer's style after a change, in a box `width`×`height`: its kind (a rounded rectangle is a
+ * rectangle with a corner radius), colour, corner radius or line width. A rectangle or ellipse
+ * turned into a line runs corner to corner inside the box.
+ */
+export function shapeWith(shape: ShapeStyle, args: Record<string, unknown>, box: { width: number; height: number }, colour: (value: unknown) => RGB): { style: ShapeStyle; changes: string[] } {
+  const style: ShapeStyle = { ...shape }
+  const changes: string[] = []
+  const largestRadius = Math.max(0, Math.min(box.width, box.height) / 2)
+
+  if (args.kind !== undefined && args.kind !== '') {
+    const { kind, rounded } = shapeKindFrom(args.kind)
+    style.kind = kind
+    delete style.start
+    delete style.end
+    delete style.lineWidth
+
+    if (kind === 'Line') {
+      const lineWidth = shape.kind === 'Line' && shape.lineWidth ? shape.lineWidth : 4
+      const [start, end] = shape.kind === 'Line' && shape.start && shape.end ? [shape.start, shape.end] : diagonalEnds(box, lineWidth)
+      Object.assign(style, { cornerRadius: 0, lineWidth, start, end })
+    } else {
+      style.cornerRadius = kind === 'Rectangle' && rounded ? (shape.kind === 'Rectangle' && shape.cornerRadius > 0 ? shape.cornerRadius : Math.round(Math.min(box.width, box.height) * 0.15)) : 0
+    }
+
+    changes.push(kind === 'Rectangle' ? (style.cornerRadius > 0 ? 'a rounded rectangle' : 'a rectangle') : kind === 'Ellipse' ? 'an ellipse' : 'a line')
+  }
+
+  if (args.color !== undefined && args.color !== '') {
+    Object.assign(style, colour(args.color))
+    changes.push('colour')
+  }
+
+  const radius = finite(args.radius)
+
+  if (radius !== undefined) {
+    if (style.kind !== 'Rectangle') {
+      throw new Error(`radius rounds a rectangle’s corners, and this shape is ${style.kind === 'Ellipse' ? 'an ellipse' : 'a line'} (give kind=rounded to make it a rectangle)`)
+    }
+
+    style.cornerRadius = Math.round(Math.min(largestRadius, Math.max(0, radius)) * 100) / 100
+    changes.push(`corner radius ${style.cornerRadius}`)
+  }
+
+  const lineWidth = finite(args.lineWidth)
+
+  if (lineWidth !== undefined) {
+    if (style.kind !== 'Line') {
+      throw new Error(`lineWidth is for lines, and this shape is ${style.kind === 'Ellipse' ? 'an ellipse' : 'a rectangle'} (give kind=line to make it one)`)
+    }
+
+    style.lineWidth = Math.min(MAX_LINE_WIDTH, Math.max(1, lineWidth))
+    changes.push(`line width ${style.lineWidth}`)
+  }
+
+  if (!changes.length) {
+    throw new Error('Nothing to change: give kind (rectangle, rounded, ellipse or line), color, radius or lineWidth')
+  }
+
+  return { style, changes }
 }
 
 /** Style words at the end of a font name ("Avenir Next Bold Italic") and the weights they stand for. */

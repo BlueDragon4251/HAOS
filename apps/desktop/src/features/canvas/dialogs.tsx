@@ -137,6 +137,27 @@ export function NewDocumentDialog() {
   )
 }
 
+/** What an import or an export could not carry over exactly, listed once it is done. */
+export function NotesDialog({ title, notes }: { title: string; notes: string[] }) {
+  const close = () => $dialog.set(null)
+
+  return (
+    <Modal title={title} onClose={close}>
+      <p className="mb-2 text-[12.5px] text-fg-2">Some things were approximated or left out:</p>
+      <ul className="mb-5 flex max-h-72 list-disc flex-col gap-1.5 overflow-y-auto pl-5 text-[12px] text-fg-2">
+        {notes.map((note) => (
+          <li key={note}>{note}</li>
+        ))}
+      </ul>
+      <div className="flex justify-end">
+        <GlassButton variant="primary" autoFocus onClick={close}>
+          OK
+        </GlassButton>
+      </div>
+    </Modal>
+  )
+}
+
 /** Close a document, asking first when it has unsaved edits. */
 export function CloseDialog({ docKey }: { docKey: string }) {
   const doc = $documents.get().find((entry) => entry.key === docKey)

@@ -13,7 +13,7 @@ import { containsPoint } from '../engine/geometry.ts'
 import type { View } from '../engine/gpu/view.ts'
 import type { Rect } from '../engine/raster.ts'
 import { quadOf } from '../engine/transform.ts'
-import { fontFace, layoutText, measureFor, originForAnchor, postScriptName, type TextLayout, textStyle } from '../engine/text.ts'
+import { editedRuns, fontFace, layoutText, measureFor, originForAnchor, postScriptName, type TextLayout, textStyle } from '../engine/text.ts'
 import { $documents, notify } from '../store.ts'
 import { makeTextLayer, restyleText, textPlacement } from '../text-layers.ts'
 import { drawOutline } from './select.ts'
@@ -167,11 +167,15 @@ export function cancelTyping(): void {
 /** Change the text being typed (or the active text layer) from the options bar. */
 export function applyTypeOptions(doc: CanvasDocument, options: TypeOptions, colour?: [number, number, number]): void {
   const session = $typing.get()
+  // A face or colour picked for the whole text lets go of the runs of that kind (see `editedRuns`).
   const fromOptions = (style: TextStyle): TextStyle => {
     const next = optionsStyle(style.content, options)
     const [red, green, blue] = colour ? colour.map((value) => value / 255) : [style.red, style.green, style.blue]
+    // The same face keeps the name it had (one from Photoshop or Compositor may be spelled otherwise).
+    const face = fontFace(style.fontName)
+    const fontName = face.family === options.family && face.weight === options.weight && face.italic === options.italic ? style.fontName : next.fontName
 
-    return { ...style, ...next, red, green, blue, ...(style.boxSize ? { boxSize: style.boxSize } : {}) }
+    return editedRuns(style, { ...style, ...next, fontName, red, green, blue, ...(style.boxSize ? { boxSize: style.boxSize } : {}) })
   }
 
   if (session?.docKey === doc.key) {

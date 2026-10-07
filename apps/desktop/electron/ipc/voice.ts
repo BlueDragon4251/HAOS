@@ -4,8 +4,11 @@ import type { BackendManager } from '../backend/manager.ts'
 import { log } from '../log.ts'
 import { isShellPage } from '../paths.ts'
 
-/** Chromium permission names the shell grants for its own origin; everything else stays denied. */
-const MEDIA_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection'])
+/**
+ * Chromium permission names the shell grants for its own origin; everything else stays denied.
+ * `local-fonts` lets Herald Canvas list the fonts on this computer by their real names.
+ */
+const SHELL_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection', 'local-fonts'])
 
 /**
  * Voice plumbing owned by main: the microphone permission gate, tokenized audio WebSocket URLs
@@ -13,7 +16,7 @@ const MEDIA_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection']
  * global hotkey that toggles a conversation from any app.
  */
 export function registerVoiceIpc(backend: BackendManager): void {
-  installMediaPermissions()
+  installShellPermissions()
 
   ipcMain.handle(IPC.voiceMicrophoneStatus, (): MicPermission => microphoneStatus())
   ipcMain.handle(IPC.voiceRequestMicrophone, async (): Promise<MicPermission> => {
@@ -38,14 +41,14 @@ function microphoneStatus(): MicPermission {
   return status === 'granted' || status === 'denied' || status === 'restricted' || status === 'not-determined' ? status : 'unknown'
 }
 
-function installMediaPermissions(): void {
+function installShellPermissions(): void {
   const allowed = (permission: string, requestingUrl: string, mediaTypes?: readonly string[]): boolean => {
-    if (!MEDIA_PERMISSIONS.has(permission)) {
+    if (!SHELL_PERMISSIONS.has(permission)) {
       return false
     }
 
-    // Pinned web apps share this session; only the shell itself may use the microphone or the
-    // camera (the camera bubble for screen recordings).
+    // Pinned web apps share this session; only the shell itself may use the microphone, the
+    // camera (the camera bubble for screen recordings) or the font list.
     return isShellPage(requestingUrl) && (!mediaTypes || mediaTypes.every(type => type === 'audio' || type === 'video'))
   }
 

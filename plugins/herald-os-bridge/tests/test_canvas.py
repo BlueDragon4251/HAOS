@@ -130,6 +130,21 @@ def test_on_device_tools_and_placing_a_picture_pass_their_arguments(plugin):
     assert {"place_image", "remove_background", "content_fill"} <= set(properties["action"]["enum"])
 
 
+def test_set_shape_restyles_a_shape_layer(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "set_shape", "layer": "Date panel", "kind": "rounded", "color": "#ffb347", "radius": 24, "lineWidth": 3, "x": 10, "content": "no"})
+    assert command == "canvas.setShape"
+    assert args == {"layer": "Date panel", "kind": "rounded", "color": "#ffb347", "radius": 24, "lineWidth": 3}
+    assert "set_shape" in tools.CANVAS_SCHEMA["parameters"]["properties"]["action"]["enum"]
+
+
+def test_export_takes_a_layered_psd(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "export", "to": "~/Desktop/poster.psd", "format": "psd"})
+    assert (command, args) == ("canvas.export", {"to": "~/Desktop/poster.psd", "format": "psd"})
+    assert "psd" in tools.CANVAS_SCHEMA["parameters"]["properties"]["format"]["enum"]
+
+
 def test_replacing_a_file_asks_first(plugin, tmp_path):
     tools = _mod(plugin, "tools")
     catalogue = {entry["id"]: entry for entry in CATALOGUE}

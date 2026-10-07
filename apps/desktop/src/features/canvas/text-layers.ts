@@ -10,7 +10,7 @@ import { type CanvasLayer, pixelLayer } from './engine/document.ts'
 import { apply, type Mat, multiply, scale, tidy, unitToDocument } from './engine/geometry.ts'
 import type { Rect } from './engine/raster.ts'
 import { renderShape } from './engine/shapes.ts'
-import { isParagraph, layoutText, loadFont, measureFor, originForAnchor, originForTop, renderText, type TextLayout } from './engine/text.ts'
+import { editedRuns, isParagraph, layoutText, loadFont, measureFor, originForAnchor, originForTop, renderText, type TextLayout } from './engine/text.ts'
 
 /** The name a text layer gets from its text: the first line, shortened. */
 export function textLayerName(content: string): string {
@@ -70,12 +70,15 @@ export function textPlacement(transform: LayerTransform, old: TextStyle, style: 
   return { transform: { ...sized, origin: [tidy(sized.origin[0] + anchor[0] - moved[0]), tidy(sized.origin[1] + anchor[1] - moved[1])] }, layout, scale: [sx, sy] }
 }
 
-/** A text layer after its text or style changed: new pixels and a placement that keeps its anchor, scale, turn and flips. */
+/**
+ * A text layer after its text or style changed: new pixels and a placement that keeps its anchor,
+ * scale, turn and flips. Its colour and font runs follow the edit where they can (`editedRuns`).
+ */
 export async function restyleText(layer: CanvasLayer, text: TextStyle): Promise<Partial<CanvasLayer>> {
   const old = layer.text ?? text
   await loadFont(old)
   await loadFont(text)
-  const { style } = laidOut({ ...text, colorRuns: undefined, fontRuns: undefined })
+  const { style } = laidOut(editedRuns(old, text))
   const { transform, layout, scale: drawn } = textPlacement(layer.transform, old, style)
   const renamed = layer.name === textLayerName(old.content) ? { name: textLayerName(style.content) } : {}
 

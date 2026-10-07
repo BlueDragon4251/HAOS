@@ -49,7 +49,8 @@ export const canvasCommands: readonly OsCommand[] = [
   {
     id: 'canvas.open',
     title: 'Open Herald Canvas',
-    description: 'Open Herald Canvas, or open a .comp project in it so the person sees it. An image becomes a new project in ~/Pictures/Herald Canvas (the original is never changed); the answer gives the project path to work on.',
+    description:
+      'Open Herald Canvas, or open a .comp project in it so the person sees it. An image becomes a new project in ~/Pictures/Herald Canvas (the original is never changed); a Photoshop document (.psd, .psb) keeps its layers, and the answer lists anything approximated. The answer gives the project path to work on.',
     tier: 'act',
     args: [{ name: 'path', type: 'string', description: 'An image or a .comp project (full path or ~/…)' }],
     phrases: ['open herald canvas', 'open canvas', 'open the image editor'],
@@ -192,6 +193,22 @@ export const canvasCommands: readonly OsCommand[] = [
     run: async (args) => done((await canvas()).addShape(args))
   },
   {
+    id: 'canvas.setShape',
+    title: 'Change a shape',
+    description:
+      'Restyle a shape layer in place: its kind (rectangle, rounded, ellipse or line; a rectangle or ellipse becoming a line runs corner to corner in its box), its colour, a rectangle’s corner radius or a line’s width. It keeps its place, size and rotation; only what is given changes.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layer', type: 'string', description: 'The shape layer (id or name)', required: true },
+      { name: 'kind', type: 'string', description: 'rectangle, rounded, ellipse or line' },
+      { name: 'color', type: 'string', description: 'Any CSS colour' },
+      { name: 'radius', type: 'number', description: 'Corner radius in pixels, for rectangles (0 squares the corners)' },
+      { name: 'lineWidth', type: 'number', description: 'Line thickness in pixels, for lines' }
+    ],
+    run: async (args) => done((await canvas()).setShape(args))
+  },
+  {
     id: 'canvas.resize',
     title: 'Resize an image',
     description:
@@ -331,14 +348,15 @@ export const canvasCommands: readonly OsCommand[] = [
   {
     id: 'canvas.export',
     title: 'Export an image',
-    description: 'Write the flattened image as PNG, JPEG or WebP. An existing file is replaced only with overwrite=true, which asks the person first.',
+    description:
+      'Write the image as a flattened PNG, JPEG or WebP, or as a layered Photoshop document (psd: layers, folders, masks, clipping, blend modes, text and the adjustments Photoshop has, plus the flattened image; the answer lists anything approximated). An existing file is replaced only with overwrite=true, which asks the person first.',
     tier: 'act',
     args: [
       project,
       { name: 'to', type: 'string', description: 'The file to write (full path or ~/…)', required: true },
-      { name: 'format', type: 'string', description: 'png, jpeg or webp (from the file name when left out)' },
+      { name: 'format', type: 'string', description: 'png, jpeg, webp or psd (from the file name when left out)' },
       { name: 'quality', type: 'number', description: 'JPEG and WebP quality, 0 to 1 (0.9)' },
-      { name: 'scale', type: 'number', description: 'Size relative to the canvas, e.g. 0.5 for half' },
+      { name: 'scale', type: 'number', description: 'Size relative to the canvas, e.g. 0.5 for half (not for psd)' },
       { name: 'overwrite', type: 'boolean', description: 'Replace an existing file' }
     ],
     run: async (args) => done((await canvas()).exportTo(args))

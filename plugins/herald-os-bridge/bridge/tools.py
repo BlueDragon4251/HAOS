@@ -1104,6 +1104,7 @@ CANVAS_ACTIONS: dict[str, str] = {
     "add_text": "canvas.addText",
     "set_text": "canvas.setText",
     "add_shape": "canvas.addShape",
+    "set_shape": "canvas.setShape",
     "resize": "canvas.resize",
     "crop": "canvas.crop",
     "export": "canvas.export",
@@ -1133,6 +1134,7 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "add_text": ("project", "content", "x", "y", "width", "height", "font", "size", "color", "align", "tracking", "leading", "name", "opacity", "blend", "above", "folder", "clip"),
     "set_text": ("project", "layer", "content", "font", "size", "color", "align", "tracking", "leading"),
     "add_shape": ("project", "kind", "x", "y", "width", "height", "color", "radius", "lineWidth", "name", "opacity", "blend", "above", "folder", "clip"),
+    "set_shape": ("project", "layer", "kind", "color", "radius", "lineWidth"),
     "resize": ("project", "width", "height", "anchor", "scale", "image", "resample"),
     "crop": ("project", "x", "y", "width", "height"),
     "export": ("project", "to", "format", "quality", "scale", "overwrite"),
@@ -1152,8 +1154,8 @@ CANVAS_SCHEMA = _schema(
     "canvas",
     "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
-    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, add_adjustment, set_adjustment, group and remove_layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
-    "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=export writes PNG, JPEG or WebP. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
+    "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=export writes PNG, JPEG, WebP or a layered PSD; action=open takes .psd files with their layers. "
     "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something). place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
     {
@@ -1166,14 +1168,14 @@ CANVAS_SCHEMA = _schema(
         "background": _desc(_STR, "new: white, black, transparent or any CSS colour"),
         "resolution": _desc(_NUM, "new: pixels per inch (72)"),
         "source": _desc(_STR, "add_layer: an image file or an http(s) URL"),
-        "color": _desc(_STR, "add_layer: a solid fill; add_text, set_text: the text colour; add_shape: the fill (any CSS colour)"),
+        "color": _desc(_STR, "add_layer: a solid fill; add_text, set_text: the text colour; add_shape, set_shape: the fill (any CSS colour)"),
         "content": _desc(_STR, "add_text, set_text: the words (\\n starts a new line)"),
         "font": _desc(_STR, "add_text, set_text: an installed font family with a style if wanted, e.g. \"Helvetica Neue Bold\", \"Georgia Italic\""),
         "align": _enum("left", "center", "right", description="add_text, set_text: text alignment; for point text x is the left edge, centre or right edge accordingly"),
         "tracking": _desc(_NUM, "add_text, set_text: extra space between letters, in pixels (-100 to 1000)"),
         "leading": _desc(_NUM, "add_text, set_text: line spacing from baseline to baseline, in pixels (0 to 5000; 0 is automatic, 120% of the size)"),
-        "radius": _desc(_NUM, "add_shape: corner radius of a rectangle, in pixels"),
-        "lineWidth": _desc(_NUM, "add_shape: thickness of a line, in pixels (4); a line runs from (x, y) to (x + width, y + height)"),
+        "radius": _desc(_NUM, "add_shape, set_shape: corner radius of a rectangle, in pixels"),
+        "lineWidth": _desc(_NUM, "add_shape, set_shape: thickness of a line, in pixels (4); add_shape's line runs from (x, y) to (x + width, y + height)"),
         "anchor": _enum("center", "top-left", "top", "top-right", "left", "right", "bottom-left", "bottom", "bottom-right", description="resize: where the canvas grows or shrinks from (center)"),
         "image": _desc(_BOOL, "resize: scale the whole image to width/height instead of changing the canvas"),
         "resample": _desc(_BOOL, "resize: when scaling, recalculate layer pixels too (default true)"),
@@ -1187,14 +1189,14 @@ CANVAS_SCHEMA = _schema(
         "flipY": _desc(_BOOL, "set_layer: mirror top to bottom"),
         "opacity": _desc(_NUM, "0 to 1"),
         "blend": _desc(_STR, "Blend mode, e.g. Normal, Multiply, Screen, Overlay, Soft Light, Color, Luminosity"),
-        "layer": _desc(_STR, "set_layer, set_text, remove_layer, set_adjustment, set_effects, mask: the layer's id or name; remove_background, content_fill: the layer (the active one when left out)"),
+        "layer": _desc(_STR, "set_layer, set_text, set_shape, remove_layer, set_adjustment, set_effects, mask: the layer's id or name; remove_background, content_fill: the layer (the active one when left out)"),
         "layers": _desc(_STR, "group: comma-separated layer ids or names"),
         "visible": _desc(_BOOL, "set_layer: show or hide"),
         "order": _enum("up", "down", "top", "bottom", description="set_layer: move among its neighbours"),
         "above": _desc(_STR, "Put the new layer right above this one"),
         "folder": _desc(_STR, "new: where the project goes; add_layer, add_adjustment: put it in this folder; set_layer: move into it (\"none\" takes it out)"),
         "clip": _desc(_BOOL, "Clip to the layer below (shows only where it has pixels); false lets go"),
-        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape: rectangle, rounded, ellipse or line"),
+        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape, set_shape: rectangle, rounded, ellipse or line"),
         "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}; set_adjustment: settings merged over the layer's own", "additionalProperties": True},
         "effects": {
             "type": "object",
@@ -1204,7 +1206,7 @@ CANVAS_SCHEMA = _schema(
         "clear": _desc(_BOOL, "set_effects: remove every effect first"),
         "mask": _enum("reveal", "hide", "revealSelection", "hideSelection", "invert", "apply", "enable", "disable", "remove", "link", "unlink", description="mask: what to do to the layer's mask (reveal and hide make one showing or hiding everything)"),
         "to": _desc(_STR, "export: the file to write; save: a new project path"),
-        "format": _enum("png", "jpeg", "webp", description="export: the format (from the file name when left out)"),
+        "format": _enum("png", "jpeg", "webp", "psd", description="export: the format (from the file name when left out); psd keeps the layers"),
         "quality": _desc(_NUM, "export: JPEG or WebP quality, 0 to 1"),
         "scale": _desc(_NUM, "export: size relative to the canvas; resize: scale the whole image by this much (0.5 is half)"),
         "overwrite": _desc(_BOOL, "export, save: replace an existing file (asks the person first)"),

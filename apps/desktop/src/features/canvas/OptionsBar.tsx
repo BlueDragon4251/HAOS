@@ -16,7 +16,6 @@ import {
   IconSquareToggle,
   IconX
 } from '@tabler/icons-react'
-import { atom } from 'nanostores'
 import { useEffect, useState } from 'react'
 import { RANGES, type TextAlignment } from '../../../shared/canvas/comp-format.ts'
 import { GlassButton } from '../../components/ui/glass.tsx'
@@ -24,6 +23,7 @@ import { cn } from '../../lib/cn.ts'
 import { cssOf, type RGB } from './color.ts'
 import { ColorPicker } from './ColorPicker.tsx'
 import type { CanvasDocument } from './engine/document.ts'
+import { $fontFamilies, loadFonts } from './fonts.ts'
 import type { SelectionMode } from './engine/selection.ts'
 import { useRevision } from './hooks.ts'
 import { cannotSegment } from './ai/subject.ts'
@@ -163,19 +163,6 @@ function BrushFields({ store, doc }: { store: typeof $brush; doc: CanvasDocument
   )
 }
 
-/** Font families on this computer, listed once. */
-const $fonts = atom<string[] | null>(null)
-
-function loadFonts(): void {
-  if (!$fonts.get()) {
-    $fonts.set([])
-    window.heraldOS.fonts
-      .list()
-      .then((families) => $fonts.set(families))
-      .catch(() => {})
-  }
-}
-
 const WEIGHTS: { value: number; label: string }[] = [
   { value: 100, label: 'Thin' },
   { value: 200, label: 'Extra Light' },
@@ -192,7 +179,7 @@ function TypeFields({ doc }: { doc: CanvasDocument }) {
   const options = useStore($type)
   const typing = useStore($typing)
   const foreground = useStore($foreground)
-  const fonts = useStore($fonts)
+  const fonts = useStore($fontFamilies)
   const [picking, setPicking] = useState(false)
   const [family, setFamily] = useState(options.family)
   const session = typing?.docKey === doc.key ? typing : null
@@ -200,7 +187,7 @@ function TypeFields({ doc }: { doc: CanvasDocument }) {
   const style = session?.style ?? layer?.text
   const colour: RGB = style ? [Math.round(style.red * 255), Math.round(style.green * 255), Math.round(style.blue * 255)] : foreground
 
-  useEffect(loadFonts, [])
+  useEffect(() => void loadFonts(), [])
   useEffect(() => setFamily(options.family), [options.family])
 
   // A text layer picked with the Type tool in hand shows its own style here.

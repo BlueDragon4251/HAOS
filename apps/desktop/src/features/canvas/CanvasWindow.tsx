@@ -10,9 +10,10 @@ import { ContentFillDialog } from './ai/ContentFillDialog.tsx'
 import { AskHermesField, GenerateDialog } from './ai/HermesPrompts.tsx'
 import { ModelPrompt, ModelsDialog } from './ai/ModelDialogs.tsx'
 import { RemoveBackgroundDialog } from './ai/RemoveBackgroundDialog.tsx'
-import { CloseDialog, NewDocumentDialog } from './dialogs.tsx'
+import { CloseDialog, NewDocumentDialog, NotesDialog } from './dialogs.tsx'
 import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, TrimDialog } from './edit-dialogs.tsx'
 import type { CanvasDocument } from './engine/document.ts'
+import { loadFonts } from './fonts.ts'
 import type { Raster, Rect } from './engine/raster.ts'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
@@ -317,6 +318,9 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       .forEach(forgetView)
   }, [documents])
 
+  // The computer's fonts, so text layers name and draw their faces exactly.
+  useEffect(() => void loadFonts(), [])
+
   useEffect(() => {
     const release = () => $spaceHeld.set(false)
     window.addEventListener('blur', release)
@@ -513,6 +517,7 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {doc && dialog?.kind === 'content-fill' && <ContentFillDialog doc={doc} />}
       {doc && dialog?.kind === 'generate' && <GenerateDialog doc={doc} mode={dialog.mode} />}
       {dialog?.kind === 'models' && <ModelsDialog />}
+      {dialog?.kind === 'notes' && <NotesDialog title={dialog.title} notes={dialog.notes} />}
       <ModelPrompt />
     </div>
   )

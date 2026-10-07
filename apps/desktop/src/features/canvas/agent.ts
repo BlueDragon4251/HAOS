@@ -6,7 +6,7 @@
  */
 
 import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS, RANGES, type ShapeStyle, type TextStyle } from '../../../shared/canvas/comp-format.ts'
-import { baseName, CANVAS_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION } from '../../../shared/canvas/files.ts'
+import { baseName, CANVAS_IMAGE_EXTENSIONS, isLayeredImage, isProjectPath, PROJECT_EXTENSION } from '../../../shared/canvas/files.ts'
 import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
 import {
@@ -36,7 +36,8 @@ import {
   rangedArg,
   resizePlan,
   resolvePath,
-  shapeKindFrom
+  shapeKindFrom,
+  shapeWith
 } from './agent-model.ts'
 import { anchorOffset, cropCanvas, resizeCanvas, scaleImage } from './engine/canvas-size.ts'
 import {
@@ -60,12 +61,12 @@ import {
 } from './engine/document.ts'
 import { EFFECT_NAMES, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, withMaskAction } from './engine/masks.ts'
-import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, saveProject, toRaster } from './engine/project.ts'
+import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, readPicture, saveProject, toRaster } from './engine/project.ts'
 import { Raster, type Rect, resample } from './engine/raster.ts'
 import { shapeBox, shapeName } from './engine/shapes.ts'
 import { textStyle } from './engine/text.ts'
 import { openInCanvas } from './open.ts'
-import { makeShapeLayer, makeTextLayer, restyleText } from './text-layers.ts'
+import { makeShapeLayer, makeTextLayer, restyleShape, restyleText } from './text-layers.ts'
 
 export interface Target {
   doc: CanvasDocument
@@ -241,7 +242,7 @@ export async function loadImage(source: string): Promise<Raster> {
     throw new Error(`Herald Canvas does not read ${extension || 'that kind of file'}`)
   }
 
-  return toRaster(await window.heraldOS.canvas.readImage(file), 4, extension === '.svg')
+  return readPicture(file)
 }
 
 // --- Commands ----------------------------------------------------------------------------------
@@ -305,13 +306,16 @@ export async function open(path: unknown): Promise<Outcome> {
     return { summary: `Opened ${baseName(file)} in Herald Canvas`, data: { path: file } }
   }
 
-  // An image becomes a project beside the others, so edits never touch the original.
-  const doc = await documentFromImage(file)
+  // An image becomes a project beside the others, so edits never touch the original; a Photoshop document keeps its layers.
+  const { doc, notes } = isLayeredImage(file) ? await (await import('./psd/psd.ts')).documentFromPsd(file) : { doc: await documentFromImage(file), notes: [] as string[] }
   const project = await freeProjectPath(resolve('~/Pictures/Herald Canvas'), baseName(file))
   await saveProject(doc, project)
   await show(project)
 
-  return { summary: `Opened ${fileName(file)} in Herald Canvas as ${baseName(project)} (the original is untouched)`, data: { path: project, source: file, width: doc.state.width, height: doc.state.height } }
+  return {
+    summary: `Opened ${fileName(file)} in Herald Canvas as ${baseName(project)} (the original is untouched)${notes.length ? `. Approximated: ${notes.join('; ')}` : ''}`,
+    data: { path: project, source: file, width: doc.state.width, height: doc.state.height, layers: doc.state.layers.length, ...(notes.length ? { notes } : {}) }
+  }
 }
 
 export async function create(args: Record<string, unknown>): Promise<Outcome> {
@@ -752,6 +756,22 @@ export async function addShape(args: Record<string, unknown>): Promise<Outcome> 
   return { summary: `Added “${layer.name}” to ${on.doc.name}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
 }
 
+/** Restyle a shape layer: its kind, colour, corner radius or line width. It keeps its box and turn. */
+export async function setShape(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = findByRef(on.doc.state, args.layer)
+
+  if (!layer.shape) {
+    throw new Error(`${layer.name} is not a shape layer (add one with canvas.addShape)`)
+  }
+
+  const box = { width: Math.abs(layer.transform.size[0]), height: Math.abs(layer.transform.size[1]) }
+  const { style, changes } = shapeWith(layer.shape, args, box, readColour)
+  await apply(on, 'Shape', withLayer(on.doc.state, layer.id, restyleShape(layer, style)))
+
+  return { summary: `${layer.name}: ${changes.join(', ')}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
 /** Canvas Size (grow or cut around an anchor; layers untouched) or Image Size (everything scaled). */
 export async function resize(args: Record<string, unknown>): Promise<Outcome> {
   const on = await target(args.project)
@@ -783,10 +803,10 @@ export async function crop(args: Record<string, unknown>): Promise<Outcome> {
   return { summary: `Cropped ${on.doc.name} to ${box.width}×${box.height} from (${box.x}, ${box.y})`, data: { ...box } }
 }
 
-const exportKind = (file: string, format: unknown): ExportKind => {
+const exportKind = (file: string, format: unknown): ExportKind | 'psd' => {
   const named = String(format ?? '').toLowerCase()
 
-  if (named === 'png' || named === 'jpeg' || named === 'webp') {
+  if (named === 'png' || named === 'jpeg' || named === 'webp' || named === 'psd') {
     return named
   }
 
@@ -794,7 +814,7 @@ const exportKind = (file: string, format: unknown): ExportKind => {
     return 'jpeg'
   }
 
-  return /\.jpe?g$/i.test(file) ? 'jpeg' : /\.webp$/i.test(file) ? 'webp' : 'png'
+  return /\.jpe?g$/i.test(file) ? 'jpeg' : /\.webp$/i.test(file) ? 'webp' : /\.psd$/i.test(file) ? 'psd' : 'png'
 }
 
 export async function exportTo(args: Record<string, unknown>): Promise<Outcome> {
@@ -807,7 +827,7 @@ export async function exportTo(args: Record<string, unknown>): Promise<Outcome> 
   const kind = exportKind(args.to, args.format)
   let file = resolve(args.to)
 
-  if (!/\.(png|jpe?g|webp)$/i.test(file)) {
+  if (!/\.(png|jpe?g|webp|psd)$/i.test(file)) {
     file = `${file}.${kind === 'jpeg' ? 'jpg' : kind}`
   }
 
@@ -817,6 +837,18 @@ export async function exportTo(args: Record<string, unknown>): Promise<Outcome> 
 
   const scale = finite(args.scale)
   const quality = finite(args.quality)
+
+  if (kind === 'psd') {
+    if (scale !== undefined && scale !== 1) {
+      throw new Error('A PSD keeps the layers at their own size: leave scale out (or export a PNG or JPEG at a scale)')
+    }
+
+    const { exportPsd } = await import('./psd/psd.ts')
+    const { file: written, notes } = await exportPsd(on.doc.state, file)
+
+    return { summary: `Exported ${fileName(written)} with its layers${notes.length ? `. Approximated: ${notes.join('; ')}` : ''}`, data: { file: written, ...(notes.length ? { notes } : {}) } }
+  }
+
   const written = await exportImage(on.doc.state, file, kind, { scale: scale && scale > 0 ? Math.min(scale, 4) : 1, quality: quality !== undefined ? Math.max(0.05, Math.min(1, quality > 1 ? quality / 100 : quality)) : undefined })
 
   return { summary: `Exported ${fileName(written)}`, data: { file: written } }
@@ -865,9 +897,7 @@ export async function preview(args: Record<string, unknown>): Promise<Outcome> {
 
 /** A mask from an image file (white shows, black hides; transparency hides too). */
 async function loadMask(source: string): Promise<Raster> {
-  const file = resolve(source)
-
-  return toRaster(await window.heraldOS.canvas.readImage(file), 1, /\.svg$/i.test(file))
+  return readPicture(resolve(source), 1)
 }
 
 /** The layer a command names, or the active one; it has to have pixels. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultTransform, newManifest, parseManifest, serializeManifest } from '../../../../shared/canvas/comp-format.ts'
 import { constrainShape, shapeBox, shapeName } from './shapes.ts'
-import { fontCss, fontFace, layoutText, originForAnchor, originForTop, postScriptName, spacedFamily, type TextMeasure, textStyle, wrapLines } from './text.ts'
+import { editedRuns, fontCss, fontFace, layoutText, originForAnchor, originForTop, pieces, postScriptName, registerFaces, spacedFamily, styleOf, type TextMeasure, textStyle, wrapLines, wrapSegments } from './text.ts'
 
 /** Every character 10 pixels wide, plus tracking. */
 const monospace = (tracking = 0): TextMeasure => ({ width: (text) => text.length * (10 + tracking), ascent: 16, descent: 4 })
@@ -69,6 +69,79 @@ describe('text layout', () => {
     manifest.layers.push({ id, name: 'Title', isVisible: true, transform: defaultTransform(400, 120, 10, 10), imageFile: `${id}.png`, text })
     const back = parseManifest(JSON.parse(serializeManifest(manifest)))
     expect(back.layers[0].text).toEqual(text)
+  })
+})
+
+describe('runs of colour and face', () => {
+  const style = textStyle({
+    content: 'Hello World',
+    red: 1,
+    colorRuns: [{ location: 6, length: 5, red: 0, green: 0, blue: 1 }],
+    fontRuns: [{ location: 0, length: 5, fontName: 'Georgia-Bold' }]
+  })
+
+  it('cut a line where its colour or face changes', () => {
+    expect(pieces(style, 'Hello World', 0).map((piece) => [piece.text, piece.fontName, piece.colour.blue])).toEqual([
+      ['Hello', 'Georgia-Bold', 0],
+      [' ', 'Helvetica', 0],
+      ['World', 'Helvetica', 1]
+    ])
+    expect(pieces(style, 'lo Wo', 3).map((piece) => piece.text)).toEqual(['lo', ' ', 'Wo'])
+  })
+
+  it('follow an edit: typed letters take the run before them, removed ones go with their part of it', () => {
+    const typed = editedRuns(style, { ...style, content: 'Hello World!!' })
+    expect(typed.colorRuns).toEqual([{ location: 6, length: 7, red: 0, green: 0, blue: 1 }])
+    const cut = editedRuns(style, { ...style, content: 'Hello Wd' })
+    expect(cut.colorRuns).toEqual([{ location: 6, length: 2, red: 0, green: 0, blue: 1 }])
+    const before = editedRuns(style, { ...style, content: 'Oh Hello World' })
+    expect(before.fontRuns).toEqual([{ location: 3, length: 5, fontName: 'Georgia-Bold' }])
+    expect(before.colorRuns).toEqual([{ location: 9, length: 5, red: 0, green: 0, blue: 1 }])
+    expect(editedRuns(style, { ...style, content: 'Hi' }).colorRuns).toBeUndefined()
+  })
+
+  it('let go of a kind of run when the whole text gets a new colour or face', () => {
+    const recoloured = editedRuns(style, { ...style, green: 1 })
+    expect(recoloured.colorRuns).toBeUndefined()
+    expect(recoloured.fontRuns).toHaveLength(1)
+    const refaced = editedRuns(style, { ...style, fontName: 'Georgia' })
+    expect(refaced.fontRuns).toBeUndefined()
+    expect(refaced.colorRuns).toHaveLength(1)
+  })
+
+  it('wrap with where each line starts, so runs follow the lines', () => {
+    expect(wrapSegments('the quick brown fox', 100, (text) => text.length * 10)).toEqual([
+      { text: 'the quick', start: 0 },
+      { text: 'brown fox', start: 10 }
+    ])
+    expect(wrapSegments('ab\ncdefgh', 40, (text) => text.length * 10)).toEqual([
+      { text: 'ab', start: 0 },
+      { text: 'cdef', start: 3 },
+      { text: 'gh', start: 7 }
+    ])
+    const layout = layoutText(textStyle({ content: 'one\ntwo', fontSize: 20 }), monospace())
+    expect(layout.lines.map((line) => line.start)).toEqual([0, 4])
+  })
+})
+
+describe('the computer’s own faces', () => {
+  it('name and read faces exactly once they are known, and as before until then', () => {
+    registerFaces([
+      { postscriptName: 'ArialMT', family: 'Arial', style: 'Regular' },
+      { postscriptName: 'Arial-BoldMT', family: 'Arial', style: 'Bold' },
+      { postscriptName: 'Arial-ItalicMT', family: 'Arial', style: 'Italic' },
+      { postscriptName: 'SFProDisplay-Semibold', family: 'SF Pro Display', style: 'Semibold' }
+    ])
+    expect(postScriptName({ family: 'Arial', weight: 700, italic: false })).toBe('Arial-BoldMT')
+    expect(postScriptName({ family: 'Arial', weight: 600, italic: false })).toBe('Arial-BoldMT')
+    expect(postScriptName({ family: 'Arial', weight: 400, italic: true })).toBe('Arial-ItalicMT')
+    // No bold italic on this computer: the name is put together, so the intent is kept.
+    expect(postScriptName({ family: 'Arial', weight: 700, italic: true })).toBe('Arial-BoldItalic')
+    expect(fontFace('ArialMT')).toEqual({ family: 'Arial', weight: 400, italic: false })
+    expect(fontFace('SFProDisplay-Semibold')).toEqual({ family: 'SF Pro Display', weight: 600, italic: false })
+    expect(styleOf('Light Oblique')).toEqual({ weight: 300, italic: true })
+    registerFaces([])
+    expect(postScriptName({ family: 'Arial', weight: 700, italic: false })).toBe('Arial-Bold')
   })
 })
 
