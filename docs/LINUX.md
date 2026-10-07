@@ -232,7 +232,8 @@ On the image, apps install through Flatpak or into `~/.local` (the catalog picks
 there); the system itself changes only by a whole new image.
 
 **Updates you can undo.** `herald-os update` runs `bootc upgrade` (the image tag of the channel:
-`stable` for releases, `edge` for main; `herald-os channel edge` switches with `bootc switch`), then
+`stable` for releases, `edge` for main once it is published; `herald-os channel edge` switches with
+`bootc switch`), then
 Flatpaks and `hermes update`. The new image starts on the next restart and the previous one stays in
 the boot menu; `herald-os rollback` (or Update > Go back to the previous version) makes it the
 default again.
@@ -259,6 +260,54 @@ its apps and saved networks on the next restart and runs setup again; the system
   `linux/image/cosign.pub` is in the repository, the image only accepts signed updates of itself
   (a `sigstoreSigned` policy for `ghcr.io/iamlukethedev/herald-os`).
 - **SELinux** stays permissive for now (ADR-012).
+
+### Switching a bootc system to Herald OS
+
+Fedora Silverblue, Kinoite, Bazzite, Bluefin and other bootc systems can switch to the Herald OS
+image in place. It replaces the system you run, so try it on a spare machine or in a virtual machine,
+not on the computer you work on. What happens on its first start:
+
+- **A new account signs in by itself.** The first boot creates `hermes`, an administrator (in
+  `wheel`) with no password, and greetd signs it in with no login screen, so you cannot pick your own
+  account there. Until you set a password in Herald OS's first-start setup (or with
+  `herald-os password`), anyone at the keyboard has administrator rights. Your own account and its
+  files stay.
+- **The first start takes a while.** It installs Hermes Agent, which needs the network, before the
+  desktop appears.
+- **SELinux becomes permissive** (greetd and the compositors have no policy yet, ADR-012).
+- **The firewall changes.** firewalld's default zone becomes `herald-os`, which refuses every
+  incoming connection except LocalSend (port 53317) and mDNS, so SSH and other ports you opened are
+  closed.
+- **Nothing checks the image's signature yet.** `linux/image/cosign.pub` is not in the repository, so
+  neither the switch nor later updates verify it; you trust GHCR and the connection to it.
+- **Only the `stable` tag is published.** `edge` does not exist yet, so `herald-os channel edge`
+  fails.
+
+bootc keeps the changes you made to `/etc` yourself, so where you changed one of these settings,
+yours stays. Note the image you run now, so you can come back to it, then switch and restart:
+
+```bash
+sudo bootc status                # your current image, for later
+sudo bootc switch ghcr.io/iamlukethedev/herald-os:stable
+systemctl reboot
+```
+
+If `bootc` is missing or refuses, `sudo rpm-ostree rebase
+ostree-unverified-registry:ghcr.io/iamlukethedev/herald-os:stable` switches through rpm-ostree instead
+(`unverified`: without a signature check, as above).
+
+**Going back.** The system you switched from stays in the boot menu: `sudo bootc rollback` (on Herald
+OS, `herald-os rollback`) makes it the default again, and the next restart starts it as it was. Once
+Herald OS has updated itself, that place holds the previous Herald OS version instead; to keep your old
+system in the boot menu through updates, run `sudo ostree admin pin booted` before you switch
+(`ostree admin status` lists what is pinned). `sudo bootc switch <your old image>` works too, but it
+keeps what changed in `/etc` under Herald OS, the `hermes` account among it: remove that with
+`sudo userdel -r hermes`. After a rollback, Herald OS's files in `/var` stay behind, the `hermes`
+home folder (`/var/home/hermes`) and `/var/lib/herald-os`; delete them when you no longer want them.
+
+On bootc and ostree systems Herald OS did not make, `herald-os update` and `herald-os rollback` never
+run `bootc`: the system is left to its own updates. The install catalog uses Flatpak and `~/.local`
+there, as on the image.
 
 ## Arch Linux (and Omarchy)
 

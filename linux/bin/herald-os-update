@@ -15,6 +15,10 @@ STATE="$HOME/.local/state/herald-os"
 CONFIG="$HOME/.config/herald-os"
 CHANNEL="$(cat "$CONFIG/channel" 2>/dev/null || echo stable)"
 MIGRATIONS_DONE="/var/lib/herald-os/migrations"
+# What tells the Herald OS image from other bootc and ostree systems (is_herald_image).
+OSTREE_BOOTED=/run/ostree-booted
+OS_RELEASE=(/etc/os-release /usr/lib/os-release)
+IMAGE_SHELL=/usr/share/herald-os/app/resources/app.asar
 CHECK=0
 MIGRATE=0
 SYSTEM=1
@@ -40,11 +44,21 @@ branch_for_channel() {
 notify() { herald-os notify "$1" "${2:-}" >/dev/null 2>&1 || true; }
 report() { herald-os update-available "$1" "$2" >/dev/null 2>&1 || true; }
 
+# The Herald OS image: a booted bootc image whose os-release says IMAGE_ID=herald-os (or, built before
+# that line, with the shell in /usr/share/herald-os/app, where only the image puts it).
+is_herald_image() {
+  [[ -e "$OSTREE_BOOTED" ]] || return 1
+  grep -qsxE 'IMAGE_ID="?herald-os"?' "${OS_RELEASE[@]}" || [[ -f "$IMAGE_SHELL" ]]
+}
+
 # What updates the system underneath: Omarchy refuses a bare `pacman -Syu` (it updates its own
-# configs alongside), and the image is replaced as a whole, never package by package.
+# configs alongside), and the image is replaced as a whole, never package by package. Another bootc
+# or ostree image (Silverblue, Bazzite, Bluefin) is the person's own system and its own tools update it.
 system_kind() {
-  if [[ -e /run/ostree-booted ]]; then
+  if is_herald_image; then
     echo image
+  elif [[ -e "$OSTREE_BOOTED" ]]; then
+    echo ostree
   elif command -v omarchy-update >/dev/null || [[ -x "$HOME/.local/share/omarchy/bin/omarchy-update" ]]; then
     echo omarchy
   elif command -v pacman >/dev/null; then
@@ -109,6 +123,9 @@ update_system() {
     image)
       # Stages the new image; it boots on the next restart and the old one stays in the boot menu.
       sudo -n bootc upgrade
+      ;;
+    ostree)
+      echo "This is not the Herald OS image, so the system is left to its own updates (its software center, rpm-ostree upgrade or bootc upgrade)."
       ;;
     *) return 0 ;;
   esac

@@ -73,7 +73,8 @@ def notify(title: str, body: str = "") -> None:
 # ---------------------------------------------------------------------------------------------
 # The package layer: which system package manager this machine has, if any.
 def is_image() -> bool:
-    """bootc and ostree images keep /usr read-only; software goes to Flatpak or ~/.local there."""
+    """Any bootc or ostree image, Herald OS's or another (Silverblue, Bazzite): /usr is read-only, so
+    software goes to Flatpak or ~/.local. Unlike herald-os's is_image, not only the Herald OS image."""
     return Path("/run/ostree-booted").exists()
 
 

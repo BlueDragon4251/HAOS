@@ -103,8 +103,10 @@ Herald.
 
 Updates come as a whole new version of the system: `herald-os update` installs one, and
 `herald-os rollback` goes back to the one before. Already on Fedora Silverblue or another bootc
-system? [docs/LINUX.md](docs/LINUX.md#the-herald-os-image-fedora-bootc) covers switching it to the
-Herald OS image instead.
+system? It can switch to the Herald OS image in place, which replaces the system you run and adds an
+account that signs in without a password: try it on a spare machine or in a virtual machine.
+[docs/LINUX.md](docs/LINUX.md#switching-a-bootc-system-to-herald-os) has the steps, what changes and
+how to go back.
 
 ### Arch Linux
 
