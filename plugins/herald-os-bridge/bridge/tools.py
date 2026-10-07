@@ -1128,14 +1128,14 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "open": ("path",),
     "new": ("name", "width", "height", "background", "resolution", "folder"),
     "layers": ("project",),
-    "add_layer": ("project", "source", "color", "gradient", "angle", "fit", "x", "y", "width", "height", "name", "opacity", "blend", "above", "folder", "clip"),
+    "add_layer": ("project", "source", "color", "gradient", "style", "angle", "fit", "x", "y", "width", "height", "name", "opacity", "blend", "above", "folder", "clip"),
     "set_layer": ("project", "layer", "name", "visible", "opacity", "blend", "x", "y", "width", "height", "rotation", "flipX", "flipY", "clip", "order", "folder"),
     "remove_layer": ("project", "layer"),
     "group": ("project", "layers", "name", "above", "folder"),
     "add_adjustment": ("project", "kind", "settings", "name", "opacity", "blend", "above", "folder", "clip"),
     "auto_adjust": ("project", "kind", "cutoff", "name", "above", "folder", "clip"),
     "set_adjustment": ("project", "layer", "settings", "opacity", "blend"),
-    "set_effects": ("project", "layer", "effects", "clear"),
+    "set_effects": ("project", "layer", "effects", "from", "clear"),
     "mask": ("project", "layer", "mask"),
     "add_text": ("project", "content", "x", "y", "width", "height", "font", "size", "color", "align", "tracking", "leading", "name", "opacity", "blend", "above", "folder", "clip"),
     "set_text": ("project", "layer", "content", "font", "size", "color", "align", "tracking", "leading"),
@@ -1164,7 +1164,7 @@ CANVAS_SCHEMA = _schema(
     "canvas",
     "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
-    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; guides lays out margins, columns and centre lines; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; guides lays out margins, columns and centre lines; set_effects adds drop shadows, strokes, glows and overlays (or copies them from another layer); mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=history lists every step (undo or redo with steps to move through them); action=export writes PNG, JPEG, WebP or a layered PSD; action=open takes .psd files with their layers. "
     "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something); filter sharpens, denoises or blurs a layer's pixels. place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
@@ -1189,7 +1189,8 @@ CANVAS_SCHEMA = _schema(
         "anchor": _enum("center", "top-left", "top", "top-right", "left", "right", "bottom-left", "bottom", "bottom-right", description="resize: where the canvas grows or shrinks from (center)"),
         "image": _desc(_BOOL, "resize: scale the whole image to width/height instead of changing the canvas"),
         "resample": _desc(_BOOL, "resize: when scaling, recalculate layer pixels too (default true)"),
-        "gradient": _desc(_STR, "add_layer: comma-separated colours of a linear gradient"),
+        "gradient": _desc(_STR, "add_layer: the gradient's colours first to last, comma-separated, each with an optional position, e.g. \"#000 0%, #335 60%, #fff\"; transparent colours (#00000000) fade"),
+        "style": _enum("linear", "radial", "angle", "reflected", "diamond", description="add_layer: how the gradient lies: linear (the default), radial (from the centre out), angle (a sweep around the centre), reflected (mirrored from the centre line) or diamond"),
         "angle": _desc(_NUM, "add_layer: gradient direction in degrees (0 left to right, 90 top to bottom); crop: degrees to turn the picture clockwise first, to level a horizon (negative turns it counterclockwise), then the crop keeps the largest box with no empty corners"),
         "ratio": _desc(_STR, "crop: width:height to hold the box to, e.g. 1:1, 4:5, 3:2, 16:9, 9:16 or original; alone it keeps the largest centred box of that shape"),
         "fit": _enum("contain", "cover", "none", "stretch", description="add_layer: how a picture fills the canvas when no box is given; place_image: cover (the default), contain or stretch in its box"),
@@ -1220,6 +1221,7 @@ CANVAS_SCHEMA = _schema(
             "additionalProperties": True,
         },
         "clear": _desc(_BOOL, "set_effects: remove every effect first"),
+        "from": _desc(_STR, "set_effects: a layer (id or name) whose effects to copy onto this one, replacing its own; effects then changes them further"),
         "mask": _enum("reveal", "hide", "revealSelection", "hideSelection", "invert", "apply", "enable", "disable", "remove", "link", "unlink", description="mask: what to do to the layer's mask (reveal and hide make one showing or hiding everything)"),
         "to": _desc(_STR, "export: the file to write; save: a new project path; align: what to line up with: canvas (the default for one layer), layers (each other, the default for several) or selection"),
         "format": _enum("png", "jpeg", "webp", "psd", description="export: the format (from the file name when left out); psd keeps the layers"),

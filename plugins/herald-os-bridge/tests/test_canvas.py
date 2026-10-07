@@ -106,6 +106,17 @@ def test_effects_travel_as_json_and_may_clear_first(plugin):
     # Effects written as JSON text by the model pass through as they are.
     _, _, args = tools.canvas_command({"action": "set_effects", "layer": "Title", "effects": '{"outerGlow": {"size": 30}}'})
     assert args["effects"] == '{"outerGlow": {"size": 30}}'
+    # A layer style copied from another layer.
+    _, command, args = tools.canvas_command({"action": "set_effects", "layer": "Subtitle", "from": "Headline", "style": "radial"})
+    assert (command, args) == ("canvas.setEffects", {"layer": "Subtitle", "from": "Headline"})
+
+
+def test_gradient_layers_take_positioned_stops_and_a_style(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "add_layer", "gradient": "#0d0d12 0%, #2a2a55 60%, #ffffff00", "style": "radial", "angle": 45, "from": "x"})
+    assert (command, args) == ("canvas.addLayer", {"gradient": "#0d0d12 0%, #2a2a55 60%, #ffffff00", "style": "radial", "angle": 45})
+    styles = tools.CANVAS_SCHEMA["parameters"]["properties"]["style"]["enum"]
+    assert styles == ["linear", "radial", "angle", "reflected", "diamond"]
 
 
 def test_a_mask_action_travels_as_the_command_action(plugin):

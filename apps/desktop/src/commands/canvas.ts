@@ -98,13 +98,14 @@ export const canvasCommands: readonly OsCommand[] = [
     id: 'canvas.addLayer',
     title: 'Add a layer',
     description:
-      'Add a layer: a picture (source = a file path or an http(s) URL), a solid colour (color), a linear gradient (gradient = "colour,colour,…" with angle), or an empty layer. A picture fits inside the canvas, centred, unless fit or a box says otherwise.',
+      'Add a layer: a picture (source = a file path or an http(s) URL), a solid colour (color), a gradient (gradient = "colour, colour, …" first to last, each with an optional position like "#ff8800 30%"; transparent colours such as #00000000 fade; style and angle lay it out), or an empty layer. A picture fits inside the canvas, centred, unless fit or a box says otherwise.',
     tier: 'act',
     args: [
       project,
       { name: 'source', type: 'string', description: 'An image file or an http(s) address' },
       { name: 'color', type: 'string', description: 'A solid fill, any CSS colour' },
-      { name: 'gradient', type: 'string', description: 'Comma-separated colours, first to last' },
+      { name: 'gradient', type: 'string', description: 'Comma-separated colours, first to last, each with an optional position: "#000 0%, #335 60%, #fff"' },
+      { name: 'style', type: 'string', description: 'Gradient style: linear (the default), radial (from the centre out), angle (a sweep around the centre), reflected (mirrored from the centre line) or diamond' },
       { name: 'angle', type: 'number', description: 'Gradient direction in degrees: 0 left to right, 90 top to bottom' },
       { name: 'fit', type: 'string', description: 'For a picture: contain (inside the canvas, the default), cover (fill it), none (its own size) or stretch' },
       ...placement,
@@ -338,12 +339,13 @@ export const canvasCommands: readonly OsCommand[] = [
     id: 'canvas.setEffects',
     title: 'Change layer effects',
     description:
-      'Add, change, hide or remove layer effects on a picture, text or shape layer: stroke, shadow (drop shadow), innerShadow, outerGlow, innerGlow, colorOverlay. effects is JSON: per effect an object merged over what it has (or over its defaults), false to remove it, {"enabled": false} to hide it and keep its settings. Sizes and distances are layer pixels, angle is where the light comes from (90 is above), color is any CSS colour, opacity 0 to 1.',
+      'Add, change, hide or remove layer effects on a picture, text or shape layer: stroke, shadow (drop shadow), innerShadow, outerGlow, innerGlow, colorOverlay. effects is JSON: per effect an object merged over what it has (or over its defaults), false to remove it, {"enabled": false} to hide it and keep its settings. Sizes and distances are layer pixels, angle is where the light comes from (90 is above), color is any CSS colour, opacity 0 to 1. from copies another layer’s effects first (its layer style), replacing the layer’s own; effects then changes them further.',
     tier: 'act',
     args: [
       project,
       { name: 'layer', type: 'string', description: 'The layer (id or name)', required: true },
       { name: 'effects', type: 'string', description: 'JSON object, e.g. {"shadow": {"distance": 12, "blur": 24, "opacity": 0.4}, "stroke": false}' },
+      { name: 'from', type: 'string', description: 'A layer (id or name) whose effects to copy onto this one' },
       { name: 'clear', type: 'boolean', description: 'Remove every effect first' }
     ],
     run: async (args) => done((await canvas()).setEffects(args))

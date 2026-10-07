@@ -31,6 +31,8 @@ import {
   fitPicture,
   fontNameFrom,
   fractionFrom,
+  gradientStopsFrom,
+  gradientStyleFrom,
   guideAxisFrom,
   holeBox,
   jsonObject,
@@ -51,8 +53,10 @@ import {
 import { autoAdjustState } from './auto-adjust.ts'
 import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
 import { AUTO_LABELS } from './engine/auto-levels.ts'
+import { paintGradient } from './engine/fill.ts'
 import { checkFilter, FILTER_NAMES } from './engine/filters.ts'
 import { pixelToDocument } from './engine/geometry.ts'
+import { type ColourStop, type Gradient, type GradientStyle, gradientTable, lineAcross } from './engine/gradient.ts'
 import { guideNear, layoutGuides, onCanvas, positionFrom, withGuides, withoutGuides } from './engine/guides.ts'
 import { coverageReader } from './engine/sampling.ts'
 import { filterArea, filterTargetArea, mixInto } from './filter-run.ts'
@@ -76,7 +80,7 @@ import {
   setClipped,
   withLayer
 } from './engine/document.ts'
-import { EFFECT_NAMES, withoutKnownEffects } from './engine/layer-effects.ts'
+import { EFFECT_NAMES, knownEffects, withEffectsFrom, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, withMaskAction } from './engine/masks.ts'
 import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, readPicture, saveProject, toRaster } from './engine/project.ts'
 import { Raster, type Rect, resample } from './engine/raster.ts'
@@ -222,26 +226,35 @@ export function parseColor(input: unknown): [number, number, number, number] {
   return [r, g, b, a]
 }
 
-/** A linear gradient filling a box, at an angle in degrees (0 runs left to right, 90 top to bottom). */
-export function gradientRaster(width: number, height: number, stops: string[], angle = 90): Raster {
-  if (stops.length < 2) {
-    throw new Error('A gradient needs at least two colours, like "#ff0000,#0000ff"')
-  }
+/**
+ * A gradient filling a box: colours with optional positions as text ("#000 0%, #fff 70%"), in a
+ * style, at an angle in degrees (0 runs left to right, 90 top to bottom).
+ */
+export function gradientRaster(width: number, height: number, text: string, style: GradientStyle = 'linear', angle = 90): Raster {
+  const stops = gradientStopsFrom(text).map((entry) => ({ at: entry.at, rgba: parseColor(entry.colour) }))
+  const shows = (entry: (typeof stops)[number]) => entry.rgba[3] > 0
+  const rgb = (entry: (typeof stops)[number]): [number, number, number] => [entry.rgba[0], entry.rgba[1], entry.rgba[2]]
+  const colours: ColourStop[] = []
 
-  const canvas = new OffscreenCanvas(width, height)
-  const context = canvas.getContext('2d', { willReadFrequently: true })!
-  const r = (angle * Math.PI) / 180
-  const half = (Math.abs(width * Math.cos(r)) + Math.abs(height * Math.sin(r))) / 2
-  const [cx, cy] = [width / 2, height / 2]
-  const gradient = context.createLinearGradient(cx - Math.cos(r) * half, cy - Math.sin(r) * half, cx + Math.cos(r) * half, cy + Math.sin(r) * half)
-  stops.forEach((stop, i) => {
-    const [cr, cg, cb, ca] = parseColor(stop)
-    gradient.addColorStop(i / (stops.length - 1), `rgba(${cr}, ${cg}, ${cb}, ${ca / 255})`)
+  // A clear stop mixes towards the colours either side of it, as CSS mixes, so a fade keeps its colour.
+  stops.forEach((entry, i) => {
+    if (shows(entry)) {
+      colours.push({ at: entry.at, colour: rgb(entry), mid: 0.5 })
+
+      return
+    }
+
+    const before = stops.slice(0, i).reverse().find(shows) ?? stops.slice(i + 1).find(shows) ?? entry
+    const after = stops.slice(i + 1).find(shows) ?? before
+    colours.push({ at: entry.at, colour: rgb(before), mid: 0.5 }, { at: entry.at, colour: rgb(after), mid: 0.5 })
   })
-  context.fillStyle = gradient
-  context.fillRect(0, 0, width, height)
 
-  return new Raster(width, height, 4, context.getImageData(0, 0, width, height).data)
+  const gradient: Gradient = { name: 'Gradient', colours, opacities: stops.map((entry) => ({ at: entry.at, opacity: entry.rgba[3] / 255, mid: 0.5 })) }
+  const raster = new Raster(width, height)
+  const line = lineAcross(style, { x: 0, y: 0, width, height }, angle)
+  paintGradient(raster, raster.bounds, pixelToDocument(defaultTransform(width, height), width, height), { ...line, table: gradientTable(gradient, [0, 0, 0], [255, 255, 255]) }, () => 1)
+
+  return raster
 }
 
 /** An image for a layer: a file, an http(s) address, or a data: URL. */
@@ -420,7 +433,7 @@ export async function addLayer(args: Record<string, unknown>): Promise<Outcome> 
     layer = pixelLayer(name, raster, defaultTransform(box.width, box.height, box.x, box.y))
   } else if (typeof args.gradient === 'string' && args.gradient.trim()) {
     const box = fillBox(canvas, args)
-    const raster = gradientRaster(box.width, box.height, args.gradient.split(/\s*,\s*/).filter(Boolean), finite(args.angle) ?? 90)
+    const raster = gradientRaster(box.width, box.height, args.gradient, gradientStyleFrom(args.style), finite(args.angle) ?? 90)
     layer = pixelLayer(typeof args.name === 'string' && args.name.trim() ? args.name.trim() : nextName(state, 'Gradient'), raster, defaultTransform(box.width, box.height, box.x, box.y))
   } else if (args.color !== undefined && args.color !== '') {
     const box = fillBox(canvas, args)
@@ -666,13 +679,20 @@ export async function setEffects(args: Record<string, unknown>): Promise<Outcome
 
   const patch = jsonObject(args.effects, 'effects', '{"shadow": {"distance": 12, "blur": 24, "opacity": 0.4}, "stroke": false}')
   const clear = args.clear === true
+  const source = args.from === undefined || args.from === null || args.from === '' ? null : findByRef(on.doc.state, args.from)
 
-  if (!Object.keys(patch).length && !clear) {
-    throw new Error('Say which effects: effects={"shadow": {...}}, or clear=true to remove them all')
+  if (source && !knownEffects(source.effects)) {
+    throw new Error(`${source.name} has no effects to copy`)
   }
 
-  const effects = effectsWith(clear ? withoutKnownEffects(layer.effects) : layer.effects, patch, readColour)
-  await apply(on, 'Layer Effects', withLayer(on.doc.state, layer.id, { effects }))
+  if (!Object.keys(patch).length && !clear && !source) {
+    throw new Error('Say which effects: effects={"shadow": {...}}, from=a layer whose effects to copy, or clear=true to remove them all')
+  }
+
+  // Copied effects replace the layer's own; effects= then changes them further.
+  const base = source ? withEffectsFrom(layer.effects, source.effects) : clear ? withoutKnownEffects(layer.effects) : layer.effects
+  const effects = effectsWith(base, patch, readColour)
+  await apply(on, source ? 'Paste Layer Style' : 'Layer Effects', withLayer(on.doc.state, layer.id, { effects }))
   const what = (value: unknown): string => {
     if (value === false || value === null) {
       return 'removed'
@@ -685,7 +705,7 @@ export async function setEffects(args: Record<string, unknown>): Promise<Outcome
   const changed = Object.keys(patch).map((name) => `${EFFECT_NAMES[effectKindFrom(name)]} ${what(patch[name])}`)
 
   return {
-    summary: `${layer.name}: ${[...(clear ? ['effects cleared'] : []), ...changed].join(', ')}`,
+    summary: `${layer.name}: ${[...(source ? [`effects copied from ${source.name}`] : clear ? ['effects cleared'] : []), ...changed].join(', ')}`,
     data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) }
   }
 }

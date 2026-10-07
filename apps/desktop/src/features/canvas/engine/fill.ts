@@ -1,11 +1,12 @@
 /*
  * Fills for Herald Canvas: finding the pixels like a clicked one (the paint bucket and the magic
- * wand), and laying a colour, a gradient or transparency into a layer's pixels with a strength for
- * each pixel (the selection, the found area and the tool's opacity together). Masks take gray.
+ * wand), and laying a colour, a gradient (see gradient.ts) or transparency into a layer's pixels
+ * with a strength for each pixel (the selection, the found area and the tool's opacity together).
+ * Masks take gray.
  */
 
-import type { Vec2 } from '../../../../shared/canvas/comp-format.ts'
 import type { Mat } from './geometry.ts'
+import { type GradientLine, gradientPosition, TABLE_SIZE } from './gradient.ts'
 import { Raster, type Rect } from './raster.ts'
 
 export type RGBA = [number, number, number, number]
@@ -171,28 +172,9 @@ export function eraseRaster(raster: Raster, area: Rect, strength: Strength): voi
   raster.touch(area)
 }
 
-export interface GradientSpec {
-  kind: 'linear' | 'radial'
-  /** Document points: where the first colour is, and where the last one is reached. */
-  from: Vec2
-  to: Vec2
-  start: RGBA
-  end: RGBA
-}
-
-/** Where a document point falls along a gradient, 0 to 1. */
-export function gradientPosition(spec: GradientSpec, x: number, y: number): number {
-  const dx = spec.to[0] - spec.from[0]
-  const dy = spec.to[1] - spec.from[1]
-  const length = dx * dx + dy * dy
-
-  if (!length) {
-    return 1
-  }
-
-  const t = spec.kind === 'radial' ? Math.sqrt(((x - spec.from[0]) ** 2 + (y - spec.from[1]) ** 2) / length) : ((x - spec.from[0]) * dx + (y - spec.from[1]) * dy) / length
-
-  return Math.max(0, Math.min(1, t))
+export interface GradientSpec extends GradientLine {
+  /** The colours along it, from `gradientTable`. */
+  table: Float32Array
 }
 
 /** A 4×4 ordered dither, so long gradients do not band. */
@@ -200,11 +182,8 @@ const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value)
 
 /** Lay a gradient into an area of a raster placed by `toDocument`, each pixel by its strength. */
 export function paintGradient(raster: Raster, area: Rect, toDocument: Mat, spec: GradientSpec, strength: Strength): void {
-  const { start, end } = spec
-  // Mixed with colour times alpha, so a fade to transparency keeps its colour.
-  const premultiplied = (colour: RGBA) => [(colour[0] * colour[3]) / 255, (colour[1] * colour[3]) / 255, (colour[2] * colour[3]) / 255, colour[3]]
-  const from = premultiplied(start)
-  const to = premultiplied(end)
+  const { table } = spec
+  const last = TABLE_SIZE - 1
 
   for (let y = area.y; y < area.y + area.height; y++) {
     for (let x = area.x; x < area.x + area.width; x++) {
@@ -216,11 +195,14 @@ export function paintGradient(raster: Raster, area: Rect, toDocument: Mat, spec:
 
       const dx = toDocument.a * (x + 0.5) + toDocument.c * (y + 0.5) + toDocument.e
       const dy = toDocument.b * (x + 0.5) + toDocument.d * (y + 0.5) + toDocument.f
-      const t = gradientPosition(spec, dx, dy)
+      // Between two entries of the table, mixed, so even a long gradient steps smoothly.
+      const at = gradientPosition(spec, dx, dy) * last
+      const entry = Math.min(last - 1, Math.floor(at))
+      const k = at - entry
+      const o = entry * 4
       const dither = BAYER[(y & 3) * 4 + (x & 3)]
-      const a = Math.max(0, Math.min(255, from[3] + (to[3] - from[3]) * t + dither))
-      const mix = (channel: number) => (a > 0 ? Math.max(0, Math.min(255, ((from[channel] + (to[channel] - from[channel]) * t) * 255) / Math.max(a, 1e-6) + dither)) : 0)
-      lay(raster, y * raster.width + x, mix(0), mix(1), mix(2), a, Math.min(1, amount))
+      const channel = (c: number) => Math.max(0, Math.min(255, table[o + c] + (table[o + 4 + c] - table[o + c]) * k + dither))
+      lay(raster, y * raster.width + x, channel(0), channel(1), channel(2), channel(3), Math.min(1, amount))
     }
   }
 

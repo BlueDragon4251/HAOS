@@ -1,12 +1,13 @@
 /*
  * The Paint Bucket (the foreground colour into the pixels like the clicked one, inside the
- * selection) and the Gradient (a drag from where the foreground starts to where the background,
- * or transparency, is reached; Shift keeps the line to 45° steps). Both work on the active layer
- * or its mask, as one undo step.
+ * selection) and the Gradient (a drag from where the gradient starts to where it ends, in the
+ * style and colours the options bar sets; Shift keeps the line to 45° steps). Both work on the
+ * active layer or its mask, as one undo step.
  */
 
 import type { Vec2 } from '../../../../shared/canvas/comp-format.ts'
-import { fillRaster, paintGradient, type RGBA, similarPixels } from '../engine/fill.ts'
+import { fillRaster, paintGradient, similarPixels } from '../engine/fill.ts'
+import { gradientTable } from '../engine/gradient.ts'
 import { PixelEdit } from '../engine/history.ts'
 import { Raster } from '../engine/raster.ts'
 import { coverageReader } from '../engine/sampling.ts'
@@ -103,14 +104,7 @@ export const gradientTool: ToolHandler = {
           return
         }
 
-        const { kind, toTransparent, reverse, opacity } = $gradient.get()
-        const foreground: RGBA = [...$foreground.get(), 255]
-        let ends: [RGBA, RGBA] = [foreground, toTransparent ? [...$foreground.get(), 0] : [...$background.get(), 255]]
-
-        if (reverse) {
-          ends = [ends[1], ends[0]]
-        }
-
+        const { style, gradient, reverse, opacity } = $gradient.get()
         const before = doc.state
         const selection = doc.state.selection
         const area = targetArea(target, selection?.opaqueBounds() ?? null)
@@ -121,7 +115,8 @@ export const gradientTool: ToolHandler = {
 
         const edit = new PixelEdit(target.raster)
         edit.prepare(area)
-        paintGradient(target.raster, area, target.toDocument, { kind, from: drawn.from, to: drawn.to, start: ends[0], end: ends[1] }, selectionStrength(target, selection, opacity))
+        const table = gradientTable(gradient, $foreground.get(), $background.get(), reverse)
+        paintGradient(target.raster, area, target.toDocument, { style, from: drawn.from, to: drawn.to, table }, selectionStrength(target, selection, opacity))
         commitPixels(doc, before, target, edit, 'Gradient')
       },
       cancel: () => {

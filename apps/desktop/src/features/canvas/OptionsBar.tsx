@@ -41,6 +41,8 @@ import { cannotSegment } from './ai/subject.ts'
 import { ALIGN_LABELS, type AlignEdge, type AlignTo, DISTRIBUTE_LABELS, type DistributeMode } from './engine/align.ts'
 import { $dialog } from './menus.ts'
 import { CROP_RATIO_LABELS, CROP_RATIOS, type CropRatio } from './engine/crop.ts'
+import { GRADIENT_STYLE_LABELS, GRADIENT_STYLES } from './engine/gradient.ts'
+import { GradientField, stylePreview } from './GradientEditor.tsx'
 import { $crop, $cropOptions, $straighten, applyCrop, cancelCrop, cropAngle, cropRect, setCropOptions } from './tools/crop.ts'
 import { warmObjectSelect } from './tools/object-select.ts'
 import {
@@ -580,23 +582,12 @@ export function OptionsBar({ doc }: { doc: CanvasDocument }) {
       )}
       {tool === 'gradient' && (
         <>
+          <GradientField />
           <Segmented
-            label="Gradient"
-            value={gradient.kind}
-            onChange={(kind) => patch($gradient, { kind })}
-            options={[
-              { id: 'linear', label: 'Linear' },
-              { id: 'radial', label: 'Radial' }
-            ]}
-          />
-          <Segmented
-            label="Colours"
-            value={gradient.toTransparent ? 'transparent' : 'background'}
-            onChange={(value) => patch($gradient, { toTransparent: value === 'transparent' })}
-            options={[
-              { id: 'background', label: 'To background' },
-              { id: 'transparent', label: 'To transparent' }
-            ]}
+            label="Gradient style"
+            value={gradient.style}
+            onChange={(style) => patch($gradient, { style })}
+            options={GRADIENT_STYLES.map((style) => ({ id: style, label: GRADIENT_STYLE_LABELS[style], icon: <img src={stylePreview(style)} alt="" className="size-3.5 rounded-[2px]" /> }))}
           />
           <button
             type="button"

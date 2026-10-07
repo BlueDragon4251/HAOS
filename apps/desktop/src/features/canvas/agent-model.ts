@@ -28,6 +28,7 @@ import { fitRatio, largestTurnedBox, ratioFrom } from './engine/crop.ts'
 import type { FilterKind } from './engine/filters.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
+import { GRADIENT_STYLES, type GradientStyle } from './engine/gradient.ts'
 import type { HistoryStep } from './engine/history.ts'
 import { MASK_ACTIONS, type MaskAction } from './engine/masks.ts'
 import type { Rect } from './engine/raster.ts'
@@ -319,6 +320,88 @@ export function fillBox(canvas: { width: number; height: number }, args: Record<
   const y = finite(args.y) ?? 0
 
   return { x, y, width: Math.max(1, Math.round(finite(args.width) ?? canvas.width - x)), height: Math.max(1, Math.round(finite(args.height) ?? canvas.height - y)) }
+}
+
+/**
+ * A gradient written as text: colours first to last, each with an optional position ("#ff8800
+ * 30%"), split at commas outside brackets so rgba() colours work. As in CSS, the ends default to 0%
+ * and 100%, stops without a position share the space between their neighbours evenly, and a stop
+ * placed before the one ahead of it moves up to it.
+ */
+export function gradientStopsFrom(text: string): { colour: string; at: number }[] {
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '(') {
+      depth++
+    } else if (text[i] === ')') {
+      depth = Math.max(0, depth - 1)
+    } else if (text[i] === ',' && !depth) {
+      parts.push(text.slice(start, i))
+      start = i + 1
+    }
+  }
+
+  parts.push(text.slice(start))
+  const stops = parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [, colour, percent] = /^(.*?)(?:\s+(-?\d+(?:\.\d+)?)%)?$/.exec(part)!
+
+      if (percent !== undefined && (Number(percent) < 0 || Number(percent) > 100)) {
+        throw new Error(`Gradient positions go from 0% to 100%, not ${percent}% ("${part}")`)
+      }
+
+      return { colour: colour.trim(), at: percent === undefined ? null : Number(percent) / 100 }
+    })
+
+  if (stops.length < 2) {
+    throw new Error('A gradient needs at least two colours, like "#ff0000, #0000ff", with positions if wanted: "#000 0%, #fff 70%"')
+  }
+
+  stops[0].at ??= 0
+  stops[stops.length - 1].at ??= 1
+  let last = 0
+
+  for (let i = 0; i < stops.length; i++) {
+    if (stops[i].at === null) {
+      let next = i
+
+      while (stops[next].at === null) {
+        next++
+      }
+
+      const from = stops[i - 1].at!
+      const to = stops[next].at!
+
+      for (let k = i; k < next; k++) {
+        stops[k].at = from + ((to - from) * (k - i + 1)) / (next - i + 1)
+      }
+    }
+
+    stops[i].at = Math.max(last, stops[i].at!)
+    last = stops[i].at!
+  }
+
+  return stops as { colour: string; at: number }[]
+}
+
+/** A gradient style however it was written; linear when none is given. */
+export function gradientStyleFrom(value: unknown): GradientStyle {
+  if (value === undefined || value === null || value === '') {
+    return 'linear'
+  }
+
+  const style = String(value).trim().toLowerCase()
+
+  if (!(GRADIENT_STYLES as readonly string[]).includes(style)) {
+    throw new Error(`A gradient's style is ${GRADIENT_STYLES.join(', ')}, not "${String(value)}"`)
+  }
+
+  return style as GradientStyle
 }
 
 /** A blend mode however it was written ("soft light", "SoftLight", "Linear Dodge (Add)"). */

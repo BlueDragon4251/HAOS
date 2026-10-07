@@ -32,7 +32,7 @@ import { AUTO_LABELS, type AutoMode } from './engine/auto-levels.ts'
 import { ALIGN_LABELS, type AlignEdge, type AlignTo, alignState, automaticTarget, DISTRIBUTE_LABELS, type DistributeMode, distributeState, movableLayers } from './engine/align.ts'
 import { apply, boundsOf, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
 import { visibleEffects } from './engine/gpu/effects.ts'
-import { EFFECT_NAMES, withAllShown, withEffect, withoutKnownEffects } from './engine/layer-effects.ts'
+import { EFFECT_NAMES, effectKinds, knownEffects, takesEffects, withAllShown, withEffect, withEffectsFrom, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
 import { flatten, readPicture } from './engine/project.ts'
 import { clipRect, Raster, type Rect, unionRect } from './engine/raster.ts'
@@ -204,7 +204,54 @@ export function setEffect<K extends EffectKind>(doc: CanvasDocument, layer: Canv
 /** Every effect on the layer hidden or shown, settings kept. */
 export const showEffects = (doc: CanvasDocument, layer: CanvasLayer, shown: boolean): void => setLayer(doc, layer.id, { effects: withAllShown(layer.effects, shown) }, shown ? 'Show Layer Effects' : 'Hide Layer Effects')
 
-export const clearEffects = (doc: CanvasDocument, layer: CanvasLayer): void => setLayer(doc, layer.id, { effects: withoutKnownEffects(layer.effects) }, 'Clear Layer Effects')
+/** What Copy Layer Style took, for Paste Layer Style in any open document. */
+let copiedStyle: LayerEffects | null = null
+
+export const hasCopiedStyle = (): boolean => copiedStyle !== null
+
+export function copyLayerStyle(doc: CanvasDocument): void {
+  const layer = doc.active
+  const effects = knownEffects(layer?.effects)
+
+  if (layer && effects) {
+    copiedStyle = effects
+    notify(`Copied the layer style of ${layer.name}`)
+  }
+}
+
+/** The copied effects onto every picked layer that takes effects, replacing theirs, as one step. */
+export function pasteLayerStyle(doc: CanvasDocument): void {
+  const targets = doc.picked.filter(takesEffects)
+
+  if (!copiedStyle || !targets.length) {
+    return
+  }
+
+  let state = doc.state
+
+  for (const layer of targets) {
+    state = withLayer(state, layer.id, { effects: withEffectsFrom(layer.effects, copiedStyle) })
+  }
+
+  doc.commit('Paste Layer Style', state)
+}
+
+/** Every picked layer's effects gone, as one step. */
+export function clearLayerStyle(doc: CanvasDocument): void {
+  const targets = doc.picked.filter((layer) => effectKinds(layer.effects).length > 0)
+
+  if (!targets.length) {
+    return
+  }
+
+  let state = doc.state
+
+  for (const layer of targets) {
+    state = withLayer(state, layer.id, { effects: withoutKnownEffects(layer.effects) })
+  }
+
+  doc.commit('Clear Layer Style', state)
+}
 
 export function deleteMask(doc: CanvasDocument): void {
   const active = doc.active

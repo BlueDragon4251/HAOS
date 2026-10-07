@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { defaultTransform } from '../../../../shared/canvas/comp-format.ts'
-import { eraseRaster, fillRaster, gradientPosition, paintGradient, similarPixels } from './fill.ts'
+import { eraseRaster, fillRaster, paintGradient, similarPixels } from './fill.ts'
 import { pixelToDocument } from './geometry.ts'
+import { GRADIENT_PRESETS, gradientPosition, gradientTable } from './gradient.ts'
 import { History } from './history.ts'
 import { dabAlpha, DabPlacer, Smoother, Stroke } from './paint.ts'
 import { Raster } from './raster.ts'
@@ -152,12 +153,13 @@ describe('fills', () => {
   })
 
   it('lays linear and radial gradients', () => {
-    const spec = { kind: 'linear' as const, from: [0, 0] as [number, number], to: [100, 0] as [number, number], start: [0, 0, 0, 255] as [number, number, number, number], end: [255, 255, 255, 255] as [number, number, number, number] }
-    expect(gradientPosition(spec, 50, 30)).toBeCloseTo(0.5)
-    expect(gradientPosition(spec, -10, 0)).toBe(0)
-    expect(gradientPosition({ ...spec, kind: 'radial' }, 0, 50)).toBeCloseTo(0.5)
+    const line = { style: 'linear' as const, from: [0, 0] as [number, number], to: [100, 0] as [number, number] }
+    expect(gradientPosition(line, 50, 30)).toBeCloseTo(0.5)
+    expect(gradientPosition(line, -10, 0)).toBe(0)
+    expect(gradientPosition({ ...line, style: 'radial' }, 0, 50)).toBeCloseTo(0.5)
     const raster = new Raster(100, 1)
-    paintGradient(raster, { x: 0, y: 0, width: 100, height: 1 }, identity(raster), { ...spec, end: [0, 0, 0, 0] }, () => 1)
+    const fade = GRADIENT_PRESETS.find((preset) => preset.name === 'Foreground to Transparent')!
+    paintGradient(raster, { x: 0, y: 0, width: 100, height: 1 }, identity(raster), { ...line, table: gradientTable(fade, [0, 0, 0], [255, 255, 255]) }, () => 1)
     // A fade to transparency keeps its colour as it goes.
     expect(pixel(raster, 0, 0)[3]).toBeGreaterThan(250)
     expect(Math.abs(pixel(raster, 50, 0)[3] - 127)).toBeLessThan(3)

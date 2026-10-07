@@ -17,6 +17,8 @@ import {
   fitPicture,
   fontNameFrom,
   fractionFrom,
+  gradientStopsFrom,
+  gradientStyleFrom,
   holeBox,
   jsonObject,
   lineEnds,
@@ -109,6 +111,32 @@ describe('fillBox', () => {
     expect(fillBox(canvas, {})).toEqual({ x: 0, y: 0, width: 1080, height: 1350 })
     expect(fillBox(canvas, { y: 500, height: 850 })).toEqual({ x: 0, y: 500, width: 1080, height: 850 })
     expect(fillBox(canvas, { x: 72, y: 1180, width: 240, height: 8 })).toEqual({ x: 72, y: 1180, width: 240, height: 8 })
+  })
+})
+
+describe('gradient arguments', () => {
+  it('reads colours with and without positions, commas inside brackets kept', () => {
+    expect(gradientStopsFrom('#000, rgba(0, 0, 0, 0.5) 40%, white')).toEqual([
+      { colour: '#000', at: 0 },
+      { colour: 'rgba(0, 0, 0, 0.5)', at: 0.4 },
+      { colour: 'white', at: 1 }
+    ])
+  })
+
+  it('shares the space between known positions, as CSS does, and keeps stops in order', () => {
+    expect(gradientStopsFrom('red 10%, orange, yellow, green 70%, blue').map((stop) => stop.at)).toEqual([0.1, 0.3, 0.5, 0.7, 1])
+    expect(gradientStopsFrom('red 60%, blue 20%').map((stop) => stop.at)).toEqual([0.6, 0.6])
+  })
+
+  it('wants two colours and positions from 0% to 100%', () => {
+    expect(() => gradientStopsFrom('#fff')).toThrow(/two colours/)
+    expect(() => gradientStopsFrom('#fff, #000 120%')).toThrow(/0% to 100%/)
+  })
+
+  it('reads a style however it is written', () => {
+    expect(gradientStyleFrom(undefined)).toBe('linear')
+    expect(gradientStyleFrom(' Diamond ')).toBe('diamond')
+    expect(() => gradientStyleFrom('conic')).toThrow(/linear, radial, angle, reflected, diamond/)
   })
 })
 

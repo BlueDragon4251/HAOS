@@ -8,6 +8,7 @@
 import { atom, type WritableAtom } from 'nanostores'
 import type { TextAlignment } from '../../../../shared/canvas/comp-format.ts'
 import type { AlignTo } from '../engine/align.ts'
+import { type Gradient, GRADIENT_PRESETS, type GradientStyle } from '../engine/gradient.ts'
 import type { SelectionMode } from '../engine/selection.ts'
 
 export type ToolId =
@@ -159,7 +160,14 @@ export const $objectSelect = atom({ allLayers: false })
 /** Spot Healing Brush: the brush's diameter in document pixels. */
 export const $heal = atom({ size: 40 })
 export const $bucket = atom({ tolerance: 32, contiguous: true, allLayers: false, opacity: 1 })
-export const $gradient = atom({ kind: 'linear' as 'linear' | 'radial', toTransparent: false, reverse: false, opacity: 1 })
+export interface GradientOptions {
+  style: GradientStyle
+  gradient: Gradient
+  reverse: boolean
+  opacity: number
+}
+
+export const $gradient = atom<GradientOptions>({ style: 'linear', gradient: GRADIENT_PRESETS[0], reverse: false, opacity: 1 })
 export const $eyedropper = atom({ allLayers: true })
 
 export type ShapeTool = 'rectangle' | 'rounded' | 'ellipse' | 'line'

@@ -60,3 +60,21 @@ export function withoutKnownEffects(effects: LayerEffects | undefined): LayerEff
 
   return next
 }
+
+/** The effects this version knows, copied out of a layer's (for Copy Layer Style); undefined when it has none. */
+export function knownEffects(effects: LayerEffects | undefined): LayerEffects | undefined {
+  const kinds = effectKinds(effects)
+
+  return kinds.length ? Object.fromEntries(kinds.map((kind) => [kind, { ...effects![kind] }])) : undefined
+}
+
+/** A layer's effects replaced by copied ones (Paste Layer Style); what other apps wrote on the layer stays. */
+export function withEffectsFrom(effects: LayerEffects | undefined, copied: LayerEffects | undefined): LayerEffects | undefined {
+  let next = withoutKnownEffects(effects)
+
+  for (const kind of effectKinds(copied)) {
+    next = withEffect(next, kind, { ...copied![kind] } as LayerEffects[typeof kind])
+  }
+
+  return next
+}

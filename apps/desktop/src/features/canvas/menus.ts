@@ -15,15 +15,18 @@ import {
   alignPicked,
   arrange,
   autoAdjust,
-  clearEffects,
+  clearLayerStyle,
+  copyLayerStyle,
   deletePicked,
   distributePicked,
   duplicatePicked,
   flattenImage,
   groupPicked,
+  hasCopiedStyle,
   maskAction,
   mergeDown,
   mergeTarget,
+  pasteLayerStyle,
   setEffect,
   showEffects,
   toggleClipping,
@@ -208,7 +211,9 @@ const EFFECT_ITEMS: CanvasCommand[] = [
       }
     })
   },
-  { id: 'effects-clear', label: 'Clear Layer Effects', needsDocument: true, enabled: (doc) => effectKinds(doc.active?.effects).length > 0, run: onDoc((doc) => doc.active && clearEffects(doc, doc.active)) }
+  { id: 'style-copy', label: 'Copy Layer Style', needsDocument: true, enabled: (doc) => effectKinds(doc.active?.effects).length > 0, dividerBefore: true, run: onDoc((doc) => copyLayerStyle(doc)) },
+  { id: 'style-paste', label: 'Paste Layer Style', needsDocument: true, enabled: (doc) => hasCopiedStyle() && doc.picked.some(takesEffects), run: onDoc((doc) => pasteLayerStyle(doc)) },
+  { id: 'effects-clear', label: 'Clear Layer Style', needsDocument: true, enabled: (doc) => doc.picked.some((layer) => effectKinds(layer.effects).length > 0), run: onDoc((doc) => clearLayerStyle(doc)) }
 ]
 
 const ALIGN_ITEMS: CanvasCommand[] = ALIGN_EDGES.map((edge, i) => ({
@@ -380,7 +385,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'ungroup', label: 'Ungroup', keys: 'mod+shift+g', needsDocument: true, enabled: (doc) => Boolean(doc.active?.isGroup), run: onDoc(ungroupActive) },
       { id: 'mask', label: 'Add Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active && !doc.active.mask), run: onDoc((doc) => addMask(doc)), dividerBefore: true },
       { id: 'layer-mask', label: 'Layer Mask', needsDocument: true, enabled: hasLayer, run: nothing, submenu: MASK_ITEMS },
-      { id: 'layer-effects', label: 'Layer Effects', needsDocument: true, enabled: (doc) => takesEffects(doc.active), run: nothing, submenu: EFFECT_ITEMS },
+      { id: 'layer-effects', label: 'Layer Style', needsDocument: true, enabled: (doc) => doc.picked.some(takesEffects), run: nothing, submenu: EFFECT_ITEMS },
       {
         id: 'clip',
         label: (doc) => (doc?.active?.maskSourceID ? 'Release Clipping Mask' : 'Create Clipping Mask'),
