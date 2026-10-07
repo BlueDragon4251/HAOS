@@ -3,9 +3,12 @@
  * Hermes and placing pictures. No window, no I/O, so it is tested directly.
  */
 
-import { BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
+import { BLEND_MODES, type BlendMode, type ShapeKind, type TextAlignment, type Vec2 } from '../../../shared/canvas/comp-format.ts'
+import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
+import type { Rect } from './engine/raster.ts'
+import { postScriptName } from './engine/text.ts'
 
 /** A full path from what Hermes or the person typed (`~/…` works); trailing slashes go. */
 export function resolvePath(input: string, home: string): string {
@@ -86,7 +89,8 @@ export function describeLayer(state: DocState, layer: CanvasLayer): Record<strin
     ...(layer.maskSourceID ? { clippedTo: findLayer(state, layer.maskSourceID)?.name ?? layer.maskSourceID } : {}),
     ...(layer.mask ? { mask: layer.maskEnabled === false ? 'off' : 'on' } : {}),
     ...(layer.adjustment ? { adjustment: layer.adjustment.kind } : {}),
-    ...(layer.text ? { text: layer.text.content } : {})
+    ...(layer.text ? { text: layer.text.content, font: layer.text.fontName, size: layer.text.fontSize, align: layer.text.alignment.toLowerCase() } : {}),
+    ...(layer.shape ? { shape: layer.shape.kind === 'Rectangle' && layer.shape.cornerRadius > 0 ? 'rounded rectangle' : layer.shape.kind.toLowerCase() } : {})
   }
 }
 
@@ -173,6 +177,193 @@ export function opacityFrom(value: unknown): number | undefined {
   const number = finite(value)
 
   return number === undefined ? undefined : Math.max(0, Math.min(1, number > 1 ? number / 100 : number))
+}
+
+const words = (value: unknown): string => String(value ?? '').trim().toLowerCase()
+
+/** Text alignment however it was written ("centre", "middle", "right"); undefined when not given. */
+export function alignFrom(value: unknown): TextAlignment | undefined {
+  const text = words(value)
+
+  if (!text) {
+    return undefined
+  }
+
+  if (['left', 'start'].includes(text)) {
+    return 'Left'
+  }
+
+  if (['center', 'centre', 'middle'].includes(text)) {
+    return 'Center'
+  }
+
+  if (['right', 'end'].includes(text)) {
+    return 'Right'
+  }
+
+  throw new Error('align is left, center or right')
+}
+
+/** A shape kind however it was written: a rectangle (rect, square, box), a rounded one, an ellipse (circle, oval) or a line. */
+export function shapeKindFrom(value: unknown): { kind: ShapeKind; rounded: boolean } {
+  const text = words(value).replace(/[\s_-]+/g, ' ')
+
+  if (['rectangle', 'rect', 'square', 'box'].includes(text)) {
+    return { kind: 'Rectangle', rounded: false }
+  }
+
+  if (['rounded', 'rounded rectangle', 'rounded rect', 'round rect', 'pill'].includes(text)) {
+    return { kind: 'Rectangle', rounded: true }
+  }
+
+  if (['ellipse', 'circle', 'oval'].includes(text)) {
+    return { kind: 'Ellipse', rounded: false }
+  }
+
+  if (['line', 'rule', 'stroke'].includes(text)) {
+    return { kind: 'Line', rounded: false }
+  }
+
+  throw new Error('kind is rectangle, rounded, ellipse or line')
+}
+
+/** Style words at the end of a font name ("Avenir Next Bold Italic") and the weights they stand for. */
+const FONT_STYLES: [RegExp, number][] = [
+  [/^(thin|hairline)$/, 100],
+  [/^(extra ?light|ultra ?light)$/, 200],
+  [/^light$/, 300],
+  [/^(regular|normal|book|plain)$/, 400],
+  [/^medium$/, 500],
+  [/^(semi ?bold|demi ?bold)$/, 600],
+  [/^bold$/, 700],
+  [/^(extra ?bold|ultra ?bold)$/, 800],
+  [/^(black|heavy)$/, 900]
+]
+
+/**
+ * A font as the format keeps it (a PostScript-style name) from what was written: a PostScript
+ * name as it is ("HelveticaNeue-Bold"), or a family with style words after it ("Avenir Next
+ * Bold Italic", "Georgia").
+ */
+export function fontNameFrom(value: unknown, fallback = 'Helvetica'): string {
+  const text = String(value ?? '').trim()
+
+  if (!text) {
+    return fallback
+  }
+
+  if (!/\s/.test(text)) {
+    return text
+  }
+
+  const parts = text.split(/\s+/)
+  let weight = 400
+  let italic = false
+
+  // Style words come off the end ("Extra Bold" is two of them).
+  for (;;) {
+    const last = parts.at(-1)?.toLowerCase() ?? ''
+    const two = parts.length > 2 ? `${parts.at(-2)!.toLowerCase()} ${last}` : ''
+    const pair = FONT_STYLES.find(([pattern]) => two && pattern.test(two))
+    const single = FONT_STYLES.find(([pattern]) => pattern.test(last))
+
+    if (/^(italic|oblique)$/.test(last) && parts.length > 1) {
+      italic = true
+      parts.pop()
+    } else if (pair) {
+      weight = pair[1]
+      parts.splice(-2, 2)
+    } else if (single && parts.length > 1) {
+      weight = single[1]
+      parts.pop()
+    } else {
+      break
+    }
+  }
+
+  return postScriptName({ family: parts.join(' '), weight, italic })
+}
+
+/** An anchor however it was written ("top left", "top-left", "centre", "bottom"); the centre when not given. */
+export function anchorFrom(value: unknown): Anchor {
+  const text = words(value).replace(/[\s_]+/g, '-').replace('centre', 'center').replace('middle', 'center')
+
+  if (!text || text === 'center-center') {
+    return 'center'
+  }
+
+  const flipped = text.split('-').reverse().join('-')
+  const anchor = ANCHORS.find((entry) => entry === text || entry === flipped || entry === text.replace(/-?center-?/, ''))
+
+  if (!anchor) {
+    throw new Error(`anchor is one of: ${ANCHORS.join(', ')}`)
+  }
+
+  return anchor
+}
+
+export type ResizePlan = { kind: 'canvas'; width: number; height: number; anchor: Anchor } | { kind: 'image'; width: number; height: number; resample: boolean }
+
+/**
+ * What a resize asks for: with `scale`, or `image` true, the whole image scaled (one side alone
+ * keeps the proportions); otherwise the canvas grown or cut around `anchor`, layers untouched.
+ */
+export function resizePlan(state: { width: number; height: number }, args: Record<string, unknown>): ResizePlan {
+  const scale = finite(args.scale)
+  const width = finite(args.width)
+  const height = finite(args.height)
+
+  if (scale !== undefined) {
+    if (scale <= 0) {
+      throw new Error('scale must be above 0')
+    }
+
+    return { kind: 'image', width: Math.max(1, Math.round(state.width * scale)), height: Math.max(1, Math.round(state.height * scale)), resample: args.resample !== false }
+  }
+
+  if (width === undefined && height === undefined) {
+    throw new Error('Give width and height (pixels), or scale')
+  }
+
+  if (args.image === true) {
+    const w = width ?? (height! * state.width) / state.height
+    const h = height ?? (width! * state.height) / state.width
+
+    return { kind: 'image', width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)), resample: args.resample !== false }
+  }
+
+  return { kind: 'canvas', width: Math.max(1, Math.round(width ?? state.width)), height: Math.max(1, Math.round(height ?? state.height)), anchor: anchorFrom(args.anchor) }
+}
+
+/** The box a crop keeps: what is given, the rest of the canvas for what is not, cut to the canvas. */
+export function cropBox(state: { width: number; height: number }, args: Record<string, unknown>): Rect {
+  const x = Math.max(0, Math.round(finite(args.x) ?? 0))
+  const y = Math.max(0, Math.round(finite(args.y) ?? 0))
+  const width = Math.min(state.width - x, Math.round(finite(args.width) ?? state.width - x))
+  const height = Math.min(state.height - y, Math.round(finite(args.height) ?? state.height - y))
+
+  if (width < 1 || height < 1) {
+    throw new Error(`That box is outside the ${state.width}×${state.height} canvas`)
+  }
+
+  return { x, y, width, height }
+}
+
+/** A line's two ends from a box: it runs from (x, y) to (x + width, y + height). */
+export function lineEnds(args: Record<string, unknown>, canvas: { width: number; height: number }): [Vec2, Vec2] {
+  const x = finite(args.x) ?? 0
+  const y = finite(args.y) ?? canvas.height / 2
+  const width = finite(args.width) ?? canvas.width - x
+  const height = finite(args.height) ?? 0
+
+  if (!width && !height) {
+    throw new Error('A line needs a length: give width (across) and/or height (down)')
+  }
+
+  return [
+    [x, y],
+    [x + width, y + height]
+  ]
 }
 
 /** Settings over an adjustment's defaults: nested objects merge, the rest replaces. */

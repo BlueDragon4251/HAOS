@@ -1,15 +1,17 @@
 ---
 name: herald-canvas
-description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, plus the .comp project format and every adjustment setting
+description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, plus the .comp project format and every adjustment setting
 metadata:
   hermes:
-    tags: [herald-os, canvas, images, design, photo, poster, layers]
+    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography]
 ---
 
 # Herald Canvas
 
-Herald Canvas is the image editor built into Herald OS: layers, folders, masks, blend modes and
-adjustment layers, drawn on the GPU. Use it whenever the person wants a picture made or changed:
+Herald Canvas is the image editor built into Herald OS: layers, folders, masks, blend modes,
+adjustment layers, editable text and shapes, drawn on the GPU. The person has the usual tools too
+(selections, brush, fill, gradient, transform, crop). Use it whenever the person wants a picture
+made or changed:
 "make a poster for Saturday's gig", "warm this photo up", "put our logo on these", "make a
 YouTube thumbnail". They watch each change appear in the Canvas window, and every change is one
 step they can undo there (⌘Z, or `canvas action=undo`).
@@ -28,14 +30,30 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    - a gradient: `gradient="#00000000,#000000cc" angle=90 y=700 height=650` (a fade to dark at
      the bottom, under text).
    - an empty layer to group with others: no source, colour or gradient.
-3. **Arrange.** `set_layer layer="band" x=… y=… width=…` (one side alone keeps the proportions),
+3. **Words.** `add_text content="NIGHT\nMARKET" x=72 y=420 font="Helvetica Neue Bold" size=180
+   color="#ffffff"` makes a text layer the person can edit later (double-click it with the Type
+   tool). Point text: `x` is its left edge, or its centre with `align=center`, or its right edge
+   with `align=right`; `y` is its top. Give `width` for a paragraph that wraps inside a box from
+   `x`. `size` is pixels; `tracking` and `leading` add pixels between letters and lines (negative
+   tightens a big headline). Fonts are installed families with an optional style ("Avenir Next
+   Demi Bold", "Georgia Italic"); a missing font falls back to the system font, so check the
+   preview. `set_text layer="Headline" content=… color=…` changes it in place and keeps its size,
+   turn and position.
+4. **Shapes.** `add_shape kind=rounded x=72 y=900 width=936 height=300 color="#ff5a36"` (a
+   rectangle with `radius`, or `kind=rectangle`, `kind=ellipse` for circles and ovals, `kind=line`
+   from `x, y` by `width` across and `height` down, `lineWidth` thick). Panels behind text, rules,
+   badges and dots are shapes, not filled boxes: they stay crisp and editable.
+5. **Arrange.** `set_layer layer="band" x=… y=… width=…` (one side alone keeps the proportions),
    `rotation=-8`, `opacity=0.8`, `blend="Multiply"`, `order=top`, `visible=false`,
    `folder="Background"`. `group layers="band,glow" name="Hero"` makes a folder.
-4. **Grade.** `add_adjustment kind="Hue/Saturation" settings={"saturation": 20}`. An adjustment
+6. **Grade.** `add_adjustment kind="Hue/Saturation" settings={"saturation": 20}`. An adjustment
    changes everything below it; with `clip=true` only the layer right below.
-5. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
+7. **The canvas.** `resize width=1080 height=1920 anchor=top` grows or cuts the canvas around an
+   anchor (layers keep their pixels, so nothing is lost); `resize scale=0.5`, or `image=true` with
+   a width, scales everything instead. `crop x=0 y=135 width=1080 height=1080` keeps a box.
+8. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
    then fix what is off. Do this after every few steps on anything that matters.
-6. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
+9. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
    `quality=0.9`, `.webp`; `scale=0.5` for half size). Replacing a file needs `overwrite=true`,
    and the person is asked first. Projects save themselves after every change.
 
@@ -50,7 +68,9 @@ name wins).
   1280×720, A4 print 2480×3508 at 300 ppi, slide 1920×1080.
 - Keep a clear hierarchy: one focal image, at most two type sizes, generous margins (about 6% of
   the short side), and a limited palette pulled from the photo.
-- Put text on calm areas or over a gradient fade, and check contrast in the preview.
+- Put text on calm areas, over a gradient fade or on a shape panel, and check contrast in the
+  preview. Big headlines read best bold with tight tracking; body text wants a paragraph `width`
+  of about 60 characters and 1.2 to 1.4 line spacing.
 - Prefer adjustment layers to changing pixels: they stay editable, and the person can switch them
   off.
 - Name layers for what they are ("Headline", "Sky"), and folder related pieces.
@@ -63,8 +83,12 @@ canvas action=new name="Night market" width=1080 height=1350 background="#0d0d12
 canvas action=add_layer source="~/Pictures/market.jpg" fit=cover name="Photo"
 canvas action=add_adjustment kind="Color Balance" clip=true settings={"midCyanRed": 12, "midYellowBlue": -14, "highlightYellowBlue": -8}
 canvas action=add_layer gradient="#0d0d1200,#0d0d12f0" angle=90 y=650 height=700 name="Fade"
-canvas action=add_layer color="#ffb347" x=72 y=1180 width=240 height=8 name="Accent rule"
+canvas action=add_text content="NIGHT\nMARKET" x=72 y=700 font="Helvetica Neue Bold" size=168 leading=-24 tracking=2 color="#fff4e6" name="Headline"
+canvas action=add_shape kind=line x=72 y=1100 width=240 lineWidth=8 color="#ffb347" name="Accent rule"
+canvas action=add_shape kind=rounded x=72 y=1140 width=600 height=120 radius=24 color="#ffb347" name="Date panel"
+canvas action=add_text content="Saturday 9 November · 6 pm till late" x=104 y=1172 width=540 font="Helvetica Neue Medium" size=40 color="#0d0d12" name="Date"
 canvas action=preview
+canvas action=set_text layer="Headline" size=180
 canvas action=export to="~/Desktop/night-market.png"
 ```
 
@@ -155,5 +179,12 @@ Rules that matter (break one and the whole file is refused):
 - `maskSourceID` clips a layer to another; `adjustment` makes an adjustment layer (no
   `imageFile`; its record needs `kind`, `hue`, `saturation`, `lightness`, `colorize`, plus full
   `levels` and `curves`). Keep fields you do not understand exactly as they were.
+- A text or shape layer is a normal pixel layer (its PNG shows it) with a `text` record
+  (`content`, `fontName` as a PostScript name, `fontSize` in pixels, `red`/`green`/`blue` 0…1,
+  `alignment` Left, Center or Right, `tracking`, `leading`, and `boxSize` [width, height] for
+  paragraph text) or a `shape` record (`kind` Rectangle, Ellipse or Line, `red`/`green`/`blue`,
+  `cornerRadius`, and for lines `lineWidth` with `start` and `end` as fractions of the box). The
+  PNG must match the record, so prefer `add_text` and `add_shape`, which draw it; painting on such
+  a layer turns it into plain pixels.
 
 The same files open in Compositor on a Mac.

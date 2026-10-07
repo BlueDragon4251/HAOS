@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { defaultTransform } from '../../../shared/canvas/comp-format.ts'
-import { blendFrom, describeLayers, fillBox, findByRef, mergeSettings, opacityFrom, placementOf, resolvePath } from './agent-model.ts'
+import {
+  alignFrom,
+  anchorFrom,
+  blendFrom,
+  cropBox,
+  describeLayer,
+  describeLayers,
+  fillBox,
+  findByRef,
+  fontNameFrom,
+  lineEnds,
+  mergeSettings,
+  opacityFrom,
+  placementOf,
+  resizePlan,
+  resolvePath,
+  shapeKindFrom
+} from './agent-model.ts'
 import { blankLayer, type DocState, folderLayer, insertLayer, pixelLayer, setClipped } from './engine/document.ts'
 import { Raster } from './engine/raster.ts'
+import { textStyle } from './engine/text.ts'
 
 const build = () => {
   let state: DocState = { width: 1000, height: 800, resolution: 72, layers: [], activeLayerId: null, guides: [], selection: null }
@@ -99,5 +117,74 @@ describe('arguments', () => {
   it('merges nested adjustment settings over the defaults', () => {
     const merged = mergeSettings({ hue: 0, exposureSettings: { exposure: 0, offset: 0, gamma: 1 } }, { exposureSettings: { exposure: 0.5 } })
     expect(merged).toEqual({ hue: 0, exposureSettings: { exposure: 0.5, offset: 0, gamma: 1 } })
+  })
+})
+
+describe('text and shape arguments', () => {
+  it('reads alignment and shape kinds however they are written', () => {
+    expect(alignFrom('centre')).toBe('Center')
+    expect(alignFrom('RIGHT')).toBe('Right')
+    expect(alignFrom(undefined)).toBeUndefined()
+    expect(() => alignFrom('justify')).toThrow(/left, center or right/)
+    expect(shapeKindFrom('circle')).toEqual({ kind: 'Ellipse', rounded: false })
+    expect(shapeKindFrom('Rounded Rectangle')).toEqual({ kind: 'Rectangle', rounded: true })
+    expect(shapeKindFrom('rect')).toEqual({ kind: 'Rectangle', rounded: false })
+    expect(() => shapeKindFrom('star')).toThrow(/rectangle, rounded, ellipse or line/)
+  })
+
+  it('turns font families with styles into PostScript-style names', () => {
+    expect(fontNameFrom('Avenir Next Bold Italic')).toBe('AvenirNext-BoldItalic')
+    expect(fontNameFrom('Helvetica Neue Extra Bold')).toBe('HelveticaNeue-ExtraBold')
+    expect(fontNameFrom('Times New Roman')).toBe('TimesNewRoman')
+    expect(fontNameFrom('Inter Light')).toBe('Inter-Light')
+    expect(fontNameFrom('HelveticaNeue-Bold')).toBe('HelveticaNeue-Bold')
+    expect(fontNameFrom('')).toBe('Helvetica')
+  })
+
+  it('runs a line from (x, y) by width and height', () => {
+    expect(lineEnds({ x: 10, y: 20, width: 100 }, { width: 500, height: 400 })).toEqual([
+      [10, 20],
+      [110, 20]
+    ])
+    expect(lineEnds({}, { width: 500, height: 400 })).toEqual([
+      [0, 200],
+      [500, 200]
+    ])
+    expect(() => lineEnds({ x: 0, width: 0, height: 0 }, { width: 500, height: 400 })).toThrow(/length/)
+  })
+
+  it('describes text and shape layers', () => {
+    const text = { ...pixelLayer('Title', new Raster(10, 10)), text: textStyle({ content: 'Hi', fontName: 'Georgia-Bold', fontSize: 40, alignment: 'Center' }) }
+    const shape = { ...pixelLayer('Card', new Raster(10, 10)), shape: { kind: 'Rectangle' as const, cornerRadius: 8, red: 1, green: 0, blue: 0 } }
+    const state: DocState = { width: 10, height: 10, resolution: 72, layers: [text, shape], activeLayerId: null, guides: [], selection: null }
+    expect(describeLayer(state, text)).toMatchObject({ kind: 'text', text: 'Hi', font: 'Georgia-Bold', size: 40, align: 'center' })
+    expect(describeLayer(state, shape)).toMatchObject({ kind: 'shape', shape: 'rounded rectangle' })
+  })
+})
+
+describe('resize and crop arguments', () => {
+  const canvas = { width: 1000, height: 500 }
+
+  it('changes the canvas around an anchor, or scales the image', () => {
+    expect(resizePlan(canvas, { width: 1200, height: 600 })).toEqual({ kind: 'canvas', width: 1200, height: 600, anchor: 'center' })
+    expect(resizePlan(canvas, { width: 1200, anchor: 'top left' })).toEqual({ kind: 'canvas', width: 1200, height: 500, anchor: 'top-left' })
+    expect(resizePlan(canvas, { scale: 0.5 })).toEqual({ kind: 'image', width: 500, height: 250, resample: true })
+    expect(resizePlan(canvas, { image: true, width: 400, resample: false })).toEqual({ kind: 'image', width: 400, height: 200, resample: false })
+    expect(() => resizePlan(canvas, {})).toThrow(/width and height/)
+  })
+
+  it('reads anchors however they are written', () => {
+    expect(anchorFrom('bottom right')).toBe('bottom-right')
+    expect(anchorFrom('right-bottom')).toBe('bottom-right')
+    expect(anchorFrom('top centre')).toBe('top')
+    expect(anchorFrom('middle')).toBe('center')
+    expect(anchorFrom(undefined)).toBe('center')
+    expect(() => anchorFrom('nowhere')).toThrow(/anchor is one of/)
+  })
+
+  it('keeps a crop box inside the canvas', () => {
+    expect(cropBox(canvas, { x: 100, y: 50, width: 300, height: 200 })).toEqual({ x: 100, y: 50, width: 300, height: 200 })
+    expect(cropBox(canvas, { x: 900, width: 500 })).toEqual({ x: 900, y: 0, width: 100, height: 500 })
+    expect(() => cropBox(canvas, { x: 2000 })).toThrow(/outside/)
   })
 })

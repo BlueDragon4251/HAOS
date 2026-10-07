@@ -46,8 +46,14 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     command, payload = cli.canvas_request(["export", "out.png", "--project", "Poster.comp", "--scale", "0.5", "--overwrite"])
     assert command == "canvas.export"
     assert payload == {"to": str(here / "out.png"), "project": str(here / "Poster.comp"), "scale": 0.5, "overwrite": True}
-    with pytest.raises(SystemExit):
-        cli.canvas_request(["paint"])
+    assert cli.canvas_request(["text", "Night", "market", "--size", "120", "--font", "Helvetica Neue Bold", "--x", "72"]) == ("canvas.addText", {"content": "Night market", "size": 120.0, "x": 72.0, "font": "Helvetica Neue Bold"})
+    assert cli.canvas_request(["resize", "1080x1080", "--anchor", "top"]) == ("canvas.resize", {"width": 1080, "height": 1080, "anchor": "top"})
+    assert cli.canvas_request(["resize", "--scale", "0.5"]) == ("canvas.resize", {"scale": 0.5})
+    assert cli.canvas_request(["resize", "800x600", "--image"]) == ("canvas.resize", {"width": 800, "height": 600, "image": True})
+    assert cli.canvas_request(["crop", "0", "100", "1080", "1350"]) == ("canvas.crop", {"x": 0, "y": 100, "width": 1080, "height": 1350})
+    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"]):
+        with pytest.raises(SystemExit):
+            cli.canvas_request(wrong)
 
 
 def test_herald_keymap_is_the_template():

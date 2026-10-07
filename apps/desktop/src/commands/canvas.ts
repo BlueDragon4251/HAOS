@@ -18,6 +18,15 @@ const placement = [
   { name: 'height', type: 'number', description: 'Height in canvas pixels (alone, it keeps the proportions)' }
 ] as const
 
+/** A box in canvas pixels, where whatever is left out runs to the canvas's edge. */
+const box = (what: string) =>
+  [
+    { name: 'x', type: 'number', description: `Left edge ${what}, in canvas pixels (0)` },
+    { name: 'y', type: 'number', description: `Top edge ${what}, in canvas pixels (0)` },
+    { name: 'width', type: 'number', description: `Width ${what} (to the right edge when left out)` },
+    { name: 'height', type: 'number', description: `Height ${what} (to the bottom when left out)` }
+  ] as const
+
 const appearance = [
   { name: 'opacity', type: 'number', description: '0 to 1 (or a percentage)' },
   { name: 'blend', type: 'string', description: `Blend mode: ${BLEND_MODES.join(', ')}` }
@@ -118,6 +127,93 @@ export const canvasCommands: readonly OsCommand[] = [
       { name: 'folder', type: 'string', description: 'Move it into this folder (id or name), or "none"' }
     ],
     run: async (args) => done((await canvas()).setLayer(args))
+  },
+  {
+    id: 'canvas.addText',
+    title: 'Add text',
+    description:
+      'Add a text layer that stays editable. Point text: x is its left edge (its centre with align=center, its right edge with align=right) and y its top. Give width for a paragraph that wraps inside a box from x. Fonts are installed families, with a style after them if wanted ("Avenir Next Bold", "Georgia Italic"), or PostScript names ("HelveticaNeue-Bold"). size is the font size in pixels. A new line is \\n.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'content', type: 'string', description: 'The words', required: true },
+      { name: 'x', type: 'number', description: 'Left edge (or centre or right edge, by align) in canvas pixels' },
+      { name: 'y', type: 'number', description: 'Top edge in canvas pixels' },
+      { name: 'width', type: 'number', description: 'A paragraph box this wide (the text wraps in it)' },
+      { name: 'height', type: 'number', description: 'The paragraph box height (fits the text when left out)' },
+      { name: 'font', type: 'string', description: 'Font family and style, e.g. "Helvetica Neue Bold"' },
+      { name: 'size', type: 'number', description: 'Font size in pixels (72)' },
+      { name: 'color', type: 'string', description: 'Any CSS colour (black)' },
+      { name: 'align', type: 'string', description: 'left, center or right' },
+      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels' },
+      { name: 'leading', type: 'number', description: 'Extra space between lines, in pixels' },
+      { name: 'name', type: 'string', description: 'The layer name (the text when left out)' },
+      ...appearance,
+      ...where
+    ],
+    run: async (args) => done((await canvas()).addText(args))
+  },
+  {
+    id: 'canvas.setText',
+    title: 'Change text',
+    description: 'Change a text layer’s words or style. It keeps its place, size and rotation; only what is given changes.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layer', type: 'string', description: 'The text layer (id or name)', required: true },
+      { name: 'content', type: 'string', description: 'New words' },
+      { name: 'font', type: 'string', description: 'Font family and style, e.g. "Georgia Italic"' },
+      { name: 'size', type: 'number', description: 'Font size in pixels' },
+      { name: 'color', type: 'string', description: 'Any CSS colour' },
+      { name: 'align', type: 'string', description: 'left, center or right' },
+      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels' },
+      { name: 'leading', type: 'number', description: 'Extra space between lines, in pixels' }
+    ],
+    run: async (args) => done((await canvas()).setText(args))
+  },
+  {
+    id: 'canvas.addShape',
+    title: 'Add a shape',
+    description:
+      'Add a shape layer: a rectangle (radius rounds its corners; kind=rounded picks a radius), an ellipse (a circle when width equals height) or a line from (x, y) to (x + width, y + height), lineWidth thick. A box left out fills the rest of the canvas.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'kind', type: 'string', description: 'rectangle, rounded, ellipse or line', required: true },
+      ...box('of the shape'),
+      { name: 'color', type: 'string', description: 'Any CSS colour (black)' },
+      { name: 'radius', type: 'number', description: 'Corner radius in pixels, for rectangles' },
+      { name: 'lineWidth', type: 'number', description: 'Line thickness in pixels (4)' },
+      { name: 'name', type: 'string', description: 'The layer name' },
+      ...appearance,
+      ...where
+    ],
+    run: async (args) => done((await canvas()).addShape(args))
+  },
+  {
+    id: 'canvas.resize',
+    title: 'Resize an image',
+    description:
+      'Change the canvas size: width and height grow or cut the canvas around anchor (center by default; top-left, top, bottom-right and so on), and layers keep their pixels. To scale everything instead (Image Size), give scale (0.5 is half) or image=true with width and/or height (one side keeps the proportions).',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'width', type: 'number', description: 'New width in pixels' },
+      { name: 'height', type: 'number', description: 'New height in pixels' },
+      { name: 'anchor', type: 'string', description: 'Where the canvas grows or shrinks from: center, top-left, top, top-right, left, right, bottom-left, bottom or bottom-right' },
+      { name: 'scale', type: 'number', description: 'Scale everything by this much (Image Size)' },
+      { name: 'image', type: 'boolean', description: 'Scale everything to width and height instead of changing the canvas' },
+      { name: 'resample', type: 'boolean', description: 'When scaling, recalculate layer pixels too (true); false only stretches them' }
+    ],
+    run: async (args) => done((await canvas()).resize(args))
+  },
+  {
+    id: 'canvas.crop',
+    title: 'Crop an image',
+    description: 'Crop the canvas to a box (canvas pixels from the top-left). Layers keep their pixels, so it can be undone without loss.',
+    tier: 'act',
+    args: [project, ...box('of the box to keep')],
+    run: async (args) => done((await canvas()).crop(args))
   },
   {
     id: 'canvas.removeLayer',

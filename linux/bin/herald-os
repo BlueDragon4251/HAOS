@@ -19,7 +19,8 @@ call the tools directly.
                 capture region --ask | capture color | capture qr | capture text
                 capture transcode <file> [gif|mp4|webm] | capture share <file>
   Canvas        canvas open [file] | canvas new [name] [WxH] | canvas status | canvas layers [project]
-                canvas preview [project] | canvas export <file> [--project <project>] | canvas undo|redo
+                canvas text <words> [--x --y --size --font --color --align] | canvas resize <WxH> [--anchor <a>]
+                canvas crop <x> <y> <w> <h> | canvas preview [project] | canvas export <file> | canvas undo|redo
   Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
   Events        event <name> [key=value ...] | hook list | hook install <event> <script> | hook dir
   System        lock | suspend | power | wm <niri action...> | state | debug | commands [--json]
@@ -86,7 +87,7 @@ COMMANDS: dict[str, str] = {
     "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
     "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
     "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
-    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | preview [project] | export <file> [--project …] [--overwrite] | undo | redo: Herald Canvas, the image editor",
+    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo: Herald Canvas, the image editor",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
@@ -990,7 +991,12 @@ def run_os_wait(command: str, args: dict | None = None, timeout: float = 30) -> 
 
 # ---------------------------------------------------------------------------------------------
 # Herald Canvas: the image editor, through the same canvas.* commands Hermes uses.
-CANVAS_USAGE = "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] | preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo"
+CANVAS_USAGE = (
+    "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] "
+    "| text <words> [--x <px>] [--y <px>] [--width <px>] [--size <px>] [--font <family>] [--color <css>] [--align left|center|right] "
+    "| resize <width>x<height> [--anchor <where>] [--image] | resize --scale <n> | crop <x> <y> <width> <height> "
+    "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo"
+)
 
 
 def _absolute(value: str) -> str:
@@ -1005,7 +1011,7 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
     i = 0
     while i < len(rest):
         token = rest[i]
-        if token in ("--overwrite", "--json"):
+        if token in ("--overwrite", "--json", "--image"):
             flags[token[2:]] = True
         elif token.startswith("--") and i + 1 < len(rest):
             flags[token[2:]] = rest[i + 1]
@@ -1035,6 +1041,42 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if "size" in flags:
             payload["size"] = int(str(flags["size"]))
         return "canvas.preview", payload
+    if sub == "text":
+        if not words:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"content": " ".join(words)}
+        for key in ("x", "y", "width", "size"):
+            if key in flags:
+                payload[key] = float(str(flags[key]))
+        for key in ("font", "color", "align", "name"):
+            if key in flags:
+                payload[key] = str(flags[key])
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.addText", payload
+    if sub == "resize":
+        payload = {}
+        size = re.fullmatch(r"(\d+)[x×](\d+)", words[0]) if words else None
+        if size:
+            payload["width"], payload["height"] = int(size.group(1)), int(size.group(2))
+        if "scale" in flags:
+            payload["scale"] = float(str(flags["scale"]))
+        if not payload:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        if "anchor" in flags:
+            payload["anchor"] = str(flags["anchor"])
+        if flags.get("image"):
+            payload["image"] = True
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.resize", payload
+    if sub == "crop":
+        if len(words) != 4 or not all(re.fullmatch(r"-?\d+", word) for word in words):
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = dict(zip(("x", "y", "width", "height"), (int(word) for word in words)))
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.crop", payload
     if sub == "export":
         if not words:
             die(f"herald-os {CANVAS_USAGE}", 2)

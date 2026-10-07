@@ -5,11 +5,29 @@
  * from disk, changed and written back, and any window showing it reloads.
  */
 
-import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS } from '../../../shared/canvas/comp-format.ts'
+import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS, type ShapeStyle, type TextStyle } from '../../../shared/canvas/comp-format.ts'
 import { baseName, CANVAS_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION } from '../../../shared/canvas/files.ts'
 import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
-import { blendFrom, describeLayer, describeLayers, fillBox, findByRef, finite, mergeSettings, opacityFrom, placementOf, resolvePath } from './agent-model.ts'
+import {
+  alignFrom,
+  blendFrom,
+  cropBox,
+  describeLayer,
+  describeLayers,
+  fillBox,
+  findByRef,
+  finite,
+  fontNameFrom,
+  lineEnds,
+  mergeSettings,
+  opacityFrom,
+  placementOf,
+  resizePlan,
+  resolvePath,
+  shapeKindFrom
+} from './agent-model.ts'
+import { anchorOffset, cropCanvas, resizeCanvas, scaleImage } from './engine/canvas-size.ts'
 import {
   adjustmentLayer,
   blankLayer,
@@ -30,8 +48,11 @@ import {
   withLayer
 } from './engine/document.ts'
 import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, saveProject, toRaster } from './engine/project.ts'
-import { Raster } from './engine/raster.ts'
+import { Raster, type Rect } from './engine/raster.ts'
+import { shapeBox, shapeName } from './engine/shapes.ts'
+import { textStyle } from './engine/text.ts'
 import { openInCanvas } from './open.ts'
+import { makeShapeLayer, makeTextLayer, restyleText } from './text-layers.ts'
 
 export interface Target {
   doc: CanvasDocument
@@ -525,6 +546,158 @@ export async function addAdjustment(args: Record<string, unknown>): Promise<Outc
   await apply(on, `${kind} Layer`, next)
 
   return { summary: `Added a ${kind} adjustment${args.clip === true ? ' clipped to the layer below' : ''}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+const layerName = (args: Record<string, unknown>): string | undefined => (typeof args.name === 'string' && args.name.trim() ? args.name.trim() : undefined)
+
+/** A colour argument as the format's red, green and blue (0 to 1). */
+const unitColour = (value: unknown, fallback: string) => {
+  const [r, g, b] = parseColor(value === undefined || value === '' ? fallback : value)
+
+  return { red: r / 255, green: g / 255, blue: b / 255 }
+}
+
+/** The text style a command asks for, over a style there was (or the defaults). */
+function textStyleFrom(args: Record<string, unknown>, base?: TextStyle): TextStyle {
+  const size = finite(args.size)
+
+  if (size !== undefined && (size <= 0 || size > 10_000)) {
+    throw new Error('size is the font size in pixels, above 0')
+  }
+
+  return textStyle({
+    ...base,
+    content: typeof args.content === 'string' ? args.content.replace(/\\n/g, '\n') : (base?.content ?? ''),
+    fontName: args.font !== undefined && args.font !== '' ? fontNameFrom(args.font) : (base?.fontName ?? 'Helvetica'),
+    fontSize: size ?? base?.fontSize ?? 72,
+    ...(args.color !== undefined && args.color !== '' ? unitColour(args.color, '#000') : base ? {} : unitColour(undefined, '#000')),
+    alignment: alignFrom(args.align) ?? base?.alignment ?? 'Left',
+    tracking: finite(args.tracking) ?? base?.tracking ?? 0,
+    leading: finite(args.leading) ?? base?.leading ?? 0
+  })
+}
+
+/** Text as a new layer: point text with its alignment edge at x and its top at y, or a paragraph wrapping in a box `width` wide. */
+export async function addText(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+
+  if (typeof args.content !== 'string' || !args.content.trim()) {
+    throw new Error('Give the words to write: content="Night market"')
+  }
+
+  const width = finite(args.width)
+  const height = finite(args.height)
+  let style = textStyleFrom(args)
+
+  if (width !== undefined) {
+    if (width < 1) {
+      throw new Error('width is the paragraph box in pixels')
+    }
+
+    style = { ...style, boxSize: [Math.round(width), Math.max(0, Math.round(height ?? 0))] }
+  }
+
+  // Left out, the text sits a margin in from the edge its alignment is on.
+  const margin = Math.round(Math.min(state.width, state.height) * 0.06)
+  const x = finite(args.x) ?? (width !== undefined ? margin : style.alignment === 'Center' ? state.width / 2 : style.alignment === 'Right' ? state.width - margin : margin)
+  const y = finite(args.y) ?? margin
+  let layer = await makeTextLayer(style, [x, y], { from: 'top', name: layerName(args) })
+  layer = { ...layer, opacity: opacityFrom(args.opacity) ?? 1, blendMode: blendFrom(args.blend) ?? 'Normal' }
+  let next = insertLayer(state, layer, placementFrom(state, args))
+
+  if (args.clip === true) {
+    next = setClipped(next, layer.id, true)
+  }
+
+  await apply(on, 'Type Tool', next)
+
+  return { summary: `Added the text “${layer.name}” to ${on.doc.name}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+/** Change a text layer's words or style; it keeps its place (its anchor), size and turn. */
+export async function setText(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = findByRef(on.doc.state, args.layer)
+
+  if (!layer.text) {
+    throw new Error(`${layer.name} is not a text layer`)
+  }
+
+  const style = textStyleFrom(args, layer.text)
+
+  if (!style.content.trim()) {
+    throw new Error('A text layer needs some text; remove the layer instead')
+  }
+
+  await apply(on, 'Edit Type', withLayer(on.doc.state, layer.id, await restyleText(layer, style)))
+
+  return { summary: `${layer.name}: text changed`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+/** A rectangle (corners rounded with radius), an ellipse or a line, as a new shape layer. */
+export async function addShape(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+  const { kind, rounded } = shapeKindFrom(args.kind)
+  const colour = unitColour(args.color, '#000')
+  let style: ShapeStyle
+  let box: Rect
+
+  if (kind === 'Line') {
+    const lineWidth = Math.max(1, finite(args.lineWidth) ?? 4)
+    const [from, to] = lineEnds(args, state)
+    const placed = shapeBox('Line', from, to, lineWidth)
+    style = { ...colour, kind, cornerRadius: 0, lineWidth, start: placed.start, end: placed.end }
+    box = placed.box
+  } else {
+    box = fillBox(state, args)
+    const radius = finite(args.radius) ?? (rounded ? Math.round(Math.min(box.width, box.height) * 0.15) : 0)
+    style = { ...colour, kind, cornerRadius: Math.max(0, radius) }
+  }
+
+  let layer = makeShapeLayer(style, box, layerName(args) ?? nextName(state, shapeName(style)))
+  layer = { ...layer, opacity: opacityFrom(args.opacity) ?? 1, blendMode: blendFrom(args.blend) ?? 'Normal' }
+  let next = insertLayer(state, layer, placementFrom(state, args))
+
+  if (args.clip === true) {
+    next = setClipped(next, layer.id, true)
+  }
+
+  await apply(on, shapeName(style), next)
+
+  return { summary: `Added “${layer.name}” to ${on.doc.name}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+/** Canvas Size (grow or cut around an anchor; layers untouched) or Image Size (everything scaled). */
+export async function resize(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+  const plan = resizePlan(state, args)
+
+  if (plan.width > LIMITS.side || plan.height > LIMITS.side || plan.width * plan.height > LIMITS.sourcePixels) {
+    throw new Error(`A canvas is 1 to ${LIMITS.side.toLocaleString()} pixels a side, ${(LIMITS.sourcePixels / 1e6).toLocaleString()} million in all`)
+  }
+
+  if (plan.kind === 'canvas') {
+    await apply(on, 'Canvas Size', resizeCanvas(state, plan.width, plan.height, anchorOffset(state, plan, plan.anchor)))
+  } else {
+    await apply(on, 'Image Size', scaleImage(state, plan.width, plan.height, plan.resample))
+  }
+
+  return {
+    summary: `${on.doc.name} is ${plan.width}×${plan.height} now (${plan.kind === 'canvas' ? `canvas around the ${plan.anchor}; layers keep their pixels` : 'everything scaled'})`,
+    data: { width: plan.width, height: plan.height, kind: plan.kind }
+  }
+}
+
+/** Crop the canvas to a box; layers keep their pixels. */
+export async function crop(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const box = cropBox(on.doc.state, args)
+  await apply(on, 'Crop', cropCanvas(on.doc.state, box))
+
+  return { summary: `Cropped ${on.doc.name} to ${box.width}×${box.height} from (${box.x}, ${box.y})`, data: { ...box } }
 }
 
 const exportKind = (file: string, format: unknown): ExportKind => {

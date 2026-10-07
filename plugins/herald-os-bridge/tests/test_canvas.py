@@ -56,6 +56,33 @@ def test_actions_map_to_commands_and_drop_stray_arguments(plugin):
         tools.canvas_command({"action": "paint"})
 
 
+def test_text_shape_and_canvas_actions_pass_their_arguments(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "add_text", "content": "Night market", "x": 72, "y": 900, "font": "Helvetica Neue Bold", "size": 120, "align": "center", "source": "x.png"})
+    assert command == "canvas.addText"
+    assert args == {"content": "Night market", "x": 72, "y": 900, "font": "Helvetica Neue Bold", "size": 120, "align": "center"}
+    _, command, args = tools.canvas_command({"action": "set_text", "layer": "Headline", "color": "#fff", "kind": "line"})
+    assert (command, args) == ("canvas.setText", {"layer": "Headline", "color": "#fff"})
+    _, command, args = tools.canvas_command({"action": "add_shape", "kind": "rounded", "width": 300, "height": 80, "radius": 40, "lineWidth": 2, "content": "no"})
+    assert (command, args) == ("canvas.addShape", {"kind": "rounded", "width": 300, "height": 80, "radius": 40, "lineWidth": 2})
+    _, command, args = tools.canvas_command({"action": "resize", "width": 1080, "height": 1080, "anchor": "top", "x": 3})
+    assert (command, args) == ("canvas.resize", {"width": 1080, "height": 1080, "anchor": "top"})
+    _, command, args = tools.canvas_command({"action": "resize", "scale": 0.5, "resample": False})
+    assert args == {"scale": 0.5, "resample": False}
+    _, command, args = tools.canvas_command({"action": "crop", "x": 0, "y": 100, "width": 1080, "height": 1350})
+    assert (command, args) == ("canvas.crop", {"x": 0, "y": 100, "width": 1080, "height": 1350})
+
+
+def test_the_schema_offers_every_action_and_argument(plugin):
+    tools = _mod(plugin, "tools")
+    properties = tools.CANVAS_SCHEMA["parameters"]["properties"]
+    assert set(tools.CANVAS_ACTIONS) <= set(properties["action"]["enum"])
+    for action, names in tools.CANVAS_ARGS.items():
+        for name in names:
+            assert name in properties, f"{action} passes {name}, which the schema does not describe"
+    assert properties["size"]["type"] == "number"
+
+
 def test_adjustment_settings_travel_as_json(plugin):
     tools = _mod(plugin, "tools")
     _, command, args = tools.canvas_command({"action": "add_adjustment", "kind": "Hue/Saturation", "settings": {"saturation": 20}})
