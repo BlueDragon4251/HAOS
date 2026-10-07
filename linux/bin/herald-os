@@ -1093,6 +1093,21 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if "project" in flags:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.crop", payload
+    if sub == "filter":
+        if not words:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"kind": " ".join(words)}
+        settings = json.loads(str(flags["settings"])) if "settings" in flags else {}
+        for key in ("amount", "radius", "threshold", "angle", "distance", "strength"):
+            if key in flags:
+                settings[key] = float(str(flags[key]))
+        if settings:
+            payload["settings"] = json.dumps(settings)
+        if "layer" in flags:
+            payload["layer"] = str(flags["layer"])
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.filter", payload
     if sub == "guides":
         action = words[0] if words else "list"
         if action not in ("add", "remove", "clear", "list") or (action in ("clear", "list") and len(words) > 1):

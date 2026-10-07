@@ -25,6 +25,7 @@ import type { AlignEdge, AlignTo, DistributeMode } from './engine/align.ts'
 import type { AutoMode } from './engine/auto-levels.ts'
 import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
 import { fitRatio, largestTurnedBox, ratioFrom } from './engine/crop.ts'
+import type { FilterKind } from './engine/filters.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
 import type { HistoryStep } from './engine/history.ts'
@@ -914,6 +915,38 @@ export function distributeFrom(value: unknown): DistributeMode {
   }
 
   return mode
+}
+
+/** A filter however it was written ("Unsharp Mask", "sharpen", "gaussian", "denoise"). */
+export function filterKindFrom(value: unknown): FilterKind {
+  const text = words(value).replace(/[^a-z]/g, '')
+  const aliases: Record<string, FilterKind> = {
+    gaussianblur: 'gaussianBlur',
+    gaussian: 'gaussianBlur',
+    blur: 'gaussianBlur',
+    motionblur: 'motionBlur',
+    motion: 'motionBlur',
+    highpass: 'highPass',
+    unsharpmask: 'unsharpMask',
+    unsharp: 'unsharpMask',
+    usm: 'unsharpMask',
+    sharpen: 'unsharpMask',
+    smartsharpen: 'smartSharpen',
+    reducenoise: 'reduceNoise',
+    denoise: 'reduceNoise',
+    noisereduction: 'reduceNoise',
+    addnoise: 'addNoise',
+    noise: 'addNoise',
+    median: 'median',
+    despeckle: 'median'
+  }
+  const kind = aliases[text]
+
+  if (!kind) {
+    throw new Error('kind is one of: Gaussian Blur, Motion Blur, High Pass, Unsharp Mask (sharpen), Smart Sharpen, Reduce Noise, Add Noise, Median')
+  }
+
+  return kind
 }
 
 /** Which way a guide runs, however it was written: vertical (a line down, at an x) or horizontal (across, at a y). */

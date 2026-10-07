@@ -64,6 +64,9 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     assert cli.canvas_request(["crop", "0", "0", "800", "800", "--ratio", "16:9"]) == ("canvas.crop", {"x": 0, "y": 0, "width": 800, "height": 800, "ratio": "16:9"})
     assert cli.canvas_request(["auto"]) == ("canvas.autoAdjust", {})
     assert cli.canvas_request(["auto", "color", "--cutoff", "0.5"]) == ("canvas.autoAdjust", {"kind": "color", "cutoff": 0.5})
+    command, payload = cli.canvas_request(["filter", "unsharp", "mask", "--amount", "120", "--radius", "1.5", "--layer", "Photo"])
+    assert (command, payload["kind"], payload["layer"], json.loads(payload["settings"])) == ("canvas.filter", "unsharp mask", "Photo", {"amount": 120.0, "radius": 1.5})
+    assert cli.canvas_request(["filter", "median"]) == ("canvas.filter", {"kind": "median"})
     assert cli.canvas_request(["guides"]) == ("canvas.guides", {"action": "list"})
     assert cli.canvas_request(["guides", "add", "vertical", "50%"]) == ("canvas.guides", {"action": "add", "axis": "vertical", "position": "50%"})
     assert cli.canvas_request(["guides", "add", "--margins", "6%", "--columns", "12", "--gutter", "20", "--center"]) == ("canvas.guides", {"action": "add", "margins": "6%", "columns": 12.0, "gutter": 20.0, "center": True})
@@ -71,7 +74,7 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     assert cli.canvas_request(["history"]) == ("canvas.history", {})
     assert cli.canvas_request(["undo", "--steps", "3"]) == ("canvas.undo", {"steps": 3})
     assert cli.canvas_request(["redo", "Poster.comp"]) == ("canvas.redo", {"project": str(here / "Poster.comp")})
-    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"], ["fill", "1", "2", "3"], ["align"], ["distribute"], ["guides", "paint"], ["guides", "add", "vertical"], ["guides", "clear", "x"]):
+    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"], ["fill", "1", "2", "3"], ["align"], ["distribute"], ["guides", "paint"], ["guides", "add", "vertical"], ["guides", "clear", "x"], ["filter"]):
         with pytest.raises(SystemExit):
             cli.canvas_request(wrong)
 

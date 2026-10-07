@@ -14,6 +14,7 @@ import { RemoveBackgroundDialog } from './ai/RemoveBackgroundDialog.tsx'
 import { CloseDialog, NewDocumentDialog, NotesDialog } from './dialogs.tsx'
 import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, NewGuideDialog, TrimDialog } from './edit-dialogs.tsx'
 import type { CanvasDocument } from './engine/document.ts'
+import { FilterDialog } from './FilterDialog.tsx'
 import { loadFonts } from './fonts.ts'
 import type { Raster, Rect } from './engine/raster.ts'
 import { messageOf } from './errors.ts'
@@ -551,6 +552,7 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {doc && dialog?.kind === 'trim' && <TrimDialog doc={doc} />}
       {doc && dialog?.kind === 'fill' && <FillDialog doc={doc} />}
       {doc && dialog?.kind === 'new-guide' && <NewGuideDialog doc={doc} />}
+      {doc && dialog?.kind === 'filter' && <FilterDialog key={dialog.filter} doc={doc} kind={dialog.filter} />}
       {doc && dialog?.kind === 'modify-selection' && <ModifySelectionDialog doc={doc} change={dialog.change} />}
       {doc && dialog?.kind === 'remove-background' && <RemoveBackgroundDialog doc={doc} />}
       {doc && dialog?.kind === 'content-fill' && <ContentFillDialog doc={doc} />}

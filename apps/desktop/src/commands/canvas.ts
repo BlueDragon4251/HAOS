@@ -392,6 +392,21 @@ export const canvasCommands: readonly OsCommand[] = [
     run: async (args) => done((await canvas()).removeBackground(args))
   },
   {
+    id: 'canvas.filter',
+    title: 'Run a filter on a layer',
+    description:
+      'Run a Filter menu filter on a layer’s pixels as one undoable step: Unsharp Mask (sharpen: amount 1–500 %, radius 0.1–250 px, threshold 0–255 levels), Smart Sharpen (amount, radius 0.1–64, reduceNoise 0–100 %; sharpens brightness only, without halos), Reduce Noise (strength 0–10, preserveDetails 0–100 %, colorNoise 0–100 %), Gaussian Blur (radius), Motion Blur (angle −90–90, distance 1–2000), High Pass (radius), Add Noise (amount 0.1–400 %, gaussian, monochromatic, seed) or Median (radius 1–25). settings is JSON over the defaults. Text and shape layers are refused (filters would turn them into pixels). Adjustment layers already do blur and noise without changing pixels.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'kind', type: 'string', description: 'The filter: unsharp mask, smart sharpen, reduce noise, gaussian blur, motion blur, high pass, add noise or median', required: true },
+      { name: 'settings', type: 'string', description: 'JSON object of settings, e.g. {"amount": 120, "radius": 1.2, "threshold": 2}' },
+      { name: 'layer', type: 'string', description: 'The layer (id or name); the active layer when left out' },
+      { name: 'inSelection', type: 'boolean', description: 'Only inside what the person selected in the open window' }
+    ],
+    run: async (args) => done((await canvas()).filter(args))
+  },
+  {
     id: 'canvas.contentFill',
     title: 'Content-aware fill',
     description:

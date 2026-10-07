@@ -50,6 +50,9 @@ import {
 import { ensureModel } from './ai/models.ts'
 import { cannotSegment, selectSubject } from './ai/remove-background.ts'
 import { ALIGN_EDGES, ALIGN_LABELS, DISTRIBUTE_LABELS, DISTRIBUTE_MODES } from './engine/align.ts'
+import { FILTER_NAMES, type FilterKind } from './engine/filters.ts'
+import { applyFilterToDocument, lastFilter } from './filter-run.ts'
+import { cannotPaint } from './tools/target.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
 import { messageOf } from './errors.ts'
@@ -77,6 +80,7 @@ export type CanvasDialog =
   | { kind: 'models' }
   | { kind: 'notes'; title: string; notes: string[] }
   | { kind: 'new-guide' }
+  | { kind: 'filter'; filter: FilterKind }
   | null
 
 export const $dialog = atom<CanvasDialog>(null)
@@ -223,6 +227,31 @@ const DISTRIBUTE_ITEMS: CanvasCommand[] = DISTRIBUTE_MODES.map((mode, i) => ({
   dividerBefore: i === 3 || i === 6,
   run: onDoc((doc) => distributePicked(doc, mode))
 }))
+
+/** Filter > Last Filter: the last filter again, with the same settings, without its dialog. */
+async function repeatLastFilter(doc: CanvasDocument): Promise<void> {
+  const spec = lastFilter()
+
+  if (!spec) {
+    return
+  }
+
+  notify(`Applying ${FILTER_NAMES[spec.kind]}…`)
+
+  try {
+    notify((await applyFilterToDocument(doc, spec)) ? `Applied ${FILTER_NAMES[spec.kind]}` : `${FILTER_NAMES[spec.kind]} changed nothing`)
+  } catch (error) {
+    notify(`Could not apply ${FILTER_NAMES[spec.kind]}: ${messageOf(error)}`, 'error')
+  }
+}
+
+const filterItem = (kind: FilterKind): CanvasCommand => ({
+  id: `filter-${kind}`,
+  label: `${FILTER_NAMES[kind]}…`,
+  needsDocument: true,
+  enabled: (doc) => !cannotPaint(doc),
+  run: () => $dialog.set({ kind: 'filter', filter: kind })
+})
 
 const SNAP_ITEMS: CanvasCommand[] = (
   [
@@ -383,6 +412,28 @@ export const MENUS: CanvasMenu[] = [
       { id: 'contract', label: 'Contract…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'contract' }) },
       { id: 'layer-pixels', label: 'Layer Pixels', needsDocument: true, enabled: (doc) => Boolean(doc.active?.pixels), run: onDoc((doc) => selectLayerPixels(doc)), dividerBefore: true },
       { id: 'layer-mask', label: 'Layer Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active?.mask), run: onDoc((doc) => selectLayerPixels(doc, doc.active, true)) }
+    ]
+  },
+  {
+    id: 'filter',
+    label: 'Filter',
+    items: [
+      {
+        id: 'last-filter',
+        label: () => {
+          const spec = lastFilter()
+
+          return spec ? `Last Filter: ${FILTER_NAMES[spec.kind]}` : 'Last Filter'
+        },
+        keys: 'mod+alt+f',
+        needsDocument: true,
+        enabled: (doc) => Boolean(lastFilter()) && !cannotPaint(doc),
+        run: onDoc((doc) => void repeatLastFilter(doc))
+      },
+      { id: 'filter-blur', label: 'Blur', needsDocument: true, run: nothing, submenu: [filterItem('gaussianBlur'), filterItem('motionBlur')], dividerBefore: true },
+      { id: 'filter-noise', label: 'Noise', needsDocument: true, run: nothing, submenu: [filterItem('addNoise'), filterItem('median'), filterItem('reduceNoise')] },
+      { id: 'filter-sharpen', label: 'Sharpen', needsDocument: true, run: nothing, submenu: [filterItem('unsharpMask'), filterItem('smartSharpen')] },
+      { id: 'filter-other', label: 'Other', needsDocument: true, run: nothing, submenu: [filterItem('highPass')] }
     ]
   },
   {

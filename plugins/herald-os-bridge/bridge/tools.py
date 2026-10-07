@@ -1119,6 +1119,7 @@ CANVAS_ACTIONS: dict[str, str] = {
     "place_image": "canvas.placeImage",
     "remove_background": "canvas.removeBackground",
     "content_fill": "canvas.contentFill",
+    "filter": "canvas.filter",
 }
 
 # What each action passes on; anything else in the call is dropped.
@@ -1153,6 +1154,7 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "place_image": ("project", "source", "x", "y", "width", "height", "fit", "mask_image", "name", "opacity", "blend", "above", "folder", "clip"),
     "remove_background": ("project", "layer", "mode", "threshold", "feather", "refine"),
     "content_fill": ("project", "layer", "x", "y", "width", "height", "newLayer", "sampling"),
+    "filter": ("project", "layer", "kind", "settings", "inSelection"),
 }
 
 # Loading, rendering and saving a large image can take a while.
@@ -1164,7 +1166,7 @@ CANVAS_SCHEMA = _schema(
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
     "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; guides lays out margins, columns and centre lines; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=history lists every step (undo or redo with steps to move through them); action=export writes PNG, JPEG, WebP or a layered PSD; action=open takes .psd files with their layers. "
-    "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something). place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
+    "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something); filter sharpens, denoises or blurs a layer's pixels. place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
     {
         "action": _enum(*CANVAS_ACTIONS, description="What to do"),
@@ -1208,9 +1210,10 @@ CANVAS_SCHEMA = _schema(
         "above": _desc(_STR, "Put the new layer right above this one"),
         "folder": _desc(_STR, "new: where the project goes; add_layer, add_adjustment: put it in this folder; set_layer: move into it (\"none\" takes it out)"),
         "clip": _desc(_BOOL, "Clip to the layer below (shows only where it has pixels); false lets go"),
-        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape, set_shape: rectangle, rounded, ellipse or line; auto_adjust: tone (the default), contrast or color"),
+        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape, set_shape: rectangle, rounded, ellipse or line; auto_adjust: tone (the default), contrast or color; filter: unsharp mask (sharpen), smart sharpen, reduce noise, gaussian blur, motion blur, high pass, add noise or median"),
+        "inSelection": _desc(_BOOL, "filter: only inside what the person selected in the open window"),
         "cutoff": _desc(_NUM, "auto_adjust: percentage of the darkest and of the lightest pixels to ignore, 0 to 10 (0.1)"),
-        "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}; set_adjustment: settings merged over the layer's own", "additionalProperties": True},
+        "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}; set_adjustment: settings merged over the layer's own; filter: the filter's settings, e.g. {\"amount\": 120, \"radius\": 1.2}", "additionalProperties": True},
         "effects": {
             "type": "object",
             "description": "set_effects: per effect (stroke, shadow, innerShadow, outerGlow, innerGlow, colorOverlay) an object merged over its settings or defaults, false to remove it, {\"enabled\": false} to hide it; e.g. {\"shadow\": {\"distance\": 12, \"blur\": 24, \"opacity\": 0.4}}",

@@ -25,6 +25,7 @@ import {
   effectKindFrom,
   effectsWith,
   fillBox,
+  filterKindFrom,
   findByRef,
   finite,
   fitPicture,
@@ -50,7 +51,11 @@ import {
 import { autoAdjustState } from './auto-adjust.ts'
 import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
 import { AUTO_LABELS } from './engine/auto-levels.ts'
+import { checkFilter, FILTER_NAMES } from './engine/filters.ts'
+import { pixelToDocument } from './engine/geometry.ts'
 import { guideNear, layoutGuides, onCanvas, positionFrom, withGuides, withoutGuides } from './engine/guides.ts'
+import { coverageReader } from './engine/sampling.ts'
+import { filterArea, filterTargetArea, mixInto } from './filter-run.ts'
 import { anchorOffset, cropCanvas, resizeCanvas, rotateLayers, scaleImage } from './engine/canvas-size.ts'
 import {
   adjustmentLayer,
@@ -1124,6 +1129,44 @@ export async function removeBackground(args: Record<string, unknown>): Promise<O
   const result = findLayer(on.doc.state, mode === 'cutout' ? on.doc.state.activeLayerId : layer.id)
 
   return { summary: mode === 'cutout' ? `Cut ${layer.name}'s subject out onto a new layer and hid the original` : `${layer.name}: its background is hidden by a mask (nothing erased)`, data: result ? { layer: describeLayer(on.doc.state, result) } : undefined }
+}
+
+/** A Filter menu filter on a layer's pixels (inside the window's selection when asked), as one step. */
+export async function filter(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const kind = filterKindFrom(args.kind)
+  const spec = checkFilter(kind, jsonObject(args.settings, 'settings', '{"radius": 2}'))
+  const layer = pixelsLayer(on.doc.state, args.layer, 'filter')
+
+  if (layer.text || layer.shape) {
+    throw new Error(`${layer.name} is a ${layer.text ? 'text' : 'shape'} layer that stays editable: filters change pixels, so rasterize it first or filter a copy`)
+  }
+
+  const selection = args.inSelection === true && on.live ? on.doc.state.selection : null
+
+  if (args.inSelection === true && !selection) {
+    throw new Error('Nothing is selected in the open Canvas window: leave inSelection out to filter the whole layer')
+  }
+
+  // A new raster, so the step undoes by putting the old one back.
+  const pixels = layer.pixels!.clone()
+  const toDocument = pixelToDocument(layer.transform, pixels.width, pixels.height)
+  const area = filterTargetArea(pixels, toDocument, selection)
+
+  if (!area) {
+    throw new Error(`The selection misses ${layer.name}`)
+  }
+
+  const filtered = await filterArea(pixels, area, spec)
+  const covered = coverageReader(selection, toDocument)
+  mixInto(pixels, area, filtered, (x, y) => covered(x, y) / 255)
+  await apply(on, FILTER_NAMES[kind], withLayer(on.doc.state, layer.id, { pixels }))
+  const settings = Object.entries(spec).filter(([key]) => key !== 'kind' && key !== 'seed')
+
+  return {
+    summary: `${layer.name}: ${FILTER_NAMES[kind]}${settings.length ? ` (${settings.map(([key, value]) => `${key} ${value}`).join(', ')})` : ''}${selection ? ', inside the selection' : ''}`,
+    data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!), settings: Object.fromEntries(settings) }
+  }
 }
 
 /** Content-aware fill: a box (or the open window's selection) on a layer filled from the pixels around it, in place or on a new layer. */

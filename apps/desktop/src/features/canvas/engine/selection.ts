@@ -213,7 +213,7 @@ export function shiftSelection(selection: Raster, dx: number, dy: number): Raste
 }
 
 /** Box sizes whose three passes approximate a gaussian of `sigma`. */
-function boxSizes(sigma: number, passes = 3): number[] {
+export function boxSizes(sigma: number, passes = 3): number[] {
   const ideal = Math.sqrt((12 * sigma * sigma) / passes + 1)
   let lower = Math.floor(ideal)
 
@@ -228,7 +228,7 @@ function boxSizes(sigma: number, passes = 3): number[] {
 }
 
 /** A box blur along rows (stride 1) or columns (stride `width`), edges extended. */
-function boxPass(source: Float32Array, target: Float32Array, width: number, height: number, radius: number, vertical: boolean): void {
+export function boxPass(source: Float32Array, target: Float32Array, width: number, height: number, radius: number, vertical: boolean): void {
   const lines = vertical ? width : height
   const length = vertical ? height : width
   const step = vertical ? width : 1

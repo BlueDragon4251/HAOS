@@ -147,6 +147,15 @@ def test_export_takes_a_layered_psd(plugin):
     assert "psd" in tools.CANVAS_SCHEMA["parameters"]["properties"]["format"]["enum"]
 
 
+def test_filters_take_their_settings_as_json(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "filter", "kind": "unsharp mask", "settings": {"amount": 120, "radius": 1.2}, "layer": "Photo", "inSelection": True, "x": 3})
+    assert command == "canvas.filter"
+    assert json.loads(args.pop("settings")) == {"amount": 120, "radius": 1.2}
+    assert args == {"kind": "unsharp mask", "layer": "Photo", "inSelection": True}
+    assert "filter" in tools.CANVAS_SCHEMA["parameters"]["properties"]["action"]["enum"]
+
+
 def test_guides_take_their_action_as_guide(plugin):
     tools = _mod(plugin, "tools")
     _, command, args = tools.canvas_command({"action": "guides", "guide": "add", "margins": "6%", "columns": 12, "gutter": 20, "center": True, "mask": "hide"})
