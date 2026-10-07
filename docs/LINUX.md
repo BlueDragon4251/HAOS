@@ -153,7 +153,7 @@ Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores 
 
 ## Themes, omakase, updates
 
-- **Themes** live in `linux/themes/<name>/theme.json` (ocean, ice, violet, graphite). `herald-os
+- **Themes** live in `linux/themes/<name>/theme.json` (twelve ship, two of them light). `herald-os
   theme set <name>` (or Style → Theme in the control menu, or the agent's `system_os theme_set`)
   recolours the shell, niri borders/backdrop (`~/.config/niri/theme.kdl`), swaylock, GTK 3/4
   (`gtk.css` + `gsettings`), and the `foot` rescue terminal in one step; a theme may also ship a
@@ -216,9 +216,9 @@ builds it for x86_64 and aarch64 on matching runners, pushes it to the repositor
 (`ghcr.io/iamlukethedev/herald-os`) and, for a release, turns it into:
 
 - **an x86_64 installer ISO** (bootc-image-builder `anaconda-iso`, `linux/image/iso.toml`): the
-  storage screen stays interactive, so it installs next to another system and encrypts the disk
-  (btrfs). Boot it with `inst.ks=<url>` and a kickstart like `linux/image/unattended.ks` for an
-  unattended install.
+  storage screen stays interactive, so it can install next to another system and encrypt the disk
+  (btrfs) if you tick "Encrypt my data". Boot it with `inst.ks=<url>` and a kickstart like
+  `linux/image/unattended.ks` for an unattended install.
 - **an aarch64 VM disk** (`qcow2`, `linux/image/disk.toml`): `bash linux/vm/run-qemu.sh --image <disk>`
   or `bash linux/vm/run-vf.sh --image <disk>` boot it, and `bash linux/vm/try.sh` fetches the latest
   release's disk and boots it in one command.
@@ -336,4 +336,5 @@ can still drive Herald's UI.
   fullscreen and returns to it when closed; there is no switching between other apps' windows.
 - SELinux is permissive on the VM.
 - Apple Silicon Macs cannot boot this natively (no Asahi support for M4/M5); the VM is the target.
-  x86 hardware comes with the ISO work in the roadmap.
+  On x86_64 PCs it installs from the ISO above, which has been tested in a KVM virtual machine
+  (`installer-test.yml`) but not yet on real PC hardware.

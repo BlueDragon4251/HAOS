@@ -53,7 +53,7 @@ on the Mac (QEMU or UTM).
 - SELinux policy for the session.
 
 **Stage 3 (under way, ADR-018): a distribution.** Fedora bootc images: an x86_64 installer ISO
-(encrypted by default, dual boot, unattended through kickstart) and an aarch64 VM image, `bootc
+(optional encryption, dual boot, unattended through kickstart) and an aarch64 VM image, `bootc
 upgrade` and `bootc rollback` behind `herald-os update` and `herald-os rollback`, first-boot setup and
 reset, firewall and SSH off by default, fingerprint and security-key sign-in, firmware updates,
 signed images. Still to come: a recovery partition, an NVIDIA image, Fedora Asahi for M1 and M2.
