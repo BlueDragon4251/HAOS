@@ -150,6 +150,12 @@ export class Smoother {
 export interface StrokeInk {
   colour: [number, number, number]
   erase: boolean
+  /**
+   * What to lay at each raster pixel instead of one colour (the Clone Stamp's copy), as straight
+   * RGBA, or gray in the first channel and 255 in the last on a mask. A pixel must get the same
+   * value all stroke long, as each dab redraws from the pixels as they were. A clear copy lays nothing.
+   */
+  sample?: (x: number, y: number, out: Uint8ClampedArray) => void
 }
 
 /**
@@ -167,6 +173,7 @@ export class Stroke {
   private readonly cover = new Map<number, Float32Array>()
   private readonly columns: number
   private readonly gray: number
+  private readonly copied = new Uint8ClampedArray(4)
   /** Where the stroke changed pixels so far (raster pixels). */
   area: Rect | null = null
 
@@ -219,6 +226,24 @@ export class Stroke {
     return this.edit.finish(label)
   }
 
+  /** How much the stroke laid over a raster area, 0 to 1 a pixel (opacity and the selection included). */
+  coverage(rect: Rect): Float32Array {
+    const out = new Float32Array(rect.width * rect.height)
+
+    for (let y = rect.y; y < rect.y + rect.height; y++) {
+      for (let x = rect.x; x < rect.x + rect.width; x++) {
+        const cover = this.cover.get(Math.floor(y / TILE) * this.columns + Math.floor(x / TILE))
+        const built = cover ? cover[(y % TILE) * TILE + (x % TILE)] : 0
+
+        if (built > 0) {
+          out[(y - rect.y) * rect.width + (x - rect.x)] = built * this.settings.opacity * (this.selected(x, y) / 255)
+        }
+      }
+    }
+
+    return out
+  }
+
   private along(point: Dab, changed: Rect | null): Rect | null {
     let area = changed
 
@@ -255,7 +280,10 @@ export class Stroke {
 
     this.edit.prepare(rect)
     const { data, width, channels } = raster
-    const [r, g, b] = ink.colour
+    const { sample } = ink
+    const copied = this.copied
+    let [r, g, b] = ink.colour
+    let gray = this.gray
 
     for (let ty = Math.floor(rect.y / TILE); ty <= Math.floor((rect.y + rect.height - 1) / TILE); ty++) {
       for (let tx = Math.floor(rect.x / TILE); tx <= Math.floor((rect.x + rect.width - 1) / TILE); tx++) {
@@ -287,12 +315,21 @@ export class Stroke {
             const local = (y - ty * TILE) * TILE + (x - tx * TILE)
             const built = cover[local] + alpha * (1 - cover[local])
             cover[local] = built
-            const amount = built * settings.opacity * (this.selected(x, y) / 255)
+            let amount = built * settings.opacity * (this.selected(x, y) / 255)
             const o = (y * width + x) * channels
             const s = ((y - original.rect.y) * original.rect.width + (x - original.rect.x)) * channels
 
+            if (sample) {
+              sample(x, y, copied)
+              amount *= copied[3] / 255
+              r = copied[0]
+              g = copied[1]
+              b = copied[2]
+              gray = copied[0]
+            }
+
             if (channels === 1) {
-              data[o] = original.pixels[s] + (this.gray - original.pixels[s]) * amount
+              data[o] = original.pixels[s] + (gray - original.pixels[s]) * amount
             } else if (ink.erase) {
               data[o + 3] = original.pixels[s + 3] * (1 - amount)
             } else {

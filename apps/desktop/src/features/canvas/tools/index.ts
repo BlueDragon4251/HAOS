@@ -3,7 +3,9 @@
  * than the document, so the viewport handles them itself.
  */
 
+import { refineTool } from '../select-mask.ts'
 import { brushTool, eraserTool } from './brush.ts'
+import { cloneStampTool, healingBrushTool } from './clone.ts'
 import { cropTool } from './crop.ts'
 import { eyedropperTool } from './eyedropper.ts'
 import { bucketTool, gradientTool } from './fill.ts'
@@ -11,7 +13,6 @@ import { healTool } from './heal.ts'
 import { moveTool } from './move.ts'
 import { objectSelectTool } from './object-select.ts'
 import { lassoTool, marqueeTools, polygonLassoTool, wandTool } from './select.ts'
-import { refineTool } from '../select-mask.ts'
 import { shapeTool } from './shape.ts'
 import type { ToolId } from './state.ts'
 import { typeTool } from './type.ts'
@@ -29,7 +30,9 @@ export const HANDLERS: Partial<Record<ToolId, ToolHandler>> = {
   crop: cropTool,
   eyedropper: eyedropperTool,
   heal: healTool,
+  healing: healingBrushTool,
   brush: brushTool,
+  clone: cloneStampTool,
   eraser: eraserTool,
   bucket: bucketTool,
   gradient: gradientTool,

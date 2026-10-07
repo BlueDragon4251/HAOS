@@ -48,11 +48,13 @@ import {
   $autoSelect,
   $brush,
   $bucket,
+  $clone,
   $eraser,
   $eyedropper,
   $foreground,
   $gradient,
   $heal,
+  $healing,
   $marquee,
   $objectSelect,
   $refineBrush,
@@ -63,6 +65,7 @@ import {
   $type,
   $wand,
   type BrushOptions,
+  type CloneOptions,
   type ShapeTool,
   toolDef,
   type TypeOptions
@@ -161,6 +164,23 @@ function SelectionModes() {
 }
 
 const patch = <T extends object>(store: { get(): T; set(value: T): void }, change: Partial<T>) => store.set({ ...store.get(), ...change })
+
+function CloneFields({ store, doc, healing }: { store: typeof $clone; doc: CanvasDocument; healing: boolean }) {
+  const options = useStore(store)
+  const set = (change: Partial<CloneOptions>) => patch(store, change)
+
+  return (
+    <>
+      <BrushFields store={store} doc={doc} />
+      <Check label="Aligned" checked={options.aligned} onChange={(aligned) => set({ aligned })} />
+      <select aria-label="Sample" title="What the copy comes from" value={options.allLayers ? 'all' : 'current'} onChange={(event) => set({ allLayers: event.target.value === 'all' })} className="glass-input h-6 rounded-md px-1 text-[12px] text-fg outline-none">
+        <option value="current">Sample: this layer</option>
+        <option value="all">Sample: all layers</option>
+      </select>
+      <span className="text-fg-3">{healing ? 'Alt-click a source, then paint: the copy takes on the colour around each stroke.' : 'Alt-click where to copy from, then paint.'}</span>
+    </>
+  )
+}
 
 function BrushFields({ store, doc }: { store: typeof $brush; doc: CanvasDocument }) {
   const options = useStore(store) as BrushOptions
@@ -548,6 +568,8 @@ export function OptionsBar({ doc }: { doc: CanvasDocument }) {
       )}
       {tool === 'brush' && <BrushFields store={$brush} doc={doc} />}
       {tool === 'eraser' && <BrushFields store={$eraser} doc={doc} />}
+      {tool === 'clone' && <CloneFields store={$clone} doc={doc} healing={false} />}
+      {tool === 'healing' && <CloneFields store={$healing} doc={doc} healing />}
       {tool === 'bucket' && (
         <>
           <NumberField label="Tolerance" value={bucket.tolerance} min={0} max={255} width="w-12" onChange={(tolerance) => patch($bucket, { tolerance })} />

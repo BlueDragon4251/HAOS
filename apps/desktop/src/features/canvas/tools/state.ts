@@ -1,10 +1,11 @@
 /*
  * The tool in hand and every tool's options, shared by the tool palette, the options bar, the
- * viewport and the shortcuts. Tools that share a key (the marquees, the lassos, the bucket and the
- * gradient) form a group: the palette shows the one used last, and the key again moves to the next.
+ * viewport and the shortcuts. Tools that share a key (the marquees, the lassos, the healing brushes,
+ * the bucket and the gradient) form a group: the palette shows the one used last, and the key again
+ * moves to the next.
  */
 
-import { atom } from 'nanostores'
+import { atom, type WritableAtom } from 'nanostores'
 import type { TextAlignment } from '../../../../shared/canvas/comp-format.ts'
 import type { AlignTo } from '../engine/align.ts'
 import type { SelectionMode } from '../engine/selection.ts'
@@ -21,6 +22,8 @@ export type ToolId =
   | 'eyedropper'
   | 'brush'
   | 'heal'
+  | 'healing'
+  | 'clone'
   | 'eraser'
   | 'bucket'
   | 'gradient'
@@ -50,7 +53,9 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'crop', label: 'Crop', key: 'c', group: 'crop' },
   { id: 'eyedropper', label: 'Eyedropper', key: 'i', group: 'eyedropper' },
   { id: 'heal', label: 'Spot Healing Brush', key: 'j', group: 'heal' },
+  { id: 'healing', label: 'Healing Brush', key: 'j', group: 'heal' },
   { id: 'brush', label: 'Brush', key: 'b', group: 'brush' },
+  { id: 'clone', label: 'Clone Stamp', key: 's', group: 'clone' },
   { id: 'eraser', label: 'Eraser', key: 'e', group: 'eraser' },
   { id: 'bucket', label: 'Paint Bucket', key: 'g', group: 'fill' },
   { id: 'gradient', label: 'Gradient', key: 'g', group: 'fill' },
@@ -136,6 +141,16 @@ export interface BrushOptions {
 export const $brush = atom<BrushOptions>({ size: 30, hardness: 0.8, opacity: 1, flow: 1, spacing: 0.12 })
 export const $eraser = atom<BrushOptions>({ size: 50, hardness: 0.8, opacity: 1, flow: 1, spacing: 0.12 })
 
+export interface CloneOptions extends BrushOptions {
+  /** Keep the distance to the source from one stroke to the next, rather than copying from the source point again. */
+  aligned: boolean
+  /** Copy what every layer shows together, rather than the layer painted on. */
+  allLayers: boolean
+}
+
+export const $clone = atom<CloneOptions>({ size: 60, hardness: 0.7, opacity: 1, flow: 1, spacing: 0.1, aligned: true, allLayers: false })
+export const $healing = atom<CloneOptions>({ size: 60, hardness: 0.7, opacity: 1, flow: 1, spacing: 0.1, aligned: true, allLayers: false })
+
 /** How a new selection goes with the one there is (Shift adds, Alt takes away, both intersect). */
 export const $selectionMode = atom<SelectionMode>('new')
 export const $marquee = atom({ feather: 0 })
@@ -166,8 +181,8 @@ export const $type = atom<TypeOptions>({ family: 'Helvetica', weight: 400, itali
 export const $refineBrush = atom({ size: 40 })
 
 /** The painting tool's options atom, for the keys that change size and opacity. */
-export function paintOptionsFor(tool: ToolId): typeof $brush | null {
-  return tool === 'brush' ? $brush : tool === 'eraser' ? $eraser : null
+export function paintOptionsFor(tool: ToolId): WritableAtom<BrushOptions> | null {
+  return tool === 'brush' ? $brush : tool === 'eraser' ? $eraser : tool === 'clone' ? $clone : tool === 'healing' ? $healing : null
 }
 /** The next brush size for `[` and `]`, in steps that grow with the size. */
 export function stepSize(size: number, direction: 1 | -1): number {
