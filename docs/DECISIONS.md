@@ -273,8 +273,9 @@ an aarch64 qcow2 that boots straight into Herald OS.
   `edge` follows `main`.
 - **Software on an image.** `/usr` is read-only, so apps come from Flatpak, command-line tools go
   into `~/.local` (npm, mise) or a toolbox container, and `dnf install` stays a development-VM tool.
-- **The installer asks little.** Anaconda with a kickstart that encrypts the disk by default and
-  offers installing beside Windows; a kickstart passed with `inst.ks=` installs unattended. The
+- **The installer asks little.** Anaconda with a kickstart that leaves the storage screen to the
+  person, who can encrypt the disk (Anaconda's "Encrypt my data", off by default) and install
+  beside Windows; a kickstart passed with `inst.ks=` installs unattended. The
   first-boot setup in the shell (name, password, Wi-Fi, Hermes sign-in) also covers handing a machine
   to a new owner, which `herald-os reset` returns to.
 - **Secure by default on release images.** firewalld with only LocalSend and mDNS open, SSH off,
