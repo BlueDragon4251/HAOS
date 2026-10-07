@@ -1098,6 +1098,7 @@ CANVAS_ACTIONS: dict[str, str] = {
     "remove_layer": "canvas.removeLayer",
     "group": "canvas.group",
     "add_adjustment": "canvas.addAdjustment",
+    "auto_adjust": "canvas.autoAdjust",
     "set_adjustment": "canvas.setAdjustment",
     "set_effects": "canvas.setEffects",
     "mask": "canvas.mask",
@@ -1130,6 +1131,7 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "remove_layer": ("project", "layer"),
     "group": ("project", "layers", "name", "above", "folder"),
     "add_adjustment": ("project", "kind", "settings", "name", "opacity", "blend", "above", "folder", "clip"),
+    "auto_adjust": ("project", "kind", "cutoff", "name", "above", "folder", "clip"),
     "set_adjustment": ("project", "layer", "settings", "opacity", "blend"),
     "set_effects": ("project", "layer", "effects", "clear"),
     "mask": ("project", "layer", "mask"),
@@ -1138,7 +1140,7 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "add_shape": ("project", "kind", "x", "y", "width", "height", "color", "radius", "lineWidth", "name", "opacity", "blend", "above", "folder", "clip"),
     "set_shape": ("project", "layer", "kind", "color", "radius", "lineWidth"),
     "resize": ("project", "width", "height", "anchor", "scale", "image", "resample"),
-    "crop": ("project", "x", "y", "width", "height"),
+    "crop": ("project", "x", "y", "width", "height", "ratio", "angle"),
     "align": ("project", "layers", "edge", "to", "margin", "distribute"),
     "export": ("project", "to", "format", "quality", "scale", "overwrite"),
     "save": ("project", "to", "overwrite"),
@@ -1158,7 +1160,7 @@ CANVAS_SCHEMA = _schema(
     "canvas",
     "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
-    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, set_shape, add_adjustment, set_adjustment, group and remove_layer; align lines layers up (or distributes them) exactly; auto_adjust fixes a photo's tone or colour cast as an editable Levels layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=history lists every step (undo or redo with steps to move through them); action=export writes PNG, JPEG, WebP or a layered PSD; action=open takes .psd files with their layers. "
     "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something). place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
@@ -1184,7 +1186,8 @@ CANVAS_SCHEMA = _schema(
         "image": _desc(_BOOL, "resize: scale the whole image to width/height instead of changing the canvas"),
         "resample": _desc(_BOOL, "resize: when scaling, recalculate layer pixels too (default true)"),
         "gradient": _desc(_STR, "add_layer: comma-separated colours of a linear gradient"),
-        "angle": _desc(_NUM, "add_layer: gradient direction in degrees (0 left to right, 90 top to bottom)"),
+        "angle": _desc(_NUM, "add_layer: gradient direction in degrees (0 left to right, 90 top to bottom); crop: degrees to turn the picture clockwise first, to level a horizon (negative turns it counterclockwise), then the crop keeps the largest box with no empty corners"),
+        "ratio": _desc(_STR, "crop: width:height to hold the box to, e.g. 1:1, 4:5, 3:2, 16:9, 9:16 or original; alone it keeps the largest centred box of that shape"),
         "fit": _enum("contain", "cover", "none", "stretch", description="add_layer: how a picture fills the canvas when no box is given; place_image: cover (the default), contain or stretch in its box"),
         "x": _desc(_NUM, "Left edge in canvas pixels (add_text with align=center or right: the centre or right edge)"),
         "y": _desc(_NUM, "Top edge in canvas pixels"),
@@ -1203,7 +1206,8 @@ CANVAS_SCHEMA = _schema(
         "above": _desc(_STR, "Put the new layer right above this one"),
         "folder": _desc(_STR, "new: where the project goes; add_layer, add_adjustment: put it in this folder; set_layer: move into it (\"none\" takes it out)"),
         "clip": _desc(_BOOL, "Clip to the layer below (shows only where it has pixels); false lets go"),
-        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape, set_shape: rectangle, rounded, ellipse or line"),
+        "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape, set_shape: rectangle, rounded, ellipse or line; auto_adjust: tone (the default), contrast or color"),
+        "cutoff": _desc(_NUM, "auto_adjust: percentage of the darkest and of the lightest pixels to ignore, 0 to 10 (0.1)"),
         "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}; set_adjustment: settings merged over the layer's own", "additionalProperties": True},
         "effects": {
             "type": "object",

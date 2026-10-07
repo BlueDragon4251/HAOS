@@ -27,6 +27,8 @@ import {
   withLayer
 } from './engine/document.ts'
 import { baseName } from '../../../shared/canvas/files.ts'
+import { autoAdjustState } from './auto-adjust.ts'
+import { AUTO_LABELS, type AutoMode } from './engine/auto-levels.ts'
 import { ALIGN_LABELS, type AlignEdge, type AlignTo, alignState, automaticTarget, DISTRIBUTE_LABELS, type DistributeMode, distributeState, movableLayers } from './engine/align.ts'
 import { apply, boundsOf, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
 import { visibleEffects } from './engine/gpu/effects.ts'
@@ -35,6 +37,7 @@ import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
 import { flatten, readPicture } from './engine/project.ts'
 import { clipRect, Raster, type Rect, unionRect } from './engine/raster.ts'
 import { notify } from './store.ts'
+import { renderLayers } from './tools/screen.ts'
 import { $alignTo, $background, $foreground } from './tools/state.ts'
 
 /** An image file as a new layer, centred, shrunk to fit when it is larger than the canvas (pixels kept). */
@@ -259,6 +262,23 @@ export function movedState(state: DocState, ids: readonly string[], dx: number, 
   }
 
   return { ...state, layers: state.layers.map((layer) => (moving.has(layer.id) ? { ...layer, transform: moved(layer.transform, dx, dy) } : layer)) }
+}
+
+/** Image > Auto Tone, Auto Contrast or Auto Color: a Levels layer above the active one, worked out from the picture below it. */
+export function autoAdjust(doc: CanvasDocument, mode: AutoMode): void {
+  try {
+    const result = autoAdjustState(doc.state, mode, { render: renderLayers })
+
+    if (!result) {
+      notify(`${AUTO_LABELS[mode]} found nothing to change: the picture already spans the whole range`)
+
+      return
+    }
+
+    doc.commit(AUTO_LABELS[mode], result.state)
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error), 'error')
+  }
 }
 
 /** Layer > Align: the picked layers lined up by an edge or their centres, to the selection, each other or the canvas, as one step. */

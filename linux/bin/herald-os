@@ -1081,12 +1081,27 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.resize", payload
     if sub == "crop":
-        if len(words) != 4 or not all(re.fullmatch(r"-?\d+", word) for word in words):
+        # A box, a ratio, an angle to straighten by, or a box with either.
+        shaped = "ratio" in flags or "angle" in flags
+        if (words or not shaped) and (len(words) != 4 or not all(re.fullmatch(r"-?\d+", word) for word in words)):
             die(f"herald-os {CANVAS_USAGE}", 2)
         payload = dict(zip(("x", "y", "width", "height"), (int(word) for word in words)))
+        if "ratio" in flags:
+            payload["ratio"] = str(flags["ratio"])
+        if "angle" in flags:
+            payload["angle"] = float(str(flags["angle"]))
         if "project" in flags:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.crop", payload
+    if sub == "auto":
+        if len(words) > 1:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"kind": words[0]} if words else {}
+        if "cutoff" in flags:
+            payload["cutoff"] = float(str(flags["cutoff"]))
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.autoAdjust", payload
     if sub in ("align", "distribute"):
         if not words:
             die(f"herald-os {CANVAS_USAGE}", 2)

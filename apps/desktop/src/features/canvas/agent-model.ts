@@ -22,7 +22,9 @@ import {
   type Vec2
 } from '../../../shared/canvas/comp-format.ts'
 import type { AlignEdge, AlignTo, DistributeMode } from './engine/align.ts'
+import type { AutoMode } from './engine/auto-levels.ts'
 import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
+import { fitRatio, largestTurnedBox, ratioFrom } from './engine/crop.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
 import type { HistoryStep } from './engine/history.ts'
@@ -588,6 +590,31 @@ export function cropBox(state: { width: number; height: number }, args: Record<s
   return { x, y, width, height }
 }
 
+/**
+ * What a crop keeps: the box given (the rest of the canvas for what is left out), held to `ratio`
+ * around its centre; with `angle`, the picture is turned that many degrees clockwise first, and
+ * without a box the crop is the largest one (of the ratio, or the canvas's shape) the turned
+ * picture fills, so no empty corners show.
+ */
+export function cropPlan(state: { width: number; height: number }, args: Record<string, unknown>): { box: Rect; angle: number } {
+  const angle = finite(args.angle) ?? 0
+
+  if (Math.abs(angle) > 180) {
+    throw new Error(`angle is degrees from -180 to 180 (it was ${angle})`)
+  }
+
+  const ratio = ratioFrom(args.ratio, state)
+  const boxGiven = [args.x, args.y, args.width, args.height].some((value) => finite(value) !== undefined)
+
+  if (angle && !boxGiven) {
+    return { box: largestTurnedBox(state.width, state.height, angle, ratio ?? state.width / state.height), angle }
+  }
+
+  const box = cropBox(state, args)
+
+  return { box: ratio ? fitRatio(box, ratio) : box, angle }
+}
+
 /** A line's two ends from a box: it runs from (x, y) to (x + width, y + height). */
 export function lineEnds(args: Record<string, unknown>, canvas: { width: number; height: number }): [Vec2, Vec2] {
   const x = finite(args.x) ?? 0
@@ -887,6 +914,25 @@ export function distributeFrom(value: unknown): DistributeMode {
   }
 
   return mode
+}
+
+/** Which automatic fix, however it was written ("tone", "Auto Contrast", "colour"); tone when not given. */
+export function autoModeFrom(value: unknown): AutoMode {
+  const text = words(value).replace(/^auto\s*/, '').replace(/[^a-z]/g, '')
+
+  if (!text || text === 'tone' || text === 'levels') {
+    return 'tone'
+  }
+
+  if (text === 'contrast') {
+    return 'contrast'
+  }
+
+  if (text === 'color' || text === 'colour') {
+    return 'color'
+  }
+
+  throw new Error('kind is tone, contrast or color')
 }
 
 /** How many steps an undo or redo takes: one when not given, at most a thousand. */

@@ -3,6 +3,7 @@ import {
   IconAlignCenter,
   IconAlignLeft,
   IconAlignRight,
+  IconArrowsExchange,
   IconCheck,
   IconCircle,
   IconItalic,
@@ -19,6 +20,7 @@ import {
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
   IconLine,
+  IconRulerMeasure,
   IconSquare,
   IconSquareRounded,
   IconSquareToggle,
@@ -38,7 +40,8 @@ import { alignPicked, distributePicked } from './actions.ts'
 import { cannotSegment } from './ai/subject.ts'
 import { ALIGN_LABELS, type AlignEdge, type AlignTo, DISTRIBUTE_LABELS, type DistributeMode } from './engine/align.ts'
 import { $dialog } from './menus.ts'
-import { applyCrop, cancelCrop, $crop, cropRect } from './tools/crop.ts'
+import { CROP_RATIO_LABELS, CROP_RATIOS, type CropRatio } from './engine/crop.ts'
+import { $crop, $cropOptions, $straighten, applyCrop, cancelCrop, cropAngle, cropRect, setCropOptions } from './tools/crop.ts'
 import { warmObjectSelect } from './tools/object-select.ts'
 import {
   $alignTo,
@@ -431,14 +434,50 @@ function HealFields() {
 
 function CropFields({ doc }: { doc: CanvasDocument }) {
   useStore($crop)
+  const options = useStore($cropOptions)
+  const straightening = useStore($straighten)
   const rect = cropRect(doc)
+  const angle = cropAngle(doc)
 
   return (
     <>
+      <select aria-label="Ratio" title="Hold the box to a ratio" value={options.ratio} onChange={(event) => setCropOptions(doc, { ratio: event.target.value as CropRatio })} className="glass-input h-6 rounded-md px-1 text-[12px] text-fg outline-none">
+        {CROP_RATIOS.map((ratio) => (
+          <option key={ratio} value={ratio}>
+            {CROP_RATIO_LABELS[ratio]}
+          </option>
+        ))}
+      </select>
+      {options.ratio === 'custom' && (
+        <>
+          <NumberField label="W" value={options.custom[0]} min={0.01} max={10_000} step={0.1} width="w-12" onChange={(value) => setCropOptions(doc, { custom: [value, options.custom[1]] })} />
+          <NumberField label="H" value={options.custom[1]} min={0.01} max={10_000} step={0.1} width="w-12" onChange={(value) => setCropOptions(doc, { custom: [options.custom[0], value] })} />
+        </>
+      )}
+      <button
+        type="button"
+        title="Swap width and height (portrait and landscape)"
+        aria-label="Swap width and height"
+        aria-pressed={options.swapped}
+        disabled={options.ratio === 'free'}
+        onClick={() => setCropOptions(doc, { swapped: !options.swapped })}
+        className={cn('grid size-6 place-items-center rounded-md ring-1 ring-line disabled:opacity-35', options.swapped ? 'bg-white/14 text-fg' : 'text-fg-3 hover:text-fg')}
+      >
+        <IconArrowsExchange size={13} />
+      </button>
+      <button
+        type="button"
+        title="Straighten: draw a line along the horizon or a wall"
+        aria-pressed={straightening}
+        onClick={() => $straighten.set(!straightening)}
+        className={cn('flex h-6 items-center gap-1 rounded-md px-1.5 ring-1 ring-line', straightening ? 'bg-white/14 text-fg' : 'text-fg-3 hover:text-fg')}
+      >
+        <IconRulerMeasure size={13} /> Straighten
+      </button>
       <span className="tabular-nums text-fg-2">
-        {rect.width} × {rect.height} px
+        {rect.width} × {rect.height} px{angle ? ` · turned ${angle}°` : ''}
       </span>
-      <span className="text-fg-3">Drag the handles or a new box; layers keep their pixels.</span>
+      <span className="text-fg-3">{straightening ? 'Draw a line along something that should be level.' : 'Drag the handles or a new box; layers keep their pixels.'}</span>
       <Confirm onApply={() => applyCrop(doc)} onCancel={cancelCrop} />
     </>
   )

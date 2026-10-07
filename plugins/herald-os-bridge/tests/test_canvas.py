@@ -71,6 +71,8 @@ def test_text_shape_and_canvas_actions_pass_their_arguments(plugin):
     assert args == {"scale": 0.5, "resample": False}
     _, command, args = tools.canvas_command({"action": "crop", "x": 0, "y": 100, "width": 1080, "height": 1350})
     assert (command, args) == ("canvas.crop", {"x": 0, "y": 100, "width": 1080, "height": 1350})
+    _, command, args = tools.canvas_command({"action": "crop", "ratio": "4:5", "angle": -1.5, "kind": "x"})
+    assert (command, args) == ("canvas.crop", {"ratio": "4:5", "angle": -1.5})
 
 
 def test_the_schema_offers_every_action_and_argument(plugin):
@@ -143,6 +145,13 @@ def test_export_takes_a_layered_psd(plugin):
     _, command, args = tools.canvas_command({"action": "export", "to": "~/Desktop/poster.psd", "format": "psd"})
     assert (command, args) == ("canvas.export", {"to": "~/Desktop/poster.psd", "format": "psd"})
     assert "psd" in tools.CANVAS_SCHEMA["parameters"]["properties"]["format"]["enum"]
+
+
+def test_auto_adjust_adds_a_levels_layer(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "auto_adjust", "kind": "color", "cutoff": 0.2, "clip": True, "settings": {"x": 1}})
+    assert (command, args) == ("canvas.autoAdjust", {"kind": "color", "cutoff": 0.2, "clip": True})
+    assert "auto_adjust" in tools.CANVAS_SCHEMA["parameters"]["properties"]["action"]["enum"]
 
 
 def test_align_lines_layers_up_or_distributes_them(plugin):

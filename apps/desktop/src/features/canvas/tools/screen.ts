@@ -5,7 +5,7 @@
  * viewport the document is flattened offscreen instead.
  */
 
-import type { CanvasDocument } from '../engine/document.ts'
+import type { CanvasDocument, DocState } from '../engine/document.ts'
 import type { ScreenRenderer } from '../engine/gpu/view.ts'
 import { flatten } from '../engine/project.ts'
 import { clipRect, type Raster, type Rect } from '../engine/raster.ts'
@@ -53,6 +53,14 @@ export function compositeArea(doc: CanvasDocument, area?: Rect): Raster {
 
 /** Every visible layer together, document sized, straight alpha. */
 export const compositeOf = (doc: CanvasDocument): Raster => compositeArea(doc)
+
+/** Some of a document's layers composited at a scale (1 is full size), drawn where the layers already are. */
+export function renderLayers(state: DocState, only: ReadonlySet<string>, scale: number): Raster {
+  const raster = flatten(state, scale, null, { only, compositor: screen?.compositor })
+  screen?.borrowed()
+
+  return raster
+}
 
 /** A small picture of the document as it is, at most `side` pixels on its long side. */
 export function thumbnailOf(doc: CanvasDocument, side = 64): Raster {

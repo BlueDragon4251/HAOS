@@ -7,7 +7,7 @@
 
 import type { Guide, LayerTransform, Vec2 } from '../../../../shared/canvas/comp-format.ts'
 import type { CanvasLayer, DocState } from './document.ts'
-import { decompose, type Mat, multiply, scale, tidy, unitToDocument } from './geometry.ts'
+import { decompose, type Mat, multiply, rotate, scale, tidy, translate, unitToDocument } from './geometry.ts'
 import { Raster, type Rect, resample } from './raster.ts'
 
 export const ANCHORS = ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] as const
@@ -155,6 +155,25 @@ export function rotateCanvas(state: DocState, turns: 1 | 2 | 3): DocState {
     layers: state.layers.map((layer) => ({ ...layer, transform: carried(layer.transform, m), ...(layer.maskPlacement ? { maskPlacement: carried(layer.maskPlacement, m) } : {}) })),
     guides: state.guides.map(guide),
     selection: state.selection ? rotateRaster(state.selection, turns) : null
+  }
+}
+
+/**
+ * Every layer turned `degrees` clockwise around the canvas's centre (for straightening): placements
+ * turn, pixels stay as they are. The canvas keeps its size, so a crop usually follows; the
+ * selection goes, as it no longer fits the picture.
+ */
+export function rotateLayers(state: DocState, degrees: number): DocState {
+  if (!degrees) {
+    return state
+  }
+
+  const m = multiply(translate(state.width / 2, state.height / 2), multiply(rotate(degrees), translate(-state.width / 2, -state.height / 2)))
+
+  return {
+    ...state,
+    layers: state.layers.map((layer) => ({ ...layer, transform: carried(layer.transform, m), ...(layer.maskPlacement ? { maskPlacement: carried(layer.maskPlacement, m) } : {}) })),
+    selection: null
   }
 }
 

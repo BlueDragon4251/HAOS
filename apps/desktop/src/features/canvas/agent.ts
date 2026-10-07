@@ -14,9 +14,10 @@ import {
   alignEdgesFrom,
   alignFrom,
   alignToFrom,
+  autoModeFrom,
   backgroundModeFrom,
   blendFrom,
-  cropBox,
+  cropPlan,
   describeHistory,
   describeLayer,
   describeLayers,
@@ -45,8 +46,10 @@ import {
   stepCount,
   stepThrough
 } from './agent-model.ts'
+import { autoAdjustState } from './auto-adjust.ts'
 import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
-import { anchorOffset, cropCanvas, resizeCanvas, scaleImage } from './engine/canvas-size.ts'
+import { AUTO_LABELS } from './engine/auto-levels.ts'
+import { anchorOffset, cropCanvas, resizeCanvas, rotateLayers, scaleImage } from './engine/canvas-size.ts'
 import {
   adjustmentLayer,
   blankLayer,
@@ -73,6 +76,7 @@ import { Raster, type Rect, resample } from './engine/raster.ts'
 import { shapeBox, shapeName } from './engine/shapes.ts'
 import { textStyle } from './engine/text.ts'
 import { openInCanvas } from './open.ts'
+import { renderLayers } from './tools/screen.ts'
 import { makeShapeLayer, makeTextLayer, restyleShape, restyleText } from './text-layers.ts'
 
 export interface Target {
@@ -571,6 +575,29 @@ export async function addAdjustment(args: Record<string, unknown>): Promise<Outc
 
 const layerName = (args: Record<string, unknown>): string | undefined => (typeof args.name === 'string' && args.name.trim() ? args.name.trim() : undefined)
 
+/** Auto Tone, Auto Contrast or Auto Color as an editable Levels layer, worked out from the picture under it. */
+export async function autoAdjust(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const mode = autoModeFrom(args.kind)
+  const cutoff = finite(args.cutoff)
+
+  if (cutoff !== undefined && (cutoff < 0 || cutoff > 10)) {
+    throw new Error(`cutoff is the percentage of the darkest and lightest pixels to ignore, from 0 to 10 (it was ${cutoff})`)
+  }
+
+  const render = on.live ? renderLayers : (state: DocState, only: ReadonlySet<string>, scale: number) => flatten(state, scale, null, { only })
+  const result = autoAdjustState(on.doc.state, mode, { place: placementFrom(on.doc.state, args), clip: cutoff === undefined ? undefined : cutoff / 100, name: layerName(args), render })
+
+  if (!result) {
+    return { summary: `${AUTO_LABELS[mode]} found nothing to change: the picture already spans the whole range` }
+  }
+
+  const next = args.clip === true ? setClipped(result.state, result.layer.id, true) : result.state
+  await apply(on, AUTO_LABELS[mode], next)
+
+  return { summary: `Added ${AUTO_LABELS[mode]} as a Levels layer, “${result.layer.name}” (change it with canvas.setAdjustment)`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, result.layer.id)!) } }
+}
+
 /** A colour argument as the format's red, green and blue (0 to 1). */
 const unitColour = (value: unknown, fallback: string) => {
   const [r, g, b] = parseColor(value === undefined || value === '' ? fallback : value)
@@ -848,13 +875,13 @@ export async function align(args: Record<string, unknown>): Promise<Outcome> {
   return { summary: `${names}: ${edges.map((edge) => (edge === 'center' ? 'centred across' : edge === 'middle' ? 'centred down' : edge)).join(' and ')} on ${where}${moved ? '' : ' (already there)'}`, data: described() }
 }
 
-/** Crop the canvas to a box; layers keep their pixels. */
+/** Crop the canvas to a box (held to a ratio, after turning the picture level when asked); layers keep their pixels. */
 export async function crop(args: Record<string, unknown>): Promise<Outcome> {
   const on = await target(args.project)
-  const box = cropBox(on.doc.state, args)
-  await apply(on, 'Crop', cropCanvas(on.doc.state, box))
+  const { box, angle } = cropPlan(on.doc.state, args)
+  await apply(on, angle ? 'Straighten' : 'Crop', cropCanvas(rotateLayers(on.doc.state, angle), box))
 
-  return { summary: `Cropped ${on.doc.name} to ${box.width}×${box.height} from (${box.x}, ${box.y})`, data: { ...box } }
+  return { summary: `${angle ? `Turned ${on.doc.name} ${angle}° and cropped it` : `Cropped ${on.doc.name}`} to ${box.width}×${box.height} from (${box.x}, ${box.y})`, data: { ...box, ...(angle ? { angle } : {}) } }
 }
 
 const exportKind = (file: string, format: unknown): ExportKind | 'psd' => {

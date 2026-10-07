@@ -250,9 +250,15 @@ export const canvasCommands: readonly OsCommand[] = [
   {
     id: 'canvas.crop',
     title: 'Crop an image',
-    description: 'Crop the canvas to a box (canvas pixels from the top-left). Layers keep their pixels, so it can be undone without loss.',
+    description:
+      'Crop the canvas to a box (canvas pixels from the top-left), or to a ratio: ratio=4:5 alone keeps the largest centred 4:5 box, and with a box it trims the box to that shape around its centre. angle turns the picture that many degrees clockwise first, to level a horizon (negative turns it counterclockwise), and then crops to the largest box the turned picture fills. Layers keep their pixels, so it can be undone without loss.',
     tier: 'act',
-    args: [project, ...box('of the box to keep')],
+    args: [
+      project,
+      ...box('of the box to keep'),
+      { name: 'ratio', type: 'string', description: 'Width:height to hold the box to: 1:1, 4:5, 3:2, 16:9, 9:16, original, or a number like 1.5' },
+      { name: 'angle', type: 'number', description: 'Degrees to turn the picture clockwise before cropping, to straighten it (−180 to 180)' }
+    ],
     run: async (args) => done((await canvas()).crop(args))
   },
   {
@@ -285,6 +291,21 @@ export const canvasCommands: readonly OsCommand[] = [
       ...where
     ],
     run: async (args) => done((await canvas()).addAdjustment(args))
+  },
+  {
+    id: 'canvas.autoAdjust',
+    title: 'Auto Tone, Auto Contrast or Auto Color',
+    description:
+      'Fix a photo’s tone or colour cast automatically from its histogram, as an editable Levels adjustment layer above the active layer (or where asked): kind=tone stretches each channel to the full range (the usual first step for a dull photo), contrast stretches the three together so colours keep their balance, color also neutralises a cast in the shadows, highlights and near-gray midtones. cutoff is the percentage of the darkest and lightest pixels ignored (0.1). Change the result later with canvas.setAdjustment.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'kind', type: 'string', description: 'tone (the default), contrast or color' },
+      { name: 'cutoff', type: 'number', description: 'Percentage of the darkest and of the lightest pixels to ignore, 0 to 10 (0.1)' },
+      { name: 'name', type: 'string', description: 'The layer name (Auto Tone, Auto Contrast or Auto Color)' },
+      ...where
+    ],
+    run: async (args) => done((await canvas()).autoAdjust(args))
   },
   {
     id: 'canvas.setAdjustment',
