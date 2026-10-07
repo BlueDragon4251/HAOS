@@ -118,7 +118,9 @@
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Herald OS controls applications on your behalf when you ask it to.",
         "NSMicrophoneUsageDescription": "Herald OS uses the microphone for voice input.",
-        "NSCameraUsageDescription": "Herald OS shows your camera in a bubble while you record the screen, when you turn it on."
+        "NSCameraUsageDescription": "Herald OS shows your camera in a bubble while you record the screen, when you turn it on.",
+        "NSCalendarsFullAccessUsageDescription": "Herald OS shows today's events on the Overview, and gives their titles and times to Hermes when you turn on Pick up where you left off.",
+        "NSCalendarsUsageDescription": "Herald OS shows today's events on the Overview, and gives their titles and times to Hermes when you turn on Pick up where you left off."
       }
     },
     "dmg": {
