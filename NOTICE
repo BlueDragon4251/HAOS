@@ -28,9 +28,7 @@ https://github.com/microsoft/onnxruntime), which runs Herald Canvas's on-device
 models, and ag-psd (MIT, https://github.com/Agamnentzar/ag-psd), which reads and
 writes Photoshop documents, with its dependencies pako (MIT and Zlib,
 https://github.com/nodeca/pako) and base64-js (MIT,
-https://github.com/beatgammit/base64-js). Herald Canvas's `.comp` projects are
-implemented from Compositor's public documentation
-(https://github.com/robbietilton/Compositor); no Compositor code is included.
-The models themselves are not distributed with Herald OS: Herald Canvas
-downloads each from where its publisher put it, only after the person allows
-it, and each keeps its own license (listed in apps/desktop/shared/canvas/models.ts).
+https://github.com/beatgammit/base64-js). The models themselves are not
+distributed with Herald OS: Herald Canvas downloads each from where its
+publisher put it, only after the person allows it, and each keeps its own
+license (listed in apps/desktop/shared/canvas/models.ts).

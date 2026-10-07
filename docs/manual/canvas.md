@@ -144,8 +144,8 @@ model: when one is missing it asks you to allow it in the window.
 
 ## Compositor compatibility
 
-The `.comp` format (version 11) is implemented from Compositor's public documentation, so a project
-moves between Herald Canvas on Linux or a Mac and Compositor on a Mac. Herald holds every value to
+Herald Canvas reads and writes the `.comp` format (version 11), so a project moves between Herald
+Canvas on Linux or a Mac and Compositor on a Mac. Herald holds every value to
 the ranges Compositor accepts (it refuses a whole project over one value outside them) and says
 which field is wrong when a change would leave a range. Fields it does not use, such as
 Compositor's own settings, are kept as they were. Text keeps Compositor's per-letter colour and
