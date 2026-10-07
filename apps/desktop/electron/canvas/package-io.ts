@@ -167,26 +167,71 @@ export async function writePackage(dir: string, request: WriteRequest): Promise<
  * that does not load, so a half-written project shows once it is complete.
  */
 export class PackageWatcher {
-  private watcher: FSWatcher | null = null
+  private readonly watchers = new Map<string, FSWatcher>()
+  private poll: NodeJS.Timeout | null = null
   private timer: NodeJS.Timeout | null = null
   private known: string
+  private stamp = ''
   private writing = 0
+  private running = false
 
   constructor(
     private readonly dir: string,
     digest: string,
     private readonly onChange: (contents: PackageContents) => void,
-    private readonly delayMs = 350
+    private readonly delayMs = 350,
+    private readonly pollMs = 2000
   ) {
     this.known = digest
   }
 
   start(): void {
-    try {
-      this.watcher = watch(this.dir, { recursive: true }, () => this.schedule())
-      this.watcher.on('error', () => this.stop())
-    } catch {
-      this.watcher = null
+    this.running = true
+    this.watchFolders()
+    void this.manifestStamp().then(stamp => {
+      this.stamp ||= stamp
+    })
+    // Some file systems (network shares, some containers) report no events: the manifest's time and size still move.
+    this.poll = setInterval(() => void this.probe(), this.pollMs)
+    this.poll.unref()
+  }
+
+  /**
+   * Each folder is watched on its own rather than recursively: on Linux a recursive watch follows
+   * files, so once a save renames a new manifest.json over the old one, later writes to it go
+   * unreported. A folder's watch sees every change to its entries, renames included.
+   */
+  private watchFolders(): void {
+    for (const folder of [this.dir, path.join(this.dir, 'images')]) {
+      if (this.watchers.has(folder)) {
+        continue
+      }
+
+      try {
+        const watcher = watch(folder, () => this.schedule())
+        watcher.on('error', () => {
+          watcher.close()
+          this.watchers.delete(folder)
+        })
+        this.watchers.set(folder, watcher)
+      } catch {
+        // No images folder yet: it is watched from the check that its creation schedules.
+      }
+    }
+  }
+
+  private async manifestStamp(): Promise<string> {
+    const stat = await fs.stat(path.join(this.dir, 'manifest.json')).catch(() => null)
+
+    return stat ? `${stat.mtimeMs}:${stat.size}` : ''
+  }
+
+  private async probe(): Promise<void> {
+    const stamp = await this.manifestStamp()
+
+    if (stamp !== this.stamp) {
+      this.stamp = stamp
+      this.schedule()
     }
   }
 
@@ -205,8 +250,17 @@ export class PackageWatcher {
   }
 
   stop(): void {
-    this.watcher?.close()
-    this.watcher = null
+    this.running = false
+
+    for (const watcher of this.watchers.values()) {
+      watcher.close()
+    }
+    this.watchers.clear()
+
+    if (this.poll) {
+      clearInterval(this.poll)
+      this.poll = null
+    }
 
     if (this.timer) {
       clearTimeout(this.timer)
@@ -215,6 +269,10 @@ export class PackageWatcher {
   }
 
   private schedule(): void {
+    if (!this.running) {
+      return
+    }
+
     if (this.timer) {
       clearTimeout(this.timer)
     }
@@ -232,10 +290,14 @@ export class PackageWatcher {
       return
     }
 
+    if (this.running) {
+      this.watchFolders()
+    }
+
     try {
       const contents = await readPackage(this.dir)
 
-      if (contents.digest !== this.known) {
+      if (this.running && contents.digest !== this.known) {
         this.known = contents.digest
         this.onChange(contents)
       }

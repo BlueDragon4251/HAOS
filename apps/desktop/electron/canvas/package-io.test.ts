@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defaultTransform, imageFileFor, maskFileFor, newManifest, parseManifestText } from '../../shared/canvas/comp-format.ts'
 import { PackageWatcher, readAsset, readPackage, writePackage } from './package-io.ts'
-import { decodePng } from './png.ts'
+import { decodePng, encodePng } from './png.ts'
 
 const A = '6F1D3C2A-0B7E-4E8A-9C4D-2A1B3C4D5E6F'
 const B = 'A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D'
@@ -87,9 +87,18 @@ describe('writePackage and readPackage', () => {
 })
 
 describe('PackageWatcher', () => {
-  const settle = () => new Promise(resolve => setTimeout(resolve, 200))
+  const settle = () => new Promise(resolve => setTimeout(resolve, 300))
 
-  it('reports a change made elsewhere, but not Herald saving its own work', async () => {
+  /** File events arrive later on a busy machine (CI), so wait for the outcome rather than a fixed time. */
+  async function until(condition: () => boolean, timeoutMs = 4000): Promise<void> {
+    const deadline = Date.now() + timeoutMs
+
+    while (!condition() && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+  }
+
+  it('reports a change made elsewhere, but not Herald saving its own work', { timeout: 10_000 }, async () => {
     const dir = await project()
     const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
     const first = await writePackage(dir, { manifest: twoLayers(), assets })
@@ -111,9 +120,32 @@ describe('PackageWatcher', () => {
       const theirs = twoLayers()
       theirs.layers[1].name = 'From Hermes'
       await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify(theirs))
-      await settle()
+      await until(() => seen.length > 0)
       expect(seen).toEqual(['From Hermes'])
       expect(parseManifestText(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')).layers[1].name).toBe('From Hermes')
+    } finally {
+      watcher.stop()
+    }
+  })
+
+  it('reports an image replaced elsewhere through a rename', { timeout: 10_000 }, async () => {
+    const dir = await project()
+    const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
+    const first = await writePackage(dir, { manifest: twoLayers(), assets })
+    const sizes: number[] = []
+    const watcher = new PackageWatcher(dir, first, contents => sizes.push(contents.assets[imageFileFor(B)]), 40)
+    watcher.start()
+
+    try {
+      const noise = { width: 2, height: 2, channels: 4 as const, data: Uint8Array.from({ length: 16 }, (_, i) => (i * 97) % 256) }
+      const file = path.join(dir, 'images', imageFileFor(B))
+      const before = (await fs.stat(file)).size
+      await fs.writeFile(`${file}.tmp`, encodePng(noise))
+      await fs.rename(`${file}.tmp`, file)
+      const after = (await fs.stat(file)).size
+      expect(after).not.toBe(before)
+      await until(() => sizes.length > 0)
+      expect(sizes).toEqual([after])
     } finally {
       watcher.stop()
     }
