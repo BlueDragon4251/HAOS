@@ -100,7 +100,7 @@ export const softwareCommands: readonly OsCommand[] = [
     }
   },
   {
-    id: 'software.local_model',
+    id: 'software.localModel',
     title: 'Use a local model',
     description: 'Point Hermes at a model running on this computer through Ollama or LM Studio. Without a model, lists the ones the server has.',
     tier: 'mutate',

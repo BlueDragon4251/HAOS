@@ -110,7 +110,7 @@ preview of the site.
 | "Add my backup script to the menu" | write `~/.config/herald-os/menu.json` (the `herald-os-tailor` skill has the format) |
 | "Put our company logo in About" / "Use this photo on the lock screen" | `os_ui` run `branding.set logo=<path>` / `branding.set lock=<path>` (`name=` for the line under the logo) |
 | "Install Claude Code" / "Get me Steam" / "Set up a Windows VM" / "What can I install?" | `os_ui` run `software.install name=...` (or `software.list`); on Linux `system_os` action=catalog_list / catalog_install id=... does the same. Say why when an entry is unavailable (the listing gives the reason) |
-| "Use my local model" / "Run Hermes on Ollama" | `os_ui` run `software.local_model server=ollama` to list models, then again with `model=...` |
+| "Use my local model" / "Run Hermes on Ollama" | `os_ui` run `software.localModel server=ollama` to list models, then again with `model=...` |
 | "Open Codex in the terminal" | `os_ui` run `software.agent name=codex` |
 | "Let me dictate into this app" / "I want to type an emoji" | `os_ui` run `dictation.toggle` / `emoji.pick` (the hotkeys are Super+Ctrl+X and Super+Ctrl+E, Cmd+Ctrl on a Mac) |
 | "Make Super+C copy like on Omarchy" | `os_ui` run `keymap.set keymap=omarchy` (Herald OS Linux; voice moves to Super+Shift+V) |
