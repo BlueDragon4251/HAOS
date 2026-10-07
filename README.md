@@ -40,6 +40,7 @@ Pick the way that matches your machine:
 | Your machine | What to install |
 | --- | --- |
 | A Mac with Apple Silicon | [Herald OS for macOS](#macos) |
+| An Intel Mac | [Herald OS Linux in a virtual machine, or the Mac app from source](#on-an-intel-mac) |
 | A PC you can give to Herald OS | [The Herald OS Linux installer](#herald-os-linux-on-a-pc) |
 | Arch Linux | [The Arch package](#arch-linux) |
 | Omarchy | [The Arch package, then one command](#omarchy) |
@@ -75,8 +76,33 @@ xattr -dr com.apple.quarantine "/Applications/Herald OS.app"
 
 Herald OS takes over the screen: `Cmd+Ctrl+F` leaves or re-enters fullscreen and `Cmd+Q` quits. On
 its first start it adds its system tools to Hermes (`~/.hermes/plugins/herald-os-bridge`). macOS asks
-for Screen Recording, Accessibility or Microphone access the first time a feature needs it: asking
-about the screen, typing an emoji into another app, or talking to Hermes.
+for each of these the first time a feature needs it:
+
+- **Microphone**: talking to Hermes, dictation, and screen recordings with sound.
+- **Camera**: the camera bubble on a screen recording, when you turn it on.
+- **Screen Recording**: asking Hermes about the screen, copying text or a QR code from it,
+  screenshots and screen recordings.
+- **Accessibility and Automation**: typing an emoji or dictation into another app (through System
+  Events), and Hermes listing or quitting apps, locking the screen, switching dark mode and moving
+  files to the Trash (through Finder).
+- **Calendars**: today's events on the Overview.
+- **Files and Folders**: your Desktop, Documents and Downloads, for recent files on the Overview,
+  the Files page and Hermes's file tools.
+- **Notifications**: alerts while you are in another app, in a code-signed build (this release is
+  not one yet).
+
+#### On an Intel Mac
+
+There is no Intel build of the Mac app (`npm run dist:mac` builds for Apple Silicon only), and the
+ready-made virtual machine (`linux/vm/try.sh`) needs Apple Silicon too. Instead:
+
+- **Herald OS Linux in a virtual machine.** Install the x86_64 installer ISO from
+  [Herald OS Linux on a PC](#herald-os-linux-on-a-pc) in a VM that boots with UEFI, such as
+  [UTM](https://mac.getutm.app). CI installs it in QEMU with UEFI, 4 cores, 6 GB of memory and a
+  40 GB disk ([installer-test.yml](.github/workflows/installer-test.yml)).
+- **The Mac app from source** on macOS 13 or later, as in
+  [Herald OS on macOS from source](#herald-os-on-macos-from-source). It is untested on Intel, though
+  node-pty, its native terminal module, ships Intel binaries.
 
 ### Herald OS Linux on a PC
 
