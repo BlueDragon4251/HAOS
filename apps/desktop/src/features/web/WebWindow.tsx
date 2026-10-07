@@ -1,11 +1,13 @@
 import { useStore } from '@nanostores/react'
-import { IconFile, IconLock, IconWorld } from '@tabler/icons-react'
+import { IconFile, IconLock, IconPhotoEdit, IconWorld } from '@tabler/icons-react'
 import { useMemo, useRef } from 'react'
+import { isCanvasImage } from '../../../shared/canvas/files.ts'
 import { Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { describeWebUrl } from '../../lib/web-url.ts'
 import { $webWindows } from '../../store/web-windows.ts'
 import type { OSWindow } from '../../store/windows.ts'
+import { openInCanvas } from '../canvas/open.ts'
 import { useNativeView } from './native-view.ts'
 
 /**
@@ -45,6 +47,16 @@ export function WebWindow({ win }: { win: OSWindow }) {
           )}
           {entry?.loading && <Spinner className="ml-auto shrink-0" />}
         </div>
+        {filePath && isCanvasImage(filePath) && (
+          <button
+            type="button"
+            onClick={() => openInCanvas(filePath)}
+            className="flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-fg-2 hover:bg-white/8 hover:text-fg"
+            title="Edit in Herald Canvas"
+          >
+            <IconPhotoEdit size={13} /> Edit
+          </button>
+        )}
       </div>
       <div ref={content} className="relative min-h-0 flex-1 bg-black/20">
         {!visible && (

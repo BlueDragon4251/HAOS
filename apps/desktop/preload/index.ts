@@ -4,6 +4,11 @@ import {
   type AuditEntry,
   type BackendState,
   type CalendarResult,
+  type CanvasChangedEvent,
+  type CanvasProject,
+  type CanvasRawImage,
+  type CanvasSaveKind,
+  type CanvasWrite,
   type CatalogGroupView,
   type CatalogResult,
   type SetupResult,
@@ -177,6 +182,23 @@ const api = {
     saveImage: (file: string, dataUrl: string): Promise<string> => ipcRenderer.invoke(IPC.captureSaveImage, file, dataUrl),
     copyImage: (source: string): Promise<void> => ipcRenderer.invoke(IPC.captureCopyImage, source),
     requestCamera: (): Promise<boolean> => ipcRenderer.invoke(IPC.cameraRequest)
+  },
+  canvas: {
+    /** A `.comp` project or an image to open (null when cancelled). */
+    pickOpen: (): Promise<string | null> => ipcRenderer.invoke(IPC.canvasPickOpen),
+    pickSave: (kind: CanvasSaveKind, suggestedName: string): Promise<string | null> => ipcRenderer.invoke(IPC.canvasPickSave, kind, suggestedName),
+    read: (project: string): Promise<CanvasProject> => ipcRenderer.invoke(IPC.canvasRead, project),
+    /** A layer image or mask: exact pixels, or PNG bytes when only the window can decode it. */
+    readAsset: (project: string, name: string): Promise<CanvasRawImage | Uint8Array> => ipcRenderer.invoke(IPC.canvasReadAsset, project, name),
+    /** Save a project (creating it if needed); resolves with its new digest. */
+    write: (project: string, request: CanvasWrite): Promise<string> => ipcRenderer.invoke(IPC.canvasWrite, project, request),
+    /** An image's pixels, or its bytes for the window to decode (HEIC, TIFF and RAW arrive converted). */
+    readImage: (file: string): Promise<CanvasRawImage | Uint8Array> => ipcRenderer.invoke(IPC.canvasReadImage, file),
+    /** Write an export: encoded bytes, or raw pixels to save as PNG. */
+    writeFile: (file: string, data: Uint8Array | CanvasRawImage, ppi?: number): Promise<string> => ipcRenderer.invoke(IPC.canvasWriteFile, file, data, ppi),
+    watch: (project: string): Promise<string> => ipcRenderer.invoke(IPC.canvasWatch, project),
+    unwatch: (watchId: string): Promise<void> => ipcRenderer.invoke(IPC.canvasUnwatch, watchId),
+    onChanged: (listener: (event: CanvasChangedEvent) => void): Unsubscribe => subscribe(IPC.canvasChanged, listener)
   },
   catalog: {
     /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */

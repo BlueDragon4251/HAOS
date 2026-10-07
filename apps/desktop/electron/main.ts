@@ -11,6 +11,7 @@ import { run } from './platform/exec.ts'
 import { startEventSources } from './events/sources.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
+import { registerCanvasIpc } from './canvas/ipc.ts'
 import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerControlsIpc } from './ipc/controls.ts'
 import { registerCatalogIpc } from './ipc/catalog.ts'
@@ -253,6 +254,7 @@ function registerCoreIpc(): void {
   )
 
   registerFsIpc(() => mainWindow)
+  registerCanvasIpc(() => mainWindow)
   registerAppsIpc()
   registerBridgeIpc()
   registerServiceIpc()

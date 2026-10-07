@@ -913,8 +913,52 @@ export const IPC = {
   clipboardPaste: 'herald-os:clipboard:paste',
   /** Desktop notifications from other apps (org.freedesktop.Notifications), pushed to the Hermes window. */
   notificationsIncoming: 'herald-os:notifications:incoming',
-  notificationsAction: 'herald-os:notifications:action'
+  notificationsAction: 'herald-os:notifications:action',
+
+  // Herald Canvas: `.comp` projects (a manifest and PNG layers), images to open and export, live reload.
+  canvasPickOpen: 'herald-os:canvas:pick-open',
+  canvasPickSave: 'herald-os:canvas:pick-save',
+  canvasRead: 'herald-os:canvas:read',
+  canvasReadAsset: 'herald-os:canvas:read-asset',
+  canvasWrite: 'herald-os:canvas:write',
+  canvasReadImage: 'herald-os:canvas:read-image',
+  canvasWriteFile: 'herald-os:canvas:write-file',
+  canvasWatch: 'herald-os:canvas:watch',
+  canvasUnwatch: 'herald-os:canvas:unwatch',
+  /** Main -> renderer: an open project changed on disk (Hermes, a script, Compositor). */
+  canvasChanged: 'herald-os:canvas:changed'
 } as const
+
+/** Raw pixels for a project image or an export: RGBA layers, grayscale masks. */
+export interface CanvasRawImage {
+  width: number
+  height: number
+  channels: 1 | 4
+  data: Uint8Array
+}
+
+/** A project as read from disk: its manifest (validated), its images' sizes, and a digest of both. */
+export interface CanvasProject {
+  path: string
+  manifest: unknown
+  assets: Record<string, number>
+  digest: string
+}
+
+export interface CanvasWrite {
+  manifest: unknown
+  /** Images to (re)write by name; the rest stay as they are on disk. */
+  assets: Record<string, CanvasRawImage>
+  /** Finder's preview (JPEG). */
+  preview?: Uint8Array
+}
+
+export type CanvasSaveKind = 'project' | 'png' | 'jpeg' | 'webp' | 'psd'
+
+export interface CanvasChangedEvent {
+  watchId: string
+  project: CanvasProject
+}
 
 export type PowerAction = 'suspend' | 'reboot' | 'poweroff' | 'logout' | 'lock'
 

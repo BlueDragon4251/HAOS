@@ -126,7 +126,7 @@ async function readFile(target: string): Promise<FilePreview> {
 }
 
 /** Paths the shell may write to directly (user-initiated edits). Everything else goes through the audited bridge. */
-function assertWritable(target: string): string {
+export function assertWritable(target: string): string {
   const file = normalizeUserPath(target)
   const home = os.homedir()
   const protectedRoots = [path.join(home, '.ssh'), path.join(home, 'Library', 'Keychains'), '/System', '/usr', '/bin', '/sbin', '/private/etc', '/Library']

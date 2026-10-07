@@ -13,6 +13,7 @@ const ChatPopout = lazy(() => import('../../features/hermes/ChatPopout.tsx').the
 const StudioWindow = lazy(() => import('../../features/studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
 const CaptureEditor = lazy(() => import('../../features/capture/CaptureEditor.tsx').then(m => ({ default: m.CaptureEditor })))
 const CameraBubble = lazy(() => import('../../features/capture/CameraBubble.tsx').then(m => ({ default: m.CameraBubble })))
+const CanvasWindow = lazy(() => import('../../features/canvas/CanvasWindow.tsx').then(m => ({ default: m.CanvasWindow })))
 
 const isFloatingAppId = (value: string): value is FloatingAppId => FLOATING_APPS.some(app => app.id === value)
 
@@ -33,6 +34,8 @@ function FloatingContent({ appId, payload }: { appId: FloatingAppId; payload: Re
       return <CameraBubble />
     case 'widget':
       return <WidgetWindow pluginId={typeof payload.plugin === 'string' ? payload.plugin : undefined} />
+    case 'canvas':
+      return <CanvasWindow payload={payload} />
     default:
       return null
   }

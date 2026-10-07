@@ -18,6 +18,8 @@ export interface MenuItemDef {
   disabled?: boolean
   /** Draw a divider above this item. */
   dividerBefore?: boolean
+  /** A keyboard shortcut shown at the right. */
+  hint?: string
 }
 
 export function Menu({ items, onClose, align = 'right', className }: { items: MenuItemDef[]; onClose: () => void; align?: 'left' | 'right'; className?: string }) {
@@ -70,6 +72,7 @@ export function Menu({ items, onClose, align = 'right', className }: { items: Me
           >
             {item.icon && <span className={cn(item.danger ? 'text-danger' : 'text-fg-3')}>{item.icon}</span>}
             <span className="flex-1">{item.label}</span>
+            {item.hint && <span className="pl-4 text-[11px] text-fg-3">{item.hint}</span>}
             {item.checked && <IconCheck size={14} className="text-accent-strong" />}
           </button>
         </div>

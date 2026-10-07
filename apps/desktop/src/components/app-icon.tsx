@@ -59,6 +59,14 @@ const PATHS: Record<AppIconId, React.ReactNode> = {
   ),
   code: <path d="M9 7 4 12l5 5M15 7l5 5-5 5M13 5l-2 14" />,
   studio: <path d="M12 3.5 5 20h3l1.4-3.5h5.2L16 20h3zM10.3 14 12 9.4l1.7 4.6z" />,
+  canvas: (
+    <>
+      <path d="M7.5 4.5h10a2 2 0 0 1 2 2v9" />
+      <rect x="4.5" y="7.5" width="12.5" height="12" rx="2" />
+      <path d="m6.8 17 3-3.5 2.3 2.3 1.4-1.5 2 2.2" />
+      <circle cx="13.3" cy="10.9" r="1.1" />
+    </>
+  ),
   documents: (
     <>
       <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9.5A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />

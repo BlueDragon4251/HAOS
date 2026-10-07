@@ -1,0 +1,171 @@
+/*
+ * Undo and redo for Herald Canvas. Document changes are snapshots of the (immutable) document state;
+ * pixel edits keep only the tiles a tool touched, before and after. History is bounded by memory,
+ * not by a step count, so a few big edits and many small ones both fit.
+ */
+
+import { clipRect, type Raster, type Rect } from './raster.ts'
+
+export interface HistoryEntry {
+  label: string
+  /** Roughly how much memory the entry holds. */
+  bytes: number
+  undo(): void
+  redo(): void
+}
+
+const DEFAULT_LIMIT = 768 * 1024 * 1024
+
+let nextEntryId = 1
+
+export class History {
+  private past: (HistoryEntry & { id: number })[] = []
+  private future: (HistoryEntry & { id: number })[] = []
+  private bytes = 0
+
+  constructor(private readonly limitBytes = DEFAULT_LIMIT) {}
+
+  /** The newest entry still applied, or 0 at the start: compare with a saved mark to know about edits. */
+  get position(): number {
+    return this.past.at(-1)?.id ?? 0
+  }
+
+  get canUndo(): boolean {
+    return this.past.length > 0
+  }
+
+  get canRedo(): boolean {
+    return this.future.length > 0
+  }
+
+  get undoLabel(): string | null {
+    return this.past.at(-1)?.label ?? null
+  }
+
+  get redoLabel(): string | null {
+    return this.future.at(-1)?.label ?? null
+  }
+
+  /** The applied steps, oldest first (for a History panel). */
+  get labels(): string[] {
+    return this.past.map((entry) => entry.label)
+  }
+
+  /** Record a change that has already happened. */
+  push(entry: HistoryEntry): void {
+    for (const dropped of this.future) {
+      this.bytes -= dropped.bytes
+    }
+
+    this.future = []
+    this.past.push({ ...entry, id: nextEntryId++ })
+    this.bytes += entry.bytes
+
+    // The oldest steps go first; the newest always stays even when it alone is over the limit.
+    while (this.bytes > this.limitBytes && this.past.length > 1) {
+      this.bytes -= this.past.shift()!.bytes
+    }
+  }
+
+  undo(): string | null {
+    const entry = this.past.pop()
+
+    if (!entry) {
+      return null
+    }
+
+    entry.undo()
+    this.future.push(entry)
+
+    return entry.label
+  }
+
+  redo(): string | null {
+    const entry = this.future.pop()
+
+    if (!entry) {
+      return null
+    }
+
+    entry.redo()
+    this.past.push(entry)
+
+    return entry.label
+  }
+
+  clear(): void {
+    this.past = []
+    this.future = []
+    this.bytes = 0
+  }
+}
+
+/** Steps that undo and redo as one. */
+export function combine(label: string, entries: HistoryEntry[]): HistoryEntry {
+  return {
+    label,
+    bytes: entries.reduce((sum, entry) => sum + entry.bytes, 0),
+    undo: () => [...entries].reverse().forEach((entry) => entry.undo()),
+    redo: () => entries.forEach((entry) => entry.redo())
+  }
+}
+
+const TILE = 128
+
+/**
+ * Pixel history for one raster: call `prepare` with each area before changing it, then `finish`
+ * once the tool is done. Only the touched tiles are kept.
+ */
+export class PixelEdit {
+  private readonly before = new Map<number, { rect: Rect; pixels: Uint8ClampedArray }>()
+  private readonly columns: number
+
+  constructor(readonly raster: Raster) {
+    this.columns = Math.ceil(raster.width / TILE)
+  }
+
+  get touched(): boolean {
+    return this.before.size > 0
+  }
+
+  prepare(area: Rect): void {
+    const rect = clipRect(area, this.raster.width, this.raster.height)
+
+    if (!rect) {
+      return
+    }
+
+    for (let ty = Math.floor(rect.y / TILE); ty <= Math.floor((rect.y + rect.height - 1) / TILE); ty++) {
+      for (let tx = Math.floor(rect.x / TILE); tx <= Math.floor((rect.x + rect.width - 1) / TILE); tx++) {
+        const key = ty * this.columns + tx
+
+        if (!this.before.has(key)) {
+          const tile = { x: tx * TILE, y: ty * TILE, width: Math.min(TILE, this.raster.width - tx * TILE), height: Math.min(TILE, this.raster.height - ty * TILE) }
+          this.before.set(key, { rect: tile, pixels: this.raster.read(tile) })
+        }
+      }
+    }
+  }
+
+  /** Every pixel is about to change (a fill or a filter over the whole layer). */
+  prepareAll(): void {
+    this.prepare(this.raster.bounds)
+  }
+
+  /** The history step, or null when no pixels were touched. */
+  finish(label: string): HistoryEntry | null {
+    if (!this.before.size) {
+      return null
+    }
+
+    const tiles = [...this.before.values()].map(({ rect, pixels }) => ({ rect, before: pixels, after: this.raster.read(rect) }))
+    const raster = this.raster
+
+    return {
+      label,
+      bytes: tiles.reduce((sum, tile) => sum + tile.before.byteLength * 2, 0),
+      undo: () => tiles.forEach((tile) => raster.write(tile.rect, tile.before)),
+      redo: () => tiles.forEach((tile) => raster.write(tile.rect, tile.after))
+    }
+  }
+}

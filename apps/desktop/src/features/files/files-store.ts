@@ -12,6 +12,8 @@ import { $activeSpace } from '../../store/spaces.ts'
 import { openFileWindow } from '../../store/web-windows.ts'
 import { showPage } from '../../store/windows.ts'
 import { isViewable } from '../../../shared/viewer.ts'
+import { isProjectPath } from '../../../shared/canvas/files.ts'
+import { openInCanvas } from '../canvas/open.ts'
 
 /*
  * Page-local state for Files: where we are, what is selected, how we look at it, plus the
@@ -772,6 +774,13 @@ export async function createTextFile(dir: string, name: string): Promise<string 
 }
 
 export function openItem(item: FileItem): void {
+  // A Herald Canvas project is a folder on Linux (a package on the Mac): it opens in Canvas.
+  if (isProjectPath(item.path)) {
+    openInCanvas(item.path)
+
+    return
+  }
+
   if (item.kind === 'directory') {
     navigate({ kind: 'dir', path: item.path })
 

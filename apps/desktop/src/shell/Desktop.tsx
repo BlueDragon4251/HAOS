@@ -31,6 +31,7 @@ const WebWindow = lazy(() => import('../features/web/WebWindow.tsx').then(m => (
 const StudioWindow = lazy(() => import('../features/studio/StudioWindow.tsx').then(m => ({ default: m.StudioWindow })))
 const CaptureEditor = lazy(() => import('../features/capture/CaptureEditor.tsx').then(m => ({ default: m.CaptureEditor })))
 const CameraBubble = lazy(() => import('../features/capture/CameraBubble.tsx').then(m => ({ default: m.CameraBubble })))
+const CanvasWindow = lazy(() => import('../features/canvas/CanvasWindow.tsx').then(m => ({ default: m.CanvasWindow })))
 
 function FloatingContent({ win }: { win: OSWindow }) {
   switch (win.appId) {
@@ -50,6 +51,8 @@ function FloatingContent({ win }: { win: OSWindow }) {
       return <CameraBubble />
     case 'widget':
       return <WidgetWindow pluginId={typeof win.payload?.plugin === 'string' ? win.payload.plugin : undefined} />
+    case 'canvas':
+      return <CanvasWindow payload={win.payload} />
     default:
       return null
   }

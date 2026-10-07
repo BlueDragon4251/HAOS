@@ -25,6 +25,7 @@ import { revealLabel } from '../../lib/platform-labels.ts'
 import { notify } from '../../store/notifications.ts'
 import { $activeSpace } from '../../store/spaces.ts'
 import { $page, showPage } from '../../store/windows.ts'
+import { openInCanvas } from '../canvas/open.ts'
 import { type CardAction, FileCard, FileRow, RenameField } from './FileCard.tsx'
 import { FileDetail, PreviewOverlay } from './FileDetail.tsx'
 import { FilesSidebar } from './FilesSidebar.tsx'
@@ -233,6 +234,9 @@ export function FilesPage() {
           break
         case 'ask':
           askHermesAbout(item.path)
+          break
+        case 'edit-canvas':
+          openInCanvas(item.path)
           break
       }
     },

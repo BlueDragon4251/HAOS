@@ -230,6 +230,11 @@ window-rule {
     match app-id=r#"^(herald-os|Herald OS)$"# title="^Preview$"
     default-column-width { proportion 0.4; }
 }
+// Herald Canvas wants room for the image and its panels; Hermes's half stays beside it.
+window-rule {
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Canvas$"
+    default-column-width { proportion 0.75; }
+}
 
 // Foreign apps get the same rounding and open as tiles even when they remember being maximized
 // or fullscreen elsewhere (apps that genuinely need fullscreen can still ask for it later).
