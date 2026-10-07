@@ -53,25 +53,30 @@ async function readPlistKeys(plist: string, keys: string[]): Promise<Record<stri
   return out
 }
 
+/** How long the calendar script waits for an answer to the permission prompt. */
+const CALENDAR_PROMPT_MS = 60_000
+
 /** Runs inside `osascript -l JavaScript`; prints one JSON document. */
-const CALENDAR_JXA = String.raw`
+export const CALENDAR_JXA = String.raw`
 ObjC.import('EventKit');
 ObjC.import('Foundation');
 function out(o){ return JSON.stringify(o); }
+// JXA hands NSInteger results back as strings (macOS 26 does), so the status goes through Number().
+function authStatus(){ return Number($.EKEventStore.authorizationStatusForEntityType($.EKEntityTypeEvent)); }
 var store = $.EKEventStore.alloc.init;
-var status = $.EKEventStore.authorizationStatusForEntityType($.EKEntityTypeEvent);
-// 0 notDetermined, 1 restricted, 2 denied, 3 fullAccess (authorized), 4 writeOnly
+var status = authStatus();
+// 0 notDetermined, 1 restricted, 2 denied, 3 fullAccess (authorized), 4 writeOnly (cannot read events).
 if (status === 0) {
   var done = false; var granted = false;
   var sel = store.respondsToSelector('requestFullAccessToEventsWithCompletion:');
   var handler = function(g, e){ granted = g; done = true; };
   if (sel) { store.requestFullAccessToEventsWithCompletion(handler); } else { store.requestAccessToEntityTypeCompletion($.EKEntityTypeEvent, handler); }
-  var deadline = Date.now() + 60000;
+  var deadline = Date.now() + ${CALENDAR_PROMPT_MS};
   while (!done && Date.now() < deadline) { $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1)); }
-  status = $.EKEventStore.authorizationStatusForEntityType($.EKEntityTypeEvent);
+  status = authStatus();
 }
 if (status === 1) { out({status:'restricted', events:[]}); }
-else if (status === 2) { out({status:'denied', events:[]}); }
+else if (status === 2 || status === 4) { out({status:'denied', events:[]}); }
 else if (status === 0) { out({status:'not-determined', events:[]}); }
 else {
   var cal = $.NSCalendar.currentCalendar;
@@ -271,7 +276,7 @@ export class DarwinPlatform implements HostPlatform {
    * authorization state honestly so the UI can show "Grant access" instead of an empty day.
    */
   async calendarToday(): Promise<CalendarResult> {
-    const result = await run('osascript', ['-l', 'JavaScript', '-e', CALENDAR_JXA], 25_000)
+    const result = await run('osascript', ['-l', 'JavaScript', '-e', CALENDAR_JXA], CALENDAR_PROMPT_MS + 25_000)
 
     if (result.code !== 0) {
       return { status: 'unavailable', events: [], error: result.stderr.trim() || 'osascript failed' }
