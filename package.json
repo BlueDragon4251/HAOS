@@ -42,5 +42,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:bridge": "bash scripts/test-bridge.sh",
     "dist:mac": "npm run dist:mac --workspace apps/desktop"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
   }
 }
