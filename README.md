@@ -12,6 +12,7 @@
   <a href="https://github.com/iamlukethedev/Herald-OS/releases"><img src="https://img.shields.io/github/v/release/iamlukethedev/Herald-OS?include_prereleases&label=release" alt="Latest release"></a>
   <a href="https://github.com/iamlukethedev/Herald-OS/actions/workflows/ci.yml"><img src="https://github.com/iamlukethedev/Herald-OS/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <a href="https://discord.gg/RHyFZ7FX6E"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 ![The Herald OS desktop](docs/images/desktop.png)
@@ -545,11 +546,14 @@ does not change the shell's code. Moving the pin is described in [upstream/READM
   Microphone. In development the permission belongs to Electron (or your terminal); in a built
   release, to Herald OS.
 - **Stuck fullscreen on macOS.** `Cmd+Ctrl+F`, or start with `HERALD_OS_WINDOWED=1 npm run dev`.
+- **Still stuck?** Ask in #help on [Discord](https://discord.gg/RHyFZ7FX6E), or open an issue on
+  GitHub.
 
 ## Contributing and security
 
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Please report vulnerabilities
-privately, as described in [SECURITY.md](SECURITY.md).
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Come and ask questions, share
+ideas or show what you built on [Discord](https://discord.gg/RHyFZ7FX6E). Please report
+vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
