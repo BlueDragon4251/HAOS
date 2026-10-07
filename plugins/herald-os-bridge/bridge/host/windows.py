@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from ..documents import DocumentText
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, HostNotSupported, PortListener, ProcessRow
 
 _MESSAGE = "The Herald OS system bridge does not support Windows yet."
@@ -54,6 +55,9 @@ class WindowsHost(HostAdapter):
         raise HostNotSupported(_MESSAGE)
 
     def quit_app(self, name: str, force: bool) -> None:
+        raise HostNotSupported(_MESSAGE)
+
+    def read_document(self, path: Path, max_pages: int, ocr: bool) -> DocumentText:
         raise HostNotSupported(_MESSAGE)
 
     def network_status(self) -> dict[str, Any]:

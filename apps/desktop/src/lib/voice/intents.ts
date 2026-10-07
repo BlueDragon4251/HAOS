@@ -84,6 +84,8 @@ interface CompiledPhrase {
   slots: string[]
   literalWords: number
   presetArgs: Record<string, unknown>
+  /** The phrase says the slot is a name ("find files named {query}"), whatever its words. */
+  byName: boolean
 }
 
 function compile(command: CommandSummary, phrase: CommandPhrase): CompiledPhrase {
@@ -107,7 +109,7 @@ function compile(command: CommandSummary, phrase: CommandPhrase): CompiledPhrase
     .split(/\s+/)
     .filter(Boolean).length
 
-  return { command, regex: new RegExp(`^${parts.join('')}$`, 'i'), slots, literalWords, presetArgs }
+  return { command, regex: new RegExp(`^${parts.join('')}$`, 'i'), slots, literalWords, presetArgs, byName: /\b(named|called)\b/i.test(text) }
 }
 
 let cache: { key: string; compiled: CompiledPhrase[] } | null = null
@@ -152,10 +154,34 @@ const BUILD_REQUEST = /^(?:create|build|make|design|code|develop|generate|put to
 const HERMES_MARKERS = /\b(why|how come|explain|summari[sz]e|write|draft|fix|debug|refactor|research|compare|analy[sz]e|tell me about|what do you think)\b/i
 
 /**
+ * Sorting, renaming or filing documents ("rename it properly and put it where it belongs", "file the
+ * invoices in this folder"): Hermes has to read the files first, so no command matches these.
+ */
+const FILING_REQUEST = /\b(renam(?:e|ing)|organi[sz]e|tidy up|sort (?:out|through)|where (?:it|they|this|these|those|that) (?:belongs?|goes|go|should go))\b|(?:^|\b(?:and|then|to|please|also)\s+)file (?:it|them|this|these|those|that|the|my|all|every|everything)\b/i
+
+/** A slot that describes a document by what it is or who sent it ("the invoice from Acme") rather than naming it. */
+const DOCUMENT_DESCRIPTION = /\b(invoices?|receipts?|bills|statements?|payslips?|contracts?|from|sent by|dated)\b/i
+const NAMED_FILE = /\.[a-z0-9]{1,5}$|\s+dot\s+[a-z0-9]{1,5}$/i
+
+/** Commands that look a file, folder or app up by its name: a description is no name. */
+const LOOKUP_COMMANDS = new Set(['open.any', 'file.open', 'files.search'])
+
+/** Commands whose "that" is ambiguous right after Hermes acted. */
+const UNDO_COMMANDS = new Set(['edit.undo', 'edit.redo'])
+
+export interface MatchContext {
+  /**
+   * The previous turn of the conversation was Hermes using its tools (it moved a file, say). "Undo
+   * that" then means Hermes's change, so it goes to Hermes instead of the text field's undo.
+   */
+  afterHermesAction?: boolean
+}
+
+/**
  * Match one utterance against the registry. Returns null when nothing matches confidently; the
  * caller then sends the utterance to Hermes. `commands` defaults to the live registry.
  */
-export function matchIntent(text: string, commands: readonly CommandSummary[] = listCommands({ includeHidden: true })): IntentMatch | null {
+export function matchIntent(text: string, commands: readonly CommandSummary[] = listCommands({ includeHidden: true }), context: MatchContext = {}): IntentMatch | null {
   // Dictation first: "type …" keeps the exact words (any length, any question) for the text field.
   const dictated = dictationRemainder(stripFillers(text))
   const typeCommand = commands.find(c => c.id === 'text.type')
@@ -186,7 +212,7 @@ export function matchIntent(text: string, commands: readonly CommandSummary[] = 
     return { command: 'build.start', args: { goal }, title: `Build: ${goal.slice(0, 60)}`, confidence: 0.85 }
   }
 
-  if (!utterance || utterance.split(' ').length > 14 || HERMES_MARKERS.test(utterance)) {
+  if (!utterance || utterance.split(' ').length > 14 || HERMES_MARKERS.test(utterance) || FILING_REQUEST.test(utterance)) {
     return null
   }
 
@@ -195,6 +221,10 @@ export function matchIntent(text: string, commands: readonly CommandSummary[] = 
 
     if (!match) {
       continue
+    }
+
+    if (context.afterHermesAction && UNDO_COMMANDS.has(entry.command.id)) {
+      return null
     }
 
     const args: Record<string, unknown> = { ...entry.presetArgs }
@@ -219,12 +249,21 @@ export function matchIntent(text: string, commands: readonly CommandSummary[] = 
       continue
     }
 
+    // "Show me the invoice from Acme": only Hermes can find a document by what it says.
+    if (LOOKUP_COMMANDS.has(entry.command.id) && !entry.byName && entry.slots.some(slot => describesDocument(String(args[slot])))) {
+      continue
+    }
+
     const confidence = entry.slots.length === 0 ? 1 : entry.literalWords >= 2 ? 0.9 : 0.75
 
     return { command: entry.command.id, args, title: describe(entry.command, args), confidence }
   }
 
   return null
+}
+
+function describesDocument(value: string): boolean {
+  return DOCUMENT_DESCRIPTION.test(value) && !NAMED_FILE.test(value.trim())
 }
 
 /** Slot values come out of the lower-cased utterance; give them back the user's casing when it is findable. */

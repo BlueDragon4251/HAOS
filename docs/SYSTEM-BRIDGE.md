@@ -19,12 +19,33 @@ unrestricted machine access.
 | `system_control` | read / act / mutate | Volume, dark mode, notifications, System Settings panes, display sleep, screen lock; switching Wi-Fi asks first. On Herald OS Linux also Wi-Fi networks and joining one (asks first), Bluetooth power (asks first) and devices, the sound output, brightness and the power mode |
 | `system_open` | act | Open an app, URL, file or folder; reveal in Finder; open a path in an editor |
 | `system_kill_process` | destructive | Terminate a process by pid or by listening port |
-| `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`); `dry_run` plans |
+| `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`). `dry_run` plans say where each item lands and list clashes (nothing is ever overwritten, and a batch is checked before anything moves); applied moves and copies return `undo` operations |
+| `system_documents` | read | Read PDFs page by page (scans and photos of documents through on-device OCR) with hints for filing: kind, vendor, dates, number, total, a suggested name and a fingerprint for duplicates; `places` lists the folders documents are already filed in, with their layout and naming. Used by the `file-documents` skill |
 | `os_ui` | per command | Operate the Herald OS interface: open pages and apps, add memories, run automations, start missions and Studio builds. Each command carries its own tier |
 | `system_os` | act / mutate | Herald OS Linux only: install apps and anything in the install catalog (`catalog_list`, `catalog_install`, `catalog_remove`), widget plugins (`plugin_list`, `plugin_add`, `plugin_update`, `plugin_disable`, `plugin_remove`; turning one on is left to the user), reminders, themes, screenshots, lock, suspend, update |
 
 "Start my development environment" is a skill: it composes `system_open` with Hermes's existing
 `terminal` tool rather than adding another core-shaped tool.
+
+## Documents
+
+"Find the invoice from Acme in my Downloads, rename it properly and put it where it belongs" is the
+`file-documents` skill: `system_documents action=read` on the folder, `system_documents
+action=places` for where such files already live, one `system_files` batch run as a dry run, the
+approval card, and the result's `undo` if the person changes their mind.
+
+- Text: on macOS PDFKit reads each page's text layer and Vision recognises the text of scanned pages
+  and images (both through a JavaScript-for-Automation script, as the shell's screen-text reader
+  does; nothing is installed). On Linux `pdftotext` reads text when poppler-utils is installed,
+  otherwise the Hermes runtime's own converter (anydoc) or pypdf; tesseract reads scans, from pages
+  rendered by `pdftoppm` or, without poppler, from the pictures the scan is made of (JPEG, Flate,
+  CCITT fax).
+- Limits per call: 15 documents (50 at most), 3 pages each (20 at most), files up to 50 MB, about two
+  minutes of reading; what is left over comes back under `skipped` for the next call.
+- Hints are heuristics: the document's kind (invoice, receipt, statement, quote, credit note, payslip,
+  contract, order), the vendor (never the bill-to customer), the issue and due dates (`date_ambiguous`
+  when day and month could swap), the invoice or receipt number and the total with its currency.
+- Nothing leaves the computer: no hosted OCR is used.
 
 ## Where the tools run
 
@@ -142,15 +163,17 @@ protected_paths:
 
 Every tool invocation appends one JSON line to `$HERMES_HOME/herald-os/audit.jsonl`:
 `{ts, tool, tier, action, args, decision, ok, error}`. Arguments are truncated; no file contents are
-logged.
+logged (`system_documents` records the paths it was given, never the text it read).
 
 ## Platform abstraction
 
 `bridge/host/base.py` defines `HostAdapter`. `darwin.py` implements it with `mdfind`, `open`,
-`lsof`, `ps`, `osascript`, `system_profiler`, `vm_stat`; `linux.py` with `ps`, `ss`,
-`plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`, `gsettings` and `journalctl`
-(shared POSIX parts live in `posix.py`). `windows.py` raises `HostNotSupported` with a clear
-message. The adapters exist so the tool layer never branches on `sys.platform`.
+`lsof`, `ps`, `osascript` (PDFKit and Vision for documents), `system_profiler`, `vm_stat`;
+`linux.py` with `ps`, `ss`, `plocate`/`fd`, `gio`, `xdg-open`, `nmcli`, `bluetoothctl`, `wpctl`,
+`gsettings`, `journalctl`, and `pdftotext`/`tesseract` for documents (shared POSIX parts live in
+`posix.py`; the document hints, the scan-picture reader and the filing-place scan in
+`bridge/documents.py`). `windows.py` raises `HostNotSupported` with a clear message. The adapters
+exist so the tool layer never branches on `sys.platform`.
 
 ## Tests
 

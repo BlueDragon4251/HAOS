@@ -27,6 +27,7 @@ _SKILLS_DIR = Path(__file__).parent / "skills"
 SKILLS: dict[str, str] = {
     "herald-os": "How Hermes acts as the operating environment on this computer.",
     "diagnose-crash": "Explain why a program crashed from its crash report or core dump, and whether it is worth reporting.",
+    "file-documents": "Find documents such as invoices and receipts among badly named files, read them (OCR for scans), name them clearly and file them where the person keeps them, with a plan they approve and an undo.",
     "herald-os-tailor": "Change Herald OS itself: Herald OS widgets (menu bar, Overview, their own window), themes, fonts, the wallpaper, the menu bar, control-menu entries, branding, keybindings, settings and routines.",
 }
 

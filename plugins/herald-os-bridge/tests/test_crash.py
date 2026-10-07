@@ -85,7 +85,7 @@ def test_crash_report_needs_a_report(plugin):
     assert not json.loads(tools.handle_system_logs({"action": "nope"}))["success"]
 
 
-def test_register_adds_both_skills(plugin):
+def test_register_adds_every_skill(plugin):
     registered: dict[str, object] = {}
 
     class Ctx:
@@ -96,7 +96,7 @@ def test_register_adds_both_skills(plugin):
             registered[name] = path
 
     plugin.register(Ctx())
-    assert set(registered) == {"herald-os", "diagnose-crash", "herald-os-tailor"}
+    assert set(registered) == {"herald-os", "diagnose-crash", "herald-os-tailor", "file-documents"}
     assert all(path.exists() for path in registered.values())
 
 
@@ -108,4 +108,5 @@ def test_tool_descriptions_point_to_the_skills(plugin):
     assert 'skill_view name="herald-os-bridge:herald-os-tailor"' in os_ui and "widget" in os_ui
     assert 'skill_view name="herald-os-bridge:herald-os"' in os_ui
     assert 'skill_view name="herald-os-bridge:diagnose-crash"' in tools.SYSTEM_LOGS_SCHEMA["description"]
+    assert 'skill_view name="herald-os-bridge:file-documents"' in tools.SYSTEM_DOCUMENTS_SCHEMA["description"]
     assert "widgets" in plugin.SKILLS["herald-os-tailor"]

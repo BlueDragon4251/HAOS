@@ -32,6 +32,21 @@ export function runningToolsSince(messages: readonly ChatMessage[], fromIndex: n
   return names
 }
 
+/** Names of every tool the turn used after `fromIndex`, running or finished. */
+export function toolsSince(messages: readonly ChatMessage[], fromIndex: number): string[] {
+  const names: string[] = []
+
+  for (let i = fromIndex + 1; i < messages.length; i++) {
+    const message = messages[i]
+
+    if (message.role === 'tool') {
+      names.push(message.name)
+    }
+  }
+
+  return names
+}
+
 /** The delta between two growing texts; empty when `next` does not extend `previous`. */
 export function textDelta(previous: string, next: string): string {
   if (next.length <= previous.length) {
