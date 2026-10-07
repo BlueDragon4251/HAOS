@@ -26,6 +26,30 @@ unrestricted machine access.
 "Start my development environment" is a skill: it composes `system_open` with Hermes's existing
 `terminal` tool rather than adding another core-shaped tool.
 
+## Where the tools run
+
+Only in sessions Herald OS starts. Hermes turns a plugin's toolset on for every platform that has not
+saved a list without it, and Herald OS's backend shares the `cli` platform's list with the `hermes`
+CLI, so the configuration alone would hand these tools to the person's Telegram, Discord, cron and
+terminal sessions as well. The plugin decides from the session instead (`bridge/scope.py`):
+
+- **Every call is checked.** A tool runs only when the source Hermes binds for the turn
+  (`HERMES_SESSION_SOURCE`) is `herald_os`, or `hermes_os` for sessions from before the rename. Any
+  other call is refused with `decision: outside_herald` and recorded in the audit log. This holds
+  whatever the toolset configuration says and whichever process loaded the plugin, a messaging
+  gateway started by Herald OS's backend included.
+- **The model only sees them there.** The tools' availability check hides them from turns of every
+  other surface (a messaging platform, the API server, cron, the TUI, Hermes Desktop) and, in
+  processes Herald OS did not start, from anything but a Herald OS turn. Herald OS's own backend
+  keeps them listed while it builds or refreshes an agent between turns. The check is not cached, so
+  one session's answer never reaches another.
+- **Nothing to do on existing installs.** The toolset can stay enabled on every platform; outside
+  Herald OS it is inert. The bundled skills stay readable everywhere, and without the tools they
+  change nothing.
+
+`herald_os.bridge.enabled: false` in `config.yaml` (or `HERALD_OS_BRIDGE_DISABLED=1`) hides the tools
+and refuses their calls everywhere, Herald OS sessions included.
+
 ## Permission tiers
 
 | Tier | Behaviour | Examples |

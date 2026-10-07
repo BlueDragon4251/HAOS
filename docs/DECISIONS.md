@@ -32,6 +32,18 @@ server-side behind a `HostAdapter` abstraction. Client-side execution (for remot
 deferred until upstream exposes a generic plugin server-request hook; the adapter boundary keeps
 that move mechanical.
 
+Amendment (session scope): the tools are offered and run only in sessions Herald OS starts. Hermes
+enables a plugin toolset on every platform that has not saved a list without it, and the backend
+shares the `cli` platform's list with the `hermes` CLI, so the person's Telegram, Discord, cron and
+terminal sessions got the system tools, with read and act tiers running unprompted. No toolset list
+can say "Herald OS sessions only", and `HERALD_OS=1` is not enough either: the backend runs cron
+in-process, and a messaging gateway it starts inherits its environment. Every handler is wrapped to
+run only when the turn's bound session source is `herald_os` (ADR-003), read through
+`gateway.session_context.get_session_env` as Hermes's own tools read it; the availability check hides
+the schemas from other surfaces and is registered uncached (`tools.registry.no_cache_check_fn`) so
+one session's verdict is never served to another. Proposed upstream: pass the session source to
+handlers with the other context keywords, or let a toolset declare the session sources it serves.
+
 ## ADR-005: Permissions reuse the upstream approval gate
 
 Rather than inventing a parallel confirmation channel, mutating and destructive bridge operations
