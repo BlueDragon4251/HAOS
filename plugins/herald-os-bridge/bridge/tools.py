@@ -1098,6 +1098,9 @@ CANVAS_ACTIONS: dict[str, str] = {
     "remove_layer": "canvas.removeLayer",
     "group": "canvas.group",
     "add_adjustment": "canvas.addAdjustment",
+    "set_adjustment": "canvas.setAdjustment",
+    "set_effects": "canvas.setEffects",
+    "mask": "canvas.mask",
     "add_text": "canvas.addText",
     "set_text": "canvas.setText",
     "add_shape": "canvas.addShape",
@@ -1121,6 +1124,9 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "remove_layer": ("project", "layer"),
     "group": ("project", "layers", "name", "above", "folder"),
     "add_adjustment": ("project", "kind", "settings", "name", "opacity", "blend", "above", "folder", "clip"),
+    "set_adjustment": ("project", "layer", "settings", "opacity", "blend"),
+    "set_effects": ("project", "layer", "effects", "clear"),
+    "mask": ("project", "layer", "mask"),
     "add_text": ("project", "content", "x", "y", "width", "height", "font", "size", "color", "align", "tracking", "leading", "name", "opacity", "blend", "above", "folder", "clip"),
     "set_text": ("project", "layer", "content", "font", "size", "color", "align", "tracking", "leading"),
     "add_shape": ("project", "kind", "x", "y", "width", "height", "color", "radius", "lineWidth", "name", "opacity", "blend", "above", "folder", "clip"),
@@ -1140,7 +1146,7 @@ CANVAS_SCHEMA = _schema(
     "canvas",
     "Herald Canvas, the layered image editor built into Herald OS (layers, folders, masks, blend modes, adjustment layers, like Photoshop). "
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
-    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, add_adjustment, group and remove_layer; resize and crop change the canvas. "
+    "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, add_adjustment, set_adjustment, group and remove_layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=export writes PNG, JPEG or WebP. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
     {
@@ -1174,7 +1180,7 @@ CANVAS_SCHEMA = _schema(
         "flipY": _desc(_BOOL, "set_layer: mirror top to bottom"),
         "opacity": _desc(_NUM, "0 to 1"),
         "blend": _desc(_STR, "Blend mode, e.g. Normal, Multiply, Screen, Overlay, Soft Light, Color, Luminosity"),
-        "layer": _desc(_STR, "set_layer, set_text, remove_layer: the layer's id or name"),
+        "layer": _desc(_STR, "set_layer, set_text, remove_layer, set_adjustment, set_effects, mask: the layer's id or name"),
         "layers": _desc(_STR, "group: comma-separated layer ids or names"),
         "visible": _desc(_BOOL, "set_layer: show or hide"),
         "order": _enum("up", "down", "top", "bottom", description="set_layer: move among its neighbours"),
@@ -1182,7 +1188,14 @@ CANVAS_SCHEMA = _schema(
         "folder": _desc(_STR, "new: where the project goes; add_layer, add_adjustment: put it in this folder; set_layer: move into it (\"none\" takes it out)"),
         "clip": _desc(_BOOL, "Clip to the layer below (shows only where it has pixels); false lets go"),
         "kind": _desc(_STR, "add_adjustment: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur or Add Noise; add_shape: rectangle, rounded, ellipse or line"),
-        "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}", "additionalProperties": True},
+        "settings": {"type": "object", "description": "add_adjustment: settings over the defaults, e.g. {\"saturation\": 25}; set_adjustment: settings merged over the layer's own", "additionalProperties": True},
+        "effects": {
+            "type": "object",
+            "description": "set_effects: per effect (stroke, shadow, innerShadow, outerGlow, innerGlow, colorOverlay) an object merged over its settings or defaults, false to remove it, {\"enabled\": false} to hide it; e.g. {\"shadow\": {\"distance\": 12, \"blur\": 24, \"opacity\": 0.4}}",
+            "additionalProperties": True,
+        },
+        "clear": _desc(_BOOL, "set_effects: remove every effect first"),
+        "mask": _enum("reveal", "hide", "revealSelection", "hideSelection", "invert", "apply", "enable", "disable", "remove", "link", "unlink", description="mask: what to do to the layer's mask (reveal and hide make one showing or hiding everything)"),
         "to": _desc(_STR, "export: the file to write; save: a new project path"),
         "format": _enum("png", "jpeg", "webp", description="export: the format (from the file name when left out)"),
         "quality": _desc(_NUM, "export: JPEG or WebP quality, 0 to 1"),
@@ -1200,9 +1213,13 @@ def canvas_command(args: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     if action not in CANVAS_ACTIONS:
         raise ValueError(f"action must be one of {', '.join(CANVAS_ACTIONS)}")
     command_args = {key: args[key] for key in CANVAS_ARGS[action] if key in args and args[key] not in (None, "")}
-    # The shell takes adjustment settings as JSON text.
-    if isinstance(command_args.get("settings"), (dict, list)):
-        command_args["settings"] = json.dumps(command_args["settings"])
+    # The shell takes adjustment settings and layer effects as JSON text.
+    for key in ("settings", "effects"):
+        if isinstance(command_args.get(key), (dict, list)):
+            command_args[key] = json.dumps(command_args[key])
+    # `action` already names the tool's action, so the mask's own one travels as `mask`.
+    if action == "mask" and "mask" in command_args:
+        command_args["action"] = command_args.pop("mask")
     return action, CANVAS_ACTIONS[action], command_args
 
 

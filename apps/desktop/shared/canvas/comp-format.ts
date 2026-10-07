@@ -908,6 +908,12 @@ function parseLayer(value: unknown, index: number): LayerRecord {
   return layer
 }
 
+/** An adjustment record checked as strictly as a project file's, with its defaults filled in. */
+export const checkAdjustment = (value: unknown): Adjustment => parseAdjustment(value, 'adjustment')
+
+/** A layer's effects checked as strictly as a project file's, with each effect's defaults filled in. */
+export const checkEffects = (value: unknown): LayerEffects => parseEffects(value, 'effects')
+
 /** Folder structure: every parent exists and is a folder, there are no loops, and nesting stays shallow enough. */
 function checkTree(layers: LayerRecord[]): void {
   const byId = new Map(layers.map(layer => [layer.id, layer]))

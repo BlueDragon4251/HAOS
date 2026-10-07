@@ -10,17 +10,21 @@ import { baseName, CANVAS_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION } f
 import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
 import {
+  adjustmentWith,
   alignFrom,
   blendFrom,
   cropBox,
   describeLayer,
   describeLayers,
+  effectKindFrom,
+  effectsWith,
   fillBox,
   findByRef,
   finite,
   fontNameFrom,
+  jsonObject,
   lineEnds,
-  mergeSettings,
+  maskActionFrom,
   opacityFrom,
   placementOf,
   resizePlan,
@@ -47,6 +51,8 @@ import {
   setClipped,
   withLayer
 } from './engine/document.ts'
+import { EFFECT_NAMES, withoutKnownEffects } from './engine/layer-effects.ts'
+import { MASK_LABELS, withMaskAction } from './engine/masks.ts'
 import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, saveProject, toRaster } from './engine/project.ts'
 import { Raster, type Rect } from './engine/raster.ts'
 import { shapeBox, shapeName } from './engine/shapes.ts'
@@ -520,20 +526,11 @@ export async function addAdjustment(args: Record<string, unknown>): Promise<Outc
     throw new Error(`Adjustments: ${ADJUSTMENT_KINDS.join(', ')}`)
   }
 
-  let settings: Record<string, unknown> = {}
-
-  if (typeof args.settings === 'string' && args.settings.trim()) {
-    try {
-      settings = JSON.parse(args.settings) as Record<string, unknown>
-    } catch {
-      throw new Error('settings must be a JSON object, like {"saturation": 20}')
-    }
-  }
-
+  const settings = jsonObject(args.settings, 'settings', '{"saturation": 20}')
   const layer: CanvasLayer = {
     ...adjustmentLayer(kind as AdjustmentKind, state.width, state.height),
     ...(typeof args.name === 'string' && args.name.trim() ? { name: args.name.trim() } : {}),
-    adjustment: { ...(mergeSettings(defaultAdjustment(kind as AdjustmentKind), settings) as ReturnType<typeof defaultAdjustment>), kind: kind as AdjustmentKind },
+    adjustment: adjustmentWith(defaultAdjustment(kind as AdjustmentKind), settings, readColour),
     opacity: opacityFrom(args.opacity) ?? 1,
     blendMode: blendFrom(args.blend) ?? 'Normal'
   }
@@ -545,7 +542,7 @@ export async function addAdjustment(args: Record<string, unknown>): Promise<Outc
 
   await apply(on, `${kind} Layer`, next)
 
-  return { summary: `Added a ${kind} adjustment${args.clip === true ? ' clipped to the layer below' : ''}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+  return { summary: `Added ${/^[AEIOU]/.test(kind) ? 'an' : 'a'} ${kind} adjustment${args.clip === true ? ' clipped to the layer below' : ''}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
 }
 
 const layerName = (args: Record<string, unknown>): string | undefined => (typeof args.name === 'string' && args.name.trim() ? args.name.trim() : undefined)
@@ -555,6 +552,94 @@ const unitColour = (value: unknown, fallback: string) => {
   const [r, g, b] = parseColor(value === undefined || value === '' ? fallback : value)
 
   return { red: r / 255, green: g / 255, blue: b / 255 }
+}
+
+const readColour = (value: unknown) => unitColour(value, '#000')
+
+/** Change an adjustment layer: settings merged over what it has, and its opacity or blend mode. */
+export async function setAdjustment(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = findByRef(on.doc.state, args.layer)
+
+  if (!layer.adjustment) {
+    throw new Error(`${layer.name} is not an adjustment layer (add one with canvas.addAdjustment)`)
+  }
+
+  const settings = jsonObject(args.settings, 'settings', '{"saturation": -30}')
+  const patch: Partial<CanvasLayer> = {}
+  const changes: string[] = []
+
+  if (Object.keys(settings).length) {
+    patch.adjustment = adjustmentWith(layer.adjustment, settings, readColour)
+    changes.push(`${Object.keys(settings).join(', ')} set`)
+  }
+
+  const opacity = opacityFrom(args.opacity)
+
+  if (opacity !== undefined) {
+    patch.opacity = opacity
+    changes.push(`opacity ${Math.round(opacity * 100)}%`)
+  }
+
+  const blend = blendFrom(args.blend)
+
+  if (blend) {
+    patch.blendMode = blend
+    changes.push(blend)
+  }
+
+  if (!changes.length) {
+    throw new Error('Nothing to change: give settings (a JSON object), opacity or blend')
+  }
+
+  await apply(on, layer.adjustment.kind, withLayer(on.doc.state, layer.id, patch))
+
+  return { summary: `${layer.name}: ${changes.join(', ')}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+/** Add, change, hide or remove a layer's effects. */
+export async function setEffects(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = findByRef(on.doc.state, args.layer)
+
+  if (layer.isGroup || layer.adjustment) {
+    throw new Error(`${layer.name} is ${layer.isGroup ? 'a folder' : 'an adjustment layer'}: effects go on layers with pixels (pictures, text, shapes)`)
+  }
+
+  const patch = jsonObject(args.effects, 'effects', '{"shadow": {"distance": 12, "blur": 24, "opacity": 0.4}, "stroke": false}')
+  const clear = args.clear === true
+
+  if (!Object.keys(patch).length && !clear) {
+    throw new Error('Say which effects: effects={"shadow": {...}}, or clear=true to remove them all')
+  }
+
+  const effects = effectsWith(clear ? withoutKnownEffects(layer.effects) : layer.effects, patch, readColour)
+  await apply(on, 'Layer Effects', withLayer(on.doc.state, layer.id, { effects }))
+  const what = (value: unknown): string => {
+    if (value === false || value === null) {
+      return 'removed'
+    }
+
+    const settings = value && typeof value === 'object' ? Object.keys(value) : []
+
+    return settings.length === 1 && settings[0] === 'enabled' ? ((value as { enabled: unknown }).enabled === false ? 'hidden' : 'shown') : 'set'
+  }
+  const changed = Object.keys(patch).map((name) => `${EFFECT_NAMES[effectKindFrom(name)]} ${what(patch[name])}`)
+
+  return {
+    summary: `${layer.name}: ${[...(clear ? ['effects cleared'] : []), ...changed].join(', ')}`,
+    data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) }
+  }
+}
+
+/** One step on a layer's mask (making the mask where the action does). */
+export async function mask(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = findByRef(on.doc.state, args.layer)
+  const action = maskActionFrom(args.action)
+  await apply(on, MASK_LABELS[action], withMaskAction(on.doc.state, layer.id, action))
+
+  return { summary: `${layer.name}: ${MASK_LABELS[action]}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
 }
 
 /** The text style a command asks for, over a style there was (or the defaults). */

@@ -3,10 +3,25 @@
  * Hermes and placing pictures. No window, no I/O, so it is tested directly.
  */
 
-import { BLEND_MODES, type BlendMode, type ShapeKind, type TextAlignment, type Vec2 } from '../../../shared/canvas/comp-format.ts'
+import {
+  type Adjustment,
+  BLEND_MODES,
+  type BlendMode,
+  checkAdjustment,
+  checkEffects,
+  defaultEffect,
+  EFFECT_KINDS,
+  type EffectKind,
+  type LayerEffects,
+  type RGB,
+  type ShapeKind,
+  type TextAlignment,
+  type Vec2
+} from '../../../shared/canvas/comp-format.ts'
 import { type Anchor, ANCHORS } from './engine/canvas-size.ts'
 import { type CanvasLayer, childrenOf, type DocState, findLayer } from './engine/document.ts'
 import { boundsOf } from './engine/geometry.ts'
+import { MASK_ACTIONS, type MaskAction } from './engine/masks.ts'
 import type { Rect } from './engine/raster.ts'
 import { postScriptName } from './engine/text.ts'
 
@@ -87,8 +102,9 @@ export function describeLayer(state: DocState, layer: CanvasLayer): Record<strin
     ...(transform.flipY ? { flipY: true } : {}),
     ...(layer.pixels ? { pixels: `${layer.pixels.width}×${layer.pixels.height}` } : {}),
     ...(layer.maskSourceID ? { clippedTo: findLayer(state, layer.maskSourceID)?.name ?? layer.maskSourceID } : {}),
-    ...(layer.mask ? { mask: layer.maskEnabled === false ? 'off' : 'on' } : {}),
-    ...(layer.adjustment ? { adjustment: layer.adjustment.kind } : {}),
+    ...(layer.mask ? { mask: layer.maskEnabled === false ? 'off' : 'on', ...(layer.maskLinked === false ? { maskLinked: false } : {}) } : {}),
+    ...(layer.adjustment ? { adjustment: layer.adjustment.kind, settings: adjustmentSettings(layer.adjustment) } : {}),
+    ...(layer.effects && EFFECT_KINDS.some((kind) => layer.effects?.[kind]) ? { effects: Object.fromEntries(EFFECT_KINDS.filter((kind) => layer.effects?.[kind]).map((kind) => [kind, layer.effects![kind]])) } : {}),
     ...(layer.text ? { text: layer.text.content, font: layer.text.fontName, size: layer.text.fontSize, align: layer.text.alignment.toLowerCase() } : {}),
     ...(layer.shape ? { shape: layer.shape.kind === 'Rectangle' && layer.shape.cornerRadius > 0 ? 'rounded rectangle' : layer.shape.kind.toLowerCase() } : {})
   }
@@ -364,6 +380,199 @@ export function lineEnds(args: Record<string, unknown>, canvas: { width: number;
     [x, y],
     [x + width, y + height]
   ]
+}
+
+/** The fields of an adjustment that its kind uses, as `canvas.setAdjustment` takes them. */
+export function adjustmentSettings(adjustment: Adjustment): Record<string, unknown> {
+  const fields: Record<Adjustment['kind'], string[]> = {
+    'Hue/Saturation': ['hue', 'saturation', 'lightness', 'colorize'],
+    Levels: ['levels'],
+    Curves: ['curves'],
+    Exposure: ['exposureSettings'],
+    'Gradient Map': ['gradientMapSettings'],
+    Grain: ['grainSettings'],
+    Invert: [],
+    'Black & White': ['blackWhiteSettings'],
+    'Color Balance': ['colorBalanceSettings'],
+    'Gaussian Blur': ['blurRadius'],
+    'Motion Blur': ['motionAngle', 'motionDistance'],
+    'Add Noise': ['noiseAmount', 'noiseGaussian', 'noiseMonochromatic', 'noiseSeed']
+  }
+
+  return Object.fromEntries(fields[adjustment.kind].filter((key) => adjustment[key] !== undefined).map((key) => [key, adjustment[key]]))
+}
+
+/** A JSON object argument (settings, effects): an object as it is, or JSON text of one; nothing given is an empty one. */
+export function jsonObject(value: unknown, what: string, example: string): Record<string, unknown> {
+  if (value === undefined || value === null || value === '') {
+    return {}
+  }
+
+  let parsed: unknown = value
+
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      parsed = null
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${what} must be a JSON object, like ${example}`)
+  }
+
+  return parsed as Record<string, unknown>
+}
+
+/** A colour Hermes wrote (any CSS colour) as the format's red, green and blue from 0 to 1. */
+export type ColourReader = (value: unknown) => RGB
+
+/** Colours written as text in a record ("color", or named fields like a gradient map's ends) as red, green and blue. */
+function withColours(record: Record<string, unknown>, fields: string[], read: ColourReader | undefined): Record<string, unknown> {
+  const out = { ...record }
+
+  for (const field of fields) {
+    if (typeof out[field] !== 'string') {
+      continue
+    }
+
+    if (!read) {
+      throw new Error(`${field} needs red, green and blue from 0 to 1`)
+    }
+
+    const colour = read(out[field])
+
+    // An effect's colour is its own red, green and blue; a gradient map's ends are records.
+    if (field === 'color' || field === 'colour') {
+      delete out[field]
+      Object.assign(out, colour)
+    } else {
+      out[field] = colour
+    }
+  }
+
+  return out
+}
+
+/**
+ * An adjustment with settings changed: nested settings merge over what it has (a gradient map's
+ * ends may be CSS colours), and the result is checked as strictly as a project file would be.
+ */
+export function adjustmentWith(current: Adjustment, settings: Record<string, unknown>, read?: ColourReader): Adjustment {
+  if (settings.kind !== undefined && settings.kind !== current.kind) {
+    throw new Error(`An adjustment keeps its kind (${current.kind}): add a new adjustment layer for another`)
+  }
+
+  const prepared = { ...settings }
+
+  if (prepared.gradientMapSettings && typeof prepared.gradientMapSettings === 'object') {
+    prepared.gradientMapSettings = withColours(prepared.gradientMapSettings as Record<string, unknown>, ['shadows', 'highlights'], read)
+  }
+
+  return checkAdjustment({ ...mergeSettings(current, prepared), kind: current.kind })
+}
+
+/** An effect's name however it was written ("drop shadow", "DropShadow", "glow", "outline"). */
+export function effectKindFrom(name: string): EffectKind {
+  const squashed = name.toLowerCase().replace(/[^a-z]/g, '')
+  const aliases: Record<string, EffectKind> = {
+    stroke: 'stroke',
+    outline: 'stroke',
+    shadow: 'shadow',
+    dropshadow: 'shadow',
+    coloroverlay: 'colorOverlay',
+    colouroverlay: 'colorOverlay',
+    overlay: 'colorOverlay',
+    innershadow: 'innerShadow',
+    outerglow: 'outerGlow',
+    glow: 'outerGlow',
+    innerglow: 'innerGlow'
+  }
+  const kind = aliases[squashed]
+
+  if (!kind) {
+    throw new Error(`Effects: ${EFFECT_KINDS.join(', ')} (“${name}” is not one)`)
+  }
+
+  return kind
+}
+
+/**
+ * A layer's effects after a change. Per effect: an object of settings merged over what it has (or
+ * over the effect's defaults when the layer lacks it), true to add or show it, false or null to
+ * remove it; {"enabled": false} hides it and keeps its settings. `color` takes any CSS colour and
+ * an opacity above 1 is a percentage. Effects other apps wrote stay as they were.
+ */
+export function effectsWith(current: LayerEffects | undefined, patch: Record<string, unknown>, read?: ColourReader): LayerEffects | undefined {
+  const next: LayerEffects = { ...current }
+
+  for (const [name, value] of Object.entries(patch)) {
+    const kind = effectKindFrom(name)
+
+    if (value === false || value === null) {
+      delete next[kind]
+      continue
+    }
+
+    const existing = (next[kind] as Record<string, unknown> | undefined) ?? (defaultEffect[kind]() as unknown as Record<string, unknown>)
+
+    if (value === true) {
+      next[kind] = { ...existing, enabled: true } as never
+      continue
+    }
+
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`${name} takes an object of settings, true to add it, or false to remove it`)
+    }
+
+    const record = withColours({ ...existing, ...(value as Record<string, unknown>) }, ['color', 'colour'], read)
+
+    if (typeof record.opacity === 'number' && record.opacity > 1) {
+      record.opacity = Math.min(100, record.opacity) / 100
+    }
+
+    next[kind] = record as never
+  }
+
+  const checked = checkEffects(next)
+
+  return Object.keys(checked).length ? checked : undefined
+}
+
+/** A mask action however it was written ("reveal all", "hide_selection", "off", "delete"). */
+export function maskActionFrom(value: unknown): MaskAction {
+  const squashed = String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+  const aliases: Record<string, MaskAction> = {
+    reveal: 'reveal',
+    revealall: 'reveal',
+    show: 'reveal',
+    showall: 'reveal',
+    hide: 'hide',
+    hideall: 'hide',
+    revealselection: 'revealSelection',
+    showselection: 'revealSelection',
+    hideselection: 'hideSelection',
+    invert: 'invert',
+    apply: 'apply',
+    enable: 'enable',
+    on: 'enable',
+    disable: 'disable',
+    off: 'disable',
+    remove: 'remove',
+    delete: 'remove',
+    link: 'link',
+    unlink: 'unlink'
+  }
+  const action = aliases[squashed]
+
+  if (!action) {
+    throw new Error(`Mask actions: ${MASK_ACTIONS.join(', ')}`)
+  }
+
+  return action
 }
 
 /** Settings over an adjustment's defaults: nested objects merge, the rest replaces. */

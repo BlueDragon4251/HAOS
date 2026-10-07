@@ -21,6 +21,7 @@ call the tools directly.
   Canvas        canvas open [file] | canvas new [name] [WxH] | canvas status | canvas layers [project]
                 canvas text <words> [--x --y --size --font --color --align] | canvas resize <WxH> [--anchor <a>]
                 canvas crop <x> <y> <w> <h> | canvas preview [project] | canvas export <file> | canvas undo|redo
+                canvas mask <layer> reveal|hide|invert|apply|enable|disable|remove|link|unlink|reveal-selection|hide-selection
   Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
   Events        event <name> [key=value ...] | hook list | hook install <event> <script> | hook dir
   System        lock | suspend | power | wm <niri action...> | state | debug | commands [--json]
@@ -87,7 +88,7 @@ COMMANDS: dict[str, str] = {
     "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
     "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
     "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
-    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo: Herald Canvas, the image editor",
+    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo | mask <layer> <action>: Herald Canvas, the image editor",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
@@ -995,8 +996,12 @@ CANVAS_USAGE = (
     "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] "
     "| text <words> [--x <px>] [--y <px>] [--width <px>] [--size <px>] [--font <family>] [--color <css>] [--align left|center|right] "
     "| resize <width>x<height> [--anchor <where>] [--image] | resize --scale <n> | crop <x> <y> <width> <height> "
-    "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo"
+    "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo "
+    "| mask <layer> <reveal|hide|reveal-selection|hide-selection|invert|apply|enable|disable|remove|link|unlink> [--project <project>]"
 )
+
+# What `canvas mask` does, as canvas.mask names it.
+CANVAS_MASK_ACTIONS = ("reveal", "hide", "revealSelection", "hideSelection", "invert", "apply", "enable", "disable", "remove", "link", "unlink")
 
 
 def _absolute(value: str) -> str:
@@ -1091,6 +1096,16 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if flags.get("overwrite"):
             payload["overwrite"] = True
         return "canvas.export", payload
+    if sub == "mask":
+        # "reveal-selection", "hide_selection" and "hideSelection" all mean the same.
+        wanted = re.sub(r"[^a-z]", "", words[-1].lower()) if len(words) == 2 else ""
+        action = next((name for name in CANVAS_MASK_ACTIONS if name.lower() == wanted), None)
+        if not action:
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = {"layer": words[0], "action": action}
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.mask", payload
     die(f"herald-os {CANVAS_USAGE}", 2)
     return "", {}
 

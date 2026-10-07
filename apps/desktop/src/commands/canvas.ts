@@ -1,4 +1,5 @@
 import { ADJUSTMENT_KINDS, BLEND_MODES } from '../../shared/canvas/comp-format.ts'
+import { MASK_ACTIONS } from '../features/canvas/mask-actions.ts'
 import { ok, type OsCommand } from '../store/os-commands.ts'
 
 /*
@@ -245,6 +246,38 @@ export const canvasCommands: readonly OsCommand[] = [
       ...where
     ],
     run: async (args) => done((await canvas()).addAdjustment(args))
+  },
+  {
+    id: 'canvas.setAdjustment',
+    title: 'Change an adjustment layer',
+    description:
+      'Change an adjustment layer: settings is JSON merged over what it has now (nested settings merge too), e.g. {"saturation": -30} or {"exposureSettings": {"exposure": 0.5}}; a gradient map’s ends take CSS colours. canvas.layers shows each adjustment’s settings; the herald-canvas skill lists every field and range.',
+    tier: 'act',
+    args: [project, { name: 'layer', type: 'string', description: 'The adjustment layer (id or name)', required: true }, { name: 'settings', type: 'string', description: 'JSON object of the settings to change' }, ...appearance],
+    run: async (args) => done((await canvas()).setAdjustment(args))
+  },
+  {
+    id: 'canvas.setEffects',
+    title: 'Change layer effects',
+    description:
+      'Add, change, hide or remove layer effects on a picture, text or shape layer: stroke, shadow (drop shadow), innerShadow, outerGlow, innerGlow, colorOverlay. effects is JSON: per effect an object merged over what it has (or over its defaults), false to remove it, {"enabled": false} to hide it and keep its settings. Sizes and distances are layer pixels, angle is where the light comes from (90 is above), color is any CSS colour, opacity 0 to 1.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layer', type: 'string', description: 'The layer (id or name)', required: true },
+      { name: 'effects', type: 'string', description: 'JSON object, e.g. {"shadow": {"distance": 12, "blur": 24, "opacity": 0.4}, "stroke": false}' },
+      { name: 'clear', type: 'boolean', description: 'Remove every effect first' }
+    ],
+    run: async (args) => done((await canvas()).setEffects(args))
+  },
+  {
+    id: 'canvas.mask',
+    title: 'Change a layer mask',
+    description:
+      'Work on a layer’s mask (folders and adjustment layers take masks too): reveal (a mask showing everything) or hide (one hiding everything), revealSelection or hideSelection (from the selection in the Canvas window), invert, apply (bake it into the pixels), enable, disable, remove, link (it moves with the layer) or unlink (it stays put when the layer moves).',
+    tier: 'act',
+    args: [project, { name: 'layer', type: 'string', description: 'The layer (id or name)', required: true }, { name: 'action', type: 'string', description: 'What to do', required: true, enum: MASK_ACTIONS }],
+    run: async (args) => done((await canvas()).mask(args))
   },
   {
     id: 'canvas.export',

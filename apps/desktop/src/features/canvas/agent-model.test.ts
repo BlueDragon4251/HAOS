@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { defaultTransform } from '../../../shared/canvas/comp-format.ts'
+import { defaultAdjustment, defaultEffect, defaultTransform } from '../../../shared/canvas/comp-format.ts'
 import {
+  adjustmentSettings,
+  adjustmentWith,
   alignFrom,
   anchorFrom,
   blendFrom,
   cropBox,
   describeLayer,
   describeLayers,
+  effectKindFrom,
+  effectsWith,
   fillBox,
   findByRef,
   fontNameFrom,
+  jsonObject,
   lineEnds,
+  maskActionFrom,
   mergeSettings,
   opacityFrom,
   placementOf,
@@ -18,7 +24,7 @@ import {
   resolvePath,
   shapeKindFrom
 } from './agent-model.ts'
-import { blankLayer, type DocState, folderLayer, insertLayer, pixelLayer, setClipped } from './engine/document.ts'
+import { adjustmentLayer, blankLayer, type DocState, folderLayer, insertLayer, pixelLayer, setClipped } from './engine/document.ts'
 import { Raster } from './engine/raster.ts'
 import { textStyle } from './engine/text.ts'
 
@@ -186,5 +192,69 @@ describe('resize and crop arguments', () => {
     expect(cropBox(canvas, { x: 100, y: 50, width: 300, height: 200 })).toEqual({ x: 100, y: 50, width: 300, height: 200 })
     expect(cropBox(canvas, { x: 900, width: 500 })).toEqual({ x: 900, y: 0, width: 100, height: 500 })
     expect(() => cropBox(canvas, { x: 2000 })).toThrow(/outside/)
+  })
+})
+
+describe('adjustments, effects and masks for Hermes', () => {
+  const black = () => ({ red: 0, green: 0, blue: 0 })
+  const read = (value: unknown) => (value === '#ff0000' ? { red: 1, green: 0, blue: 0 } : value === 'navy' ? { red: 0, green: 0, blue: 0.5 } : black())
+
+  it('takes JSON objects as objects or text', () => {
+    expect(jsonObject('{"a": 1}', 'settings', '{}')).toEqual({ a: 1 })
+    expect(jsonObject({ a: 2 }, 'settings', '{}')).toEqual({ a: 2 })
+    expect(jsonObject(undefined, 'settings', '{}')).toEqual({})
+    expect(() => jsonObject('[1]', 'effects', '{"stroke": false}')).toThrow(/effects must be a JSON object, like \{"stroke": false\}/)
+    expect(() => jsonObject('{nope', 'settings', '{}')).toThrow(/JSON object/)
+  })
+
+  it('merges settings over an adjustment and checks them', () => {
+    const exposure = defaultAdjustment('Exposure')
+    const changed = adjustmentWith(exposure, { exposureSettings: { exposure: 0.6 } })
+    expect(changed.exposureSettings).toEqual({ exposure: 0.6, offset: 0, gamma: 1 })
+    expect(() => adjustmentWith(exposure, { exposureSettings: { exposure: 40 } })).toThrow(/exposure must be a number from -20 to 20/)
+    expect(() => adjustmentWith(exposure, { kind: 'Invert' })).toThrow(/keeps its kind/)
+    const map = adjustmentWith(defaultAdjustment('Gradient Map'), { gradientMapSettings: { shadows: 'navy' } }, read)
+    expect(map.gradientMapSettings).toMatchObject({ shadows: { red: 0, green: 0, blue: 0.5 }, highlights: { red: 1, green: 1, blue: 1 } })
+  })
+
+  it('shows Hermes the settings each kind uses', () => {
+    expect(adjustmentSettings(defaultAdjustment('Hue/Saturation'))).toEqual({ hue: 0, saturation: 0, lightness: 0, colorize: false })
+    expect(adjustmentSettings(defaultAdjustment('Motion Blur'))).toEqual({ motionAngle: 0, motionDistance: 20 })
+    expect(adjustmentSettings(defaultAdjustment('Invert'))).toEqual({})
+    const layer = adjustmentLayer('Gaussian Blur', 10, 10)
+    const state: DocState = { width: 10, height: 10, resolution: 72, layers: [layer], activeLayerId: null, guides: [], selection: null }
+    expect(describeLayer(state, layer)).toMatchObject({ kind: 'adjustment', adjustment: 'Gaussian Blur', settings: { blurRadius: 8 } })
+  })
+
+  it('adds, merges, hides and removes effects', () => {
+    expect(effectKindFrom('Drop Shadow')).toBe('shadow')
+    expect(effectKindFrom('glow')).toBe('outerGlow')
+    expect(() => effectKindFrom('bevel')).toThrow(/Effects: stroke, shadow/)
+    const added = effectsWith(undefined, { shadow: { distance: 12, color: '#ff0000', opacity: 40 }, stroke: true }, read)!
+    expect(added.shadow).toEqual({ ...defaultEffect.shadow(), distance: 12, red: 1, green: 0, blue: 0, opacity: 0.4 })
+    expect(added.stroke).toEqual({ ...defaultEffect.stroke(), enabled: true })
+    const hidden = effectsWith(added, { shadow: { enabled: false } })!
+    expect(hidden.shadow).toEqual({ ...added.shadow, enabled: false })
+    const removed = effectsWith(hidden, { shadow: false, stroke: null })
+    expect(removed).toBeUndefined()
+    // Effects another app wrote stay as they were.
+    expect(effectsWith({ satin: { size: 3 } } as never, { stroke: false })).toEqual({ satin: { size: 3 } })
+    expect(() => effectsWith(undefined, { stroke: { size: 900 } })).toThrow(/size must be a number from 0 to 500/)
+    expect(() => effectsWith(undefined, { stroke: 4 })).toThrow(/takes an object/)
+  })
+
+  it('reads mask actions however they are written', () => {
+    expect(maskActionFrom('reveal all')).toBe('reveal')
+    expect(maskActionFrom('hide_selection')).toBe('hideSelection')
+    expect(maskActionFrom('revealSelection')).toBe('revealSelection')
+    expect(maskActionFrom('off')).toBe('disable')
+    expect(maskActionFrom('Delete')).toBe('remove')
+    expect(() => maskActionFrom('feather')).toThrow(/Mask actions: reveal, hide/)
+  })
+
+  it('describes effects and unlinked masks', () => {
+    const layer = { ...pixelLayer('Logo', new Raster(4, 4)), effects: { stroke: defaultEffect.stroke() }, mask: Raster.filled(1, 1, 255, 1), maskLinked: false }
+    const state: DocState = { width: 4, height: 4, resolution: 72, layers: [layer], activeLayerId: null, guides: [], selection: null }
+    expect(describeLayer(state, layer)).toMatchObject({ mask: 'on', maskLinked: false, effects: { stroke: defaultEffect.stroke() } })
   })
 })

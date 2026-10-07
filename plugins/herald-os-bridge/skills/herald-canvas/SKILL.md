@@ -1,9 +1,9 @@
 ---
 name: herald-canvas
-description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, plus the .comp project format and every adjustment setting
+description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows) and masks, plus the .comp project format and every adjustment setting
 metadata:
   hermes:
-    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography]
+    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks]
 ---
 
 # Herald Canvas
@@ -47,13 +47,19 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    `rotation=-8`, `opacity=0.8`, `blend="Multiply"`, `order=top`, `visible=false`,
    `folder="Background"`. `group layers="band,glow" name="Hero"` makes a folder.
 6. **Grade.** `add_adjustment kind="Hue/Saturation" settings={"saturation": 20}`. An adjustment
-   changes everything below it; with `clip=true` only the layer right below.
-7. **The canvas.** `resize width=1080 height=1920 anchor=top` grows or cuts the canvas around an
+   changes everything below it; with `clip=true` only the layer right below. Change it later with
+   `set_adjustment layer="Hue/Saturation" settings={"saturation": 35}` (merged over what it has;
+   `canvas action=layers` shows each adjustment's `settings`).
+7. **Polish.** `set_effects layer="Headline" effects={"shadow": {"distance": 8, "blur": 16,
+   "opacity": 0.45}}` adds a drop shadow; strokes, glows, inner shadows and colour overlays work the
+   same way (see Layer effects below). `mask layer="Photo" mask=hide` and friends show or hide
+   parts of a layer without erasing anything.
+8. **The canvas.** `resize width=1080 height=1920 anchor=top` grows or cuts the canvas around an
    anchor (layers keep their pixels, so nothing is lost); `resize scale=0.5`, or `image=true` with
    a width, scales everything instead. `crop x=0 y=135 width=1080 height=1080` keeps a box.
-8. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
+9. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
    then fix what is off. Do this after every few steps on anything that matters.
-9. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
+10. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
    `quality=0.9`, `.webp`; `scale=0.5` for half size). Replacing a file needs `overwrite=true`,
    and the person is asked first. Projects save themselves after every change.
 
@@ -84,6 +90,7 @@ canvas action=add_layer source="~/Pictures/market.jpg" fit=cover name="Photo"
 canvas action=add_adjustment kind="Color Balance" clip=true settings={"midCyanRed": 12, "midYellowBlue": -14, "highlightYellowBlue": -8}
 canvas action=add_layer gradient="#0d0d1200,#0d0d12f0" angle=90 y=650 height=700 name="Fade"
 canvas action=add_text content="NIGHT\nMARKET" x=72 y=700 font="Helvetica Neue Bold" size=168 leading=-24 tracking=2 color="#fff4e6" name="Headline"
+canvas action=set_effects layer="Headline" effects={"shadow": {"distance": 6, "blur": 18, "opacity": 0.5}}
 canvas action=add_shape kind=line x=72 y=1100 width=240 lineWidth=8 color="#ffb347" name="Accent rule"
 canvas action=add_shape kind=rounded x=72 y=1140 width=600 height=120 radius=24 color="#ffb347" name="Date panel"
 canvas action=add_text content="Saturday 9 November · 6 pm till late" x=104 y=1172 width=540 font="Helvetica Neue Medium" size=40 color="#0d0d12" name="Date"
@@ -113,10 +120,11 @@ Pass only what you change; the rest keeps its default.
 - **Curves**: `curves.channels`, four point lists (RGB, red, green, blue) of 2 to 64
   `{"x": 0…255, "y": 0…255}` in increasing x. A gentle S for contrast:
   `[{"x":0,"y":0},{"x":64,"y":52},{"x":192,"y":204},{"x":255,"y":255}]`.
-- **Exposure**: `exposureSettings.exposure` −20…20 stops, `offset` −1…1, `gamma` 0.01…10.
+- **Exposure**: `exposureSettings.exposure` −20…20 stops, `offset` −0.5…0.5, `gamma` 0.01…9.99
+  (worked in linear light).
 - **Gradient Map**: `gradientMapSettings.shadows` and `highlights` as `{"red", "green", "blue"}`
-  0…1, `reversed`.
-- **Grain**: `grainSettings.amount` 0…100, `size` 0.1…100, `roughness` 0…100, `seed`.
+  0…1 or any CSS colour (`"#1b1340"`), `reversed`.
+- **Grain**: `grainSettings.amount` 0…100, `size` 0.5…20 pixels, `roughness` 0…100, `seed`.
 - **Invert**: no settings.
 - **Black & White**: `blackWhiteSettings.reds`, `yellows`, `greens`, `cyans`, `blues`,
   `magentas` −200…300 (how light each colour turns), `tint`, `tintHue` 0…360, `tintSaturation`
@@ -125,13 +133,66 @@ Pass only what you change; the rest keeps its default.
   `shadowYellowBlue`, the same three for `mid…` and `highlight…`, each −100…100 (positive is
   towards red, green, blue), and `preserveLuminosity`.
 - **Gaussian Blur**: `blurRadius` 0.1…250 pixels.
-- **Motion Blur**: `motionAngle` −90…90, `motionDistance` 1…2000.
-- **Add Noise**: `noiseAmount` 0.1…400, `noiseGaussian`, `noiseMonochromatic`, `noiseSeed`.
+- **Motion Blur**: `motionAngle` −90…90 (counterclockwise from horizontal), `motionDistance`
+  1…2000 pixels.
+- **Add Noise**: `noiseAmount` 0.1…400 (percent), `noiseGaussian`, `noiseMonochromatic`,
+  `noiseSeed`.
+
+An adjustment never adds opacity: over transparency it shows nothing, and a blur softens colour
+but keeps the edges of what is below it. A mask on an adjustment layer limits where it applies.
 
 Quick recipes: warmer, `Color Balance` with `midCyanRed` +10 and `midYellowBlue` −15; moodier,
 `Curves` with a lowered midpoint plus `Hue/Saturation saturation=-25`; brighter,
 `Exposure exposure=0.4`; vintage, `Gradient Map` from deep blue to cream at opacity 0.35 with
-blend Soft Light, plus `Grain amount=20`.
+blend Soft Light, plus `Grain amount=20`; dreamy, `Gaussian Blur blurRadius=12` at opacity 0.4
+with blend Screen.
+
+## Layer effects
+
+`set_effects layer=… effects={…}` puts effects on a picture, text or shape layer (not on folders
+or adjustment layers). Per effect, an object merged over what the layer has (or over the effect's
+defaults when it has none), `true` to add it with its defaults, `false` to remove it, and
+`{"enabled": false}` to hide it while keeping its settings. `clear=true` removes them all first.
+Sizes and distances are layer pixels; `color` is any CSS colour (or `red`, `green`, `blue` 0…1);
+`opacity` is 0…1. The effects follow the layer's own mask, and the layer's opacity and blend mode
+apply to the layer and its effects together.
+
+- **shadow** (drop shadow, under the layer): `angle` −360…360, where the light comes from (90 is
+  straight above, so the shadow falls straight down; 120 drops it down and to the right),
+  `distance` 0…5000, `blur` 0…500 (how soft), `color`, `opacity`. Defaults 90, 20, 20, black, 0.5.
+- **innerShadow** (inside the edges, as if cut out): the same fields; defaults 90, 10, 10, black,
+  0.5.
+- **outerGlow**: `size` 0…500, `color`, `opacity`; defaults 20, white, 0.75.
+- **innerGlow**: `size` 0…500, `color`, `opacity`; defaults 10, white, 0.75.
+- **stroke**: `size` 0…500, `inside` (false puts it outside the edge, with round corners),
+  `color`, `opacity`; defaults 4, black, 1, outside.
+- **colorOverlay** (tints the layer, keeping its shape): `color`, `opacity`; defaults red, 1.
+
+Recipes:
+
+- A soft drop shadow for a cut-out photo or a card:
+  `effects={"shadow": {"angle": 120, "distance": 18, "blur": 40, "opacity": 0.35}}`.
+- A glow on a headline over a dark picture:
+  `effects={"outerGlow": {"size": 28, "color": "#ffd27a", "opacity": 0.8}}`.
+- Legible white text on a busy photo: `effects={"stroke": {"size": 3, "color": "#111"},
+  "shadow": {"distance": 4, "blur": 10, "opacity": 0.6}}`.
+- A sticker look: `effects={"stroke": {"size": 14, "color": "#fff"}, "shadow": {"distance": 6,
+  "blur": 12, "opacity": 0.3}}`.
+- Hide the stroke but keep it for later: `effects={"stroke": {"enabled": false}}`.
+
+## Masks
+
+A mask shows (white) or hides (black) parts of a layer without erasing anything; folders and
+adjustment layers take masks too. `mask layer=… mask=<action>`:
+
+- `reveal` or `hide`: a mask showing or hiding everything (replacing one the layer has).
+- `revealSelection` or `hideSelection`: from what the person has selected in the Canvas window.
+- `invert`, `enable`, `disable` (kept but not used), `remove`.
+- `apply`: bake the mask into the pixels and drop it (not for folders or adjustments).
+- `unlink`: the mask stays where it is when the layer moves; `link` ties it to the layer again.
+
+Typical use: a vignette is a `Curves` or `Exposure` layer that darkens, with a mask hiding its
+centre; a two-tone grade is two adjustments, each masked to its half.
 
 ## The .comp format (for writing projects directly)
 
@@ -178,7 +239,9 @@ Rules that matter (break one and the whole file is refused):
   the editor never reads half a project.
 - `maskSourceID` clips a layer to another; `adjustment` makes an adjustment layer (no
   `imageFile`; its record needs `kind`, `hue`, `saturation`, `lightness`, `colorize`, plus full
-  `levels` and `curves`). Keep fields you do not understand exactly as they were.
+  `levels` and `curves`). `effects` holds the layer effects, one record per effect as listed under
+  Layer effects (a missing record means no such effect). An unlinked mask has `"maskLinked": false`
+  and its own `maskPlacement` transform. Keep fields you do not understand exactly as they were.
 - A text or shape layer is a normal pixel layer (its PNG shows it) with a `text` record
   (`content`, `fontName` as a PostScript name, `fontSize` in pixels, `red`/`green`/`blue` 0…1,
   `alignment` Left, Center or Right, `tracking`, `leading`, and `boxSize` [width, height] for

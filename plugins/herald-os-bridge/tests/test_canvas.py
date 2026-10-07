@@ -88,6 +88,31 @@ def test_adjustment_settings_travel_as_json(plugin):
     _, command, args = tools.canvas_command({"action": "add_adjustment", "kind": "Hue/Saturation", "settings": {"saturation": 20}})
     assert command == "canvas.addAdjustment"
     assert json.loads(args["settings"]) == {"saturation": 20}
+    _, command, args = tools.canvas_command({"action": "set_adjustment", "layer": "Warmth", "settings": {"midCyanRed": 12}, "opacity": 0.6, "kind": "Levels"})
+    assert command == "canvas.setAdjustment"
+    assert json.loads(args.pop("settings")) == {"midCyanRed": 12}
+    assert args == {"layer": "Warmth", "opacity": 0.6}
+
+
+def test_effects_travel_as_json_and_may_clear_first(plugin):
+    tools = _mod(plugin, "tools")
+    effects = {"shadow": {"distance": 12, "blur": 24, "opacity": 0.4}, "stroke": False}
+    _, command, args = tools.canvas_command({"action": "set_effects", "layer": "Cut-out", "effects": effects, "clear": True, "size": 3})
+    assert command == "canvas.setEffects"
+    assert json.loads(args.pop("effects")) == effects
+    assert args == {"layer": "Cut-out", "clear": True}
+    # Effects written as JSON text by the model pass through as they are.
+    _, _, args = tools.canvas_command({"action": "set_effects", "layer": "Title", "effects": '{"outerGlow": {"size": 30}}'})
+    assert args["effects"] == '{"outerGlow": {"size": 30}}'
+
+
+def test_a_mask_action_travels_as_the_command_action(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "mask", "layer": "Photo", "mask": "hideSelection", "settings": {"x": 1}})
+    assert (command, args) == ("canvas.mask", {"layer": "Photo", "action": "hideSelection"})
+    properties = tools.CANVAS_SCHEMA["parameters"]["properties"]
+    assert "revealSelection" in properties["mask"]["enum"] and "unlink" in properties["mask"]["enum"]
+    assert properties["effects"]["type"] == "object"
 
 
 def test_replacing_a_file_asks_first(plugin, tmp_path):

@@ -51,7 +51,9 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     assert cli.canvas_request(["resize", "--scale", "0.5"]) == ("canvas.resize", {"scale": 0.5})
     assert cli.canvas_request(["resize", "800x600", "--image"]) == ("canvas.resize", {"width": 800, "height": 600, "image": True})
     assert cli.canvas_request(["crop", "0", "100", "1080", "1350"]) == ("canvas.crop", {"x": 0, "y": 100, "width": 1080, "height": 1350})
-    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"]):
+    assert cli.canvas_request(["mask", "Photo", "hide-selection"]) == ("canvas.mask", {"layer": "Photo", "action": "hideSelection"})
+    assert cli.canvas_request(["mask", "Sky glow", "invert", "--project", "Poster.comp"]) == ("canvas.mask", {"layer": "Sky glow", "action": "invert", "project": str(here / "Poster.comp")})
+    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"]):
         with pytest.raises(SystemExit):
             cli.canvas_request(wrong)
 
