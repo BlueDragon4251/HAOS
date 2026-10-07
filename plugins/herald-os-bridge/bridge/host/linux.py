@@ -18,11 +18,13 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
 from ..crash import parse_coredumpctl_list
+from ..documents import EMPTY_PAGE_CHARS, DocumentText, count_pdf_pages, document_type, page_images, split_pdftotext, text_with_python
 from ..util import ExecResult, run
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, HostNotSupported, PortListener, ProcessRow
 from .desktop_entries import DesktopEntry, scan_desktop_entries
@@ -894,6 +896,77 @@ class LinuxHost(HostAdapter):
         if not result.ok and not result.stdout.strip():
             raise RuntimeError(text or f"no core dump for pid {pid}")
         return {"pid": int(pid), "info": text[:12000], "truncated": len(text) > 12000}
+
+    # --- documents (read) ----------------------------------------------------------------------
+    def read_document(self, path: Path, max_pages: int, ocr: bool) -> DocumentText:
+        if document_type(path) == "image":
+            if not ocr:
+                return DocumentText(pages=[""], page_count=1, engine="none", notes=["OCR is off and an image has no text layer."])
+            return DocumentText(pages=[self._tesseract(path)], page_count=1, ocr_pages=[1], engine="tesseract")
+        doc = self._pdf_text(path, max_pages)
+        if ocr:
+            self._ocr_scanned_pages(path, doc)
+        return doc
+
+    def _pdf_text(self, path: Path, max_pages: int) -> DocumentText:
+        """Text page by page with pdftotext (poppler-utils) when installed, else the Python readers."""
+        result = run(["pdftotext", "-layout", "-enc", "UTF-8", "-f", "1", "-l", str(max_pages), str(path), "-"], timeout=60, encoding="utf-8")
+        if result.code == 127:
+            return text_with_python(path, max_pages)
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or f"pdftotext could not read {path.name}")
+        pages = split_pdftotext(result.stdout)
+        info = run(["pdfinfo", str(path)], timeout=20, encoding="utf-8")
+        match = re.search(r"^Pages:\s+(\d+)", info.stdout, re.MULTILINE)
+        count = int(match[1]) if match else (count_pdf_pages(path.read_bytes()) or len(pages))
+        return DocumentText(pages=pages, page_count=max(count, len(pages)), engine="pdftotext")
+
+    def _tesseract(self, image: Path) -> str:
+        result = run(["tesseract", str(image), "stdout", "--psm", "3"], timeout=90, encoding="utf-8")
+        _missing(result, "tesseract")
+        if not result.ok:
+            lines = result.stderr.strip().splitlines()
+            raise RuntimeError(lines[-1] if lines else f"tesseract could not read {image.name}")
+        return result.stdout.strip()
+
+    def _ocr_scanned_pages(self, path: Path, doc: DocumentText) -> None:
+        """Fill the pages that have no text layer (scans) with OCR. pdftoppm renders those pages when
+        poppler-utils is installed; otherwise tesseract reads the pictures the scan is made of."""
+        empty = [n for n, text in enumerate(doc.pages, start=1) if len(re.sub(r"\s", "", text)) < EMPTY_PAGE_CHARS]
+        if not empty:
+            return
+        listed = ", ".join(str(n) for n in empty)
+        if not shutil.which("tesseract"):
+            doc.notes.append(f"Page {listed} has no text layer (a scan); install tesseract to read it.")
+            return
+        with tempfile.TemporaryDirectory(prefix="herald-os-ocr-") as tmp:
+            images: dict[int, Path] = {}
+            if shutil.which("pdftoppm"):
+                for number in empty:
+                    target = Path(tmp, f"page-{number}")
+                    rendered = run(["pdftoppm", "-r", "200", "-gray", "-png", "-f", str(number), "-l", str(number), "-singlefile", str(path), str(target)], timeout=60)
+                    if rendered.ok and target.with_suffix(".png").exists():
+                        images[number] = target.with_suffix(".png")
+            else:
+                pictures = page_images(path.read_bytes(), limit=max(len(doc.pages), 1))
+                if not pictures:
+                    doc.notes.append(f"Page {listed} has no text layer and its pictures are in a format this OCR cannot unpack; install poppler-utils (pdftoppm).")
+                # Scanners write one picture per page in page order; when the counts differ the pairing is a guess.
+                pairs = zip(empty, [pictures[n - 1] for n in empty]) if len(pictures) >= len(doc.pages) else zip(empty, pictures)
+                if pictures and len(pictures) < len(doc.pages) and len(pictures) != len(empty):
+                    doc.notes.append("Matched the scan's pictures to pages by order; check the page numbers.")
+                for number, picture in pairs:
+                    target = Path(tmp, f"page-{number}{picture.extension}")
+                    target.write_bytes(picture.data)
+                    images[number] = target
+            for number, image in sorted(images.items()):
+                try:
+                    doc.pages[number - 1] = self._tesseract(image)
+                    doc.ocr_pages.append(number)
+                except (RuntimeError, HostNotSupported) as exc:
+                    doc.notes.append(f"Page {number} could not be read with OCR: {exc}")
+        if doc.ocr_pages:
+            doc.engine = f"{doc.engine} + tesseract"
 
     # --- system control ----------------------------------------------------------------------
     def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:

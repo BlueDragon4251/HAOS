@@ -1,6 +1,7 @@
 import type { OsControlRequest } from '../../shared/ipc.ts'
 import { appById } from '../shell/apps.ts'
 import { listCommands, runCommand } from './os-commands.ts'
+import { screenFacts } from './on-screen.ts'
 import { isMainSurface } from './shell.ts'
 import { $voice } from './voice.ts'
 import { $webWindows } from './web-windows.ts'
@@ -25,12 +26,16 @@ export function osState(): Record<string, unknown> {
       focused: w.id === focused
     }))
   const voice = $voice.get()
+  const screen = screenFacts()
 
   return {
     page,
     pageTitle: appById(page).name,
     windows,
     webPages: Object.values($webWindows.get()).map(w => ({ id: w.id, url: w.url, title: w.title })),
+    // "This folder" / "this file": what the Files page lists and selects while it is the page in view.
+    files: page === 'files' ? screen.files : null,
+    viewerFile: screen.viewerFile,
     voice: { state: voice.state, engine: voice.engine, muted: voice.muted }
   }
 }

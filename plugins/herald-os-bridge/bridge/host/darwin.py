@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, Sequence
 
 from ..crash import MAC_REPORT_DIRS, is_crash_header, resolve_mac_report, summarise_ips
+from ..documents import EMPTY_PAGE_CHARS, DocumentText, document_type
 from ..util import run
 from .base import AppInfo, FileSearch, FoundFile, HostAdapter, PortListener, ProcessRow
 from .posix import parse_du, parse_ps  # noqa: F401 - shared with Linux; re-exported for callers/tests.
@@ -209,6 +210,82 @@ def parse_volume_settings(text: str) -> dict[str, Any]:
     muted = re.search(r"output muted:(true|false)", text)
     out["muted"] = muted[1] == "true" if muted else None
     return out
+
+
+# PDF text page by page through PDFKit, and on-device text recognition through Vision for pages that
+# are pictures of text (scans) and for images. Both ship with macOS, so nothing is installed; the same
+# JavaScript-for-Automation approach as the shell's screen-text reader. Prints ASCII-only JSON.
+DOCUMENT_SCRIPT = r"""ObjC.import('Foundation')
+ObjC.import('AppKit')
+ObjC.import('PDFKit')
+ObjC.import('Vision')
+function recognise(handler) {
+  const request = $.VNRecognizeTextRequest.alloc.init
+  request.recognitionLevel = 0
+  request.usesLanguageCorrection = true
+  const error = $()
+  if (!handler.performRequestsError($.NSArray.arrayWithObject(request), error)) {
+    throw new Error(error.localizedDescription ? error.localizedDescription.js : 'Vision could not read the page')
+  }
+  const lines = []
+  const results = request.results
+  for (let i = 0; i < results.count; i++) lines.push(results.objectAtIndex(i).topCandidates(1).objectAtIndex(0).string.js)
+  return lines.join('\n')
+}
+function ascii(value) {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, c => '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4))
+}
+function run(argv) {
+  const [kind, file, maxPages, ocrFlag, minChars] = argv
+  const ocr = ocrFlag === '1'
+  const url = $.NSURL.fileURLWithPath(file)
+  if (kind === 'image') {
+    if (!ocr) return ascii({ count: 1, pages: [''], ocr: [], notes: ['OCR is off and an image has no text layer.'] })
+    return ascii({ count: 1, pages: [recognise($.VNImageRequestHandler.alloc.initWithURLOptions(url, $.NSDictionary.dictionary))], ocr: [1], notes: [] })
+  }
+  const doc = $.PDFDocument.alloc.initWithURL(url)
+  if (!doc || doc.isNil()) return ascii({ error: 'not a readable PDF' })
+  const count = Number(doc.pageCount)
+  if (doc.isLocked) return ascii({ error: 'the PDF is password protected', count })
+  const pages = []
+  const used = []
+  const notes = []
+  for (let i = 0; i < Math.min(count, Number(maxPages)); i++) {
+    const page = doc.pageAtIndex(i)
+    const text = page.string
+    let value = text && !text.isNil() ? text.js : ''
+    if (ocr && value.replace(/\s/g, '').length < Number(minChars)) {
+      try {
+        const box = page.boundsForBox(0)
+        const scale = 2200 / Math.max(box.size.width, box.size.height, 1)
+        const image = page.thumbnailOfSizeForBox($.NSMakeSize(box.size.width * scale, box.size.height * scale), 0)
+        value = recognise($.VNImageRequestHandler.alloc.initWithDataOptions(image.TIFFRepresentation, $.NSDictionary.dictionary))
+        used.push(i + 1)
+      } catch (e) {
+        notes.push('Page ' + (i + 1) + ' could not be read with OCR: ' + e.message)
+      }
+    }
+    pages.push(value)
+  }
+  return ascii({ count, pages, ocr: used, notes })
+}
+"""
+
+
+def parse_document_output(stdout: str, kind: str) -> DocumentText:
+    """The document script's JSON -> DocumentText; a reported error raises (pure; tested)."""
+    try:
+        data = json.loads(stdout.strip() or "{}")
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"PDFKit returned unreadable output: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("PDFKit returned an unexpected reply")
+    if data.get("error"):
+        raise RuntimeError(str(data["error"]))
+    pages = [str(page) for page in data.get("pages") or []]
+    ocr_pages = [int(n) for n in data.get("ocr") or []]
+    engine = "Vision" if kind == "image" else "PDFKit + Vision" if ocr_pages else "PDFKit"
+    return DocumentText(pages=pages, page_count=int(data.get("count") or len(pages)), ocr_pages=ocr_pages, engine=engine, notes=[str(n) for n in data.get("notes") or []])
 
 
 def parse_displays(json_text: str) -> list[dict[str, Any]]:
@@ -484,6 +561,14 @@ class DarwinHost(HostAdapter):
     def crash_report(self, ref: str) -> dict[str, Any]:
         path = resolve_mac_report(ref)
         return {"report": str(path), **summarise_ips(path.read_text(errors="replace"))}
+
+    def read_document(self, path: Path, max_pages: int, ocr: bool) -> DocumentText:
+        kind = document_type(path) or "pdf"
+        argv = ["osascript", "-l", "JavaScript", "-e", DOCUMENT_SCRIPT, kind, str(path), str(max_pages), "1" if ocr else "0", str(EMPTY_PAGE_CHARS)]
+        result = run(argv, timeout=20.0 + 10.0 * max_pages, encoding="utf-8")
+        if not result.ok:
+            raise RuntimeError(result.stderr.strip() or f"PDFKit could not read {path.name}")
+        return parse_document_output(result.stdout, kind)
 
     # --- system control ----------------------------------------------------------------------
     def set_volume(self, percent: int | None, muted: bool | None) -> dict[str, Any]:

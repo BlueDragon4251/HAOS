@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from ..documents import DocumentText
+
 
 class HostNotSupported(RuntimeError):
     """Raised by adapters for platforms Herald OS does not implement yet."""
@@ -158,6 +160,11 @@ class HostAdapter(ABC):
     def crash_report(self, ref: str) -> dict[str, Any]:
         """The facts of one crash: ``ref`` is a report path (macOS) or the crashed pid (Linux)."""
         raise HostNotSupported(f"crash reports are not available on {self.platform}")
+
+    def read_document(self, path: Path, max_pages: int, ocr: bool) -> DocumentText:
+        """The text of a PDF, page by page (pages that are pictures of text through OCR when ``ocr``),
+        or of an image of a document (OCR). Reads at most ``max_pages`` pages and counts them all."""
+        raise HostNotSupported(f"reading documents is not available on {self.platform}")
 
     # --- system control (act / mutate) ------------------------------------------------------
     @abstractmethod
