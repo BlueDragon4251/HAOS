@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises'
 import zlib from 'node:zlib'
 
 /*
@@ -56,20 +57,25 @@ const paeth = (a: number, b: number, c: number) => {
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c
 }
 
+/** Images up to this many bytes pick each row's filter; larger ones use Paeth throughout. */
+const ADAPTIVE_BYTES = 4_000_000
+
 /**
  * Filtered scanlines. Each row takes the filter that leaves the smallest absolute sum (the usual
  * heuristic); large images use Paeth throughout, which is nearly as small at a fifth of the work.
+ * `above` is the row before the first one, for an image filtered a band at a time.
  */
-function filterRows(data: ArrayLike<number>, width: number, height: number, channels: number): Buffer {
+function filterRows(data: ArrayLike<number>, width: number, height: number, channels: number, above: ArrayLike<number> | null = null, adaptive = width * channels * height <= ADAPTIVE_BYTES): Buffer {
   const stride = width * channels
   const out = Buffer.alloc((stride + 1) * height)
   const candidates = Array.from({ length: 5 }, () => Buffer.alloc(stride))
-  const adaptive = stride * height <= 4_000_000
+  const upAt = (y: number, i: number) => (y > 0 ? data[(y - 1) * stride + i] : above ? above[i] : 0)
+  const first = above ? 4 : 1
 
   for (let y = 0; y < height; y++) {
     const row = y * stride
-    const prior = row - stride
-    let best = adaptive ? 0 : y === 0 ? 1 : 4
+    const hasUp = y > 0 || Boolean(above)
+    let best = adaptive ? 0 : y === 0 ? first : 4
     let bestSum = Infinity
 
     for (let filter = 0; adaptive && filter < 5; filter++) {
@@ -79,8 +85,8 @@ function filterRows(data: ArrayLike<number>, width: number, height: number, chan
       for (let i = 0; i < stride; i++) {
         const value = data[row + i]
         const left = i >= channels ? data[row + i - channels] : 0
-        const up = y > 0 ? data[prior + i] : 0
-        const upLeft = y > 0 && i >= channels ? data[prior + i - channels] : 0
+        const up = hasUp ? upAt(y, i) : 0
+        const upLeft = hasUp && i >= channels ? upAt(y, i - channels) : 0
         const predicted = filter === 0 ? 0 : filter === 1 ? left : filter === 2 ? up : filter === 3 ? (left + up) >> 1 : paeth(left, up, upLeft)
         const residual = (value - predicted) & 0xff
         line[i] = residual
@@ -104,8 +110,8 @@ function filterRows(data: ArrayLike<number>, width: number, height: number, chan
     for (let i = 0; i < stride; i++) {
       const value = data[row + i]
       const left = i >= channels ? data[row + i - channels] : 0
-      const up = y > 0 ? data[prior + i] : 0
-      const upLeft = y > 0 && i >= channels ? data[prior + i - channels] : 0
+      const up = hasUp ? upAt(y, i) : 0
+      const upLeft = hasUp && i >= channels ? upAt(y, i - channels) : 0
       const predicted = best === 0 ? 0 : best === 1 ? left : best === 2 ? up : best === 3 ? (left + up) >> 1 : paeth(left, up, upLeft)
       line[i] = (value - predicted) & 0xff
     }
@@ -124,14 +130,8 @@ export interface PngImage {
   data: Uint8Array
 }
 
-/** An 8-bit PNG: RGBA for 4 channels, grayscale for 1; `ppi` adds the resolution (pHYs). */
-export function encodePng(image: { width: number; height: number; channels: 1 | 4; data: ArrayLike<number> }, ppi?: number): Buffer {
-  const { width, height, channels, data } = image
-
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || data.length !== width * height * channels) {
-    throw new Error(`a ${width}×${height} PNG needs ${width * height * channels} bytes, got ${data.length}`)
-  }
-
+/** The signature and header chunks of an 8-bit PNG: RGBA for 4 channels, grayscale for 1; `ppi` adds the resolution (pHYs). */
+function pngHead(width: number, height: number, channels: 1 | 4, ppi?: number): Buffer[] {
   const header = Buffer.alloc(13)
   header.writeUInt32BE(width, 0)
   header.writeUInt32BE(height, 4)
@@ -148,9 +148,101 @@ export function encodePng(image: { width: number; height: number; channels: 1 | 
     chunks.push(chunk('pHYs', physical))
   }
 
-  chunks.push(chunk('IDAT', zlib.deflateSync(filterRows(data, width, height, channels), { level: 6 })), chunk('IEND', Buffer.alloc(0)))
+  return chunks
+}
 
-  return Buffer.concat(chunks)
+/** An 8-bit PNG: RGBA for 4 channels, grayscale for 1; `ppi` adds the resolution (pHYs). */
+export function encodePng(image: { width: number; height: number; channels: 1 | 4; data: ArrayLike<number> }, ppi?: number): Buffer {
+  const { width, height, channels, data } = image
+
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || data.length !== width * height * channels) {
+    throw new Error(`a ${width}×${height} PNG needs ${width * height * channels} bytes, got ${data.length}`)
+  }
+
+  return Buffer.concat([...pngHead(width, height, channels, ppi), chunk('IDAT', zlib.deflateSync(filterRows(data, width, height, channels), { level: 6 })), chunk('IEND', Buffer.alloc(0))])
+}
+
+/**
+ * A PNG written to a file a band of rows at a time, so an export as large as the format allows
+ * never sits whole in memory: rows are filtered, run through one deflate stream, and written as
+ * IDAT chunks as the compressed data comes out.
+ */
+export class PngStream {
+  private readonly deflate = zlib.createDeflate({ level: 6 })
+  private readonly compressed: Buffer[] = []
+  private above: Buffer | null = null
+  private rows = 0
+  private failure: Error | null = null
+  private readonly ended: Promise<void>
+
+  private constructor(
+    private readonly file: fs.FileHandle,
+    readonly width: number,
+    readonly height: number,
+    private readonly channels: 1 | 4
+  ) {
+    this.deflate.on('data', (data: Buffer) => this.compressed.push(data))
+    this.deflate.on('error', (error: Error) => (this.failure = error))
+    this.ended = new Promise((resolve) => this.deflate.once('end', resolve))
+  }
+
+  static async open(target: string, width: number, height: number, channels: 1 | 4, ppi?: number): Promise<PngStream> {
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+      throw new Error(`a PNG is a whole number of pixels a side, not ${width}×${height}`)
+    }
+
+    const file = await fs.open(target, 'w')
+    const stream = new PngStream(file, width, height, channels)
+    await file.write(Buffer.concat(pngHead(width, height, channels, ppi)))
+
+    return stream
+  }
+
+  /** The next whole rows, top to bottom. */
+  async write(data: Uint8Array): Promise<void> {
+    const stride = this.width * this.channels
+
+    if (data.length % stride || this.rows + data.length / stride > this.height) {
+      throw new Error(`rows of a ${this.width}-pixel-wide PNG come ${stride} bytes each, and it has ${this.height - this.rows} left`)
+    }
+
+    const count = data.length / stride
+    const filtered = filterRows(data, this.width, count, this.channels, this.above, this.width * this.channels * this.height <= ADAPTIVE_BYTES)
+    this.above = Buffer.from(data.subarray(data.length - stride))
+    this.rows += count
+    await new Promise<void>((resolve, reject) => this.deflate.write(filtered, (error) => (error ? reject(error) : resolve())))
+    await this.flush()
+  }
+
+  /** Write what has been compressed so far as IDAT chunks. */
+  private async flush(): Promise<void> {
+    if (this.failure) {
+      throw this.failure
+    }
+
+    if (this.compressed.length) {
+      const data = Buffer.concat(this.compressed.splice(0))
+      await this.file.write(chunk('IDAT', data))
+    }
+  }
+
+  /** Finish the file once every row is in. */
+  async finish(): Promise<void> {
+    if (this.rows !== this.height) {
+      throw new Error(`the PNG has ${this.rows} of its ${this.height} rows`)
+    }
+
+    this.deflate.end()
+    await this.ended
+    await this.flush()
+    await this.file.write(chunk('IEND', Buffer.alloc(0)))
+    await this.file.close()
+  }
+
+  async abort(): Promise<void> {
+    this.deflate.destroy()
+    await this.file.close().catch(() => {})
+  }
 }
 
 /** Decoded pixels as RGBA (4) or one gray value a pixel (1, for masks: colour averaged, times alpha). */

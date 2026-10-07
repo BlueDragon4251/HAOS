@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import type { CanvasDocument, CanvasLayer } from './engine/document.ts'
 import { apply, corners } from './engine/geometry.ts'
-import { docToScreen, fitView, type Look, ScreenRenderer, type View, zoomAt } from './engine/gpu/view.ts'
+import { docToScreen, fitView, type Look, ScreenRenderer, SETTLE_MS, type View, zoomAt } from './engine/gpu/view.ts'
 import type { Raster } from './engine/raster.ts'
 import { traceOutline } from './engine/selection.ts'
 import { HANDLERS } from './tools/index.ts'
@@ -66,6 +66,7 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
   const renderer = useRef<ScreenRenderer | null>(null)
   const docRef = useRef(doc)
   const frame = useRef(0)
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const drag = useRef<Drag | null>(null)
   const hidden = useRef<{ id: string | null; map: ReadonlyMap<string, Partial<CanvasLayer>> | undefined }>({ id: null, map: undefined })
   const [failure, setFailure] = useState<string | null>(null)
@@ -90,14 +91,21 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
     const current = docRef.current
     const view = viewOf(current)
     const dpr = window.devicePixelRatio || 1
+    let draft = false
 
     try {
-      renderer.current?.draw(current, view, LOOK, dpr, hidden.current.map)
+      draft = renderer.current?.draw(current, view, LOOK, dpr, { overrides: hidden.current.map }) ?? false
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error))
     }
 
     drawOverlay(overlay.current, current, view, dpr)
+    clearTimeout(settle.current)
+
+    // A draft drawn while things moved: the full frame follows once they are still.
+    if (draft) {
+      settle.current = setTimeout(() => schedule(), SETTLE_MS + 10)
+    }
   }
   const paintRef = useRef(paint)
   paintRef.current = paint
@@ -153,6 +161,7 @@ export function Viewport({ doc }: { doc: CanvasDocument }) {
       canvas.removeEventListener('webglcontextlost', lost)
       canvas.removeEventListener('webglcontextrestored', restored)
       cancelAnimationFrame(frame.current)
+      clearTimeout(settle.current)
       frame.current = 0
       registerScreen(null)
       renderer.current?.dispose()

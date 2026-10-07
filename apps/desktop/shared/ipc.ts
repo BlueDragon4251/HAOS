@@ -922,7 +922,14 @@ export const IPC = {
   canvasReadAsset: 'herald-os:canvas:read-asset',
   canvasWrite: 'herald-os:canvas:write',
   canvasReadImage: 'herald-os:canvas:read-image',
+  /** A layered file (PSD, PSB) read in parts, so a large one need not cross in one message. */
+  canvasReadPart: 'herald-os:canvas:read-part',
   canvasWriteFile: 'herald-os:canvas:write-file',
+  /** An export written a part at a time: PNG rows compressed by main, or bytes as they are. */
+  canvasStreamBegin: 'herald-os:canvas:stream-begin',
+  canvasStreamWrite: 'herald-os:canvas:stream-write',
+  canvasStreamEnd: 'herald-os:canvas:stream-end',
+  canvasStreamAbort: 'herald-os:canvas:stream-abort',
   canvasWatch: 'herald-os:canvas:watch',
   canvasUnwatch: 'herald-os:canvas:unwatch',
   canvasExists: 'herald-os:canvas:exists',
@@ -968,6 +975,15 @@ export interface CanvasWrite {
 }
 
 export type CanvasSaveKind = 'project' | 'png' | 'jpeg' | 'webp' | 'psd'
+
+/** A file written in parts: PNG rows to compress (with the image's size), or bytes to write as they come. */
+export type CanvasStreamKind = { kind: 'png'; width: number; height: number; ppi?: number } | { kind: 'bytes' }
+
+/** Part of a file, and how large the whole file is. */
+export interface CanvasFilePart {
+  size: number
+  bytes: Uint8Array
+}
 
 /** An open Herald Canvas document, as a window reports it (for Hermes's commands). */
 export interface CanvasDocSummary {

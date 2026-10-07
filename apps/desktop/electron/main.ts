@@ -51,6 +51,12 @@ import { WallpaperService } from './shell/wallpaper.ts'
 import { appIconPath, createMainWindow } from './window.ts'
 
 app.setName('Herald OS')
+// Chromium turns WebGL off where it does not accelerate the graphics (virtual machines, drivers it
+// blocklists), and Herald Canvas draws with WebGL: there it falls back to SwiftShader, Chromium's
+// software renderer, rather than to nothing. Machines it accelerates are not affected.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('enable-unsafe-swiftshader')
+}
 // Widget plugins load from herald-plugin://<id>/, Canvas's verified models from herald-model://<model>/
 // (registered before the app is ready, as Electron requires).
 protocol.registerSchemesAsPrivileged([

@@ -1,9 +1,21 @@
 /*
  * Small WebGL2 helpers for Herald Canvas: programs with cached uniforms, render targets, and a
- * texture cache that uploads a raster once and afterwards only the part that changed.
+ * texture cache that uploads a raster once and afterwards only the part that changed. A raster
+ * larger than the GPU's largest texture is held in pieces, uploaded as they come into view, with a
+ * reduced copy of the whole for drawing it small.
  */
 
-import type { Raster, Rect } from '../raster.ts'
+import { clipRect, type Raster, type Rect } from '../raster.ts'
+
+/** A WebGL renderer that runs on the processor rather than a graphics chip. */
+export const isSoftwareRenderer = (name: string): boolean => /swiftshader|llvmpipe|softpipe|software rasterizer|basic render driver/i.test(name)
+
+/** The renderer's name, unmasked where the browser allows it. */
+export function rendererName(gl: WebGL2RenderingContext): string {
+  const info = gl.getExtension('WEBGL_debug_renderer_info')
+
+  return String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '')
+}
 
 export interface Target {
   texture: WebGLTexture
@@ -126,12 +138,18 @@ export class Gpu {
   readonly maxTextureSize: number
   /** Can targets hold half floats (smoother blending), or only 8 bits? */
   readonly halfFloat: boolean
+  /** Drawn by the processor (SwiftShader, llvmpipe): every pixel is dear, so the view draws less while things move. */
+  readonly software: boolean
+  readonly renderer: string
   private readonly quad: WebGLVertexArrayObject
   private readonly programs = new Map<string, Program>()
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
-    this.halfFloat = Boolean(gl.getExtension('EXT_color_buffer_float'))
+    this.renderer = rendererName(gl)
+    this.software = isSoftwareRenderer(this.renderer)
+    // Half floats are emulated on the processor, at twice the memory traffic: 8 bits are much quicker there.
+    this.halfFloat = !this.software && Boolean(gl.getExtension('EXT_color_buffer_float'))
     gl.getExtension('OES_texture_float_linear')
 
     const buffer = gl.createBuffer()
@@ -300,19 +318,44 @@ export class Gpu {
   }
 }
 
+/** A texture holding a raster, or one piece of a raster too large for a single texture. */
+export interface Piece {
+  texture: WebGLTexture
+  /** The raster pixels the texture holds: the piece and a pixel of its neighbours on each side, so filtering shows no seams. */
+  rect: Rect
+  /** The pixels the piece stands for; pieces tile the raster without overlapping. */
+  inner: Rect
+}
+
 interface Uploaded {
   texture: WebGLTexture
   version: number
-  /** The size uploaded: smaller than the raster when it is past the GPU's largest texture. */
+  /** The raster pixels it holds: all of them, or one piece with its border. */
+  rect: Rect
+  /** Its own size: smaller than `rect` for the reduced copy of a raster past the GPU's largest texture. */
   width: number
   height: number
-  mipmaps: boolean
+  levels: number
+  /** The version its mipmaps were made from. */
+  mipVersion: number
   usedAt: number
 }
 
+interface Held {
+  /** The whole raster in one texture, reduced when it is too large for one. */
+  whole?: Uploaded
+  /** Full-size pieces of a raster too large for one texture, by row and column. */
+  pieces: Map<number, Uploaded>
+}
+
+/** Side of the pieces a raster past the GPU's limit is held in. */
+export const PIECE_SIZE = 2048
+
+const intersect = (a: Rect, b: Rect): Rect | null => clipRect({ x: a.x - b.x, y: a.y - b.y, width: a.width, height: a.height }, b.width, b.height)
+
 /** Textures for rasters: RGBA premultiplied on the way up, masks as one channel. */
 export class RasterTextures {
-  private readonly entries = new Map<Raster, Uploaded>()
+  private readonly entries = new Map<Raster, Held>()
   private staging = new Uint8Array(0)
   private frame = 0
 
@@ -323,123 +366,252 @@ export class RasterTextures {
     this.frame++
   }
 
+  /** Is the raster past the GPU's largest texture (held in pieces at full size)? */
+  tooBig(raster: Raster): boolean {
+    return raster.width > this.gpu.maxTextureSize || raster.height > this.gpu.maxTextureSize
+  }
+
+  /** Raster pixels per pixel of its reduced copy: 1 for a raster that fits in one texture. */
+  reduction(raster: Raster): number {
+    return this.tooBig(raster) ? Math.max(raster.width, raster.height) / this.gpu.maxTextureSize : 1
+  }
+
+  /** The whole raster in one texture (a reduced copy when it is too large for one); mipmaps are made when asked for. */
   get(raster: Raster, mipmaps = false): WebGLTexture {
+    const held = this.held(raster)
+    const ratio = 1 / this.reduction(raster)
+    const width = Math.max(1, Math.floor(raster.width * ratio))
+    const height = Math.max(1, Math.floor(raster.height * ratio))
+    held.whole = this.ensure(held.whole, raster.channels, raster.bounds, width, height, mipmaps)
+    this.sync(raster, held.whole, mipmaps)
+
+    return held.whole.texture
+  }
+
+  /**
+   * What draws the raster at full size, covering at least `need` (raster pixels; all of it when
+   * null): one texture when it fits, else the pieces that reach into `need`.
+   */
+  pieces(raster: Raster, need: Rect | null, mipmaps = false): Piece[] {
+    if (!this.tooBig(raster)) {
+      return [{ texture: this.get(raster, mipmaps), rect: raster.bounds, inner: raster.bounds }]
+    }
+
+    const held = this.held(raster)
+    const area = need ? clipRect(need, raster.width, raster.height) : raster.bounds
+    const out: Piece[] = []
+
+    if (!area) {
+      return out
+    }
+
+    const columns = Math.ceil(raster.width / PIECE_SIZE)
+
+    for (let row = Math.floor(area.y / PIECE_SIZE); row * PIECE_SIZE < area.y + area.height; row++) {
+      for (let column = Math.floor(area.x / PIECE_SIZE); column * PIECE_SIZE < area.x + area.width; column++) {
+        const x = column * PIECE_SIZE
+        const y = row * PIECE_SIZE
+        const inner = { x, y, width: Math.min(PIECE_SIZE, raster.width - x), height: Math.min(PIECE_SIZE, raster.height - y) }
+        const rect = clipRect({ x: x - 1, y: y - 1, width: inner.width + 2, height: inner.height + 2 }, raster.width, raster.height)!
+        const key = row * columns + column
+        const entry = this.ensure(held.pieces.get(key), raster.channels, rect, rect.width, rect.height, mipmaps)
+        held.pieces.set(key, entry)
+        this.sync(raster, entry, mipmaps)
+        out.push({ texture: entry.texture, rect, inner })
+      }
+    }
+
+    return out
+  }
+
+  private held(raster: Raster): Held {
+    let held = this.entries.get(raster)
+
+    if (!held) {
+      held = { pieces: new Map() }
+      this.entries.set(raster, held)
+    }
+
+    return held
+  }
+
+  /** An entry of this size, made (or made again with mipmap levels) when it has to be. */
+  private ensure(entry: Uploaded | undefined, channels: 1 | 4, rect: Rect, width: number, height: number, mipmaps: boolean): Uploaded {
+    if (entry && entry.width === width && entry.height === height && (!mipmaps || entry.levels > 1)) {
+      return entry
+    }
+
+    if (entry) {
+      this.gpu.gl.deleteTexture(entry.texture)
+    }
+
     const { gl } = this.gpu
-    let entry = this.entries.get(raster)
-    const tooBig = raster.width > this.gpu.maxTextureSize || raster.height > this.gpu.maxTextureSize
+    const texture = gl.createTexture()!
+    this.gpu.bindScratch(texture)
+    const levels = mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
+    gl.texStorage2D(gl.TEXTURE_2D, levels, channels === 4 ? gl.RGBA8 : gl.R8, width, height)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.gpu.setSampling(texture, 'linear')
 
-    if (entry && entry.mipmaps !== mipmaps) {
-      gl.deleteTexture(entry.texture)
-      this.entries.delete(raster)
-      entry = undefined
-    }
+    return { texture, version: -1, rect, width, height, levels, mipVersion: -1, usedAt: this.frame }
+  }
 
-    if (!entry) {
-      const ratio = tooBig ? this.gpu.maxTextureSize / Math.max(raster.width, raster.height) : 1
-      const width = Math.max(1, Math.floor(raster.width * ratio))
-      const height = Math.max(1, Math.floor(raster.height * ratio))
-      const texture = gl.createTexture()!
-      this.gpu.bindScratch(texture)
-      const levels = mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
-      gl.texStorage2D(gl.TEXTURE_2D, levels, raster.channels === 4 ? gl.RGBA8 : gl.R8, width, height)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      this.gpu.setSampling(texture, mipmaps ? 'mipmap' : 'linear')
-      entry = { texture, version: -1, width, height, mipmaps, usedAt: this.frame }
-      this.entries.set(raster, entry)
-    }
-
+  /** Bring an entry up to the raster's version (only what changed is uploaded), and its mipmaps when they are wanted. */
+  private sync(raster: Raster, entry: Uploaded, mipmaps: boolean): void {
     entry.usedAt = this.frame
 
     if (entry.version !== raster.version) {
-      this.upload(raster, entry)
+      const changed = entry.version < 0 ? null : raster.changedSince(entry.version)
+      const area = intersect(changed ?? raster.bounds, entry.rect)
+
+      if (area) {
+        this.upload(raster, entry, { ...area, x: area.x + entry.rect.x, y: area.y + entry.rect.y })
+      }
+
       entry.version = raster.version
     }
 
-    return entry.texture
+    if (mipmaps && entry.levels > 1 && entry.mipVersion !== raster.version) {
+      this.gpu.bindScratch(entry.texture)
+      this.gpu.gl.generateMipmap(this.gpu.gl.TEXTURE_2D)
+      entry.mipVersion = raster.version
+    }
   }
 
-  private upload(raster: Raster, entry: Uploaded): void {
+  /** Upload an area of the raster (raster pixels, inside the entry's rect). */
+  private upload(raster: Raster, entry: Uploaded, area: Rect): void {
     const { gl } = this.gpu
     this.gpu.bindScratch(entry.texture)
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
-    if (entry.width !== raster.width || entry.height !== raster.height) {
-      // Past the GPU's limit: a reduced copy until tiled drawing takes over.
-      const reduced = new Uint8Array(entry.width * entry.height * raster.channels)
+    if (entry.width !== entry.rect.width || entry.height !== entry.rect.height) {
+      this.uploadReduced(raster, entry, area)
 
-      for (let y = 0; y < entry.height; y++) {
-        const sy = Math.floor((y * raster.height) / entry.height)
-
-        for (let x = 0; x < entry.width; x++) {
-          const sx = Math.floor((x * raster.width) / entry.width)
-          const s = (sy * raster.width + sx) * raster.channels
-          const d = (y * entry.width + x) * raster.channels
-
-          for (let c = 0; c < raster.channels; c++) {
-            reduced[d + c] = raster.data[s + c]
-          }
-        }
-      }
-
-      if (raster.channels === 4) {
-        premultiplyInPlace(reduced)
-      }
-
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, entry.width, entry.height, raster.channels === 4 ? gl.RGBA : gl.RED, gl.UNSIGNED_BYTE, reduced)
-    } else {
-      const rect = raster.changedSince(entry.version) ?? raster.bounds
-
-      if (!rect.width || !rect.height) {
-        return
-      }
-
-      if (raster.channels === 1) {
-        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, raster.width)
-        gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, rect.x)
-        gl.pixelStorei(gl.UNPACK_SKIP_ROWS, rect.y)
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, rect.x, rect.y, rect.width, rect.height, gl.RED, gl.UNSIGNED_BYTE, raster.data)
-        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
-        gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0)
-        gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0)
-      } else {
-        const size = rect.width * rect.height * 4
-
-        if (this.staging.length < size) {
-          this.staging = new Uint8Array(size)
-        }
-
-        const staging = this.staging.subarray(0, size)
-
-        for (let row = 0; row < rect.height; row++) {
-          const start = ((rect.y + row) * raster.width + rect.x) * 4
-          staging.set(raster.data.subarray(start, start + rect.width * 4), row * rect.width * 4)
-        }
-
-        premultiplyInPlace(staging)
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, rect.x, rect.y, rect.width, rect.height, gl.RGBA, gl.UNSIGNED_BYTE, staging)
-      }
+      return
     }
 
-    if (entry.mipmaps) {
-      this.gpu.bindScratch(entry.texture)
-      gl.generateMipmap(gl.TEXTURE_2D)
+    const x = area.x - entry.rect.x
+    const y = area.y - entry.rect.y
+
+    if (raster.channels === 1) {
+      gl.pixelStorei(gl.UNPACK_ROW_LENGTH, raster.width)
+      gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, area.x)
+      gl.pixelStorei(gl.UNPACK_SKIP_ROWS, area.y)
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, area.width, area.height, gl.RED, gl.UNSIGNED_BYTE, raster.data)
+      gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
+      gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0)
+      gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0)
+
+      return
     }
+
+    const staging = this.stage(area.width * area.height * 4)
+
+    for (let row = 0; row < area.height; row++) {
+      const start = ((area.y + row) * raster.width + area.x) * 4
+      staging.set(raster.data.subarray(start, start + area.width * 4), row * area.width * 4)
+    }
+
+    premultiplyInPlace(staging)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, area.width, area.height, gl.RGBA, gl.UNSIGNED_BYTE, staging)
   }
 
-  /** Free textures of rasters no frame has used lately. */
+  /** The reduced copy over a changed area: each of its pixels the average of four raster pixels in its footprint. */
+  private uploadReduced(raster: Raster, entry: Uploaded, area: Rect): void {
+    const { gl } = this.gpu
+    const fx = raster.width / entry.width
+    const fy = raster.height / entry.height
+    const x0 = Math.max(0, Math.floor(area.x / fx))
+    const y0 = Math.max(0, Math.floor(area.y / fy))
+    const x1 = Math.min(entry.width, Math.ceil((area.x + area.width) / fx))
+    const y1 = Math.min(entry.height, Math.ceil((area.y + area.height) / fy))
+    const width = x1 - x0
+    const height = y1 - y0
+
+    if (width <= 0 || height <= 0) {
+      return
+    }
+
+    const { channels, data } = raster
+    const staging = this.stage(width * height * channels)
+    const sampleAt = (value: number, factor: number, limit: number, quarter: number) => Math.min(limit - 1, Math.floor((value + quarter) * factor))
+
+    for (let y = 0; y < height; y++) {
+      const ya = sampleAt(y0 + y, fy, raster.height, 0.25)
+      const yb = sampleAt(y0 + y, fy, raster.height, 0.75)
+
+      for (let x = 0; x < width; x++) {
+        const xa = sampleAt(x0 + x, fx, raster.width, 0.25)
+        const xb = sampleAt(x0 + x, fx, raster.width, 0.75)
+        const d = (y * width + x) * channels
+        const samples = [(ya * raster.width + xa) * channels, (ya * raster.width + xb) * channels, (yb * raster.width + xa) * channels, (yb * raster.width + xb) * channels]
+
+        if (channels === 1) {
+          staging[d] = (data[samples[0]] + data[samples[1]] + data[samples[2]] + data[samples[3]] + 2) >> 2
+          continue
+        }
+
+        // Premultiplied while averaging, so transparent pixels add no colour.
+        let r = 0
+        let g = 0
+        let b = 0
+        let a = 0
+
+        for (const s of samples) {
+          const alpha = data[s + 3]
+          r += data[s] * alpha
+          g += data[s + 1] * alpha
+          b += data[s + 2] * alpha
+          a += alpha
+        }
+
+        staging[d] = Math.round(r / 1020)
+        staging[d + 1] = Math.round(g / 1020)
+        staging[d + 2] = Math.round(b / 1020)
+        staging[d + 3] = Math.round(a / 4)
+      }
+    }
+
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, width, height, channels === 4 ? gl.RGBA : gl.RED, gl.UNSIGNED_BYTE, staging)
+  }
+
+  private stage(size: number): Uint8Array {
+    if (this.staging.length < size) {
+      this.staging = new Uint8Array(size)
+    }
+
+    return this.staging.subarray(0, size)
+  }
+
+  /** Free textures of rasters (and pieces) no frame has used lately. */
   sweep(keepFrames = 2): void {
-    for (const [raster, entry] of this.entries) {
-      if (this.frame - entry.usedAt >= keepFrames) {
-        this.gpu.gl.deleteTexture(entry.texture)
+    for (const [raster, held] of this.entries) {
+      if (held.whole && this.frame - held.whole.usedAt >= keepFrames) {
+        this.gpu.gl.deleteTexture(held.whole.texture)
+        held.whole = undefined
+      }
+
+      for (const [key, entry] of held.pieces) {
+        if (this.frame - entry.usedAt >= keepFrames) {
+          this.gpu.gl.deleteTexture(entry.texture)
+          held.pieces.delete(key)
+        }
+      }
+
+      if (!held.whole && !held.pieces.size) {
         this.entries.delete(raster)
       }
     }
   }
 
   clear(): void {
-    for (const entry of this.entries.values()) {
-      this.gpu.gl.deleteTexture(entry.texture)
+    for (const held of this.entries.values()) {
+      if (held.whole) {
+        this.gpu.gl.deleteTexture(held.whole.texture)
+      }
+
+      held.pieces.forEach((entry) => this.gpu.gl.deleteTexture(entry.texture))
     }
 
     this.entries.clear()

@@ -10,18 +10,26 @@ import { BLEND_MODES, type BlendMode } from '../../../../../shared/canvas/comp-f
 /** The number each blend mode has in the shaders: its place in the format's list. */
 export const blendModeIndex = (mode: BlendMode | undefined): number => Math.max(0, BLEND_MODES.indexOf(mode ?? 'Normal'))
 
-/** A unit square placed by `u_place` (unit to target pixels) in a target of `u_size` pixels. */
+/**
+ * A unit square placed by `u_place` (unit to target pixels) in a target of `u_size` pixels; only
+ * the part `u_unitRect` names is drawn (all of it is 0, 0, 1, 1), so a layer held in several
+ * textures is drawn a piece at a time.
+ */
 export const PLACE_VERTEX = `#version 300 es
 in vec2 a_unit;
 uniform mat3 u_place;
 uniform vec2 u_size;
+uniform vec4 u_unitRect;
 out vec2 v_unit;
 void main() {
-  v_unit = a_unit;
-  vec2 p = (u_place * vec3(a_unit, 1.0)).xy;
+  v_unit = u_unitRect.xy + a_unit * u_unitRect.zw;
+  vec2 p = (u_place * vec3(v_unit, 1.0)).xy;
   gl_Position = vec4(p / u_size * 2.0 - 1.0, 0.0, 1.0);
 }
 `
+
+/** The whole unit square, and a texture that holds all of its raster. */
+export const WHOLE: readonly [number, number, number, number] = [0, 0, 1, 1]
 
 /** The whole target. */
 export const FULL_VERTEX = `#version 300 es
@@ -37,6 +45,7 @@ void main() {
 export const COVERAGE = `
 uniform int u_maskMode;          // 0 none, 1 linked to the layer, 2 placed on its own
 uniform sampler2D u_mask;
+uniform vec4 u_maskWindow;       // the mask's unit square to its texture: xy + unit * zw
 uniform mat3 u_docToMask;        // document pixels to the placed mask's unit square
 uniform sampler2D u_folderMask;  // enclosing folders' masks, multiplied (same target space)
 uniform bool u_hasFolderMask;
@@ -52,10 +61,10 @@ float coverage(vec2 unit) {
   vec2 targetUv = gl_FragCoord.xy / u_size;
   float c = u_opacity;
   if (u_maskMode == 1) {
-    c *= texture(u_mask, unit).r;
+    c *= texture(u_mask, u_maskWindow.xy + unit * u_maskWindow.zw).r;
   } else if (u_maskMode == 2) {
     vec2 m = (u_docToMask * vec3(doc, 1.0)).xy;
-    c *= (m.x < 0.0 || m.y < 0.0 || m.x > 1.0 || m.y > 1.0) ? 0.0 : texture(u_mask, m).r;
+    c *= (m.x < 0.0 || m.y < 0.0 || m.x > 1.0 || m.y > 1.0) ? 0.0 : texture(u_mask, u_maskWindow.xy + m * u_maskWindow.zw).r;
   }
   if (u_hasFolderMask) c *= texture(u_folderMask, targetUv).a;
   if (u_hasClip) c *= texture(u_clip, targetUv).a;
@@ -68,11 +77,12 @@ export const LAYER_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_unit;
 uniform sampler2D u_image;
+uniform vec4 u_imageWindow;      // the layer's unit square to its texture: xy + unit * zw
 uniform bool u_hasImage;
 ${COVERAGE}
 out vec4 o;
 void main() {
-  vec4 c = u_hasImage ? texture(u_image, v_unit) : vec4(0.0);
+  vec4 c = u_hasImage ? texture(u_image, u_imageWindow.xy + v_unit * u_imageWindow.zw) : vec4(0.0);
   o = c * coverage(v_unit);
 }
 `
@@ -82,11 +92,12 @@ export const COVERAGE_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_unit;
 uniform sampler2D u_image;
+uniform vec4 u_imageWindow;
 uniform bool u_hasImage;
 ${COVERAGE}
 out vec4 o;
 void main() {
-  float a = u_hasImage ? texture(u_image, v_unit).a : 1.0;
+  float a = u_hasImage ? texture(u_image, u_imageWindow.xy + v_unit * u_imageWindow.zw).a : 1.0;
   o = vec4(a * coverage(v_unit));
 }
 `

@@ -3,22 +3,32 @@
  * pass-through: they draw nothing themselves, and their opacity and mask multiply into every layer
  * inside them. A clipped layer is multiplied by its base's coverage (the base's pixels, opacity and
  * mask, but not its visibility or its folders). Normal layers go straight onto the backdrop through
- * the fixed blender; other modes are blended in a shader, ping-ponging between two targets.
+ * the fixed blender; other modes are blended in a shader, ping-ponging between two targets. A
+ * render covers the whole frame (the document at a scale) or any area of it: the part of the view
+ * on screen, or one tile of an export.
  */
 
 import { LIMITS } from '../../../../../shared/canvas/comp-format.ts'
 import { ancestorsOf, type CanvasLayer, type DocState, findLayer, isShown } from '../document.ts'
-import { invert, type Mat, multiply, scale as scaleMat, toMat3, unitToDocument } from '../geometry.ts'
-import { Raster, type Rect } from '../raster.ts'
+import { apply, invert, type Mat, multiply, pixelToDocument, scale as scaleMat, toMat3, translate, unitToDocument } from '../geometry.ts'
+import { clipRect, Raster, type Rect } from '../raster.ts'
+import { filterReach, frameSize, planTiles, TILE_ALIGN, tileSide } from '../tiles.ts'
 import { AdjustmentPass } from './adjustments.ts'
 import { EffectsPass } from './effects.ts'
 import { Filters } from './filters.ts'
-import { Gpu, type Program, RasterTextures, type Sampling, type Target } from './gl.ts'
-import { BLEND_FRAGMENT, blendModeIndex, COPY_FRAGMENT, COVERAGE_FRAGMENT, FULL_VERTEX, LAYER_FRAGMENT, PLACE_VERTEX } from './shaders.ts'
+import { Gpu, type Piece, type Program, RasterTextures, type Sampling, type Target } from './gl.ts'
+import { BLEND_FRAGMENT, blendModeIndex, COPY_FRAGMENT, COVERAGE_FRAGMENT, FULL_VERTEX, LAYER_FRAGMENT, PLACE_VERTEX, WHOLE } from './shaders.ts'
 
 export interface RenderOptions {
   /** Target pixels per document pixel: below 1 for previews and thumbnails. */
   scale?: number
+  /**
+   * The part of the frame (the document at `scale`) to draw, in its pixels, at most the GPU's
+   * largest texture a side; all of it by default, shrunk to fit the GPU when it is larger.
+   */
+  area?: Rect
+  /** Quicker and rougher, while something moves: layers drawn small are not mipmapped. */
+  draft?: boolean
   /** Draw only these layers. */
   only?: ReadonlySet<string>
   /** Changes to layers for this render only (a merge drawing a layer at full opacity). */
@@ -31,10 +41,12 @@ export interface RenderOptions {
 
 export interface Rendered {
   target: Target
-  /** The size drawn, which the scale and the GPU's largest texture decide. */
+  /** The size drawn, which the scale, the area and the GPU's largest texture decide. */
   width: number
   height: number
   scale: number
+  /** The part of the frame it holds, in frame pixels. */
+  area: Rect
 }
 
 /** Where a render is drawing: its size, and document pixels to target pixels. */
@@ -47,6 +59,8 @@ export interface FrameInfo {
   precise: boolean
   /** The document position of the target's pixel 0, for a target that holds only part of the frame. */
   docOffset?: [number, number]
+  /** A draft: layers drawn small are not mipmapped. */
+  draft?: boolean
 }
 
 /** What reaches a layer from outside it: its opacity (folders' included), its folders' masks and its clipping base. */
@@ -72,6 +86,17 @@ interface FrameState extends FrameInfo {
   borrowed: Target[]
 }
 
+interface TargetSet {
+  a: Target
+  b: Target
+  source: Target
+  width: number
+  height: number
+}
+
+/** Target sets kept between renders: the view's and an export's tiles take turns without making new ones each time. */
+const KEPT_SETS = 2
+
 const PRECISE_PIXELS = 16_777_216
 
 /** GPU memory work targets kept between renders may take; past it the oldest go. */
@@ -82,7 +107,7 @@ const bytesOf = (target: Target): number => target.width * target.height * (targ
 export class Compositor {
   readonly textures: RasterTextures
   readonly filters: Filters
-  private targets: { a: Target; b: Target; source: Target; width: number; height: number } | null = null
+  private sets: TargetSet[] = []
   private spares: Target[] = []
   private readonly white: WebGLTexture
   private readonly layerProgram: Program
@@ -143,22 +168,27 @@ export class Compositor {
     }
   }
 
-  private ensure(width: number, height: number) {
-    if (this.targets?.width === width && this.targets.height === height) {
-      return this.targets
+  private ensure(width: number, height: number): TargetSet {
+    const index = this.sets.findIndex((set) => set.width === width && set.height === height)
+
+    if (index >= 0) {
+      const [set] = this.sets.splice(index, 1)
+      this.sets.unshift(set)
+
+      return set
     }
 
-    this.disposeTargets()
     const precise = width * height <= PRECISE_PIXELS
-    this.targets = {
-      a: this.gpu.createTarget(width, height, { mipmaps: true, precise }),
-      b: this.gpu.createTarget(width, height, { mipmaps: true, precise }),
-      source: this.gpu.createTarget(width, height, { precise }),
-      width,
-      height
+    const set = { a: this.gpu.createTarget(width, height, { precise }), b: this.gpu.createTarget(width, height, { precise }), source: this.gpu.createTarget(width, height, { precise }), width, height }
+    this.sets.unshift(set)
+
+    for (const old of this.sets.splice(KEPT_SETS)) {
+      this.gpu.deleteTarget(old.a)
+      this.gpu.deleteTarget(old.b)
+      this.gpu.deleteTarget(old.source)
     }
 
-    return this.targets
+    return set
   }
 
   private borrow(frame: FrameState): Target {
@@ -168,14 +198,36 @@ export class Compositor {
     return target
   }
 
-  /** Composite the document; the result stays valid until the next render. */
+  /** Composite the document (or an area of its frame); the result stays valid until the next render. */
   render(state: DocState, options: RenderOptions = {}): Rendered {
     const limit = this.gpu.maxTextureSize
-    const scale = Math.min(options.scale ?? 1, limit / state.width, limit / state.height)
-    const width = Math.max(1, Math.round(state.width * scale))
-    const height = Math.max(1, Math.round(state.height * scale))
+    let scale = options.scale ?? 1
+    let area = options.area
+
+    if (!area) {
+      scale = Math.min(scale, limit / state.width, limit / state.height)
+      area = { x: 0, y: 0, ...frameSize(state.width, state.height, scale) }
+    }
+
+    const { width, height } = area
+
+    if (width < 1 || height < 1 || width > limit || height > limit || !Number.isInteger(width) || !Number.isInteger(height)) {
+      throw new Error(`A render is 1 to ${limit} whole pixels a side, not ${width}×${height}`)
+    }
+
     const targets = this.ensure(width, height)
-    const frame: FrameState = { width, height, scale, docToTarget: scaleMat(scale), precise: width * height <= PRECISE_PIXELS, folders: new Map(), clips: new Map(), borrowed: [] }
+    const frame: FrameState = {
+      width,
+      height,
+      scale,
+      docToTarget: multiply(translate(-area.x, -area.y), scaleMat(scale)),
+      docOffset: [area.x / scale, area.y / scale],
+      precise: width * height <= PRECISE_PIXELS,
+      draft: options.draft,
+      folders: new Map(),
+      clips: new Map(),
+      borrowed: []
+    }
     const overrides = options.overrides
     const view: DocState = overrides?.size ? { ...state, layers: state.layers.map((layer) => (overrides.has(layer.id) ? { ...layer, ...overrides.get(layer.id) } : layer)) } : state
     let current = targets.a
@@ -237,7 +289,27 @@ export class Compositor {
     this.release(...frame.borrowed)
     this.textures.sweep()
 
-    return { target: current, width, height, scale }
+    return { target: current, width, height, scale, area }
+  }
+
+  /**
+   * Draw the frame (or an area of it) tile by tile at full quality, handing over each tile's pixels
+   * (straight alpha, rows from the top, over `background` when given) and its place in the area.
+   * Each tile is rendered with a border as wide as the blurs reach, then cut back.
+   */
+  renderTiles(state: DocState, options: RenderOptions & { background?: [number, number, number] | null; tile?: number }, onTile: (pixels: Raster, x: number, y: number) => void): void {
+    const scale = options.scale ?? 1
+    const frame = frameSize(state.width, state.height, scale)
+    const area = options.area ?? { x: 0, y: 0, ...frame }
+    const limit = this.gpu.maxTextureSize
+    const pad = Math.min(filterReach(state, scale), Math.floor((limit - TILE_ALIGN * 3) / 2))
+    const { background, tile: side, ...render } = options
+
+    for (const tile of planTiles(frame, area, tileSide(limit, pad, side), pad)) {
+      const rendered = this.render(state, { ...render, scale, area: tile.padded, draft: false })
+      const inner = { x: tile.inner.x - tile.padded.x, y: tile.inner.y - tile.padded.y, width: tile.inner.width, height: tile.inner.height }
+      onTile(this.read(rendered, background ?? null, inner), tile.inner.x - area.x, tile.inner.y - area.y)
+    }
   }
 
   /** Blend `source` over `backdrop` with a mode (0 is Normal) into `into`. */
@@ -247,40 +319,94 @@ export class Compositor {
     this.gpu.drawQuad()
   }
 
-  /** Set the uniforms every placed draw shares, and draw the layer's quad. */
+  /**
+   * Set the uniforms every placed draw shares, and draw the layer's quad: in one go, or a piece at a
+   * time when its pixels (or its mask) are larger than the GPU's largest texture and drawn large
+   * enough to need them at full size.
+   */
   drawLayer(program: Program, layer: CanvasLayer, frame: FrameInfo, opacity: number, folderMask: Target | null, clip: Target | null): void {
     const place = multiply(frame.docToTarget, unitToDocument(layer.transform))
     const [offsetX, offsetY] = frame.docOffset ?? [0, 0]
     program.use().mat3('u_place', toMat3(place)).vec2('u_size', frame.width, frame.height).float('u_scale', frame.scale).vec2('u_docOffset', offsetX, offsetY).float('u_opacity', opacity)
+    program.texture('u_folderMask', 2, folderMask?.texture ?? this.white).int('u_hasFolderMask', Boolean(folderMask))
+    program.texture('u_clip', 3, clip?.texture ?? this.white).int('u_hasClip', Boolean(clip))
 
-    if (layer.pixels) {
-      const onTarget = (Math.abs(layer.transform.size[0]) * frame.scale) / layer.pixels.width
-      const sampling: Sampling = layer.transform.sampling === 'Nearest' ? 'nearest' : layer.transform.sampling === 'Smooth' || onTarget >= 1 ? 'linear' : 'mipmap'
-      const texture = this.textures.get(layer.pixels, sampling === 'mipmap')
-      this.gpu.setSampling(texture, sampling)
-      program.texture('u_image', 0, texture).int('u_hasImage', true)
-    } else {
-      program.texture('u_image', 0, this.white).int('u_hasImage', false)
-    }
-
+    const pixels = layer.pixels
     const mask = layer.mask && layer.maskEnabled !== false ? layer.mask : null
+    const placement = mask && layer.maskLinked === false ? layer.maskPlacement : undefined
+    const sampling = pixels ? this.samplingFor(layer, pixels, frame) : 'linear'
+    // Pieces at full size only when the layer is drawn larger than its reduced copy would show it.
+    const pieced = (raster: Raster | null, transform = layer.transform) => Boolean(raster && this.textures.tooBig(raster) && this.onTarget(transform, raster, frame) > 1 / this.textures.reduction(raster))
+    const piecedPixels = pieced(pixels)
+    const linkedMask = mask && !placement ? mask : null
+    const primary = piecedPixels ? pixels : linkedMask && pieced(linkedMask) ? linkedMask : null
 
     if (mask) {
-      const texture = this.textures.get(mask)
-      this.gpu.setSampling(texture, 'linear')
-      const placement = layer.maskLinked === false ? layer.maskPlacement : undefined
-      program.texture('u_mask', 1, texture).int('u_maskMode', placement ? 2 : 1)
+      program.int('u_maskMode', placement ? 2 : 1)
 
       if (placement) {
         program.mat3('u_docToMask', toMat3(invert(unitToDocument(placement))))
       }
     } else {
-      program.texture('u_mask', 1, this.white).int('u_maskMode', 0)
+      program.texture('u_mask', 1, this.white).int('u_maskMode', 0).vec4('u_maskWindow', ...WHOLE)
     }
 
-    program.texture('u_folderMask', 2, folderMask?.texture ?? this.white).int('u_hasFolderMask', Boolean(folderMask))
-    program.texture('u_clip', 3, clip?.texture ?? this.white).int('u_hasClip', Boolean(clip))
-    this.gpu.drawQuad()
+    if (!pixels) {
+      program.texture('u_image', 0, this.white).int('u_hasImage', false).vec4('u_imageWindow', ...WHOLE)
+    }
+
+    const pieces: (Piece | null)[] = primary ? this.textures.pieces(primary, this.visiblePart(layer.transform, primary, frame), sampling === 'mipmap') : [null]
+
+    for (const piece of pieces) {
+      const unit = piece && primary ? ([piece.inner.x / primary.width, piece.inner.y / primary.height, piece.inner.width / primary.width, piece.inner.height / primary.height] as const) : WHOLE
+      program.vec4('u_unitRect', ...unit)
+
+      if (pixels) {
+        const texture = piece && primary === pixels ? piece : this.wholePiece(pixels, sampling === 'mipmap')
+        this.gpu.setSampling(texture.texture, sampling)
+        program.texture('u_image', 0, texture.texture).int('u_hasImage', true).vec4('u_imageWindow', ...windowOf(texture, pixels))
+      }
+
+      if (mask) {
+        // A mask the size of the pieced raster shares its pieces; any other is drawn from one texture.
+        const sameGrid = piece && primary && !placement && mask.width === primary.width && mask.height === primary.height
+        const texture = sameGrid ? (primary === mask ? piece : this.textures.pieces(mask, piece.inner)[0]) : this.wholePiece(mask, false)
+        this.gpu.setSampling(texture.texture, 'linear')
+        program.texture('u_mask', 1, texture.texture).vec4('u_maskWindow', ...windowOf(texture, mask))
+      }
+
+      this.gpu.drawQuad()
+    }
+  }
+
+  /** Target pixels per raster pixel, along the layer's width. */
+  private onTarget(transform: CanvasLayer['transform'], raster: Raster, frame: FrameInfo): number {
+    return (Math.abs(transform.size[0]) * frame.scale) / raster.width
+  }
+
+  private samplingFor(layer: CanvasLayer, pixels: Raster, frame: FrameInfo): Sampling {
+    if (layer.transform.sampling === 'Nearest') {
+      return 'nearest'
+    }
+
+    return layer.transform.sampling === 'Smooth' || frame.draft || this.onTarget(layer.transform, pixels, frame) >= 1 ? 'linear' : 'mipmap'
+  }
+
+  /** A raster in one texture (reduced when it is too large), as a piece covering all of it. */
+  private wholePiece(raster: Raster, mipmaps: boolean): Piece {
+    return { texture: this.textures.get(raster, mipmaps), rect: raster.bounds, inner: raster.bounds }
+  }
+
+  /** The raster pixels of a placed layer that fall in the frame (with a pixel to spare). */
+  private visiblePart(transform: CanvasLayer['transform'], raster: Raster, frame: FrameInfo): Rect | null {
+    const toRaster = invert(multiply(frame.docToTarget, pixelToDocument(transform, raster.width, raster.height)))
+    const corners = [apply(toRaster, [0, 0]), apply(toRaster, [frame.width, 0]), apply(toRaster, [frame.width, frame.height]), apply(toRaster, [0, frame.height])]
+    const xs = corners.map((point) => point[0])
+    const ys = corners.map((point) => point[1])
+    const x = Math.floor(Math.min(...xs)) - 1
+    const y = Math.floor(Math.min(...ys)) - 1
+
+    return clipRect({ x, y, width: Math.ceil(Math.max(...xs)) + 1 - x, height: Math.ceil(Math.max(...ys)) + 1 - y }, raster.width, raster.height)
   }
 
   /** The enclosing folders' enabled masks multiplied together, or null when none has one. */
@@ -367,13 +493,13 @@ export class Compositor {
   }
 
   private disposeTargets(): void {
-    if (this.targets) {
-      this.gpu.deleteTarget(this.targets.a)
-      this.gpu.deleteTarget(this.targets.b)
-      this.gpu.deleteTarget(this.targets.source)
-      this.targets = null
+    for (const set of this.sets) {
+      this.gpu.deleteTarget(set.a)
+      this.gpu.deleteTarget(set.b)
+      this.gpu.deleteTarget(set.source)
     }
 
+    this.sets = []
     this.spares.forEach((target) => this.gpu.deleteTarget(target))
     this.spares = []
   }
@@ -384,6 +510,13 @@ export class Compositor {
     this.passes.forEach((pass) => pass.dispose?.())
     this.gpu.gl.deleteTexture(this.white)
   }
+}
+
+/** Where a raster's unit square lands in a texture holding part of it (or all of it): xy + unit × zw. */
+export function windowOf(piece: Piece, raster: Raster): [number, number, number, number] {
+  const { rect } = piece
+
+  return [-rect.x / rect.width, -rect.y / rect.height, raster.width / rect.width, raster.height / rect.height]
 }
 
 /** A WebGL2 context of its own, for exports and previews made without a window on screen. */

@@ -6,11 +6,13 @@ import {
   type CalendarResult,
   type CanvasChangedEvent,
   type CanvasFetched,
+  type CanvasFilePart,
   type CanvasPasted,
   type CanvasPresence,
   type CanvasProject,
   type CanvasRawImage,
   type CanvasSaveKind,
+  type CanvasStreamKind,
   type CanvasWrite,
   type CatalogGroupView,
   type CatalogResult,
@@ -198,8 +200,17 @@ const api = {
     write: (project: string, request: CanvasWrite): Promise<string> => ipcRenderer.invoke(IPC.canvasWrite, project, request),
     /** An image's pixels, or its bytes for the window to decode (HEIC, TIFF and RAW arrive converted). */
     readImage: (file: string): Promise<CanvasRawImage | Uint8Array> => ipcRenderer.invoke(IPC.canvasReadImage, file),
+    /** Part of a layered file (PSD, PSB) from `offset`, with the whole file's size. */
+    readPart: (file: string, offset: number, length: number): Promise<CanvasFilePart> => ipcRenderer.invoke(IPC.canvasReadPart, file, offset, length),
     /** Write an export: encoded bytes, or raw pixels to save as PNG. */
     writeFile: (file: string, data: Uint8Array | CanvasRawImage, ppi?: number): Promise<string> => ipcRenderer.invoke(IPC.canvasWriteFile, file, data, ppi),
+    /** Start a file written in parts (resolves with its stream id); it appears only once ended. */
+    streamBegin: (file: string, kind: CanvasStreamKind): Promise<string> => ipcRenderer.invoke(IPC.canvasStreamBegin, file, kind),
+    /** The next part: whole PNG rows, top to bottom, or bytes. */
+    streamWrite: (stream: string, bytes: Uint8Array): Promise<void> => ipcRenderer.invoke(IPC.canvasStreamWrite, stream, bytes),
+    /** Finish the file; resolves with its path. */
+    streamEnd: (stream: string): Promise<string> => ipcRenderer.invoke(IPC.canvasStreamEnd, stream),
+    streamAbort: (stream: string): Promise<void> => ipcRenderer.invoke(IPC.canvasStreamAbort, stream),
     /** Follow a project; `loaded` is the digest of the version this window has, so nothing slips by. */
     watch: (project: string, loaded?: string | null): Promise<string> => ipcRenderer.invoke(IPC.canvasWatch, project, loaded ?? undefined),
     unwatch: (watchId: string): Promise<void> => ipcRenderer.invoke(IPC.canvasUnwatch, watchId),

@@ -10,7 +10,7 @@ import type { CanvasDocument } from '../engine/document.ts'
 import { flatten } from '../engine/project.ts'
 import type { Raster } from '../engine/raster.ts'
 import { $autosave, save } from '../store.ts'
-import { compositeOf } from '../tools/screen.ts'
+import { compositeArea } from '../tools/screen.ts'
 import { editRequest, generatedLayerRequest, generationBox, generativeFillRequest, type ImageContext, layerLine } from './hermes-requests.ts'
 
 export const REQUEST_FOLDER = '/tmp/herald-canvas-ai'
@@ -49,7 +49,7 @@ export async function prepareGenerativeFill(doc: CanvasDocument, prompt: string)
   const image = await contextOf(doc)
   const box = generationBox(bounds, doc.state.width, doc.state.height)
   const folder = requestFolder()
-  const context = await window.heraldOS.canvas.writeFile(`${folder}/context.png`, rawOf(compositeOf(doc).crop(box)))
+  const context = await window.heraldOS.canvas.writeFile(`${folder}/context.png`, rawOf(compositeArea(doc, box)))
   const mask = await window.heraldOS.canvas.writeFile(`${folder}/mask.png`, rawOf(selection.crop(box)))
 
   return { text: generativeFillRequest({ image, prompt, box, context, mask, result: `${folder}/result.png` }), attachments: [context, mask] }

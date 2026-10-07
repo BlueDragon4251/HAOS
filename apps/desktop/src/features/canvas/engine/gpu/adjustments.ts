@@ -12,7 +12,7 @@ import type { Compositor, FrameInfo, LayerCoverage, LayerPass } from './composit
 import type { Scaled } from './filters.ts'
 import type { Program, Target } from './gl.ts'
 import { ADJUST_FRAGMENT, SHADER_KIND } from './adjust-shaders.ts'
-import { blendModeIndex, FULL_VERTEX } from './shaders.ts'
+import { blendModeIndex, FULL_VERTEX, WHOLE } from './shaders.ts'
 
 export class AdjustmentPass implements LayerPass {
   private readonly program: Program
@@ -53,7 +53,7 @@ export class AdjustmentPass implements LayerPass {
       .int('u_mode', blendModeIndex(layer.blendMode))
       .vec2('u_size', frame.width, frame.height)
       .float('u_scale', frame.scale)
-      .vec2('u_docOffset', 0, 0)
+      .vec2('u_docOffset', ...(frame.docOffset ?? [0, 0]))
       .float('u_opacity', coverage.opacity)
 
     if (source) {
@@ -77,6 +77,7 @@ export class AdjustmentPass implements LayerPass {
     const mask = layer.mask && layer.maskEnabled !== false ? layer.mask : null
 
     if (mask) {
+      // A mask past the GPU's largest texture is read from its reduced copy, which is plenty for a mask.
       const texture = textures.get(mask)
       gpu.setSampling(texture, 'linear')
       const placement = layer.maskLinked === false && layer.maskPlacement ? layer.maskPlacement : layer.transform
@@ -84,6 +85,8 @@ export class AdjustmentPass implements LayerPass {
     } else {
       program.texture('u_mask', 1, blank).int('u_maskMode', 0)
     }
+
+    program.vec4('u_maskWindow', ...WHOLE)
 
     program
       .texture('u_folderMask', 2, coverage.folderMask?.texture ?? blank)

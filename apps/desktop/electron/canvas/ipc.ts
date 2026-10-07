@@ -4,15 +4,37 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { parseManifest } from '../../shared/canvas/comp-format.ts'
-import { CANVAS_IMAGE_EXTENSIONS, CONVERTED_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION, projectContaining } from '../../shared/canvas/files.ts'
-import { type CanvasChangedEvent, type CanvasFetched, type CanvasPasted, type CanvasPresence, type CanvasProject, type CanvasRawImage, type CanvasSaveKind, type CanvasWrite, IPC } from '../../shared/ipc.ts'
+import { CANVAS_IMAGE_EXTENSIONS, CONVERTED_IMAGE_EXTENSIONS, isLayeredImage, isProjectPath, PROJECT_EXTENSION, projectContaining } from '../../shared/canvas/files.ts'
+import {
+  type CanvasChangedEvent,
+  type CanvasFetched,
+  type CanvasFilePart,
+  type CanvasPasted,
+  type CanvasPresence,
+  type CanvasProject,
+  type CanvasRawImage,
+  type CanvasSaveKind,
+  type CanvasStreamKind,
+  type CanvasWrite,
+  IPC
+} from '../../shared/ipc.ts'
 import { assertWritable, normalizeUserPath } from '../ipc/fs.ts'
 import { log } from '../log.ts'
 import { convertToPng } from './convert.ts'
 import { type PackageContents, PackageWatcher, readAsset, readPackage, writePackage } from './package-io.ts'
-import { decodePng, encodePng, toChannels } from './png.ts'
+import { decodePng, encodePng, PngStream, toChannels } from './png.ts'
 
 const MAX_IMAGE_BYTES = 512 * 1024 * 1024
+
+/** The largest layered file (PSD, PSB) Herald Canvas opens: what its reader can hold in memory. */
+const MAX_LAYERED_BYTES = 2 * 1024 * 1024 * 1024
+
+/** The most one part of a file read or written in parts may hold (a message must stay well under Chromium's limit). */
+const MAX_PART_BYTES = 64 * 1024 * 1024
+
+/** The largest export: PNG and JPEG sides, and pixels in all. */
+const MAX_EXPORT_SIDE = 65_535
+const MAX_EXPORT_PIXELS = 1_000_000_000
 
 /**
  * A PNG as exact pixels when it decodes here (a browser canvas would round semi-transparent
@@ -51,6 +73,37 @@ function imagePath(target: string): string {
 }
 
 const toProject = (dir: string, contents: PackageContents): CanvasProject => ({ path: dir, manifest: contents.manifest, assets: contents.assets, digest: contents.digest })
+
+/** A layered file Herald may read (a PSD or PSB in the home folder or /tmp). */
+function layeredPath(target: string): string {
+  const file = assertWritable(String(target))
+
+  if (!isLayeredImage(file)) {
+    throw new Error(`${path.basename(file)} is not a Photoshop document`)
+  }
+
+  return file
+}
+
+/** Files being written in parts: the place they go, the temporary file they grow in, and how they are written. */
+interface Stream {
+  file: string
+  partial: string
+  png?: PngStream
+  handle?: fs.FileHandle
+}
+
+const streams = new Map<string, Stream>()
+
+async function abortStream(id: string): Promise<void> {
+  const stream = streams.get(id)
+  streams.delete(id)
+
+  if (stream) {
+    await (stream.png ? stream.png.abort() : stream.handle?.close().catch(() => {}))
+    await fs.rm(stream.partial, { force: true })
+  }
+}
 
 interface Watch {
   watcher: PackageWatcher
@@ -133,12 +186,99 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
       throw new Error(`${path.basename(file)} is too large to open`)
     }
 
-    if (CONVERTED_IMAGE_EXTENSIONS.has(path.extname(file).toLowerCase())) {
+    // Photoshop documents normally open in the window with their layers; asked for as one picture, the system flattens them.
+    if (CONVERTED_IMAGE_EXTENSIONS.has(path.extname(file).toLowerCase()) || isLayeredImage(file)) {
       return pixelsOrBytes(await convertToPng(file), 4)
     }
 
     return pixelsOrBytes(new Uint8Array(await fs.readFile(file)), 4)
   })
+
+  ipcMain.handle(IPC.canvasReadPart, async (_event, target: string, offset: number, length: number): Promise<CanvasFilePart> => {
+    const file = layeredPath(target)
+    const handle = await fs.open(file, 'r')
+
+    try {
+      const { size } = await handle.stat()
+
+      if (size > MAX_LAYERED_BYTES) {
+        throw new Error(`${path.basename(file)} is larger than ${MAX_LAYERED_BYTES / 1024 ** 3} GB, more than Herald Canvas opens`)
+      }
+
+      const start = Math.max(0, Math.min(size, Math.floor(Number(offset) || 0)))
+      const count = Math.max(0, Math.min(MAX_PART_BYTES, Math.floor(Number(length) || 0), size - start))
+      const bytes = new Uint8Array(count)
+      await handle.read(bytes, 0, count, start)
+
+      return { size, bytes }
+    } finally {
+      await handle.close()
+    }
+  })
+
+  ipcMain.handle(IPC.canvasStreamBegin, async (event, target: string, kind: CanvasStreamKind) => {
+    const file = assertWritable(String(target))
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    const id = crypto.randomUUID()
+    const partial = `${file}.${id.slice(0, 8)}.part`
+
+    if (kind?.kind === 'png') {
+      const { width, height } = kind
+
+      if (width > MAX_EXPORT_SIDE || height > MAX_EXPORT_SIDE || width * height > MAX_EXPORT_PIXELS) {
+        throw new Error(`An export is at most ${MAX_EXPORT_SIDE.toLocaleString('en')} pixels a side and ${(MAX_EXPORT_PIXELS / 1e9).toLocaleString('en')} billion in all`)
+      }
+
+      streams.set(id, { file, partial, png: await PngStream.open(partial, width, height, 4, kind.ppi) })
+    } else {
+      streams.set(id, { file, partial, handle: await fs.open(partial, 'w') })
+    }
+
+    // A window that closes mid-export leaves no half-written file behind.
+    event.sender.once('destroyed', () => void abortStream(id))
+
+    return id
+  })
+
+  ipcMain.handle(IPC.canvasStreamWrite, async (_event, id: string, bytes: Uint8Array) => {
+    const stream = streams.get(String(id))
+
+    if (!stream) {
+      throw new Error('That export is no longer being written')
+    }
+
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength > MAX_PART_BYTES * 2) {
+      throw new Error('An export part must be bytes, at most 128 MB')
+    }
+
+    try {
+      await (stream.png ? stream.png.write(bytes) : stream.handle!.write(bytes))
+    } catch (error) {
+      await abortStream(String(id))
+      throw error
+    }
+  })
+
+  ipcMain.handle(IPC.canvasStreamEnd, async (_event, id: string) => {
+    const stream = streams.get(String(id))
+
+    if (!stream) {
+      throw new Error('That export is no longer being written')
+    }
+
+    try {
+      await (stream.png ? stream.png.finish() : stream.handle!.close())
+      streams.delete(String(id))
+      await fs.rename(stream.partial, stream.file)
+    } catch (error) {
+      await abortStream(String(id))
+      throw error
+    }
+
+    return stream.file
+  })
+
+  ipcMain.handle(IPC.canvasStreamAbort, (_event, id: string) => abortStream(String(id)))
 
   ipcMain.handle(IPC.canvasWriteFile, async (_event, target: string, data: Uint8Array | CanvasRawImage, ppi?: number) => {
     const file = assertWritable(String(target))

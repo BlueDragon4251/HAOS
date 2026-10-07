@@ -29,6 +29,7 @@ import { effectKinds } from './engine/layer-effects.ts'
 import type { Raster } from './engine/raster.ts'
 import { useRevision } from './hooks.ts'
 import { isMac } from './platform.ts'
+import { softwareRendering } from './tools/screen.ts'
 
 const DRAG_TYPE = 'application/x-herald-canvas-layer'
 
@@ -63,52 +64,78 @@ function rowsOf(state: DocState, collapsed: ReadonlySet<string>, parentID?: stri
   return out
 }
 
-/** A small preview of a raster, fitted and sampled (cheap enough to redraw on every stroke). */
-function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raster | null; version: number; size?: number; targeted?: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null)
+/** How often a thumbnail redraws while its raster keeps changing, when the processor draws everything (milliseconds). */
+const SOFTWARE_THUMB_MS = 400
 
-  useEffect(() => {
-    const canvas = ref.current
-    const context = canvas?.getContext('2d')
+/** Draw a raster into a thumbnail canvas, fitted and sampled. */
+function drawThumb(canvas: HTMLCanvasElement | null, raster: Raster | null): void {
+  const context = canvas?.getContext('2d')
 
-    if (!canvas || !context) {
-      return
-    }
+  if (!canvas || !context) {
+    return
+  }
 
-    context.clearRect(0, 0, canvas.width, canvas.height)
+  context.clearRect(0, 0, canvas.width, canvas.height)
 
-    if (!raster) {
-      return
-    }
+  if (!raster) {
+    return
+  }
 
-    const side = canvas.width
-    const ratio = Math.min(side / raster.width, side / raster.height)
-    const width = Math.max(1, Math.round(raster.width * ratio))
-    const height = Math.max(1, Math.round(raster.height * ratio))
-    const image = context.createImageData(width, height)
+  const side = canvas.width
+  const ratio = Math.min(side / raster.width, side / raster.height)
+  const width = Math.max(1, Math.round(raster.width * ratio))
+  const height = Math.max(1, Math.round(raster.height * ratio))
+  const image = context.createImageData(width, height)
 
-    for (let y = 0; y < height; y++) {
-      const sy = Math.min(raster.height - 1, Math.floor(((y + 0.5) * raster.height) / height))
+  for (let y = 0; y < height; y++) {
+    const sy = Math.min(raster.height - 1, Math.floor(((y + 0.5) * raster.height) / height))
 
-      for (let x = 0; x < width; x++) {
-        const sx = Math.min(raster.width - 1, Math.floor(((x + 0.5) * raster.width) / width))
-        const o = (y * width + x) * 4
+    for (let x = 0; x < width; x++) {
+      const sx = Math.min(raster.width - 1, Math.floor(((x + 0.5) * raster.width) / width))
+      const o = (y * width + x) * 4
 
-        if (raster.channels === 4) {
-          const s = (sy * raster.width + sx) * 4
-          image.data[o] = raster.data[s]
-          image.data[o + 1] = raster.data[s + 1]
-          image.data[o + 2] = raster.data[s + 2]
-          image.data[o + 3] = raster.data[s + 3]
-        } else {
-          const v = raster.data[sy * raster.width + sx]
-          image.data[o] = image.data[o + 1] = image.data[o + 2] = v
-          image.data[o + 3] = 255
-        }
+      if (raster.channels === 4) {
+        const s = (sy * raster.width + sx) * 4
+        image.data[o] = raster.data[s]
+        image.data[o + 1] = raster.data[s + 1]
+        image.data[o + 2] = raster.data[s + 2]
+        image.data[o + 3] = raster.data[s + 3]
+      } else {
+        const v = raster.data[sy * raster.width + sx]
+        image.data[o] = image.data[o + 1] = image.data[o + 2] = v
+        image.data[o + 3] = 255
       }
     }
+  }
 
-    context.putImageData(image, Math.floor((side - width) / 2), Math.floor((side - height) / 2))
+  context.putImageData(image, Math.floor((side - width) / 2), Math.floor((side - height) / 2))
+}
+
+/**
+ * A small preview of a raster. It is cheap enough to redraw on every stroke, except where the
+ * processor draws everything: there it redraws at most every so often while the raster changes,
+ * and once more when it stops.
+ */
+function Thumb({ raster, version, size = 32, targeted = false }: { raster: Raster | null; version: number; size?: number; targeted?: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const drawnAt = useRef(0)
+
+  useEffect(() => {
+    const draw = () => {
+      drawnAt.current = performance.now()
+      drawThumb(ref.current, raster)
+    }
+    const wait = softwareRendering() ? SOFTWARE_THUMB_MS - (performance.now() - drawnAt.current) : 0
+
+    if (wait <= 0) {
+      draw()
+
+      return
+    }
+
+    const timer = setTimeout(draw, wait)
+
+    return () => clearTimeout(timer)
   }, [raster, version])
 
   return <canvas ref={ref} width={size * 2} height={size * 2} className={cn('shrink-0 rounded-[4px]', targeted ? 'ring-2 ring-white/85' : 'ring-1 ring-line')} style={{ width: size, height: size, background: CHECKER }} />

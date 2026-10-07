@@ -14,7 +14,8 @@ import type { Rect } from '../raster.ts'
 import type { Compositor, FrameInfo, LayerCoverage, LayerPass } from './compositor.ts'
 import type { Scaled } from './filters.ts'
 import type { Program, Target } from './gl.ts'
-import { BLEND_FUNCTIONS, blendModeIndex, COVERAGE, FULL_VERTEX } from './shaders.ts'
+import { TILE_ALIGN } from '../tiles.ts'
+import { BLEND_FUNCTIONS, blendModeIndex, COVERAGE, FULL_VERTEX, WHOLE } from './shaders.ts'
 
 /** The effects that draw something: present, not hidden, and not at zero opacity or size. */
 export function visibleEffects(effects: LayerEffects | undefined): LayerEffects | null {
@@ -177,12 +178,20 @@ export class EffectsPass implements LayerPass {
       Math.max(shadow ? Math.hypot(...shadow.offset) + shadow.sigma * 3 : 0, glowSigma * 3, stroke && !stroke.inside ? stroke.reach + 1 : 0, inner ? 2 : 0, innerGlowSigma ? 2 : 0)
     const box = boundsOf(layer.transform)
     const s = frame.scale
-    const x0 = Math.max(0, Math.floor(box.x * s - margin))
-    const y0 = Math.max(0, Math.floor(box.y * s - margin))
-    const x1 = Math.min(frame.width, Math.ceil((box.x + box.width) * s + margin))
-    const y1 = Math.min(frame.height, Math.ceil((box.y + box.height) * s + margin))
+    // In the whole document's frame: where this frame starts, and the work tile around the layer.
+    // The tile reaches past the frame as far as the effects carry (a layer just outside still
+    // casts its shadow in), within the GPU's limit, and starts on the tile grid so its blurs
+    // halve the same pixels however the document is cut into tiles.
+    const fx = Math.round((frame.docOffset?.[0] ?? 0) * s)
+    const fy = Math.round((frame.docOffset?.[1] ?? 0) * s)
+    const reach = Math.max(0, Math.min(Math.ceil(margin) + TILE_ALIGN, Math.floor((compositor.gpu.maxTextureSize - Math.max(frame.width, frame.height)) / 2) - TILE_ALIGN))
+    const down = (value: number) => Math.floor(value / TILE_ALIGN) * TILE_ALIGN
+    const x0 = down(Math.max(Math.floor(box.x * s - margin), fx - reach))
+    const y0 = down(Math.max(Math.floor(box.y * s - margin), fy - reach))
+    const x1 = Math.min(Math.ceil((box.x + box.width) * s + margin), fx + frame.width + reach)
+    const y1 = Math.min(Math.ceil((box.y + box.height) * s + margin), fy + frame.height + reach)
 
-    if (x1 <= x0 || y1 <= y0) {
+    if (x1 <= x0 || y1 <= y0 || x1 <= fx || y1 <= fy || x0 >= fx + frame.width || y0 >= fy + frame.height) {
       return false
     }
 
@@ -190,9 +199,10 @@ export class EffectsPass implements LayerPass {
       width: x1 - x0,
       height: y1 - y0,
       scale: s,
-      docToTarget: multiply(translate(-x0, -y0), frame.docToTarget),
+      docToTarget: multiply(translate(fx - x0, fy - y0), frame.docToTarget),
       precise: frame.precise,
-      docOffset: [x0 / s, y0 / s]
+      docOffset: [x0 / s, y0 / s],
+      draft: frame.draft
     }
     const format = frame.precise ? 'precise' : 'bytes'
     // The layer's own pixels in the tile, through its own mask: what the effects follow.
@@ -248,15 +258,16 @@ export class EffectsPass implements LayerPass {
       .use()
       .texture('u_backdrop', 0, backdrop.texture)
       .texture('u_unit', 4, unit.texture)
-      .ivec2('u_tileOrigin', x0, y0)
+      .ivec2('u_tileOrigin', x0 - fx, y0 - fy)
       .ivec2('u_tileSize', tile.width, tile.height)
       .int('u_mode', blendModeIndex(layer.blendMode))
       .vec2('u_size', frame.width, frame.height)
       .float('u_scale', s)
-      .vec2('u_docOffset', 0, 0)
+      .vec2('u_docOffset', ...(frame.docOffset ?? [0, 0]))
       .float('u_opacity', coverage.opacity)
       .texture('u_mask', 1, blank)
       .int('u_maskMode', 0)
+      .vec4('u_maskWindow', ...WHOLE)
       .texture('u_folderMask', 2, coverage.folderMask?.texture ?? blank)
       .int('u_hasFolderMask', Boolean(coverage.folderMask))
       .texture('u_clip', 3, coverage.clip?.texture ?? blank)

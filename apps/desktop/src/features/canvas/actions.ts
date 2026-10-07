@@ -27,17 +27,18 @@ import {
   withLayer
 } from './engine/document.ts'
 import { baseName } from '../../../shared/canvas/files.ts'
-import { apply, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
+import { apply, boundsOf, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
+import { visibleEffects } from './engine/gpu/effects.ts'
 import { EFFECT_NAMES, withAllShown, withEffect, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
-import { offscreen, toRaster } from './engine/project.ts'
-import { Raster } from './engine/raster.ts'
+import { flatten, readPicture } from './engine/project.ts'
+import { clipRect, Raster, type Rect, unionRect } from './engine/raster.ts'
 import { notify } from './store.ts'
 import { $background, $foreground } from './tools/state.ts'
 
 /** An image file as a new layer, centred, shrunk to fit when it is larger than the canvas (pixels kept). */
 export async function placeImage(doc: CanvasDocument, file: string): Promise<void> {
-  const raster = await toRaster(await window.heraldOS.canvas.readImage(file), 4, /\.svg$/i.test(file))
+  const raster = await readPicture(file)
   const { width, height } = doc.state
   const fit = Math.min(1, width / raster.width, height / raster.height)
   const w = Math.max(1, Math.round(raster.width * fit))
@@ -274,17 +275,34 @@ function trimmed(raster: Raster): { pixels: Raster; x: number; y: number } | nul
   return bounds ? { pixels: bounds.width === raster.width && bounds.height === raster.height ? raster : raster.crop(bounds), x: bounds.x, y: bounds.y } : null
 }
 
-/** Draw some layers into one new pixel layer (document sized, then trimmed). */
+/** Draw some layers into one new pixel layer (over the part of the canvas they cover, at full size, then trimmed). */
 function renderInto(doc: CanvasDocument, ids: string[], overrides = new Map<string, Partial<CanvasLayer>>(), isolated = true): { pixels: Raster; x: number; y: number } | null {
-  const compositor = offscreen()
+  const { state } = doc
+  let covered: Rect | null = null
 
-  try {
-    const rendered = compositor.render(doc.state, { only: new Set(ids), overrides, isolated, includeHidden: false })
+  for (const id of ids) {
+    const layer = findLayer(state, id)
 
-    return trimmed(compositor.read(rendered))
-  } finally {
-    compositor.textures.clear()
+    // Effects reach past a layer's box, and an adjustment changes whatever is under it: those take the whole canvas.
+    if (layer && (layer.adjustment || visibleEffects(layer.effects))) {
+      covered = { x: 0, y: 0, width: state.width, height: state.height }
+      break
+    }
+
+    if (layer?.pixels) {
+      covered = unionRect(covered, boundsOf(layer.transform))
+    }
   }
+
+  const area = covered && clipRect(covered, state.width, state.height)
+
+  if (!area) {
+    return null
+  }
+
+  const result = trimmed(flatten(state, 1, null, { area, only: new Set(ids), overrides, isolated, includeHidden: false }))
+
+  return result && { ...result, x: result.x + area.x, y: result.y + area.y }
 }
 
 /** The layer below the active one, when the two can merge. */
@@ -324,16 +342,7 @@ export function mergeDown(doc: CanvasDocument): void {
 /** Everything visible as one layer; hidden layers are dropped. */
 export function flattenImage(doc: CanvasDocument): void {
   const { state } = doc
-  const compositor = offscreen()
-  let raster: Raster
-
-  try {
-    raster = compositor.read(compositor.render(state))
-  } finally {
-    compositor.textures.clear()
-  }
-
-  const layer = pixelLayer('Background', raster)
+  const layer = pixelLayer('Background', flatten(state, 1))
   doc.selectedIds = []
   doc.commit('Flatten Image', { ...state, layers: [layer], activeLayerId: layer.id })
 }
