@@ -13,6 +13,8 @@ import {
   EFFECT_KINDS,
   type EffectKind,
   type LayerEffects,
+  RANGES,
+  type RangeName,
   type RGB,
   type ShapeKind,
   type TextAlignment,
@@ -132,6 +134,23 @@ export function describeLayers(state: DocState): Record<string, unknown>[] {
 export type Fit = 'contain' | 'cover' | 'none' | 'stretch'
 
 export const finite = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
+
+/** A number argument held to one of Compositor's ranges: undefined when not given, an error naming the argument and the range when outside it. */
+export function rangedArg(value: unknown, name: string, range: RangeName, unit = ''): number | undefined {
+  const number = finite(value)
+
+  if (number === undefined) {
+    return undefined
+  }
+
+  const [min, max] = RANGES[range]
+
+  if (number < min || number > max) {
+    throw new Error(`${name} must be from ${min} to ${max}${unit} (it was ${number})`)
+  }
+
+  return number
+}
 
 /**
  * Where a picture of `width`×`height` goes on the canvas: an explicit box (a missing side keeps the

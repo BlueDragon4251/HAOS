@@ -20,6 +20,7 @@ import {
   mergeSettings,
   opacityFrom,
   placementOf,
+  rangedArg,
   resizePlan,
   resolvePath,
   shapeKindFrom
@@ -256,5 +257,24 @@ describe('adjustments, effects and masks for Hermes', () => {
     const layer = { ...pixelLayer('Logo', new Raster(4, 4)), effects: { stroke: defaultEffect.stroke() }, mask: Raster.filled(1, 1, 255, 1), maskLinked: false }
     const state: DocState = { width: 4, height: 4, resolution: 72, layers: [layer], activeLayerId: null, guides: [], selection: null }
     expect(describeLayer(state, layer)).toMatchObject({ mask: 'on', maskLinked: false, effects: { stroke: defaultEffect.stroke() } })
+  })
+
+  it("holds settings to Compositor's ranges, naming the field and the range", () => {
+    expect(() => adjustmentWith(defaultAdjustment('Exposure'), { exposureSettings: { offset: 0.8 } })).toThrow('adjustment.exposureSettings.offset must be a number from -0.5 to 0.5 (it was 0.8)')
+    expect(() => adjustmentWith(defaultAdjustment('Grain'), { grainSettings: { size: 40 } })).toThrow(/grainSettings\.size must be a number from 0\.5 to 20/)
+    expect(() => effectsWith(undefined, { shadow: { distance: 8000 } })).toThrow(/shadow\.distance must be a number from 0 to 5000/)
+    expect(rangedArg(undefined, 'size', 'fontSize')).toBeUndefined()
+    expect(rangedArg(120, 'size', 'fontSize')).toBe(120)
+    expect(() => rangedArg(4000, 'size (the font size)', 'fontSize', ' pixels')).toThrow('size (the font size) must be from 1 to 2000 pixels (it was 4000)')
+    expect(() => rangedArg(-24, 'leading', 'leading')).toThrow(/leading must be from 0 to 5000/)
+  })
+
+  it('never clips a layer to an adjustment layer', () => {
+    let state: DocState = { width: 10, height: 10, resolution: 72, layers: [], activeLayerId: null, guides: [], selection: null }
+    const grade = adjustmentLayer('Curves', 10, 10)
+    state = insertLayer(state, grade, {})
+    const photo = pixelLayer('Photo', new Raster(10, 10))
+    state = insertLayer(state, photo, { above: grade.id })
+    expect(setClipped(state, photo.id, true)).toBe(state)
   })
 })

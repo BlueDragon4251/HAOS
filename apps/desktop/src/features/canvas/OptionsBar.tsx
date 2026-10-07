@@ -17,7 +17,7 @@ import {
 } from '@tabler/icons-react'
 import { atom } from 'nanostores'
 import { useEffect, useState } from 'react'
-import type { TextAlignment } from '../../../shared/canvas/comp-format.ts'
+import { RANGES, type TextAlignment } from '../../../shared/canvas/comp-format.ts'
 import { GlassButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { cssOf, type RGB } from './color.ts'
@@ -265,7 +265,7 @@ function TypeFields({ doc }: { doc: CanvasDocument }) {
       >
         <IconItalic size={13} />
       </button>
-      <NumberField label="Size" value={options.size} min={1} max={10_000} unit="px" onChange={(size) => set({ size })} />
+      <NumberField label="Size" value={options.size} min={RANGES.fontSize[0]} max={RANGES.fontSize[1]} unit="px" onChange={(size) => set({ size })} />
       <div className="relative">
         <button type="button" title="Text colour" aria-label="Text colour" onClick={() => setPicking(true)} className="block size-6 rounded-md ring-1 ring-white/40" style={{ background: cssOf(colour) }} />
         {picking && (
@@ -294,8 +294,8 @@ function TypeFields({ doc }: { doc: CanvasDocument }) {
           { id: 'Right', label: 'Align right', icon: <IconAlignRight size={13} /> }
         ]}
       />
-      <NumberField label="Tracking" title="Extra space between letters" value={options.tracking} min={-1000} max={1000} step={0.5} unit="px" width="w-12" onChange={(tracking) => set({ tracking })} />
-      <NumberField label="Leading" title="Extra space between lines" value={options.leading} min={-1000} max={1000} step={1} unit="px" width="w-12" onChange={(leading) => set({ leading })} />
+      <NumberField label="Tracking" title="Extra space between letters" value={options.tracking} min={RANGES.tracking[0]} max={RANGES.tracking[1]} step={0.5} unit="px" width="w-12" onChange={(tracking) => set({ tracking })} />
+      <NumberField label="Leading" title="Line spacing, baseline to baseline (0 is automatic: 120% of the size)" value={options.leading} min={RANGES.leading[0]} max={RANGES.leading[1]} step={1} unit="px" width="w-12" onChange={(leading) => set({ leading })} />
       {session && <Confirm onApply={() => void commitTyping(doc)} onCancel={cancelTyping} />}
     </>
   )

@@ -20,6 +20,59 @@ export const LIMITS = {
   clipChain: 256
 } as const
 
+/**
+ * The values Compositor accepts, field by field ([lowest, highest], both allowed). It refuses a
+ * whole project, without a word, when one value is outside them, so the reader holds every field
+ * here to the same bounds and the writer never sends one it would refuse.
+ */
+export const RANGES = {
+  hue: [-360, 360],
+  saturation: [-100, 100],
+  lightness: [-100, 100],
+  /** Levels: white must also sit above black. */
+  levelsBlack: [0, 254],
+  levelsWhite: [1, 255],
+  levelsGamma: [0.1, 9.99],
+  levelsOutput: [0, 255],
+  /** Curves: points in a channel; the first sits at x 0 and the last at x 255. */
+  curvePoints: [2, 32],
+  curveValue: [0, 255],
+  exposure: [-20, 20],
+  exposureOffset: [-0.5, 0.5],
+  exposureGamma: [0.01, 9.99],
+  grainAmount: [0, 100],
+  grainSize: [0.5, 20],
+  grainRoughness: [0, 100],
+  blackWhite: [-200, 300],
+  tintHue: [0, 360],
+  tintSaturation: [0, 100],
+  colorBalance: [-100, 100],
+  blurRadius: [0.1, 250],
+  motionAngle: [-90, 90],
+  motionDistance: [1, 2000],
+  noiseAmount: [0.1, 400],
+  seed: [0, 4_294_967_295],
+  colour: [0, 1],
+  opacity: [0, 1],
+  strokeSize: [0, 500],
+  shadowAngle: [-360, 360],
+  shadowDistance: [0, 5000],
+  shadowBlur: [0, 500],
+  glowSize: [0, 500],
+  fontSize: [1, 2000],
+  tracking: [-100, 1000],
+  /** Baseline to baseline in layer pixels; 0 is automatic (120% of the font size). */
+  leading: [0, 5000],
+  /** Each side of a paragraph box, whose area stays within `textBoxArea`. */
+  textBox: [16, 30_000],
+  layerSize: [1, 300_000],
+  position: [-1_000_000, 1_000_000]
+} as const satisfies Record<string, readonly [number, number]>
+
+export type RangeName = keyof typeof RANGES
+
+export const LIMITS_TEXT = { content: 100_000, boxArea: 200_000_000, fontName: 200, layerName: 16_384 } as const
+
 export const BLEND_MODES = [
   'Normal',
   'Darken',
@@ -416,11 +469,14 @@ function finite(value: unknown, field: string, min = -Infinity, max = Infinity, 
   }
 
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
-    fail(`${field} must be a number from ${min} to ${max}`, field)
+    fail(`${field} must be a number from ${min} to ${max}${typeof value === 'number' ? ` (it was ${value})` : ''}`, field)
   }
 
   return value
 }
+
+/** A number within one of Compositor's ranges. */
+const ranged = (value: unknown, field: string, range: RangeName, fallback?: number): number => finite(value, field, RANGES[range][0], RANGES[range][1], fallback)
 
 function integer(value: unknown, field: string, min: number, max: number): number {
   const number = finite(value, field, min, max)
@@ -466,9 +522,9 @@ function vec2(value: unknown, field: string, min = -1_000_000, max = 1_000_000):
 
 function rgb(value: Json, field: string, fallback?: RGB): RGB {
   return {
-    red: finite(value.red, `${field}.red`, 0, 1, fallback?.red),
-    green: finite(value.green, `${field}.green`, 0, 1, fallback?.green),
-    blue: finite(value.blue, `${field}.blue`, 0, 1, fallback?.blue)
+    red: ranged(value.red, `${field}.red`, 'colour', fallback?.red),
+    green: ranged(value.green, `${field}.green`, 'colour', fallback?.green),
+    blue: ranged(value.blue, `${field}.blue`, 'colour', fallback?.blue)
   }
 }
 
@@ -479,8 +535,8 @@ export function parseTransform(value: unknown, field: string): LayerTransform {
 
   return {
     ...value,
-    origin: vec2(value.origin, `${field}.origin`),
-    size: vec2(value.size, `${field}.size`, 0, 10_000_000),
+    origin: vec2(value.origin, `${field}.origin`, ...RANGES.position),
+    size: vec2(value.size, `${field}.size`, ...RANGES.layerSize),
     rotation: finite(value.rotation, `${field}.rotation`, -1_000_000, 1_000_000, 0),
     flipX: bool(value.flipX, `${field}.flipX`, false),
     flipY: bool(value.flipY, `${field}.flipY`, false),
@@ -504,12 +560,19 @@ function parseLevels(value: unknown, field: string): LevelsSettings {
       fail(`${at} is not a range`, at)
     }
 
+    const black = ranged(range.black, `${at}.black`, 'levelsBlack', 0)
+    const white = ranged(range.white, `${at}.white`, 'levelsWhite', 255)
+
+    if (white <= black) {
+      fail(`${at}.white (${white}) must be above ${at}.black (${black}), up to 255`, `${at}.white`)
+    }
+
     return {
-      black: finite(range.black, `${at}.black`, 0, 255, 0),
-      gamma: finite(range.gamma, `${at}.gamma`, 0.01, 10, 1),
-      white: finite(range.white, `${at}.white`, 0, 255, 255),
-      outputBlack: finite(range.outputBlack, `${at}.outputBlack`, 0, 255, 0),
-      outputWhite: finite(range.outputWhite, `${at}.outputWhite`, 0, 255, 255)
+      black,
+      gamma: ranged(range.gamma, `${at}.gamma`, 'levelsGamma', 1),
+      white,
+      outputBlack: ranged(range.outputBlack, `${at}.outputBlack`, 'levelsOutput', 0),
+      outputWhite: ranged(range.outputWhite, `${at}.outputWhite`, 'levelsOutput', 255)
     }
   }) as LevelsSettings['ranges']
 
@@ -527,19 +590,20 @@ function parseCurves(value: unknown, field: string): CurvesSettings {
 
   const channels = value.channels.map((points: unknown, i: number) => {
     const at = `${field}.channels[${i}]`
+    const [fewest, most] = RANGES.curvePoints
 
-    if (!Array.isArray(points) || points.length < 2 || points.length > 64) {
-      fail(`${at} needs 2 to 64 points`, at)
+    if (!Array.isArray(points) || points.length < fewest || points.length > most) {
+      fail(`${at} needs ${fewest} to ${most} points`, at)
     }
 
     let lastX = -1
 
-    return points.map((point: unknown, j: number) => {
+    const parsed = points.map((point: unknown, j: number) => {
       if (!isObject(point)) {
         fail(`${at}[${j}] is not a point`, at)
       }
 
-      const x = finite(point.x, `${at}[${j}].x`, 0, 255)
+      const x = ranged(point.x, `${at}[${j}].x`, 'curveValue')
 
       if (x <= lastX) {
         fail(`${at} points must run in increasing x`, at)
@@ -547,8 +611,14 @@ function parseCurves(value: unknown, field: string): CurvesSettings {
 
       lastX = x
 
-      return { x, y: finite(point.y, `${at}[${j}].y`, 0, 255) }
+      return { x, y: ranged(point.y, `${at}[${j}].y`, 'curveValue') }
     })
+
+    if (parsed[0].x !== 0 || parsed[parsed.length - 1].x !== 255) {
+      fail(`${at} must start at x 0 and end at x 255`, at)
+    }
+
+    return parsed
   }) as CurvesSettings['channels']
 
   return { channel: oneOf(value.channel, CHANNELS, `${field}.channel`, 'RGB'), channels }
@@ -563,20 +633,24 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
   const adjustment: Adjustment = {
     ...value,
     kind,
-    hue: finite(value.hue, `${field}.hue`, -360, 360, 0),
-    saturation: finite(value.saturation, `${field}.saturation`, -100, 100, 0),
-    lightness: finite(value.lightness, `${field}.lightness`, -100, 100, 0),
+    hue: ranged(value.hue, `${field}.hue`, 'hue', 0),
+    saturation: ranged(value.saturation, `${field}.saturation`, 'saturation', 0),
+    lightness: ranged(value.lightness, `${field}.lightness`, 'lightness', 0),
     colorize: bool(value.colorize, `${field}.colorize`, false),
     levels: parseLevels(value.levels, `${field}.levels`),
     curves: parseCurves(value.curves, `${field}.curves`)
   }
 
+  if (value.hsvSettings !== undefined) {
+    checkHsvSettings(value.hsvSettings, `${field}.hsvSettings`)
+  }
+
   if (isObject(value.exposureSettings)) {
     const at = `${field}.exposureSettings`
     adjustment.exposureSettings = {
-      exposure: finite(value.exposureSettings.exposure, `${at}.exposure`, -20, 20, 0),
-      offset: finite(value.exposureSettings.offset, `${at}.offset`, -1, 1, 0),
-      gamma: finite(value.exposureSettings.gamma, `${at}.gamma`, 0.01, 10, 1)
+      exposure: ranged(value.exposureSettings.exposure, `${at}.exposure`, 'exposure', 0),
+      offset: ranged(value.exposureSettings.offset, `${at}.offset`, 'exposureOffset', 0),
+      gamma: ranged(value.exposureSettings.gamma, `${at}.gamma`, 'exposureGamma', 1)
     }
   }
 
@@ -594,17 +668,17 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
     const at = `${field}.grainSettings`
     const settings = value.grainSettings
     adjustment.grainSettings = {
-      amount: finite(settings.amount, `${at}.amount`, 0, 100, 25),
-      size: finite(settings.size, `${at}.size`, 0.1, 100, 1.5),
-      roughness: finite(settings.roughness, `${at}.roughness`, 0, 100, 50),
-      seed: integer(settings.seed ?? 0, `${at}.seed`, 0, 4_294_967_295)
+      amount: ranged(settings.amount, `${at}.amount`, 'grainAmount', 25),
+      size: ranged(settings.size, `${at}.size`, 'grainSize', 1.5),
+      roughness: ranged(settings.roughness, `${at}.roughness`, 'grainRoughness', 50),
+      seed: integer(settings.seed ?? 0, `${at}.seed`, ...RANGES.seed)
     }
   }
 
   if (isObject(value.blackWhiteSettings)) {
     const at = `${field}.blackWhiteSettings`
     const settings = value.blackWhiteSettings
-    const weight = (key: string, fallback: number) => finite(settings[key], `${at}.${key}`, -200, 300, fallback)
+    const weight = (key: string, fallback: number) => ranged(settings[key], `${at}.${key}`, 'blackWhite', fallback)
     adjustment.blackWhiteSettings = {
       reds: weight('reds', 40),
       yellows: weight('yellows', 60),
@@ -613,15 +687,15 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
       blues: weight('blues', 20),
       magentas: weight('magentas', 80),
       tint: bool(settings.tint, `${at}.tint`, false),
-      tintHue: finite(settings.tintHue, `${at}.tintHue`, 0, 360, 40),
-      tintSaturation: finite(settings.tintSaturation, `${at}.tintSaturation`, 0, 100, 20)
+      tintHue: ranged(settings.tintHue, `${at}.tintHue`, 'tintHue', 40),
+      tintSaturation: ranged(settings.tintSaturation, `${at}.tintSaturation`, 'tintSaturation', 20)
     }
   }
 
   if (isObject(value.colorBalanceSettings)) {
     const at = `${field}.colorBalanceSettings`
     const settings = value.colorBalanceSettings
-    const shift = (key: string) => finite(settings[key], `${at}.${key}`, -100, 100, 0)
+    const shift = (key: string) => ranged(settings[key], `${at}.${key}`, 'colorBalance', 0)
     adjustment.colorBalanceSettings = {
       shadowCyanRed: shift('shadowCyanRed'),
       shadowMagentaGreen: shift('shadowMagentaGreen'),
@@ -637,19 +711,19 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
   }
 
   if (value.blurRadius !== undefined) {
-    adjustment.blurRadius = finite(value.blurRadius, `${field}.blurRadius`, 0.1, 250)
+    adjustment.blurRadius = ranged(value.blurRadius, `${field}.blurRadius`, 'blurRadius')
   }
 
   if (value.motionAngle !== undefined) {
-    adjustment.motionAngle = finite(value.motionAngle, `${field}.motionAngle`, -90, 90)
+    adjustment.motionAngle = ranged(value.motionAngle, `${field}.motionAngle`, 'motionAngle')
   }
 
   if (value.motionDistance !== undefined) {
-    adjustment.motionDistance = finite(value.motionDistance, `${field}.motionDistance`, 1, 2000)
+    adjustment.motionDistance = ranged(value.motionDistance, `${field}.motionDistance`, 'motionDistance')
   }
 
   if (value.noiseAmount !== undefined) {
-    adjustment.noiseAmount = finite(value.noiseAmount, `${field}.noiseAmount`, 0.1, 400)
+    adjustment.noiseAmount = ranged(value.noiseAmount, `${field}.noiseAmount`, 'noiseAmount')
   }
 
   if (value.noiseGaussian !== undefined) {
@@ -661,10 +735,38 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
   }
 
   if (value.noiseSeed !== undefined) {
-    adjustment.noiseSeed = integer(value.noiseSeed, `${field}.noiseSeed`, 0, 4_294_967_295)
+    adjustment.noiseSeed = integer(value.noiseSeed, `${field}.noiseSeed`, ...RANGES.seed)
   }
 
   return adjustment
+}
+
+/**
+ * Compositor's own Hue/Saturation record (a setting per colour range, kept as it was): its ranges'
+ * values are held to the same bounds, since it refuses the project over them too. Its dictionaries
+ * are stored as lists of keys and values in turn.
+ */
+function checkHsvSettings(value: unknown, field: string): void {
+  if (!isObject(value)) {
+    return
+  }
+
+  const entries = (list: unknown): Json[] => (Array.isArray(list) ? list.filter(isObject) : isObject(list) ? Object.values(list).filter(isObject) : [])
+
+  entries(value.adjustments).forEach((entry, i) => {
+    const at = `${field}.adjustments[${i}]`
+    ranged(entry.hue, `${at}.hue`, 'hue', 0)
+    ranged(entry.saturation, `${at}.saturation`, 'saturation', 0)
+    ranged(entry.lightness, `${at}.lightness`, 'lightness', 0)
+  })
+
+  entries(value.bands).forEach((band, i) => {
+    for (const key of ['falloffStart', 'rangeStart', 'rangeEnd', 'falloffEnd']) {
+      if (band[key] !== undefined) {
+        finite(band[key], `${field}.bands[${i}].${key}`)
+      }
+    }
+  })
 }
 
 function parseRuns<T>(value: unknown, field: string, length: number, item: (run: Json, at: string) => T): (T & { location: number; length: number })[] | undefined {
@@ -706,21 +808,58 @@ function parseText(value: unknown, field: string): TextStyle {
   const content = typeof value.content === 'string' ? value.content : fail(`${field}.content must be text`, field)
   const units = content.length
 
-  return {
+  if (units > LIMITS_TEXT.content) {
+    fail(`${field}.content holds at most ${LIMITS_TEXT.content.toLocaleString('en')} characters`, `${field}.content`)
+  }
+
+  const text: TextStyle = {
     ...value,
     content,
     fontName: typeof value.fontName === 'string' && value.fontName ? value.fontName : 'Helvetica',
-    fontSize: finite(value.fontSize, `${field}.fontSize`, 0.1, 10_000, 72),
+    fontSize: ranged(value.fontSize, `${field}.fontSize`, 'fontSize', 72),
     ...rgb(value, field, { red: 0, green: 0, blue: 0 }),
     alignment: oneOf(value.alignment, TEXT_ALIGNMENTS, `${field}.alignment`, 'Left'),
-    tracking: finite(value.tracking, `${field}.tracking`, -10_000, 10_000, 0),
-    leading: finite(value.leading, `${field}.leading`, -10_000, 10_000, 0),
-    ...(value.boxSize !== undefined ? { boxSize: vec2(value.boxSize, `${field}.boxSize`, 0, 1_000_000) } : {}),
-    ...(value.colorRuns !== undefined ? { colorRuns: parseRuns(value.colorRuns, `${field}.colorRuns`, units, (run, at) => rgb(run, at)) } : {}),
-    ...(value.fontRuns !== undefined
-      ? { fontRuns: parseRuns(value.fontRuns, `${field}.fontRuns`, units, (run, at) => ({ fontName: typeof run.fontName === 'string' && run.fontName ? run.fontName : fail(`${at}.fontName is missing`, at) })) }
-      : {})
+    tracking: ranged(value.tracking, `${field}.tracking`, 'tracking', 0),
+    leading: ranged(value.leading, `${field}.leading`, 'leading', 0)
   }
+
+  if (value.boxSize !== undefined) {
+    const box = vec2(value.boxSize, `${field}.boxSize`, ...RANGES.textBox)
+
+    if (box[0] * box[1] > LIMITS_TEXT.boxArea) {
+      fail(`${field}.boxSize covers at most ${LIMITS_TEXT.boxArea.toLocaleString('en')} pixels`, `${field}.boxSize`)
+    }
+
+    text.boxSize = box
+  }
+
+  // An empty list of runs is no runs at all (a strict reader refuses an empty one).
+  const colorRuns = value.colorRuns !== undefined ? parseRuns(value.colorRuns, `${field}.colorRuns`, units, (run, at) => rgb(run, at)) : undefined
+  const fontRuns =
+    value.fontRuns !== undefined
+      ? parseRuns(value.fontRuns, `${field}.fontRuns`, units, (run, at) => {
+          const name = run.fontName
+
+          if (typeof name !== 'string' || !name || name.length > LIMITS_TEXT.fontName || /[\n\r\u2028\u2029]/.test(name)) {
+            fail(`${at}.fontName must be a font name of 1 to ${LIMITS_TEXT.fontName} characters on one line`, at)
+          }
+
+          return { fontName: name }
+        })
+      : undefined
+
+  for (const [key, runs] of [
+    ['colorRuns', colorRuns],
+    ['fontRuns', fontRuns]
+  ] as const) {
+    if (runs?.length) {
+      ;(text as Record<string, unknown>)[key] = runs
+    } else {
+      delete text[key]
+    }
+  }
+
+  return text
 }
 
 function parseShape(value: unknown, field: string): ShapeStyle {
@@ -748,17 +887,17 @@ function parseEffects(value: unknown, field: string): LayerEffects {
   const enabled = (record: Json, at: string) => (record.enabled === undefined ? {} : { enabled: bool(record.enabled, `${at}.enabled`, true) })
   const shadow = (record: Json, at: string, defaults: ShadowEffect): ShadowEffect => ({
     ...enabled(record, at),
-    angle: finite(record.angle, `${at}.angle`, -360, 360, defaults.angle),
-    distance: finite(record.distance, `${at}.distance`, 0, 30_000, defaults.distance),
-    blur: finite(record.blur, `${at}.blur`, 0, 1000, defaults.blur),
+    angle: ranged(record.angle, `${at}.angle`, 'shadowAngle', defaults.angle),
+    distance: ranged(record.distance, `${at}.distance`, 'shadowDistance', defaults.distance),
+    blur: ranged(record.blur, `${at}.blur`, 'shadowBlur', defaults.blur),
     ...rgb(record, at, defaults),
-    opacity: finite(record.opacity, `${at}.opacity`, 0, 1, defaults.opacity)
+    opacity: ranged(record.opacity, `${at}.opacity`, 'opacity', defaults.opacity)
   })
   const glow = (record: Json, at: string, defaults: GlowEffect): GlowEffect => ({
     ...enabled(record, at),
-    size: finite(record.size, `${at}.size`, 0, 500, defaults.size),
+    size: ranged(record.size, `${at}.size`, 'glowSize', defaults.size),
     ...rgb(record, at, defaults),
-    opacity: finite(record.opacity, `${at}.opacity`, 0, 1, defaults.opacity)
+    opacity: ranged(record.opacity, `${at}.opacity`, 'opacity', defaults.opacity)
   })
 
   if (isObject(value.stroke)) {
@@ -766,9 +905,9 @@ function parseEffects(value: unknown, field: string): LayerEffects {
     const defaults = defaultEffect.stroke()
     effects.stroke = {
       ...enabled(value.stroke, at),
-      size: finite(value.stroke.size, `${at}.size`, 0, 500, defaults.size),
+      size: ranged(value.stroke.size, `${at}.size`, 'strokeSize', defaults.size),
       ...rgb(value.stroke, at, defaults),
-      opacity: finite(value.stroke.opacity, `${at}.opacity`, 0, 1, defaults.opacity),
+      opacity: ranged(value.stroke.opacity, `${at}.opacity`, 'opacity', defaults.opacity),
       inside: bool(value.stroke.inside, `${at}.inside`, defaults.inside)
     }
   }
@@ -784,7 +923,7 @@ function parseEffects(value: unknown, field: string): LayerEffects {
   if (isObject(value.colorOverlay)) {
     const at = `${field}.colorOverlay`
     const defaults = defaultEffect.colorOverlay()
-    effects.colorOverlay = { ...enabled(value.colorOverlay, at), ...rgb(value.colorOverlay, at, defaults), opacity: finite(value.colorOverlay.opacity, `${at}.opacity`, 0, 1, defaults.opacity) }
+    effects.colorOverlay = { ...enabled(value.colorOverlay, at), ...rgb(value.colorOverlay, at, defaults), opacity: ranged(value.colorOverlay.opacity, `${at}.opacity`, 'opacity', defaults.opacity) }
   }
 
   if (isObject(value.outerGlow)) {
@@ -796,6 +935,19 @@ function parseEffects(value: unknown, field: string): LayerEffects {
   }
 
   return effects
+}
+
+/** A layer's name: a blank one becomes "Layer" (a strict reader refuses blank names), a very long one is refused. */
+function layerName(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return 'Layer'
+  }
+
+  if (new TextEncoder().encode(value).length > LIMITS_TEXT.layerName) {
+    fail(`${field} is longer than ${LIMITS_TEXT.layerName.toLocaleString('en')} bytes`, field)
+  }
+
+  return value
 }
 
 function parseLayer(value: unknown, index: number): LayerRecord {
@@ -814,11 +966,11 @@ function parseLayer(value: unknown, index: number): LayerRecord {
   const layer: LayerRecord = {
     ...value,
     id,
-    name: typeof value.name === 'string' ? value.name : '',
+    name: layerName(value.name, `${field}.name`),
     isVisible: bool(value.isVisible, `${field}.isVisible`, true),
     transform: parseTransform(value.transform, `${field}.transform`),
     isGroup,
-    opacity: finite(value.opacity, `${field}.opacity`, 0, 1, 1),
+    opacity: ranged(value.opacity, `${field}.opacity`, 'opacity', 1),
     blendMode: isGroup ? 'Normal' : oneOf(value.blendMode, BLEND_MODES, `${field}.blendMode`, 'Normal')
   }
 
@@ -938,19 +1090,23 @@ function checkTree(layers: LayerRecord[]): void {
   }
 }
 
-/** Clipping links point at layers (not folders), never at themselves, and never in a loop. */
+/** Clipping links go from a layer (not a folder) to one with pixels (not a folder or an adjustment), never to itself, and never in a loop. */
 function checkClipping(layers: LayerRecord[]): void {
   const byId = new Map(layers.map(layer => [layer.id, layer]))
 
   for (const layer of layers) {
+    if (layer.maskSourceID && layer.isGroup) {
+      fail(`${layer.name || layer.id} is a folder, and a folder cannot be clipped`, 'maskSourceID')
+    }
+
     let source = layer.maskSourceID
     let steps = 0
 
     while (source) {
       const node = byId.get(source)
 
-      if (!node || node.isGroup) {
-        fail(`${layer.name || layer.id} is clipped to a layer that cannot clip it`, 'maskSourceID')
+      if (!node || node.isGroup || node.adjustment) {
+        fail(`${layer.name || layer.id} is clipped to a layer that cannot clip it (a missing layer, a folder or an adjustment layer)`, 'maskSourceID')
       }
 
       if (source === layer.id || ++steps > LIMITS.clipChain) {
@@ -1011,6 +1167,7 @@ export function parseManifest(value: unknown): CompManifest {
   }
 
   const active = value.activeLayerID
+  const guideIds = new Set<string>()
 
   return {
     ...value,
@@ -1030,7 +1187,15 @@ export function parseManifest(value: unknown): CompManifest {
         fail(`${at} needs a UUID`, at)
       }
 
-      return { id: guide.id.toUpperCase(), axis: oneOf(guide.axis, ['horizontal', 'vertical'] as const, `${at}.axis`), position: finite(guide.position, `${at}.position`, -1_000_000, 1_000_000) }
+      const id = guide.id.toUpperCase()
+
+      if (guideIds.has(id)) {
+        fail(`Two guides share the id ${id}`, at)
+      }
+
+      guideIds.add(id)
+
+      return { id, axis: oneOf(guide.axis, ['horizontal', 'vertical'] as const, `${at}.axis`), position: ranged(guide.position, `${at}.position`, 'position') }
     })
   }
 }

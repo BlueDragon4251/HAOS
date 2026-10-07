@@ -34,8 +34,10 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    color="#ffffff"` makes a text layer the person can edit later (double-click it with the Type
    tool). Point text: `x` is its left edge, or its centre with `align=center`, or its right edge
    with `align=right`; `y` is its top. Give `width` for a paragraph that wraps inside a box from
-   `x`. `size` is pixels; `tracking` and `leading` add pixels between letters and lines (negative
-   tightens a big headline). Fonts are installed families with an optional style ("Avenir Next
+   `x` (at least 16 pixels). `size` is pixels, 1…2000; `tracking` adds pixels between letters
+   (−100…1000; a little negative tightens a big headline); `leading` is the line spacing from
+   baseline to baseline in pixels (0…5000; 0, the default, is automatic: 120% of the size, and
+   about the size itself sets a headline tight). Fonts are installed families with an optional style ("Avenir Next
    Demi Bold", "Georgia Italic"); a missing font falls back to the system font, so check the
    preview. `set_text layer="Headline" content=… color=…` changes it in place and keeps its size,
    turn and position.
@@ -89,7 +91,7 @@ canvas action=new name="Night market" width=1080 height=1350 background="#0d0d12
 canvas action=add_layer source="~/Pictures/market.jpg" fit=cover name="Photo"
 canvas action=add_adjustment kind="Color Balance" clip=true settings={"midCyanRed": 12, "midYellowBlue": -14, "highlightYellowBlue": -8}
 canvas action=add_layer gradient="#0d0d1200,#0d0d12f0" angle=90 y=650 height=700 name="Fade"
-canvas action=add_text content="NIGHT\nMARKET" x=72 y=700 font="Helvetica Neue Bold" size=168 leading=-24 tracking=2 color="#fff4e6" name="Headline"
+canvas action=add_text content="NIGHT\nMARKET" x=72 y=700 font="Helvetica Neue Bold" size=168 leading=150 tracking=2 color="#fff4e6" name="Headline"
 canvas action=set_effects layer="Headline" effects={"shadow": {"distance": 6, "blur": 18, "opacity": 0.5}}
 canvas action=add_shape kind=line x=72 y=1100 width=240 lineWidth=8 color="#ffb347" name="Accent rule"
 canvas action=add_shape kind=rounded x=72 y=1140 width=600 height=120 radius=24 color="#ffb347" name="Date panel"
@@ -110,16 +112,19 @@ Normal, and their opacity and mask apply to everything inside.
 
 ## Adjustment settings
 
-Pass only what you change; the rest keeps its default.
+Pass only what you change; the rest keeps its default. These are the exact ranges the format
+allows (Compositor refuses a whole project over one value outside them, so Herald Canvas refuses
+the change and says which field and range): when a command answers with a range error, fix that
+value and try again.
 
 - **Hue/Saturation**: `hue` −360…360, `saturation` −100…100, `lightness` −100…100, `colorize`
   true/false (with colorize, hue picks the tint).
 - **Levels**: `levels.channel` RGB, Red, Green or Blue, and `levels.ranges`, four ranges (RGB,
-  red, green, blue), each `black` 0…255, `gamma` 0.01…10, `white` 0…255, `outputBlack`,
-  `outputWhite`. Give all four ranges when you set them.
-- **Curves**: `curves.channels`, four point lists (RGB, red, green, blue) of 2 to 64
-  `{"x": 0…255, "y": 0…255}` in increasing x. A gentle S for contrast:
-  `[{"x":0,"y":0},{"x":64,"y":52},{"x":192,"y":204},{"x":255,"y":255}]`.
+  red, green, blue), each `black` 0…254, `gamma` 0.1…9.99, `white` 1…255 (above `black`),
+  `outputBlack` 0…255, `outputWhite` 0…255. Give all four ranges when you set them.
+- **Curves**: `curves.channels`, four point lists (RGB, red, green, blue) of 2…32
+  `{"x": 0…255, "y": 0…255}` in increasing x, the first at x 0 and the last at x 255. A gentle
+  S for contrast: `[{"x":0,"y":0},{"x":64,"y":52},{"x":192,"y":204},{"x":255,"y":255}]`.
 - **Exposure**: `exposureSettings.exposure` −20…20 stops, `offset` −0.5…0.5, `gamma` 0.01…9.99
   (worked in linear light).
 - **Gradient Map**: `gradientMapSettings.shadows` and `highlights` as `{"red", "green", "blue"}`
@@ -232,20 +237,23 @@ Rules that matter (break one and the whole file is refused):
   carry `"parentID"` and come right after it.
 - Ids are uppercase UUIDs, unique. A layer's picture is `images/<ID>.png` (8-bit RGBA PNG) and
   its mask `images/<ID>.mask.png` (8-bit grayscale, white shows), named after the layer exactly.
-- `transform.origin` is the top-left corner in canvas pixels, `size` the drawn size (the PNG is
-  stretched to it), `rotation` degrees clockwise around the centre, `sampling` "High quality",
-  "Smooth" or "Nearest".
+- Every layer has a `name` that is not blank.
+- `transform.origin` is the top-left corner in canvas pixels (−1000000…1000000), `size` the drawn
+  size (1…300000 a side; the PNG is stretched to it), `rotation` degrees clockwise around the
+  centre, `sampling` "High quality", "Smooth" or "Nearest".
 - Write every image first, then `manifest.json` last, through a temporary file and a rename, so
   the editor never reads half a project.
-- `maskSourceID` clips a layer to another; `adjustment` makes an adjustment layer (no
+- `maskSourceID` clips a layer to another (never a folder, and never to a folder or an adjustment
+  layer); `adjustment` makes an adjustment layer (no
   `imageFile`; its record needs `kind`, `hue`, `saturation`, `lightness`, `colorize`, plus full
   `levels` and `curves`). `effects` holds the layer effects, one record per effect as listed under
   Layer effects (a missing record means no such effect). An unlinked mask has `"maskLinked": false`
   and its own `maskPlacement` transform. Keep fields you do not understand exactly as they were.
 - A text or shape layer is a normal pixel layer (its PNG shows it) with a `text` record
-  (`content`, `fontName` as a PostScript name, `fontSize` in pixels, `red`/`green`/`blue` 0…1,
-  `alignment` Left, Center or Right, `tracking`, `leading`, and `boxSize` [width, height] for
-  paragraph text) or a `shape` record (`kind` Rectangle, Ellipse or Line, `red`/`green`/`blue`,
+  (`content`, `fontName` as a PostScript name, `fontSize` in pixels 1…2000, `red`/`green`/`blue`
+  0…1, `alignment` Left, Center or Right, `tracking` −100…1000, `leading` 0…5000 (baseline to
+  baseline; 0 is automatic), and `boxSize` [width, height] for paragraph text, each 16…30000)
+  or a `shape` record (`kind` Rectangle, Ellipse or Line, `red`/`green`/`blue`,
   `cornerRadius`, and for lines `lineWidth` with `start` and `end` as fractions of the box). The
   PNG must match the record, so prefer `add_text` and `add_shape`, which draw it; painting on such
   a layer turns it into plain pixels.

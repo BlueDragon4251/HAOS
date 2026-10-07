@@ -340,7 +340,7 @@ export function duplicateLayers(state: DocState, ids: string[]): { state: DocSta
   return { state: { ...next, activeLayerId: copies.at(-1) ?? state.activeLayerId }, ids: copies }
 }
 
-/** The layer a clipping stack rests on: the base of the sibling below, or that sibling itself. */
+/** The layer a clipping stack rests on: the base of the sibling below, or that sibling itself (never a folder or an adjustment, which have no pixels to clip to). */
 function clipBaseBelow(state: DocState, layer: CanvasLayer): CanvasLayer | undefined {
   const siblings = childrenOf(state, layer.parentID)
   const below = siblings[siblings.indexOf(layer) - 1]
@@ -351,7 +351,7 @@ function clipBaseBelow(state: DocState, layer: CanvasLayer): CanvasLayer | undef
 
   const base = below.maskSourceID ? findLayer(state, below.maskSourceID) : below
 
-  return base && !base.isGroup ? base : undefined
+  return base && !base.isGroup && !base.adjustment ? base : undefined
 }
 
 /** Clip a layer to the one below it (joining that one's stack when it is clipped too), or release it. */

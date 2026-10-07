@@ -5,7 +5,7 @@
  * it stays sharp.
  */
 
-import { defaultTransform, type LayerTransform, type ShapeStyle, type TextStyle, type Vec2 } from '../../../shared/canvas/comp-format.ts'
+import { defaultTransform, type LayerTransform, RANGES, type ShapeStyle, type TextStyle, type Vec2 } from '../../../shared/canvas/comp-format.ts'
 import { type CanvasLayer, pixelLayer } from './engine/document.ts'
 import { apply, type Mat, multiply, scale, tidy, unitToDocument } from './engine/geometry.ts'
 import type { Rect } from './engine/raster.ts'
@@ -19,20 +19,36 @@ export function textLayerName(content: string): string {
   return line ? (line.length > 40 ? `${line.slice(0, 39)}…` : line) : 'Text'
 }
 
-const keepBox = (style: TextStyle, layout: TextLayout): TextStyle => (isParagraph(style) ? { ...style, boxSize: [layout.width, layout.height] } : style)
+/**
+ * Text laid out, with paragraph text keeping the box it was laid out in: at least 16 pixels a
+ * side, the smallest box Compositor reads. Point text has no box.
+ */
+function laidOut(style: TextStyle): { style: TextStyle; layout: TextLayout } {
+  const layout = layoutText(style, measureFor(style))
+
+  if (!isParagraph(style)) {
+    return { style, layout }
+  }
+
+  const least = RANGES.textBox[0]
+  const box: Vec2 = [Math.max(least, layout.width), Math.max(least, layout.height)]
+  const sized = { ...style, boxSize: box }
+
+  return { style: sized, layout: box[0] === layout.width && box[1] === layout.height ? layout : layoutText(sized, measureFor(sized)) }
+}
 
 /**
  * A new text layer. Point text hangs from `at` (its first baseline at the alignment edge, where a
  * click with the Type tool puts it) or, with `from: 'top'`, has its top edge there; paragraph
  * text fills its box from `at`.
  */
-export async function makeTextLayer(style: TextStyle, at: Vec2, options: { from?: 'anchor' | 'top'; name?: string } = {}): Promise<CanvasLayer> {
-  await loadFont(style)
-  const layout = layoutText(style, measureFor(style))
+export async function makeTextLayer(text: TextStyle, at: Vec2, options: { from?: 'anchor' | 'top'; name?: string } = {}): Promise<CanvasLayer> {
+  await loadFont(text)
+  const { style, layout } = laidOut(text)
   const [x, y] = options.from === 'top' ? originForTop(layout, at[0], at[1]) : originForAnchor(layout, at[0], at[1])
   const pixels = renderText(style, layout)
 
-  return { ...pixelLayer(options.name ?? textLayerName(style.content), pixels, defaultTransform(layout.width, layout.height, tidy(x), tidy(y))), text: keepBox(style, layout) }
+  return { ...pixelLayer(options.name ?? textLayerName(style.content), pixels, defaultTransform(layout.width, layout.height, tidy(x), tidy(y))), text: style }
 }
 
 /** Layout pixels to document pixels for text laid out in a placement. */
@@ -55,14 +71,15 @@ export function textPlacement(transform: LayerTransform, old: TextStyle, style: 
 }
 
 /** A text layer after its text or style changed: new pixels and a placement that keeps its anchor, scale, turn and flips. */
-export async function restyleText(layer: CanvasLayer, style: TextStyle): Promise<Partial<CanvasLayer>> {
-  const old = layer.text ?? style
+export async function restyleText(layer: CanvasLayer, text: TextStyle): Promise<Partial<CanvasLayer>> {
+  const old = layer.text ?? text
   await loadFont(old)
-  await loadFont(style)
+  await loadFont(text)
+  const { style } = laidOut({ ...text, colorRuns: undefined, fontRuns: undefined })
   const { transform, layout, scale: drawn } = textPlacement(layer.transform, old, style)
   const renamed = layer.name === textLayerName(old.content) ? { name: textLayerName(style.content) } : {}
 
-  return { ...renamed, transform, pixels: renderText(style, layout, drawn), text: keepBox({ ...style, colorRuns: undefined, fontRuns: undefined }, layout) }
+  return { ...renamed, transform, pixels: renderText(style, layout, drawn), text: style }
 }
 
 /** A new shape layer filling a box (document pixels). */

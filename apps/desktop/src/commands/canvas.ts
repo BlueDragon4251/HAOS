@@ -146,8 +146,8 @@ export const canvasCommands: readonly OsCommand[] = [
       { name: 'size', type: 'number', description: 'Font size in pixels (72)' },
       { name: 'color', type: 'string', description: 'Any CSS colour (black)' },
       { name: 'align', type: 'string', description: 'left, center or right' },
-      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels' },
-      { name: 'leading', type: 'number', description: 'Extra space between lines, in pixels' },
+      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels (−100 to 1000)' },
+      { name: 'leading', type: 'number', description: 'Line spacing from baseline to baseline, in pixels (0 to 5000; 0 is automatic, 120% of the size)' },
       { name: 'name', type: 'string', description: 'The layer name (the text when left out)' },
       ...appearance,
       ...where
@@ -167,8 +167,8 @@ export const canvasCommands: readonly OsCommand[] = [
       { name: 'size', type: 'number', description: 'Font size in pixels' },
       { name: 'color', type: 'string', description: 'Any CSS colour' },
       { name: 'align', type: 'string', description: 'left, center or right' },
-      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels' },
-      { name: 'leading', type: 'number', description: 'Extra space between lines, in pixels' }
+      { name: 'tracking', type: 'number', description: 'Extra space between letters, in pixels (−100 to 1000)' },
+      { name: 'leading', type: 'number', description: 'Line spacing from baseline to baseline, in pixels (0 to 5000; 0 is automatic, 120% of the size)' }
     ],
     run: async (args) => done((await canvas()).setText(args))
   },

@@ -44,10 +44,11 @@ describe('text layout', () => {
     expect(originForTop(centred, 100, 100)).toEqual([70, 95])
   })
 
-  it('counts tracking and leading', () => {
-    const layout = layoutText(textStyle({ content: 'ab\ncd', fontSize: 20, tracking: 2, leading: 6 }), monospace(2))
+  it('counts tracking, and leading from baseline to baseline (0 is 120% of the size)', () => {
+    const layout = layoutText(textStyle({ content: 'ab\ncd', fontSize: 20, tracking: 2, leading: 30 }), monospace(2))
     expect(layout.lines[0].width).toBe(24)
     expect(layout.lineHeight).toBe(30)
+    expect(layoutText(textStyle({ content: 'ab\ncd', fontSize: 20 }), monospace()).lineHeight).toBe(24)
   })
 
   it('wraps paragraph text inside its box', () => {

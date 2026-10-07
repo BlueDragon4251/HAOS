@@ -11,8 +11,10 @@ import {
   FORMAT_VERSION,
   imageFileFor,
   type LayerRecord,
+  type LayerTransform,
   maskFileFor,
-  parseManifest
+  parseManifest,
+  RANGES
 } from '../../../../shared/canvas/comp-format.ts'
 import { baseName, PROJECT_EXTENSION } from '../../../../shared/canvas/files.ts'
 import type { CanvasProject, CanvasRawImage } from '../../../../shared/ipc.ts'
@@ -227,9 +229,17 @@ export function newDocument(width: number, height: number, background: Backgroun
 
 // --- Saving ------------------------------------------------------------------------------------
 
+/** A placement within the sizes Compositor reads: a layer scaled down to nothing keeps a pixel. */
+function readableBox(transform: LayerTransform): LayerTransform {
+  const [least, most] = RANGES.layerSize
+  const side = (value: number) => Math.min(most, Math.max(least, value))
+
+  return transform.size[0] >= least && transform.size[1] >= least && transform.size[0] <= most && transform.size[1] <= most ? transform : { ...transform, size: [side(transform.size[0]), side(transform.size[1])] }
+}
+
 function layerRecord(layer: CanvasLayer): LayerRecord {
   const { pixels, mask, imageFile: _image, maskFile: _mask, ...rest } = layer
-  const record: LayerRecord = { ...rest }
+  const record: LayerRecord = { ...rest, transform: readableBox(layer.transform), ...(layer.maskPlacement ? { maskPlacement: readableBox(layer.maskPlacement) } : {}) }
 
   if (pixels) {
     record.imageFile = imageFileFor(layer.id)

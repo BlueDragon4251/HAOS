@@ -11,6 +11,7 @@ import {
   type EffectKind,
   type LayerEffects,
   type LevelRange,
+  RANGES,
   type RGB
 } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
@@ -489,9 +490,9 @@ function ExposureControls({ adjustment, edit, set }: AdjustmentProps) {
 
   return (
     <>
-      <Slider label="Exposure" value={settings.exposure} min={-20} max={20} step={0.01} unit="EV" edit={edit} onChange={(exposure) => put({ exposure })} />
-      <Slider label="Offset" value={settings.offset} min={-0.5} max={0.5} step={0.001} edit={edit} onChange={(offset) => put({ offset })} />
-      <Slider label="Gamma" value={settings.gamma} min={0.01} max={9.99} step={0.01} curve="log" edit={edit} onChange={(gamma) => put({ gamma })} />
+      <Slider label="Exposure" value={settings.exposure} min={RANGES.exposure[0]} max={RANGES.exposure[1]} step={0.01} unit="EV" edit={edit} onChange={(exposure) => put({ exposure })} />
+      <Slider label="Offset" value={settings.offset} min={RANGES.exposureOffset[0]} max={RANGES.exposureOffset[1]} step={0.001} edit={edit} onChange={(offset) => put({ offset })} />
+      <Slider label="Gamma" value={settings.gamma} min={RANGES.exposureGamma[0]} max={RANGES.exposureGamma[1]} step={0.01} curve="log" edit={edit} onChange={(gamma) => put({ gamma })} />
     </>
   )
 }
@@ -533,9 +534,9 @@ function GrainControls({ adjustment, edit, set }: AdjustmentProps) {
 
   return (
     <>
-      <Slider label="Amount" value={settings.amount} min={0} max={100} edit={edit} onChange={(amount) => put({ amount })} />
-      <Slider label="Size" value={settings.size} min={0.5} max={20} step={0.1} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />
-      <Slider label="Roughness" value={settings.roughness} min={0} max={100} edit={edit} onChange={(roughness) => put({ roughness })} />
+      <Slider label="Amount" value={settings.amount} min={RANGES.grainAmount[0]} max={RANGES.grainAmount[1]} edit={edit} onChange={(amount) => put({ amount })} />
+      <Slider label="Size" value={settings.size} min={RANGES.grainSize[0]} max={RANGES.grainSize[1]} step={0.1} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />
+      <Slider label="Roughness" value={settings.roughness} min={RANGES.grainRoughness[0]} max={RANGES.grainRoughness[1]} edit={edit} onChange={(roughness) => put({ roughness })} />
       <SeedRow seed={settings.seed} onChange={(seed) => put({ seed })} />
     </>
   )
@@ -561,8 +562,8 @@ function BlackWhiteControls({ adjustment, edit, set }: AdjustmentProps) {
           key={family.key}
           label={family.label}
           value={settings[family.key]}
-          min={-200}
-          max={300}
+          min={RANGES.blackWhite[0]}
+          max={RANGES.blackWhite[1]}
           unit="%"
           track={`linear-gradient(to right, #000, ${family.colour})`}
           edit={edit}
@@ -572,8 +573,8 @@ function BlackWhiteControls({ adjustment, edit, set }: AdjustmentProps) {
       <Check label="Tint" checked={settings.tint} onChange={(tint) => put({ tint })} />
       {settings.tint && (
         <>
-          <Slider label="Tint hue" value={settings.tintHue} min={0} max={360} unit="°" track={HUES} edit={edit} onChange={(tintHue) => put({ tintHue })} />
-          <Slider label="Tint saturation" value={settings.tintSaturation} min={0} max={100} unit="%" edit={edit} onChange={(tintSaturation) => put({ tintSaturation })} />
+          <Slider label="Tint hue" value={settings.tintHue} min={RANGES.tintHue[0]} max={RANGES.tintHue[1]} unit="°" track={HUES} edit={edit} onChange={(tintHue) => put({ tintHue })} />
+          <Slider label="Tint saturation" value={settings.tintSaturation} min={RANGES.tintSaturation[0]} max={RANGES.tintSaturation[1]} unit="%" edit={edit} onChange={(tintSaturation) => put({ tintSaturation })} />
         </>
       )}
     </>
@@ -605,7 +606,7 @@ function ColorBalanceControls({ adjustment, edit, set }: AdjustmentProps) {
         ]}
       />
       {pairs.map((pair) => (
-        <Slider key={pair.key} label={pair.label} value={settings[pair.key]} min={-100} max={100} track={pair.track} edit={edit} onChange={(value) => put({ [pair.key]: value } as Partial<typeof settings>)} />
+        <Slider key={pair.key} label={pair.label} value={settings[pair.key]} min={RANGES.colorBalance[0]} max={RANGES.colorBalance[1]} track={pair.track} edit={edit} onChange={(value) => put({ [pair.key]: value } as Partial<typeof settings>)} />
       ))}
       <Check label="Preserve luminosity" checked={settings.preserveLuminosity} onChange={(preserveLuminosity) => put({ preserveLuminosity })} />
     </>
@@ -616,13 +617,13 @@ function BlurControls({ adjustment, edit, set }: AdjustmentProps) {
   const settings = resolved(adjustment)
 
   if (adjustment.kind === 'Gaussian Blur') {
-    return <Slider label="Radius" value={settings.blurRadius} min={0.1} max={250} step={0.1} curve="square" unit="px" edit={edit} onChange={(blurRadius) => set(() => ({ blurRadius }))} />
+    return <Slider label="Radius" value={settings.blurRadius} min={RANGES.blurRadius[0]} max={RANGES.blurRadius[1]} step={0.1} curve="square" unit="px" edit={edit} onChange={(blurRadius) => set(() => ({ blurRadius }))} />
   }
 
   return (
     <>
-      <Slider label="Angle" value={settings.motionAngle} min={-90} max={90} unit="°" edit={edit} onChange={(motionAngle) => set(() => ({ motionAngle }))} />
-      <Slider label="Distance" value={settings.motionDistance} min={1} max={2000} curve="square" unit="px" edit={edit} onChange={(motionDistance) => set(() => ({ motionDistance }))} />
+      <Slider label="Angle" value={settings.motionAngle} min={RANGES.motionAngle[0]} max={RANGES.motionAngle[1]} unit="°" edit={edit} onChange={(motionAngle) => set(() => ({ motionAngle }))} />
+      <Slider label="Distance" value={settings.motionDistance} min={RANGES.motionDistance[0]} max={RANGES.motionDistance[1]} curve="square" unit="px" edit={edit} onChange={(motionDistance) => set(() => ({ motionDistance }))} />
     </>
   )
 }
@@ -632,7 +633,7 @@ function NoiseControls({ adjustment, edit, set }: AdjustmentProps) {
 
   return (
     <>
-      <Slider label="Amount" value={settings.amount} min={0.1} max={400} step={0.1} curve="square" unit="%" edit={edit} onChange={(noiseAmount) => set(() => ({ noiseAmount }))} />
+      <Slider label="Amount" value={settings.amount} min={RANGES.noiseAmount[0]} max={RANGES.noiseAmount[1]} step={0.1} curve="square" unit="%" edit={edit} onChange={(noiseAmount) => set(() => ({ noiseAmount }))} />
       <Segmented
         label="Distribution"
         value={settings.gaussian ? 'gaussian' : 'uniform'}
@@ -685,7 +686,7 @@ function EffectFields({ kind, record, edit, put }: { kind: EffectKind; record: E
 
   if (kind === 'stroke' && 'inside' in record) {
     fields.push(
-      <Slider key="size" label="Size" value={record.size} min={0} max={500} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />,
+      <Slider key="size" label="Size" value={record.size} min={RANGES.strokeSize[0]} max={RANGES.strokeSize[1]} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />,
       <Segmented
         key="position"
         label="Position"
@@ -699,12 +700,13 @@ function EffectFields({ kind, record, edit, put }: { kind: EffectKind; record: E
     )
   } else if ((kind === 'shadow' || kind === 'innerShadow') && 'angle' in record) {
     fields.push(
+      // A dial's worth of angles; the format takes any turn from −360° to 360°.
       <Slider key="angle" label="Angle" value={record.angle} min={-180} max={180} unit="°" edit={edit} onChange={(angle) => put({ angle })} />,
-      <Slider key="distance" label="Distance" value={record.distance} min={0} max={1000} curve="square" unit="px" edit={edit} onChange={(distance) => put({ distance })} />,
-      <Slider key="blur" label="Size" value={record.blur} min={0} max={500} curve="square" unit="px" edit={edit} onChange={(blur) => put({ blur })} />
+      <Slider key="distance" label="Distance" value={record.distance} min={RANGES.shadowDistance[0]} max={RANGES.shadowDistance[1]} curve="square" unit="px" edit={edit} onChange={(distance) => put({ distance })} />,
+      <Slider key="blur" label="Size" value={record.blur} min={RANGES.shadowBlur[0]} max={RANGES.shadowBlur[1]} curve="square" unit="px" edit={edit} onChange={(blur) => put({ blur })} />
     )
   } else if ((kind === 'outerGlow' || kind === 'innerGlow') && 'size' in record) {
-    fields.push(<Slider key="size" label="Size" value={record.size} min={0} max={500} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />)
+    fields.push(<Slider key="size" label="Size" value={record.size} min={RANGES.glowSize[0]} max={RANGES.glowSize[1]} curve="square" unit="px" edit={edit} onChange={(size) => put({ size })} />)
   }
 
   return (

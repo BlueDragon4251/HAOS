@@ -112,7 +112,8 @@ export interface TextLayout {
 
 export const isParagraph = (style: TextStyle): boolean => Boolean(style.boxSize && style.boxSize[0] > 0)
 
-export const lineHeightOf = (style: TextStyle): number => Math.max(1, style.fontSize * 1.2 + style.leading)
+/** Baseline to baseline: the leading when one is set, 120% of the font size when it is 0 (automatic), as Compositor reads it. */
+export const lineHeightOf = (style: TextStyle): number => Math.max(1, style.leading > 0 ? style.leading : style.fontSize * 1.2)
 
 /** Lines broken to fit a width: at spaces where it can, inside a word too long for a line alone. */
 export function wrapLines(text: string, width: number, measure: (text: string) => number): string[] {

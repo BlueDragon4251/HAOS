@@ -5,7 +5,7 @@
  * from disk, changed and written back, and any window showing it reloads.
  */
 
-import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS, type ShapeStyle, type TextStyle } from '../../../shared/canvas/comp-format.ts'
+import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS, RANGES, type ShapeStyle, type TextStyle } from '../../../shared/canvas/comp-format.ts'
 import { baseName, CANVAS_IMAGE_EXTENSIONS, isProjectPath, PROJECT_EXTENSION } from '../../../shared/canvas/files.ts'
 import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
@@ -27,6 +27,7 @@ import {
   maskActionFrom,
   opacityFrom,
   placementOf,
+  rangedArg,
   resizePlan,
   resolvePath,
   shapeKindFrom
@@ -438,15 +439,16 @@ export async function setLayer(args: Record<string, unknown>): Promise<Outcome> 
   }
 
   const transform = { ...layer.transform }
-  const [x, y, width, height, rotation] = [finite(args.x), finite(args.y), finite(args.width), finite(args.height), finite(args.rotation)]
+  const [x, y, width, height, rotation] = [rangedArg(args.x, 'x', 'position'), rangedArg(args.y, 'y', 'position'), rangedArg(args.width, 'width', 'layerSize', ' pixels'), rangedArg(args.height, 'height', 'layerSize', ' pixels'), finite(args.rotation)]
 
   if (x !== undefined || y !== undefined || width !== undefined || height !== undefined || rotation !== undefined || typeof args.flipX === 'boolean' || typeof args.flipY === 'boolean') {
     // A size given on one side keeps the proportions.
     const ratio = transform.size[0] / Math.max(1e-6, transform.size[1])
     const newWidth = width ?? (height !== undefined ? height * ratio : transform.size[0])
     const newHeight = height ?? (width !== undefined ? width / ratio : transform.size[1])
+    const [least, most] = RANGES.layerSize
     transform.origin = [x ?? transform.origin[0], y ?? transform.origin[1]]
-    transform.size = [Math.max(0.01, newWidth), Math.max(0.01, newHeight)]
+    transform.size = [Math.min(most, Math.max(least, newWidth)), Math.min(most, Math.max(least, newHeight))]
     transform.rotation = rotation ?? transform.rotation
     transform.flipX = typeof args.flipX === 'boolean' ? args.flipX : transform.flipX
     transform.flipY = typeof args.flipY === 'boolean' ? args.flipY : transform.flipY
@@ -644,21 +646,15 @@ export async function mask(args: Record<string, unknown>): Promise<Outcome> {
 
 /** The text style a command asks for, over a style there was (or the defaults). */
 function textStyleFrom(args: Record<string, unknown>, base?: TextStyle): TextStyle {
-  const size = finite(args.size)
-
-  if (size !== undefined && (size <= 0 || size > 10_000)) {
-    throw new Error('size is the font size in pixels, above 0')
-  }
-
   return textStyle({
     ...base,
     content: typeof args.content === 'string' ? args.content.replace(/\\n/g, '\n') : (base?.content ?? ''),
     fontName: args.font !== undefined && args.font !== '' ? fontNameFrom(args.font) : (base?.fontName ?? 'Helvetica'),
-    fontSize: size ?? base?.fontSize ?? 72,
+    fontSize: rangedArg(args.size, 'size (the font size)', 'fontSize', ' pixels') ?? base?.fontSize ?? 72,
     ...(args.color !== undefined && args.color !== '' ? unitColour(args.color, '#000') : base ? {} : unitColour(undefined, '#000')),
     alignment: alignFrom(args.align) ?? base?.alignment ?? 'Left',
-    tracking: finite(args.tracking) ?? base?.tracking ?? 0,
-    leading: finite(args.leading) ?? base?.leading ?? 0
+    tracking: rangedArg(args.tracking, 'tracking', 'tracking', ' pixels') ?? base?.tracking ?? 0,
+    leading: rangedArg(args.leading, 'leading (baseline to baseline; 0 is automatic)', 'leading', ' pixels') ?? base?.leading ?? 0
   })
 }
 
@@ -671,16 +667,12 @@ export async function addText(args: Record<string, unknown>): Promise<Outcome> {
     throw new Error('Give the words to write: content="Night market"')
   }
 
-  const width = finite(args.width)
-  const height = finite(args.height)
+  const width = rangedArg(args.width, 'width (the paragraph box)', 'textBox', ' pixels')
+  const height = args.height === 0 ? undefined : rangedArg(args.height, 'height (the paragraph box)', 'textBox', ' pixels')
   let style = textStyleFrom(args)
 
   if (width !== undefined) {
-    if (width < 1) {
-      throw new Error('width is the paragraph box in pixels')
-    }
-
-    style = { ...style, boxSize: [Math.round(width), Math.max(0, Math.round(height ?? 0))] }
+    style = { ...style, boxSize: [Math.round(width), Math.round(height ?? 0)] }
   }
 
   // Left out, the text sits a margin in from the edge its alignment is on.
