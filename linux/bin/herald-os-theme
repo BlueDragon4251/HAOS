@@ -22,11 +22,17 @@ from pathlib import Path
 HOME = Path.home()
 CONFIG = HOME / ".config"
 STATE = HOME / ".config" / "herald-os"
+# The themes that came with this command come first: a checkout's linux/themes, or the app's
+# resources/themes when the command is a link into it (/opt/herald-os: the Arch package, the release
+# tarball). Copies installed elsewhere (the image, the development VM) use the folders after them.
+_SOURCE = Path(__file__).resolve().parent.parent
 THEME_DIRS = [
     *([Path(os.environ["HERALD_OS_THEMES"])] if os.environ.get("HERALD_OS_THEMES") else []),
+    (_SOURCE.parent if _SOURCE.name == "herald-os-linux" else _SOURCE) / "themes",
     HOME / "Herald-OS" / "linux" / "themes",
     Path("/usr/local/share/herald-os-linux/themes"),
     Path("/usr/share/herald-os/themes"),
+    Path("/opt/herald-os/resources/themes"),
     STATE / "themes",
 ]
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
