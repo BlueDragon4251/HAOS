@@ -1111,6 +1111,9 @@ CANVAS_ACTIONS: dict[str, str] = {
     "preview": "canvas.preview",
     "undo": "canvas.undo",
     "redo": "canvas.redo",
+    "place_image": "canvas.placeImage",
+    "remove_background": "canvas.removeBackground",
+    "content_fill": "canvas.contentFill",
 }
 
 # What each action passes on; anything else in the call is dropped.
@@ -1137,6 +1140,9 @@ CANVAS_ARGS: dict[str, tuple[str, ...]] = {
     "preview": ("project", "size"),
     "undo": ("project",),
     "redo": ("project",),
+    "place_image": ("project", "source", "x", "y", "width", "height", "fit", "mask_image", "name", "opacity", "blend", "above", "folder", "clip"),
+    "remove_background": ("project", "layer", "mode", "threshold", "feather", "refine"),
+    "content_fill": ("project", "layer", "x", "y", "width", "height", "newLayer", "sampling"),
 }
 
 # Loading, rendering and saving a large image can take a while.
@@ -1148,14 +1154,15 @@ CANVAS_SCHEMA = _schema(
     "Use it to make or change pictures: posters, banners, thumbnails, collages, photo fixes. The person watches every change land in the Canvas window, and each one is a step they can undo. "
     "Start with action=new (a new project; it answers with the path) or action=open (an image or a .comp project), then add_layer, add_text, add_shape, set_layer, set_text, add_adjustment, set_adjustment, group and remove_layer; set_effects adds drop shadows, strokes, glows and overlays; mask shows or hides parts of a layer; resize and crop change the canvas. "
     "Look at your work with action=preview: it answers with a PNG file you can view. action=layers lists the layers with ids and placement; action=export writes PNG, JPEG or WebP. "
+    "On-device tools: remove_background (hides a layer's background with a mask, or cuts the subject out) and content_fill (fills a box from the pixels around it, to remove something). place_image puts a picture in an exact box, optionally masked (mask_image), which is how a generated picture lands where the person asked. "
     "Coordinates are canvas pixels from the top-left. Before a real design job read skill_view name=\"herald-os-bridge:herald-canvas\": the workflow, good design habits, the .comp format and every adjustment setting.",
     {
         "action": _enum(*CANVAS_ACTIONS, description="What to do"),
         "project": _desc(_STR, "The .comp project (full path or ~/...); the image in front when left out"),
         "path": _desc(_STR, "open: an image or .comp project to show"),
         "name": _desc(_STR, "new: the project name; add_layer, add_text, add_shape, group, add_adjustment: the layer name; set_layer: a new name"),
-        "width": _desc(_NUM, "new: canvas width (1920); add_layer, set_layer, add_shape: width in canvas pixels; add_text: a paragraph box this wide; resize: the new canvas width; crop: the width kept"),
-        "height": _desc(_NUM, "new: canvas height (1080); add_layer, set_layer, add_shape: height in canvas pixels; add_text: the paragraph box height; resize: the new canvas height; crop: the height kept"),
+        "width": _desc(_NUM, "new: canvas width (1920); add_layer, set_layer, add_shape, place_image: width in canvas pixels; add_text: a paragraph box this wide; resize: the new canvas width; crop: the width kept; content_fill: the width of the area to fill"),
+        "height": _desc(_NUM, "new: canvas height (1080); add_layer, set_layer, add_shape, place_image: height in canvas pixels; add_text: the paragraph box height; resize: the new canvas height; crop: the height kept; content_fill: the height of the area to fill"),
         "background": _desc(_STR, "new: white, black, transparent or any CSS colour"),
         "resolution": _desc(_NUM, "new: pixels per inch (72)"),
         "source": _desc(_STR, "add_layer: an image file or an http(s) URL"),
@@ -1172,7 +1179,7 @@ CANVAS_SCHEMA = _schema(
         "resample": _desc(_BOOL, "resize: when scaling, recalculate layer pixels too (default true)"),
         "gradient": _desc(_STR, "add_layer: comma-separated colours of a linear gradient"),
         "angle": _desc(_NUM, "add_layer: gradient direction in degrees (0 left to right, 90 top to bottom)"),
-        "fit": _enum("contain", "cover", "none", "stretch", description="add_layer: how a picture fills the canvas when no box is given"),
+        "fit": _enum("contain", "cover", "none", "stretch", description="add_layer: how a picture fills the canvas when no box is given; place_image: cover (the default), contain or stretch in its box"),
         "x": _desc(_NUM, "Left edge in canvas pixels (add_text with align=center or right: the centre or right edge)"),
         "y": _desc(_NUM, "Top edge in canvas pixels"),
         "rotation": _desc(_NUM, "set_layer: degrees clockwise around the layer's centre"),
@@ -1180,7 +1187,7 @@ CANVAS_SCHEMA = _schema(
         "flipY": _desc(_BOOL, "set_layer: mirror top to bottom"),
         "opacity": _desc(_NUM, "0 to 1"),
         "blend": _desc(_STR, "Blend mode, e.g. Normal, Multiply, Screen, Overlay, Soft Light, Color, Luminosity"),
-        "layer": _desc(_STR, "set_layer, set_text, remove_layer, set_adjustment, set_effects, mask: the layer's id or name"),
+        "layer": _desc(_STR, "set_layer, set_text, remove_layer, set_adjustment, set_effects, mask: the layer's id or name; remove_background, content_fill: the layer (the active one when left out)"),
         "layers": _desc(_STR, "group: comma-separated layer ids or names"),
         "visible": _desc(_BOOL, "set_layer: show or hide"),
         "order": _enum("up", "down", "top", "bottom", description="set_layer: move among its neighbours"),
@@ -1202,6 +1209,13 @@ CANVAS_SCHEMA = _schema(
         "scale": _desc(_NUM, "export: size relative to the canvas; resize: scale the whole image by this much (0.5 is half)"),
         "overwrite": _desc(_BOOL, "export, save: replace an existing file (asks the person first)"),
         "size": _desc(_NUM, "preview: longest side in pixels (1024); add_text, set_text: font size in pixels (72)"),
+        "mask_image": _desc(_STR, "place_image: a grayscale image over the same box (white shows the picture, black hides it), such as the mask Herald saved for generative fill"),
+        "mode": _enum("mask", "cutout", description="remove_background: hide the background with a layer mask (mask, the default) or put just the subject on a new layer (cutout)"),
+        "threshold": _desc(_NUM, "remove_background: where the edge sits, 0 to 1 (0.5); lower keeps more"),
+        "feather": _desc(_NUM, "remove_background: softens the edge, in pixels"),
+        "refine": _desc(_BOOL, "remove_background: snap the edge to the picture's own outlines such as hair (default true)"),
+        "newLayer": _desc(_BOOL, "content_fill: put the fill on a new layer above instead of into the layer"),
+        "sampling": _enum("around", "all", description="content_fill: copy from around the box (around, the default) or from anywhere in the layer"),
     },
     ["action"],
 )
@@ -1220,6 +1234,9 @@ def canvas_command(args: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     # `action` already names the tool's action, so the mask's own one travels as `mask`.
     if action == "mask" and "mask" in command_args:
         command_args["action"] = command_args.pop("mask")
+    # `mask` is taken by the mask action, so place_image's mask file travels as `mask_image`.
+    if action == "place_image" and "mask_image" in command_args:
+        command_args["mask"] = command_args.pop("mask_image")
     return action, CANVAS_ACTIONS[action], command_args
 
 

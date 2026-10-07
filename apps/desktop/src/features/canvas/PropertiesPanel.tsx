@@ -1,4 +1,4 @@
-import { IconArrowsShuffle, IconChevronDown, IconChevronRight, IconContrast, IconEye, IconEyeOff, IconLink, IconLinkOff, IconMask, IconStack2, IconTrash } from '@tabler/icons-react'
+import { IconArrowsShuffle, IconBackground, IconChevronDown, IconChevronRight, IconContrast, IconEye, IconEyeOff, IconLink, IconLinkOff, IconMask, IconStack2, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -16,6 +16,7 @@ import {
 } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
 import { maskAction } from './actions.ts'
+import { cannotSegment } from './ai/subject.ts'
 import { ADJUSTMENT_ICONS, EFFECT_ICONS } from './adjustment-icons.tsx'
 import { cssOf, type RGB as Bytes } from './color.ts'
 import { ColorPicker } from './ColorPicker.tsx'
@@ -23,6 +24,7 @@ import { curveTable, resolved } from './engine/adjust-math.ts'
 import { type CanvasDocument, type CanvasLayer, type DocState, findLayer, withLayer } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, takesEffects, withEffect } from './engine/layer-effects.ts'
 import { useRevision } from './hooks.ts'
+import { $dialog } from './menus.ts'
 
 /*
  * The Properties panel: the active layer's settings. An adjustment layer shows its own controls; a
@@ -812,7 +814,23 @@ function LayerProperties({ doc, layer }: { doc: CanvasDocument; layer: CanvasLay
   }
 
   if (takesEffects(layer)) {
-    return <EffectsList layer={layer} edit={edit} />
+    return (
+      <>
+        {!cannotSegment(layer) && (
+          <div className="flex items-center gap-1.5 border-b border-line/40 px-3 py-1.5">
+            <button
+              type="button"
+              title="Hide the background with a mask, found on this computer"
+              onClick={() => $dialog.set({ kind: 'remove-background' })}
+              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-fg-2 ring-1 ring-line hover:bg-white/8 hover:text-fg"
+            >
+              <IconBackground size={14} /> Remove Background
+            </button>
+          </div>
+        )}
+        <EffectsList layer={layer} edit={edit} />
+      </>
+    )
   }
 
   return <div className="px-3 py-2 text-[12px] text-fg-3">A folder passes through: its opacity and mask apply to everything inside it.</div>

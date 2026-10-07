@@ -1,9 +1,9 @@
 ---
 name: herald-canvas
-description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows) and masks, plus the .comp project format and every adjustment setting
+description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows), masks, on-device background removal and content-aware fill, generated pictures placed where asked, how to plan an edit from a description, plus the .comp project format and every adjustment setting
 metadata:
   hermes:
-    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks]
+    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks, background removal, content-aware fill, generative fill]
 ---
 
 # Herald Canvas
@@ -198,6 +198,57 @@ adjustment layers take masks too. `mask layer=… mask=<action>`:
 
 Typical use: a vignette is a `Curves` or `Exposure` layer that darkens, with a mask hiding its
 centre; a two-tone grade is two adjustments, each masked to its half.
+
+## On-device AI tools
+
+These run on the person's computer (nothing is uploaded) with models they download once, when
+they first use the tool in the Canvas window. A command never downloads a model: when one is
+missing, the answer says which, and you ask the person to allow it in Herald Canvas (Layer >
+Remove Background, or the Object Select tool), then try again.
+
+- **Remove a background**: `canvas action=remove_background layer="Photo"` hides everything but the
+  subject with a layer mask, so nothing is erased (`mask layer="Photo" mask=invert` keeps the
+  background instead). `mode=cutout` puts just the subject on a new layer above and hides the original.
+  `threshold` (0…1, 0.5) moves the edge in (higher) or out (lower), `feather` softens it in pixels,
+  and `refine=false` keeps the model's own edge. Good for product shots, portraits and stickers.
+- **Remove something / fill a hole**: `canvas action=content_fill layer="Photo" x=… y=… width=…
+  height=…` fills that box from the pixels around it (a passer-by, a wire, a logo on a wall). Give a
+  box a little larger than the thing; `newLayer=true` keeps the fill on its own layer so it can be
+  masked or undone separately. Without a box it fills what the person selected in the open window.
+- **Place a picture exactly**: `canvas action=place_image source=… x=… y=… width=… height=…`
+  (`fit=cover` fills the box and cuts the overflow, `contain` fits inside, `stretch`), with
+  `mask_image=…` a grayscale picture over the same box (white shows). This is how generated
+  pictures land where the person asked.
+
+The person also has Select > Subject, Edit > Content-Aware Fill, the Spot Healing Brush (J) and the
+Object Select tool (W, with the Magic Wand) in the window.
+
+## Generated pictures
+
+When the person asks the Canvas window for Generative Fill or a New Generated Layer, Herald sends
+you a request naming the project, the box, the files it saved (a picture of the area and its mask)
+and the file to save your picture to. Make the picture with your image generation tool (pick its
+aspect ratio from the box; if it can edit an image, give it the area's picture), save it there,
+place it with `place_image` exactly as the request says, check it with `preview`, and say what you
+made. If you have no image generation tool, or it fails, say so in a sentence and place nothing.
+
+## Planning an edit from a description
+
+Requests like "make it moodier", "warmer and brighter", "put the logo bottom right" or "make the sky
+dramatic" come from the window's Ask Hermes field with the project, its layers and a preview.
+
+1. Look first: `canvas action=preview` and `canvas action=layers`. Decide what the request means
+   for this picture (moodier: darker midtones, less saturation, cooler shadows, a vignette).
+2. Prefer adjustment layers over changing pixels: Curves or Levels for tone, Hue/Saturation for
+   colour strength, Color Balance or a Gradient Map for colour casts, Exposure for brightness.
+   Clip an adjustment to one layer (`clip=true`) when only that layer should change, and mask an
+   adjustment (a vignette is a darkening Curves layer with its centre masked out) to limit it.
+3. Keep it editable and tidy: name what you add ("Moody grade", "Vignette"), group related layers,
+   use layer effects for shadows and glows, and `place_image` or `add_layer` for new pictures,
+   placed with an explicit box ("bottom right" is a box a margin of about 4% in from the corner).
+4. Look again with `preview`, adjust what is too strong (lower an adjustment layer's opacity
+   rather than redoing it), and finish by telling the person in a sentence or two what you changed
+   and why, so they can tweak it or undo it.
 
 ## The .comp format (for writing projects directly)
 

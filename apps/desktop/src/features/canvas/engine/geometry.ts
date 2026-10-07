@@ -75,6 +75,10 @@ export function unitToDocument(t: LayerTransform): Mat {
 /** A raster's pixels (0..width, 0..height) to document pixels. */
 export const pixelToDocument = (t: LayerTransform, width: number, height: number): Mat => multiply(unitToDocument(t), scale(1 / width, 1 / height))
 
+/** Where a rectangle of a raster's pixels sits when the raster (`width`×`height`) is placed by `t`: for a part cut out of a layer. */
+export const partPlacement = (t: LayerTransform, width: number, height: number, part: Rect): LayerTransform =>
+  decompose(multiply(pixelToDocument(t, width, height), multiply(translate(part.x, part.y), scale(part.width, part.height))), t)
+
 /** The four corners in document pixels: top-left, top-right, bottom-right, bottom-left of the layer. */
 export function corners(t: LayerTransform): [Vec2, Vec2, Vec2, Vec2] {
   const m = unitToDocument(t)

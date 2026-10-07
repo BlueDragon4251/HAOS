@@ -6,8 +6,12 @@ import type { Background } from './engine/project.ts'
 import { $dialog } from './menus.ts'
 import { $documents, closeDocument, createDocument, save } from './store.ts'
 
-/** A dialog over the Canvas window (not the whole desktop). */
-export function Modal({ title, children, onClose, className }: { title: string; children: React.ReactNode; onClose: () => void; className?: string }) {
+/**
+ * A dialog over the Canvas window (not the whole desktop). Beside the canvas (`aside`), it leaves
+ * the picture in view for a dialog that previews its change there, and a click outside does not
+ * close it.
+ */
+export function Modal({ title, children, onClose, className, aside }: { title: string; children: React.ReactNode; onClose: () => void; className?: string; aside?: boolean }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -21,8 +25,8 @@ export function Modal({ title, children, onClose, className }: { title: string; 
   }, [onClose])
 
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-black/35 p-6" onMouseDown={onClose}>
-      <div role="dialog" aria-label={title} className={cn('float menu-surface w-full max-w-md rounded-2xl p-5 animate-pop', className)} onMouseDown={(event) => event.stopPropagation()}>
+    <div className={cn('absolute inset-0 z-40 p-6', aside ? 'flex items-start justify-end pt-24 pr-80' : 'grid place-items-center bg-black/35')} onMouseDown={aside ? undefined : onClose}>
+      <div role="dialog" aria-label={title} className={cn('float menu-surface w-full max-w-md rounded-2xl p-5 animate-pop', aside && 'max-w-sm', className)} onMouseDown={(event) => event.stopPropagation()}>
         <div className="mb-4 text-[14px] font-medium text-fg">{title}</div>
         {children}
       </div>

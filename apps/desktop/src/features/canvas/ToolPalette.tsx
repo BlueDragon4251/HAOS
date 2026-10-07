@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import {
   IconArrowsExchange,
   IconArrowsMove,
+  IconBandage,
   IconBrush,
   IconBucketDroplet,
   IconCircleDashed,
@@ -13,6 +14,7 @@ import {
   IconLasso,
   IconLassoPolygon,
   IconMarquee2,
+  IconScan,
   IconShape,
   IconTypography,
   IconWand,
@@ -32,8 +34,10 @@ export const TOOL_ICONS: Record<ToolId, React.ReactNode> = {
   lasso: <IconLasso size={17} />,
   'polygon-lasso': <IconLassoPolygon size={17} />,
   wand: <IconWand size={17} />,
+  'object-select': <IconScan size={17} />,
   crop: <IconCrop size={17} />,
   eyedropper: <IconColorPicker size={17} />,
+  heal: <IconBandage size={17} />,
   brush: <IconBrush size={17} />,
   eraser: <IconEraser size={17} />,
   bucket: <IconBucketDroplet size={17} />,
@@ -151,7 +155,7 @@ export function ToolPalette() {
   return (
     <div className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-visible border-r border-line py-2" role="toolbar" aria-orientation="vertical" aria-label="Tools">
       {GROUPS.map((group, i) => (
-        <div key={group} className={cn(['crop', 'brush', 'type', 'hand'].includes(group) && i > 0 && 'mt-1.5')}>
+        <div key={group} className={cn(['crop', 'heal', 'type', 'hand'].includes(group) && i > 0 && 'mt-1.5')}>
           <GroupButton group={group} />
         </div>
       ))}

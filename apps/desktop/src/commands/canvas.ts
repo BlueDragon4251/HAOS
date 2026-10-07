@@ -280,6 +280,55 @@ export const canvasCommands: readonly OsCommand[] = [
     run: async (args) => done((await canvas()).mask(args))
   },
   {
+    id: 'canvas.placeImage',
+    title: 'Place a picture in a box',
+    description:
+      'Place a picture (a file, or an http(s) address) as a new layer in a box in canvas pixels (the rest of the canvas for what is left out): fit=cover fills the box and cuts what overflows (the default), contain fits inside it, stretch fills it exactly. mask is a grayscale image spread over the same box (white shows, black hides) that becomes the layer’s mask: Herald saves one for generative fill, so a generated picture is kept to the selection.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'source', type: 'string', description: 'The picture: a file path or an http(s) address', required: true },
+      ...box('of the box'),
+      { name: 'fit', type: 'string', description: 'cover (the default), contain or stretch' },
+      { name: 'mask', type: 'string', description: 'A grayscale image file over the same box: white shows the picture, black hides it' },
+      { name: 'name', type: 'string', description: 'The layer name' },
+      ...appearance,
+      ...where
+    ],
+    run: async (args) => done((await canvas()).placeImage(args))
+  },
+  {
+    id: 'canvas.removeBackground',
+    title: 'Remove the background of a layer',
+    description:
+      'Find a layer’s subject with the on-device model and hide everything else: mode=mask (the default) adds a layer mask, so nothing is erased; mode=cutout puts just the subject on a new layer above and hides the original. threshold (0 to 1, 0.5 by default) moves the edge in or out, feather softens it in pixels. Needs the ISNet model on this computer: when it is missing, the answer says so, and only the person can allow its download in Herald Canvas.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layer', type: 'string', description: 'The layer (id or name); the active layer when left out' },
+      { name: 'mode', type: 'string', description: 'mask (the default) or cutout' },
+      { name: 'threshold', type: 'number', description: 'Where the edge sits, 0 to 1 (0.5); lower keeps more' },
+      { name: 'feather', type: 'number', description: 'Softens the edge, in pixels (0)' },
+      { name: 'refine', type: 'boolean', description: 'Snap the edge to the picture’s own outlines, such as hair (true)' }
+    ],
+    run: async (args) => done((await canvas()).removeBackground(args))
+  },
+  {
+    id: 'canvas.contentFill',
+    title: 'Content-aware fill',
+    description:
+      'Fill a box on a layer from the pixels around it, to remove something (a person, a wire, a logo) without leaving a hole. Give the box in canvas pixels (x, y, width, height), or leave it out to fill what the person has selected in the open Canvas window. newLayer=true puts the fill on a new layer above instead. It runs on this computer.',
+    tier: 'act',
+    args: [
+      project,
+      { name: 'layer', type: 'string', description: 'The layer (id or name); the active layer when left out' },
+      ...placement.map((arg) => ({ ...arg, description: `${arg.description.replace(' (alone, it keeps the proportions)', '')} of the area to fill` })),
+      { name: 'newLayer', type: 'boolean', description: 'Put the fill on a new layer above, leaving the layer as it is' },
+      { name: 'sampling', type: 'string', description: 'around (copy from around the area, the default) or all (from anywhere in the layer)' }
+    ],
+    run: async (args) => done((await canvas()).contentFill(args))
+  },
+  {
     id: 'canvas.export',
     title: 'Export an image',
     description: 'Write the flattened image as PNG, JPEG or WebP. An existing file is replaced only with overwrite=true, which asks the person first.',

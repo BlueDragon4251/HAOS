@@ -53,7 +53,10 @@ def test_canvas_words_become_canvas_commands(tmp_path, monkeypatch):
     assert cli.canvas_request(["crop", "0", "100", "1080", "1350"]) == ("canvas.crop", {"x": 0, "y": 100, "width": 1080, "height": 1350})
     assert cli.canvas_request(["mask", "Photo", "hide-selection"]) == ("canvas.mask", {"layer": "Photo", "action": "hideSelection"})
     assert cli.canvas_request(["mask", "Sky glow", "invert", "--project", "Poster.comp"]) == ("canvas.mask", {"layer": "Sky glow", "action": "invert", "project": str(here / "Poster.comp")})
-    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"]):
+    assert cli.canvas_request(["remove-background"]) == ("canvas.removeBackground", {})
+    assert cli.canvas_request(["remove-background", "Band", "photo", "--cutout"]) == ("canvas.removeBackground", {"layer": "Band photo", "mode": "cutout"})
+    assert cli.canvas_request(["fill", "10", "20", "300", "200", "--layer", "Photo", "--new-layer"]) == ("canvas.contentFill", {"x": 10, "y": 20, "width": 300, "height": 200, "layer": "Photo", "newLayer": True})
+    for wrong in (["paint"], ["text"], ["resize"], ["crop", "1", "2"], ["mask", "Photo"], ["mask", "Photo", "feather"], ["fill", "1", "2", "3"]):
         with pytest.raises(SystemExit):
             cli.canvas_request(wrong)
 

@@ -44,6 +44,8 @@ import {
   type SelectionChange,
   selectLayerPixels
 } from './editing.ts'
+import { ensureModel } from './ai/models.ts'
+import { cannotSegment, selectSubject } from './ai/remove-background.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
 import { isMac } from './platform.ts'
@@ -64,6 +66,10 @@ export type CanvasDialog =
   | { kind: 'trim' }
   | { kind: 'fill' }
   | { kind: 'modify-selection'; change: SelectionChange }
+  | { kind: 'remove-background' }
+  | { kind: 'content-fill' }
+  | { kind: 'generate'; mode: 'fill' | 'layer' }
+  | { kind: 'models' }
   | null
 
 export const $dialog = atom<CanvasDialog>(null)
@@ -107,6 +113,22 @@ const selected = (doc: CanvasDocument): boolean => Boolean(doc.state.selection)
 const hasLayer = (doc: CanvasDocument): boolean => Boolean(doc.active)
 const hasMask = (doc: CanvasDocument): boolean => Boolean(doc.active?.mask)
 const nothing = (): void => {}
+
+/** Select > Subject: the model is asked for first when it is not on this computer yet. */
+async function subject(doc: CanvasDocument): Promise<void> {
+  if (!(await ensureModel('isnet', 'Select Subject'))) {
+    return
+  }
+
+  notify('Finding the subject…')
+
+  try {
+    await selectSubject(doc)
+    notify('Selected the subject')
+  } catch (error) {
+    notify(`Could not select the subject: ${error instanceof Error ? error.message : String(error)}`, 'error')
+  }
+}
 
 const ADJUSTMENT_ITEMS: CanvasCommand[] = ADJUSTMENT_KINDS.map((kind, i) => ({
   id: `adjustment-${kind}`,
@@ -206,6 +228,8 @@ export const MENUS: CanvasMenu[] = [
       { id: 'fill', label: 'Fill…', keys: 'shift+f5', also: ['shift+backspace'], needsDocument: true, enabled: hasLayer, run: () => $dialog.set({ kind: 'fill' }), dividerBefore: true },
       { id: 'fill-foreground', label: 'Fill with Foreground', keys: 'alt+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$foreground.get(), 255])) },
       { id: 'fill-background', label: 'Fill with Background', keys: 'mod+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$background.get(), 255])) },
+      { id: 'content-fill', label: 'Content-Aware Fill…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'content-fill' }) },
+      { id: 'generative-fill', label: 'Generative Fill…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'generate', mode: 'fill' }) },
       {
         id: 'clear',
         label: (doc) => (doc?.state.selection ? 'Clear' : 'Delete Layer'),
@@ -243,7 +267,8 @@ export const MENUS: CanvasMenu[] = [
       { id: 'flip-vertical', label: 'Flip Vertical', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { flip: 'vertical' }, 'Flip Vertical')) },
       { id: 'rotate-180', label: 'Rotate 180°', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: 180 }, 'Rotate 180°')) },
       { id: 'rotate-cw', label: 'Rotate 90° Clockwise', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: 90 }, 'Rotate 90° Clockwise')) },
-      { id: 'rotate-ccw', label: 'Rotate 90° Counter Clockwise', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: -90 }, 'Rotate 90° Counter Clockwise')) }
+      { id: 'rotate-ccw', label: 'Rotate 90° Counter Clockwise', needsDocument: true, enabled: hasLayer, inSession: true, run: onDoc((doc) => turnPicked(doc, { degrees: -90 }, 'Rotate 90° Counter Clockwise')) },
+      { id: 'models', label: 'AI Models…', run: () => $dialog.set({ kind: 'models' }), dividerBefore: true }
     ]
   },
   {
@@ -269,6 +294,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'new-layer', label: 'New Layer', keys: 'mod+shift+n', needsDocument: true, run: onDoc(addLayer) },
       { id: 'new-folder', label: 'New Folder', needsDocument: true, run: onDoc(addFolder) },
       { id: 'new-adjustment', label: 'New Adjustment Layer', needsDocument: true, run: nothing, submenu: ADJUSTMENT_ITEMS },
+      { id: 'new-generated', label: 'New Generated Layer…', needsDocument: true, run: () => $dialog.set({ kind: 'generate', mode: 'layer' }) },
       {
         id: 'duplicate',
         label: (doc) => (doc?.state.selection ? 'New Layer via Copy' : 'Duplicate'),
@@ -280,6 +306,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'via-cut', label: 'New Layer via Cut', keys: 'mod+shift+j', needsDocument: true, enabled: (doc) => selected(doc) && Boolean(doc.active?.pixels), run: onDoc((doc) => layerViaCopy(doc, true)) },
       { id: 'delete', label: 'Delete', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(deletePicked) },
       { id: 'rasterize', label: 'Rasterize', needsDocument: true, enabled: (doc) => Boolean(doc.active?.text || doc.active?.shape), run: onDoc(rasterize) },
+      { id: 'remove-background', label: 'Remove Background…', needsDocument: true, enabled: (doc) => !cannotSegment(doc.active), run: () => $dialog.set({ kind: 'remove-background' }) },
       { id: 'group', label: 'Group Layers', keys: 'mod+g', needsDocument: true, enabled: (doc) => doc.picked.length > 0, run: onDoc(groupPicked), dividerBefore: true },
       { id: 'ungroup', label: 'Ungroup', keys: 'mod+shift+g', needsDocument: true, enabled: (doc) => Boolean(doc.active?.isGroup), run: onDoc(ungroupActive) },
       { id: 'mask', label: 'Add Mask', needsDocument: true, enabled: (doc) => Boolean(doc.active && !doc.active.mask), run: onDoc((doc) => addMask(doc)), dividerBefore: true },
@@ -309,6 +336,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'deselect', label: 'Deselect', keys: 'mod+d', needsDocument: true, enabled: selected, run: onDoc(deselect) },
       { id: 'reselect', label: 'Reselect', keys: 'mod+shift+d', needsDocument: true, enabled: (doc) => Boolean(doc.lastSelection && !doc.state.selection), run: onDoc(reselect) },
       { id: 'inverse', label: 'Inverse', keys: 'mod+shift+i', needsDocument: true, enabled: selected, run: onDoc(invertSelected) },
+      { id: 'subject', label: 'Subject', needsDocument: true, enabled: (doc) => doc.state.layers.length > 0, run: onDoc((doc) => void subject(doc)) },
       { id: 'feather', label: 'Feather…', keys: 'shift+f6', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'feather' }), dividerBefore: true },
       { id: 'expand', label: 'Expand…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'expand' }) },
       { id: 'contract', label: 'Contract…', needsDocument: true, enabled: selected, run: () => $dialog.set({ kind: 'modify-selection', change: 'contract' }) },

@@ -12,6 +12,7 @@ import { isPanels } from '../../store/shell.ts'
 import {
   adjustmentWith,
   alignFrom,
+  backgroundModeFrom,
   blendFrom,
   cropBox,
   describeLayer,
@@ -21,11 +22,16 @@ import {
   fillBox,
   findByRef,
   finite,
+  fitPicture,
   fontNameFrom,
+  fractionFrom,
+  holeBox,
   jsonObject,
   lineEnds,
   maskActionFrom,
+  maskPart,
   opacityFrom,
+  pictureFitFrom,
   placementOf,
   rangedArg,
   resizePlan,
@@ -55,7 +61,7 @@ import {
 import { EFFECT_NAMES, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, withMaskAction } from './engine/masks.ts'
 import { documentFromImage, type ExportKind, exportImage, flatten, newDocument, openProject, saveProject, toRaster } from './engine/project.ts'
-import { Raster, type Rect } from './engine/raster.ts'
+import { Raster, type Rect, resample } from './engine/raster.ts'
 import { shapeBox, shapeName } from './engine/shapes.ts'
 import { textStyle } from './engine/text.ts'
 import { openInCanvas } from './open.ts'
@@ -855,6 +861,118 @@ export async function preview(args: Record<string, unknown>): Promise<Outcome> {
     summary: `Preview of ${on.doc.name} (${raster.width}×${raster.height}): ${file}`,
     data: { file, width: raster.width, height: raster.height, canvas: { width: state.width, height: state.height }, layers: state.layers.length }
   }
+}
+
+/** A mask from an image file (white shows, black hides; transparency hides too). */
+async function loadMask(source: string): Promise<Raster> {
+  const file = resolve(source)
+
+  return toRaster(await window.heraldOS.canvas.readImage(file), 1, /\.svg$/i.test(file))
+}
+
+/** The layer a command names, or the active one; it has to have pixels. */
+function pixelsLayer(state: DocState, ref: unknown, what: string): CanvasLayer {
+  const layer = ref !== undefined && ref !== '' ? findByRef(state, ref) : findLayer(state, state.activeLayerId)
+
+  if (!layer) {
+    throw new Error(`Say which layer to ${what}: layer=…`)
+  }
+
+  if (!layer.pixels || layer.isGroup || layer.adjustment) {
+    throw new Error(`${layer.name} ${layer.isGroup ? 'is a folder' : layer.adjustment ? 'is an adjustment layer' : 'is empty'}: ${what} works on a layer with a picture`)
+  }
+
+  return layer
+}
+
+/**
+ * A picture (a file or an http(s) address) as a new layer in an explicit box (the rest of the
+ * canvas for what is not given): covering it (the default), inside it, or stretched over it. With
+ * `mask`, an image spread over the same box becomes the layer's mask, so a generated picture can be
+ * kept to a selection whatever window the command runs in.
+ */
+export async function placeImage(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+
+  if (typeof args.source !== 'string' || !args.source.trim()) {
+    throw new Error('Give the picture to place: source=/path/to/picture.png (or an https address)')
+  }
+
+  const source = args.source.trim()
+  const raster = await loadImage(source)
+  const box = fillBox(state, args)
+  const fitted = fitPicture(raster.width, raster.height, box, pictureFitFrom(args.fit))
+  const whole = fitted.crop.width === raster.width && fitted.crop.height === raster.height
+  const pixels = whole ? raster : raster.crop(fitted.crop)
+  const name = layerName(args) ?? (/^https?:|^data:/.test(source) ? nextName(state, 'Image') : baseName(source))
+  let layer: CanvasLayer = { ...pixelLayer(name, pixels, defaultTransform(fitted.box.width, fitted.box.height, fitted.box.x, fitted.box.y)), opacity: opacityFrom(args.opacity) ?? 1, blendMode: blendFrom(args.blend) ?? 'Normal' }
+
+  if (typeof args.mask === 'string' && args.mask.trim()) {
+    const mask = await loadMask(args.mask.trim())
+    const part = maskPart(mask.width, mask.height, box, fitted.box)
+    layer = { ...layer, mask: resample(mask.crop(part), pixels.width, pixels.height), maskEnabled: true, maskLinked: true }
+  }
+
+  let next = insertLayer(state, layer, placementFrom(state, args))
+
+  if (args.clip === true) {
+    next = setClipped(next, layer.id, true)
+  }
+
+  await apply(on, 'Place Image', next)
+
+  return { summary: `Placed “${layer.name}” in ${on.doc.name}${layer.mask ? ', masked' : ''}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
+}
+
+/** Remove Background on a layer with the on-device model: as its mask (the default) or as a cut-out layer. */
+export async function removeBackground(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const layer = pixelsLayer(on.doc.state, args.layer, 'remove the background')
+  const mode = backgroundModeFrom(args.mode)
+  const { requireModel } = await import('./ai/models.ts')
+  await requireModel('isnet', 'Remove Background')
+  const ai = await import('./ai/remove-background.ts')
+  const feather = finite(args.feather)
+  const next = await ai.removeBackground(on.doc, layer.id, { output: mode, threshold: fractionFrom(args.threshold, 'threshold'), feather: feather === undefined ? undefined : Math.max(0, Math.min(250, feather)), refine: args.refine !== false })
+  await apply(on, 'Remove Background', next)
+  // A cut-out is the new active layer.
+  const result = findLayer(on.doc.state, mode === 'cutout' ? on.doc.state.activeLayerId : layer.id)
+
+  return { summary: mode === 'cutout' ? `Cut ${layer.name}'s subject out onto a new layer and hid the original` : `${layer.name}: its background is hidden by a mask (nothing erased)`, data: result ? { layer: describeLayer(on.doc.state, result) } : undefined }
+}
+
+/** Content-aware fill: a box (or the open window's selection) on a layer filled from the pixels around it, in place or on a new layer. */
+export async function contentFill(args: Record<string, unknown>): Promise<Outcome> {
+  const on = await target(args.project)
+  const { state } = on.doc
+  const layer = pixelsLayer(state, args.layer, 'fill')
+  const box = holeBox(state, args)
+  const ai = await import('./ai/content-fill.ts')
+  let mask: Raster | null = box ? ai.boxMask(state.width, state.height, box) : null
+
+  if (!mask) {
+    if (!on.live || !state.selection) {
+      throw new Error('Give the box to fill (x, y, width and height in canvas pixels), or have the person select it in the Canvas window')
+    }
+
+    mask = state.selection
+  }
+
+  const pixels = layer.pixels!
+  const hole = ai.holeFromMask(mask, ai.placementOf(layer), pixels.width, pixels.height)
+
+  if (!hole) {
+    throw new Error(`That area misses ${layer.name}`)
+  }
+
+  const filled = await ai.fillRaster(pixels, hole, { sampling: args.sampling === 'all' ? 'all' : 'around' }).done
+  const onNew = args.newLayer === true
+  const next = onNew ? ai.withFillLayer(state, filled, { transform: layer.transform, width: pixels.width, height: pixels.height }, layer.id) : ai.withFillInLayer(state, layer.id, filled)
+  await apply(on, 'Content-Aware Fill', next)
+  const area = box ?? mask.opaqueBounds()!
+
+  return { summary: `Filled ${area.width}×${area.height} at (${area.x}, ${area.y}) ${onNew ? 'on a new layer above' : 'in'} ${layer.name}, from the pixels around it`, data: { box: area } }
 }
 
 /** Undo or redo in the image in front (it has to be open in a Canvas window). */

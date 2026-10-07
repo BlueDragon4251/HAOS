@@ -22,6 +22,7 @@ call the tools directly.
                 canvas text <words> [--x --y --size --font --color --align] | canvas resize <WxH> [--anchor <a>]
                 canvas crop <x> <y> <w> <h> | canvas preview [project] | canvas export <file> | canvas undo|redo
                 canvas mask <layer> reveal|hide|invert|apply|enable|disable|remove|link|unlink|reveal-selection|hide-selection
+                canvas remove-background [layer] [--cutout] | canvas fill <x> <y> <w> <h> [--layer <l>] [--new-layer]
   Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
   Events        event <name> [key=value ...] | hook list | hook install <event> <script> | hook dir
   System        lock | suspend | power | wm <niri action...> | state | debug | commands [--json]
@@ -88,7 +89,7 @@ COMMANDS: dict[str, str] = {
     "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
     "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
     "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
-    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo | mask <layer> <action>: Herald Canvas, the image editor",
+    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo | mask <layer> <action> | remove-background [layer] [--cutout] | fill <x> <y> <w> <h> [--layer …] [--new-layer]: Herald Canvas, the image editor",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
@@ -997,7 +998,8 @@ CANVAS_USAGE = (
     "| text <words> [--x <px>] [--y <px>] [--width <px>] [--size <px>] [--font <family>] [--color <css>] [--align left|center|right] "
     "| resize <width>x<height> [--anchor <where>] [--image] | resize --scale <n> | crop <x> <y> <width> <height> "
     "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo "
-    "| mask <layer> <reveal|hide|reveal-selection|hide-selection|invert|apply|enable|disable|remove|link|unlink> [--project <project>]"
+    "| mask <layer> <reveal|hide|reveal-selection|hide-selection|invert|apply|enable|disable|remove|link|unlink> [--project <project>] "
+    "| remove-background [<layer>] [--cutout] [--project <project>] | fill <x> <y> <width> <height> [--layer <layer>] [--new-layer] [--project <project>]"
 )
 
 # What `canvas mask` does, as canvas.mask names it.
@@ -1016,7 +1018,7 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
     i = 0
     while i < len(rest):
         token = rest[i]
-        if token in ("--overwrite", "--json", "--image"):
+        if token in ("--overwrite", "--json", "--image", "--cutout", "--new-layer"):
             flags[token[2:]] = True
         elif token.startswith("--") and i + 1 < len(rest):
             flags[token[2:]] = rest[i + 1]
@@ -1106,6 +1108,24 @@ def canvas_request(args: list[str]) -> tuple[str, dict]:
         if "project" in flags:
             payload["project"] = _absolute(str(flags["project"]))
         return "canvas.mask", payload
+    if sub == "remove-background":
+        payload = {"layer": " ".join(words)} if words else {}
+        if flags.get("cutout"):
+            payload["mode"] = "cutout"
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.removeBackground", payload
+    if sub == "fill":
+        if len(words) != 4 or not all(re.fullmatch(r"-?\d+", word) for word in words):
+            die(f"herald-os {CANVAS_USAGE}", 2)
+        payload = dict(zip(("x", "y", "width", "height"), (int(word) for word in words)))
+        if "layer" in flags:
+            payload["layer"] = str(flags["layer"])
+        if flags.get("new-layer"):
+            payload["newLayer"] = True
+        if "project" in flags:
+            payload["project"] = _absolute(str(flags["project"]))
+        return "canvas.contentFill", payload
     die(f"herald-os {CANVAS_USAGE}", 2)
     return "", {}
 

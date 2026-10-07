@@ -115,6 +115,21 @@ def test_a_mask_action_travels_as_the_command_action(plugin):
     assert properties["effects"]["type"] == "object"
 
 
+def test_on_device_tools_and_placing_a_picture_pass_their_arguments(plugin):
+    tools = _mod(plugin, "tools")
+    _, command, args = tools.canvas_command({"action": "remove_background", "layer": "Photo", "mode": "cutout", "threshold": 0.4, "feather": 2, "refine": False, "source": "x.png"})
+    assert (command, args) == ("canvas.removeBackground", {"layer": "Photo", "mode": "cutout", "threshold": 0.4, "feather": 2, "refine": False})
+    _, command, args = tools.canvas_command({"action": "content_fill", "x": 10, "y": 20, "width": 300, "height": 200, "newLayer": True, "sampling": "all", "mode": "mask"})
+    assert (command, args) == ("canvas.contentFill", {"x": 10, "y": 20, "width": 300, "height": 200, "newLayer": True, "sampling": "all"})
+    # place_image's mask file travels as `mask`, which the mask action's own name would otherwise take.
+    _, command, args = tools.canvas_command({"action": "place_image", "project": "~/P.comp", "source": "/tmp/r.png", "x": 5, "y": 6, "width": 70, "height": 80, "fit": "cover", "mask_image": "/tmp/m.png", "name": "Fill", "mask": "hide"})
+    assert command == "canvas.placeImage"
+    assert args == {"project": "~/P.comp", "source": "/tmp/r.png", "x": 5, "y": 6, "width": 70, "height": 80, "fit": "cover", "mask": "/tmp/m.png", "name": "Fill"}
+    properties = tools.CANVAS_SCHEMA["parameters"]["properties"]
+    assert properties["mode"]["enum"] == ["mask", "cutout"] and properties["sampling"]["enum"] == ["around", "all"]
+    assert {"place_image", "remove_background", "content_fill"} <= set(properties["action"]["enum"])
+
+
 def test_replacing_a_file_asks_first(plugin, tmp_path):
     tools = _mod(plugin, "tools")
     catalogue = {entry["id"]: entry for entry in CATALOGUE}

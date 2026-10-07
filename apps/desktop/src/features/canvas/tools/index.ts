@@ -7,7 +7,9 @@ import { brushTool, eraserTool } from './brush.ts'
 import { cropTool } from './crop.ts'
 import { eyedropperTool } from './eyedropper.ts'
 import { bucketTool, gradientTool } from './fill.ts'
+import { healTool } from './heal.ts'
 import { moveTool } from './move.ts'
+import { objectSelectTool } from './object-select.ts'
 import { lassoTool, marqueeTools, polygonLassoTool, wandTool } from './select.ts'
 import { shapeTool } from './shape.ts'
 import type { ToolId } from './state.ts'
@@ -21,8 +23,10 @@ export const HANDLERS: Partial<Record<ToolId, ToolHandler>> = {
   lasso: lassoTool,
   'polygon-lasso': polygonLassoTool,
   wand: wandTool,
+  'object-select': objectSelectTool,
   crop: cropTool,
   eyedropper: eyedropperTool,
+  heal: healTool,
   brush: brushTool,
   eraser: eraserTool,
   bucket: bucketTool,

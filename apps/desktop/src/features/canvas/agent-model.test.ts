@@ -5,6 +5,7 @@ import {
   adjustmentWith,
   alignFrom,
   anchorFrom,
+  backgroundModeFrom,
   blendFrom,
   cropBox,
   describeLayer,
@@ -13,12 +14,17 @@ import {
   effectsWith,
   fillBox,
   findByRef,
+  fitPicture,
   fontNameFrom,
+  fractionFrom,
+  holeBox,
   jsonObject,
   lineEnds,
   maskActionFrom,
+  maskPart,
   mergeSettings,
   opacityFrom,
+  pictureFitFrom,
   placementOf,
   rangedArg,
   resizePlan,
@@ -267,6 +273,31 @@ describe('adjustments, effects and masks for Hermes', () => {
     expect(rangedArg(120, 'size', 'fontSize')).toBe(120)
     expect(() => rangedArg(4000, 'size (the font size)', 'fontSize', ' pixels')).toThrow('size (the font size) must be from 1 to 2000 pixels (it was 4000)')
     expect(() => rangedArg(-24, 'leading', 'leading')).toThrow(/leading must be from 0 to 5000/)
+  })
+
+  it('fits a placed picture to its box, and finds the part of a mask under it', () => {
+    const box = { x: 100, y: 50, width: 400, height: 200 }
+    expect(pictureFitFrom(undefined)).toBe('cover')
+    expect(pictureFitFrom('Contain')).toBe('contain')
+    expect(() => pictureFitFrom('none')).toThrow(/cover .* contain .* stretch/)
+    expect(fitPicture(1000, 1000, box, 'cover')).toEqual({ crop: { x: 0, y: 250, width: 1000, height: 500 }, box })
+    expect(fitPicture(1000, 1000, box, 'contain')).toEqual({ crop: { x: 0, y: 0, width: 1000, height: 1000 }, box: { x: 200, y: 50, width: 200, height: 200 } })
+    expect(fitPicture(10, 10, box, 'stretch').box).toBe(box)
+    expect(maskPart(800, 400, box, { x: 200, y: 50, width: 200, height: 200 })).toEqual({ x: 200, y: 0, width: 400, height: 400 })
+    expect(maskPart(400, 200, box, box)).toEqual({ x: 0, y: 0, width: 400, height: 200 })
+  })
+
+  it('reads the on-device tools’ arguments', () => {
+    expect(backgroundModeFrom(undefined)).toBe('mask')
+    expect(backgroundModeFrom('cut-out')).toBe('cutout')
+    expect(() => backgroundModeFrom('erase')).toThrow(/mask .* or cutout/)
+    expect(fractionFrom(40, 'threshold')).toBe(0.4)
+    expect(fractionFrom(0.3, 'threshold')).toBe(0.3)
+    expect(() => fractionFrom(-1, 'threshold')).toThrow(/threshold is from 0 to 1/)
+    expect(holeBox({ width: 1000, height: 800 }, {})).toBeNull()
+    expect(holeBox({ width: 1000, height: 800 }, { x: 900, y: -20, width: 300, height: 100 })).toEqual({ x: 900, y: 0, width: 100, height: 80 })
+    expect(() => holeBox({ width: 1000, height: 800 }, { x: 10, y: 10 })).toThrow(/whole box/)
+    expect(() => holeBox({ width: 1000, height: 800 }, { x: 2000, y: 0, width: 10, height: 10 })).toThrow(/outside/)
   })
 
   it('never clips a layer to an adjustment layer', () => {

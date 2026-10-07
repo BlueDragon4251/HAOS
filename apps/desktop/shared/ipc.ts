@@ -933,7 +933,14 @@ export const IPC = {
   canvasCopyImage: 'herald-os:canvas:copy-image',
   canvasPasteImage: 'herald-os:canvas:paste-image',
   /** Main -> renderer: an open project changed on disk (Hermes, a script, Compositor). */
-  canvasChanged: 'herald-os:canvas:changed'
+  canvasChanged: 'herald-os:canvas:changed',
+  /** On-device models: what is downloaded, downloads (asked for by the person), and removal. */
+  canvasModels: 'herald-os:canvas:models',
+  canvasModelDownload: 'herald-os:canvas:model-download',
+  canvasModelCancel: 'herald-os:canvas:model-cancel',
+  canvasModelRemove: 'herald-os:canvas:model-remove',
+  /** Main -> renderer: how a model download is going. */
+  canvasModelProgress: 'herald-os:canvas:model-progress'
 } as const
 
 /** Raw pixels for a project image or an export: RGBA layers, grayscale masks. */

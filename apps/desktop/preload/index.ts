@@ -64,6 +64,7 @@ import {
   type WmState
 } from '../shared/ipc.ts'
 import type { BrandingPatch, BrandingView } from '../shared/branding.ts'
+import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/models.ts'
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
@@ -214,7 +215,16 @@ const api = {
     /** Put copied pixels on the system clipboard as a PNG, for other apps. */
     copyImage: (image: CanvasRawImage): Promise<void> => ipcRenderer.invoke(IPC.canvasCopyImage, image),
     /** The image on the system clipboard (null when there is none), and whether Herald Canvas put it there. */
-    pasteImage: (): Promise<CanvasPasted | null> => ipcRenderer.invoke(IPC.canvasPasteImage)
+    pasteImage: (): Promise<CanvasPasted | null> => ipcRenderer.invoke(IPC.canvasPasteImage),
+    /** On-device models: downloaded only when the person allows it, checked before they run. */
+    models: {
+      list: (): Promise<ModelStatus[]> => ipcRenderer.invoke(IPC.canvasModels),
+      /** Resolves once the model is downloaded and verified. */
+      download: (id: ModelId): Promise<void> => ipcRenderer.invoke(IPC.canvasModelDownload, id),
+      cancel: (id: ModelId): Promise<void> => ipcRenderer.invoke(IPC.canvasModelCancel, id),
+      remove: (id: ModelId): Promise<void> => ipcRenderer.invoke(IPC.canvasModelRemove, id),
+      onProgress: (listener: (progress: ModelProgress) => void): Unsubscribe => subscribe(IPC.canvasModelProgress, listener)
+    }
   },
   catalog: {
     /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */

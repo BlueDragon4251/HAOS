@@ -6,6 +6,7 @@ import {
   IconCheck,
   IconCircle,
   IconItalic,
+  IconBackground,
   IconLayersIntersect,
   IconLayersSubtract,
   IconLayersUnion,
@@ -25,7 +26,10 @@ import { ColorPicker } from './ColorPicker.tsx'
 import type { CanvasDocument } from './engine/document.ts'
 import type { SelectionMode } from './engine/selection.ts'
 import { useRevision } from './hooks.ts'
+import { cannotSegment } from './ai/subject.ts'
+import { $dialog } from './menus.ts'
 import { applyCrop, cancelCrop, $crop, cropRect } from './tools/crop.ts'
+import { warmObjectSelect } from './tools/object-select.ts'
 import {
   $autoSelect,
   $brush,
@@ -34,7 +38,9 @@ import {
   $eyedropper,
   $foreground,
   $gradient,
+  $heal,
   $marquee,
+  $objectSelect,
   $selectionMode,
   $shape,
   $showTransform,
@@ -341,6 +347,35 @@ function MoveFields({ doc }: { doc: CanvasDocument }) {
     <>
       <Check label="Pick the layer under the pointer" checked={autoSelect} onChange={(checked) => $autoSelect.set(checked)} />
       <Check label="Show transform controls" checked={showTransform} onChange={(checked) => $showTransform.set(checked)} />
+      <GlassButton size="sm" variant="ghost" disabled={Boolean(cannotSegment(doc.active))} title="Hide the background with a mask (Layer > Remove Background)" onClick={() => $dialog.set({ kind: 'remove-background' })}>
+        <IconBackground size={14} /> Remove Background
+      </GlassButton>
+    </>
+  )
+}
+
+function ObjectSelectFields({ doc }: { doc: CanvasDocument }) {
+  const options = useStore($objectSelect)
+
+  // The picture is looked at once, as soon as the tool is in hand.
+  useEffect(() => warmObjectSelect(doc), [doc, options.allLayers, doc.state.activeLayerId])
+
+  return (
+    <>
+      <SelectionModes />
+      <Check label="All layers" checked={options.allLayers} onChange={(allLayers) => $objectSelect.set({ allLayers })} />
+      <span className="text-fg-3">Click an object or drag a box around it; Shift-click adds a part, Alt-click takes one away, Esc starts over.</span>
+    </>
+  )
+}
+
+function HealFields() {
+  const options = useStore($heal)
+
+  return (
+    <>
+      <NumberField label="Size" title="Size ([ and ])" value={options.size} min={1} max={2000} unit="px" onChange={(size) => $heal.set({ size })} />
+      <span className="text-fg-3">Paint over what should go; it is filled from around it when you let go (Esc stops it).</span>
     </>
   )
 }
@@ -401,6 +436,8 @@ export function OptionsBar({ doc }: { doc: CanvasDocument }) {
           <Check label="All layers" checked={wand.allLayers} onChange={(allLayers) => patch($wand, { allLayers })} />
         </>
       )}
+      {tool === 'object-select' && <ObjectSelectFields doc={doc} />}
+      {tool === 'heal' && <HealFields />}
       {tool === 'crop' && <CropFields doc={doc} />}
       {tool === 'eyedropper' && (
         <Segmented

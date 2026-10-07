@@ -15,9 +15,11 @@ export type ToolId =
   | 'lasso'
   | 'polygon-lasso'
   | 'wand'
+  | 'object-select'
   | 'crop'
   | 'eyedropper'
   | 'brush'
+  | 'heal'
   | 'eraser'
   | 'bucket'
   | 'gradient'
@@ -42,8 +44,10 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'lasso', label: 'Lasso', key: 'l', group: 'lasso' },
   { id: 'polygon-lasso', label: 'Polygonal Lasso', key: 'l', group: 'lasso' },
   { id: 'wand', label: 'Magic Wand', key: 'w', group: 'wand' },
+  { id: 'object-select', label: 'Object Select', key: 'w', group: 'wand' },
   { id: 'crop', label: 'Crop', key: 'c', group: 'crop' },
   { id: 'eyedropper', label: 'Eyedropper', key: 'i', group: 'eyedropper' },
+  { id: 'heal', label: 'Spot Healing Brush', key: 'j', group: 'heal' },
   { id: 'brush', label: 'Brush', key: 'b', group: 'brush' },
   { id: 'eraser', label: 'Eraser', key: 'e', group: 'eraser' },
   { id: 'bucket', label: 'Paint Bucket', key: 'g', group: 'fill' },
@@ -128,6 +132,9 @@ export const $eraser = atom<BrushOptions>({ size: 50, hardness: 0.8, opacity: 1,
 export const $selectionMode = atom<SelectionMode>('new')
 export const $marquee = atom({ feather: 0 })
 export const $wand = atom({ tolerance: 32, contiguous: true, allLayers: false })
+export const $objectSelect = atom({ allLayers: false })
+/** Spot Healing Brush: the brush's diameter in document pixels. */
+export const $heal = atom({ size: 40 })
 export const $bucket = atom({ tolerance: 32, contiguous: true, allLayers: false, opacity: 1 })
 export const $gradient = atom({ kind: 'linear' as 'linear' | 'radial', toTransparent: false, reverse: false, opacity: 1 })
 export const $eyedropper = atom({ allLayers: true })
@@ -151,7 +158,6 @@ export const $type = atom<TypeOptions>({ family: 'Helvetica', weight: 400, itali
 export function paintOptionsFor(tool: ToolId): typeof $brush | null {
   return tool === 'brush' ? $brush : tool === 'eraser' ? $eraser : null
 }
-
 /** The next brush size for `[` and `]`, in steps that grow with the size. */
 export function stepSize(size: number, direction: 1 | -1): number {
   const step = size < 10 ? 1 : size < 50 ? 5 : size < 100 ? 10 : size < 300 ? 25 : 50

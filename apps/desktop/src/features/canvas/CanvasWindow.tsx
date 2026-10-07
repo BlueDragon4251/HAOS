@@ -6,6 +6,10 @@ import { GlassButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Menu, type MenuItemDef } from '../files/Menu.tsx'
 import { nudge, placeImage, setLayer } from './actions.ts'
+import { ContentFillDialog } from './ai/ContentFillDialog.tsx'
+import { AskHermesField, GenerateDialog } from './ai/HermesPrompts.tsx'
+import { ModelPrompt, ModelsDialog } from './ai/ModelDialogs.tsx'
+import { RemoveBackgroundDialog } from './ai/RemoveBackgroundDialog.tsx'
 import { CloseDialog, NewDocumentDialog } from './dialogs.tsx'
 import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, TrimDialog } from './edit-dialogs.tsx'
 import type { CanvasDocument } from './engine/document.ts'
@@ -18,7 +22,7 @@ import { PropertiesPanel } from './PropertiesPanel.tsx'
 import { $activeKey, $conflict, $documents, $notice, activate, notify, openPath, reportPresence, resolveConflict } from './store.ts'
 import { HANDLERS } from './tools/index.ts'
 import { settleTools } from './tools/sessions.ts'
-import { $bucket, $gradient, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
+import { $bucket, $gradient, $heal, $spaceHeld, $tool, paintOptionsFor, resetColours, setTool, stepSize, swapColours, toolForKey } from './tools/state.ts'
 import { ToolPalette } from './ToolPalette.tsx'
 import { $pointer, $views, forgetView, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
@@ -198,6 +202,7 @@ function StatusBar({ doc }: { doc: CanvasDocument | null }) {
       <span className={cn('ml-auto truncate', fresh && notice.tone === 'error' && 'text-danger')}>
         {fresh ? notice.message : doc ? (doc.path ? (doc.modified ? 'Edited' : 'Saved') : 'Not saved yet') : ''}
       </span>
+      {doc && <AskHermesField doc={doc} />}
     </div>
   )
 }
@@ -422,6 +427,8 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       if (options) {
         const current = options.get()
         options.set(event.shiftKey ? { ...current, hardness: Math.max(0, Math.min(1, Math.round((current.hardness + direction * 0.25) * 4) / 4)) } : { ...current, size: stepSize(current.size, direction) })
+      } else if ($tool.get() === 'heal') {
+        $heal.set({ size: stepSize($heal.get().size, direction) })
       }
 
       return
@@ -502,6 +509,11 @@ export function CanvasWindow({ payload }: { payload?: Record<string, unknown> })
       {doc && dialog?.kind === 'trim' && <TrimDialog doc={doc} />}
       {doc && dialog?.kind === 'fill' && <FillDialog doc={doc} />}
       {doc && dialog?.kind === 'modify-selection' && <ModifySelectionDialog doc={doc} change={dialog.change} />}
+      {doc && dialog?.kind === 'remove-background' && <RemoveBackgroundDialog doc={doc} />}
+      {doc && dialog?.kind === 'content-fill' && <ContentFillDialog doc={doc} />}
+      {doc && dialog?.kind === 'generate' && <GenerateDialog doc={doc} mode={dialog.mode} />}
+      {dialog?.kind === 'models' && <ModelsDialog />}
+      <ModelPrompt />
     </div>
   )
 }

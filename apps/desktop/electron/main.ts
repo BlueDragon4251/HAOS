@@ -12,6 +12,8 @@ import { startEventSources } from './events/sources.ts'
 import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
 import { registerCanvasIpc } from './canvas/ipc.ts'
+import { registerModelIpc } from './canvas/model-ipc.ts'
+import { MODEL_SCHEME } from '../shared/canvas/models.ts'
 import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerControlsIpc } from './ipc/controls.ts'
 import { registerCatalogIpc } from './ipc/catalog.ts'
@@ -49,8 +51,12 @@ import { WallpaperService } from './shell/wallpaper.ts'
 import { appIconPath, createMainWindow } from './window.ts'
 
 app.setName('Herald OS')
-// Widget plugins load from herald-plugin://<id>/ (registered before the app is ready, as Electron requires).
-protocol.registerSchemesAsPrivileged([{ scheme: 'herald-plugin', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
+// Widget plugins load from herald-plugin://<id>/, Canvas's verified models from herald-model://<model>/
+// (registered before the app is ready, as Electron requires).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'herald-plugin', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: MODEL_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }
+])
 
 // Electron shows a modal dialog for an uncaught main-process error and waits on it: the whole
 // shell, the Linux session included, would freeze behind a box nobody may see. Log it and go on.
@@ -255,6 +261,7 @@ function registerCoreIpc(): void {
 
   registerFsIpc(() => mainWindow)
   registerCanvasIpc(() => mainWindow)
+  registerModelIpc()
   registerAppsIpc()
   registerBridgeIpc()
   registerServiceIpc()

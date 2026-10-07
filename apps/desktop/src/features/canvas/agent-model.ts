@@ -182,6 +182,121 @@ export function placementOf(width: number, height: number, canvas: { width: numb
   return { x: x ?? (canvas.width - w) / 2, y: y ?? (canvas.height - h) / 2, width: w, height: h }
 }
 
+export type PictureFit = 'cover' | 'contain' | 'stretch'
+
+/** How a placed picture fills its box, however it was written; cover when not given. */
+export function pictureFitFrom(value: unknown): PictureFit {
+  const text = String(value ?? '').trim().toLowerCase()
+
+  if (!text || text === 'cover' || text === 'fill') {
+    return 'cover'
+  }
+
+  if (text === 'contain' || text === 'fit' || text === 'inside') {
+    return 'contain'
+  }
+
+  if (text === 'stretch') {
+    return 'stretch'
+  }
+
+  throw new Error('fit is cover (fill the box, cutting what overflows), contain (inside the box) or stretch')
+}
+
+/**
+ * A picture of `width`×`height` in a box: which of its pixels to keep (`crop`, all of them unless
+ * it covers the box) and the layer's own box (smaller than the box when it is contained).
+ */
+export function fitPicture(width: number, height: number, box: Rect, fit: PictureFit): { crop: Rect; box: Rect } {
+  const whole = { x: 0, y: 0, width, height }
+
+  if (fit === 'stretch') {
+    return { crop: whole, box }
+  }
+
+  if (fit === 'contain') {
+    const scale = Math.min(box.width / width, box.height / height)
+    const w = width * scale
+    const h = height * scale
+
+    return { crop: whole, box: { x: box.x + (box.width - w) / 2, y: box.y + (box.height - h) / 2, width: w, height: h } }
+  }
+
+  const scale = Math.max(box.width / width, box.height / height)
+  const w = Math.min(width, Math.max(1, Math.round(box.width / scale)))
+  const h = Math.min(height, Math.max(1, Math.round(box.height / scale)))
+
+  return { crop: { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), width: w, height: h }, box }
+}
+
+/** The part of a mask image spread over `box` that lies under `inner` (a box inside it), in the mask's pixels. */
+export function maskPart(maskWidth: number, maskHeight: number, box: Rect, inner: Rect): Rect {
+  const sx = maskWidth / box.width
+  const sy = maskHeight / box.height
+  const x = Math.max(0, Math.floor((inner.x - box.x) * sx))
+  const y = Math.max(0, Math.floor((inner.y - box.y) * sy))
+
+  return { x, y, width: Math.max(1, Math.min(maskWidth - x, Math.ceil(inner.width * sx))), height: Math.max(1, Math.min(maskHeight - y, Math.ceil(inner.height * sy))) }
+}
+
+/** Remove Background's result, however it was written: the layer's mask (the default) or a cut-out layer. */
+export function backgroundModeFrom(value: unknown): 'mask' | 'cutout' {
+  const text = String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+
+  if (!text || text === 'mask' || text === 'layermask') {
+    return 'mask'
+  }
+
+  if (['cutout', 'cut', 'newlayer', 'layer', 'copy'].includes(text)) {
+    return 'cutout'
+  }
+
+  throw new Error('mode is mask (hide the background with a layer mask) or cutout (a new layer with just the subject)')
+}
+
+/** A fraction from 0 to 1, or a percentage. */
+export function fractionFrom(value: unknown, name: string): number | undefined {
+  const number = finite(value)
+
+  if (number === undefined) {
+    return undefined
+  }
+
+  const fraction = number > 1 ? number / 100 : number
+
+  if (fraction < 0 || fraction > 1) {
+    throw new Error(`${name} is from 0 to 1 (or a percentage)`)
+  }
+
+  return fraction
+}
+
+/** The box a fill works on: null when none is given, otherwise x, y, width and height cut to the canvas. */
+export function holeBox(canvas: { width: number; height: number }, args: Record<string, unknown>): Rect | null {
+  const [x, y, width, height] = [finite(args.x), finite(args.y), finite(args.width), finite(args.height)]
+
+  if (x === undefined && y === undefined && width === undefined && height === undefined) {
+    return null
+  }
+
+  if (width === undefined || height === undefined) {
+    throw new Error('Give the whole box to fill: x, y, width and height in canvas pixels')
+  }
+
+  const left = Math.max(0, Math.round(x ?? 0))
+  const top = Math.max(0, Math.round(y ?? 0))
+  const right = Math.min(canvas.width, Math.round((x ?? 0) + width))
+  const bottom = Math.min(canvas.height, Math.round((y ?? 0) + height))
+
+  if (right - left < 1 || bottom - top < 1) {
+    throw new Error(`That box is outside the ${canvas.width}×${canvas.height} canvas`)
+  }
+
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
 /** A colour or gradient fill's box: what is given, and the rest of the canvas for what is not. */
 export function fillBox(canvas: { width: number; height: number }, args: Record<string, unknown>): { x: number; y: number; width: number; height: number } {
   const x = finite(args.x) ?? 0
