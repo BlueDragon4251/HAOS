@@ -49,7 +49,7 @@ export function converterHint(file: string, output = ''): string {
   const extension = path.extname(file).toLowerCase()
 
   if (HEIF.has(extension) && /HEVC|libde265/i.test(output)) {
-    return 'this photo is compressed with HEVC, and libheif here has no HEVC decoder: install libheif-freeworld from RPM Fusion on Fedora, or libheif-plugin-libde265 on Debian and Ubuntu'
+    return 'install libheif-freeworld from RPM Fusion on Fedora, or libheif-plugin-libde265 on Debian and Ubuntu'
   }
 
   if (HEIF.has(extension)) {
@@ -94,7 +94,7 @@ export async function convertToPng(file: string): Promise<Uint8Array> {
     }
 
     if (HEIF.has(path.extname(file).toLowerCase()) && /HEVC|libde265/i.test(said)) {
-      throw new Error(`This HEIC photo cannot be opened yet: ${converterHint(file, said)}`)
+      throw new Error(`This HEIC photo is compressed with HEVC, which libheif here cannot decode: ${converterHint(file, said)}`)
     }
 
     throw new Error(tried ? `The converters on this computer could not read this ${kind} file; it may be damaged, or need a newer one (${converterHint(file)})` : `Nothing on this computer opens ${kind} files yet: ${converterHint(file)}`)
