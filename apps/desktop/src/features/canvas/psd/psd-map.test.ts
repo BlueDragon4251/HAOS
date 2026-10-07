@@ -127,12 +127,12 @@ describe('Photoshop documents into Herald layers', () => {
     expect(clipped.record.maskSourceID).toBe(inside.record.id)
   })
 
-  it('keeps text editable, with its colour and font runs', () => {
+  it('keeps text editable, with its colour and font runs (the text’s own face and colour are the ones most of it uses)', () => {
     const title = imported().layers.find((layer) => layer.record.name === 'Title')!
-    expect(title.record.text).toMatchObject({ content: 'Hello\nWorld', fontName: 'ArialMT', fontSize: 24, alignment: 'Center', red: 1, green: 0, blue: 0 })
+    expect(title.record.text).toMatchObject({ content: 'Hello\nWorld', fontName: 'Arial-BoldMT', fontSize: 24, alignment: 'Center', red: 1, green: 1, blue: 1 })
     expect(title.record.text!.tracking).toBeCloseTo(1.2, 5)
-    expect(title.record.text!.colorRuns).toEqual([{ location: 5, length: 6, red: 1, green: 1, blue: 1 }])
-    expect(title.record.text!.fontRuns).toEqual([{ location: 5, length: 6, fontName: 'Arial-BoldMT' }])
+    expect(title.record.text!.colorRuns).toEqual([{ location: 0, length: 5, red: 1, green: 0, blue: 0 }])
+    expect(title.record.text!.fontRuns).toEqual([{ location: 0, length: 5, fontName: 'ArialMT' }])
     expect(title.textAnchor).toEqual([10, 80])
   })
 

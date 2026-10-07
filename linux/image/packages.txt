@@ -68,7 +68,8 @@ util-linux
 grim
 socat
 curl
-# Herald Canvas converts HEIC (libheif) and TIFF, camera RAW and the like (ImageMagick) before opening them.
+# Herald Canvas converts HEIF and AVIF stills (libheif; HEVC-compressed HEIC photos also need RPM Fusion's
+# libheif-freeworld, which the image does not add) and TIFF, camera RAW and the like (ImageMagick) before opening them.
 libheif-tools
 ImageMagick
 # OCR, Flatpak software, the boot splash.

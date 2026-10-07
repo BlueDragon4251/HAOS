@@ -19,6 +19,7 @@ import {
   saveProject,
   watchProject
 } from './engine/project.ts'
+import { messageOf } from './errors.ts'
 
 export const $documents = atom<CanvasDocument[]>([])
 export const $activeKey = atom<string | null>(null)
@@ -89,7 +90,7 @@ export function activate(key: string): void {
   }
 }
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+const describe = messageOf
 
 function watch(doc: CanvasDocument): () => void {
   return watchProject(doc, (project) => {

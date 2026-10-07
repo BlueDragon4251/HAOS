@@ -9,7 +9,7 @@ import { defaultTransform, type LayerTransform, RANGES, type ShapeStyle, type Te
 import { type CanvasLayer, pixelLayer } from './engine/document.ts'
 import { apply, type Mat, multiply, scale, tidy, unitToDocument } from './engine/geometry.ts'
 import type { Rect } from './engine/raster.ts'
-import { renderShape } from './engine/shapes.ts'
+import { renderShape, shapeName } from './engine/shapes.ts'
 import { editedRuns, isParagraph, layoutText, loadFont, measureFor, originForAnchor, originForTop, renderText, type TextLayout } from './engine/text.ts'
 
 /** The name a text layer gets from its text: the first line, shortened. */
@@ -92,10 +92,13 @@ export function makeShapeLayer(style: ShapeStyle, box: Rect, name: string): Canv
   return { ...pixelLayer(name, pixels, defaultTransform(box.width, box.height, tidy(box.x), tidy(box.y))), shape: style }
 }
 
-/** A shape layer drawn again after its style changed, at the pixel size it has. */
+/** A shape layer drawn again after its style changed, at the pixel size it has; a name it was given for its kind follows the kind. */
 export function restyleShape(layer: CanvasLayer, style: ShapeStyle): Partial<CanvasLayer> {
   const width = layer.pixels?.width ?? layer.transform.size[0]
   const height = layer.pixels?.height ?? layer.transform.size[1]
+  const before = layer.shape ? shapeName(layer.shape) : null
+  const numbered = before ? new RegExp(`^${before}( \\d+)?$`).exec(layer.name) : null
+  const renamed = numbered && shapeName(style) !== before ? { name: `${shapeName(style)}${numbered[1] ?? ''}` } : {}
 
-  return { pixels: renderShape(style, width, height), shape: style }
+  return { ...renamed, pixels: renderShape(style, width, height), shape: style }
 }

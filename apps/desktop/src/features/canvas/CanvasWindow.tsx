@@ -15,6 +15,7 @@ import { CanvasSizeDialog, FillDialog, ImageSizeDialog, ModifySelectionDialog, T
 import type { CanvasDocument } from './engine/document.ts'
 import { loadFonts } from './fonts.ts'
 import type { Raster, Rect } from './engine/raster.ts'
+import { messageOf } from './errors.ts'
 import { useActiveDocument } from './hooks.ts'
 import { LayersPanel } from './LayersPanel.tsx'
 import { $dialog, type CanvasCommand, commandLabel, isEnabled, keysLabel, MENUS, runCommand, runShortcut } from './menus.ts'
@@ -28,7 +29,7 @@ import { ToolPalette } from './ToolPalette.tsx'
 import { $pointer, $views, forgetView, zoomLabel } from './view-state.ts'
 import { Viewport } from './Viewport.tsx'
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+const describe = messageOf
 
 /** Number keys set an opacity: 1 is 10%, 0 is 100%, two quick digits (4 then 5) 45%. */
 const typedOpacity = { digits: '', at: 0 }

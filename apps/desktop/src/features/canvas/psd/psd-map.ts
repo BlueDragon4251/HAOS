@@ -512,7 +512,25 @@ export function textFrom(layer: Layer, notes: Notes, name: string): { text: Text
 
   const scale = Math.sqrt(xx * yy)
   const runs = source.styleRuns ?? []
-  const base: PsdTextStyle = { ...source.style, ...runs[0]?.style }
+  // Photoshop keeps the face and colour in the runs: the text's own are the ones most of it uses.
+  const dominant = <T>(pick: (style: PsdTextStyle) => T | undefined, key: (value: T) => string): T | undefined => {
+    const lengths = new Map<string, { value: T; length: number }>()
+
+    for (const run of runs) {
+      const value = pick({ ...source.style, ...run.style })
+
+      if (value !== undefined) {
+        const entry = lengths.get(key(value)) ?? { value, length: 0 }
+        entry.length += run.length
+        lengths.set(key(value), entry)
+      }
+    }
+
+    return [...lengths.values()].sort((a, b) => b.length - a.length)[0]?.value
+  }
+  const font = dominant((style) => style.font, (value) => value.name)
+  const fill = dominant((style) => style.fillColor, (value) => JSON.stringify(value))
+  const base: PsdTextStyle = { ...source.style, ...runs[0]?.style, ...(font ? { font } : {}), ...(fill ? { fillColor: fill } : {}) }
   let content = source.text.replace(/[\r\u0003]/g, '\n')
 
   if (content.endsWith('\n')) {

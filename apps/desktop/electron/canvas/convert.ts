@@ -40,9 +40,17 @@ export function converters(file: string, out: string, platform: NodeJS.Platform 
   return commands
 }
 
-/** What a Linux system needs for a kind of file, with the package names Fedora and Debian use (pure; tested). */
-export function converterHint(file: string): string {
+/**
+ * What a Linux system needs for a kind of file, with the package names Fedora and Debian use (pure;
+ * tested). `output` is what the converters said: a HEIC photo compressed with HEVC (an iPhone's)
+ * needs a decoder Fedora does not ship.
+ */
+export function converterHint(file: string, output = ''): string {
   const extension = path.extname(file).toLowerCase()
+
+  if (HEIF.has(extension) && /HEVC|libde265/i.test(output)) {
+    return 'this photo is compressed with HEVC, and libheif here has no HEVC decoder: install libheif-freeworld from RPM Fusion on Fedora, or libheif-plugin-libde265 on Debian and Ubuntu'
+  }
 
   if (HEIF.has(extension)) {
     return 'install libheif’s tools (libheif-tools on Fedora, libheif-examples on Debian and Ubuntu) or ImageMagick'
@@ -59,6 +67,7 @@ export async function convertToPng(file: string): Promise<Uint8Array> {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'herald-canvas-'))
   const out = path.join(folder, 'image.png')
   let tried = 0
+  let said = ''
 
   try {
     for (const [command, ...args] of converters(file, out)) {
@@ -73,6 +82,7 @@ export async function convertToPng(file: string): Promise<Uint8Array> {
         // Not installed, or it could not read this file: try the next one.
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
           tried++
+          said += String((error as { stderr?: unknown }).stderr ?? '')
         }
       }
     }
@@ -81,6 +91,10 @@ export async function convertToPng(file: string): Promise<Uint8Array> {
 
     if (process.platform !== 'linux') {
       throw new Error(`This computer could not open the ${kind} file`)
+    }
+
+    if (HEIF.has(path.extname(file).toLowerCase()) && /HEVC|libde265/i.test(said)) {
+      throw new Error(`This HEIC photo cannot be opened yet: ${converterHint(file, said)}`)
     }
 
     throw new Error(tried ? `The converters on this computer could not read this ${kind} file; it may be damaged, or need a newer one (${converterHint(file)})` : `Nothing on this computer opens ${kind} files yet: ${converterHint(file)}`)

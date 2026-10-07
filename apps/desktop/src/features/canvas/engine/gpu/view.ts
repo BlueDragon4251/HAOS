@@ -123,6 +123,8 @@ export class ScreenRenderer {
   private lastView = ''
   private lastRevision = ''
   private changedAt = 0
+  /** The frame showed a composite made at another scale, stretched: a full one is owed once things are still. */
+  private stretched = false
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' })
@@ -215,18 +217,36 @@ export class ScreenRenderer {
       .vec3('u_dark', ...look.checkerDark)
     this.gpu.drawQuad()
 
-    return this.drawn.draft
+    return this.drawn.draft || this.stretched
   }
 
-  /** The composite a plan asks for: the last one while it still holds what is in view, else a new one. */
+  /**
+   * The composite a plan asks for: the last one while it still holds what is in view, else a new
+   * one. While the view moves on a software renderer, the last one is also shown stretched when it
+   * is of the same document at a nearby scale and holds what is in view (`stretched` says so).
+   */
   private current(doc: CanvasDocument, plan: FramePlan, draft: boolean, overrides?: ReadonlyMap<string, Partial<CanvasLayer>>): Rendered {
     const last = this.rendered
     const drawn = this.drawn
     const frame = frameSize(doc.state.width, doc.state.height, plan.scale)
-    const fresh = last && drawn.key === doc.key && drawn.revision === doc.revision && drawn.overrides === overrides && drawn.draft === draft && last.scale === plan.scale
+    const same = last && drawn.key === doc.key && drawn.revision === doc.revision && drawn.overrides === overrides
+    this.stretched = false
 
-    if (fresh && covers(last.area, plan.needed, filterReach(doc.state, plan.scale), frame)) {
+    if (same && drawn.draft === draft && last.scale === plan.scale && covers(last.area, plan.needed, filterReach(doc.state, plan.scale), frame)) {
       return last
+    }
+
+    if (same && draft && this.gpu.software && last.scale !== plan.scale) {
+      const ratio = plan.scale / last.scale
+      const held = { x: last.area.x / last.scale, y: last.area.y / last.scale, width: last.area.width / last.scale, height: last.area.height / last.scale }
+      const shown = { x: plan.needed.x / plan.scale, y: plan.needed.y / plan.scale, width: plan.needed.width / plan.scale, height: plan.needed.height / plan.scale }
+      const inside = shown.x >= held.x && shown.y >= held.y && shown.x + shown.width <= held.x + held.width && shown.y + shown.height <= held.y + held.height
+
+      if (ratio >= 0.5 && ratio <= 2 && inside) {
+        this.stretched = true
+
+        return last
+      }
     }
 
     this.rendered = this.compositor.render(doc.state, { scale: plan.scale, area: plan.area, overrides, draft })

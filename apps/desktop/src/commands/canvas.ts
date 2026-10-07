@@ -1,5 +1,6 @@
 import { ADJUSTMENT_KINDS, BLEND_MODES } from '../../shared/canvas/comp-format.ts'
 import { MASK_ACTIONS } from '../features/canvas/mask-actions.ts'
+import { messageOf } from '../features/canvas/errors.ts'
 import { ok, type OsCommand } from '../store/os-commands.ts'
 
 /*
@@ -40,9 +41,14 @@ const where = [
 ] as const
 
 const done = async (work: Promise<{ summary: string; data?: Record<string, unknown> }>) => {
-  const outcome = await work
+  try {
+    const outcome = await work
 
-  return ok(outcome.summary, { data: outcome.data })
+    return ok(outcome.summary, { data: outcome.data })
+  } catch (error) {
+    // Errors from main come with Electron's prefix, which says nothing to Hermes or the person.
+    throw new Error(messageOf(error))
+  }
 }
 
 export const canvasCommands: readonly OsCommand[] = [

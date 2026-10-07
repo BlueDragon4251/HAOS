@@ -24,4 +24,10 @@ describe('converterHint', () => {
     expect(converterHint('/a/shot.NEF')).toMatch(/darktable/)
     expect(converterHint('/a/scan.tiff')).toMatch(/ImageMagick on Fedora.*vips-tools on Fedora/)
   })
+
+  it('names the HEVC decoder when libheif has none (Fedora ships it without)', () => {
+    const said = 'Could not decode image: Error while loading plugin: No decoding plugin installed for this compression format: HEVC (a suitable decoder plugin is libde265)'
+    expect(converterHint('/a/IMG_0001.HEIC', said)).toMatch(/libheif-freeworld from RPM Fusion.*libheif-plugin-libde265/)
+    expect(converterHint('/a/scan.tif', said)).toMatch(/ImageMagick/)
+  })
 })

@@ -48,6 +48,7 @@ import { ensureModel } from './ai/models.ts'
 import { cannotSegment, selectSubject } from './ai/remove-background.ts'
 import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
+import { messageOf } from './errors.ts'
 import { isMac } from './platform.ts'
 import { $autosave, exportDocument, notify, openPath, save, setAutosave } from './store.ts'
 import { hasOpenWork, settleTools } from './tools/sessions.ts'
@@ -106,7 +107,7 @@ const openFile = async (): Promise<void> => {
   const file = await window.heraldOS.canvas.pickOpen()
 
   if (file) {
-    openPath(file).catch((error: unknown) => notify(`Could not open ${file.split('/').pop()}: ${error instanceof Error ? error.message : String(error)}`, 'error'))
+    openPath(file).catch((error: unknown) => notify(`Could not open ${file.split('/').pop()}: ${messageOf(error)}`, 'error'))
   }
 }
 
@@ -127,7 +128,7 @@ async function subject(doc: CanvasDocument): Promise<void> {
     await selectSubject(doc)
     notify('Selected the subject')
   } catch (error) {
-    notify(`Could not select the subject: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    notify(`Could not select the subject: ${messageOf(error)}`, 'error')
   }
 }
 
@@ -226,7 +227,7 @@ export const MENUS: CanvasMenu[] = [
       { id: 'cut', label: 'Cut', keys: 'mod+x', needsDocument: true, enabled: selected, run: onDoc(cutSelection), dividerBefore: true },
       { id: 'copy', label: 'Copy', keys: 'mod+c', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => copySelection(doc)) },
       { id: 'copy-merged', label: 'Copy Merged', keys: 'mod+shift+c', needsDocument: true, run: onDoc((doc) => copySelection(doc, true)) },
-      { id: 'paste', label: 'Paste', keys: 'mod+v', needsDocument: true, run: onDoc((doc) => void paste(doc).catch((error: unknown) => notify(`Could not paste: ${error instanceof Error ? error.message : String(error)}`, 'error'))) },
+      { id: 'paste', label: 'Paste', keys: 'mod+v', needsDocument: true, run: onDoc((doc) => void paste(doc).catch((error: unknown) => notify(`Could not paste: ${messageOf(error)}`, 'error'))) },
       { id: 'fill', label: 'Fill…', keys: 'shift+f5', also: ['shift+backspace'], needsDocument: true, enabled: hasLayer, run: () => $dialog.set({ kind: 'fill' }), dividerBefore: true },
       { id: 'fill-foreground', label: 'Fill with Foreground', keys: 'alt+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$foreground.get(), 255])) },
       { id: 'fill-background', label: 'Fill with Background', keys: 'mod+backspace', needsDocument: true, enabled: hasLayer, run: onDoc((doc) => fillSelection(doc, [...$background.get(), 255])) },
