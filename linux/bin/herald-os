@@ -1491,9 +1491,25 @@ def pam_enable(file: Path, line: str) -> bool:
     return True
 
 
+OSTREE_BOOTED = Path("/run/ostree-booted")
+OS_RELEASES = (Path("/etc/os-release"), Path("/usr/lib/os-release"))
+IMAGE_SHELL = Path("/usr/share/herald-os/app/resources/app.asar")
+
+
 def is_image() -> bool:
-    """The Herald OS image (bootc): updates replace the whole system and can be undone."""
-    return Path("/run/ostree-booted").exists()
+    """The Herald OS image (bootc): updates replace the whole system and can be undone. Another bootc
+    or ostree system (Silverblue, Bazzite, Bluefin) is the person's own, and never gets bootc from here."""
+    if not OSTREE_BOOTED.exists():
+        return False
+    for path in OS_RELEASES:
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        if any(line.strip() in ("IMAGE_ID=herald-os", 'IMAGE_ID="herald-os"') for line in lines):
+            return True
+    # Images built before os-release named them: only the image puts the shell under /usr/share.
+    return IMAGE_SHELL.is_file()
 
 
 def image_switch(channel: str) -> int:
