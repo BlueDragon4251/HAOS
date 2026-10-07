@@ -66,6 +66,22 @@ work everywhere.
 | Pick a colour from the screen | `Super+Ctrl+Print` |
 | Ask Hermes about part of the screen | `Super+Shift+S` |
 
+## Herald Canvas
+
+The image editor uses the usual photo-editor keys; [the Herald Canvas page](canvas.md#tools) lists
+them all. `Cmd` on a Mac is `Ctrl` on Herald OS Linux.
+
+| Action | Keys |
+| --- | --- |
+| Move, Marquee, Lasso, Magic Wand and Object Select, Crop | `V`, `M`, `L`, `W`, `C` |
+| Eyedropper, Spot Healing, Brush, Eraser, Bucket and Gradient | `I`, `J`, `B`, `E`, `G` |
+| Type, Shape, Hand, Zoom | `T`, `U`, `H` (or hold `Space`), `Z` |
+| Brush size, hardness | `[` and `]`, with `Shift` for hardness |
+| Swap colours, reset them | `X`, `D` |
+| Free Transform, Merge Down, Group | `Cmd+T`, `Cmd+E`, `Cmd+G` |
+| Duplicate (or copy the selection to a layer), Deselect | `Cmd+J`, `Cmd+D` |
+| Fit on screen, actual pixels | `Cmd+0`, `Cmd+1` |
+
 ## Omarchy keys (Herald OS Linux)
 
 Coming from Omarchy? Settings > General > Keymap, or `herald-os keymap omarchy`, makes `Super+C`,

@@ -1,9 +1,9 @@
 ---
 name: herald-canvas
-description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows), masks, on-device background removal and content-aware fill, generated pictures placed where asked, how to plan an edit from a description, plus the .comp project format and every adjustment setting
+description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows), masks, on-device background removal and content-aware fill, generated pictures placed where asked, Photoshop files opened and exported with their layers, how to plan an edit from a description, plus the .comp project format and every adjustment setting
 metadata:
   hermes:
-    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks, background removal, content-aware fill, generative fill]
+    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks, background removal, content-aware fill, generative fill, photoshop, psd]
 ---
 
 # Herald Canvas
@@ -22,7 +22,11 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    makes a project in `~/Pictures/Herald Canvas/` and opens it; it answers with the `path`. To
    work on something that exists, `canvas action=open path="~/Pictures/photo.jpg"`: an image
    becomes a new project there (the original file is never changed) and the answer gives its
-   `path`; a `.comp` project opens as it is. Without `project`, actions work on the image in front.
+   `path`; a `.comp` project opens as it is. A Photoshop document (`.psd`, `.psb`) keeps its layers,
+   folders, masks, text and the adjustments Herald has, and the answer lists anything approximated
+   (tell the person what changed). HEIC, TIFF and camera RAW open where the system can convert
+   them; on Linux an error names the packages to install. A canvas is at most 30,000 pixels a side
+   and 100 million in all. Without `project`, actions work on the image in front.
 2. **Build it in layers**, bottom to top. Each `add_layer` lands above the active layer:
    - a picture: `source="~/Downloads/band.jpg"` or `source="https://…"`; it fits inside the canvas,
      centred (`fit=cover` fills it, `fit=none` keeps its own size, or give `x`, `y`, `width`).
@@ -40,11 +44,16 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    about the size itself sets a headline tight). Fonts are installed families with an optional style ("Avenir Next
    Demi Bold", "Georgia Italic"); a missing font falls back to the system font, so check the
    preview. `set_text layer="Headline" content=… color=…` changes it in place and keeps its size,
-   turn and position.
+   turn and position. Text from Compositor or Photoshop may carry per-letter colour and font runs:
+   they stay through edits where the edited range allows, and a new `color` or `font` for the
+   whole text replaces them.
 4. **Shapes.** `add_shape kind=rounded x=72 y=900 width=936 height=300 color="#ff5a36"` (a
    rectangle with `radius`, or `kind=rectangle`, `kind=ellipse` for circles and ovals, `kind=line`
    from `x, y` by `width` across and `height` down, `lineWidth` thick). Panels behind text, rules,
    badges and dots are shapes, not filled boxes: they stay crisp and editable.
+   `set_shape layer="Date panel" kind=ellipse color="#ffb347"` restyles one in place: `kind`
+   (rectangle, rounded, ellipse, line; a shape becoming a line runs corner to corner in its box),
+   `color`, `radius` (rectangles) or `lineWidth` (lines).
 5. **Arrange.** `set_layer layer="band" x=… y=… width=…` (one side alone keeps the proportions),
    `rotation=-8`, `opacity=0.8`, `blend="Multiply"`, `order=top`, `visible=false`,
    `folder="Background"`. `group layers="band,glow" name="Hero"` makes a folder.
@@ -62,8 +71,12 @@ step they can undo there (⌘Z, or `canvas action=undo`).
 9. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
    then fix what is off. Do this after every few steps on anything that matters.
 10. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
-   `quality=0.9`, `.webp`; `scale=0.5` for half size). Replacing a file needs `overwrite=true`,
-   and the person is asked first. Projects save themselves after every change.
+   `quality=0.9`, `.webp` up to 16,383 pixels a side; `scale=0.5` for half size). For a printer
+   or a designer, `.psd` (or `format=psd`) keeps the layers, folders, masks, clipping, blend modes,
+   text and the adjustments Photoshop has, at full size; Grain, the blurs and Add Noise show only in
+   its flattened image, and shapes become pixels; the answer lists what was approximated. Replacing
+   a file needs `overwrite=true`, and the person is asked first. Projects save themselves after
+   every change.
 
 `canvas action=layers` lists everything with ids, kinds, placement and clipping: use it to find
 names and to check what is where. Ids are stable; names are friendlier (the topmost layer with a
@@ -303,7 +316,9 @@ Rules that matter (break one and the whole file is refused):
 - A text or shape layer is a normal pixel layer (its PNG shows it) with a `text` record
   (`content`, `fontName` as a PostScript name, `fontSize` in pixels 1…2000, `red`/`green`/`blue`
   0…1, `alignment` Left, Center or Right, `tracking` −100…1000, `leading` 0…5000 (baseline to
-  baseline; 0 is automatic), and `boxSize` [width, height] for paragraph text, each 16…30000)
+  baseline; 0 is automatic), `boxSize` [width, height] for paragraph text, each 16…30000, and
+  optional `colorRuns` (`location`, `length`, `red`, `green`, `blue`) and `fontRuns` (`location`,
+  `length`, `fontName`), sorted, apart and inside the text, counted in UTF-16 units)
   or a `shape` record (`kind` Rectangle, Ellipse or Line, `red`/`green`/`blue`,
   `cornerRadius`, and for lines `lineWidth` with `start` and `end` as fractions of the box). The
   PNG must match the record, so prefer `add_text` and `add_shape`, which draw it; painting on such

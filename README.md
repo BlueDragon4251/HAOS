@@ -227,6 +227,11 @@ abilities as a regular Hermes plugin, `herald-os-bridge`.
   project's files, the code as it is written, the commands it runs, and a live preview.
 - **Crash help**: when a program crashes, a notification offers to have Hermes read the crash
   report and explain, in plain words, what went wrong and whether it is worth reporting.
+- **Herald Canvas**: a layered image editor with masks, blend modes, adjustment layers, layer
+  effects and editable text, drawn on the GPU. Remove backgrounds, select objects and fill holes with
+  models that run on your computer, open and export Photoshop files, and ask Hermes for a poster or a
+  warmer photo while you watch it work. Its projects open in Compositor on the Mac. See
+  [the manual](docs/manual/canvas.md).
 - **Make it yours**: twelve themes (two light) that also dress Hermes's own command line, a theme
   made from any image, themes installed from git, your own fonts, and Hermes can design one from a
   description. Widgets for the menu bar, the Overview or their own window run sandboxed with only

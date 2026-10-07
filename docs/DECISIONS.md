@@ -310,3 +310,60 @@ checks every call against the manifest and what the user granted.
   turn them on. Saved files reload the plugin live.
 - **Hermes's extension model is unchanged.** Agent capabilities stay in backend Hermes plugins such as
   the bridge, behind the approval gate; widgets are UI that Hermes can also write for you.
+
+## ADR-020: Herald Canvas is a WebGL2 editor on Compositor's project format
+
+Herald OS needs an image editor that Hermes can work in while the person watches, and that the
+person can use on their own. Herald Canvas is built into the shell: a React editor over a WebGL2
+compositor, projects in the `.comp` format that Compositor uses on the Mac, AI tools that run on the
+device, and every change Hermes makes going through the command registry (ADR-014) as one undoable
+step.
+
+- **Compositor's format, written from its documentation.** A `.comp` project is a folder with
+  `manifest.json` and 8-bit PNG layers and masks. Herald implements it from Compositor's public
+  documentation, without its code, so projects move between the two. The reader holds every value
+  to the ranges Compositor accepts (it refuses a whole project over one value outside them), keeps
+  fields it does not use, and writes the images first and the manifest last, atomically. A watcher
+  turns outside changes (Hermes, a script, Compositor) into undoable steps.
+- **A WebGL2 compositor.** Layers are composited on the GPU in premultiplied half floats (8 bits on
+  software renderers), with the blend modes in a shader, pass-through folders, masks, clipping, and
+  adjustments and effects as passes. The view composites only what is on screen, at the screen's
+  resolution; exports, previews, flattening and the AI tools render in tiles whose borders cover the
+  blurs above them, starting on a grid so tiled output matches a single pass. The format's limits
+  (30,000 pixels a side, 100 million in all), not the GPU's largest texture, decide what fits, and
+  rasters past that texture are drawn from texture pieces.
+- **Models on the device, downloaded when asked.** ISNet (general use) finds subjects for Remove
+  Background and Select Subject, and EfficientSAM (tiny) picks objects for Object Select. They run in
+  ONNX Runtime Web in a worker, on WebGPU where there is one and WebAssembly otherwise. None ships
+  with Herald OS: each downloads from its publisher the first time the person allows it, pinned by
+  size and SHA-256 and checked again before it runs. Only permissively licensed weights are used:
+  both are Apache-2.0, though ISNet's DIS5K training images were released for research use, and its
+  ONNX file is the rembg project's conversion of the authors' PyTorch weights.
+- **Our own PatchMatch.** Content-Aware Fill and the Spot Healing Brush use a PatchMatch written for
+  Herald Canvas, in a worker: no download, no licence question, and good on the textures people
+  remove things from.
+- **Generative fill goes through Hermes.** Herald saves the area and its mask and asks Hermes, which
+  makes the picture with its own image generation tool (the person's provider) and places it with
+  the canvas tool. Herald never calls an image API itself, so credentials, costs and the request
+  stay in one place the person can see.
+- **Photoshop files through ag-psd.** PSD and PSB files are read and written with ag-psd (MIT) in a
+  worker and mapped to and from Herald's layers; what does not map is approximated or left out and
+  listed for the person, rather than refusing the file.
+
+Alternatives considered:
+
+- **Rejected: an existing editor (GIMP, Krita, a web editor).** A separate app could only be scripted
+  through files, not watched as it works, and none shares a project format Hermes can edit on disk
+  and Compositor can open. Photopea is a closed online service.
+- **Rejected: a 2D canvas or the processor for compositing.** A 2D canvas rounds premultiplied
+  colour, so semi-transparent pixels drift on every save, and neither keeps blend modes,
+  adjustments and blurs interactive on large images.
+- **Rejected: a format of our own, or PSD as the native format.** A private format would strand
+  projects; PSD cannot hold Herald's text and adjustment model exactly and is hard to write
+  atomically and to edit from a script. Compositor's format is small, documented and already used.
+- **Rejected: models in the app, or segmentation in the cloud.** Bundling would add about 220 MB to
+  every install for tools many never use, and a cloud service would upload the person's pictures.
+- **Rejected: BiRefNet-lite (MIT) for backgrounds.** ONNX Runtime Web cannot run it here: WebAssembly
+  runs out of memory, and WebGPU needs more storage buffers in one shader than Chromium allows.
+- **Rejected: an inpainting model (LaMa and the like) for content-aware fill.** A large download with
+  licences that need care, for results PatchMatch already gives on most photos.

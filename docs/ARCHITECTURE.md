@@ -150,6 +150,31 @@ The Overview leads with up to three threads of work the user may want to resume.
 The feature stays off until the user turns it on, because the names of files, projects,
 conversations and events go to the model provider.
 
+## Herald Canvas
+
+The image editor (decision record: ADR-020; using it: [the manual](manual/canvas.md)) lives in
+`src/features/canvas`, with the project format in `shared/canvas` and file access in
+`electron/canvas`.
+
+- **The document** (`engine/document.ts`) is an immutable state of layers in `.comp` order with
+  shared rasters, so undo swaps states; pixel edits keep their own history. `shared/canvas/comp-format.ts`
+  reads and writes the manifest, holding every value to the ranges Compositor accepts.
+- **The compositor** (`engine/gpu/`) draws a document, or any area of it, on WebGL2: layers, blend
+  modes, folders, masks, clipping, adjustment and effect passes. The view (`gpu/view.ts`) composites
+  what is on screen at the screen's resolution and drafts at half resolution on software renderers
+  while things move; `engine/tiles.ts` plans the tiles that exports, previews and the AI tools render
+  in, and `gpu/gl.ts` holds rasters past the GPU's largest texture in pieces.
+- **Main** reads and writes projects atomically and watches them (`electron/canvas/package-io.ts`),
+  converts HEIC, TIFF and RAW through the system's tools (`convert.ts`), streams PNG exports a band
+  of rows at a time (`png.ts`), reads Photoshop files in parts, and downloads and verifies the
+  on-device models (`model-store.ts`).
+- **Workers** run what would stall the window: the ONNX models (`ai/ml-worker.ts`), PatchMatch
+  (`ai/inpaint-worker.ts`) and Photoshop files (`psd/psd-worker.ts`, mapped by `psd/psd-map.ts`).
+- **Hermes** edits through the `canvas.*` commands (`src/commands/canvas.ts`, `agent.ts`), which change
+  the open document as one step and save it, or change the project on disk; the bridge's `canvas`
+  tool maps its actions to them. In panels mode the commands run in the Hermes window and the Canvas
+  window, its own process, reloads the project when it changes.
+
 ## System bridge
 
 `plugins/herald-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset

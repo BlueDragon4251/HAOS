@@ -12,6 +12,8 @@ This manual is for using Herald OS day to day. The [README](../../README.md) cov
 - [Hotkeys](hotkeys.md): every shortcut on macOS and on Herald OS Linux.
 - [Make it yours](make-it-yours.md): themes, fonts, widgets, the menu bar, your own menu entries,
   branding, keyboard shortcuts, and hooks and automations that run when something happens.
+- [Herald Canvas](canvas.md): the image editor, its tools and AI features, Photoshop files, and
+  working on pictures with Hermes.
 - [Troubleshooting](troubleshooting.md): when something does not work.
 - [FAQ](faq.md): short answers to common questions.
 
