@@ -2,7 +2,10 @@
 
 Herald OS as a whole operating system: a Fedora base, greetd signing you in, niri arranging the
 windows, the Herald shell drawing the menu bar, dock and system menus, and Hermes Agent underneath.
-Today it runs in a virtual machine on your Mac; nothing on the Mac changes.
+Today it installs on x86_64 PCs from the installer ISO in the v0.1.0-alpha.1 release (tested in a
+virtual machine in CI, not yet on real PC hardware), runs as an app inside Omarchy, and on an Apple
+Silicon Mac (aarch64) runs in a virtual machine for trying it and for development; nothing on the
+Mac changes.
 
 ```
 kernel + systemd  ->  greetd (autologin: hermes)  ->  niri  ->  Herald OS shell  ->  hermes serve
