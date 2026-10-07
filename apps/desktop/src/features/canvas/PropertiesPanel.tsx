@@ -499,14 +499,15 @@ function ExposureControls({ adjustment, edit, set }: AdjustmentProps) {
 function GradientMapControls({ adjustment, edit, set }: AdjustmentProps) {
   const settings = resolved(adjustment).gradientMap
   const put = (change: Partial<typeof settings>) => set((current) => ({ gradientMapSettings: { ...resolved(current).gradientMap, ...change } }))
-  const [left, right] = settings.reversed ? [settings.highlights, settings.shadows] : [settings.shadows, settings.highlights]
+  // Each well sits at the end of the bar it colours, so reversing swaps which record field it edits.
+  const [dark, light] = settings.reversed ? (['highlights', 'shadows'] as const) : (['shadows', 'highlights'] as const)
 
   return (
     <>
       <div className="flex items-center gap-2 px-3 py-2">
-        <Swatch label="Shadows colour" colour={settings.shadows} edit={edit} onChange={(shadows) => put({ shadows })} />
-        <div className="h-4 flex-1 rounded ring-1 ring-line" style={{ background: `linear-gradient(to right, ${cssOf(toBytes(left))}, ${cssOf(toBytes(right))})` }} />
-        <Swatch label="Highlights colour" colour={settings.highlights} edit={edit} onChange={(highlights) => put({ highlights })} />
+        <Swatch label="Colour for dark tones" colour={settings[dark]} edit={edit} onChange={(colour) => put({ [dark]: colour })} />
+        <div className="h-4 flex-1 rounded ring-1 ring-line" style={{ background: `linear-gradient(to right, ${cssOf(toBytes(settings[dark]))}, ${cssOf(toBytes(settings[light]))})` }} />
+        <Swatch label="Colour for light tones" colour={settings[light]} edit={edit} onChange={(colour) => put({ [light]: colour })} />
       </div>
       <Check label="Reverse" checked={settings.reversed} onChange={(reversed) => put({ reversed })} />
     </>
