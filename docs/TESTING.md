@@ -9,6 +9,8 @@ npm test
 npm run build
 ```
 
+The owner-backup tests exercise actual root-owned directories and credentials. On a non-root development machine run the ordinary suite with `bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py`, then separately run `sudo /path/to/prepared/python -m pytest -q linux/haos/tests/test_backup.py`. CI executes both groups; exclusion from the ordinary account's invocation is not a skipped acceptance gate. The separate real Restic probe uses only freshly created temporary fixture files.
+
 HAOS unit setup uses Python 3.11, pytest 9.0.2, websockets 15.0.1; HAOS_TEST_PYTHON selects a prepared interpreter. Tests cover idempotency, deadlines, resource locks, ambiguous crash recovery, protocol framing and denied authority. Fake unit wires are not provider execution evidence.
 
 Real probes:
