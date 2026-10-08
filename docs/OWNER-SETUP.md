@@ -2,6 +2,8 @@
 
 HAOS creates a locked non-administrator observer account instead of Herald's empty-password wheel account. Initialization and a mandatory pre-session service remove inherited `wheel`/`sudo`/`admin` membership, lock empty passwords and install a validated UID-specific sudo denial, including inherited per-user NOPASSWD rules. Root/service/shared UIDs and privileged primary groups are rejected. The graphical session requires successful first-boot/security units; a security-unit failure blocks its start. Membership changes take effect in new sessions; old sessions must be terminated/rebooted before relying on revocation.
 
+At `739bc62`, [CI run `37842665703`](https://github.com/BlueDragon4251/HAOS/actions/runs/37842665703) verified this against a real disposable account, first demonstrating inherited passwordless root execution and then verifying group removal, locked password, root-command and sudoedit denial. Installed-OS/session evidence is still required.
+
 Automatic observer display remains enabled. It is not authenticated owner enrollment or a secure lock-screen flow. No default owner password or automatic owner privilege is created; an independently authenticated administrator/recovery console is required for owner operations. Owner enrollment, strong authentication and recovery access still need to be completed and proven before release. Continue to use disposable VMs.
 
 First boot adds the observer to haos-ui and generates per-host credentials, empty policy and managed attachment. haos-agent/haos-control are separate non-login accounts without wheel/sudo authority.

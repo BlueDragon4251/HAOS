@@ -11,7 +11,7 @@ HAOS is development, not an accepted production distribution. The master prompt 
 - Autonomous themes/skills lack accepted capability manifests, isolated generation/test, whole-theme atomic swap/watchdog/revocation.
 - Provider/vault/local-model/budget provisioning unfinished. No provider-less probe proves a real model/Git mission.
 - Task/event text may contain sensitive data; complete redaction/encryption/retention not guaranteed.
-- Observer accounts now reject inherited administrator groups, empty passwords and sudo authority before session start. Automatic observer display, independent owner enrollment/lock/recovery and review of all polkit/custom identity mechanisms remain open production gates. The real account probe and installed-guest check must pass for the exact implementation revision.
+- Observer accounts now reject inherited administrator groups, empty passwords and sudo authority before session start. The real account/NOPASSWD/sudoedit probe passed at `739bc62` (run `37842665703`); the installed-guest check remains open. Automatic observer display, independent owner enrollment/lock/recovery and review of all polkit/custom identity mechanisms remain open production gates.
 - Owner-only local encrypted Restic snapshots and staged restore are implemented and passed a real deleted-project/incorrect-key runner probe at `88425fb` (run `37839452538`); installed-OS evidence remains a distinct open gate. External/off-host backup, retention/scheduling, whole-system restore, broken-update rollback, GPU/resource measurements and long gateway missions remain outstanding.
 
 See [evidence](HAOS.md) and [release gates](RELEASE.md). A green desktop suite or syntax-checked harness does not close these gaps.
