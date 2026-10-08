@@ -10,6 +10,7 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 | Durable missions | `controller.py`, `store.py`; SQLite WAL/FULL, idempotency, deadlines, bounded pre-dispatch retry, retained lock for ambiguity |
 | Local API | Fixed Unix socket/methods, kernel peer UID, no owner endpoint |
 | Storage authority | `policy.py`, `owner.py`; protected schema, stable identities, root mounts, system disk denial |
+| Owner recovery | `backup.py`, `haos-owner`; encrypted local Restic snapshots and verified staged restore with stopped execution units |
 | Native UI | Managed attachment, real mission/event list, cancellation requests, once/deny approvals and clarification |
 | Image/VM gates | `haos-image.yml`, `test-haos-iso.sh`, `haos_guest.py`; real ISO build and guarded disposable multi-disk acceptance harness |
 
@@ -39,3 +40,5 @@ Native host-command GUI bridge access is not exposed to the isolated agent. A sa
 - New source image build `37838091836` and matching harness reuse run `37838091868` were started. Require their completed steps, checksums and both installed-guest receipts before marking installation/storage/reboot acceptance successful. Production owner authentication, general full-volume access, egress, safe GUI brokerage, gateways, autonomous themes, update/backup recovery and release signing remain incomplete.
 
 At `d108d70`, PR service run `37838097614` subsequently passed 40 HAOS and 15 QEMU unit tests, two real socket/kernel probes, two real QEMU probes and systemd syntax. KVM was denied and TCG initialized successfully on this runner. Installed-guest receipts remain a distinct pending gate.
+
+Owner recovery at `cea2117` adds fixed-scope encrypted snapshots and restores into new root-private directories, leaving live state untouched. At `88425fb`, [service run `37839452538`](https://github.com/BlueDragon4251/HAOS/actions/runs/37839452538) passed **62 unit tests** (40 ordinary HAOS, seven owner/root fixtures and 15 QEMU) and **five real integration probes** (two socket/kernel, two QEMU and one Restic). Restic 0.16.4 backed up a disposable project, recovered it after deletion with identical bytes and mode 0600, preserved neighboring/live state and denied a wrong password. Systemd syntax also passed. Root-owned fixture tests run explicitly as root rather than being skipped on ordinary CI accounts. This proves the local backup/restore implementation on that runner; installed-OS recovery, off-host storage/retention and whole-system/broken-update recovery remain open.

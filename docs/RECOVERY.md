@@ -38,6 +38,6 @@ Initialization generates a unique key in `/etc/haos/backup-password`, never the 
 
 Restore checks repository data and verifies the recovered files in a newly created directory below `/var/lib/haos-owner/backup/restores`. It leaves live state untouched; inspect and explicitly apply selected recovered files from the owner console. Interrupted restores retain an incomplete marker and never produce a success receipt. Partial backup exit codes also fail. There is no automatic prune/delete operation.
 
-The CI probe uses an actual disposable Restic repository, deletes only its own fixture project, restores it, verifies bytes and permissions, checks a neighboring canary and rejects the wrong key. A green runner probe is distinct from installed-OS and whole-system recovery. Bootc rollback remains inherited architecture without a passed broken-update drill.
+The CI probe uses an actual disposable Restic repository, deletes only its own fixture project, restores it, verifies bytes and permissions, checks a neighboring canary and rejects the wrong key. This passed with Restic 0.16.4 at `88425fb` in [run `37839452538`](https://github.com/BlueDragon4251/HAOS/actions/runs/37839452538). A green runner probe is distinct from installed-OS and whole-system recovery. Bootc rollback remains inherited architecture without a passed broken-update drill.
 
 Contracts follow [Restic backup/scripting](https://restic.readthedocs.io/en/stable/075_scripting.html) and [restore](https://restic.readthedocs.io/en/stable/050_restore.html) documentation.
