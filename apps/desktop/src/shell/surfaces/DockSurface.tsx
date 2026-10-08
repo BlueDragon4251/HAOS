@@ -11,7 +11,7 @@ import { notify } from '../../store/notifications.ts'
 import { $wm, openSurface, wmAction } from '../../store/shell.ts'
 import { showPage } from '../../store/windows.ts'
 import { appById, distinctAppLabel, type FloatingAppId } from '../apps.ts'
-import { NativeIcon, pinnedFor, useDockMagnification } from '../Dock.tsx'
+import { isOfficeApp, NativeIcon, pinnedFor, useDockMagnification } from '../Dock.tsx'
 import { OUR_MAIN_TITLE, ourFloatingAppId, windowLabel } from './shell-utils.ts'
 
 /** The dock window is 720 x 84; a gentler magnification keeps swollen icons inside it. */
@@ -165,13 +165,25 @@ export function DockSurface() {
       windows: canvasWindows
     })
 
+    // Docs, Sheets and Slides share one entry, so three icons do not crowd the Dock; this window is too
+    // short for a chooser, so with none open it opens Applications, where the three sit together.
+    const officeWindows = ours.filter(w => isOfficeApp(ourFloatingAppId(w) ?? ''))
+    list.push({
+      id: 'hermes:office',
+      label: 'Herald Office',
+      render: () => <AppTile id="office" size={44} />,
+      onClick: () => (officeWindows.length > 0 ? focusGroup('hermes:office', officeWindows) : void openSurface('command', { type: 'applications' })),
+      running: officeWindows.length > 0,
+      windows: officeWindows
+    })
+
     // Our own floating Hermes apps (terminal, system, popped-out chat) as running entries.
     const floatingGroups = new Map<FloatingAppId, WmWindow[]>()
 
     for (const win of ours) {
       const appId = ourFloatingAppId(win)
 
-      if (appId && appId !== 'canvas') {
+      if (appId && appId !== 'canvas' && !isOfficeApp(appId)) {
         floatingGroups.set(appId, [...(floatingGroups.get(appId) ?? []), win])
       }
     }

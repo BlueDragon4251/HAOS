@@ -1,13 +1,15 @@
 import { useStore } from '@nanostores/react'
-import { IconFile, IconLock, IconPhotoEdit, IconWorld } from '@tabler/icons-react'
+import { IconFile, IconLock, IconPencil, IconPhotoEdit, IconWorld } from '@tabler/icons-react'
 import { useMemo, useRef } from 'react'
 import { isCanvasImage } from '../../../shared/canvas/files.ts'
+import { OFFICE_APP_NAMES } from '../../../shared/office/files.ts'
 import { Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { describeWebUrl } from '../../lib/web-url.ts'
 import { $webWindows } from '../../store/web-windows.ts'
 import type { OSWindow } from '../../store/windows.ts'
 import { openInCanvas } from '../canvas/open.ts'
+import { officeAppForFile, openInOffice } from '../office/open.ts'
 import { useNativeView } from './native-view.ts'
 
 /**
@@ -28,6 +30,7 @@ export function WebWindow({ win }: { win: OSWindow }) {
   const filePath = url.startsWith('file://') ? decodeURIComponent(url.slice('file://'.length)) : null
   const fileDir = filePath ? filePath.replace(/[^/]+$/, '') : ''
   const fileName = filePath ? filePath.slice(fileDir.length) : ''
+  const office = filePath ? officeAppForFile(filePath) : null
 
   return (
     <div className="flex h-full flex-col">
@@ -55,6 +58,16 @@ export function WebWindow({ win }: { win: OSWindow }) {
             title="Edit in Herald Canvas"
           >
             <IconPhotoEdit size={13} /> Edit
+          </button>
+        )}
+        {filePath && office && (
+          <button
+            type="button"
+            onClick={() => openInOffice(office, { file: filePath })}
+            className="flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-fg-2 hover:bg-white/8 hover:text-fg"
+            title={`Edit in ${OFFICE_APP_NAMES[office]}`}
+          >
+            <IconPencil size={13} /> Edit
           </button>
         )}
       </div>

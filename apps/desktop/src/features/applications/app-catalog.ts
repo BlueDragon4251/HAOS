@@ -42,7 +42,7 @@ const STUDIO_NAMES = ['Pixelmator Pro', 'Figma', 'Sketch', 'Affinity Designer', 
 
 /** The curated head of "All apps", in mockup order. Native slots are hidden when nothing matches. */
 type Slot =
-  | { kind: 'hermes'; appId: HermesAppId; label?: string; icon?: AppIconId }
+  | { kind: 'hermes'; appId: HermesAppId; label?: string; icon?: AppIconId; keywords?: string[] }
   | { kind: 'featured'; label: string }
   | { kind: 'native'; label: string; names: string[]; category: AppCategory }
 
@@ -57,6 +57,9 @@ const ORDER: readonly Slot[] = [
   { kind: 'hermes', appId: 'memory' },
   { kind: 'native', label: 'Studio', names: STUDIO_NAMES, category: 'creative' },
   { kind: 'hermes', appId: 'canvas' },
+  { kind: 'hermes', appId: 'docs', keywords: ['word', 'document', 'writer', 'markdown'] },
+  { kind: 'hermes', appId: 'sheets', keywords: ['excel', 'spreadsheet', 'numbers', 'csv'] },
+  { kind: 'hermes', appId: 'slides', keywords: ['powerpoint', 'presentation', 'keynote', 'deck'] },
   { kind: 'hermes', appId: 'files', label: 'Documents', icon: 'documents' },
   { kind: 'hermes', appId: 'automations' },
   { kind: 'hermes', appId: 'connections' },
@@ -133,7 +136,7 @@ export function buildCatalog(apps: readonly InstalledApp[]): LauncherTile[] {
     if (slot.kind === 'hermes') {
       const def = appById(slot.appId)
       const label = slot.label ?? def.name
-      tiles.push({ kind: 'hermes', key: `hermes:${slot.appId}:${label}`, label, category: def.category, keywords: label === def.name ? [] : [def.name], appId: slot.appId, icon: slot.icon ?? def.icon })
+      tiles.push({ kind: 'hermes', key: `hermes:${slot.appId}:${label}`, label, category: def.category, keywords: [...(label === def.name ? [] : [def.name]), ...(slot.keywords ?? [])], appId: slot.appId, icon: slot.icon ?? def.icon })
     } else if (slot.kind === 'featured') {
       const alias = FEATURED_NATIVE.find(entry => entry.label === slot.label)
 

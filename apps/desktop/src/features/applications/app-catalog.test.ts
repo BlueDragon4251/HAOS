@@ -22,4 +22,13 @@ describe('buildCatalog', () => {
     expect(tiles.filter(tile => tile.label === 'Files')).toHaveLength(1)
     expect(filterTiles(tiles, 'all', 'files').map(tile => tile.label)).toEqual(expect.arrayContaining(['Files', 'Files (Nautilus)']))
   })
+
+  it('puts Herald Docs, Sheets and Slides after Herald Canvas, found by the names people know', () => {
+    const labels = buildCatalog([]).map(tile => tile.label)
+    const canvas = labels.indexOf('Herald Canvas')
+
+    expect(labels.slice(canvas, canvas + 4)).toEqual(['Herald Canvas', 'Herald Docs', 'Herald Sheets', 'Herald Slides'])
+    expect(filterTiles(buildCatalog([]), 'all', 'excel').map(tile => tile.label)).toEqual(['Herald Sheets'])
+    expect(filterTiles(buildCatalog([]), 'productivity', 'powerpoint').map(tile => tile.label)).toEqual(['Herald Slides'])
+  })
 })

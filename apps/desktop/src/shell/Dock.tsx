@@ -1,8 +1,11 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InstalledApp } from '../../shared/ipc.ts'
+import { OFFICE_APPS, type OfficeApp } from '../../shared/office/files.ts'
 import { AppGlyph, HermesAvatar } from '../components/app-icon.tsx'
 import { openInCanvas } from '../features/canvas/open.ts'
+import { OfficeChooser } from '../features/office/OfficeChooser.tsx'
+import { openInOffice } from '../features/office/open.ts'
 import { cn } from '../lib/cn.ts'
 import { reducedMotion } from '../lib/motion.ts'
 import { $env, $prefs } from '../store/backend.ts'
@@ -15,7 +18,7 @@ interface DockItem {
   id: string
   label: string
   render: () => React.ReactNode
-  onClick: () => void
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   running?: boolean
 }
 
@@ -42,6 +45,8 @@ const PINNED_BY_PLATFORM: Record<'darwin' | 'linux' | 'other', PinnedNative[]> =
   ],
   other: [{ label: 'Files', names: [] }]
 }
+
+export const isOfficeApp = (id: string): id is OfficeApp => (OFFICE_APPS as readonly string[]).includes(id)
 
 export function pinnedFor(platform: string | undefined): PinnedNative[] {
   return platform === 'darwin' ? PINNED_BY_PLATFORM.darwin : platform === 'linux' ? PINNED_BY_PLATFORM.linux : PINNED_BY_PLATFORM.other
@@ -91,6 +96,13 @@ export function Dock() {
 
   const main = windows[MAIN_WINDOW_ID]
   const canvasOpen = Object.values(windows).some(w => w.appId === 'canvas')
+  const officeKey = Object.values(windows)
+    .map(w => w.appId)
+    .filter(isOfficeApp)
+    .sort()
+    .join(',')
+  const [chooser, setChooser] = useState<number | null>(null)
+  const closeChooser = useCallback(() => setChooser(null), [])
   const openHermes = () => {
     if (main && main.phase !== 'minimized') {
       focusWindow(MAIN_WINDOW_ID)
@@ -140,12 +152,23 @@ export function Dock() {
 
     // A shortcut beside the one in Applications.
     list.push({ id: 'canvas', label: 'Herald Canvas', render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="canvas" size={22} /></span>, onClick: () => openInCanvas(), running: canvasOpen })
+    // Docs, Sheets and Slides share one entry, so three icons do not crowd the Dock.
+    list.push({
+      id: 'office',
+      label: 'Herald Office',
+      render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="office" size={22} /></span>,
+      onClick: event => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        setChooser(open => (open === null ? rect.left + rect.width / 2 : null))
+      },
+      running: officeKey !== ''
+    })
     list.push({ id: 'applications', label: 'Applications', render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="grid" size={22} /></span>, onClick: () => $applicationsOpen.set(true) })
     list.push({ id: 'trash', label: 'Trash', render: () => <span className="flex size-11 items-center justify-center rounded-[11px] bg-white/6 text-fg-2"><AppGlyph id="trash" size={22} /></span>, onClick: () => void window.heraldOS.fs.openPath(trashPath) })
 
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apps, iconFor, main?.phase, platform, canvasOpen])
+  }, [apps, iconFor, main?.phase, platform, canvasOpen, officeKey])
 
   const barRef = useRef<HTMLDivElement>(null)
   const { onMove, onLeave } = useDockMagnification(barRef)
@@ -169,6 +192,7 @@ export function Dock() {
             key={item.id}
             type="button"
             aria-label={item.label}
+            data-dock-item={item.id}
             onClick={item.onClick}
             className={cn('dock-item group relative flex flex-col items-center active:brightness-90', bouncing === item.id && 'dock-bounce')}
           >
@@ -180,6 +204,17 @@ export function Dock() {
           </button>
         ))}
       </div>
+      {chooser !== null && (
+        <OfficeChooser
+          x={chooser}
+          running={new Set(officeKey.split(',').filter(isOfficeApp))}
+          onClose={closeChooser}
+          onChoose={app => {
+            setChooser(null)
+            openInOffice(app)
+          }}
+        />
+      )}
     </nav>
   )
 }

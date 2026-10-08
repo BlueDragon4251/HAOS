@@ -28,7 +28,10 @@ export const FLOATING_APPS: Record<string, { title: string; width: number; heigh
   'capture-editor': { title: 'Herald OS · Markup', width: 960, height: 680 },
   camera: { title: 'Herald OS · Camera', width: 240, height: 240 },
   widget: { title: 'Herald OS · Widget', width: 360, height: 280 },
-  canvas: { title: 'Herald OS · Canvas', width: 1320, height: 840 }
+  canvas: { title: 'Herald OS · Canvas', width: 1320, height: 840 },
+  docs: { title: 'Herald OS · Docs', width: 1120, height: 840 },
+  sheets: { title: 'Herald OS · Sheets', width: 1280, height: 820 },
+  slides: { title: 'Herald OS · Slides', width: 1280, height: 820 }
 }
 
 export function surfaceTitle(surface: ShellSurface): string {

@@ -236,6 +236,11 @@ window-rule {
     match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · Canvas$"
     default-column-width { proportion 0.75; }
 }
+// Herald Docs, Sheets and Slides want the same room for the page, the grid or the slide.
+window-rule {
+    match app-id=r#"^(herald-os|Herald OS)$"# title="^Herald OS · (Docs|Sheets|Slides)$"
+    default-column-width { proportion 0.75; }
+}
 
 // Foreign apps get the same rounding and open as tiles even when they remember being maximized
 // or fullscreen elsewhere (apps that genuinely need fullscreen can still ask for it later).

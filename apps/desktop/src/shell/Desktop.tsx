@@ -32,6 +32,9 @@ const StudioWindow = lazy(() => import('../features/studio/StudioWindow.tsx').th
 const CaptureEditor = lazy(() => import('../features/capture/CaptureEditor.tsx').then(m => ({ default: m.CaptureEditor })))
 const CameraBubble = lazy(() => import('../features/capture/CameraBubble.tsx').then(m => ({ default: m.CameraBubble })))
 const CanvasWindow = lazy(() => import('../features/canvas/CanvasWindow.tsx').then(m => ({ default: m.CanvasWindow })))
+const DocsWindow = lazy(() => import('../features/office/docs/DocsWindow.tsx').then(m => ({ default: m.DocsWindow })))
+const SheetsWindow = lazy(() => import('../features/office/sheets/SheetsWindow.tsx').then(m => ({ default: m.SheetsWindow })))
+const SlidesWindow = lazy(() => import('../features/office/slides/SlidesWindow.tsx').then(m => ({ default: m.SlidesWindow })))
 
 function FloatingContent({ win }: { win: OSWindow }) {
   switch (win.appId) {
@@ -53,6 +56,12 @@ function FloatingContent({ win }: { win: OSWindow }) {
       return <WidgetWindow pluginId={typeof win.payload?.plugin === 'string' ? win.payload.plugin : undefined} />
     case 'canvas':
       return <CanvasWindow payload={win.payload} />
+    case 'docs':
+      return <DocsWindow payload={win.payload} />
+    case 'sheets':
+      return <SheetsWindow payload={win.payload} />
+    case 'slides':
+      return <SlidesWindow payload={win.payload} />
     default:
       return null
   }

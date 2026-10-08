@@ -1,7 +1,9 @@
-import { IconCopy, IconExternalLink, IconFile, IconFolderFilled, IconFolderOpen, IconMessage, IconPencil, IconPhotoEdit, IconTrash } from '@tabler/icons-react'
+import { IconCopy, IconExternalLink, IconFile, IconFileText, IconFolderFilled, IconFolderOpen, IconMessage, IconPencil, IconPhotoEdit, IconPresentation, IconTable, IconTrash } from '@tabler/icons-react'
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { canOpenInCanvas } from '../../../shared/canvas/files.ts'
+import { OFFICE_APP_NAMES } from '../../../shared/office/files.ts'
+import { officeAppForFile } from '../office/open.ts'
 import { MoreButton } from '../../components/ui/glass.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatBytes, formatRelative } from '../../lib/format.ts'
@@ -9,7 +11,9 @@ import { revealLabel } from '../../lib/platform-labels.ts'
 import { DRAG_MIME, type FileItem, extBadge, fileMeta, useDirCount, useInView, useThumbnail } from './files-store.ts'
 import { Menu, type MenuItemDef } from './Menu.tsx'
 
-export type CardAction = 'open' | 'reveal' | 'rename' | 'copy-path' | 'trash' | 'ask' | 'edit-canvas'
+export type CardAction = 'open' | 'reveal' | 'rename' | 'copy-path' | 'trash' | 'ask' | 'edit-canvas' | 'edit-office'
+
+const OFFICE_ICONS = { docs: <IconFileText />, sheets: <IconTable />, slides: <IconPresentation /> }
 
 export interface FileCardProps {
   item: FileItem
@@ -24,10 +28,12 @@ export interface FileCardProps {
 
 function buildMenu(item: FileItem, onAction: (action: CardAction) => void): MenuItemDef[] {
   const editable = canOpenInCanvas(item.path) && (item.kind !== 'directory' || item.path.toLowerCase().endsWith('.comp'))
+  const office = item.kind === 'file' ? officeAppForFile(item.path) : null
 
   return [
     { id: 'open', label: 'Open', icon: <IconExternalLink />, onSelect: () => onAction('open') },
     ...(editable ? [{ id: 'edit-canvas', label: 'Edit in Herald Canvas', icon: <IconPhotoEdit />, onSelect: () => onAction('edit-canvas') }] : []),
+    ...(office ? [{ id: 'edit-office', label: `Edit in ${OFFICE_APP_NAMES[office]}`, icon: OFFICE_ICONS[office], onSelect: () => onAction('edit-office') }] : []),
     { id: 'reveal', label: revealLabel(), icon: <IconFolderOpen />, onSelect: () => onAction('reveal') },
     { id: 'rename', label: 'Rename', icon: <IconPencil />, onSelect: () => onAction('rename') },
     { id: 'copy', label: 'Copy path', icon: <IconCopy />, onSelect: () => onAction('copy-path') },

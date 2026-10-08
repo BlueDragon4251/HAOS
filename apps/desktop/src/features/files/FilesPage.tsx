@@ -26,6 +26,7 @@ import { notify } from '../../store/notifications.ts'
 import { $activeSpace } from '../../store/spaces.ts'
 import { $page, showPage } from '../../store/windows.ts'
 import { openInCanvas } from '../canvas/open.ts'
+import { officeAppForFile, openInOffice } from '../office/open.ts'
 import { type CardAction, FileCard, FileRow, RenameField } from './FileCard.tsx'
 import { FileDetail, PreviewOverlay } from './FileDetail.tsx'
 import { FilesSidebar } from './FilesSidebar.tsx'
@@ -238,6 +239,15 @@ export function FilesPage() {
         case 'edit-canvas':
           openInCanvas(item.path)
           break
+        case 'edit-office': {
+          const app = officeAppForFile(item.path)
+
+          if (app) {
+            openInOffice(app, { file: item.path })
+          }
+
+          break
+        }
       }
     },
     []
