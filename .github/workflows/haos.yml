@@ -27,10 +27,12 @@ jobs:
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap apparmor-profiles
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py
+      - name: Record actual diskless QEMU acceleration
+        run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
       - name: Validate service unit syntax
         run: systemd-analyze verify linux/haos/*.service
