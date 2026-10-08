@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boxMean, featherValues, fitSide, guidedFilter, maskFromLogits, maskFromProbability, modelInput, normalise, remap, resamplePlanes, rgbPlanes } from './segment-math.ts'
+import { boxMean, featherValues, fitSide, guidedFilter, maskFromLogits, maskFromProbability, maskOptions, modelInput, normalise, remap, resamplePlanes, rgbPlanes } from './segment-math.ts'
 
 const near = (values: ArrayLike<number>, expected: number[], tolerance = 1e-4) => expected.forEach((value, i) => expect(Math.abs(values[i] - value), `index ${i}`).toBeLessThan(tolerance))
 
@@ -23,6 +23,12 @@ describe('segmentation maths', () => {
     expect(remap(0.6, 0.3)).toBeCloseTo(1)
     expect(remap(0.1, 0.8)).toBe(0)
     near(normalise(Float32Array.from([2, 4, 6])), [0, 0.5, 1])
+  })
+
+  it('keeps a default for a setting given as undefined, as a command that leaves it out does', () => {
+    expect(maskOptions({ threshold: undefined, feather: undefined, refine: true })).toEqual({ threshold: 0.5, feather: 0, refine: true })
+    expect(maskOptions({ threshold: 0.3, refine: false })).toEqual({ threshold: 0.3, feather: 0, refine: false })
+    expect(maskOptions()).toEqual({ threshold: 0.5, feather: 0, refine: true })
   })
 
   it('takes box means with the window cut at the edges', () => {

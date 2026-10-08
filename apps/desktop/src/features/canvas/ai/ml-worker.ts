@@ -8,7 +8,7 @@ import * as ort from 'onnxruntime-web/webgpu'
 import wasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url'
 import { modelFileUrl, type ModelId, modelInfo } from '../../../../shared/canvas/models.ts'
 import type { MlReply, MlRequest } from './ml-protocol.ts'
-import { DEFAULT_MASK, fitSide, type MaskOptions, maskFromLogits, maskFromProbability, modelInput, normalise } from './segment-math.ts'
+import { fitSide, type MaskOptions, maskFromLogits, maskFromProbability, maskOptions, modelInput, normalise } from './segment-math.ts'
 
 /** The parts of a worker's global scope this uses (the window's type library describes a page). */
 interface WorkerScope {
@@ -193,7 +193,7 @@ async function handle(request: MlRequest): Promise<{ reply: Omit<MlReply, 'id'>;
       return { reply: { ok: true, backend }, transfer: [] }
     }
     case 'salientMask': {
-      const mask = salientMask(request.token, request.width, request.height, { ...DEFAULT_MASK, ...request.options })
+      const mask = salientMask(request.token, request.width, request.height, maskOptions(request.options))
 
       return { reply: { ok: true, mask }, transfer: [mask.buffer] }
     }

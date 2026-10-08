@@ -217,6 +217,11 @@ export interface MaskOptions {
 
 export const DEFAULT_MASK: MaskOptions = { threshold: 0.5, feather: 0, refine: true }
 
+/** Settings over the defaults: one given as undefined (a command left it out) keeps its default rather than blanking the mask. */
+export function maskOptions(options: Partial<MaskOptions> = {}): MaskOptions {
+  return { threshold: options.threshold ?? DEFAULT_MASK.threshold, feather: options.feather ?? DEFAULT_MASK.feather, refine: options.refine ?? DEFAULT_MASK.refine }
+}
+
 /** Move a probability's half-way point to `threshold`, keeping the soft ramp around it (identity at 0.5). */
 export function remap(probability: number, threshold: number): number {
   const t = Math.min(0.99, Math.max(0.01, threshold))
