@@ -22,4 +22,6 @@ They require actual AF_UNIX/user namespaces, unavailable in scratch. GitHub Ubun
 
 QEMU adds installed-service health, native UI process presence, UI restart without backend PID change, multi-disk policy enforcement and a journal record across reboot. The persistence fixture is offline/cancelled, not a real provider/gateway mission. Syntax-checked harness is not success: require both acceptance JSON receipts and logs.
 
+`haos-acceptance.yml` retests the latest completed, non-expired private image artifact on the working branch when the harness changes. It verifies the ISO checksum and manifest, uses the guest probe from that image's exact source commit, and records both the image and harness revisions. This avoids mistaking an older runtime's probe results for evidence about a newer runtime. Images must be ancestors of the harness revision. A completed image build can be reused even when its earlier installation test failed.
+
 Outstanding acceptance includes authenticated model/Git/gateway missions, unknown sender denial, theme/watchdog rollback, backups, broken-update recovery, remote streaming and resource measurements.

@@ -4,7 +4,9 @@ set -euo pipefail
 HAOS_TEST_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HAOS_TEST_ISO="$(realpath "${1:?usage: test-haos-iso.sh <development.iso> <evidence-directory>}")"
 HAOS_TEST_EVIDENCE="$(realpath -m "${2:?an evidence directory is required}")"
+HAOS_TEST_GUEST_PROBE="$(realpath "${3:-$HAOS_TEST_REPO/tests/e2e/haos_guest.py}")"
 [[ -f "$HAOS_TEST_ISO" && ! -b "$HAOS_TEST_ISO" ]] || { echo "ISO must be a regular file" >&2; exit 1; }
+[[ -f "$HAOS_TEST_GUEST_PROBE" && ! -b "$HAOS_TEST_GUEST_PROBE" ]] || { echo "Guest probe must be a regular file" >&2; exit 1; }
 mkdir -p "$HAOS_TEST_EVIDENCE"
 HAOS_TEST_TEMP="$(mktemp -d)"
 HAOS_TEST_HTTP_PID=""
@@ -24,7 +26,7 @@ fi
 [[ -n "$HAOS_TEST_KS" ]] || { echo "Missing kickstart in the built ISO" >&2; exit 1; }
 7z e -oiso "$HAOS_TEST_ISO" "${HAOS_TEST_KS#/}" >/dev/null
 cp "iso/$(basename "$HAOS_TEST_KS")" ks.cfg
-cp "$HAOS_TEST_REPO/tests/e2e/haos_guest.py" haos_guest.py
+cp "$HAOS_TEST_GUEST_PROBE" haos_guest.py
 cat >>ks.cfg <<'KS'
 text
 lang en_US.UTF-8
@@ -68,7 +70,8 @@ HAOS_TEST_QEMU=(qemu-system-x86_64 "${HAOS_TEST_ACCEL[@]}" -smp 4 -m 6144 -machi
   -smbios type=1,manufacturer=HAOS-CI,product=haos-acceptance
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
   -drive if=pflash,format=raw,file=vars.fd
-  -drive file=system.qcow2,if=virtio,serial=HAOS-CI-SYSTEM
+  -drive file=system.qcow2,format=qcow2,if=none,id=system
+  -device virtio-blk-pci,drive=system,serial=HAOS-CI-SYSTEM,bootindex=1
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0
   -display none -device virtio-vga -no-reboot)
 python3 -m http.server 8000 >"$HAOS_TEST_EVIDENCE/http.log" 2>&1 &
@@ -88,8 +91,8 @@ mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000001 data-a.raw >/dev/null
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000002 data-b.raw >/dev/null
 for stage in 1 2; do
   timeout 15m "${HAOS_TEST_QEMU[@]}" \
-    -drive file=data-a.raw,format=raw,if=virtio,serial=HAOS-CI-DATA-A \
-    -drive file=data-b.raw,format=raw,if=virtio,serial=HAOS-CI-DATA-B \
+    -drive file=data-a.raw,format=raw,if=none,id=data-a -device virtio-blk-pci,drive=data-a,serial=HAOS-CI-DATA-A \
+    -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B \
     -serial "file:$HAOS_TEST_EVIDENCE/boot-$stage.log"
   python3 - "$HAOS_TEST_EVIDENCE/boot-$stage.log" "$stage" "$HAOS_TEST_EVIDENCE" <<'PY'
 import json, re, sys
