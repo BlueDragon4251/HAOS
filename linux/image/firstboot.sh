@@ -61,7 +61,11 @@ system_phase() {
   install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/session/swaylock.conf" "$HOME_DIR/.config/swaylock/config"
 
   step "Hermes Agent for $HERMES_USER"
-  if [[ -x /usr/lib/haos/hermes/.venv/bin/hermes ]]; then
+  if [[ -d /usr/lib/haos/haos ]]; then
+    [[ -x /usr/lib/haos/hermes/.venv/bin/hermes ]] || {
+      echo "firstboot: the mandatory HAOS runtime is missing; refusing unrestricted fallback" >&2
+      exit 1
+    }
     # Never install an unrestricted second agent in the observer's administrator account.
     usermod -aG haos-ui "$HERMES_USER"
     (cd /usr/lib/haos && python3 -m haos.initialize "$HERMES_USER")

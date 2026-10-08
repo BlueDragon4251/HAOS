@@ -53,6 +53,8 @@ dejavu-sans-fonts
 liberation-fonts
 # What the CLIs and the shell shell out to.
 python3
+python3.11
+python3.11-devel
 python3-pyyaml
 git
 tar

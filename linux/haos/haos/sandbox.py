@@ -40,6 +40,7 @@ def command(grants: list[dict], token: str, *, certificates: list[str]) -> list[
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin", "--symlink", "usr/sbin", "/sbin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
             "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/run", "--dir", "/etc",
+            "--ro-bind", "/usr/lib/haos/passwd", "/etc/passwd", "--ro-bind", "/usr/lib/haos/group", "/etc/group",
             "--dir", "/var", "--dir", "/home", "--bind", "/var/lib/haos-agent", "/home/agent",
             "--bind", "/var/lib/haos-workspace", "/workspace", "--dir", "/volumes"]
     # Do not bind the host's /etc, /run, /var, home folders, /sys or raw devices.
@@ -60,6 +61,7 @@ def command(grants: list[dict], token: str, *, certificates: list[str]) -> list[
         args.extend(["--ro-bind" if mode == "read-only" else "--bind", f"/run/haos-volumes/{key}", f"/volumes/{key}"])
     for name, value in {
         "HOME": "/home/agent", "HERMES_HOME": "/home/agent/.hermes", "PATH": "/usr/lib/haos/hermes/.venv/bin:/usr/bin",
+        "USER": "haos-agent", "LOGNAME": "haos-agent",
         "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1",
         "HERMES_DASHBOARD_SESSION_TOKEN": token,
     }.items():
