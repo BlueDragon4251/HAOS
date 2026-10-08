@@ -87,7 +87,8 @@ def mission_prompt(goal: str) -> str:
 def outcome(payload: dict, cancel_requested: bool) -> tuple[str, str | None]:
     status = payload.get("status")
     if status == "interrupted":
-        return ("cancelled" if cancel_requested else "blocked", "Hermes turn interrupted")
+        # An interrupted model turn does not prove that background tools stopped touching the workspace.
+        return "blocked", "Hermes turn interrupted; owner must inspect remaining processes and side effects"
     if status == "error" or payload.get("error") or payload.get("partial"):
         return "failed", str(payload.get("error") or payload.get("text") or "Hermes turn failed")
     # A completion is a turn receipt, not independent proof that the user's goal was achieved.

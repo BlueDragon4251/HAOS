@@ -71,6 +71,7 @@ import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
 import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { MissionMethods } from '../shared/missions.ts'
 
 type Unsubscribe = () => void
 
@@ -88,6 +89,10 @@ const subscribe = <T,>(channel: string, listener: (payload: T) => void): Unsubsc
 
 /** The whole capability surface the renderer gets. Keep it narrow and typed. */
 const api = {
+  missions: {
+    serviceInfo: (): Promise<{ managed: boolean }> => ipcRenderer.invoke(IPC.missionServiceInfo),
+    request: <M extends keyof MissionMethods>(method: M, params: MissionMethods[M]['params']): Promise<MissionMethods[M]['result']> => ipcRenderer.invoke(IPC.missionRequest, method, params)
+  },
   backend: {
     getState: (): Promise<BackendState> => ipcRenderer.invoke(IPC.backendGetState),
     onState: (listener: (state: BackendState) => void): Unsubscribe => subscribe(IPC.backendState, listener),

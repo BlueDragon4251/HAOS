@@ -1,0 +1,72 @@
+name: HAOS x86_64 image and installer build
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    paths: ['linux/image/**', 'linux/haos/**', 'upstream/UPSTREAM.lock', '.github/workflows/haos-image.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: haos-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the native shell from this commit
+        run: |
+          npm run sync-upstream
+          npm ci
+          npm run dist:linux --workspace apps/desktop -- --x64
+          cp apps/desktop/release/herald-os-*-linux-x64.tar.gz herald-os-linux.tar.gz
+          mkdir -p evidence
+          npm sbom --sbom-format cyclonedx --omit dev > evidence/npm.cdx.json
+      - name: Build the pinned-runtime Fedora bootc image
+        run: |
+          sudo podman build -f linux/image/Containerfile --build-arg SHELL_TARBALL=herald-os-linux.tar.gz -t localhost/haos:ci . 2>&1 | tee evidence/image-build.log
+          sudo podman image inspect localhost/haos:ci > evidence/image.json
+          sudo podman image inspect quay.io/fedora/fedora-bootc:44 > evidence/base-image.json
+          sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-packages.txt
+      - name: Build the UEFI x86_64 installer ISO from the local image
+        run: |
+          mkdir -p output
+          sudo podman run --rm --privileged --pull=newer --security-opt label=type:unconfined_t \
+            -v ./output:/output -v ./linux/image/iso.toml:/config.toml:ro \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest --type anaconda-iso --rootfs btrfs --local localhost/haos:ci \
+            2>&1 | tee evidence/iso-build.log
+          sudo chown -R "$(id -u):$(id -g)" output
+          mv output/bootiso/install.iso evidence/haos-x86_64-development.iso
+          (cd evidence && sha256sum haos-x86_64-development.iso > SHA256SUMS)
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          def pin(file):
+              return dict(line.split('=', 1) for line in Path(file).read_text().splitlines() if line and not line.startswith('#'))
+          manifest = {'schema': 1, 'release': False, 'signed': False, 'source_commit': os.environ['GITHUB_SHA'],
+                      'source_repository': os.environ['GITHUB_REPOSITORY'], 'architecture': 'x86_64',
+                      'herald': pin('upstream/HERALD.lock'), 'hermes': pin('upstream/UPSTREAM.lock'),
+                      'image': json.loads(Path('evidence/image.json').read_text()),
+                      'base_image': json.loads(Path('evidence/base-image.json').read_text()),
+                      'checksums': Path('evidence/SHA256SUMS').read_text(),
+                      'limitations': ['unsigned development build', 'requires successful QEMU and security acceptance before release',
+                                      'npm SBOM and RPM inventory do not constitute a complete multi-ecosystem release SBOM']}
+          Path('evidence/build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-x86_64-build-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 7

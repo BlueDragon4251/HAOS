@@ -4,6 +4,8 @@ Requires=haos-policy.service
 After=haos-policy.service network-online.target herald-os-firstboot.service
 Wants=network-online.target
 ConditionPathExists=/etc/haos/enabled
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -37,6 +39,7 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LockPersonality=yes
 TasksMax=512
 MemoryHigh=4G
+MemoryMax=8G
 
 [Install]
 WantedBy=multi-user.target

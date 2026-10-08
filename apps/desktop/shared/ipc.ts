@@ -708,6 +708,8 @@ export interface EnvInfo {
 
 /** Channel names, table-driven so preload and main cannot drift. */
 export const IPC = {
+  missionServiceInfo: 'haos:missions:service-info',
+  missionRequest: 'haos:missions:request',
   backendGetState: 'herald-os:backend:get-state',
   backendState: 'herald-os:backend:state',
   backendRestart: 'herald-os:backend:restart',

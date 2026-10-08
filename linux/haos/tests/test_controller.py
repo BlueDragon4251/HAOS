@@ -27,6 +27,7 @@ def test_provider_failure_and_missing_terminal_receipts_never_become_success():
                     {"status": "error", "text": "No API key"}, {"status": "interrupted"}):
         assert outcome(payload, False)[0] != "completed"
     assert outcome({"status": "complete", "text": "Built"}, True)[0] == "blocked"
+    assert outcome({"status": "interrupted"}, True)[0] == "blocked"
     for url in ("https://127.0.0.1:9119", "http://localhost:9119", "http://remote:9119", "http://u@127.0.0.1:9119", "http://127.0.0.1:9119/other"):
         with pytest.raises(ValueError):
             websocket_url(url, "secret")

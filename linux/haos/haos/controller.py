@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
 import os
 import pwd
@@ -109,6 +110,7 @@ class Controller:
         raise ValueError("unknown control method")
 
     async def client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        actor = "unverified"
         try:
             actor = peer_actor(writer.get_extra_info("socket"), self.allowed_uids)
             line = await asyncio.wait_for(reader.readline(), 10)
@@ -120,6 +122,7 @@ class Controller:
             result = await self.dispatch(actor, request)
             reply = {"ok": True, "result": result}
         except (ValueError, KeyError, PermissionError, Conflict, TimeoutError) as exc:
+            print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
             reply = {"ok": False, "error": str(exc)}
         except Exception:
             # Traceback remains in the independent service journal; never expose secrets to a peer.
@@ -197,6 +200,8 @@ async def serve():
     config = json.loads(Path("/etc/haos/controller.json").read_text())
     uids = {pwd.getpwnam(user).pw_uid for user in config["control_users"]}
     token = Path("/etc/haos/backend-token").read_text().strip()
+    lock = open("/var/lib/haos-control/controller.lock", "a")
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     store = MissionStore(Path("/var/lib/haos-control/missions.db"))
     controller = Controller(store, websocket_url(config["backend_url"], token), uids)
     loop = asyncio.get_running_loop()
@@ -213,6 +218,7 @@ async def serve():
         server.close()
         await server.wait_closed()
         store.close()
+        lock.close()
 
 
 if __name__ == "__main__":

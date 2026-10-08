@@ -68,3 +68,11 @@ These are not boot/installation evidence. The local sandbox rejects the addition
 namespace (`open /proc/8/ns/ns failed`); real kernel and Unix-socket probes are committed separately
 and required in the HAOS CI workflow. No kernel isolation, complete image, ISO, QEMU installation,
 live provider mission, backup restore or signed release has been certified here.
+
+The subsequent native UI integration submits HAOS missions to the controller, displays its seven
+states and persisted event cursor, routes one-time answers and cancellation through the existing
+OS command registry, and preserves request keys on transport retries. Local verification now
+passes 20 HAOS tests, 729 desktop tests, typecheck and build. The existing CI (Linux/macOS desktop,
+bridge, script parsing and secret scan) passed at `f6127a5`. The first kernel probe failed because
+Bubblewrap requires explicit `--unshare-user` with `--disable-userns`; this has been corrected and
+must pass the next CI run. The actual Unix-socket roundtrip already passed in that run.

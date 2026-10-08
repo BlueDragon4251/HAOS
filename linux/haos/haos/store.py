@@ -26,6 +26,7 @@ class MissionStore:
         self.db.execute("PRAGMA foreign_keys=ON")
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version not in (0, 1):
+            self.db.close()
             raise RuntimeError(f"unsupported mission database version {version}")
         self.db.executescript("""
             BEGIN IMMEDIATE;
@@ -208,6 +209,8 @@ class MissionStore:
             for row in self.db.execute("SELECT * FROM missions WHERE state IN ('running','waiting')").fetchall():
                 if row["phase"] == "dispatching":
                     self._settle(row["id"], "blocked", "controller restarted; reconcile Hermes before resubmission")
+                elif row["attempt"] >= row["max_attempts"] or row["deadline"] <= time.time():
+                    self._settle(row["id"], "failed", "recovery retry budget or deadline exhausted before dispatch")
                 else:
                     self.db.execute("UPDATE missions SET state='queued',phase='pending',updated_at=? WHERE id=?", (time.time(), row["id"]))
                     self.db.execute("DELETE FROM locks WHERE mission_id=?", (row["id"],))

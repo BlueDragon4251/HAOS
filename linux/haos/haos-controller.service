@@ -3,6 +3,8 @@ Description=HAOS durable mission controller
 After=haos-hermes.service
 Wants=haos-hermes.service
 ConditionPathExists=/etc/haos/enabled
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple

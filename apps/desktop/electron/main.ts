@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
 import { BackendManager } from './backend/manager.ts'
+import { controllerRequest, managedMissions } from './missions/client.ts'
+import type { MissionMethods } from '../shared/missions.ts'
 import { forgetInheritedSession } from './backend/session-env.ts'
 import { CrashWatcher } from './crash/watch.ts'
 import { fireEventAutomations } from './events/automations.ts'
@@ -202,6 +204,8 @@ function broadcastWindowState(): void {
 }
 
 function registerCoreIpc(): void {
+  ipcMain.handle(IPC.missionServiceInfo, () => ({ managed: managedMissions() }))
+  ipcMain.handle(IPC.missionRequest, (_event, method: keyof MissionMethods, params: MissionMethods[typeof method]['params']) => controllerRequest(method, params))
   ipcMain.handle(IPC.backendGetState, () => backend.getState())
   ipcMain.handle(IPC.backendRestart, () => backend.restart())
   ipcMain.handle(IPC.backendRest, (_event, request: RestRequest) => backend.rest(request))

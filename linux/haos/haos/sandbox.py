@@ -35,7 +35,7 @@ def trusted_json(path: Path) -> dict:
 def command(grants: list[dict], token: str, *, certificates: list[str]) -> list[str]:
     if not token.strip():
         raise ValueError("missing backend credential")
-    args = ["/usr/bin/bwrap", "--unshare-all", "--share-net", "--die-with-parent", "--new-session",
+    args = ["/usr/bin/bwrap", "--unshare-all", "--unshare-user", "--share-net", "--die-with-parent", "--new-session",
             "--disable-userns", "--assert-userns-disabled", "--cap-drop", "ALL", "--clearenv",
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin", "--symlink", "usr/sbin", "/sbin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
