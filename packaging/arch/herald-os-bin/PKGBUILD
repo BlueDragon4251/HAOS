@@ -4,8 +4,8 @@
 # A local tarball builds too: HERALD_OS_TARBALL_URL=file:///path/herald-os-<v>-linux-x64.tar.gz makepkg -si --skipchecksums
 
 pkgname=herald-os-bin
-_version=0.1.0-alpha.1
-pkgver=0.1.0alpha.1
+_version=0.1.0-alpha.2
+pkgver=0.1.0alpha.2
 pkgrel=1
 pkgdesc='An AI-native desktop built around Hermes Agent: a niri session, or an app inside Hyprland and Omarchy'
 arch=('x86_64' 'aarch64')
@@ -44,10 +44,11 @@ install=herald-os.install
 source=('herald-os-package.sh')
 source_x86_64=("herald-os-${_version}-x64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/releases/download/v${_version}/herald-os-${_version}-linux-x64.tar.gz}")
 source_aarch64=("herald-os-${_version}-arm64.tar.gz::${HERALD_OS_TARBALL_URL:-$url/releases/download/v${_version}/herald-os-${_version}-linux-arm64.tar.gz}")
-# From the release's .sha256 files; a tarball of your own (HERALD_OS_TARBALL_URL) needs --skipchecksums.
+# From the release's .sha256 files, filled in for the tarballs once the release is built; a tarball
+# of your own (HERALD_OS_TARBALL_URL) needs --skipchecksums.
 sha256sums=('120a3b0922a8677c6790af4a93b04109030b5d7201bc85125b62031b152c247c')
-sha256sums_x86_64=('6f8f5aa3f14fb30f8987958baaf55242474c1d0b443358b58ada5a6bebad7456')
-sha256sums_aarch64=('41a58962cfb9212a314a51e9dfe376945f82d2fdb9d35202a03ac55dced14b06')
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
 
 package() {
   source "$srcdir/herald-os-package.sh"
