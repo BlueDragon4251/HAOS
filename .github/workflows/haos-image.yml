@@ -48,6 +48,9 @@ jobs:
           sudo podman image inspect localhost/haos:ci > evidence/image.json
           sudo podman image inspect quay.io/fedora/fedora-bootc:44 > evidence/base-image.json
           sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-packages.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/source.json > evidence/python-runtime-source.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/requirements.txt > evidence/python-runtime-requirements.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/installed.txt > evidence/python-runtime-installed.txt
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
           set -euo pipefail
@@ -68,6 +71,7 @@ jobs:
           manifest = {'schema': 1, 'release': False, 'signed': False, 'source_commit': os.environ['GITHUB_SHA'],
                       'source_repository': os.environ['GITHUB_REPOSITORY'], 'architecture': 'x86_64',
                       'herald': pin('upstream/HERALD.lock'), 'hermes': pin('upstream/UPSTREAM.lock'),
+                      'python_runtime': json.loads(Path('evidence/python-runtime-source.json').read_text()),
                       'image': json.loads(Path('evidence/image.json').read_text()),
                       'base_image': json.loads(Path('evidence/base-image.json').read_text()),
                       'checksums': Path('evidence/SHA256SUMS').read_text(),

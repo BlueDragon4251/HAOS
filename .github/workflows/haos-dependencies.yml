@@ -20,10 +20,17 @@ jobs:
           python-version: '3.11'
       - name: Install audit tools and fetch the pinned source
         run: |
-          python -m pip install uv==0.12.19 pip-audit
+          python -m pip install uv==0.12.19 pip-audit==2.10.1
           npm run sync-upstream
           mkdir -p evidence
           python -m pip freeze > evidence/audit-tools.txt
+      - name: Audit the exact committed image dependencies
+        run: |
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime --check
+          python -m pip_audit --no-deps --disable-pip -r linux/haos/runtime/requirements.txt --format json --output evidence/audit-committed.json
+          python -m pip_audit --no-deps --disable-pip -r linux/haos/runtime/requirements.txt --format cyclonedx-json --output evidence/python-runtime.cdx.json
+          cp linux/haos/runtime/source.json evidence/committed-runtime-source.json
+          cp linux/haos/runtime/requirements.txt evidence/committed-runtime-requirements.txt
       - name: Resolve scoped security fixes with package hashes
         run: |
           uv export --project upstream/hermes-agent --frozen --no-dev --no-emit-project --extra web --extra messaging --no-hashes --format requirements-txt --output-file evidence/runtime-input.txt
@@ -49,16 +56,9 @@ jobs:
           python -m pip_audit --no-deps --disable-pip -r evidence/runtime.requirements.txt --format json --output evidence/audit-fixed.json
       - name: Install and exercise the actual pinned Hermes with these dependencies
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('upstream/hermes-agent/pyproject.toml')
-          source = path.read_text()
-          old, new = '"PyJWT[crypto]==2.13.0"', '"PyJWT[crypto]==2.15.1"'
-          assert source.count(old) == 1, 'upstream metadata changed; review the overlay'
-          path.write_text(source.replace(old, new))
-          PY
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
           uv sync --project upstream/hermes-agent --frozen --python "$(command -v python)" --no-dev --extra web --extra messaging
-          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r evidence/runtime.requirements.txt
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
           uv pip freeze --python upstream/hermes-agent/.venv/bin/python > evidence/installed-runtime.txt
           HERMES_HOME="$(mktemp -d)" upstream/hermes-agent/.venv/bin/hermes --help > evidence/hermes-help.txt
