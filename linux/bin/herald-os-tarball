@@ -21,6 +21,8 @@ leaves it alone. HERALD_OS_DESTDIR puts everything under another folder instead 
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -49,6 +51,13 @@ Terminal=false
 # A release's .sha256 is sha256sum's line for the file as it is named on the release.
 CHECKSUM_LINE = re.compile(r"^([0-9a-f]{64}) [ *](\S+)$")
 SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
+# Every request goes over HTTPS, redirects included: GitHub sends release files on to its CDN, and
+# a redirect to plain http would let anyone on the way swap the tarball and its checksum together.
+CURL = ("curl", "--proto", "=https", "--proto-redir", "=https", "--fail", "--location", "--retry", "2")
+AT_FDCWD = -100
+RENAME_EXCHANGE = 2
+# What renameat2 answers where the kernel, the C library or the filesystem cannot exchange two paths.
+EXCHANGE_UNSUPPORTED = frozenset({errno.ENOSYS, errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP})
 
 
 class ReleaseError(Exception):
@@ -256,7 +265,7 @@ def machine_arch() -> str | None:
 
 def releases() -> list[dict]:
     """The repository's published releases, newest first (GitHub's API lists drafts only to the owner)."""
-    found = subprocess.run(["curl", "-fsSL", "--retry", "2", "--max-time", "60", "-H", "Accept: application/vnd.github+json", RELEASES_API], capture_output=True, text=True, check=False)
+    found = subprocess.run([*CURL, "-sS", "--max-time", "60", "-H", "Accept: application/vnd.github+json", RELEASES_API], capture_output=True, text=True, check=False)
     if found.returncode != 0:
         raise ReleaseError(found.stderr.strip() or f"curl exited with {found.returncode}")
     try:
@@ -299,8 +308,8 @@ def pick_release(listing: list[dict], arch: str, channel: str = "stable", versio
 
 def download(url: str, target: Path) -> None:
     progress = ["--progress-bar"] if sys.stderr.isatty() else ["-sS"]
-    if not url.startswith("https://") or subprocess.call(["curl", "-fL", "--retry", "2", *progress, "-o", str(target), url]) != 0:
-        raise ReleaseError(f"could not download {url}")
+    if not url.startswith("https://") or subprocess.call([*CURL, *progress, "-o", str(target), url]) != 0:
+        raise ReleaseError(f"could not download {url} over HTTPS")
 
 
 def verify(tarball: Path, checksum: Path) -> None:
@@ -319,6 +328,71 @@ def verify(tarball: Path, checksum: Path) -> None:
 
 def tree_size(folder: Path) -> int:
     return sum(path.stat().st_size for path in folder.rglob("*") if path.is_file() and not path.is_symlink()) if folder.is_dir() else 0
+
+
+def exchange(first: Path, second: Path) -> None:
+    """Swap two paths in one step (Linux's renameat2 with RENAME_EXCHANGE), so neither is ever missing.
+    Raises OSError with an errno in EXCHANGE_UNSUPPORTED where this system cannot."""
+    renameat2 = getattr(ctypes.CDLL(None, use_errno=True), "renameat2", None)
+    if renameat2 is None:
+        raise OSError(errno.ENOSYS, "renameat2 is not available")
+    renameat2.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    if renameat2(AT_FDCWD, os.fsencode(first), AT_FDCWD, os.fsencode(second), RENAME_EXCHANGE) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), str(first), None, str(second))
+
+
+def swap_by_renames(first: Path, second: Path, parked: Path) -> None:
+    """``exchange`` where it is unsupported: three renames through ``parked``, each undone when a later
+    one fails. ``first`` is missing between the first two."""
+    shutil.rmtree(parked, ignore_errors=True)
+    first.rename(parked)
+    try:
+        second.rename(first)
+    except OSError:
+        parked.rename(first)
+        raise
+    try:
+        parked.rename(second)
+    except OSError:
+        first.rename(second)
+        parked.rename(first)
+        raise
+
+
+def put_in_place(layout: Layout, new: Path) -> Path:
+    """``new`` becomes /opt/herald-os and the version it replaces /opt/herald-os.previous, which must not
+    exist. One exchange where the system allows it, otherwise two renames (the first undone if the
+    second fails). Returns where the replaced version ended up: ``new`` when it could not be moved on."""
+    try:
+        exchange(new, layout.app)
+    except OSError as exc:
+        if exc.errno not in EXCHANGE_UNSUPPORTED:
+            raise
+        layout.app.rename(layout.previous)
+        try:
+            new.rename(layout.app)
+        except OSError:
+            layout.previous.rename(layout.app)
+            raise
+        return layout.previous
+    try:
+        new.rename(layout.previous)
+    except OSError as exc:
+        print(f"  the version it replaced stays in {new} ({exc.strerror}); herald-os rollback looks for it in {layout.previous}")
+        return new
+    return layout.previous
+
+
+def whereabouts(layout: Layout, *others: Path) -> str:
+    """Where each version is now, for the message after a step failed."""
+    found = [(path, read_version(path) or "an unknown version") for path in (layout.app, layout.previous, *others) if (path / "resources" / "app.asar").is_file()]
+    if not found:
+        return f"no Herald OS is left in {layout.app.parent}"
+    text = "Herald OS " + ", ".join(f"{version} is in {path}" for path, version in found)
+    if found[0][0] != layout.app:
+        text += f", and nothing is in {layout.app}: sudo mv {found[0][0]} {layout.app} puts it back"
+    return text
 
 
 def reinstall(layout: Layout) -> int:
@@ -374,11 +448,12 @@ def update(layout: Layout, version: str | None = None) -> int:
         if free + tree_size(layout.previous) < need:
             die(f"the update needs about {need >> 20} MB free in {layout.app.parent}, and there are {free >> 20} MB")
         shutil.rmtree(layout.previous, ignore_errors=True)
-    # Unpacked next to /opt/herald-os: the same filesystem, so the swap is a rename, and the same
+    # Unpacked next to /opt/herald-os: the same filesystem, so the swap moves nothing, and the same
     # SELinux labels as a tarball unpacked there by hand.
     staging = Path(tempfile.mkdtemp(prefix=".herald-os-update-", dir=layout.app.parent))
+    tarball, checksum, unpacked = staging / release["name"], staging / f"{release['name']}.sha256", staging / "herald-os"
+    replaced: Path | None = None
     try:
-        tarball, checksum, unpacked = staging / release["name"], staging / f"{release['name']}.sha256", staging / "herald-os"
         download(release["url"], tarball)
         download(release["checksum_url"], checksum)
         verify(tarball, checksum)
@@ -391,18 +466,20 @@ def update(layout: Layout, version: str | None = None) -> int:
             raise ReleaseError(f"{tarball.name} does not hold Herald OS {release['version']}")
         setuid_sandbox(unpacked)
         shutil.rmtree(layout.previous, ignore_errors=True)
-        layout.app.rename(layout.previous)
-        try:
-            unpacked.rename(layout.app)
-        except OSError:
-            layout.previous.rename(layout.app)
-            raise
+        if layout.previous.exists():
+            raise ReleaseError(f"could not clear {layout.previous} for the version in use")
+        replaced = put_in_place(layout, unpacked)
     except (ReleaseError, OSError) as exc:
-        die(f"{exc}; the Herald OS in {layout.app} is unchanged")
+        die(f"{exc}; {whereabouts(layout)}")
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if replaced == unpacked:
+            tarball.unlink(missing_ok=True)
+            checksum.unlink(missing_ok=True)
+        else:
+            shutil.rmtree(staging, ignore_errors=True)
     reinstall(layout)
-    print(f"Herald OS {release['version']} is in {layout.app}; {installed or 'the version before'} stays in {layout.previous} (herald-os rollback goes back).")
+    note = " (herald-os rollback goes back)" if replaced == layout.previous else ""
+    print(f"Herald OS {release['version']} is in {layout.app}; {installed or 'the version before'} stays in {replaced}{note}.")
     print("Log out and back in, or restart herald-os-app, to use it.")
     return 0
 
@@ -412,10 +489,15 @@ def rollback(layout: Layout) -> int:
         die(f"there is no earlier version in {layout.previous} to go back to")
     current, previous = read_version(layout.app), read_version(layout.previous)
     parked = layout.app.with_name(".herald-os.rollback")
-    shutil.rmtree(parked, ignore_errors=True)
-    layout.app.rename(parked)
-    layout.previous.rename(layout.app)
-    parked.rename(layout.previous)
+    try:
+        try:
+            exchange(layout.app, layout.previous)
+        except OSError as exc:
+            if exc.errno not in EXCHANGE_UNSUPPORTED:
+                raise
+            swap_by_renames(layout.app, layout.previous, parked)
+    except OSError as exc:
+        die(f"could not swap the versions ({exc.strerror or exc}); {whereabouts(layout, parked)}")
     reinstall(layout)
     print(f"Herald OS {previous or '(unknown version)'} is back in {layout.app}; {current or 'the newer one'} is in {layout.previous}.")
     newer_tool = layout.previous / "resources" / "herald-os-linux" / "bin" / "herald-os-tarball"
