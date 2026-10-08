@@ -924,6 +924,8 @@ export const IPC = {
   canvasReadImage: 'herald-os:canvas:read-image',
   /** A layered file (PSD, PSB) read in parts, so a large one need not cross in one message. */
   canvasReadPart: 'herald-os:canvas:read-part',
+  /** A colour table (`.cube`) for a Color Lookup layer, as its bytes. */
+  canvasReadTable: 'herald-os:canvas:read-table',
   canvasWriteFile: 'herald-os:canvas:write-file',
   /** An export written a part at a time: PNG rows compressed by main, or bytes as they are. */
   canvasStreamBegin: 'herald-os:canvas:stream-begin',
@@ -968,8 +970,8 @@ export interface CanvasProject {
 
 export interface CanvasWrite {
   manifest: unknown
-  /** Images to (re)write by name; the rest stay as they are on disk. */
-  assets: Record<string, CanvasRawImage>
+  /** Images (and colour tables, as their file's bytes) to (re)write by name; the rest stay as they are on disk. */
+  assets: Record<string, CanvasRawImage | Uint8Array>
   /** Finder's preview (JPEG). */
   preview?: Uint8Array
 }

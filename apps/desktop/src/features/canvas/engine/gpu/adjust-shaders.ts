@@ -22,6 +22,18 @@ export const SHADER_KIND = {
   'Add Noise': 9
 } as const
 
+/** The same for Herald's own kinds (engine/herald-adjust.ts); Brightness/Contrast runs as its tone curve. */
+export const HERALD_SHADER_KIND = {
+  'Brightness/Contrast': 1,
+  Vibrance: 10,
+  'Photo Filter': 11,
+  'Channel Mixer': 12,
+  'Selective Color': 13,
+  Posterize: 14,
+  Threshold: 15,
+  'Color Lookup': 16
+} as const
+
 const f = (value: number): string => (Number.isInteger(value) ? value.toFixed(1) : String(value))
 
 const ADJUST_FUNCTIONS = `
@@ -212,6 +224,102 @@ vec3 grain(vec3 c, vec2 p) {
   float delta = n * (u_amount / 100.0) * ${f(GRAIN_REACH)} * (0.3 + 2.8 * l * (1.0 - l));
   return clamp(c + delta, 0.0, 1.0);
 }
+
+// Vibrance, then Saturation as Hue/Saturation saturates (u_hue and u_lightness at 0).
+uniform float u_vibrance;
+
+float skinGuard(float hue) {
+  float distance = abs(mod(hue - 25.0 + 540.0, 360.0) - 180.0);
+  return 1.0 - 0.6 * max(0.0, 1.0 - distance / 35.0);
+}
+
+vec3 vibrance(vec3 c) {
+  vec3 o = c;
+  if (u_vibrance != 0.0) {
+    float chroma = max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b);
+    float amount = u_vibrance / 100.0;
+    float k = amount > 0.0 ? 1.0 + amount * (1.0 - chroma) * (1.0 - chroma) * 1.5 * skinGuard(rgbToHsl(c).x) : 1.0 + amount * (1.0 - chroma * 0.5);
+    float gray = luma(c);
+    o = clamp(gray + (c - gray) * k, 0.0, 1.0);
+  }
+  return u_saturation != 0.0 ? hueSaturation(o) : o;
+}
+
+// Photo Filter: u_filter is what each channel is multiplied by.
+uniform vec3 u_filter;
+
+vec3 photoFilter(vec3 c) {
+  vec3 filtered = c * u_filter;
+  return u_preserve ? clamp(setLum(filtered, lum(c)), 0.0, 1.0) : filtered;
+}
+
+// Channel Mixer: each row is the red, green and blue shares and the constant, already divided by 100.
+uniform vec4 u_mixRed;
+uniform vec4 u_mixGreen;
+uniform vec4 u_mixBlue;
+uniform vec4 u_mixGray;
+uniform bool u_monochrome;
+
+float mixed(vec3 c, vec4 row) { return clamp01(dot(row.rgb, c) + row.a); }
+
+vec3 channelMixer(vec3 c) {
+  if (u_monochrome) return vec3(mixed(c, u_mixGray));
+  return vec3(mixed(c, u_mixRed), mixed(c, u_mixGreen), mixed(c, u_mixBlue));
+}
+
+// Selective Color: cyan, magenta, yellow and black for reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks, divided by 100.
+uniform vec4 u_inks[9];
+uniform bool u_absolute;
+
+vec3 selectiveColor(vec3 c) {
+  float mx = max(max(c.r, c.g), c.b);
+  float mn = min(min(c.r, c.g), c.b);
+  float md = c.r + c.g + c.b - mx - mn;
+  float w[9];
+  for (int i = 0; i < 9; i++) w[i] = 0.0;
+  if (c.r >= c.g && c.r >= c.b) {
+    w[0] = mx - md;
+    if (c.g >= c.b) w[1] = md - mn; else w[5] = md - mn;
+  } else if (c.g >= c.b) {
+    w[2] = mx - md;
+    if (c.r >= c.b) w[1] = md - mn; else w[3] = md - mn;
+  } else {
+    w[4] = mx - md;
+    if (c.g >= c.r) w[3] = md - mn; else w[5] = md - mn;
+  }
+  w[6] = clamp01((mn - 0.5) * 2.0);
+  w[7] = clamp01(1.0 - abs(mx - 0.5) - abs(mn - 0.5));
+  w[8] = clamp01((0.5 - mx) * 2.0);
+  float black = 1.0 - mx;
+  vec3 change = vec3(0.0);
+  for (int i = 0; i < 9; i++) {
+    if (w[i] == 0.0) continue;
+    vec4 ink = u_inks[i];
+    float k = ink.w * (u_absolute ? 1.0 : black);
+    vec3 share = u_absolute ? vec3(1.0) : 1.0 - c;
+    change += w[i] * (ink.xyz * share + k);
+  }
+  return clamp(c - change, 0.0, 1.0);
+}
+
+// Posterize and Threshold, on the 8-bit values the channels show; a value right on a step reaches it.
+uniform float u_levels;
+uniform float u_level;
+
+vec3 eightBit(vec3 c) { return floor(clamp(c, 0.0, 1.0) * 255.0 + 0.5); }
+vec3 posterize(vec3 c) { return min(vec3(u_levels - 1.0), floor(eightBit(c) * u_levels / 255.0 + 1e-4)) / (u_levels - 1.0); }
+vec3 threshold(vec3 c) { return vec3(dot(eightBit(c), vec3(0.2126, 0.7152, 0.0722)) + 1e-4 >= u_level ? 1.0 : 0.0); }
+
+// Color Lookup: a table u_tableSize entries a side, spanning u_domainMin to u_domainMax.
+uniform sampler3D u_table;
+uniform float u_tableSize;
+uniform vec3 u_domainMin;
+uniform vec3 u_domainMax;
+
+vec3 lookUp(vec3 c) {
+  vec3 p = clamp((c - u_domainMin) / (u_domainMax - u_domainMin), 0.0, 1.0);
+  return clamp(texture(u_table, (p * (u_tableSize - 1.0) + 0.5) / u_tableSize).rgb, 0.0, 1.0);
+}
 `
 
 /**
@@ -222,6 +330,7 @@ vec3 grain(vec3 c, vec2 p) {
 export const ADJUST_FRAGMENT = `#version 300 es
 precision highp float;
 precision highp int;
+precision highp sampler3D;
 uniform sampler2D u_backdrop;
 uniform sampler2D u_source;
 uniform vec2 u_sourceSize;
@@ -253,6 +362,13 @@ void main() {
     vec4 s = texture(u_source, (gl_FragCoord.xy + u_sourceOffset) / u_sourceSize);
     ca = s.a > 1e-5 ? clamp(s.rgb / s.a, 0.0, 1.0) : cb;
   } else if (u_kind == 9) ca = addNoise(cb, uvec2(floor(doc)));
+  else if (u_kind == 10) ca = vibrance(cb);
+  else if (u_kind == 11) ca = photoFilter(cb);
+  else if (u_kind == 12) ca = channelMixer(cb);
+  else if (u_kind == 13) ca = selectiveColor(cb);
+  else if (u_kind == 14) ca = posterize(cb);
+  else if (u_kind == 15) ca = threshold(cb);
+  else if (u_kind == 16) ca = lookUp(cb);
   vec3 blended = clamp(blendColor(u_mode, cb, ca), 0.0, 1.0);
   o = vec4(mix(cb, blended, coverage(vec2(0.0))) * b.a, b.a);
 }

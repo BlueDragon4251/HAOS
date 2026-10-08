@@ -1,4 +1,4 @@
-import { IconArrowsShuffle, IconBackground, IconChevronDown, IconChevronRight, IconContrast, IconEye, IconEyeOff, IconLink, IconLinkOff, IconMask, IconStack2, IconTrash } from '@tabler/icons-react'
+import { IconArrowsShuffle, IconBackground, IconChevronDown, IconChevronRight, IconContrast, IconCube3dSphere, IconEye, IconEyeOff, IconLink, IconLinkOff, IconMask, IconStack2, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -9,10 +9,16 @@ import {
   defaultAdjustment,
   defaultEffect,
   type EffectKind,
+  HERALD_RANGES,
+  type HeraldAdjustment,
+  type Inks,
   type LayerEffects,
   type LevelRange,
+  type MixerRow,
   RANGES,
   type RGB,
+  SELECTIVE_RANGES,
+  type SelectiveRange,
   type ShapeKind,
   type ShapeStyle
 } from '../../../shared/canvas/comp-format.ts'
@@ -20,11 +26,13 @@ import { cn } from '../../lib/cn.ts'
 import { maskAction } from './actions.ts'
 import { MAX_LINE_WIDTH, shapeWith } from './agent-model.ts'
 import { cannotSegment } from './ai/subject.ts'
-import { ADJUSTMENT_ICONS, EFFECT_ICONS } from './adjustment-icons.tsx'
+import { ADJUSTMENT_ICONS, adjustmentKindOf, EFFECT_ICONS } from './adjustment-icons.tsx'
 import { cssOf, type RGB as Bytes } from './color.ts'
 import { ColorPicker } from './ColorPicker.tsx'
 import { curveTable, resolved } from './engine/adjust-math.ts'
+import { parseCube } from './engine/color-table.ts'
 import { type CanvasDocument, type CanvasLayer, type DocState, findLayer, withLayer } from './engine/document.ts'
+import { heraldOf, withHerald } from './engine/herald-adjust.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, takesEffects, withEffect } from './engine/layer-effects.ts'
 import { useRevision } from './hooks.ts'
 import { $dialog } from './menus.ts'
@@ -655,6 +663,277 @@ function NoiseControls({ adjustment, edit, set }: AdjustmentProps) {
   )
 }
 
+// Herald's own adjustments: each change sets the settings and their stand-in together.
+
+interface HeraldProps<K extends HeraldAdjustment['kind']> {
+  settings: Extract<HeraldAdjustment, { kind: K }>
+  edit: Edit
+  /** Change the settings as they were when the hold began. */
+  set: (change: (settings: Extract<HeraldAdjustment, { kind: K }>) => Partial<Extract<HeraldAdjustment, { kind: K }>>) => void
+}
+
+const GRAYS = 'linear-gradient(to right, #000, #fff)'
+
+function BrightnessContrastControls({ settings, edit, set }: HeraldProps<'Brightness/Contrast'>) {
+  return (
+    <>
+      <Slider label="Brightness" value={settings.brightness} min={HERALD_RANGES.brightness[0]} max={HERALD_RANGES.brightness[1]} track={GRAYS} edit={edit} onChange={(brightness) => set(() => ({ brightness }))} />
+      <Slider label="Contrast" value={settings.contrast} min={HERALD_RANGES.contrast[0]} max={HERALD_RANGES.contrast[1]} edit={edit} onChange={(contrast) => set(() => ({ contrast }))} />
+    </>
+  )
+}
+
+function VibranceControls({ settings, edit, set }: HeraldProps<'Vibrance'>) {
+  return (
+    <>
+      <Slider label="Vibrance" value={settings.vibrance} min={HERALD_RANGES.vibrance[0]} max={HERALD_RANGES.vibrance[1]} track="linear-gradient(to right, #8a8a8a, #c96, #36f)" edit={edit} onChange={(vibrance) => set(() => ({ vibrance }))} />
+      <Slider label="Saturation" value={settings.saturation} min={HERALD_RANGES.saturation[0]} max={HERALD_RANGES.saturation[1]} track="linear-gradient(to right, #888, #f33)" edit={edit} onChange={(saturation) => set(() => ({ saturation }))} />
+    </>
+  )
+}
+
+/** Photo Filter colours to start from; any other colour is the person's own. */
+const FILTERS: { label: string; colour: Bytes }[] = [
+  { label: 'Warm', colour: [236, 138, 0] },
+  { label: 'Cool', colour: [0, 109, 255] },
+  { label: 'Sepia', colour: [172, 122, 51] },
+  { label: 'Underwater', colour: [0, 193, 177] },
+  { label: 'Red', colour: [234, 26, 26] },
+  { label: 'Orange', colour: [243, 132, 23] },
+  { label: 'Yellow', colour: [249, 227, 28] },
+  { label: 'Green', colour: [25, 201, 25] },
+  { label: 'Cyan', colour: [29, 203, 234] },
+  { label: 'Blue', colour: [29, 53, 234] },
+  { label: 'Violet', colour: [155, 29, 234] },
+  { label: 'Magenta', colour: [227, 24, 227] }
+]
+
+function PhotoFilterControls({ settings, edit, set }: HeraldProps<'Photo Filter'>) {
+  const bytes = toBytes(settings.color)
+  const preset = FILTERS.findIndex((filter) => filter.colour.every((value, i) => value === bytes[i]))
+
+  return (
+    <>
+      <Row label="Filter">
+        <select
+          aria-label="Filter colour"
+          value={preset}
+          onChange={(event) => {
+            const chosen = FILTERS[Number(event.target.value)]
+
+            if (chosen) {
+              set(() => ({ color: toUnit(chosen.colour) }))
+            }
+          }}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="glass-input h-6 rounded-md px-1 text-[12px] text-fg outline-none"
+        >
+          {preset < 0 && <option value={-1}>Own colour</option>}
+          {FILTERS.map((filter, i) => (
+            <option key={filter.label} value={i}>
+              {filter.label}
+            </option>
+          ))}
+        </select>
+        <Swatch label="Filter colour" colour={settings.color} edit={edit} onChange={(color) => set(() => ({ color }))} />
+      </Row>
+      <Slider label="Density" value={settings.density} min={HERALD_RANGES.density[0]} max={HERALD_RANGES.density[1]} unit="%" edit={edit} onChange={(density) => set(() => ({ density }))} />
+      <Check label="Preserve luminosity" checked={settings.preserveLuminosity} onChange={(preserveLuminosity) => set(() => ({ preserveLuminosity }))} />
+    </>
+  )
+}
+
+type MixerOutput = 'red' | 'green' | 'blue'
+
+function ChannelMixerControls({ settings, edit, set }: HeraldProps<'Channel Mixer'>) {
+  const [output, setOutput] = useState<MixerOutput>('red')
+  const key = settings.monochrome ? 'gray' : output
+  const row = settings[key]
+  const put = (change: Partial<MixerRow>) => set((current) => ({ [key]: { ...current[key], ...change } }))
+  const total = Math.round(row.red + row.green + row.blue)
+
+  return (
+    <>
+      {!settings.monochrome && (
+        <Segmented<MixerOutput>
+          label="Output channel"
+          value={output}
+          onChange={setOutput}
+          options={[
+            { id: 'red', label: 'Red' },
+            { id: 'green', label: 'Green' },
+            { id: 'blue', label: 'Blue' }
+          ]}
+        />
+      )}
+      {(['red', 'green', 'blue'] as const).map((source) => (
+        <Slider
+          key={source}
+          label={source[0].toUpperCase() + source.slice(1)}
+          value={row[source]}
+          min={HERALD_RANGES.mixer[0]}
+          max={HERALD_RANGES.mixer[1]}
+          unit="%"
+          track={`linear-gradient(to right, #000, ${source === 'red' ? '#f33' : source === 'green' ? '#3c3' : '#36f'})`}
+          edit={edit}
+          onChange={(value) => put({ [source]: value })}
+        />
+      ))}
+      <Slider label="Constant" value={row.constant} min={HERALD_RANGES.mixer[0]} max={HERALD_RANGES.mixer[1]} unit="%" track={GRAYS} edit={edit} onChange={(constant) => put({ constant })} />
+      <div className={cn('px-3 pb-1 text-[11px]', total > 100 ? 'text-amber-300/90' : 'text-fg-3')}>Total {total}%{total > 100 ? ': brighter than the original, and may clip' : ''}</div>
+      <Check label="Monochrome" checked={settings.monochrome} onChange={(monochrome) => set(() => ({ monochrome }))} />
+    </>
+  )
+}
+
+const RANGE_LABELS: Record<SelectiveRange, string> = {
+  reds: 'Reds',
+  yellows: 'Yellows',
+  greens: 'Greens',
+  cyans: 'Cyans',
+  blues: 'Blues',
+  magentas: 'Magentas',
+  whites: 'Whites',
+  neutrals: 'Neutrals',
+  blacks: 'Blacks'
+}
+
+const INKS: { key: keyof Inks; label: string; track: string }[] = [
+  { key: 'cyan', label: 'Cyan', track: 'linear-gradient(to right, #f33, #888, #0ff)' },
+  { key: 'magenta', label: 'Magenta', track: 'linear-gradient(to right, #3c3, #888, #f0f)' },
+  { key: 'yellow', label: 'Yellow', track: 'linear-gradient(to right, #36f, #888, #ff0)' },
+  { key: 'black', label: 'Black', track: 'linear-gradient(to right, #fff, #888, #000)' }
+]
+
+function SelectiveColorControls({ settings, edit, set }: HeraldProps<'Selective Color'>) {
+  const [range, setRange] = useState<SelectiveRange>('reds')
+  const inks = settings[range]
+
+  return (
+    <>
+      <Row label="Colours">
+        <select aria-label="Colour range" value={range} onChange={(event) => setRange(event.target.value as SelectiveRange)} onKeyDown={(event) => event.stopPropagation()} className="glass-input h-6 rounded-md px-1 text-[12px] text-fg outline-none">
+          {SELECTIVE_RANGES.map((entry) => (
+            <option key={entry} value={entry}>
+              {RANGE_LABELS[entry]}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {INKS.map((ink) => (
+        <Slider
+          key={ink.key}
+          label={ink.label}
+          value={inks[ink.key]}
+          min={HERALD_RANGES.inks[0]}
+          max={HERALD_RANGES.inks[1]}
+          unit="%"
+          track={ink.track}
+          edit={edit}
+          onChange={(value) => set((current) => ({ [range]: { ...current[range], [ink.key]: value } }))}
+        />
+      ))}
+      <Segmented
+        label="Method"
+        value={settings.absolute ? 'absolute' : 'relative'}
+        onChange={(value) => set(() => ({ absolute: value === 'absolute' }))}
+        options={[
+          { id: 'relative', label: 'Relative' },
+          { id: 'absolute', label: 'Absolute' }
+        ]}
+      />
+    </>
+  )
+}
+
+function PosterizeControls({ settings, edit, set }: HeraldProps<'Posterize'>) {
+  return <Slider label="Levels" value={settings.levels} min={HERALD_RANGES.posterize[0]} max={HERALD_RANGES.posterize[1]} curve="log" edit={edit} onChange={(levels) => set(() => ({ levels: Math.round(levels) }))} />
+}
+
+function ThresholdControls({ settings, edit, set }: HeraldProps<'Threshold'>) {
+  return <Slider label="Threshold level" value={settings.level} min={HERALD_RANGES.threshold[0]} max={HERALD_RANGES.threshold[1]} track={GRAYS} edit={edit} onChange={(level) => set(() => ({ level: Math.round(level) }))} />
+}
+
+function ColorLookupControls({ layer, settings, edit }: { layer: CanvasLayer; settings: Extract<HeraldAdjustment, { kind: 'Color Lookup' }>; edit: Edit }) {
+  const [error, setError] = useState<string | null>(null)
+
+  const load = async () => {
+    const [file] = await window.heraldOS.fs.pickFiles({})
+
+    if (!file) {
+      return
+    }
+
+    try {
+      const table = parseCube(await window.heraldOS.canvas.readTable(file))
+      const name = file.split('/').pop() ?? file
+      setError(null)
+      edit.change('Color Lookup', () => ({ table, ...withHerald({ ...settings, name, size: table.size }) }))
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(failure))
+    }
+  }
+
+  return (
+    <div className="px-3 py-2 text-[12px] text-fg-2">
+      {settings.size > 0 ? (
+        <div className="flex items-center gap-1.5">
+          <IconCube3dSphere size={14} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 flex-1 truncate" title={layer.table?.title || settings.name}>
+            {settings.name || layer.table?.title || 'Colour table'}
+          </span>
+          <span className="text-fg-3 tabular-nums">
+            {settings.size}
+            <sup>3</sup>
+          </span>
+        </div>
+      ) : (
+        <div className="text-fg-3">No table yet: load a .cube file (a 3D colour lookup table, as grading tools save them).</div>
+      )}
+      <button type="button" onClick={() => void load()} className="mt-2 h-7 rounded-md px-2.5 text-[12px] text-fg ring-1 ring-line hover:bg-white/8">
+        {settings.size > 0 ? 'Load another table…' : 'Load a table…'}
+      </button>
+      {error && <div className="mt-2 text-[11.5px] text-red-300">{error}</div>}
+    </div>
+  )
+}
+
+/** The controls of a Herald-only adjustment; a kind from a newer Herald Canvas only says what it is. */
+function HeraldControls({ layer, edit }: { layer: CanvasLayer; edit: Edit }) {
+  const settings = heraldOf(layer)
+
+  if (!settings) {
+    return <div className="px-3 py-2 text-[12px] text-fg-3">{String(layer.heraldAdjustment?.kind)} comes from a newer Herald Canvas: it shows as its stand-in here, and keeps its settings for that version.</div>
+  }
+
+  const set = (change: (settings: HeraldAdjustment) => Partial<HeraldAdjustment>) =>
+    edit.change(settings.kind, (current) => {
+      const now = heraldOf(current) ?? settings
+
+      return withHerald({ ...now, ...change(now) } as HeraldAdjustment)
+    })
+  const props = { edit, set: set as never }
+
+  switch (settings.kind) {
+    case 'Brightness/Contrast':
+      return <BrightnessContrastControls settings={settings} {...props} />
+    case 'Vibrance':
+      return <VibranceControls settings={settings} {...props} />
+    case 'Photo Filter':
+      return <PhotoFilterControls settings={settings} {...props} />
+    case 'Channel Mixer':
+      return <ChannelMixerControls settings={settings} {...props} />
+    case 'Selective Color':
+      return <SelectiveColorControls settings={settings} {...props} />
+    case 'Posterize':
+      return <PosterizeControls settings={settings} {...props} />
+    case 'Threshold':
+      return <ThresholdControls settings={settings} {...props} />
+    case 'Color Lookup':
+      return <ColorLookupControls layer={layer} settings={settings} edit={edit} />
+  }
+}
+
 const CONTROLS: Partial<Record<Adjustment['kind'], (props: AdjustmentProps) => React.ReactNode>> = {
   'Hue/Saturation': HueSaturationControls,
   Levels: LevelsControls,
@@ -670,6 +949,10 @@ const CONTROLS: Partial<Record<Adjustment['kind'], (props: AdjustmentProps) => R
 }
 
 function AdjustmentControls({ layer, edit }: { layer: CanvasLayer; edit: Edit }) {
+  if (layer.heraldAdjustment) {
+    return <HeraldControls layer={layer} edit={edit} />
+  }
+
   const adjustment = layer.adjustment!
   const Controls = CONTROLS[adjustment.kind]
   const set = (change: (adjustment: Adjustment) => Partial<Adjustment>) => edit.change(adjustment.kind, (current) => ({ adjustment: { ...current.adjustment!, ...change(current.adjustment!) } }))
@@ -888,7 +1171,8 @@ function LayerProperties({ doc, layer }: { doc: CanvasDocument; layer: CanvasLay
 export function PropertiesPanel({ doc, header }: { doc: CanvasDocument; header?: React.ReactNode }) {
   useRevision(doc)
   const layer = doc.active
-  const Icon = layer?.adjustment ? ADJUSTMENT_ICONS[layer.adjustment.kind] : null
+  const kind = layer ? adjustmentKindOf(layer) : null
+  const Icon = kind ? ADJUSTMENT_ICONS[kind] : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -897,7 +1181,7 @@ export function PropertiesPanel({ doc, header }: { doc: CanvasDocument; header?:
         {layer && (
           <span className="flex min-w-0 items-center gap-1 truncate">
             {Icon && <Icon size={12} className="shrink-0" />}
-            <span className="truncate">{layer.adjustment ? layer.adjustment.kind : layer.shape ? `${layer.name}: shape and effects` : takesEffects(layer) ? `${layer.name}: effects` : layer.name}</span>
+            <span className="truncate">{kind ?? (layer.shape ? `${layer.name}: shape and effects` : takesEffects(layer) ? `${layer.name}: effects` : layer.name)}</span>
           </span>
         )}
       </div>

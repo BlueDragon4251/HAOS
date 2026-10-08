@@ -32,6 +32,9 @@ const MAX_LAYERED_BYTES = 2 * 1024 * 1024 * 1024
 /** The most one part of a file read or written in parts may hold (a message must stay well under Chromium's limit). */
 const MAX_PART_BYTES = 64 * 1024 * 1024
 
+/** The largest colour table read: a 65-entry `.cube` written with plenty of digits. */
+const MAX_TABLE_BYTES = 64 * 1024 * 1024
+
 /** The largest export: PNG and JPEG sides, and pixels in all. */
 const MAX_EXPORT_SIDE = 65_535
 const MAX_EXPORT_PIXELS = 1_000_000_000
@@ -166,7 +169,9 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.canvasReadAsset, async (_event, target: string, name: string) => {
     const asset = String(name)
 
-    return pixelsOrBytes(await readAsset(projectPath(target), asset), asset.endsWith('.mask.png') ? 1 : 4)
+    const bytes = await readAsset(projectPath(target), asset)
+
+    return asset.endsWith('.png') ? pixelsOrBytes(bytes, asset.endsWith('.mask.png') ? 1 : 4) : bytes
   })
 
   ipcMain.handle(IPC.canvasWrite, async (event, target: string, request: CanvasWrite) => {
@@ -192,6 +197,22 @@ export function registerCanvasIpc(getWindow: () => BrowserWindow | null): void {
     }
 
     return pixelsOrBytes(new Uint8Array(await fs.readFile(file)), 4)
+  })
+
+  ipcMain.handle(IPC.canvasReadTable, async (_event, target: string): Promise<Uint8Array> => {
+    const file = assertWritable(String(target))
+
+    if (path.extname(file).toLowerCase() !== '.cube') {
+      throw new Error(`${path.basename(file)} is not a .cube colour table`)
+    }
+
+    const stat = await fs.stat(file)
+
+    if (!stat.isFile() || stat.size > MAX_TABLE_BYTES) {
+      throw new Error(`${path.basename(file)} is larger than a colour table can be (${MAX_TABLE_BYTES / 1024 / 1024} MB)`)
+    }
+
+    return new Uint8Array(await fs.readFile(file))
   })
 
   ipcMain.handle(IPC.canvasReadPart, async (_event, target: string, offset: number, length: number): Promise<CanvasFilePart> => {

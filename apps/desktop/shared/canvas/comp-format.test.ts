@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest'
 import {
   CompFormatError,
   defaultAdjustment,
+  defaultHeraldAdjustment,
   defaultTransform,
   FORMAT_ID,
   FORMAT_VERSION,
+  HERALD_ADJUSTMENT_KINDS,
   imageFileFor,
   type LayerRecord,
   maskFileFor,
@@ -18,7 +20,8 @@ import {
   RANGES,
   type RangeName,
   referencedAssets,
-  serializeManifest
+  serializeManifest,
+  tableFileFor
 } from './comp-format.ts'
 
 const A = '6F1D3C2A-0B7E-4E8A-9C4D-2A1B3C4D5E6F'
@@ -234,6 +237,53 @@ describe('serializeManifest', () => {
     const broken = newManifest(10, 10)
     broken.layers = [layer(A), layer(A)]
     expect(() => serializeManifest(broken)).toThrow(CompFormatError)
+  })
+})
+
+describe("Herald's own adjustments", () => {
+  const adjustmentLayer = (herald: Record<string, unknown>) => ({ ...layer(A), imageFile: undefined, adjustment: defaultAdjustment('Levels'), heraldAdjustment: herald })
+
+  it('round-trips every kind with its defaults filled in, beside a stand-in Compositor reads', () => {
+    for (const kind of HERALD_ADJUSTMENT_KINDS) {
+      const base = newManifest(100, 50)
+      base.layers = [adjustmentLayer({ kind }) as LayerRecord]
+      const written = JSON.parse(serializeManifest(base))
+      expect(written.layers[0].heraldAdjustment, kind).toEqual(defaultHeraldAdjustment(kind))
+      // What Compositor decodes is untouched: its own kind, complete.
+      expect(written.layers[0].adjustment.kind).toBe('Levels')
+      expect(parseManifestText(JSON.stringify(written)).layers[0].heraldAdjustment).toEqual(defaultHeraldAdjustment(kind))
+    }
+  })
+
+  it('keeps settings and fields it does not know, and a kind from a newer version as it was', () => {
+    const parsed = parseManifest(manifest([adjustmentLayer({ kind: 'Vibrance', vibrance: 35, note: 'kept' })]))
+    expect(parsed.layers[0].heraldAdjustment).toEqual({ kind: 'Vibrance', vibrance: 35, saturation: 0, note: 'kept' })
+    const future = { kind: 'Shadows/Highlights', amount: 12, nested: { a: [1, 2] } }
+    expect(parseManifest(manifest([adjustmentLayer(future)])).layers[0].heraldAdjustment).toEqual(future)
+  })
+
+  it('holds the settings to their bounds and needs an adjustment beside them', () => {
+    const cases: [string, unknown][] = [
+      ['brightness past 150', manifest([adjustmentLayer({ kind: 'Brightness/Contrast', brightness: 151 })])],
+      ['two posterize levels and a half', manifest([adjustmentLayer({ kind: 'Posterize', levels: 2.5 })])],
+      ['a mixer share past 200%', manifest([adjustmentLayer({ kind: 'Channel Mixer', red: { red: 250 } })])],
+      ['an ink past 100%', manifest([adjustmentLayer({ kind: 'Selective Color', reds: { cyan: -101 } })])],
+      ['a one-entry table', manifest([adjustmentLayer({ kind: 'Color Lookup', size: 1 })])],
+      ['no kind', manifest([adjustmentLayer({ vibrance: 1 })])],
+      ['settings on a picture layer', manifest([layer(A, { heraldAdjustment: { kind: 'Threshold', level: 9 } })])]
+    ]
+
+    for (const [label, value] of cases) {
+      expect(() => parseManifest(value), label).toThrow(CompFormatError)
+    }
+  })
+
+  it('names a Color Lookup layer’s table among the project’s files once it has one', () => {
+    const base = newManifest(100, 50)
+    base.layers = [adjustmentLayer({ kind: 'Color Lookup', name: 'Film.cube', size: 33 }) as LayerRecord]
+    expect([...referencedAssets(base)]).toEqual([tableFileFor(A)])
+    base.layers = [adjustmentLayer({ kind: 'Color Lookup', size: 0 }) as LayerRecord]
+    expect([...referencedAssets(base)]).toEqual([])
   })
 })
 

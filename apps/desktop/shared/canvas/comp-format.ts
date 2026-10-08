@@ -119,6 +119,121 @@ export const ADJUSTMENT_KINDS = [
 
 export type AdjustmentKind = (typeof ADJUSTMENT_KINDS)[number]
 
+/**
+ * Adjustments only Herald Canvas makes. Compositor reads `adjustment.kind` from its own closed list
+ * and refuses a whole project over a kind it does not know, so these never go there: a layer keeps
+ * one in `heraldAdjustment`, which Compositor skips like any field it does not know, while
+ * `adjustment` holds one of Compositor's kinds, the very same change where one exists, otherwise
+ * none (see ADR-020).
+ */
+export const HERALD_ADJUSTMENT_KINDS = ['Brightness/Contrast', 'Vibrance', 'Photo Filter', 'Channel Mixer', 'Selective Color', 'Posterize', 'Threshold', 'Color Lookup'] as const
+
+export type HeraldAdjustmentKind = (typeof HERALD_ADJUSTMENT_KINDS)[number]
+
+export const isHeraldKind = (kind: unknown): kind is HeraldAdjustmentKind => (HERALD_ADJUSTMENT_KINDS as readonly unknown[]).includes(kind)
+
+/** Bounds of the Herald-only settings: Herald's own, since Compositor never reads them. */
+export const HERALD_RANGES = {
+  brightness: [-150, 150],
+  contrast: [-50, 100],
+  vibrance: [-100, 100],
+  saturation: [-100, 100],
+  density: [0, 100],
+  mixer: [-200, 200],
+  inks: [-100, 100],
+  posterize: [2, 255],
+  threshold: [1, 255],
+  /** Entries along each side of a colour table; 0 is a Color Lookup without one yet. */
+  tableSize: [2, 65]
+} as const satisfies Record<string, readonly [number, number]>
+
+export const SELECTIVE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'] as const
+export type SelectiveRange = (typeof SELECTIVE_RANGES)[number]
+
+/** A Channel Mixer output: percentages of the red, green and blue inputs, plus a constant. */
+export interface MixerRow {
+  red: number
+  green: number
+  blue: number
+  constant: number
+}
+
+/** Selective Color's changes to one range, as percentages of each ink. */
+export interface Inks {
+  cyan: number
+  magenta: number
+  yellow: number
+  black: number
+}
+
+interface OpenRecord {
+  [key: string]: unknown
+}
+
+export interface BrightnessContrastSettings extends OpenRecord {
+  kind: 'Brightness/Contrast'
+  brightness: number
+  contrast: number
+}
+
+export interface VibranceSettings extends OpenRecord {
+  kind: 'Vibrance'
+  vibrance: number
+  saturation: number
+}
+
+export interface PhotoFilterSettings extends OpenRecord {
+  kind: 'Photo Filter'
+  color: RGB
+  /** Percent. */
+  density: number
+  preserveLuminosity: boolean
+}
+
+export interface ChannelMixerSettings extends OpenRecord {
+  kind: 'Channel Mixer'
+  /** One gray output from the gray row instead of three colour ones. */
+  monochrome: boolean
+  red: MixerRow
+  green: MixerRow
+  blue: MixerRow
+  gray: MixerRow
+}
+
+export interface SelectiveColorSettings extends OpenRecord, Record<SelectiveRange, Inks> {
+  kind: 'Selective Color'
+  /** Changes by the given amount, rather than by that share of the ink there is. */
+  absolute: boolean
+}
+
+export interface PosterizeSettings extends OpenRecord {
+  kind: 'Posterize'
+  levels: number
+}
+
+export interface ThresholdSettings extends OpenRecord {
+  kind: 'Threshold'
+  level: number
+}
+
+/** A colour table, kept in the project as `images/<layer ID>.cube` once `size` is above 0. */
+export interface ColorLookupSettings extends OpenRecord {
+  kind: 'Color Lookup'
+  /** What the table was called (its file name). */
+  name: string
+  size: number
+}
+
+export type HeraldAdjustment =
+  | BrightnessContrastSettings
+  | VibranceSettings
+  | PhotoFilterSettings
+  | ChannelMixerSettings
+  | SelectiveColorSettings
+  | PosterizeSettings
+  | ThresholdSettings
+  | ColorLookupSettings
+
 export const SAMPLING = ['High quality', 'Smooth', 'Nearest'] as const
 export type Sampling = (typeof SAMPLING)[number]
 
@@ -333,6 +448,8 @@ export interface LayerRecord {
   maskPlacement?: LayerTransform
   maskLinked?: boolean
   adjustment?: Adjustment
+  /** An adjustment only Herald Canvas has; `adjustment` then holds its stand-in. A kind from a newer Herald is kept as it was. */
+  heraldAdjustment?: HeraldAdjustment
   text?: TextStyle
   shape?: ShapeStyle
   effects?: LayerEffects
@@ -379,6 +496,8 @@ export function newId(): string {
 export const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID.test(value)
 export const imageFileFor = (id: string): string => `${id.toUpperCase()}.png`
 export const maskFileFor = (id: string): string => `${id.toUpperCase()}.mask.png`
+/** A Color Lookup layer's table; Compositor reads only the images layers name, so it passes this file by. */
+export const tableFileFor = (id: string): string => `${id.toUpperCase()}.cube`
 
 export const identityRange = (): LevelRange => ({ black: 0, gamma: 1, white: 255, outputBlack: 0, outputWhite: 255 })
 export const identityLevels = (): LevelsSettings => ({ channel: 'RGB', ranges: [identityRange(), identityRange(), identityRange(), identityRange()] })
@@ -437,6 +556,37 @@ export function defaultAdjustment(kind: AdjustmentKind): Adjustment {
   }
 
   return adjustment
+}
+
+const noInks = (): Inks => ({ cyan: 0, magenta: 0, yellow: 0, black: 0 })
+
+/** Settings each Herald-only kind starts with: no change, except a Photo Filter's warming tint. */
+export function defaultHeraldAdjustment(kind: HeraldAdjustmentKind): HeraldAdjustment {
+  switch (kind) {
+    case 'Brightness/Contrast':
+      return { kind, brightness: 0, contrast: 0 }
+    case 'Vibrance':
+      return { kind, vibrance: 0, saturation: 0 }
+    case 'Photo Filter':
+      return { kind, color: { red: 0.925, green: 0.541, blue: 0 }, density: 25, preserveLuminosity: true }
+    case 'Channel Mixer':
+      return {
+        kind,
+        monochrome: false,
+        red: { red: 100, green: 0, blue: 0, constant: 0 },
+        green: { red: 0, green: 100, blue: 0, constant: 0 },
+        blue: { red: 0, green: 0, blue: 100, constant: 0 },
+        gray: { red: 40, green: 40, blue: 20, constant: 0 }
+      }
+    case 'Selective Color':
+      return { kind, absolute: false, ...(Object.fromEntries(SELECTIVE_RANGES.map((range) => [range, noInks()])) as Record<SelectiveRange, Inks>) }
+    case 'Posterize':
+      return { kind, levels: 4 }
+    case 'Threshold':
+      return { kind, level: 128 }
+    case 'Color Lookup':
+      return { kind, name: '', size: 0 }
+  }
 }
 
 export const defaultEffect = {
@@ -741,6 +891,84 @@ function parseAdjustment(value: unknown, field: string): Adjustment {
   return adjustment
 }
 
+type HeraldRangeName = keyof typeof HERALD_RANGES
+
+/**
+ * A Herald-only adjustment's settings, held to Herald's bounds with its defaults filled in. A kind
+ * this version does not know (from a newer Herald Canvas) is kept as it was: the layer then shows
+ * its stand-in, as Compositor does.
+ */
+function parseHeraldAdjustment(value: unknown, field: string): HeraldAdjustment {
+  if (!isObject(value) || typeof value.kind !== 'string' || !value.kind) {
+    fail(`${field} is not a Herald Canvas adjustment`, field)
+  }
+
+  if (!isHeraldKind(value.kind)) {
+    return value as unknown as HeraldAdjustment
+  }
+
+  const kind = value.kind
+  const number = (record: Json, key: string, at: string, range: HeraldRangeName, fallback: number) => finite(record[key], `${at}.${key}`, HERALD_RANGES[range][0], HERALD_RANGES[range][1], fallback)
+  const part = (key: string): Json => (isObject(value[key]) ? value[key] : {})
+
+  switch (kind) {
+    case 'Brightness/Contrast':
+      return { ...value, kind, brightness: number(value, 'brightness', field, 'brightness', 0), contrast: number(value, 'contrast', field, 'contrast', 0) }
+    case 'Vibrance':
+      return { ...value, kind, vibrance: number(value, 'vibrance', field, 'vibrance', 0), saturation: number(value, 'saturation', field, 'saturation', 0) }
+    case 'Photo Filter': {
+      const defaults = defaultHeraldAdjustment(kind) as PhotoFilterSettings
+
+      return {
+        ...value,
+        kind,
+        color: rgb(part('color'), `${field}.color`, defaults.color),
+        density: number(value, 'density', field, 'density', defaults.density),
+        preserveLuminosity: bool(value.preserveLuminosity, `${field}.preserveLuminosity`, true)
+      }
+    }
+    case 'Channel Mixer': {
+      const defaults = defaultHeraldAdjustment(kind) as ChannelMixerSettings
+      const row = (key: 'red' | 'green' | 'blue' | 'gray'): MixerRow => {
+        const at = `${field}.${key}`
+        const entry = part(key)
+
+        return {
+          red: number(entry, 'red', at, 'mixer', defaults[key].red),
+          green: number(entry, 'green', at, 'mixer', defaults[key].green),
+          blue: number(entry, 'blue', at, 'mixer', defaults[key].blue),
+          constant: number(entry, 'constant', at, 'mixer', defaults[key].constant)
+        }
+      }
+
+      return { ...value, kind, monochrome: bool(value.monochrome, `${field}.monochrome`, false), red: row('red'), green: row('green'), blue: row('blue'), gray: row('gray') }
+    }
+    case 'Selective Color': {
+      const inks = (range: SelectiveRange): Inks => {
+        const at = `${field}.${range}`
+        const entry = part(range)
+
+        return { cyan: number(entry, 'cyan', at, 'inks', 0), magenta: number(entry, 'magenta', at, 'inks', 0), yellow: number(entry, 'yellow', at, 'inks', 0), black: number(entry, 'black', at, 'inks', 0) }
+      }
+
+      return { ...value, kind, absolute: bool(value.absolute, `${field}.absolute`, false), ...(Object.fromEntries(SELECTIVE_RANGES.map((range) => [range, inks(range)])) as Record<SelectiveRange, Inks>) }
+    }
+    case 'Posterize':
+      return { ...value, kind, levels: integer(value.levels ?? 4, `${field}.levels`, ...HERALD_RANGES.posterize) }
+    case 'Threshold':
+      return { ...value, kind, level: integer(value.level ?? 128, `${field}.level`, ...HERALD_RANGES.threshold) }
+    case 'Color Lookup': {
+      const size = integer(value.size ?? 0, `${field}.size`, 0, HERALD_RANGES.tableSize[1])
+
+      if (size > 0 && size < HERALD_RANGES.tableSize[0]) {
+        fail(`${field}.size must be 0 (no table) or from ${HERALD_RANGES.tableSize[0]} to ${HERALD_RANGES.tableSize[1]}`, `${field}.size`)
+      }
+
+      return { ...value, kind, name: typeof value.name === 'string' ? value.name : '', size }
+    }
+  }
+}
+
 /**
  * Compositor's own Hue/Saturation record (a setting per colour range, kept as it was): its ranges'
  * values are held to the same bounds, since it refuses the project over them too. Its dictionaries
@@ -1039,6 +1267,16 @@ function parseLayer(value: unknown, index: number): LayerRecord {
     delete layer.adjustment
   }
 
+  if (value.heraldAdjustment !== undefined && value.heraldAdjustment !== null) {
+    if (!layer.adjustment) {
+      fail(`${field} has Herald Canvas adjustment settings but is not an adjustment layer`, `${field}.heraldAdjustment`)
+    }
+
+    layer.heraldAdjustment = parseHeraldAdjustment(value.heraldAdjustment, `${field}.heraldAdjustment`)
+  } else {
+    delete layer.heraldAdjustment
+  }
+
   if (value.text !== undefined && value.text !== null) {
     layer.text = parseText(value.text, `${field}.text`)
   } else {
@@ -1062,6 +1300,9 @@ function parseLayer(value: unknown, index: number): LayerRecord {
 
 /** An adjustment record checked as strictly as a project file's, with its defaults filled in. */
 export const checkAdjustment = (value: unknown): Adjustment => parseAdjustment(value, 'adjustment')
+
+/** Herald-only adjustment settings checked as strictly as a project file's, with their defaults filled in. */
+export const checkHeraldAdjustment = (value: unknown): HeraldAdjustment => parseHeraldAdjustment(value, 'heraldAdjustment')
 
 /** A layer's effects checked as strictly as a project file's, with each effect's defaults filled in. */
 export const checkEffects = (value: unknown): LayerEffects => parseEffects(value, 'effects')
@@ -1231,6 +1472,10 @@ export function referencedAssets(manifest: CompManifest): Set<string> {
 
     if (layer.maskFile) {
       files.add(layer.maskFile)
+    }
+
+    if (layer.heraldAdjustment?.kind === 'Color Lookup' && (layer.heraldAdjustment as ColorLookupSettings).size > 0) {
+      files.add(tableFileFor(layer.id))
     }
   }
 

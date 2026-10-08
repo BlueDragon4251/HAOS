@@ -1,7 +1,21 @@
 import { initializeCanvas, type Layer, type Psd, readPsd, writePsdUint8Array } from 'ag-psd'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { defaultAdjustment, defaultEffect, defaultTransform, type LayerRecord, newId, parseManifest, serializeManifest, newManifest, imageFileFor, maskFileFor } from '../../../../shared/canvas/comp-format.ts'
-import { adjustmentFrom, adjustmentTo, fromPsd, Notes, type PixelData, type PsdSourceLayer, rgbOf, toPsd } from './psd-map.ts'
+import {
+  defaultAdjustment,
+  defaultEffect,
+  defaultHeraldAdjustment,
+  defaultTransform,
+  HERALD_ADJUSTMENT_KINDS,
+  type HeraldAdjustment,
+  type LayerRecord,
+  newId,
+  parseManifest,
+  serializeManifest,
+  newManifest,
+  imageFileFor,
+  maskFileFor
+} from '../../../../shared/canvas/comp-format.ts'
+import { adjustmentFrom, adjustmentTo, fromPsd, heraldFrom, heraldTo, Notes, type PixelData, type PsdSourceLayer, rgbOf, toPsd } from './psd-map.ts'
 
 beforeAll(() => {
   // The tests run without a canvas: ag-psd makes plain pixel buffers, as in the worker.
@@ -106,7 +120,7 @@ describe('Photoshop documents into Herald layers', () => {
   it('keeps the order, folders, visibility, opacity and blend modes', () => {
     const { layers, width, height, resolution } = imported()
     expect([width, height, resolution]).toEqual([200, 100, 300])
-    expect(layers.map((layer) => layer.record.name)).toEqual(['Background', 'Multiply box', 'Folder', 'Inside', 'Clipped', 'Grain', 'Multiply folder', 'In it', 'Title', 'Curves', 'Levels', 'Tint', 'Card'])
+    expect(layers.map((layer) => layer.record.name)).toEqual(['Background', 'Multiply box', 'Folder', 'Inside', 'Clipped', 'Grain', 'Multiply folder', 'In it', 'Title', 'Curves', 'Levels', 'Tint', 'Threshold', 'Card'])
     const byName = new Map(layers.map((layer) => [layer.record.name, layer.record]))
     expect(byName.get('Multiply box')).toMatchObject({ blendMode: 'Multiply', opacity: 0.5, transform: { origin: [20, 10], size: [50, 40] } })
     expect(byName.get('Folder')).toMatchObject({ isGroup: true, isVisible: false, blendMode: 'Normal' })
@@ -146,7 +160,10 @@ describe('Photoshop documents into Herald layers', () => {
     ])
     expect(adjustment('Levels').levels.ranges[0]).toEqual({ black: 10, white: 240, gamma: 1.2, outputBlack: 5, outputWhite: 250 })
     expect(adjustment('Tint')).toMatchObject({ kind: 'Hue/Saturation', colorize: true, hue: 200, saturation: 40, lightness: -10 })
-    expect(notes.some((note) => note.startsWith('Threshold adjustment layers have no counterpart'))).toBe(true)
+    // Threshold is one of Herald's own, beside a Compositor stand-in.
+    const threshold = layers.find((layer) => layer.record.name === 'Threshold')!.record
+    expect(threshold.heraldAdjustment).toEqual({ kind: 'Threshold', level: 128 })
+    expect(threshold.adjustment!.kind).toBe('Levels')
     expect(notes.some((note) => note.includes('Blend mode Dissolve') && note.includes('“Grain”'))).toBe(true)
     expect(notes.some((note) => note.includes('(Multiply) became Pass Through') && note.includes('“Multiply folder”'))).toBe(true)
   })
@@ -176,10 +193,14 @@ describe('Photoshop documents into Herald layers', () => {
     expect(white.red).toBeCloseTo(1, 2)
   })
 
-  it('lets go of what it cannot hold, with a note', () => {
+  it('lets go of a colour table it cannot read, with a note', () => {
     const notes = new Notes()
-    expect(adjustmentFrom({ type: 'posterize', levels: 4 }, notes, 'Poster')).toBeNull()
-    expect(notes.list()[0]).toMatch(/Posterize adjustment layers have no counterpart.*“Poster”/)
+    expect(heraldFrom({ type: 'color lookup', lutFormat: '3dl', lut3DFileData: new Uint8Array(4) }, notes, 'Film')).toBe('left out')
+    expect(heraldFrom({ type: 'color lookup', lutFormat: 'cube', lut3DFileData: new TextEncoder().encode('LUT_3D_SIZE 2\n') }, notes, 'Broken')).toBe('left out')
+    expect(notes.list()[0]).toMatch(/\.3dl or \.look table.*“Film”/)
+    expect(notes.list()[1]).toMatch(/could not be read.*“Broken”/)
+    // Compositor's kinds are not Herald's own.
+    expect(heraldFrom({ type: 'invert' }, notes, 'Invert')).toBeNull()
   })
 })
 
@@ -247,5 +268,37 @@ describe('Herald layers into Photoshop documents', () => {
     for (const kind of ['Grain', 'Gaussian Blur', 'Motion Blur', 'Add Noise'] as const) {
       expect(adjustmentTo(defaultAdjustment(kind))).toBeNull()
     }
+  })
+
+  it('writes Herald’s own adjustments as Photoshop’s, which read back the same', () => {
+    const table = new TextEncoder().encode('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n')
+    const changed: Record<string, Record<string, unknown>> = {
+      'Brightness/Contrast': { brightness: 30, contrast: -20 },
+      Vibrance: { vibrance: 40, saturation: -10 },
+      'Photo Filter': { density: 60, preserveLuminosity: false },
+      'Channel Mixer': { monochrome: false, red: { red: 80, green: 20, blue: 0, constant: 5 } },
+      'Selective Color': { absolute: true, reds: { cyan: -30, magenta: 10, yellow: 0, black: 5 } },
+      Posterize: { levels: 6 },
+      Threshold: { level: 100 },
+      'Color Lookup': { name: 'Identity.cube', size: 2 }
+    }
+    const layers: PsdSourceLayer[] = HERALD_ADJUSTMENT_KINDS.map((kind) => ({
+      record: record(kind, { adjustment: defaultAdjustment('Levels'), heraldAdjustment: { ...defaultHeraldAdjustment(kind), ...changed[kind] } as HeraldAdjustment }),
+      pixels: null,
+      mask: null,
+      ...(kind === 'Color Lookup' ? { table } : {})
+    }))
+    const { psd } = toPsd({ width: 10, height: 10, resolution: 72, layers, composite: pixels(10, 10, [0, 0, 0, 255]) })
+    const back = fromPsd(roundTrip(psd))
+    expect(back.layers.map((layer) => layer.record.name)).toEqual([...HERALD_ADJUSTMENT_KINDS])
+
+    for (const layer of back.layers) {
+      const kind = layer.record.name as HeraldAdjustment['kind']
+      expect(layer.record.heraldAdjustment, kind).toMatchObject({ kind, ...changed[kind] })
+    }
+
+    expect(back.layers.at(-1)!.table).toEqual(table)
+    // A Color Lookup with no table yet has nothing to write.
+    expect(heraldTo(defaultHeraldAdjustment('Color Lookup'), undefined)).toBeNull()
   })
 })

@@ -8,6 +8,7 @@
 import type {
   AdjustmentLayer,
   BlendMode as PsdBlendMode,
+  ChannelMixerChannel,
   Color,
   CurvesAdjustmentChannel,
   HueSaturationAdjustmentChannel,
@@ -24,20 +25,30 @@ import type {
 import {
   type Adjustment,
   type BlendMode,
+  type ChannelMixerSettings,
   type CurvePoint,
   defaultAdjustment,
   defaultEffect,
+  defaultHeraldAdjustment,
   defaultTransform,
   type GlowEffect,
+  HERALD_RANGES,
+  type HeraldAdjustment,
+  type Inks,
+  isHeraldKind,
   type LayerEffects,
   type LayerRecord,
   type LevelRange,
   LIMITS,
   LIMITS_TEXT,
+  type MixerRow,
   newId,
+  type PhotoFilterSettings,
   RANGES,
   type RangeName,
   type RGB,
+  SELECTIVE_RANGES,
+  type SelectiveRange,
   type ShadowEffect,
   type TextAlignment,
   type TextColorRun,
@@ -45,6 +56,7 @@ import {
   type TextStyle,
   type Vec2
 } from '../../../../shared/canvas/comp-format.ts'
+import { parseCube } from '../engine/color-table.ts'
 
 /** Pixels as plain data, so they cross to and from a worker: RGBA, or one channel for masks. */
 export interface PixelData {
@@ -58,6 +70,8 @@ export interface PsdLayer {
   record: LayerRecord
   pixels: PixelData | null
   mask: PixelData | null
+  /** A Color Lookup layer's `.cube` file. */
+  table?: Uint8Array
   /** A text layer's anchor in the document (the first baseline at its alignment edge, or a paragraph box's corner), for laying it out again. */
   textAnchor?: Vec2
 }
@@ -341,6 +355,105 @@ export function adjustmentFrom(source: AdjustmentLayer, notes: Notes, name: stri
     default:
       notes.add(`${blendLabel(source.type)} adjustment layers have no counterpart and were left out`, name)
 
+      return null
+  }
+}
+
+const heraldRanged = (value: number | undefined, range: keyof typeof HERALD_RANGES, fallback: number, whole = false): number => {
+  const number = typeof value === 'number' && Number.isFinite(value) ? clamp(value, HERALD_RANGES[range]) : fallback
+
+  return whole ? Math.round(number) : number
+}
+
+/**
+ * One of Herald's own adjustments from a Photoshop adjustment layer (with a Color Lookup's `.cube`
+ * file), or null when the layer is none of them. A Color Lookup holding another kind of table, or
+ * a colour profile, is left out with a note.
+ */
+export function heraldFrom(source: AdjustmentLayer, notes: Notes, name: string): { settings: HeraldAdjustment; table?: Uint8Array } | 'left out' | null {
+  const mixer = (channel: ChannelMixerChannel | undefined, fallback: MixerRow): MixerRow =>
+    channel ? { red: heraldRanged(channel.red, 'mixer', fallback.red), green: heraldRanged(channel.green, 'mixer', fallback.green), blue: heraldRanged(channel.blue, 'mixer', fallback.blue), constant: heraldRanged(channel.constant, 'mixer', fallback.constant) } : fallback
+  const inks = (cmyk: { c: number; m: number; y: number; k: number } | undefined): Inks => ({
+    cyan: heraldRanged(cmyk?.c, 'inks', 0),
+    magenta: heraldRanged(cmyk?.m, 'inks', 0),
+    yellow: heraldRanged(cmyk?.y, 'inks', 0),
+    black: heraldRanged(cmyk?.k, 'inks', 0)
+  })
+
+  switch (source.type) {
+    case 'brightness/contrast':
+      if (source.useLegacy) {
+        notes.add('Legacy Brightness/Contrast settings were kept as they are, and look a little different', name)
+      }
+
+      return { settings: { kind: 'Brightness/Contrast', brightness: heraldRanged(source.brightness, 'brightness', 0), contrast: heraldRanged(source.contrast, 'contrast', 0) } }
+    case 'vibrance':
+      return { settings: { kind: 'Vibrance', vibrance: heraldRanged(source.vibrance, 'vibrance', 0), saturation: heraldRanged(source.saturation, 'saturation', 0) } }
+    case 'photo filter': {
+      const defaults = defaultHeraldAdjustment('Photo Filter') as PhotoFilterSettings
+
+      return { settings: { kind: 'Photo Filter', color: rgbOf(source.color, defaults.color), density: heraldRanged(source.density, 'density', defaults.density), preserveLuminosity: source.preserveLuminosity !== false } }
+    }
+    case 'channel mixer': {
+      const defaults = defaultHeraldAdjustment('Channel Mixer') as ChannelMixerSettings
+
+      return {
+        settings: { kind: 'Channel Mixer', monochrome: Boolean(source.monochrome), red: mixer(source.red, defaults.red), green: mixer(source.green, defaults.green), blue: mixer(source.blue, defaults.blue), gray: mixer(source.gray, defaults.gray) }
+      }
+    }
+    case 'selective color':
+      return { settings: { kind: 'Selective Color', absolute: source.mode === 'absolute', ...(Object.fromEntries(SELECTIVE_RANGES.map((range) => [range, inks(source[range])])) as Record<SelectiveRange, Inks>) } }
+    case 'posterize':
+      return { settings: { kind: 'Posterize', levels: heraldRanged(source.levels, 'posterize', 4, true) } }
+    case 'threshold':
+      return { settings: { kind: 'Threshold', level: heraldRanged(source.level, 'threshold', 128, true) } }
+    case 'color lookup': {
+      const data = source.lut3DFileData
+
+      if (!data || (source.lutFormat !== undefined && source.lutFormat !== 'cube')) {
+        notes.add('Color Lookup layers with a .3dl or .look table, or a colour profile, have no counterpart and were left out', name)
+
+        return 'left out'
+      }
+
+      try {
+        const table = parseCube(data)
+
+        return { settings: { kind: 'Color Lookup', name: source.lut3DFileName || source.name || 'Colour table', size: table.size }, table: data }
+      } catch (error) {
+        notes.add(`A Color Lookup's table could not be read (${error instanceof Error ? error.message : String(error)}), so the layer was left out`, name)
+
+        return 'left out'
+      }
+    }
+    default:
+      return null
+  }
+}
+
+/** Herald's own adjustment as a Photoshop adjustment layer; a Color Lookup needs its table's file. */
+export function heraldTo(settings: HeraldAdjustment, table: Uint8Array | undefined): AdjustmentLayer | null {
+  const whole = (row: MixerRow) => ({ red: Math.round(row.red), green: Math.round(row.green), blue: Math.round(row.blue), constant: Math.round(row.constant) })
+  const cmyk = (entry: Inks) => ({ c: Math.round(entry.cyan), m: Math.round(entry.magenta), y: Math.round(entry.yellow), k: Math.round(entry.black) })
+
+  switch (settings.kind) {
+    case 'Brightness/Contrast':
+      return { type: 'brightness/contrast', brightness: Math.round(settings.brightness), contrast: Math.round(settings.contrast), useLegacy: false }
+    case 'Vibrance':
+      return { type: 'vibrance', vibrance: Math.round(settings.vibrance), saturation: Math.round(settings.saturation) }
+    case 'Photo Filter':
+      return { type: 'photo filter', color: toPsdColor(settings.color), density: Math.round(settings.density), preserveLuminosity: settings.preserveLuminosity }
+    case 'Channel Mixer':
+      return { type: 'channel mixer', monochrome: settings.monochrome, red: whole(settings.red), green: whole(settings.green), blue: whole(settings.blue), gray: whole(settings.gray) }
+    case 'Selective Color':
+      return { type: 'selective color', mode: settings.absolute ? 'absolute' : 'relative', ...Object.fromEntries(SELECTIVE_RANGES.map((range) => [range, cmyk(settings[range])])) }
+    case 'Posterize':
+      return { type: 'posterize', levels: settings.levels }
+    case 'Threshold':
+      return { type: 'threshold', level: settings.level }
+    case 'Color Lookup':
+      return table && settings.size > 0 ? { type: 'color lookup', lookupType: '3dlut', name: settings.name, lutFormat: 'cube', lut3DFileData: table, lut3DFileName: settings.name } : null
+    default:
       return null
   }
 }
@@ -733,6 +846,7 @@ export function fromPsd(psd: Psd): ImportedPsd {
       }
 
       let pixels: PixelData | null = null
+      let table: Uint8Array | null = null
       const left = source.left ?? 0
       const top = source.top ?? 0
       const layerWidth = Math.max(0, (source.right ?? 0) - left)
@@ -748,13 +862,21 @@ export function fromPsd(psd: Psd): ImportedPsd {
       }
 
       if (source.adjustment) {
-        const adjustment = adjustmentFrom(source.adjustment, notes, name)
+        const herald = heraldFrom(source.adjustment, notes, name)
+        // A Herald-only kind's stand-in is made when the document is put together; Levels holds its place.
+        const adjustment = herald ? (herald === 'left out' ? null : defaultAdjustment('Levels')) : adjustmentFrom(source.adjustment, notes, name)
 
         if (!adjustment) {
           continue
         }
 
         record.adjustment = adjustment
+
+        if (herald && herald !== 'left out') {
+          record.heraldAdjustment = herald.settings
+          table = herald.table ?? null
+        }
+
         pixels = null
         record.transform = defaultTransform(width, height)
       }
@@ -789,7 +911,7 @@ export function fromPsd(psd: Psd): ImportedPsd {
         }
       }
 
-      const layer: PsdLayer = { record, pixels, mask: mask?.mask ?? null }
+      const layer: PsdLayer = { record, pixels, mask: mask?.mask ?? null, ...(table ? { table } : {}) }
 
       if (source.text && pixels) {
         const text = textFrom(source, notes, name)
@@ -842,6 +964,8 @@ export function fromPsd(psd: Psd): ImportedPsd {
 
 export interface PsdSourceLayer {
   record: LayerRecord
+  /** A Color Lookup layer's `.cube` file. */
+  table?: Uint8Array
   /** The pixels as they sit in the document, unturned: their top-left corner and size. */
   pixels: { left: number; top: number; image: PixelData } | null
   /** The mask as it sits in the document, and the value outside it. */
@@ -1068,10 +1192,12 @@ export function toPsd(source: PsdSource): { psd: Psd; notes: string[] } {
       }
 
       if (record.adjustment) {
-        const adjustment = adjustmentTo(record.adjustment)
+        const herald = record.heraldAdjustment && isHeraldKind(record.heraldAdjustment.kind) ? record.heraldAdjustment : null
+        // A kind from a newer Herald Canvas goes as its stand-in.
+        const adjustment = herald ? heraldTo(herald, entry.table) : adjustmentTo(record.adjustment)
 
         if (!adjustment) {
-          notes.add(`${record.adjustment.kind} has no adjustment layer in Photoshop: it shows in the flattened image only`, record.name)
+          notes.add(herald?.kind === 'Color Lookup' ? 'A Color Lookup without a table was left out' : `${record.adjustment.kind} has no adjustment layer in Photoshop: it shows in the flattened image only`, record.name)
 
           return []
         }

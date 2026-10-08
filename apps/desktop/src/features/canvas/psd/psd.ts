@@ -7,7 +7,9 @@
 
 import { defaultTransform, type LayerRecord } from '../../../../shared/canvas/comp-format.ts'
 import { baseName } from '../../../../shared/canvas/files.ts'
+import { parseCube } from '../engine/color-table.ts'
 import { CanvasDocument, type CanvasLayer, type DocState } from '../engine/document.ts'
+import { heraldOf, standInFor } from '../engine/herald-adjust.ts'
 import { apply, boundsOf, isPixelAligned, tidy } from '../engine/geometry.ts'
 import { flatten } from '../engine/project.ts'
 import { clipRect, Raster, resample } from '../engine/raster.ts'
@@ -111,7 +113,14 @@ export async function documentFromPsd(file: string): Promise<{ doc: CanvasDocume
   const layers: CanvasLayer[] = []
 
   for (const entry of imported.layers) {
-    let layer: CanvasLayer = { ...entry.record, pixels: entry.pixels ? rasterOf(entry.pixels) : null, mask: entry.mask ? rasterOf(entry.mask) : null }
+    const herald = heraldOf(entry.record)
+    let layer: CanvasLayer = {
+      ...entry.record,
+      ...(herald ? { adjustment: standInFor(herald) } : {}),
+      pixels: entry.pixels ? rasterOf(entry.pixels) : null,
+      mask: entry.mask ? rasterOf(entry.mask) : null,
+      ...(entry.table ? { table: parseCube(entry.table) } : {})
+    }
 
     if (layer.text && layer.pixels && entry.textAnchor) {
       layer = await settleText(layer, entry.textAnchor, notes)
@@ -139,7 +148,7 @@ export async function psdPicture(file: string): Promise<Raster> {
 // --- Exporting ---------------------------------------------------------------------------------
 
 const recordOf = (layer: CanvasLayer): LayerRecord => {
-  const { pixels: _pixels, mask: _mask, ...record } = layer
+  const { pixels: _pixels, mask: _mask, table: _table, ...record } = layer
 
   return record
 }
@@ -197,7 +206,7 @@ export async function exportPsd(state: DocState, file: string): Promise<{ file: 
   const turned: string[] = []
 
   for (const layer of state.layers) {
-    const entry: PsdSourceLayer = { record: recordOf(layer), pixels: null, mask: null }
+    const entry: PsdSourceLayer = { record: recordOf(layer), pixels: null, mask: null, ...(layer.table ? { table: layer.table.bytes } : {}) }
     const aligned = layer.pixels ? isPixelAligned(layer.transform, layer.pixels.width, layer.pixels.height) : true
 
     if (layer.pixels && aligned) {

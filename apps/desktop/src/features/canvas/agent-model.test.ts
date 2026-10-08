@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAdjustment, defaultEffect, defaultTransform } from '../../../shared/canvas/comp-format.ts'
+import { defaultAdjustment, defaultEffect, defaultHeraldAdjustment, defaultTransform } from '../../../shared/canvas/comp-format.ts'
 import {
   adjustmentSettings,
   adjustmentWith,
@@ -19,6 +19,7 @@ import {
   fractionFrom,
   gradientStopsFrom,
   gradientStyleFrom,
+  heraldWith,
   holeBox,
   jsonObject,
   lineEnds,
@@ -35,6 +36,7 @@ import {
   shapeWith
 } from './agent-model.ts'
 import { adjustmentLayer, blankLayer, type DocState, folderLayer, insertLayer, pixelLayer, setClipped } from './engine/document.ts'
+import { heraldLayer, withHerald } from './engine/herald-adjust.ts'
 import { Raster } from './engine/raster.ts'
 import { textStyle } from './engine/text.ts'
 
@@ -111,6 +113,28 @@ describe('fillBox', () => {
     expect(fillBox(canvas, {})).toEqual({ x: 0, y: 0, width: 1080, height: 1350 })
     expect(fillBox(canvas, { y: 500, height: 850 })).toEqual({ x: 0, y: 500, width: 1080, height: 850 })
     expect(fillBox(canvas, { x: 72, y: 1180, width: 240, height: 8 })).toEqual({ x: 72, y: 1180, width: 240, height: 8 })
+  })
+})
+
+describe("Herald's own adjustments for Hermes", () => {
+  const read = () => ({ red: 1, green: 0.5, blue: 0 })
+
+  it('merges settings, nested ones too, and checks them as a project would', () => {
+    const mixer = heraldWith(defaultHeraldAdjustment('Channel Mixer'), { red: { blue: 30 } })
+    expect(mixer).toMatchObject({ kind: 'Channel Mixer', red: { red: 100, green: 0, blue: 30, constant: 0 } })
+    expect(heraldWith(defaultHeraldAdjustment('Photo Filter'), { color: 'orange', density: 60 }, read)).toMatchObject({ color: { red: 1, green: 0.5, blue: 0 }, density: 60 })
+    expect(() => heraldWith(defaultHeraldAdjustment('Brightness/Contrast'), { brightness: 400 })).toThrow(/brightness must be a number from -150 to 150/)
+    expect(() => heraldWith(defaultHeraldAdjustment('Posterize'), { kind: 'Threshold' })).toThrow(/keeps its kind/)
+    // A Color Lookup's table comes from a file, never from a size written by hand.
+    expect(() => heraldWith(defaultHeraldAdjustment('Color Lookup'), { size: 33 })).toThrow(/table/)
+    expect(heraldWith(defaultHeraldAdjustment('Color Lookup'), { table: '~/Film.cube' })).toEqual(defaultHeraldAdjustment('Color Lookup'))
+  })
+
+  it('describes the layer by its own kind and settings', () => {
+    let state: DocState = { width: 100, height: 100, resolution: 72, layers: [], activeLayerId: null, guides: [], selection: null }
+    const layer = { ...heraldLayer('Vibrance', 100, 100), ...withHerald({ kind: 'Vibrance', vibrance: 25, saturation: 0 }) }
+    state = insertLayer(state, layer, {})
+    expect(describeLayer(state, layer)).toMatchObject({ kind: 'adjustment', adjustment: 'Vibrance', settings: { vibrance: 25, saturation: 0 } })
   })
 })
 

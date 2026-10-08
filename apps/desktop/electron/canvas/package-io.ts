@@ -11,8 +11,8 @@ import { encodePng } from './png.ts'
  * temporary file and a rename, so a reader sees the old manifest or the new one, never half of one.
  */
 
-/** Project images are named after their layer: `<UUID>.png` and `<UUID>.mask.png`. */
-export const ASSET_NAME = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}(\.mask)?\.png$/
+/** Project files are named after their layer: `<UUID>.png` and `<UUID>.mask.png`, and a Color Lookup layer's table `<UUID>.cube`. */
+export const ASSET_NAME = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}((\.mask)?\.png|\.cube)$/
 
 export interface RawImage {
   width: number
@@ -86,7 +86,7 @@ export async function readPackage(dir: string): Promise<PackageContents> {
 
 export async function readAsset(dir: string, name: string): Promise<Uint8Array> {
   if (!ASSET_NAME.test(name)) {
-    throw new Error(`${name} is not a project image`)
+    throw new Error(`${name} is not a project file`)
   }
 
   const file = path.join(dir, 'images', name)
@@ -127,7 +127,11 @@ export async function writePackage(dir: string, request: WriteRequest): Promise<
       throw new Error(`${name} is not part of this project`)
     }
 
-    if (!(image instanceof Uint8Array)) {
+    if (name.endsWith('.cube')) {
+      if (!(image instanceof Uint8Array)) {
+        throw new Error(`${name} is a colour table: it is written as the file's bytes`)
+      }
+    } else if (!(image instanceof Uint8Array)) {
       const isMask = name.endsWith('.mask.png')
 
       if (image.channels !== (isMask ? 1 : 4)) {

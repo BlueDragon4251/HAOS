@@ -6,7 +6,8 @@
 
 import { atom } from 'nanostores'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { ADJUSTMENT_KINDS, defaultEffect } from '../../../shared/canvas/comp-format.ts'
+import { defaultEffect } from '../../../shared/canvas/comp-format.ts'
+import { ADJUSTMENT_MENU } from './adjustment-icons.tsx'
 import {
   addAdjustmentLayer,
   addFolder,
@@ -145,11 +146,11 @@ async function subject(doc: CanvasDocument): Promise<void> {
   }
 }
 
-const ADJUSTMENT_ITEMS: CanvasCommand[] = ADJUSTMENT_KINDS.map((kind, i) => ({
+const ADJUSTMENT_ITEMS: CanvasCommand[] = ADJUSTMENT_MENU.map(({ kind, dividerBefore }) => ({
   id: `adjustment-${kind}`,
   label: kind,
   needsDocument: true,
-  dividerBefore: i === 3 || i === 9,
+  dividerBefore,
   run: onDoc((doc) => addAdjustmentLayer(doc, kind))
 }))
 

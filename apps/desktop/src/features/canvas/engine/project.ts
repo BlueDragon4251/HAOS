@@ -15,12 +15,15 @@ import {
   type LayerTransform,
   maskFileFor,
   parseManifest,
-  RANGES
+  RANGES,
+  tableFileFor
 } from '../../../../shared/canvas/comp-format.ts'
 import { baseName, isLayeredImage, PROJECT_EXTENSION } from '../../../../shared/canvas/files.ts'
 import type { CanvasProject, CanvasRawImage } from '../../../../shared/ipc.ts'
+import { type ColorTable, parseCube } from './color-table.ts'
 import { blankLayer, CanvasDocument, type CanvasLayer, type DocState, pixelLayer } from './document.ts'
 import { type Compositor, headlessCompositor, type RenderOptions } from './gpu/compositor.ts'
+import { heraldOf, standInFor, tableSizeOf } from './herald-adjust.ts'
 import { clipRect, Raster, type Rect } from './raster.ts'
 import { frameSize, strips } from './tiles.ts'
 
@@ -151,6 +154,21 @@ async function inBatches<T, R>(items: readonly T[], limit: number, work: (item: 
 
 // --- Opening -----------------------------------------------------------------------------------
 
+/** A Color Lookup layer's table from its project file. */
+async function readTable(project: string, record: LayerRecord): Promise<ColorTable> {
+  const bytes = await api().readAsset(project, tableFileFor(record.id))
+
+  try {
+    if (!(bytes instanceof Uint8Array)) {
+      throw new Error('it is not a text file')
+    }
+
+    return parseCube(bytes)
+  } catch (error) {
+    throw new Error(`${record.name}: its colour table cannot be read (${error instanceof Error ? error.message : String(error)})`)
+  }
+}
+
 interface Loaded {
   state: DocState
   documentId: string
@@ -163,8 +181,11 @@ async function loadProject(project: CanvasProject): Promise<Loaded> {
     const { imageFile, maskFile, ...rest } = record
     const pixels = imageFile ? await toRaster(await api().readAsset(project.path, imageFile), 4) : null
     const mask = maskFile ? await toRaster(await api().readAsset(project.path, maskFile), 1) : null
+    const table = tableSizeOf(record) ? await readTable(project.path, record) : null
+    const herald = heraldOf(record)
 
-    return { ...rest, pixels, mask }
+    // The stand-in is made again from the Herald settings, so the two always agree.
+    return { ...rest, ...(herald ? { adjustment: standInFor(herald) } : {}), pixels, mask, ...(table ? { table } : {}) }
   })
   const { format: _format, version: _version, colorSpace: _colorSpace, resolution, documentID, width, height, activeLayerID, layers: _layers, guides, ...extra } = manifest
   const active = activeLayerID && layers.some((layer) => layer.id === activeLayerID) ? activeLayerID : (layers.at(-1)?.id ?? null)
@@ -174,8 +195,13 @@ async function loadProject(project: CanvasProject): Promise<Loaded> {
 
 function rememberAssets(doc: CanvasDocument, layers: readonly CanvasLayer[], versions?: Map<Raster, number>): void {
   doc.savedAssets.clear()
+  doc.savedTables.clear()
 
   for (const layer of layers) {
+    if (layer.table && tableSizeOf(layer)) {
+      doc.savedTables.set(tableFileFor(layer.id), layer.table.bytes)
+    }
+
     if (layer.pixels) {
       doc.savedAssets.set(imageFileFor(layer.id), { raster: layer.pixels, version: versions?.get(layer.pixels) ?? layer.pixels.version })
     }
@@ -252,7 +278,7 @@ function readableBox(transform: LayerTransform): LayerTransform {
 }
 
 function layerRecord(layer: CanvasLayer): LayerRecord {
-  const { pixels, mask, imageFile: _image, maskFile: _mask, ...rest } = layer
+  const { pixels, mask, table: _table, imageFile: _image, maskFile: _mask, ...rest } = layer
   const record: LayerRecord = { ...rest, transform: readableBox(layer.transform), ...(layer.maskPlacement ? { maskPlacement: readableBox(layer.maskPlacement) } : {}) }
 
   if (pixels) {
@@ -366,9 +392,15 @@ export async function saveProject(doc: CanvasDocument, file = doc.path): Promise
   const state = doc.state
   const position = doc.history.position
   const versions = new Map<Raster, number>()
-  const assets: Record<string, CanvasRawImage> = {}
+  const assets: Record<string, CanvasRawImage | Uint8Array> = {}
 
   for (const layer of state.layers) {
+    const table = layer.table && tableSizeOf(layer) ? layer.table : null
+
+    if (table && (!sameProject || doc.savedTables.get(tableFileFor(layer.id)) !== table.bytes)) {
+      assets[tableFileFor(layer.id)] = table.bytes
+    }
+
     for (const [name, raster] of [
       [imageFileFor(layer.id), layer.pixels],
       [maskFileFor(layer.id), layer.mask]

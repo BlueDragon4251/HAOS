@@ -3,7 +3,7 @@
  * step named the way the History shows it.
  */
 
-import { type AdjustmentKind, type BlendMode, defaultTransform, type EffectKind, type LayerEffects } from '../../../shared/canvas/comp-format.ts'
+import { type AdjustmentKind, type BlendMode, defaultTransform, type EffectKind, type HeraldAdjustmentKind, isHeraldKind, type LayerEffects } from '../../../shared/canvas/comp-format.ts'
 import {
   adjustmentLayer,
   blankLayer,
@@ -32,6 +32,7 @@ import { AUTO_LABELS, type AutoMode } from './engine/auto-levels.ts'
 import { ALIGN_LABELS, type AlignEdge, type AlignTo, alignState, automaticTarget, DISTRIBUTE_LABELS, type DistributeMode, distributeState, movableLayers } from './engine/align.ts'
 import { apply, boundsOf, containsPoint, invert, moved, pixelToDocument } from './engine/geometry.ts'
 import { visibleEffects } from './engine/gpu/effects.ts'
+import { heraldLayer } from './engine/herald-adjust.ts'
 import { EFFECT_NAMES, effectKinds, knownEffects, takesEffects, withAllShown, withEffect, withEffectsFrom, withoutKnownEffects } from './engine/layer-effects.ts'
 import { MASK_LABELS, type MaskAction, withMaskAction } from './engine/masks.ts'
 import { flatten, readPicture } from './engine/project.ts'
@@ -72,8 +73,15 @@ const freshSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]
  * An adjustment layer above the active layer (or at the top of the active folder). A gradient map
  * runs from the foreground colour to the background one, as photo editors start it.
  */
-export function addAdjustmentLayer(doc: CanvasDocument, kind: AdjustmentKind): void {
+export function addAdjustmentLayer(doc: CanvasDocument, kind: AdjustmentKind | HeraldAdjustmentKind): void {
   const { state } = doc
+
+  if (isHeraldKind(kind)) {
+    doc.commit(`New ${kind} Layer`, insertLayer(state, heraldLayer(kind, state.width, state.height), placementFor(state)))
+
+    return
+  }
+
   const layer = adjustmentLayer(kind, state.width, state.height)
   const adjustment = layer.adjustment!
 

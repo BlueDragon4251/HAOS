@@ -99,6 +99,13 @@ export class Program {
     return this
   }
 
+  /** A whole uniform array of vec4s from its first element, four numbers each. */
+  vec4s(name: string, values: Float32Array | number[]): this {
+    this.gl.uniform4fv(this.at(name), values)
+
+    return this
+  }
+
   mat3(name: string, value: Float32Array): this {
     this.gl.uniformMatrix3fv(this.at(name), false, value)
 
@@ -109,6 +116,15 @@ export class Program {
   texture(name: string, unit: number, texture: WebGLTexture | null): this {
     this.gl.activeTexture(this.gl.TEXTURE0 + unit)
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+    this.gl.uniform1i(this.at(name), unit)
+
+    return this
+  }
+
+  /** A 3D texture (a colour table) on a unit of its own: a unit holds one sampler type for a draw. */
+  texture3d(name: string, unit: number, texture: WebGLTexture | null): this {
+    this.gl.activeTexture(this.gl.TEXTURE0 + unit)
+    this.gl.bindTexture(this.gl.TEXTURE_3D, texture)
     this.gl.uniform1i(this.at(name), unit)
 
     return this
@@ -257,6 +273,28 @@ export class Gpu {
     }
 
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.FLOAT, data)
+
+    return texture
+  }
+
+  /**
+   * A colour table as a 3D texture, `size` entries a side of red, green and blue (red fastest), in
+   * half floats so the hardware mixes the eight entries around a colour as the CPU reference does.
+   */
+  colourTable(size: number, data: Float32Array): WebGLTexture {
+    const { gl } = this
+    const texture = gl.createTexture()!
+    gl.activeTexture(gl.TEXTURE0 + SCRATCH_UNIT)
+    gl.bindTexture(gl.TEXTURE_3D, texture)
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB16F, size, size, size, 0, gl.RGB, gl.FLOAT, data)
+
+    for (const wrap of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) {
+      gl.texParameteri(gl.TEXTURE_3D, wrap, gl.CLAMP_TO_EDGE)
+    }
+
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.bindTexture(gl.TEXTURE_3D, null)
 
     return texture
   }

@@ -94,6 +94,12 @@ def test_adjustment_settings_travel_as_json(plugin):
     assert command == "canvas.setAdjustment"
     assert json.loads(args.pop("settings")) == {"midCyanRed": 12}
     assert args == {"layer": "Warmth", "opacity": 0.6}
+    # Herald's own kinds travel the same way, a colour table as a file path among the settings.
+    _, command, args = tools.canvas_command({"action": "add_adjustment", "kind": "Color Lookup", "settings": {"table": "~/LUTs/Film.cube"}, "name": "Film"})
+    assert (command, json.loads(args["settings"]), args["kind"], args["name"]) == ("canvas.addAdjustment", {"table": "~/LUTs/Film.cube"}, "Color Lookup", "Film")
+    kinds = tools.CANVAS_SCHEMA["parameters"]["properties"]["kind"]["description"]
+    for kind in ("Brightness/Contrast", "Vibrance", "Photo Filter", "Channel Mixer", "Selective Color", "Posterize", "Threshold", "Color Lookup"):
+        assert kind in kinds
 
 
 def test_effects_travel_as_json_and_may_clear_first(plugin):

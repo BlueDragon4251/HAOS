@@ -98,9 +98,9 @@ export function hslToRgb(h: number, s: number, l: number): RGB3 {
 export const luma = ([r, g, b]: RGB3): number => 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 // The W3C blend modes' luminosity, so Preserve Luminosity agrees with the Luminosity mode.
-const lum = ([r, g, b]: RGB3): number => 0.3 * r + 0.59 * g + 0.11 * b
+export const lum = ([r, g, b]: RGB3): number => 0.3 * r + 0.59 * g + 0.11 * b
 
-function setLum(c: RGB3, l: number): RGB3 {
+export function setLum(c: RGB3, l: number): RGB3 {
   const d = l - lum(c)
   let out: RGB3 = [c[0] + d, c[1] + d, c[2] + d]
   const ll = lum(out)

@@ -1,4 +1,4 @@
-import { ADJUSTMENT_KINDS, BLEND_MODES } from '../../shared/canvas/comp-format.ts'
+import { ADJUSTMENT_KINDS, BLEND_MODES, HERALD_ADJUSTMENT_KINDS } from '../../shared/canvas/comp-format.ts'
 import { MASK_ACTIONS } from '../features/canvas/mask-actions.ts'
 import { messageOf } from '../features/canvas/errors.ts'
 import { ok, type OsCommand } from '../store/os-commands.ts'
@@ -299,11 +299,11 @@ export const canvasCommands: readonly OsCommand[] = [
   {
     id: 'canvas.addAdjustment',
     title: 'Add an adjustment layer',
-    description: `Add an adjustment layer, which changes everything below it (or only the layer below, with clip). Kinds: ${ADJUSTMENT_KINDS.join(', ')}. settings is JSON over the defaults, e.g. {"hue": 10, "saturation": 25} for Hue/Saturation, {"exposureSettings": {"exposure": 0.5}} for Exposure; the herald-canvas skill lists every field.`,
+    description: `Add an adjustment layer, which changes everything below it (or only the layer below, with clip). Kinds: ${[...ADJUSTMENT_KINDS, ...HERALD_ADJUSTMENT_KINDS].join(', ')}. settings is JSON over the defaults, e.g. {"hue": 10, "saturation": 25} for Hue/Saturation, {"exposureSettings": {"exposure": 0.5}} for Exposure, {"brightness": 20, "contrast": 15} for Brightness/Contrast, {"vibrance": 30} for Vibrance, {"table": "~/LUTs/Film.cube"} for Color Lookup; the herald-canvas skill lists every field. The last eight are Herald's own: Compositor shows Brightness/Contrast (and Vibrance without vibrance, a Photo Filter without preserveLuminosity) the same, and the others as no change.`,
     tier: 'act',
     args: [
       project,
-      { name: 'kind', type: 'string', description: 'The adjustment', required: true, enum: ADJUSTMENT_KINDS },
+      { name: 'kind', type: 'string', description: 'The adjustment', required: true, enum: [...ADJUSTMENT_KINDS, ...HERALD_ADJUSTMENT_KINDS] },
       { name: 'settings', type: 'string', description: 'JSON object of settings' },
       { name: 'name', type: 'string', description: 'The layer name' },
       ...appearance,
@@ -330,7 +330,7 @@ export const canvasCommands: readonly OsCommand[] = [
     id: 'canvas.setAdjustment',
     title: 'Change an adjustment layer',
     description:
-      'Change an adjustment layer: settings is JSON merged over what it has now (nested settings merge too), e.g. {"saturation": -30} or {"exposureSettings": {"exposure": 0.5}}; a gradient map’s ends take CSS colours. canvas.layers shows each adjustment’s settings; the herald-canvas skill lists every field and range.',
+      'Change an adjustment layer: settings is JSON merged over what it has now (nested settings merge too), e.g. {"saturation": -30}, {"exposureSettings": {"exposure": 0.5}} or {"reds": {"cyan": -20}} for Selective Color; a gradient map’s ends and a Photo Filter’s color take CSS colours, and a Color Lookup takes {"table": "<a .cube file>"}. canvas.layers shows each adjustment’s settings; the herald-canvas skill lists every field and range.',
     tier: 'act',
     args: [project, { name: 'layer', type: 'string', description: 'The adjustment layer (id or name)', required: true }, { name: 'settings', type: 'string', description: 'JSON object of the settings to change' }, ...appearance],
     run: async (args) => done((await canvas()).setAdjustment(args))

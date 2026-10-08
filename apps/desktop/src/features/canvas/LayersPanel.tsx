@@ -18,11 +18,11 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
-import { ADJUSTMENT_KINDS, BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
+import { BLEND_MODES, type BlendMode } from '../../../shared/canvas/comp-format.ts'
 import { cn } from '../../lib/cn.ts'
 import { Menu } from '../files/Menu.tsx'
 import { addAdjustmentLayer, addFolder, addLayer, addMask, deletePicked, duplicatePicked, maskAction, rename, setBlendMode, toggleClipping, toggleVisible } from './actions.ts'
-import { ADJUSTMENT_ICONS } from './adjustment-icons.tsx'
+import { ADJUSTMENT_ICONS, ADJUSTMENT_MENU, adjustmentKindOf } from './adjustment-icons.tsx'
 import { selectLayerPixels } from './editing.ts'
 import { type CanvasDocument, type CanvasLayer, childrenOf, type DocState, moveLayer, setClipped, withLayer } from './engine/document.ts'
 import { effectKinds } from './engine/layer-effects.ts'
@@ -188,7 +188,8 @@ function LayerRow({
   const clipped = Boolean(layer.maskSourceID)
   const effects = effectKinds(layer.effects)
   const effectsHidden = effects.length > 0 && effects.every((kind) => (layer.effects?.[kind] as { enabled?: boolean }).enabled === false)
-  const AdjustmentIcon = layer.adjustment ? ADJUSTMENT_ICONS[layer.adjustment.kind] : null
+  const adjustmentKind = adjustmentKindOf(layer)
+  const AdjustmentIcon = adjustmentKind ? ADJUSTMENT_ICONS[adjustmentKind] : null
 
   useEffect(() => {
     if (renaming) {
@@ -287,7 +288,7 @@ function LayerRow({
       {layer.isGroup ? (
         <span className="grid size-8 shrink-0 place-items-center text-fg-3">{collapsed ? <IconFolder size={20} /> : <IconFolderOpen size={20} />}</span>
       ) : AdjustmentIcon ? (
-        <span className="grid size-8 shrink-0 place-items-center rounded-[4px] bg-white/6 text-fg-2 ring-1 ring-line" title={layer.adjustment?.kind}>
+        <span className="grid size-8 shrink-0 place-items-center rounded-[4px] bg-white/6 text-fg-2 ring-1 ring-line" title={adjustmentKind ?? undefined}>
           <AdjustmentIcon size={17} />
         </span>
       ) : (
@@ -551,10 +552,10 @@ export function LayersPanel({ doc }: { doc: CanvasDocument }) {
               align="left"
               className="bottom-full mb-1 max-h-[60vh] overflow-y-auto"
               onClose={() => setAdjustments(false)}
-              items={ADJUSTMENT_KINDS.map((kind, i) => {
+              items={ADJUSTMENT_MENU.map(({ kind, dividerBefore }) => {
                 const Icon = ADJUSTMENT_ICONS[kind]
 
-                return { id: kind, label: kind, icon: <Icon />, dividerBefore: i === 3 || i === 9, onSelect: () => addAdjustmentLayer(doc, kind) }
+                return { id: kind, label: kind, icon: <Icon />, dividerBefore, onSelect: () => addAdjustmentLayer(doc, kind) }
               })}
             />
           )}

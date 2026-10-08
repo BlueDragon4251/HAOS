@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { defaultTransform, imageFileFor, maskFileFor, newManifest, parseManifestText } from '../../shared/canvas/comp-format.ts'
+import { defaultAdjustment, defaultTransform, imageFileFor, maskFileFor, newManifest, parseManifestText } from '../../shared/canvas/comp-format.ts'
 import { PackageWatcher, readAsset, readPackage, writePackage } from './package-io.ts'
 import { decodePng, encodePng } from './png.ts'
 
@@ -65,6 +65,29 @@ describe('writePackage and readPackage', () => {
     expect(await fs.readdir(path.join(dir, 'QuickLook'))).toEqual(['Preview.jpg'])
     await writePackage(dir, { manifest: twoLayers(), assets: {} })
     await expect(fs.stat(path.join(dir, 'QuickLook'))).rejects.toThrow()
+  })
+
+  it('keeps a Color Lookup layer’s table beside the images, as bytes', async () => {
+    const dir = await project()
+    const manifest = twoLayers()
+    const C = '0C0C0C0C-1111-4222-8333-444455556666'
+    manifest.layers.push({
+      id: C,
+      name: 'Film',
+      isVisible: true,
+      transform: defaultTransform(8, 4),
+      adjustment: defaultAdjustment('Levels'),
+      heraldAdjustment: { kind: 'Color Lookup', name: 'Film.cube', size: 2 }
+    })
+    const table = new TextEncoder().encode('LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n')
+    const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
+    await expect(writePackage(dir, { manifest, assets: { ...assets, [`${C}.cube`]: rgba(1, 1, 0) } })).rejects.toThrow(/bytes/)
+    await writePackage(dir, { manifest, assets: { ...assets, [`${C}.cube`]: table } })
+    expect(Object.keys((await readPackage(dir)).assets)).toContain(`${C}.cube`)
+    expect(await readAsset(dir, `${C}.cube`)).toEqual(table)
+    // Without the layer, the table goes too.
+    await writePackage(dir, { manifest: twoLayers(), assets: {} })
+    expect(await fs.readdir(path.join(dir, 'images'))).not.toContain(`${C}.cube`)
   })
 
   it('refuses images that do not belong, are the wrong kind, or are missing', async () => {

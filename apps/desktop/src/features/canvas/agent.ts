@@ -5,7 +5,19 @@
  * from disk, changed and written back, and any window showing it reloads.
  */
 
-import { ADJUSTMENT_KINDS, type AdjustmentKind, defaultAdjustment, defaultTransform, LIMITS, RANGES, type ShapeStyle, type TextStyle } from '../../../shared/canvas/comp-format.ts'
+import {
+  ADJUSTMENT_KINDS,
+  defaultAdjustment,
+  defaultHeraldAdjustment,
+  defaultTransform,
+  HERALD_ADJUSTMENT_KINDS,
+  type HeraldAdjustment,
+  isHeraldKind,
+  LIMITS,
+  RANGES,
+  type ShapeStyle,
+  type TextStyle
+} from '../../../shared/canvas/comp-format.ts'
 import { baseName, CANVAS_IMAGE_EXTENSIONS, isLayeredImage, isProjectPath, PROJECT_EXTENSION } from '../../../shared/canvas/files.ts'
 import { $env } from '../../store/backend.ts'
 import { isPanels } from '../../store/shell.ts'
@@ -34,6 +46,7 @@ import {
   gradientStopsFrom,
   gradientStyleFrom,
   guideAxisFrom,
+  heraldWith,
   holeBox,
   jsonObject,
   lineEnds,
@@ -53,11 +66,13 @@ import {
 import { autoAdjustState } from './auto-adjust.ts'
 import { ALIGN_LABELS, alignState, DISTRIBUTE_LABELS, distributeState, movableLayers } from './engine/align.ts'
 import { AUTO_LABELS } from './engine/auto-levels.ts'
+import { type ColorTable, parseCube } from './engine/color-table.ts'
 import { paintGradient } from './engine/fill.ts'
 import { checkFilter, FILTER_NAMES } from './engine/filters.ts'
 import { pixelToDocument } from './engine/geometry.ts'
 import { type ColourStop, type Gradient, type GradientStyle, gradientTable, lineAcross } from './engine/gradient.ts'
 import { guideNear, layoutGuides, onCanvas, positionFrom, withGuides, withoutGuides } from './engine/guides.ts'
+import { heraldLayer, heraldOf, withHerald } from './engine/herald-adjust.ts'
 import { coverageReader } from './engine/sampling.ts'
 import { filterArea, filterTargetArea, mixInto } from './filter-run.ts'
 import { anchorOffset, cropCanvas, resizeCanvas, rotateLayers, scaleImage } from './engine/canvas-size.ts'
@@ -565,22 +580,50 @@ export async function group(args: Record<string, unknown>): Promise<Outcome> {
   return { summary: refs.length ? `Put ${refs.length} layer${refs.length === 1 ? '' : 's'} in “${folder.name}”` : `Added the folder “${folder.name}”`, data: { folder: folder.id } }
 }
 
+/** A Color Lookup's table from a `.cube` file Hermes named, with the settings it gives (its name and size). */
+async function tableFrom(file: unknown): Promise<{ table: ColorTable; name: string; size: number }> {
+  const path = resolve(String(file))
+  const table = parseCube(await window.heraldOS.canvas.readTable(path))
+
+  return { table, name: fileName(path), size: table.size }
+}
+
+/** Herald-only settings changed by what Hermes gave, with the table its `table` file holds. */
+async function heraldChanged(current: HeraldAdjustment, settings: Record<string, unknown>): Promise<{ settings: HeraldAdjustment; table?: ColorTable }> {
+  const next = heraldWith(current, settings, readColour)
+
+  if (settings.table === undefined || settings.table === '') {
+    return { settings: next }
+  }
+
+  if (next.kind !== 'Color Lookup') {
+    throw new Error(`table is a Color Lookup's .cube file; ${next.kind} has no table`)
+  }
+
+  const { table, name, size } = await tableFrom(settings.table)
+
+  return { settings: { ...next, name, size }, table }
+}
+
 export async function addAdjustment(args: Record<string, unknown>): Promise<Outcome> {
   const on = await target(args.project)
   const { state } = on.doc
-  const kind = ADJUSTMENT_KINDS.find((entry) => entry.toLowerCase() === String(args.kind ?? '').toLowerCase())
+  const asked = String(args.kind ?? '').toLowerCase()
+  const kind = [...ADJUSTMENT_KINDS, ...HERALD_ADJUSTMENT_KINDS].find((entry) => entry.toLowerCase() === asked)
 
   if (!kind) {
-    throw new Error(`Adjustments: ${ADJUSTMENT_KINDS.join(', ')}`)
+    throw new Error(`Adjustments: ${[...ADJUSTMENT_KINDS, ...HERALD_ADJUSTMENT_KINDS].join(', ')}`)
   }
 
   const settings = jsonObject(args.settings, 'settings', '{"saturation": 20}')
-  const layer: CanvasLayer = {
-    ...adjustmentLayer(kind as AdjustmentKind, state.width, state.height),
-    ...(typeof args.name === 'string' && args.name.trim() ? { name: args.name.trim() } : {}),
-    adjustment: adjustmentWith(defaultAdjustment(kind as AdjustmentKind), settings, readColour),
-    opacity: opacityFrom(args.opacity) ?? 1,
-    blendMode: blendFrom(args.blend) ?? 'Normal'
+  const appearance = { ...(typeof args.name === 'string' && args.name.trim() ? { name: args.name.trim() } : {}), opacity: opacityFrom(args.opacity) ?? 1, blendMode: blendFrom(args.blend) ?? 'Normal' }
+  let layer: CanvasLayer
+
+  if (isHeraldKind(kind)) {
+    const changed = await heraldChanged(defaultHeraldAdjustment(kind), settings)
+    layer = { ...heraldLayer(kind, state.width, state.height), ...appearance, ...withHerald(changed.settings), ...(changed.table ? { table: changed.table } : {}) }
+  } else {
+    layer = { ...adjustmentLayer(kind, state.width, state.height), ...appearance, adjustment: adjustmentWith(defaultAdjustment(kind), settings, readColour) }
   }
   let next = insertLayer(state, layer, placementFrom(state, args))
 
@@ -639,9 +682,20 @@ export async function setAdjustment(args: Record<string, unknown>): Promise<Outc
   const settings = jsonObject(args.settings, 'settings', '{"saturation": -30}')
   const patch: Partial<CanvasLayer> = {}
   const changes: string[] = []
+  const herald = heraldOf(layer)
+
+  if (layer.heraldAdjustment && !herald) {
+    throw new Error(`${layer.name} is a ${String(layer.heraldAdjustment.kind)} adjustment from a newer Herald Canvas: this version cannot change it`)
+  }
 
   if (Object.keys(settings).length) {
-    patch.adjustment = adjustmentWith(layer.adjustment, settings, readColour)
+    if (herald) {
+      const changed = await heraldChanged(herald, settings)
+      Object.assign(patch, withHerald(changed.settings), changed.table ? { table: changed.table } : {})
+    } else {
+      patch.adjustment = adjustmentWith(layer.adjustment, settings, readColour)
+    }
+
     changes.push(`${Object.keys(settings).join(', ')} set`)
   }
 
@@ -663,7 +717,7 @@ export async function setAdjustment(args: Record<string, unknown>): Promise<Outc
     throw new Error('Nothing to change: give settings (a JSON object), opacity or blend')
   }
 
-  await apply(on, layer.adjustment.kind, withLayer(on.doc.state, layer.id, patch))
+  await apply(on, herald?.kind ?? layer.adjustment.kind, withLayer(on.doc.state, layer.id, patch))
 
   return { summary: `${layer.name}: ${changes.join(', ')}`, data: { layer: describeLayer(on.doc.state, findLayer(on.doc.state, layer.id)!) } }
 }

@@ -202,6 +202,8 @@ const api = {
     readImage: (file: string): Promise<CanvasRawImage | Uint8Array> => ipcRenderer.invoke(IPC.canvasReadImage, file),
     /** Part of a layered file (PSD, PSB) from `offset`, with the whole file's size. */
     readPart: (file: string, offset: number, length: number): Promise<CanvasFilePart> => ipcRenderer.invoke(IPC.canvasReadPart, file, offset, length),
+    /** A colour table file (`.cube`) for a Color Lookup layer, as its bytes. */
+    readTable: (file: string): Promise<Uint8Array> => ipcRenderer.invoke(IPC.canvasReadTable, file),
     /** Write an export: encoded bytes, or raw pixels to save as PNG. */
     writeFile: (file: string, data: Uint8Array | CanvasRawImage, ppi?: number): Promise<string> => ipcRenderer.invoke(IPC.canvasWriteFile, file, data, ppi),
     /** Start a file written in parts (resolves with its stream id); it appears only once ended. */

@@ -15,6 +15,7 @@ import {
   newId,
   orderLayers
 } from '../../../../shared/canvas/comp-format.ts'
+import type { ColorTable } from './color-table.ts'
 import { combine, History, type HistoryEntry } from './history.ts'
 import type { Raster } from './raster.ts'
 
@@ -23,6 +24,8 @@ export type CanvasLayer = LayerRecord & {
   pixels: Raster | null
   /** A one-channel mask (white shows, black hides); null when the layer has none. */
   mask: Raster | null
+  /** A Color Lookup layer's table, read from its `.cube` file; never part of the record. */
+  table?: ColorTable | null
 }
 
 export interface DocState {
@@ -442,6 +445,8 @@ export class CanvasDocument {
   savedPosition = 0
   /** Which raster each image file on disk holds, and at which version. */
   readonly savedAssets = new Map<string, { raster: Raster; version: number }>()
+  /** Which colour table each `.cube` file on disk holds (tables never change in place: a new one is new bytes). */
+  readonly savedTables = new Map<string, Uint8Array>()
   /** Layers picked in the Layers panel along with the active one (not saved). */
   selectedIds: string[] = []
   /** Painting goes into the active layer's mask rather than its pixels (picked on its mask thumbnail). */
