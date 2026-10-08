@@ -12,7 +12,9 @@ permissions:
 
 concurrency:
   group: haos-acceptance-${{ github.ref }}
-  cancel-in-progress: true
+  # TCG installation is slow. A source update must not discard a running
+  # image-specific proof; each run already records its exact source identities.
+  cancel-in-progress: false
 
 jobs:
   install:

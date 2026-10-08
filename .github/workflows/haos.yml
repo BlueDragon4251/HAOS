@@ -44,7 +44,7 @@ jobs:
         run: |
           # Hosted runner's existing rule has a nonstandard mode; tighten only
           # that disposable fixture file before the strict full visudo check.
-          if [[ -f /etc/sudoers.d/runner ]]; then
+          if sudo test -f /etc/sudoers.d/runner; then
             sudo stat -c '%a %U %n' /etc/sudoers.d/runner
             sudo chmod 0440 /etc/sudoers.d/runner
           fi
