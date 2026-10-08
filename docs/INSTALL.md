@@ -11,6 +11,6 @@ bash scripts/test-haos-iso.sh /absolute/path/development.iso /absolute/path/evid
 
 The QEMU/OVMF test creates a fresh sparse system disk, installs the exact ISO, then attaches two newly formatted data-disk files. The installer cannot select those data disks. Guest code requires an explicit disposable marker and QEMU product/serial identities. Missing assertion receipts fails the test.
 
-Prerequisites: QEMU, OVMF, p7zip, e2fsprogs, ripgrep; CI requires KVM. The VM uses 4 vCPUs, 6 GiB RAM, 40 GiB sparse system disk. These are test resources, not measured hardware minima. The inherited generic unattended.ks points upstream and is not a HAOS install path.
+Prerequisites: QEMU, OVMF, p7zip, e2fsprogs, ripgrep and Python 3. KVM is preferred, with verified multi-thread TCG fallback when unavailable. The VM uses 2 vCPUs, 6 GiB RAM, 40 GiB sparse system disk. These are test resources, not measured hardware minima. Each phase records acceleration/probe/launch evidence; timeouts or missing guest receipts remain failures. The inherited generic unattended.ks points upstream and is not a HAOS install path.
 
 LUKS2 physical installation, dual boot, Secure Boot, USB writing and GPU compatibility have not passed HAOS acceptance.
