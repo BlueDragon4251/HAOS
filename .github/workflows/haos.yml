@@ -22,6 +22,8 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install pytest==9.0.2 websockets==15.0.1
       - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh
+      - name: QEMU runtime selection regression tests
+        run: python -m pytest -q tests/e2e/test_qemu_runtime.py
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq

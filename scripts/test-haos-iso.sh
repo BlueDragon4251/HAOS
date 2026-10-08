@@ -64,9 +64,7 @@ KS
 cp ks.cfg "$HAOS_TEST_EVIDENCE/kickstart.cfg"
 cp /usr/share/OVMF/OVMF_VARS_4M.fd vars.fd
 qemu-img create -f qcow2 system.qcow2 40G
-HAOS_TEST_ACCEL=( -accel tcg -cpu max )
-if [[ -r /dev/kvm && -w /dev/kvm ]]; then HAOS_TEST_ACCEL=( -accel kvm -cpu host ); fi
-HAOS_TEST_QEMU=(qemu-system-x86_64 "${HAOS_TEST_ACCEL[@]}" -smp 4 -m 6144 -machine q35
+HAOS_TEST_QEMU=(qemu-system-x86_64 -smp 2 -m 6144 -machine q35
   -smbios type=1,manufacturer=HAOS-CI,product=haos-acceptance
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
   -drive if=pflash,format=raw,file=vars.fd
@@ -77,7 +75,16 @@ HAOS_TEST_QEMU=(qemu-system-x86_64 "${HAOS_TEST_ACCEL[@]}" -smp 4 -m 6144 -machi
 python3 -m http.server 8000 >"$HAOS_TEST_EVIDENCE/http.log" 2>&1 &
 HAOS_TEST_HTTP_PID=$!
 HAOS_TEST_LABEL="$(blkid -o value -s LABEL "$HAOS_TEST_ISO")"
-timeout 75m "${HAOS_TEST_QEMU[@]}" -drive "file=$HAOS_TEST_ISO,media=cdrom,readonly=on" \
+select_runtime() {
+  local stage="$1"
+  # Check the actual QEMU process, not merely the device's Unix mode bits.
+  python3 "$HAOS_TEST_REPO/scripts/haos-qemu-runtime.py" "$HAOS_TEST_EVIDENCE/runtime-$stage.json" >runtime.args
+  mapfile -t HAOS_TEST_ACCEL <runtime.args
+  [[ ${#HAOS_TEST_ACCEL[@]} -eq 4 ]] || return 1
+  echo "VM phase $stage: ${HAOS_TEST_ACCEL[*]}"
+}
+select_runtime install
+timeout 120m "${HAOS_TEST_QEMU[@]}" "${HAOS_TEST_ACCEL[@]}" -drive "file=$HAOS_TEST_ISO,media=cdrom,readonly=on" \
   -kernel iso/vmlinuz -initrd iso/initrd.img \
   -append "inst.stage2=hd:LABEL=$HAOS_TEST_LABEL inst.ks=http://10.0.2.2:8000/ks.cfg inst.text console=ttyS0,115200" \
   -serial "file:$HAOS_TEST_EVIDENCE/install.log"
@@ -90,7 +97,8 @@ done
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000001 data-a.raw >/dev/null
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000002 data-b.raw >/dev/null
 for stage in 1 2; do
-  timeout 15m "${HAOS_TEST_QEMU[@]}" \
+  select_runtime "boot-$stage"
+  timeout 30m "${HAOS_TEST_QEMU[@]}" "${HAOS_TEST_ACCEL[@]}" \
     -drive file=data-a.raw,format=raw,if=none,id=data-a -device virtio-blk-pci,drive=data-a,serial=HAOS-CI-DATA-A \
     -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B \
     -serial "file:$HAOS_TEST_EVIDENCE/boot-$stage.log"

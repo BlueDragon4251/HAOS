@@ -3,7 +3,7 @@ name: HAOS acceptance of an existing private ISO
 on:
   push:
     branches: ['agent/haos-*']
-    paths: ['scripts/test-haos-iso.sh', 'tests/e2e/**', '.github/workflows/haos-acceptance.yml']
+    paths: ['scripts/test-haos-iso.sh', 'scripts/haos-qemu-runtime.py', 'tests/e2e/**', '.github/workflows/haos-acceptance.yml']
   workflow_dispatch:
 
 permissions:
@@ -17,7 +17,7 @@ concurrency:
 jobs:
   install:
     runs-on: ubuntu-24.04
-    timeout-minutes: 110
+    timeout-minutes: 210
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,8 +64,9 @@ jobs:
           done
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf p7zip-full e2fsprogs acl ripgrep
-          test -c /dev/kvm
-          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          if [[ -c /dev/kvm ]]; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm || echo 'KVM ACL unavailable; the harness will probe TCG'
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: ${{ steps.image.outputs.name }}
