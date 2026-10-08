@@ -19,6 +19,15 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+      - name: Reclaim unused toolchains on the disposable build runner
+        run: |
+          set -euo pipefail
+          df -h /
+          # These preinstalled SDKs are not inputs to the HAOS build.
+          for path in /usr/share/dotnet /usr/local/lib/android /opt/ghc; do
+            if [[ -d "$path" ]]; then sudo du -sh "$path"; sudo rm -rf -- "$path"; fi
+          done
+          df -h /
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -33,12 +42,14 @@ jobs:
           npm sbom --sbom-format cyclonedx --omit dev > evidence/npm.cdx.json
       - name: Build the pinned-runtime Fedora bootc image
         run: |
+          set -euo pipefail
           sudo podman build -f linux/image/Containerfile --build-arg SHELL_TARBALL=herald-os-linux.tar.gz -t localhost/haos:ci . 2>&1 | tee evidence/image-build.log
           sudo podman image inspect localhost/haos:ci > evidence/image.json
           sudo podman image inspect quay.io/fedora/fedora-bootc:44 > evidence/base-image.json
           sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-packages.txt
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
+          set -euo pipefail
           mkdir -p output
           sudo podman run --rm --privileged --pull=newer --security-opt label=type:unconfined_t \
             -v ./output:/output -v ./linux/image/iso.toml:/config.toml:ro \
@@ -68,5 +79,39 @@ jobs:
         with:
           name: haos-x86_64-build-${{ github.sha }}
           path: evidence/
+          if-no-files-found: error
+          retention-days: 7
+
+  install:
+    name: Install and verify in disposable QEMU
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v7
+      - name: Reclaim unused SDKs on the disposable VM runner
+        run: |
+          for path in /usr/share/dotnet /usr/local/lib/android /opt/ghc; do
+            if [[ -d "$path" ]]; then sudo rm -rf -- "$path"; fi
+          done
+          df -h /
+      - uses: actions/download-artifact@v4
+        with:
+          name: haos-x86_64-build-${{ github.sha }}
+          path: image-evidence
+      - name: Verify ISO checksum and prepare the VM tools
+        run: |
+          (cd image-evidence && sha256sum -c SHA256SUMS)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf p7zip-full e2fsprogs acl ripgrep
+          test -c /dev/kvm
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - name: Install, enforce multi-disk boundaries and reboot
+        run: bash scripts/test-haos-iso.sh image-evidence/haos-x86_64-development.iso vm-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-qemu-acceptance-${{ github.sha }}
+          path: vm-evidence/
           if-no-files-found: error
           retention-days: 7

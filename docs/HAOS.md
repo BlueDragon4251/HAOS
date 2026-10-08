@@ -1,29 +1,28 @@
-# Hermes Autonomous OS
+# HAOS implementation and evidence
 
-HAOS uses Herald OS as its existing implementation base. The source and complete Git history were imported into the private, independent repository https://github.com/BlueDragon4251/HAOS on 8 October 2026. This repository is separate from GitHub's public Herald fork network.
+Herald's complete history was imported into the private independent `BlueDragon4251/HAOS` repository. Baseline `3c891adcd1f5c3b6eeadf4d20472d10d9516a999` is pinned in `upstream/HERALD.lock`: 121 main commits, 133 unique imported commits, release tags and office branches. Licenses/notices/authorship remain intact.
 
-The imported baseline is `3c891adcd1f5c3b6eeadf4d20472d10d9516a999`, pinned in `upstream/HERALD.lock`. The baseline contains 121 commits on `main` and 133 unique commits across all imported branches. Both upstream release tags and the `feature/herald-office` and `office/sheets-basic` branches are part of the import. `LICENSE`, `NOTICE` and upstream authorship remain intact.
+The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery target, not implemented-feature claims.
 
-## Project scope
+| Component | Implementation |
+| --- | --- |
+| Independent Hermes | `linux/haos/haos-hermes.service`; pinned immutable runtime, Fedora Python 3.11, service account, systemd credential, mandatory Bubblewrap namespace |
+| Durable missions | `controller.py`, `store.py`; SQLite WAL/FULL, idempotency, deadlines, bounded pre-dispatch retry, retained lock for ambiguity |
+| Local API | Fixed Unix socket/methods, kernel peer UID, no owner endpoint |
+| Storage authority | `policy.py`, `owner.py`; protected schema, stable identities, root mounts, system disk denial |
+| Native UI | Managed attachment, real mission/event list, cancellation requests, once/deny approvals and clarification |
+| Image/VM gates | `haos-image.yml`, `test-haos-iso.sh`, `haos_guest.py`; real ISO build and guarded disposable multi-disk acceptance harness |
 
-The complete German project brief is in [the HAOS master prompt](requirements/HAOS-MASTER-PROMPT.md). Its target repository has been resolved to this repository. Requirements describe intended behavior; they are not claims that HAOS already implements or verifies every feature.
+Native host-command GUI bridge access is not exposed to the isolated agent. A safe GUI broker remains missing. Ordinary chat/gateways are not automatically durable HAOS missions.
 
-The machine is operated primarily by Hermes through the native Herald interface and authenticated gateways. Owners grant access to specific data volumes. Mission persistence, an independent Hermes service, technically enforced storage boundaries, safe theme development, installer verification and recovery are core requirements.
+## Recorded evidence
 
-## Development branches
+- Local HAOS: **20 passed**.
+- Native mission UI (`227597b`): TypeScript and production build passed; **729 tests in 100 files passed**. Existing Linux/macOS CI passed.
+- Remote `8499142a2be2ea988e640662e636e1fa6b8aa996`, HAOS run `37809413576`: **20 unit tests, 2 real socket/kernel probes and systemd syntax passed**.
+- Kernel probes exercise permitted writes, denied read-only writes, hidden paths/devices, symlink escape, no effective capabilities, NoNewPrivileges, denied mounts and nested user namespaces.
+- Initial image run `37807692793` failed before producing an ISO: uv could not find the requested managed interpreter. The next build tests the Fedora Python runtime correction.
+- The corrected image run `37809406559` installed Fedora Python 3.11.16 and 81 frozen Hermes dependencies successfully, then failed while committing the image layer because the runner ran out of disk space. No ISO was produced. The workflow now reclaims unused runner SDKs and excludes irrelevant build context/cache files.
+- The QEMU harness is syntax checked; no completed guest acceptance is claimed here. Require actual receipts/logs for the exact tested source commit.
 
-`main` retains the imported upstream baseline. `dev` is the integration branch, and `agent/haos-foundation` contains the HAOS foundation documentation. Future implementation changes should be committed on working branches and reviewed against `dev` before integration.
-
-The local checkout uses `origin` for `BlueDragon4251/HAOS` and `upstream` for `iamlukethedev/Herald-OS`. Deliberate upstream updates use `git fetch upstream` followed by review, tests and a merge on a working branch. Hermes remains the separately maintained upstream dependency pinned by `upstream/UPSTREAM.lock`.
-
-## Verified baseline
-
-`git fsck --full` passed, and the local clone is not shallow. The existing bridge and Linux test command was executed without changing the implementation:
-
-```sh
-bash scripts/test-bridge.sh
-```
-
-Result: **293 passed, 1 skipped, 9 setup errors**. The nine errors are in `test_os_ui.py`: this execution environment denies creation of `AF_UNIX` sockets with `PermissionError: [Errno 1] Operation not permitted`. This is not a fully passing test suite. Those integration tests require another execution environment. Desktop build, TypeScript tests, installer boot and full HAOS acceptance scenarios were not executed in this foundation change.
-
-See [the upstream inventory](architecture/upstream-inventory.md) for verified integration points and gaps.
+`main` retains baseline, `dev` is integration target, `agent/haos-foundation` holds implementation. Draft PR #1 stays unmerged while critical gates are incomplete. See [limitations](KNOWN-LIMITATIONS.md) and [release gates](RELEASE.md).

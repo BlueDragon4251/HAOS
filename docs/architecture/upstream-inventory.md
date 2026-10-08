@@ -21,4 +21,6 @@ This inventory is grounded in the imported Herald commit `3c891adcd1f5c3b6eeadf4
 
 The foundation change adds project provenance, requirements and this inventory. It does not implement the independent service, persistent mission orchestrator, capability broker, storage permission engine or HAOS release pipeline. Their acceptance criteria remain in the complete master prompt.
 
+This statement describes the original foundation commit. Subsequent HAOS implementation adds the independent service, persistent native missions, protected storage policy and build/VM gates under `linux/haos`. See [current integration and evidence](../HAOS.md) for the updated state. The baseline table above intentionally remains a record of inspected upstream behavior.
+
 Upstream artifacts and release URLs are still upstream artifacts. Before publishing HAOS builds, review repository references, package metadata, OCI labels, update locations, signing and private/public distribution together. A search-and-replace of every Herald identifier would also change protocols and migration paths and is not a safe branding strategy.
