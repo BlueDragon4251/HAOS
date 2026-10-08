@@ -1,62 +1,63 @@
-import type { CsvLayout } from '../../../../shared/office/csv.ts'
-import { csvFromWorkbook, fieldFromCell, workbookFromCsv } from '../../../../shared/office/sheet-csv.ts'
-import { cellsOf, newWorkbook, type WorkbookSnapshot } from '../../../../shared/office/workbook.ts'
-import { decodeText, encodeText, escapeHtml, printPage, unitId } from '../print.ts'
+import { numfmt } from '@univerjs/core'
+import { type CsvLayout, decodeCsv, encodeCsv } from '../../../../shared/office/csv.ts'
+import { csvFromWorkbook, type NumberFormatter, workbookFromCsv } from '../../../../shared/office/sheet-csv.ts'
+import { newWorkbook, type WorkbookSnapshot } from '../../../../shared/office/workbook.ts'
+import { unitId } from '../print.ts'
 import type { OfficeAdapter } from '../types.ts'
+import { activeSheetOf, printHtml as printSheet } from './print.ts'
+import { readXlsx, writeXlsx } from './xlsx.ts'
 
 /*
- * Herald Sheets' files: CSV for now (Excel workbooks come with the format converters), and the
- * print view of the sheet in front.
+ * Herald Sheets' files: Excel workbooks (.xlsx, and macro-enabled .xlsm opened without their
+ * macros) and CSV, and the print view of the sheet in front.
  */
 
-/** The sheet the window has in front, kept on the snapshot it hands over for saving and printing. */
-export const activeSheetOf = (workbook: WorkbookSnapshot): string | undefined => (typeof workbook.activeSheetId === 'string' ? workbook.activeSheetId : undefined)
+export { activeSheetOf }
 
-const CSS = `
-@page { size: A4; margin: 0.5in; }
-body { font: 9pt Arial, Helvetica, sans-serif; color: #000; margin: 0; }
-h1 { font-size: 11pt; margin: 0 0 6pt; }
-table { border-collapse: collapse; }
-td { border: 0.5pt solid #c8ccd4; padding: 2pt 5pt; white-space: nowrap; vertical-align: bottom; }
-td.n { text-align: right; }
-`
+/** Numbers as the sheet shows them, by Univer's own formatter (dates counted from 1904 in a workbook that does). */
+export function formatterFor(workbook: WorkbookSnapshot): NumberFormatter {
+  const shift = workbook.dateSystem === 'date1904' ? 1462 : 0
 
-export function printHtml(workbook: WorkbookSnapshot, title: string): { html: string; landscape: boolean } {
-  const sheet = workbook.sheets[activeSheetOf(workbook) ?? ''] ?? workbook.sheets[workbook.sheetOrder[0]]
-  const cells = sheet ? [...cellsOf(sheet)].filter(({ cell }) => fieldFromCell(cell) !== '') : []
-  const rows = cells.length ? Math.max(...cells.map((entry) => entry.row)) + 1 : 0
-  const columns = cells.length ? Math.max(...cells.map((entry) => entry.column)) + 1 : 0
-  const body: string[] = []
-
-  for (let row = 0; row < rows; row++) {
-    const line: string[] = []
-
-    for (let column = 0; column < columns; column++) {
-      const cell = sheet.cellData[row]?.[column]
-      const text = fieldFromCell(cell)
-      line.push(`<td${typeof cell?.v === 'number' ? ' class="n"' : ''}>${escapeHtml(text)}</td>`)
-    }
-
-    body.push(`<tr>${line.join('')}</tr>`)
-  }
-
-  return { html: printPage(title, CSS, `<h1>${escapeHtml(sheet?.name ?? title)}</h1><table>${body.join('')}</table>`), landscape: columns > 8 }
+  return (value, pattern) => numfmt.format(pattern, shift && numfmt.isDateFormat(pattern) ? value + shift : value, { locale: 'en-US' })
 }
+
+export const printHtml = (workbook: WorkbookSnapshot, title: string) => printSheet(workbook, title, formatterFor(workbook))
+
+const cannot = (extension: string, doing: string) => new Error(extension === '.ods' ? `Herald Sheets cannot ${doing} OpenDocument spreadsheets yet: LibreOffice can save this one as .xlsx first.` : `Herald Sheets cannot ${doing} ${extension || 'these'} files`)
 
 export const sheetsAdapter: OfficeAdapter<WorkbookSnapshot> = {
   app: 'sheets',
-  defaultFormat: '.csv',
+  defaultFormat: '.xlsx',
   blank: (name) => newWorkbook(unitId('book'), name),
-  read: async (bytes, _extension, name) => {
-    const { text, notes } = decodeText(bytes)
-    const { workbook, layout } = workbookFromCsv(text, { id: unitId('book'), name })
+  read: async (bytes, extension, name) => {
+    if (extension === '.csv') {
+      const { text, encoding, notes } = decodeCsv(bytes)
+      const { workbook, layout } = workbookFromCsv(text, { id: unitId('book'), name })
 
-    return { model: workbook, notes, layout }
+      return { model: workbook, notes, layout: { ...layout, encoding } }
+    }
+
+    if (extension === '.xlsx' || extension === '.xlsm') {
+      const { workbook, notes } = await readXlsx(bytes, { id: unitId('book'), name, extension })
+
+      return { model: workbook, notes }
+    }
+
+    throw cannot(extension, 'open')
   },
-  write: async (model, _extension, layout) => {
-    const { text, losses } = csvFromWorkbook(model, { sheetId: activeSheetOf(model), layout: (layout ?? {}) as Partial<CsvLayout> })
+  write: async (model, extension, layout) => {
+    if (extension === '.csv') {
+      const csvLayout = (layout ?? {}) as Partial<CsvLayout>
+      const { text, losses } = csvFromWorkbook(model, { sheetId: activeSheetOf(model), layout: csvLayout, format: formatterFor(model) })
 
-    return { bytes: encodeText(text), losses }
+      return { bytes: encodeCsv(text, csvLayout.encoding), losses }
+    }
+
+    if (extension === '.xlsx') {
+      return writeXlsx(model)
+    }
+
+    throw cannot(extension, 'save')
   },
   print: async (model, name) => printHtml(model, name)
 }

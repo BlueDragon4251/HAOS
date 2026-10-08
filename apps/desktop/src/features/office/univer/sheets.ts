@@ -6,6 +6,8 @@ import '@univerjs/sheets-filter-ui/lib/index.css'
 import '@univerjs/sheets-sort-ui/lib/index.css'
 import '@univerjs/sheets-conditional-formatting-ui/lib/index.css'
 import '@univerjs/sheets-data-validation-ui/lib/index.css'
+import '@univerjs/find-replace/lib/index.css'
+import '@univerjs/sheets-hyper-link-ui/lib/index.css'
 import '@univerjs/sheets/facade'
 import '@univerjs/ui/facade'
 import '@univerjs/docs-ui/facade'
@@ -17,6 +19,9 @@ import '@univerjs/sheets-filter/facade'
 import '@univerjs/sheets-sort/facade'
 import '@univerjs/sheets-conditional-formatting/facade'
 import '@univerjs/sheets-data-validation/facade'
+import '@univerjs/sheets-find-replace/facade'
+import '@univerjs/sheets-hyper-link/facade'
+import '@univerjs/sheets-hyper-link-ui/facade'
 import { CommandType, ICommandService, type IWorkbookData, ThemeService, type Univer, UniverInstanceType } from '@univerjs/core'
 import type { FUniver } from '@univerjs/core/facade'
 import { UniverDataValidationPlugin } from '@univerjs/data-validation'
@@ -24,6 +29,8 @@ import { UniverDocsPlugin } from '@univerjs/docs'
 import DocsUIEnUS from '@univerjs/docs-ui/locale/en-US'
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui'
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula'
+import FindReplaceEnUS from '@univerjs/find-replace/locale/en-US'
+import { UniverFindReplacePlugin } from '@univerjs/find-replace'
 import { UniverRPCMainThreadPlugin } from '@univerjs/rpc'
 import { UniverSheetsPlugin } from '@univerjs/sheets'
 import SheetsEnUS from '@univerjs/sheets/locale/en-US'
@@ -36,10 +43,15 @@ import { UniverSheetsDataValidationUIPlugin } from '@univerjs/sheets-data-valida
 import { UniverSheetsFilterPlugin } from '@univerjs/sheets-filter'
 import SheetsFilterUIEnUS from '@univerjs/sheets-filter-ui/locale/en-US'
 import { UniverSheetsFilterUIPlugin } from '@univerjs/sheets-filter-ui'
+import { UniverSheetsFindReplacePlugin } from '@univerjs/sheets-find-replace'
 import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula'
 import SheetsFormulaEnUS from '@univerjs/sheets-formula/locale/en-US'
 import SheetsFormulaUIEnUS from '@univerjs/sheets-formula-ui/locale/en-US'
 import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui'
+import SheetsHyperLinkEnUS from '@univerjs/sheets-hyper-link/locale/en-US'
+import { UniverSheetsHyperLinkPlugin } from '@univerjs/sheets-hyper-link'
+import SheetsHyperLinkUIEnUS from '@univerjs/sheets-hyper-link-ui/locale/en-US'
+import { UniverSheetsHyperLinkUIPlugin } from '@univerjs/sheets-hyper-link-ui'
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt'
 import SheetsNumfmtUIEnUS from '@univerjs/sheets-numfmt-ui/locale/en-US'
 import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui'
@@ -69,7 +81,7 @@ export interface SheetsEngine {
 export function createSheetsEngine(container: HTMLElement, workbook: WorkbookSnapshot | Partial<IWorkbookData>, options: { worker?: boolean } = {}): SheetsEngine {
   const { univer, api } = createUniver({
     container,
-    locales: [DocsUIEnUS, SheetsEnUS, SheetsUIEnUS, SheetsFormulaEnUS, SheetsFormulaUIEnUS, SheetsNumfmtUIEnUS, SheetsFilterUIEnUS, SheetsSortUIEnUS, SheetsConditionalFormattingUIEnUS, SheetsDataValidationUIEnUS]
+    locales: [DocsUIEnUS, SheetsEnUS, SheetsUIEnUS, SheetsFormulaEnUS, SheetsFormulaUIEnUS, SheetsNumfmtUIEnUS, SheetsFilterUIEnUS, SheetsSortUIEnUS, SheetsConditionalFormattingUIEnUS, SheetsDataValidationUIEnUS, FindReplaceEnUS, SheetsHyperLinkEnUS, SheetsHyperLinkUIEnUS]
   })
   const remote = options.worker ? new Worker(new URL('./formula-worker.ts', import.meta.url), { type: 'module', name: 'herald-sheets-formulas' }) : null
   univer.registerPlugin(UniverDocsPlugin)
@@ -95,6 +107,10 @@ export function createSheetsEngine(container: HTMLElement, workbook: WorkbookSna
   univer.registerPlugin(UniverDataValidationPlugin)
   univer.registerPlugin(UniverSheetsDataValidationPlugin)
   univer.registerPlugin(UniverSheetsDataValidationUIPlugin)
+  univer.registerPlugin(UniverFindReplacePlugin)
+  univer.registerPlugin(UniverSheetsFindReplacePlugin)
+  univer.registerPlugin(UniverSheetsHyperLinkPlugin)
+  univer.registerPlugin(UniverSheetsHyperLinkUIPlugin)
   univer.createUnit(UniverInstanceType.UNIVER_SHEET, workbook as Partial<IWorkbookData>)
   const unitId = String(workbook.id)
   const commands = univer.__getInjector().get(ICommandService)

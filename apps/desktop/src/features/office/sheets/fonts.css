@@ -1,0 +1,59 @@
+/*
+ * Office's fonts as Herald Sheets draws them: the real font where it is installed, else the one made
+ * to its measurements (Carlito for Calibri, Caladea for Cambria), else the nearest system font. A
+ * canvas without the font falls back to a serif, so a workbook from Excel would look like a letter.
+ * Only drawing changes: cells keep their font's name, and saved files say Calibri as they did.
+ */
+
+@font-face {
+  font-family: 'Calibri';
+  src: local('Calibri'), local('Carlito'), local('Helvetica Neue'), local('Arial'), local('Liberation Sans'), local('DejaVu Sans');
+}
+
+@font-face {
+  font-family: 'Calibri';
+  font-weight: bold;
+  src: local('Calibri Bold'), local('Calibri-Bold'), local('Carlito Bold'), local('Helvetica Neue Bold'), local('Arial Bold'), local('Liberation Sans Bold'), local('DejaVu Sans Bold');
+}
+
+@font-face {
+  font-family: 'Calibri';
+  font-style: italic;
+  src: local('Calibri Italic'), local('Calibri-Italic'), local('Carlito Italic'), local('Helvetica Neue Italic'), local('Arial Italic'), local('Liberation Sans Italic'), local('DejaVu Sans Oblique');
+}
+
+@font-face {
+  font-family: 'Calibri Light';
+  src: local('Calibri Light'), local('Carlito'), local('Helvetica Neue Light'), local('Arial'), local('Liberation Sans'), local('DejaVu Sans');
+}
+
+@font-face {
+  font-family: 'Cambria';
+  src: local('Cambria'), local('Caladea'), local('Georgia'), local('Times New Roman'), local('Liberation Serif'), local('DejaVu Serif');
+}
+
+@font-face {
+  font-family: 'Cambria';
+  font-weight: bold;
+  src: local('Cambria Bold'), local('Caladea Bold'), local('Georgia Bold'), local('Times New Roman Bold'), local('Liberation Serif Bold'), local('DejaVu Serif Bold');
+}
+
+@font-face {
+  font-family: 'Aptos';
+  src: local('Aptos'), local('Helvetica Neue'), local('Arial'), local('Liberation Sans'), local('DejaVu Sans');
+}
+
+@font-face {
+  font-family: 'Aptos Narrow';
+  src: local('Aptos Narrow'), local('Arial Narrow'), local('Helvetica Neue'), local('Liberation Sans Narrow'), local('Arial'), local('DejaVu Sans');
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  src: local('Segoe UI'), local('Helvetica Neue'), local('Arial'), local('Liberation Sans'), local('DejaVu Sans');
+}
+
+@font-face {
+  font-family: 'Consolas';
+  src: local('Consolas'), local('Menlo'), local('DejaVu Sans Mono'), local('Liberation Mono'), local('Courier New');
+}

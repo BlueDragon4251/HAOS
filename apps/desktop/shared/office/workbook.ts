@@ -50,13 +50,17 @@ export function newWorkbook(id: string, name: string, sheets: SheetSnapshot[] = 
   return { id, name, appVersion: '1.0.3', locale: 'enUS', styles: {}, sheetOrder: sheets.map((sheet) => sheet.id), sheets: Object.fromEntries(sheets.map((sheet) => [sheet.id, sheet])) }
 }
 
-/** The cells of a sheet in row and column order, skipping empty rows. */
+const isIndex = (value: number): boolean => Number.isInteger(value) && value >= 0
+
+/** The cells of a sheet in row and column order, skipping empty rows (and keys that are not a row or column, which Univer can leave). */
 export function* cellsOf(sheet: Pick<SheetSnapshot, 'cellData'>): Generator<{ row: number; column: number; cell: CellSnapshot }> {
-  for (const row of Object.keys(sheet.cellData ?? {}).map(Number).sort((a, b) => a - b)) {
+  for (const row of Object.keys(sheet.cellData ?? {}).map(Number).filter(isIndex).sort((a, b) => a - b)) {
     const columns = sheet.cellData[row] ?? {}
 
-    for (const column of Object.keys(columns).map(Number).sort((a, b) => a - b)) {
-      yield { row, column, cell: columns[column] }
+    for (const column of Object.keys(columns).map(Number).filter(isIndex).sort((a, b) => a - b)) {
+      if (columns[column]) {
+        yield { row, column, cell: columns[column] }
+      }
     }
   }
 }

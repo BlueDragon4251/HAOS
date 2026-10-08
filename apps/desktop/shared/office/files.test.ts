@@ -18,7 +18,8 @@ describe('openFormats and saveFormats', () => {
   it('offers only what Herald reads and writes', () => {
     expect(openFormats('docs', plain).map((format) => format.extension)).toEqual(['.md', '.markdown', '.txt'])
     expect(saveFormats('docs', plain).map((format) => format.extension)).toEqual(['.md', '.txt'])
-    expect(openFormats('sheets', plain).map((format) => format.extension)).toEqual(['.csv'])
+    expect(openFormats('sheets', plain).map((format) => format.extension)).toEqual(['.xlsx', '.xlsm', '.csv'])
+    expect(saveFormats('sheets', plain).map((format) => format.extension)).toEqual(['.xlsx', '.csv'])
     expect(openFormats('slides', plain)).toEqual([])
   })
 
@@ -34,6 +35,7 @@ describe('openFormats and saveFormats', () => {
 describe('officeAppFor', () => {
   it('names the app that opens a file here', () => {
     expect(officeAppFor('/tmp/a.csv', plain)).toBe('sheets')
+    expect(officeAppFor('/tmp/a.XLSX', plain)).toBe('sheets')
     expect(officeAppFor('/tmp/a.txt', plain)).toBe('docs')
     expect(officeAppFor('/tmp/a.docx', plain)).toBeNull()
     expect(officeAppFor('/tmp/a.png', plain)).toBeNull()
@@ -55,6 +57,11 @@ describe('dialogFilters', () => {
       { name: 'Markdown', extensions: ['md', 'markdown'] },
       { name: 'Plain text', extensions: ['txt'] }
     ])
-    expect(dialogFilters(openFormats('sheets', plain))).toEqual([{ name: 'CSV', extensions: ['csv'] }])
+    expect(dialogFilters(openFormats('sheets', plain))).toEqual([
+      { name: 'All supported files', extensions: ['xlsx', 'xlsm', 'csv'] },
+      { name: 'Excel workbook', extensions: ['xlsx'] },
+      { name: 'Excel macro-enabled workbook', extensions: ['xlsm'] },
+      { name: 'CSV', extensions: ['csv'] }
+    ])
   })
 })
