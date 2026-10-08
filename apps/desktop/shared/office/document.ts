@@ -128,6 +128,32 @@ export function documentFromBlocks(blocks: readonly Block[], options: { id: stri
 
 const isCodeFont = (font: string | undefined): boolean => Boolean(font) && /mono|menlo|courier|consolas|code/i.test(font!)
 
+/**
+ * The document without the text colour Univer's editor gives what is typed: the theme's
+ * "automatic" colour, written out as a colour. It means no colour, and a saved file says so.
+ */
+export function withoutAutomaticColor(document: DocumentSnapshot, automatic: string): DocumentSnapshot {
+  const runs = document.body?.textRuns
+
+  if (!runs?.length) {
+    return document
+  }
+
+  const textRuns = runs
+    .map((run) => {
+      if (typeof run.ts?.cl?.rgb !== 'string' || run.ts.cl.rgb.toLowerCase() !== automatic.toLowerCase()) {
+        return run
+      }
+
+      const { cl: _automatic, ...ts } = run.ts
+
+      return { ...run, ts }
+    })
+    .filter((run) => Object.keys(run.ts ?? {}).length > 0)
+
+  return { ...document, body: { ...document.body!, textRuns } }
+}
+
 /** A document's paragraphs as blocks, with the extra styles Herald found and the formats cannot keep. */
 export function blocksFromDocument(document: DocumentSnapshot): { blocks: Block[]; extras: Set<string> } {
   const body = document.body ?? { dataStream: '\r\n' }

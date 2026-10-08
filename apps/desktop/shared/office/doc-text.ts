@@ -102,14 +102,15 @@ export function parseInline(source: string): { text: string; runs: InlineRun[] }
 }
 
 /** A run of text with one style, for writing. */
-interface Span {
+export interface Span {
   text: string
   bold: boolean
   italic: boolean
   code: boolean
 }
 
-function spans(block: Block): Span[] {
+/** A block's text cut where its style changes. */
+export function spans(block: Block): Span[] {
   const cuts = new Set([0, block.text.length])
 
   for (const run of block.runs) {

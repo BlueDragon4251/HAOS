@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cellFromField, csvFromWorkbook, fieldFromCell, workbookFromCsv } from './sheet-csv.ts'
-import { CELL_TYPE, newSheet, newWorkbook } from './workbook.ts'
+import { CELL_TYPE, isStyled, newSheet, newWorkbook, withoutAutomaticColor } from './workbook.ts'
 
 describe('cellFromField', () => {
   it('reads numbers that read back the same, formulas, and text', () => {
@@ -43,7 +43,9 @@ describe('workbookFromCsv and csvFromWorkbook', () => {
   it('lists what a CSV file cannot keep', () => {
     const first = newSheet('a', 'Totals', { 0: { 0: { v: 2, s: 'bold' }, 1: { f: '=A1*2', v: 4 } } })
     const second = newSheet('b', 'Notes', { 0: { 0: { v: 'kept elsewhere' } } })
-    const { text, losses } = csvFromWorkbook(newWorkbook('book', 'Book', [first, second]))
+    const workbook = newWorkbook('book', 'Book', [first, second])
+    workbook.styles = { bold: { bl: 1 } }
+    const { text, losses } = csvFromWorkbook(workbook)
 
     expect(text).toBe('2,4\n')
     expect(losses).toEqual([
@@ -51,6 +53,21 @@ describe('workbookFromCsv and csvFromWorkbook', () => {
       'Formulas are saved as their results.',
       'Formatting (fonts, colours, borders and number formats) is not saved.'
     ])
+  })
+
+  it('does not count the automatic colour of typed cells as formatting', () => {
+    const workbook = newWorkbook('book', 'Book', [newSheet('s', 'S', { 0: { 0: { v: 42, s: 'typed' }, 1: { v: 'red', s: 'red' }, 2: { v: 'inline', s: { cl: { rgb: '#0C1431' } } } } })])
+    workbook.styles = { typed: { cl: { rgb: '#0c1431' } }, red: { cl: { rgb: '#ff0000' }, bl: 1 } }
+    const plain = withoutAutomaticColor(workbook, '#0c1431')
+    const cells = plain.sheets.s.cellData[0]
+
+    expect(plain.styles).toEqual({ red: { cl: { rgb: '#ff0000' }, bl: 1 } })
+    expect(cells[0]).toEqual({ v: 42 })
+    expect(cells[1].s).toBe('red')
+    expect(cells[2]).toEqual({ v: 'inline' })
+    expect(isStyled(cells[1], plain.styles)).toBe(true)
+    expect(isStyled({ v: 1, s: 'gone' }, plain.styles)).toBe(false)
+    expect(csvFromWorkbook(withoutAutomaticColor(newWorkbook('b', 'B', [newSheet('s', 'S', { 0: { 0: { v: 1, s: 'typed' } } })]), '#0c1431')).losses).toEqual([])
   })
 
   it('writes the sheet it is asked for, with gaps as empty fields', () => {

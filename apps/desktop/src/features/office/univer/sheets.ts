@@ -17,7 +17,7 @@ import '@univerjs/sheets-filter/facade'
 import '@univerjs/sheets-sort/facade'
 import '@univerjs/sheets-conditional-formatting/facade'
 import '@univerjs/sheets-data-validation/facade'
-import { type IWorkbookData, type Univer, UniverInstanceType } from '@univerjs/core'
+import { CommandType, ICommandService, type IWorkbookData, ThemeService, type Univer, UniverInstanceType } from '@univerjs/core'
 import type { FUniver } from '@univerjs/core/facade'
 import { UniverDataValidationPlugin } from '@univerjs/data-validation'
 import { UniverDocsPlugin } from '@univerjs/docs'
@@ -48,16 +48,25 @@ import SheetsSortUIEnUS from '@univerjs/sheets-sort-ui/locale/en-US'
 import { UniverSheetsSortUIPlugin } from '@univerjs/sheets-sort-ui'
 import SheetsUIEnUS from '@univerjs/sheets-ui/locale/en-US'
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui'
+import { withoutAutomaticColor, type WorkbookSnapshot } from '../../../../shared/office/workbook.ts'
 import { createUniver } from './base.ts'
 
 export interface SheetsEngine {
   univer: Univer
   api: FUniver
+  unitId: string
+  snapshot: () => WorkbookSnapshot
+  /** Called after each change to the workbook's content (not formula results or selection). */
+  onChange: (listener: () => void) => () => void
+  undo: () => void
+  redo: () => void
+  /** The sheet in front and the selection on it: "Sheet1", "B2:D9". */
+  position: () => { sheetId: string | undefined; sheet: string; selection: string | undefined }
   dispose: () => void
 }
 
 /** Univer Sheets in `container`, showing `workbook`; with `worker`, formulas are worked out in a worker. */
-export function createSheetsEngine(container: HTMLElement, workbook: Partial<IWorkbookData>, options: { worker?: boolean } = {}): SheetsEngine {
+export function createSheetsEngine(container: HTMLElement, workbook: WorkbookSnapshot | Partial<IWorkbookData>, options: { worker?: boolean } = {}): SheetsEngine {
   const { univer, api } = createUniver({
     container,
     locales: [DocsUIEnUS, SheetsEnUS, SheetsUIEnUS, SheetsFormulaEnUS, SheetsFormulaUIEnUS, SheetsNumfmtUIEnUS, SheetsFilterUIEnUS, SheetsSortUIEnUS, SheetsConditionalFormattingUIEnUS, SheetsDataValidationUIEnUS]
@@ -86,12 +95,42 @@ export function createSheetsEngine(container: HTMLElement, workbook: Partial<IWo
   univer.registerPlugin(UniverDataValidationPlugin)
   univer.registerPlugin(UniverSheetsDataValidationPlugin)
   univer.registerPlugin(UniverSheetsDataValidationUIPlugin)
-  univer.createUnit(UniverInstanceType.UNIVER_SHEET, workbook)
+  univer.createUnit(UniverInstanceType.UNIVER_SHEET, workbook as Partial<IWorkbookData>)
+  const unitId = String(workbook.id)
+  const commands = univer.__getInjector().get(ICommandService)
+  const listeners = new Set<() => void>()
+  const subscription = commands.onCommandExecuted((command, executed) => {
+    const params = command.params as { unitId?: string } | undefined
+    const echo = executed?.onlyLocal || executed?.fromCollab || executed?.fromChangeset || executed?.syncOnly
+
+    if (command.type === CommandType.MUTATION && params?.unitId === unitId && !echo && !command.id.startsWith('formula.')) {
+      listeners.forEach((listener) => listener())
+    }
+  })
+  const book = () => api.getWorkbook(unitId)
+  // What the cell editor writes as the colour of typed text when none was chosen.
+  const automatic = String(univer.__getInjector().get(ThemeService).getColorFromTheme('gray.900'))
 
   return {
     univer,
     api,
+    unitId,
+    snapshot: () => withoutAutomaticColor(book()!.save() as unknown as WorkbookSnapshot, automatic),
+    onChange: (listener) => {
+      listeners.add(listener)
+
+      return () => listeners.delete(listener)
+    },
+    undo: () => void book()?.undo(),
+    redo: () => void book()?.redo(),
+    position: () => {
+      const sheet = book()?.getActiveSheet()
+
+      return { sheetId: sheet?.getSheetId(), sheet: sheet?.getSheetName() ?? '', selection: sheet?.getSelection()?.getActiveRange()?.getA1Notation() }
+    },
     dispose: () => {
+      subscription.dispose()
+      listeners.clear()
       univer.dispose()
       remote?.terminate()
     }

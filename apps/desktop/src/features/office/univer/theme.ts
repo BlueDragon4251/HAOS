@@ -8,8 +8,16 @@ const token = (style: CSSStyleDeclaration, name: string, fallback: string): stri
 /** Univer's palette and scheme from the page's current Herald theme. */
 export function heraldUniverTheme(): { theme: UniverTheme; darkMode: boolean } {
   const style = getComputedStyle(document.documentElement)
-  const { primary, gray } = heraldPalette({ accent: token(style, '--color-accent', '#2f7dff'), background: token(style, '--color-bg', '#050f33') })
-  const scheme = style.colorScheme || token(style, 'color-scheme', 'dark')
+  const darkMode = !(style.colorScheme || token(style, 'color-scheme', 'dark')).includes('light')
+  const { primary, gray } = heraldPalette({ accent: token(style, '--color-accent', '#2f7dff'), background: token(style, '--color-bg', '#050f33'), dark: darkMode })
 
-  return { theme: { ...defaultTheme, primary, gray }, darkMode: !scheme.includes('light') }
+  return { theme: { ...defaultTheme, primary, gray }, darkMode }
+}
+
+/** A colour token ("gray.100") in Univer's own palette, for a canvas that draws as it prints. */
+export function neutralColor(color: string): string {
+  const [palette, shade] = color.split('.')
+  const value = (defaultTheme as Record<string, unknown>)[palette]
+
+  return value && typeof value === 'object' && shade in value ? String((value as Record<string, string>)[shade]) : color
 }

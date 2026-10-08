@@ -1,5 +1,5 @@
 import { type CsvLayout, parseCsv, serializeCsv } from './csv.ts'
-import { CELL_TYPE, type CellMatrix, type CellSnapshot, cellsOf, hasContent, newSheet, newWorkbook, type WorkbookSnapshot } from './workbook.ts'
+import { CELL_TYPE, type CellMatrix, type CellSnapshot, cellsOf, hasContent, isStyled, newSheet, newWorkbook, type WorkbookSnapshot } from './workbook.ts'
 
 /*
  * A CSV file as a one-sheet workbook and back. Numbers become numbers unless that would change
@@ -89,7 +89,7 @@ export function csvFromWorkbook(workbook: WorkbookSnapshot, options: { sheetId?:
 
   for (const { row, column, cell } of sheet ? cellsOf(sheet) : []) {
     formulas ||= Boolean(cell.f)
-    styled ||= Boolean(cell.s)
+    styled ||= isStyled(cell, workbook.styles ?? {})
 
     if (!hasContent(cell)) {
       continue

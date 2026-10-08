@@ -51,7 +51,7 @@ export const extensionOf = (file: string): string => {
 
 export const formatOf = (file: string): OfficeFormat | undefined => OFFICE_FORMATS.find((format) => format.extension === extensionOf(file))
 
-const byExtension = (extension: string): OfficeFormat | undefined => OFFICE_FORMATS.find((format) => format.extension === extension)
+export const byExtension = (extension: string): OfficeFormat | undefined => OFFICE_FORMATS.find((format) => format.extension === extension)
 
 /** A converted format works when LibreOffice is here and Herald handles the format it converts through. */
 function available(format: OfficeFormat, direction: 'opens' | 'saves', abilities: OfficeAbilities): boolean {

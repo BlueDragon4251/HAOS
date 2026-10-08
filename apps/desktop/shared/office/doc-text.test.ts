@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { documentFromMarkdown, documentFromText, markdownFromDocument, parseInline, textFromDocument } from './doc-text.ts'
-import { blocksFromDocument, CODE_FONT, documentFromBlocks, NAMED_STYLE } from './document.ts'
+import { blocksFromDocument, CODE_FONT, documentFromBlocks, NAMED_STYLE, withoutAutomaticColor } from './document.ts'
 
 const ids = { id: 'doc', title: 'Notes' }
 
@@ -85,6 +85,18 @@ describe('Markdown', () => {
 
     expect(blocksFromDocument(document).blocks.map((block) => block.text)).toEqual(['| a | b |', '|---|---|', 'See [the site](https://example.com).'])
     expect(notes).toEqual(['Tables, quotes and rules are shown as their Markdown text.', 'Links and images are shown as their Markdown text.'])
+  })
+
+  it('does not count the automatic colour of typed text as a colour', () => {
+    const document = documentFromBlocks([{ text: 'Typed here', runs: [] }], ids)
+    document.body!.textRuns = [
+      { st: 0, ed: 5, ts: { cl: { rgb: '#0C1431' } } },
+      { st: 6, ed: 10, ts: { cl: { rgb: '#0c1431' }, bl: 1 } }
+    ]
+    const plain = withoutAutomaticColor(document, '#0c1431')
+
+    expect(plain.body?.textRuns).toEqual([{ st: 6, ed: 10, ts: { bl: 1 } }])
+    expect(markdownFromDocument(plain)).toEqual({ text: 'Typed **here**\n', losses: [] })
   })
 
   it('lists the styles Markdown cannot hold', () => {

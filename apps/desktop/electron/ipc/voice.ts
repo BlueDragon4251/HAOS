@@ -6,9 +6,10 @@ import { isShellPage } from '../paths.ts'
 
 /**
  * Chromium permission names the shell grants for its own origin; everything else stays denied.
- * `local-fonts` lets Herald Canvas list the fonts on this computer by their real names.
+ * `local-fonts` lets Herald Canvas list the fonts on this computer by their real names, and
+ * `fullscreen` lets Herald Slides present on the whole screen from a window that does not fill it.
  */
-const SHELL_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection', 'local-fonts'])
+const SHELL_PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection', 'local-fonts', 'fullscreen'])
 
 /**
  * Voice plumbing owned by main: the microphone permission gate, tokenized audio WebSocket URLs

@@ -67,6 +67,36 @@ const PATHS: Record<AppIconId, React.ReactNode> = {
       <circle cx="13.3" cy="10.9" r="1.1" />
     </>
   ),
+  docs: (
+    <>
+      <rect x="5" y="3.5" width="14" height="17" rx="2.2" />
+      <path d="M8.5 8.2h4.8" strokeWidth={2.4} />
+      <path d="M8.5 12h7M8.5 15.2h7M8.5 18h4" />
+    </>
+  ),
+  sheets: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.2" />
+      <path d="M3.5 9.5h17M3.5 14.5h17M9 4.5v15" />
+    </>
+  ),
+  slides: (
+    <>
+      <path d="M3.5 4.5h17" />
+      <path d="M5 4.5h14v9.8a1.2 1.2 0 0 1-1.2 1.2H6.2A1.2 1.2 0 0 1 5 14.3z" />
+      <path d="M9 12.2v-1.7M12 12.2V8.3M15 12.2v-2.6M12 15.5v2.6M8.8 20.5l3.2-2.4 3.2 2.4" />
+    </>
+  ),
+  office: (
+    <>
+      <rect x="3.5" y="3.5" width="7.5" height="9" rx="1.6" />
+      <path d="M5.7 6.6h3.1M5.7 9.2h2.3" />
+      <rect x="13" y="3.5" width="7.5" height="9" rx="1.6" />
+      <path d="M13 8h7.5M16.75 3.5v9" />
+      <rect x="3.5" y="14.5" width="17" height="6" rx="1.6" />
+      <path d="M9.8 17.5h4.4" />
+    </>
+  ),
   documents: (
     <>
       <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9.5A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />

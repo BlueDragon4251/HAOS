@@ -62,6 +62,7 @@ import type { CanvasDocument } from './engine/document.ts'
 import { EFFECT_NAMES, EFFECT_ORDER, effectKinds, takesEffects } from './engine/layer-effects.ts'
 import { messageOf } from './errors.ts'
 import { isMac } from './platform.ts'
+import { keysLabel, matches } from '../../lib/shortcuts.ts'
 import { $autosave, exportDocument, notify, openPath, save, setAutosave } from './store.ts'
 import { hasOpenWork, settleTools } from './tools/sessions.ts'
 import { $background, $foreground, setTool } from './tools/state.ts'
@@ -483,53 +484,7 @@ export function runCommand(command: CanvasCommand, doc: CanvasDocument | null): 
   command.run(doc)
 }
 
-/** How a shortcut reads on this system: ⇧⌘S on the Mac, Ctrl+Shift+S elsewhere. */
-export function keysLabel(keys: string): string {
-  const parts = keys.split('+')
-  const key = parts.pop()!
-  const named: Record<string, string> = isMac ? { '=': '+', '-': '−', backspace: '⌫', delete: '⌦' } : { '=': '+', '-': '−', backspace: 'Backspace', delete: 'Delete' }
-  const shown = named[key] ?? key.toUpperCase()
-
-  if (isMac) {
-    const symbols: Record<string, string> = { mod: '⌘', shift: '⇧', alt: '⌥', ctrl: '⌃' }
-    const order = ['ctrl', 'alt', 'shift', 'mod']
-
-    return `${order.filter((mod) => parts.includes(mod)).map((mod) => symbols[mod]).join('')}${shown}`
-  }
-
-  const words: Record<string, string> = { mod: 'Ctrl', shift: 'Shift', alt: 'Alt', ctrl: 'Ctrl' }
-
-  return [...parts.map((mod) => words[mod]), shown].join('+')
-}
-
-/** Does a key press match a shortcut? */
-export function matches(event: KeyboardEvent | ReactKeyboardEvent, keys: string): boolean {
-  const parts = keys.split('+')
-  const key = parts.pop()!
-  const mod = isMac ? event.metaKey : event.ctrlKey
-
-  if (parts.includes('mod') !== mod || parts.includes('shift') !== event.shiftKey || parts.includes('alt') !== event.altKey) {
-    return false
-  }
-
-  if (isMac && event.ctrlKey && !parts.includes('ctrl')) {
-    return false
-  }
-
-  // Shifted and option layers change event.key, so letters and digits match on the physical key.
-  const code = event.code
-  const pressed = /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase() : /^Digit\d$/.test(code) ? code.slice(5) : event.key.toLowerCase()
-  const aliases: Record<string, string[]> = { '=': ['=', '+'], '-': ['-', '_'], ']': [']', '}'], '[': ['[', '{'], ';': [';', ':'] }
-
-  return (
-    (aliases[key] ?? [key]).includes(pressed) ||
-    (key === '=' && code === 'Equal') ||
-    (key === '-' && code === 'Minus') ||
-    (key === ']' && code === 'BracketRight') ||
-    (key === '[' && code === 'BracketLeft') ||
-    (key === ';' && code === 'Semicolon')
-  )
-}
+export { keysLabel, matches }
 
 /** Commands with the ones in their submenus. */
 const everyCommand = (commands: readonly CanvasCommand[]): CanvasCommand[] => commands.flatMap((command) => [command, ...everyCommand(command.submenu ?? [])])

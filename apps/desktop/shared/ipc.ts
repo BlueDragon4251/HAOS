@@ -1093,6 +1093,8 @@ export interface OfficePresence {
 export interface OfficePdfRequest {
   html: string
   suggestedName: string
+  /** Where to write it; without one the person picks a place. */
+  path?: string
   landscape?: boolean
   /** A named paper size, or one in inches. */
   pageSize?: 'A4' | 'Letter' | { width: number; height: number }

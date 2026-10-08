@@ -5,7 +5,7 @@ import type { InstalledApp } from '../../shared/ipc.ts'
 export type PageId = 'overview' | 'hermes' | 'missions' | 'memory' | 'files' | 'automations' | 'connections' | 'settings'
 
 /** Apps that open in their own floating window. */
-export type FloatingAppId = 'terminal' | 'system' | 'chat-popout' | 'web' | 'studio' | 'capture-editor' | 'camera' | 'widget' | 'canvas'
+export type FloatingAppId = 'terminal' | 'system' | 'chat-popout' | 'web' | 'studio' | 'capture-editor' | 'camera' | 'widget' | 'canvas' | 'docs' | 'sheets' | 'slides'
 
 export type HermesAppId = PageId | FloatingAppId
 
@@ -38,6 +38,10 @@ export type AppIconId =
   | 'code'
   | 'studio'
   | 'canvas'
+  | 'docs'
+  | 'sheets'
+  | 'slides'
+  | 'office'
   | 'documents'
   | 'grid'
   | 'trash'
@@ -66,7 +70,10 @@ export const FLOATING_APPS: readonly HermesAppDef<FloatingAppId>[] = [
   { id: 'camera', name: 'Camera', tagline: 'Your camera in a bubble, for screen recordings.', category: 'creative', kind: 'window', icon: 'system', defaultSize: { width: 260, height: 290 } },
   // A widget plugin in its own window (its `panel` placement); opened with plugin.open.
   { id: 'widget', name: 'Widget', tagline: 'A widget plugin in a window.', category: 'productivity', kind: 'window', icon: 'grid', defaultSize: { width: 360, height: 280 } },
-  { id: 'canvas', name: 'Herald Canvas', tagline: 'Edit images in layers, with Hermes.', category: 'creative', kind: 'window', icon: 'canvas', defaultSize: { width: 1320, height: 840 } }
+  { id: 'canvas', name: 'Herald Canvas', tagline: 'Edit images in layers, with Hermes.', category: 'creative', kind: 'window', icon: 'canvas', defaultSize: { width: 1320, height: 840 } },
+  { id: 'docs', name: 'Herald Docs', tagline: 'Write and edit documents, with Hermes.', category: 'productivity', kind: 'window', icon: 'docs', defaultSize: { width: 1120, height: 840 } },
+  { id: 'sheets', name: 'Herald Sheets', tagline: 'Spreadsheets and formulas, with Hermes.', category: 'productivity', kind: 'window', icon: 'sheets', defaultSize: { width: 1280, height: 820 } },
+  { id: 'slides', name: 'Herald Slides', tagline: 'Make presentations, with Hermes.', category: 'productivity', kind: 'window', icon: 'slides', defaultSize: { width: 1280, height: 820 } }
 ]
 
 /** Floating apps the launcher and command bar offer; the rest open only with a payload. */
