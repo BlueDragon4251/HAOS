@@ -60,6 +60,13 @@ terminal sessions as well. The plugin decides from the session instead (`bridge/
   other call is refused with `decision: outside_herald` and recorded in the audit log. This holds
   whatever the toolset configuration says and whichever process loaded the plugin, a messaging
   gateway started by Herald OS's backend included.
+- **An inherited source is not enough.** The `hermes` CLI binds no session: it takes its source from
+  `HERMES_SESSION_SOURCE` in its environment, and Hermes passes a turn's variables on to every
+  command the turn runs. In a process like that, a Herald OS source counts only when the process
+  descends from Herald OS's backend (`HERALD_OS=1`), as a command run by a Herald OS turn does, so
+  `hermes chat --source herald_os` in any other terminal is refused. Herald OS also drops a
+  `HERMES_SESSION_*` it inherited (and the backend's own `HERALD_OS` markers) from its environment
+  when it starts, so its backend, its terminals and the apps it opens never carry one.
 - **The model only sees them there.** The tools' availability check hides them from turns of every
   other surface (a messaging platform, the API server, cron, the TUI, Hermes Desktop) and, in
   processes Herald OS did not start, from anything but a Herald OS turn. Herald OS's own backend
