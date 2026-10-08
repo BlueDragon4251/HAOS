@@ -430,17 +430,21 @@ undoable step.
   (core, design, ui, engine-render, engine-formula, rpc, docs and docs-ui, and sheets with its
   formula, number format, filter, sort, conditional formatting and data validation plugins) run in
   a Herald window with React 19.3 and Electron 44 as they are. They load only when an Office window
-  opens: the shell's main chunk carries none of Univer; Docs loads a shared 3.1 MB chunk (0.85 MB
-  compressed) and Sheets another 3.3 MB (0.84 MB) and its formula worker. In the development app
-  the first Sheets canvas drew 0.8 s after the window opened and a document page 0.4 to 0.6 s.
-  Univer's paid packages (import and export, printing, charts, pivot tables, collaboration) are not
-  used.
+  opens: the shell's main chunk carries none of Univer (the registration adds 6 KB to it); Docs
+  loads a shared 3.1 MB chunk (0.85 MB compressed) and Sheets another 3.3 MB (0.84 MB) and its
+  formula worker (7.2 MB, 1.7 MB compressed). In the packaged build a window is up 0.2 s after it is
+  asked for, and a new workbook draws 0.12 s later, a new document 0.35 s; the first workbook adds
+  about 26 MB of JavaScript heap and 58 MB to the window's process, worker included, and a document
+  after it 5 MB and 11 MB. Univer's paid packages (import and export, printing, charts, pivot tables,
+  collaboration) are not used.
 - **Univer in Herald's colours.** Univer reads one palette for its chrome (CSS variables on the
   page) and for the canvas it draws on, so Herald works it out from the theme's accent and
   background when a window opens. In dark mode Univer inverts canvas colours: Sheets keeps that, a
   dark grid that matches the glass, and Docs turns it off for its canvas, so pages are white paper
   on a dark desk, as they will print. The outer chrome is made transparent to sit on the window's
-  glass, and it already uses Herald's UI font.
+  glass, and it already uses Herald's UI font. Each Univer editor is a React root of its own, whose
+  events never reach the window's React handlers, so the Office window takes its shortcuts and
+  dropped files with native listeners.
 - **Formulas in a worker.** Sheets work formulas out in a module worker. On 20,000 rows of formulas
   the window's thread was blocked 141 ms instead of 889 ms, with results as fast. The worker loads
   from the app itself, so the Content Security Policy needs no change (`worker-src` falls back to
@@ -458,11 +462,14 @@ undoable step.
   shapes and images, measured in points as PowerPoint measures them) and draws each slide with the
   Canvas engine at the size it is shown. A 1920 by 1080 slide composites in about 18 ms and a
   full-screen frame at the display's pixels in about 50 ms; text laid out at that size stays sharp,
-  and Canvas's image tools and on-device models apply to slide pictures.
+  a new deck draws 55 ms after it is asked for, and Canvas's image tools and on-device models apply
+  to slide pictures.
 - **Office files through converters of our own.** `.xlsx` through ExcelJS (MIT); `.docx` read with
   JSZip (MIT) and our own WordprocessingML mapper and written with docx (MIT); `.pptx` read with
   JSZip and our own DrawingML mapper and written with PptxGenJS (MIT); CSV, Markdown and plain
   text as well. Headless LibreOffice, when it is installed, converts `.odt`, `.ods` and `.odp`.
+  Univer's editors write their "automatic" text colour into what is typed as a colour; Herald saves
+  it as no colour, so a file never gains a colour nobody chose.
 - **Never less than the file had, silently.** What a file holds that Herald cannot keep is listed
   in a fidelity report, shown before the first save over that file. Main copies the original into
   `office-backups` under the Herald OS data folder the first time Herald saves over it in a

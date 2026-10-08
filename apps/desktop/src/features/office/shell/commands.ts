@@ -32,7 +32,8 @@ export interface MenuSource<Model> {
   file?: OfficeCommand[]
   edit?: OfficeCommand[]
   menus?: OfficeMenu[]
-  /** Whether the app saves any format here (Slides saves nothing until .pptx). */
+  /** Whether the app opens and saves any format here (Slides does neither until .pptx). */
+  canOpen?: boolean
   canSave: boolean
 }
 
@@ -47,7 +48,7 @@ export function officeMenus<Model>(source: MenuSource<Model>): OfficeMenu[] {
       label: 'File',
       items: [
         { id: 'new', label: 'New', keys: 'mod+n', run: () => session.create() },
-        { id: 'open', label: 'Open…', keys: 'mod+o', run: () => void session.openPicked() },
+        { id: 'open', label: 'Open…', keys: 'mod+o', enabled: () => source.canOpen !== false, run: () => void session.openPicked() },
         { id: 'save', label: 'Save', keys: 'mod+s', enabled: () => hasDoc() && source.canSave, run: () => void session.save().catch(() => {}), dividerBefore: true },
         { id: 'save-as', label: 'Save As…', keys: 'mod+shift+s', enabled: () => hasDoc() && source.canSave, run: () => void session.save(doc(), { as: true }).catch(() => {}) },
         { id: 'export-pdf', label: 'Export as PDF…', keys: 'mod+p', enabled: hasDoc, run: () => void session.exportPdf() },

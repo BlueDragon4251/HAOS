@@ -175,6 +175,29 @@ The image editor (decision record: ADR-020; using it: [the manual](manual/canvas
   tool maps its actions to them. In panels mode the commands run in the Hermes window and the Canvas
   window, its own process, reloads the project when it changes.
 
+## Herald Office
+
+Herald Docs, Sheets and Slides (decision record: ADR-021, a draft) live in `src/features/office`,
+with the formats in `shared/office` and file access in `electron/office`.
+
+- **One window for three apps** (`shell/OfficeWindow.tsx`): menus, document tabs, the status bar and
+  the dialogs. Each app's session (`session.ts`) opens, saves, watches and closes its documents,
+  through an adapter that reads, writes and prints its formats (`docs/adapter.ts` and so on).
+- **The save policy.** Before the first save over a file, the fidelity report lists what Herald
+  showed differently and what the format will not keep; main copies the original into
+  `office-backups` under the Herald OS data folder the first time Herald writes over it in a session
+  (`electron/office/backups.ts`). Herald saves a document by itself only once the person has saved
+  it, and stops when a save would lose something new.
+- **Docs and Sheets** are Univer's open-source packages (`univer/`), one instance per open
+  document, in Herald's palette (`palette.ts`, `theme.ts`, `univer.css`); formulas are worked out in
+  a worker, and `headless.ts` runs Univer without a window for commands.
+- **Slides** keeps its own deck (`slides/deck.ts`) and draws each slide with the Herald Canvas
+  engine at the size it is shown (`slides/render.ts`): the editor, the slide list, present mode and
+  PDF export all draw this way.
+- **Main** reads and writes files whole and atomically, watches each open file's folder with a poll
+  as a safety net (`file-watch.ts`), keeps what each window has open for Hermes, prints PDFs, and
+  converts OpenDocument files through headless LibreOffice when it is installed (`convert.ts`).
+
 ## System bridge
 
 `plugins/herald-os-bridge` is a regular out-of-tree Hermes plugin. It registers a narrow toolset

@@ -188,7 +188,7 @@ const INSERT_COMMANDS: OfficeCommand[] = [
 
 /** Herald Slides: decks drawn by the Herald Canvas engine, in a Herald window. */
 export function SlidesWindow({ payload }: { payload?: Record<string, unknown> }) {
-  const menus = useMemo(() => officeMenus({ session: slidesSession, canSave: false, menus: [{ id: 'slide', label: 'Slide', items: SLIDE_COMMANDS }, { id: 'insert', label: 'Insert', items: INSERT_COMMANDS }] }), [])
+  const menus = useMemo(() => officeMenus({ session: slidesSession, canOpen: false, canSave: false, menus: [{ id: 'slide', label: 'Slide', items: SLIDE_COMMANDS }, { id: 'insert', label: 'Insert', items: INSERT_COMMANDS }] }), [])
 
   return (
     <>

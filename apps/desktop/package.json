@@ -96,7 +96,9 @@
       "package.json",
       "!**/node_modules/usocket/**",
       "!**/node_modules/@univerjs/**",
-      "!**/node_modules/@grpc/**"
+      "!**/node_modules/@grpc/**",
+      "!**/node_modules/rxjs/**",
+      "!**/node_modules/lodash-es/**"
     ],
     "extraResources": [
       {
