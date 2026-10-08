@@ -383,10 +383,14 @@ inside your own desktop changes none of those files.
 
 **Updates.** `herald-os update` asks GitHub for the newest release with a tarball for this
 architecture (releases on the `stable` channel; `edge` also takes pre-releases), downloads it with
-its `.sha256` and checks it, unpacks it beside `/opt/herald-os`, and then swaps the two folders, so
-the version in use is never half replaced. The version before stays in `/opt/herald-os.previous`,
-and `herald-os rollback` swaps back; both take effect at the next login, or the next start of
-`herald-os-app`. Replacing `/opt/herald-os` needs sudo: in a terminal it asks for your password,
+its `.sha256` over HTTPS only (a redirect to plain http is refused) and checks it, unpacks it beside
+`/opt/herald-os`, and then swaps the two folders in one step (the kernel's `renameat2` exchange), so
+`/opt/herald-os` is never missing or half replaced. On a filesystem that cannot exchange (NFS, some
+FUSE mounts) it falls back to two renames, a moment apart, and puts the version in use back if the
+second fails. The version before stays in `/opt/herald-os.previous`, and `herald-os rollback` swaps
+back the same way; both take effect at the next login, or the next start of `herald-os-app`. If a
+step fails anyway, the message says which version is in which folder. Replacing `/opt/herald-os`
+needs sudo: in a terminal it asks for your password,
 while Update in the menu bar can only use sudo without one. The checksum proves the download is the
 file the release published, not who published it, so a release is trusted as far as GitHub is.
 `herald-os update` also updates the system's packages as before (`dnf upgrade` on Fedora).

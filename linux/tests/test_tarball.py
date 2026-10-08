@@ -1,17 +1,21 @@
 """Herald OS from the release tarball: herald-os-tarball, and the commands finding their data in /opt/herald-os."""
 
+import errno
 import hashlib
+import http.server
 import importlib.machinery
 import importlib.util
 import io
 import json
 import os
 import shutil
+import ssl
 import stat
 import struct
 import subprocess
 import sys
 import tarfile
+import threading
 from pathlib import Path
 
 import pytest
@@ -307,3 +311,238 @@ def test_the_updater_leaves_an_up_to_date_tarball_alone(tmp_path):
     assert checked.stdout.strip() == "up to date"
     subprocess.run(["bash", str(BIN / "herald-os-update"), "--no-system", "--no-hermes"], env=env, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
     assert "update" not in (tmp_path / "home" / "tarball.log").read_text().split()
+
+
+# ---------------------------------------------------------------------------------------------
+# Downloads are HTTPS only, and no swap leaves /opt/herald-os missing or half replaced.
+
+
+def test_every_request_to_github_is_https_only(tmp_path, monkeypatch):
+    ran = []
+    monkeypatch.setattr(tb.subprocess, "call", lambda argv, **kwargs: ran.append(argv) or 0)
+    monkeypatch.setattr(tb.subprocess, "run", lambda argv, **kwargs: ran.append(argv) or subprocess.CompletedProcess(argv, 0, "[]", ""))
+    tb.download("https://github.com/iamlukethedev/Herald-OS/releases/download/v1/x.tar.gz", tmp_path / "x")
+    tb.releases()
+    assert len(ran) == 2
+    for argv in ran:
+        assert argv[0] == "curl" and "--fail" in argv
+        assert argv[argv.index("--proto") + 1] == "=https" and argv[argv.index("--proto-redir") + 1] == "=https"
+    with pytest.raises(tb.ReleaseError):
+        tb.download("http://example.com/x.tar.gz", tmp_path / "y")
+    assert len(ran) == 2
+
+
+@pytest.fixture
+def tls_server(tmp_path, monkeypatch):
+    """A local HTTPS server that answers, redirects within HTTPS, or redirects to a plain http server,
+    with a certificate curl trusts through CURL_CA_BUNDLE."""
+    if not (shutil.which("openssl") and shutil.which("curl")):
+        pytest.skip("needs openssl and curl")
+    key, cert = tmp_path / "key.pem", tmp_path / "cert.pem"
+    made = subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(key), "-out", str(cert), "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"], capture_output=True)
+    if made.returncode != 0:
+        pytest.skip("openssl could not make a test certificate")
+    routes: dict[str, tuple[int, bytes | str]] = {}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            status, value = routes.get(self.path, (404, b""))
+            self.send_response(status)
+            if status == 302:
+                self.send_header("Location", value)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_header("Content-Length", str(len(value)))
+            self.end_headers()
+            self.wfile.write(value)
+
+        def log_message(self, *args):
+            pass
+
+    plain = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    secure = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert, key)
+    secure.socket = context.wrap_socket(secure.socket, server_side=True)
+    https = f"https://127.0.0.1:{secure.server_port}"
+    routes.update({
+        "/release.tar.gz": (200, b"release"),
+        "/cdn": (302, f"{https}/release.tar.gz"),
+        "/downgrade": (302, f"http://127.0.0.1:{plain.server_port}/release.tar.gz"),
+    })
+    for server in (plain, secure):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("CURL_CA_BUNDLE", str(cert))
+    yield https
+    for server in (plain, secure):
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_redirect_to_plain_http_is_refused(tls_server, tmp_path):
+    target = tmp_path / "release.tar.gz"
+    try:
+        tb.download(f"{tls_server}/release.tar.gz", target)
+    except tb.ReleaseError:
+        pytest.skip("this curl does not read its CA bundle from CURL_CA_BUNDLE")
+    assert target.read_bytes() == b"release"
+    target.unlink()
+    tb.download(f"{tls_server}/cdn", target)
+    assert target.read_bytes() == b"release"
+    target.unlink()
+    with pytest.raises(tb.ReleaseError):
+        tb.download(f"{tls_server}/downgrade", target)
+    assert not target.exists() or target.read_bytes() != b"release"
+    # Without the protocol limits curl follows the downgrade, so the refusal above is theirs.
+    assert subprocess.call(["curl", "-fsSL", "-o", str(target), f"{tls_server}/downgrade"]) == 0 and target.read_bytes() == b"release"
+
+
+def test_the_kernel_exchanges_two_folders_in_one_step_where_it_can(tmp_path):
+    first, second = tmp_path / "first", tmp_path / "second"
+    write(first / "which", "first")
+    write(second / "which", "second")
+    try:
+        tb.exchange(first, second)
+    except OSError as exc:
+        assert exc.errno in tb.EXCHANGE_UNSUPPORTED, exc
+        if sys.platform == "linux":
+            pytest.skip("this filesystem cannot exchange two folders")
+        return
+    assert (first / "which").read_text() == "second" and (second / "which").read_text() == "first"
+
+
+def fake_exchange(calls: list):
+    """An exchange with renameat2's outcome, for systems without it (macOS), recorded in ``calls``."""
+
+    def swap(first, second):
+        assert Path(first).exists() and Path(second).exists()
+        calls.append((Path(first), Path(second)))
+        middle = Path(first).with_name(".fake-exchange")
+        os.rename(first, middle)
+        os.rename(second, first)
+        os.rename(middle, second)
+
+    return swap
+
+
+def no_exchange(*paths):
+    raise OSError(errno.ENOSYS, "renameat2 is not available")
+
+
+def renames(monkeypatch, fail=lambda source, target, count: False) -> list:
+    """Path.rename, recorded, and failing where ``fail`` says (with the number of the rename)."""
+    done: list = []
+    real = Path.rename
+
+    def rename(self, target):
+        source, target = Path(self), Path(target)
+        if fail(source, target, len(done) + 1):
+            done.append((source, target, "failed"))
+            raise OSError(errno.EIO, "injected failure", str(source))
+        done.append((source, target, "ok"))
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", rename)
+    return done
+
+
+def versions(layout, *others):
+    return [tb.read_version(path) for path in (layout.app, layout.previous, *others)]
+
+
+def test_update_puts_the_new_version_in_place_with_one_exchange(layout, published, monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(tb, "exchange", fake_exchange(calls))
+    done = renames(monkeypatch)
+    assert tb.update(layout) == 0
+    assert len(calls) == 1 and calls[0][1] == layout.app and calls[0][0].name == "herald-os"
+    # /opt/herald-os itself is never renamed away: only the replaced version moves on, to .previous.
+    assert [(source.name, target) for source, target, _ in done] == [("herald-os", layout.previous)]
+    assert versions(layout) == ["0.2.0", "0.1.0"]
+
+
+def test_a_failed_exchange_leaves_everything_as_it_was(layout, published, monkeypatch, capsys):
+    monkeypatch.setattr(tb, "exchange", lambda first, second: (_ for _ in ()).throw(OSError(errno.EIO, "injected failure")))
+    with pytest.raises(SystemExit):
+        tb.update(layout)
+    assert versions(layout) == ["0.1.0", None]
+    assert "Herald OS 0.1.0 is in" in capsys.readouterr().err
+    assert not list(layout.app.parent.glob(".herald-os-update-*"))
+
+
+def test_without_exchange_a_failed_swap_puts_the_version_in_use_back(layout, published, monkeypatch):
+    monkeypatch.setattr(tb, "exchange", no_exchange)
+    done = renames(monkeypatch, fail=lambda source, target, count: target == layout.app and source != layout.previous)
+    with pytest.raises(SystemExit):
+        tb.update(layout)
+    assert [status for *_, status in done] == ["ok", "failed", "ok"]
+    assert versions(layout) == ["0.1.0", None]
+    assert not list(layout.app.parent.glob(".herald-os-update-*"))
+
+
+def test_when_putting_it_back_fails_too_the_message_says_where_it_is(layout, published, monkeypatch, capsys):
+    monkeypatch.setattr(tb, "exchange", no_exchange)
+    renames(monkeypatch, fail=lambda source, target, count: count > 1)
+    with pytest.raises(SystemExit):
+        tb.update(layout)
+    assert versions(layout) == [None, "0.1.0"]
+    error = capsys.readouterr().err
+    assert f"0.1.0 is in {layout.previous}" in error and f"sudo mv {layout.previous} {layout.app}" in error
+
+
+def test_a_replaced_version_that_cannot_move_on_is_kept(layout, published, monkeypatch, capsys):
+    monkeypatch.setattr(tb, "exchange", fake_exchange([]))
+    renames(monkeypatch, fail=lambda source, target, count: target == layout.previous)
+    assert tb.update(layout) == 0
+    assert versions(layout) == ["0.2.0", None]
+    kept = list(layout.app.parent.glob(".herald-os-update-*/herald-os"))
+    assert len(kept) == 1 and tb.read_version(kept[0]) == "0.1.0"
+    assert not list(layout.app.parent.glob(".herald-os-update-*/*.tar.gz"))
+    assert str(kept[0]) in capsys.readouterr().out
+
+
+@pytest.fixture
+def updated(layout, published, monkeypatch):
+    """0.2.0 in /opt/herald-os, 0.1.0 in /opt/herald-os.previous."""
+    tb.update(layout)
+    assert versions(layout) == ["0.2.0", "0.1.0"]
+    return layout
+
+
+def test_rollback_is_one_exchange(updated, monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(tb, "exchange", fake_exchange(calls))
+    done = renames(monkeypatch)
+    assert tb.rollback(updated) == 0
+    assert calls == [(updated.app, updated.previous)] and not done
+    assert versions(updated) == ["0.1.0", "0.2.0"]
+
+
+def test_a_failed_rollback_exchange_changes_nothing(updated, monkeypatch):
+    monkeypatch.setattr(tb, "exchange", lambda first, second: (_ for _ in ()).throw(OSError(errno.EIO, "injected failure")))
+    with pytest.raises(SystemExit):
+        tb.rollback(updated)
+    assert versions(updated) == ["0.2.0", "0.1.0"]
+
+
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_without_exchange_a_rollback_that_fails_at_any_step_puts_both_versions_back(updated, monkeypatch, step):
+    monkeypatch.setattr(tb, "exchange", no_exchange)
+    parked = updated.app.with_name(".herald-os.rollback")
+    done = renames(monkeypatch, fail=lambda source, target, count: count == step)
+    with pytest.raises(SystemExit):
+        tb.rollback(updated)
+    assert [status for *_, status in done].count("failed") == 1
+    assert versions(updated) == ["0.2.0", "0.1.0"] and not parked.exists()
+
+
+def test_a_rollback_that_cannot_put_things_back_says_where_they_are(updated, monkeypatch, capsys):
+    monkeypatch.setattr(tb, "exchange", no_exchange)
+    parked = updated.app.with_name(".herald-os.rollback")
+    renames(monkeypatch, fail=lambda source, target, count: count > 1)
+    with pytest.raises(SystemExit):
+        tb.rollback(updated)
+    assert versions(updated, parked) == [None, "0.1.0", "0.2.0"]
+    error = capsys.readouterr().err
+    assert f"0.2.0 is in {parked}" in error and f"sudo mv {updated.previous} {updated.app}" in error
