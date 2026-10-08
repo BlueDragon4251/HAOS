@@ -4,7 +4,7 @@ Private development repository based on [Herald OS](https://github.com/iamluketh
 
 HAOS adds an independent systemd Hermes runtime, persistent SQLite missions, root-owned UUID/PARTUUID storage policy and native mission controls. The UI attaches to the service. Agent code runs without owner privileges in a mandatory Bubblewrap namespace.
 
-**Development status:** no accepted production release. Desktop build/type checks and 731 tests passed; 108 Linux tests passed locally. Twenty HAOS unit tests and two real Linux socket/kernel probes passed. Image building and installation in QEMU are separate gates; a green desktop suite does not prove an installable OS.
+**Development status:** no accepted production release. Desktop build/type checks and 731 tests passed; 108 Linux tests and 33 HAOS unit tests passed locally. The two real Linux socket/kernel probes passed before the latest credential-transfer change; that change requires fresh kernel verification. Image building and installation in QEMU are separate gates; a green desktop suite does not prove an installable OS.
 
 - [Implementation and evidence](docs/HAOS.md)
 - [Install](docs/INSTALL.md), [runtime](docs/HERMES-RUNTIME.md), [missions](docs/MISSIONS.md), [storage](docs/STORAGE-POLICY.md)

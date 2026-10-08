@@ -9,8 +9,10 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/usr/bin/python3 -m haos.owner prepare
-ExecStop=/usr/bin/python3 -m haos.owner cleanup
+# systemd orders these before execution/after shutdown. The interactive owner CLI
+# additionally requires fully inactive execution units before touching mounts.
+ExecStart=/usr/bin/python3 -m haos.policy prepare
+ExecStop=/usr/bin/python3 -m haos.policy cleanup
 UMask=0077
 # Mounts must be visible to the agent unit before it constructs its private filesystem view.
 # Do not use mount-namespace hardening here: this broker publishes mounts to sibling units.

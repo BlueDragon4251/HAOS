@@ -47,7 +47,12 @@ def active(unit):
 
 def sandbox_probe(mode):
     grants = trusted_json(Path("/run/haos-policy/sandbox.json"))["grants"]
-    args = command(grants, "acceptance-unused-token", certificates=[])
+    credential = ROOT / "probe-credential"
+    credential.write_text("acceptance-unused-token")
+    fd = os.open(credential, os.O_RDONLY)
+    # The root test drops to the service UID before Bubblewrap; the inherited fd
+    # still carries only this disposable fixture, never the real service token.
+    args = command(grants, fd, certificates=[])
     key = hashlib.sha256(f"UUID:{A}".encode()).hexdigest()
     script = r'''
 import ctypes, errno, json, os, pathlib, sys
@@ -85,9 +90,12 @@ print(json.dumps({'mode': mode, 'data_access': True, 'blocked_volume_hidden': Tr
     args = args[:args.index("--") + 1] + ["/usr/bin/python3.11", "-I", "-c", script,
         f"/volumes/{key}", mode, str(ROOT / "blocked" / "canary")]
     account = pwd.getpwnam("haos-agent")
-    result = run("/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
-        "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
-        *args, capture_output=True)
+    try:
+        result = run("/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
+            "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
+            *args, pass_fds=(fd,), capture_output=True)
+    finally:
+        os.close(fd)
     return json.loads(result.stdout)
 
 

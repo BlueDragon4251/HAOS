@@ -32,14 +32,15 @@ def trusted_json(path: Path) -> dict:
     return config
 
 
-def command(grants: list[dict], token: str, *, certificates: list[str]) -> list[str]:
-    if not token.strip():
-        raise ValueError("missing backend credential")
+def command(grants: list[dict], credential_fd: int, *, certificates: list[str]) -> list[str]:
+    if type(credential_fd) is not int or credential_fd < 3:
+        raise ValueError("a private credential descriptor is required")
     args = ["/usr/bin/bwrap", "--unshare-all", "--unshare-user", "--share-net", "--die-with-parent", "--new-session",
             "--disable-userns", "--assert-userns-disabled", "--cap-drop", "ALL", "--clearenv",
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin", "--symlink", "usr/sbin", "/sbin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
             "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/run", "--dir", "/etc",
+            "--dir", "/run/haos-credentials", "--perms", "0400", "--ro-bind-data", str(credential_fd), "/run/haos-credentials/backend-token",
             "--ro-bind", "/usr/lib/haos/passwd", "/etc/passwd", "--ro-bind", "/usr/lib/haos/group", "/etc/group",
             "--dir", "/var", "--dir", "/home", "--bind", "/var/lib/haos-agent", "/home/agent",
             "--bind", "/var/lib/haos-workspace", "/workspace", "--dir", "/volumes"]
@@ -63,19 +64,23 @@ def command(grants: list[dict], token: str, *, certificates: list[str]) -> list[
         "HOME": "/home/agent", "HERMES_HOME": "/home/agent/.hermes", "PATH": "/usr/lib/haos/hermes/.venv/bin:/usr/bin",
         "USER": "haos-agent", "LOGNAME": "haos-agent",
         "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1",
-        "HERMES_DASHBOARD_SESSION_TOKEN": token,
     }.items():
         args.extend(["--setenv", name, value])
-    return args + ["--chdir", "/workspace", "--", "/usr/lib/haos/hermes/.venv/bin/hermes", "serve",
-                   "--host", "127.0.0.1", "--port", "9119", "--no-open"]
+    return args + ["--chdir", "/workspace", "--", "/usr/bin/python3", "/usr/lib/haos/haos/launch.py"]
 
 
 def main():
     config = trusted_json(Path("/run/haos-policy/sandbox.json"))
     credential = Path(os.environ["CREDENTIALS_DIRECTORY"]) / "backend-token"
     certs = [str(p) for p in map(Path, ["/etc/ssl", "/etc/pki", "/etc/hosts", "/etc/resolv.conf", "/etc/nsswitch.conf", "/etc/localtime"]) if p.exists()]
-    args = command(config["grants"], credential.read_text().strip(), certificates=certs)
-    os.execv(args[0], args)
+    fd = os.open(credential, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        # The credential value must never appear in the long-lived bwrap argv.
+        os.set_inheritable(fd, True)
+        args = command(config["grants"], fd, certificates=certs)
+        os.execv(args[0], args)
+    finally:
+        os.close(fd)
 
 
 if __name__ == "__main__":

@@ -36,19 +36,21 @@ def test_sandbox_binds_only_explicit_grants_and_never_inherits_parent_authority(
     grants = validate_policy({"version": 1, "volumes": [
         {"id": "UUID:ro", "mode": "read-only"}, {"id": "UUID:rw", "mode": "full-data-access"},
         {"id": "UUID:no", "mode": "blocked"}, {"id": "UUID:sys", "mode": "system-managed"}]})
-    args = command(grants, "credential", certificates=["/etc/hosts"])
+    args = command(grants, 3, certificates=["/etc/hosts"])
     for grant, flag in zip(grants[:2], ("--ro-bind", "--bind")):
         index = args.index(f"/run/haos-volumes/{grant['key']}")
         assert args[index - 1] == flag
     assert all(f"/run/haos-volumes/{g['key']}" not in args for g in grants[2:])
     assert "--clearenv" in args and "--disable-userns" in args and "--cap-drop" in args
-    assert "HERMES_PARENT_PID" not in args and "--no-open" in args
+    assert "HERMES_PARENT_PID" not in args and "--ro-bind-data" in args
+    assert "HERMES_DASHBOARD_SESSION_TOKEN" not in args
+    assert args[-1] == "/usr/lib/haos/haos/launch.py"
     for raw in ("/", "/etc", "/run", "/home", "/var", "/sys", "/dev"):
         assert not any(args[i:i+2] == [flag, raw] for i in range(len(args)) for flag in ("--bind", "--ro-bind", "--dev-bind"))
     with pytest.raises(ValueError):
-        command(grants, " ", certificates=[])
+        command(grants, 0, certificates=[])
     with pytest.raises(ValueError):
-        command(grants, "t", certificates=["/etc/shadow"])
+        command(grants, 3, certificates=["/etc/shadow"])
 
 
 def test_group_writable_or_symlinked_authority_is_rejected(tmp_path):

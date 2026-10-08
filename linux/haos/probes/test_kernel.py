@@ -1,7 +1,9 @@
 """Real kernel probes. Run explicitly on a Linux host permitting user namespaces."""
 
 import json
+import hashlib
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -21,7 +23,12 @@ def test_agent_filesystem_view_cannot_escape_grants(tmp_path):
     (rw / "escape").symlink_to(host_secret)
     grants = validate_policy({"version": 1, "volumes": [
         {"id": "UUID:probe-ro", "mode": "read-only"}, {"id": "UUID:probe-rw", "mode": "full-data-access"}]})
-    args = command(grants, "probe-credential", certificates=[])
+    credential = tmp_path / "credential"
+    credential_value = secrets.token_urlsafe(48)
+    credential.write_text(credential_value)
+    digest = hashlib.sha256(credential_value.encode()).hexdigest()
+    fd = os.open(credential, os.O_RDONLY)
+    args = command(grants, fd, certificates=[])
     passwd, group = tmp_path / "passwd", tmp_path / "group"
     passwd.write_text(f"haos-agent:x:{os.getuid()}:{os.getgid()}:HAOS agent:/home/agent:/usr/sbin/nologin\n")
     group.write_text(f"haos-agent:x:{os.getgid()}:\n")
@@ -32,11 +39,14 @@ def test_agent_filesystem_view_cannot_escape_grants(tmp_path):
                     "/usr/lib/haos/passwd": str(passwd), "/usr/lib/haos/group": str(group)}
     args = [replacements.get(arg, arg) for arg in args]
     probe = """
-import ctypes, errno, json, os, pathlib, pwd, sys
-ro, rw, secret = map(pathlib.Path, sys.argv[1:])
+import ctypes, errno, hashlib, json, os, pathlib, pwd, sys
+ro, rw, secret = map(pathlib.Path, sys.argv[1:4])
 assert os.getuid() != 0
 assert pwd.getpwuid(os.getuid()).pw_name == 'haos-agent'
 assert len(pwd.getpwall()) == 1
+credential = pathlib.Path('/run/haos-credentials/backend-token').read_bytes()
+assert hashlib.sha256(credential).hexdigest() == sys.argv[4]
+assert credential not in pathlib.Path('/proc/1/cmdline').read_bytes()
 status = pathlib.Path('/proc/self/status').read_text().splitlines()
 assert 'NoNewPrivs:\t1' in status
 assert 'CapEff:\t0000000000000000' in status
@@ -61,9 +71,12 @@ print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
                   'no_new_privileges': True, 'nested_userns_denied': True, 'mount_denied': True}))
 """
     args = args[:args.index("--") + 1] + ["/usr/bin/python3", "-I", "-c", probe,
-            f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret)]
+            f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret), digest]
     # Exercise the launcher's NoNewPrivileges setting as used by the service.
-    result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], capture_output=True, text=True, timeout=30)
+    try:
+        result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], pass_fds=(fd,), capture_output=True, text=True, timeout=30)
+    finally:
+        os.close(fd)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["symlink_escape_denied"]
     assert (rw / "result").read_text() == "actual permitted write"

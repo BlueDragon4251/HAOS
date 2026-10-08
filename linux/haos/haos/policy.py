@@ -140,3 +140,11 @@ def cleanup():
             if re.fullmatch(r"[a-f0-9]{64}", destination.name) and os.path.ismount(destination):
                 subprocess.run(["/usr/bin/umount", str(destination)], check=True)
     Path("/run/haos-policy/sandbox.json").unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Root storage service entrypoint; ordered by systemd")
+    parser.add_argument("action", choices=["prepare", "cleanup"])
+    action = parser.parse_args().action
+    (prepare if action == "prepare" else cleanup)()

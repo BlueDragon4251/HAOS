@@ -20,4 +20,6 @@ sudo haos-owner start
 
 Reconciliation cancels the blocked mission with an owner receipt; it never invents completion. New submission requires inspection establishing safety. Missing UUIDs should be resolved, not replaced with raw paths.
 
+The CLI requires both execution units to be fully inactive with zero main/control PIDs. Activating, deactivating, failed or unknown units are not accepted as stopped. Stop/reset and inspect them first. The systemd storage entrypoint is separately ordered before execution and after shutdown.
+
 Bootc rollback is inherited architecture, not a passed HAOS broken-update drill. Restic provisioning, encrypted backup and successful lost-project restore are incomplete.

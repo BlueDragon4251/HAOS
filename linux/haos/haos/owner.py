@@ -16,8 +16,12 @@ from .store import MissionStore
 
 def stopped():
     for unit in ("haos-controller.service", "haos-hermes.service"):
-        result = subprocess.run(["/usr/bin/systemctl", "is-active", "--quiet", unit], check=False)
-        if result.returncode not in {3, 4}:
+        result = subprocess.run(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,MainPID,ControlPID", unit],
+                                check=True, capture_output=True, text=True)
+        state = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        # is-active's exit 3 also covers activating/deactivating units: neither is stopped.
+        if (state.get("LoadState") not in {"loaded", "masked"} or state.get("ActiveState") != "inactive"
+                or state.get("MainPID") != "0" or state.get("ControlPID") != "0"):
             raise PermissionError(f"stop {unit} before modifying authority or reconciling a mission")
 
 
@@ -50,8 +54,10 @@ def main():
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
     if args.action == "prepare":
+        stopped()
         prepare()
     elif args.action == "cleanup":
+        stopped()
         cleanup()
     elif args.action == "status":
         print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory()}, indent=2))
