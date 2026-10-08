@@ -186,9 +186,11 @@ person the result.
 
 ## Keybindings (Herald OS Linux)
 
-The compositor is niri. Its managed config (`~/.config/niri/config.kdl`) is rewritten on update;
-the person's own settings go in `~/.config/niri/local.kdl`, which is included last and never
-touched by Herald OS. Add binds there:
+The compositor is niri. The Herald OS session starts it with `~/.config/niri/herald-os.kdl`, which
+Herald OS renders from its template at every login and whenever the keymap changes, so never edit
+it: the next login undoes the change. The person's own binds and other per-machine settings go in
+`~/.config/niri/local.kdl`, which that file includes last and Herald OS never touches. Add binds
+there, not to `~/.config/niri/config.kdl`, which the Herald OS session does not read:
 
 ```kdl
 binds {
@@ -198,9 +200,10 @@ binds {
 ```
 
 niri reloads the file as soon as it is saved. Check it with
-`niri validate -c ~/.config/niri/config.kdl` in the terminal, and read the hotkey overlay
-(`Mod+K`) before reusing a key: Herald OS already binds many `Mod+…` combinations. Any
-`herald-os` command can be a bind (`spawn "herald-os" "theme" "set" "herald-dusk"`).
+`niri validate -c ~/.config/niri/herald-os.kdl` in the terminal (it reads `local.kdl` through the
+include), and read the hotkey overlay (`Mod+K`) before reusing a key: Herald OS already binds many
+`Mod+…` combinations. Any `herald-os` command can be a bind
+(`spawn "herald-os" "theme" "set" "herald-dusk"`).
 
 To change one of Herald OS's own keys, bind the same key in `local.kdl`: it is included last, and
 niri lets a later bind replace an earlier one. To switch a key off, bind it to nothing:
