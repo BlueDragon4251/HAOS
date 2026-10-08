@@ -1,0 +1,38 @@
+[Unit]
+Description=HAOS durable mission controller
+After=haos-hermes.service
+Wants=haos-hermes.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=simple
+User=haos-control
+Group=haos-ui
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.controller
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=35
+StateDirectory=haos-control
+StateDirectoryMode=0700
+RuntimeDirectory=haos-control
+RuntimeDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

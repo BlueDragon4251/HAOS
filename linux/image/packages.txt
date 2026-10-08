@@ -99,3 +99,7 @@ foot
 firefox
 nautilus
 gnome-text-editor
+# HAOS independent controller and mandatory rootless filesystem sandbox.
+bubblewrap
+python3-websockets
+uv

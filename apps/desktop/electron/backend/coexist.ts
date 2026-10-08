@@ -18,6 +18,17 @@ const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 
 /** The running backend to use instead of starting one, or null. Loopback only: the token travels in the clear. */
 export function attachTarget(env: NodeJS.ProcessEnv = process.env, readFile: (file: string) => string = file => fs.readFileSync(file, 'utf8')): AttachTarget | null {
+  if (env.HAOS_BACKEND_CONFIG) {
+    const config = JSON.parse(readFile(env.HAOS_BACKEND_CONFIG)) as { version?: unknown; baseUrl?: unknown; tokenFile?: unknown }
+    if (config.version !== 1 || typeof config.baseUrl !== 'string' || config.tokenFile !== '/etc/haos/backend-token') {
+      throw new Error('Invalid HAOS system service descriptor')
+    }
+    const target = new URL(config.baseUrl)
+    if (!['127.0.0.1', '[::1]'].includes(target.hostname) || target.username || target.password || target.search || target.hash || target.pathname !== '/') {
+      throw new Error('HAOS service descriptor must contain a literal loopback origin')
+    }
+    return attachTarget({ HERALD_OS_BACKEND_URL: config.baseUrl, HERALD_OS_BACKEND_TOKEN_FILE: config.tokenFile }, readFile)
+  }
   const raw = env.HERALD_OS_BACKEND_URL?.trim()
 
   if (!raw) {
@@ -48,6 +59,9 @@ export function attachTarget(env: NodeJS.ProcessEnv = process.env, readFile: (fi
     }
   }
 
+  if (!token) {
+    throw new Error('The Hermes backend token is empty')
+  }
   return { baseUrl: url.origin, token }
 }
 

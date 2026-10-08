@@ -100,6 +100,7 @@ if [[ "$MODE" == "--image" ]]; then
   install -Dm0755 "$LINUX/image/reset-helper" /usr/libexec/herald-os/reset-helper
   install -Dm0644 "$LINUX/image/herald-os-reset.service" /usr/lib/systemd/system/herald-os-reset.service
   install -Dm0644 "$LINUX/image/kargs.toml" /usr/lib/bootc/kargs.d/10-herald-os.toml
+  bash "$LINUX/haos/install.sh"
   # Updates are signed with the project's cosign key (not keyless: that would write to a public
   # log); with its public half in the repo, the image only accepts signed updates of itself.
   if [[ -f "$LINUX/image/cosign.pub" ]]; then

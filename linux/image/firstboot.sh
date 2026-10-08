@@ -61,6 +61,13 @@ system_phase() {
   install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/session/swaylock.conf" "$HOME_DIR/.config/swaylock/config"
 
   step "Hermes Agent for $HERMES_USER"
+  if [[ -x /usr/lib/haos/hermes/.venv/bin/hermes ]]; then
+    # Never install an unrestricted second agent in the observer's administrator account.
+    usermod -aG haos-ui "$HERMES_USER"
+    (cd /usr/lib/haos && python3 -m haos.initialize "$HERMES_USER")
+    date -Is >"$STATE/firstboot-done"
+    return
+  fi
   if [[ -f /etc/herald-os/ref ]]; then
     # shellcheck disable=SC1091
     source /etc/herald-os/ref

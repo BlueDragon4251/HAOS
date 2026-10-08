@@ -1,0 +1,42 @@
+[Unit]
+Description=HAOS isolated upstream Hermes core
+Requires=haos-policy.service
+After=haos-policy.service network-online.target herald-os-firstboot.service
+Wants=network-online.target
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=simple
+User=haos-agent
+Group=haos-agent
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=backend-token:/etc/haos/backend-token
+ExecStart=/usr/bin/python3 -m haos.sandbox
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+StateDirectory=haos-agent haos-workspace
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/run/haos-volumes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+TasksMax=512
+MemoryHigh=4G
+
+[Install]
+WantedBy=multi-user.target

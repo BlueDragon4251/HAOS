@@ -1,0 +1,3 @@
+g haos-ui -
+u haos-agent - "HAOS isolated agent" /var/lib/haos-agent /usr/sbin/nologin
+u haos-control - "HAOS mission controller" /var/lib/haos-control /usr/sbin/nologin

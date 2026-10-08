@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { attachTarget, foreignGateway, parseGatewayPid } from './coexist.ts'
 
 describe('attachTarget', () => {
+  it('uses the HAOS service and fails closed on a broken descriptor or credential', () => {
+    const descriptor = JSON.stringify({ version: 1, baseUrl: 'http://127.0.0.1:9119', tokenFile: '/etc/haos/backend-token' })
+    const env = { HAOS_BACKEND_CONFIG: '/etc/haos/backend.json' }
+    expect(attachTarget(env, file => file.endsWith('.json') ? descriptor : 'host-token')).toEqual({ baseUrl: 'http://127.0.0.1:9119', token: 'host-token' })
+    expect(() => attachTarget(env, () => { throw new Error('missing descriptor') })).toThrow(/missing/)
+    expect(() => attachTarget(env, file => file.endsWith('.json') ? descriptor : ' ')).toThrow(/empty/)
+    expect(() => attachTarget(env, () => descriptor.replace('127.0.0.1', 'localhost'))).toThrow(/literal loopback/)
+  })
+
   it('is off unless asked for', () => {
     expect(attachTarget({})).toBeNull()
   })

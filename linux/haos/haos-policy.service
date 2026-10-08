@@ -1,0 +1,20 @@
+[Unit]
+Description=HAOS owner-controlled data volume mounts
+Before=haos-hermes.service
+After=herald-os-firstboot.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.owner prepare
+ExecStop=/usr/bin/python3 -m haos.owner cleanup
+UMask=0077
+# Mounts must be visible to the agent unit before it constructs its private filesystem view.
+# Do not use mount-namespace hardening here: this broker publishes mounts to sibling units.
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
