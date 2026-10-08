@@ -26,6 +26,34 @@ const NEWER = new Set(
 /** Newer still: these carry `_xlfn._xlws.`. */
 const WORKSHEET_ONLY = new Set(['FILTER', 'SORT'])
 
+const opensLiteral = (char: string | undefined): boolean => char === '"' || char === "'" || char === '['
+
+/** Where a literal starting at `start` ends: a string or quoted sheet name (quotes doubled inside), or a bracketed, possibly nested, structured reference. */
+function literalEnd(formula: string, start: number): number {
+  const char = formula[start]
+  let end = start + 1
+
+  if (char === '[') {
+    for (let depth = 1; end < formula.length && depth > 0; end++) {
+      depth += formula[end] === '[' ? 1 : formula[end] === ']' ? -1 : 0
+    }
+
+    return end
+  }
+
+  while (end < formula.length) {
+    if (formula[end] === char && formula[end + 1] === char) {
+      end += 2
+    } else if (formula[end] === char) {
+      return end + 1
+    } else {
+      end++
+    }
+  }
+
+  return end
+}
+
 /** Run `change` on the parts of a formula outside strings, quoted sheet names and structured references. */
 function outsideLiterals(formula: string, change: (part: string) => string): string {
   let out = ''
@@ -33,36 +61,15 @@ function outsideLiterals(formula: string, change: (part: string) => string): str
   let i = 0
 
   while (i < formula.length) {
-    const char = formula[i]
-
-    if (char === '"' || char === "'" || char === '[') {
-      out += change(plain)
+    if (opensLiteral(formula[i])) {
+      const end = literalEnd(formula, i)
+      out += change(plain) + formula.slice(i, end)
       plain = ''
-      let end = i + 1
-
-      if (char === '[') {
-        for (let depth = 1; end < formula.length && depth > 0; end++) {
-          depth += formula[end] === '[' ? 1 : formula[end] === ']' ? -1 : 0
-        }
-      } else {
-        while (end < formula.length) {
-          if (formula[end] === char && formula[end + 1] === char) {
-            end += 2
-          } else if (formula[end] === char) {
-            end++
-            break
-          } else {
-            end++
-          }
-        }
-      }
-
-      out += formula.slice(i, end)
       i = end
       continue
     }
 
-    plain += char
+    plain += formula[i]
     i++
   }
 
@@ -76,11 +83,97 @@ export function formulaFromExcel(text: string): string {
   return `=${bare}`
 }
 
+interface Token {
+  kind: 'name' | 'literal' | 'other'
+  text: string
+}
+
+/** A formula as names, literals (text, quoted sheet names, brackets) and the rest, one character at a time. */
+function tokens(formula: string): Token[] {
+  const out: Token[] = []
+  let i = 0
+
+  while (i < formula.length) {
+    if (opensLiteral(formula[i])) {
+      const end = literalEnd(formula, i)
+      out.push({ kind: 'literal', text: formula.slice(i, end) })
+      i = end
+      continue
+    }
+
+    const name = /^[A-Za-z_\\][A-Za-z0-9_.]*/.exec(formula.slice(i, i + 256))
+
+    if (name) {
+      out.push({ kind: 'name', text: name[0] })
+      i += name[0].length
+      continue
+    }
+
+    out.push({ kind: 'other', text: formula[i] })
+    i++
+  }
+
+  return out
+}
+
+/** LET and LAMBDA name their parameters with `_xlpm.` in a file, where they are declared and used. */
+function withParameterPrefixes(formula: string): string {
+  const list = tokens(formula)
+  const prefixed = new Set<number>()
+
+  list.forEach((token, start) => {
+    const kind = token.kind === 'name' ? token.text.toUpperCase() : ''
+
+    if ((kind !== 'LET' && kind !== 'LAMBDA') || list[start + 1]?.text !== '(') {
+      return
+    }
+
+    // The call's arguments: token ranges between top-level commas.
+    const args: [number, number][] = []
+    let depth = 0
+    let from = start + 2
+    let end = start + 2
+
+    for (; end < list.length; end++) {
+      const text = list[end].text
+
+      if (text === '(') {
+        depth++
+      } else if (text === ')' && depth-- === 0) {
+        break
+      } else if (text === ',' && depth === 0) {
+        args.push([from, end])
+        from = end + 1
+      }
+    }
+
+    args.push([from, end])
+    const names = new Set<string>()
+
+    args.slice(0, -1).forEach(([a, b], index) => {
+      const words = list.slice(a, b).filter((entry) => entry.text.trim())
+
+      if ((kind === 'LAMBDA' || index % 2 === 0) && words.length === 1 && words[0].kind === 'name') {
+        names.add(words[0].text.toUpperCase())
+      }
+    })
+
+    for (let at = start + 2; at < end; at++) {
+      if (list[at].kind === 'name' && names.has(list[at].text.toUpperCase()) && list[at + 1]?.text !== '(' && list[at + 1]?.text !== '!') {
+        prefixed.add(at)
+      }
+    }
+  })
+
+  return list.map((token, at) => (prefixed.has(at) ? `_xlpm.${token.text}` : token.text)).join('')
+}
+
 /** Univer's formula as a file writes it: no "=", and newer functions prefixed. `unitId` references to the workbook itself lose their `[id]`. */
 export function formulaToExcel(formula: string, unitId?: string): string {
   const own = unitId ? `[${unitId}]` : null
   const text = formula.replace(/^=/, '')
-  const plain = own ? text.split(own).join('') : text
+  const bare = own ? text.split(own).join('') : text
+  const plain = /\b(LET|LAMBDA)\s*\(/i.test(bare) ? withParameterPrefixes(bare) : bare
 
   return outsideLiterals(plain, (part) =>
     part.replace(/(^|[^A-Za-z0-9_.])([A-Za-z][A-Za-z0-9.]*)(\s*\()/g, (whole, before: string, name: string, open: string) => {

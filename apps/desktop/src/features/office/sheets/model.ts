@@ -44,8 +44,6 @@ export async function oneStep<T>(target: SheetsTarget, change: () => T | Promise
   }
 }
 
-// --- Finding sheets and ranges -------------------------------------------------------------------
-
 const sheetNames = (workbook: FWorkbook) => workbook.getSheets().map((sheet) => sheet.getSheetName())
 
 /** The sheet a command names (any case), or the one in front. */
@@ -110,8 +108,6 @@ export async function settled(target: SheetsTarget): Promise<void> {
 
 const size = (cells: CellRange) => (cells.endRow - cells.startRow + 1) * (cells.endColumn - cells.startColumn + 1)
 
-// --- Reading -------------------------------------------------------------------------------------
-
 export interface RangeContents {
   sheet: string
   range: string
@@ -154,8 +150,6 @@ export function describeWorkbook(target: SheetsTarget): { active: string; sheets
     })
   }
 }
-
-// --- Writing -------------------------------------------------------------------------------------
 
 /** One value as Univer's cell: a formula for text starting with "=", else a number, true or false, or text. */
 export function cellFor(value: CellInput): ICellData {
@@ -240,8 +234,6 @@ function growTo(sheet: FWorksheet, cells: CellRange): void {
     sheet.insertColumnsAfter(sheet.getMaxColumns() - 1, columns)
   }
 }
-
-// --- Formatting ----------------------------------------------------------------------------------
 
 export interface FormatInput {
   numberFormat?: string
@@ -388,8 +380,6 @@ export async function setFormat(target: SheetsTarget, args: { range: unknown; fo
   return { sheet: sheet.getSheetName(), range: rangeName(cells), changes: steps.map((step) => step.label) }
 }
 
-// --- Sheets --------------------------------------------------------------------------------------
-
 /** A sheet name Excel accepts, not taken by another sheet. */
 export function checkSheetName(name: unknown, taken: string[], current?: string): string {
   const text = String(name ?? '').trim()
@@ -444,8 +434,6 @@ export async function removeSheet(target: SheetsTarget, args: { sheet?: unknown 
 
   return { sheet: name }
 }
-
-// --- Sorting, filtering, freezing ----------------------------------------------------------------
 
 /** A column a command names: a letter ("C"), a header in the range's first row ("Cost"), or a number counted from the range's first column (1 is the first). */
 export function columnOf(range: FRange, cells: CellRange, by: unknown): number {

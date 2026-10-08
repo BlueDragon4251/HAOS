@@ -38,6 +38,17 @@ describe('formulas', () => {
     expect(formulaToExcel('=STDEV.S(A1:A9)+[book]Sheet1!A1', 'book')).toBe('_xlfn.STDEV.S(A1:A9)+Sheet1!A1')
   })
 
+  it('names the parameters of LET and LAMBDA with _xlpm. for the file, and reads them back without it', () => {
+    const let_ = '=LET(rate,0.07,total,SUM(B2:B9),total*(1+rate))'
+    const lambda = '=LAMBDA(a, b, a+b+"a")(1,2)+MAP(A1:A3,LAMBDA(x,x*2))'
+
+    expect(formulaToExcel(let_)).toBe('_xlfn.LET(_xlpm.rate,0.07,_xlpm.total,SUM(B2:B9),_xlpm.total*(1+_xlpm.rate))')
+    expect(formulaToExcel(lambda)).toBe('_xlfn.LAMBDA(_xlpm.a, _xlpm.b, _xlpm.a+_xlpm.b+"a")(1,2)+_xlfn.MAP(A1:A3,_xlfn.LAMBDA(_xlpm.x,_xlpm.x*2))')
+    expect(formulaFromExcel(formulaToExcel(let_))).toBe(let_)
+    expect(formulaFromExcel(formulaToExcel(lambda))).toBe(lambda)
+    expect(formulaToExcel("=SUM('Let it be'!A1,[Let]x)")).toBe("SUM('Let it be'!A1,[Let]x)")
+  })
+
   it('slides relative references, as a shared formula does', () => {
     const formula = 'A1+$B$1+C$2+$D3+SUM(A:A)+ROWS(1:2)+Sheet1!E5+\'My Sheet\'!F6+"A1"+LOG10(5)+1E5+Table1[Cost]'
 

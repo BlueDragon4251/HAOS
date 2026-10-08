@@ -44,8 +44,6 @@ export const ruleId = (prefix: string): string => `${prefix}${(++nextId).toStrin
 
 const withSheet = (range: CellRange) => ({ ...range, rangeType: 0 })
 
-// --- Data validation -------------------------------------------------------------------------------
-
 export interface UValidation {
   uid: string
   ranges: CellRange[]
@@ -215,8 +213,6 @@ export function validationsXml(rules: UValidation[], unitId: string): { xml: str
   return { xml: written.length ? `<dataValidations count="${written.length}">${written.join('')}</dataValidations>` : '', losses: [...losses] }
 }
 
-// --- Filters -------------------------------------------------------------------------------------
-
 export interface UFilterColumn {
   colId: number
   filters?: { blank?: true; filters?: string[] }
@@ -289,8 +285,6 @@ export function filterXml(filter: UAutoFilter): string {
 
   return `<autoFilter ref="${rangeName(filter.ref)}"${body ? `>${body}</autoFilter>` : '/>'}`
 }
-
-// --- Conditional formatting -------------------------------------------------------------------------
 
 export interface UConditionalRule {
   cfId: string
@@ -615,8 +609,6 @@ export function conditionalToExcel(rules: UConditionalRule[], unitId: string): {
   return { formats, losses: [...losses] }
 }
 
-// --- Defined names ---------------------------------------------------------------------------------
-
 export interface UDefinedName {
   id: string
   name: string
@@ -686,8 +678,6 @@ export function definedNamesXml(names: Record<string, UDefinedName> | null, shee
 
   return entries.length ? `<definedNames>${entries.join('')}</definedNames>` : ''
 }
-
-// --- Links -----------------------------------------------------------------------------------------
 
 export interface SheetLink {
   row: number
