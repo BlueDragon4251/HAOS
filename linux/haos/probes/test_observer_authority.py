@@ -12,11 +12,11 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from haos.observer import secure_observer
 
 
-def run(*args, check=True):
-    return subprocess.run(list(args), check=check, capture_output=True, text=True)
+def run(*args, check=True, env=None):
+    return subprocess.run(list(args), check=check, capture_output=True, text=True, env=env)
 
 
-def test_inherited_sudo_and_blank_password_are_denied():
+def test_inherited_sudo_and_blank_password_are_denied(tmp_path):
     assert os.geteuid() == 0, "run only on the disposable CI runner as root"
     user = "haos-fixture-" + uuid.uuid4().hex[:10]
     grant = Path("/etc/sudoers.d") / ("00-" + user)
@@ -39,8 +39,13 @@ def test_inherited_sudo_and_blank_password_are_denied():
         assert run("/usr/bin/passwd", "--status", user).stdout.split()[1] == "L"
         after = run("/usr/sbin/runuser", "-u", user, "--", "/usr/bin/sudo", "-n", "/usr/bin/id", "-u", check=False)
         assert after.returncode != 0 and after.stdout.strip() != "0"
-        edit = run("/usr/sbin/runuser", "-u", user, "--", "/usr/bin/sudo", "-n", "-e", "/etc/haos/volumes.json", check=False)
+        protected = tmp_path / "protected-policy-fixture"
+        protected.write_text("root-owned policy fixture")
+        protected.chmod(0o600)
+        edit = run("/usr/sbin/runuser", "-u", user, "--", "/usr/bin/sudo", "-n", "-e", str(protected), check=False,
+                   env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "SUDO_EDITOR": "/usr/bin/true"})
         assert edit.returncode != 0
+        assert protected.read_text() == "root-owned policy fixture"
         run("/usr/sbin/visudo", "-c")
         print(json.dumps({**receipt, "inherited_nopasswd_denied": True, "sudoedit_denied": True}))
     finally:
