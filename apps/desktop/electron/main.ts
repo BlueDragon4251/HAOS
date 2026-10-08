@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellCommand, type WindowState } from '../shared/ipc.ts'
 import { BackendManager } from './backend/manager.ts'
+import { forgetInheritedSession } from './backend/session-env.ts'
 import { CrashWatcher } from './crash/watch.ts'
 import { fireEventAutomations } from './events/automations.ts'
 import { events } from './events/bus.ts'
@@ -67,6 +68,12 @@ protocol.registerSchemesAsPrivileged([
 // Electron shows a modal dialog for an uncaught main-process error and waits on it: the whole
 // shell, the Linux session included, would freeze behind a box nobody may see. Log it and go on.
 process.on('uncaughtException', error => log('main', `uncaught exception: ${error.stack ?? error.message}`))
+
+// Started by a command a Hermes session ran, Herald OS inherits that session; the terminals, apps,
+// hooks and backend it starts must not pass for it (backend/session-env.ts).
+for (const name of forgetInheritedSession()) {
+  log('main', `dropped the inherited ${name}`)
+}
 
 for (const line of migrateLegacyData({ hermesHome: hermesHome(), appData: app.getPath('appData'), userData: app.getPath('userData') })) {
   log('migrate', line)

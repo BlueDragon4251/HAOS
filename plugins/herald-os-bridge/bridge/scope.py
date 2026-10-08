@@ -34,8 +34,23 @@ def session_source() -> str:
     return _session_env("HERMES_SESSION_SOURCE").strip().lower()
 
 
+def _hermes_binds_sessions() -> bool:
+    """Whether Hermes binds sessions in this process, as the gateway Herald OS talks to, a messaging
+    gateway and cron do for every turn. The ``hermes`` CLI never does: its HERMES_SESSION_* come from
+    its environment, which holds whatever its parent had, since Hermes passes a turn's variables on to
+    every command the turn runs. A Hermes without this latch counts as binding."""
+    try:
+        from gateway.session_context import session_context_engaged
+    except ImportError:
+        return True
+    return bool(session_context_engaged())
+
+
 def in_herald_session() -> bool:
-    return session_source() in HERALD_SOURCES
+    """A Herald OS turn: Hermes bound the source for it, or the process descends from the backend
+    Herald OS started (HERALD_OS=1), as a command run by a Herald OS turn does. A source in the
+    environment of anything else, such as ``hermes chat --source herald_os``, does not count."""
+    return session_source() in HERALD_SOURCES and (_hermes_binds_sessions() or herald_backend())
 
 
 def herald_backend() -> bool:

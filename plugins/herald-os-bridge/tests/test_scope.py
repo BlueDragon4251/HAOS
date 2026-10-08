@@ -29,7 +29,8 @@ class Ctx:
 @pytest.fixture
 def session(monkeypatch):
     """Hermes's ``gateway.session_context``: a bound turn sets every variable (unnamed ones to ""),
-    which hides the process environment; with nothing bound the environment answers."""
+    which hides the process environment; with nothing bound the environment answers. A process
+    binds sessions (the latch) only when it binds one, as here; the ``hermes`` CLI never does."""
     state: dict = {"bound": None}
     package = types.ModuleType("gateway")
     package.__path__ = []
@@ -41,6 +42,7 @@ def session(monkeypatch):
         return os.environ.get(name, default)
 
     module.get_session_env = get_session_env
+    module.session_context_engaged = lambda: state["bound"] is not None
     monkeypatch.setitem(sys.modules, "gateway", package)
     monkeypatch.setitem(sys.modules, "gateway.session_context", module)
     for name in ("HERALD_OS", "HERMES_KANBAN_TASK", "HERMES_SESSION_SOURCE", "HERMES_SESSION_PLATFORM", "HERMES_CRON_SESSION", "HERALD_OS_BRIDGE_DISABLED", "HERMES_OS_BRIDGE_DISABLED"):
@@ -79,6 +81,10 @@ CONTEXTS = {
     "Herald OS's backend between turns": (HERALD_BACKEND, None, True, False),
     "an eager resume in Herald OS's backend": (HERALD_BACKEND, {"HERMES_SESSION_SOURCE": "desktop"}, True, False),
     "a process a Herald OS session started": ({**HERALD_BACKEND, "HERMES_SESSION_SOURCE": "herald_os"}, None, True, True),
+    # The hermes CLI takes its source from the environment: one Herald OS's backend did not start
+    # must not pass for a Herald OS turn, whatever it inherited or was told.
+    "the hermes CLI with an inherited Herald OS source": ({"HERMES_SESSION_SOURCE": "herald_os"}, None, False, False),
+    "hermes chat --source herald_os": ({"HERMES_SESSION_SOURCE": "herald_os", "HERMES_SESSION_SOURCE_EXPLICIT": "1"}, None, False, False),
 }
 
 
@@ -115,6 +121,14 @@ def test_a_refused_call_does_nothing_and_is_audited(plugin, registered, session,
     assert not target.exists()
     entry = json.loads((isolated_home / "herald-os" / "audit.jsonl").read_text().strip().splitlines()[-1])
     assert entry["tool"] == "system_files" and entry["decision"] == "outside_herald" and entry["ok"] is False
+
+
+def test_a_hermes_without_the_latch_still_takes_the_source_it_was_given(plugin, registered, session, monkeypatch, tmp_path):
+    session({"HERMES_SESSION_SOURCE": "herald_os"}, None)
+    monkeypatch.delattr(sys.modules["gateway.session_context"], "session_context_engaged")
+    assert plugin._check_available() is True
+    result = json.loads(registered["system_files"]["handler"]({"action": "mkdir", "path": str(tmp_path / "plan"), "dry_run": True}))
+    assert result["success"] is True, result
 
 
 def test_a_call_without_a_session_in_the_backend_points_at_hermes_update(registered, session):

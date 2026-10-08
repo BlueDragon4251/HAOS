@@ -12,6 +12,7 @@ import { type AttachTarget, attachTarget, foreignGateway } from './coexist.ts'
 import { waitForStatus } from './probe.ts'
 import { LineBuffer, parseReadyLine, readyFileName, staleReadyFiles } from './ready.ts'
 import { resolveBackendRuntime } from './resolve.ts'
+import { withoutInheritedSession } from './session-env.ts'
 import { loginShellPath } from './shell-env.ts'
 
 const READY_TIMEOUT_MS = 90_000
@@ -255,8 +256,7 @@ export class BackendManager {
       fs.rmSync(path.join(dataDir, name), { force: true })
     }
 
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
+    const env = serveEnvironment(process.env, {
       PATH: await loginShellPath(),
       HERMES_HOME: hermesHome(),
       // Sessions start in the user's world, not inside the runtime checkout.
@@ -280,8 +280,7 @@ export class BackendManager {
       HERMES_DESKTOP_READY_FILE: readyFile,
       PYTHONUNBUFFERED: '1',
       ...(this.control ? { HERALD_OS_CONTROL_SOCKET: this.control.socketPath, HERALD_OS_CONTROL_TOKEN: this.control.token } : {})
-    }
-    delete env.ELECTRON_RUN_AS_NODE
+    })
 
     log('backend', `spawning ${[command, ...args].join(' ')} (cwd ${runtime.root ?? process.cwd()})`)
     const child = spawn(command, args, {
@@ -436,6 +435,18 @@ export class BackendManager {
       listener(snapshot)
     }
   }
+}
+
+/**
+ * The environment `hermes serve` runs with: the app's, then `own`. A session the app inherited
+ * (HERMES_SESSION_* and the rest, see session-env.ts) would otherwise be the backend's, and through
+ * it every gateway and command the backend starts.
+ */
+export function serveEnvironment(inherited: NodeJS.ProcessEnv, own: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env = { ...withoutInheritedSession(inherited), ...own }
+  delete env.ELECTRON_RUN_AS_NODE
+
+  return env
 }
 
 function parentPid(pid: number): number | null {
