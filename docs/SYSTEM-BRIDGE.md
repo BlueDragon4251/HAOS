@@ -19,7 +19,7 @@ unrestricted machine access.
 | `system_control` | read / act / mutate | Volume, dark mode, notifications, System Settings panes, display sleep, screen lock; switching Wi-Fi asks first. On Herald OS Linux also Wi-Fi networks and joining one (asks first), Bluetooth power (asks first) and devices, the sound output, brightness and the power mode |
 | `system_open` | act | Open an app, URL, file or folder; reveal in Finder; open a path in an editor |
 | `system_kill_process` | destructive | Terminate a process by pid or by listening port |
-| `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`). `dry_run` plans say where each item lands and list clashes (nothing is ever overwritten, and a batch is checked before anything moves); applied moves and copies return `undo` operations |
+| `system_files` | mutate / destructive | Create folders, move, rename, trash (never `rm`). `dry_run` plans say where each item lands and list clashes (nothing is ever overwritten, and a batch is checked before anything moves). `action=undo` replays the exact reverse of the conversation's last applied batch (kept per session in `$HERMES_HOME/herald-os/file-undo.json`, paths only) and asks again |
 | `system_documents` | read | Read PDFs page by page (scans and photos of documents through on-device OCR) with hints for filing: kind, vendor, dates, number, total, a suggested name and a fingerprint for duplicates; `places` lists the folders documents are already filed in, with their layout and naming. Used by the `file-documents` skill |
 | `os_ui` | per command | Operate the Herald OS interface: open pages and apps, add memories, run automations, start missions and Studio builds. Each command carries its own tier |
 | `system_os` | act / mutate | Herald OS Linux only: install apps and anything in the install catalog (`catalog_list`, `catalog_install`, `catalog_remove`), widget plugins (`plugin_list`, `plugin_add`, `plugin_update`, `plugin_disable`, `plugin_remove`; turning one on is left to the user), reminders, themes, screenshots, lock, suspend, update |
@@ -32,7 +32,8 @@ unrestricted machine access.
 "Find the invoice from Acme in my Downloads, rename it properly and put it where it belongs" is the
 `file-documents` skill: `system_documents action=read` on the folder, `system_documents
 action=places` for where such files already live, one `system_files` batch run as a dry run, the
-approval card, and the result's `undo` if the person changes their mind.
+approval card (answered by voice in a spoken conversation), and `system_files action=undo` if the
+person changes their mind.
 
 - Text: on macOS PDFKit reads each page's text layer and Vision recognises the text of scanned pages
   and images (both through a JavaScript-for-Automation script, as the shell's screen-text reader

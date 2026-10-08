@@ -67,6 +67,13 @@ export interface VoiceHost {
   runIntent(text: string): Promise<{ handled: boolean; spoken: string; ok: boolean }>
   /** Stop the in-flight Hermes turn (barge-in). */
   interrupt(): Promise<void>
+  /** One of this conversation's approval cards is waiting for an answer. */
+  approvalPending(): boolean
+  /**
+   * Words heard while a card waits: a short "yes" or "no" decides this conversation's card (allow
+   * once, or deny) and returns the answer; null when no card waits or the words are no answer.
+   */
+  answerApproval(text: string): 'approve' | 'deny' | null
   /** Follow the assistant text of a turn on `sessionId`; the returned function stops following. */
   observeTurn(sessionId: string, handlers: TurnHandlers): () => void
   /** The engine ended the conversation on its own (idle, stop phrase, error). */
@@ -86,4 +93,6 @@ export interface ConversationEngine {
   setMuted(muted: boolean): void
   /** The user asked Hermes to stop talking (orb button); listening continues. */
   interrupt(): void
+  /** A final transcript handed in rather than heard (typed fallback, tests); the microphone's own path. */
+  submitTranscript?(text: string): Promise<void>
 }

@@ -1,11 +1,12 @@
 import { useStore } from '@nanostores/react'
 import type { ApprovalChoice, ApprovalRequestParams, ClarifyRequestParams } from '@herald-os/client'
-import { IconKey, IconLock, IconQuestionMark, IconShieldCheck } from '@tabler/icons-react'
+import { IconKey, IconLock, IconMicrophone, IconQuestionMark, IconShieldCheck } from '@tabler/icons-react'
 import { useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { Badge } from '../components/ui/primitives.tsx'
 import { deviceNoun } from '../lib/platform-labels.ts'
 import { $pendingRequests, type PendingRequest, resolveRequest } from '../store/requests.ts'
+import { $voiceActive, $voiceSessionId } from '../store/voice.ts'
 
 /**
  * One host for every server->client question. Cards stack bottom-right; the oldest is on top so
@@ -52,6 +53,10 @@ const BRIDGE_DESTRUCTIVE = new Set(['system_kill_process'])
 const DESTRUCTIVE_SUMMARY_RE = /^(trash|force quit|force kill|terminate|quit)\b/i
 
 function ApprovalCard({ id, params }: { id: string; params: ApprovalRequestParams }) {
+  const voiceActive = useStore($voiceActive)
+  const voiceSession = useStore($voiceSessionId)
+  // A running conversation on this card's session takes a spoken "yes" (allow once) or "no".
+  const answerByVoice = voiceActive && voiceSession !== null && (params.session_id === voiceSession || params.gateway_session_id === voiceSession)
   const bridgeTool = PLUGIN_RULE_RE.exec(params.command ?? '')?.[1] ?? null
   const toolName = params.tool_name ?? bridgeTool
   const destructive = Boolean(bridgeTool) && (BRIDGE_DESTRUCTIVE.has(bridgeTool!) || DESTRUCTIVE_SUMMARY_RE.test(params.description ?? ''))
@@ -83,6 +88,12 @@ function ApprovalCard({ id, params }: { id: string; params: ApprovalRequestParam
       </div>
       {params.command && !bridgeTool && (
         <pre className="selectable max-h-40 overflow-auto rounded-md bg-surface px-3 py-2 font-mono text-[12px] leading-relaxed text-fg hairline whitespace-pre-wrap">{params.command}</pre>
+      )}
+      {answerByVoice && (
+        <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
+          <IconMicrophone size={13} />
+          Or say "yes" to allow once, or "no" to deny.
+        </div>
       )}
       <div className="flex flex-wrap justify-end gap-2">
         {choices.map(choice => (

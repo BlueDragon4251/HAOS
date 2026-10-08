@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -21,7 +22,7 @@ from . import audit, documents, ui
 from .host import HostNotSupported, host
 from .host.base import FileSearch
 from .permissions import Tier, authorize, load_policy, protected_root
-from .util import expand, fail, ok, os_env, run, truncate
+from .util import data_dir, expand, fail, ok, os_env, run, truncate
 
 _STR = {"type": "string"}
 _INT = {"type": "integer"}
@@ -475,9 +476,11 @@ def handle_system_kill_process(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_FILES_SCHEMA = _schema(
     "system_files",
-    "Organise files and folders on this computer. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan: it says where each item lands and lists problems (missing items, names already taken: nothing is ever overwritten). The user confirms mutating actions once per batch. An applied move or copy returns undo: operations that reverse it, to pass back as action=batch if the user asks to undo. Use the write_file tool to create file contents.",
+    "Organise files and folders on this computer. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan: it says where each item lands and lists problems (missing items, names already taken: nothing is ever overwritten). The user confirms mutating actions once per batch. "
+    "When the user says 'undo that' or 'put it back', use action=undo: it replays the exact reverse of the most recent batch applied in this conversation (moved items go back, copies go to the Trash; undo_id picks an earlier one) and asks again; never retype the paths yourself. Use the write_file tool to create file contents.",
     {
-        "action": _enum("mkdir", "move", "copy", "trash", "batch"),
+        "action": _enum("mkdir", "move", "copy", "trash", "batch", "undo"),
+        "undo_id": _desc(_STR, "For undo: the undo_id an applied batch returned, to reverse that one instead of the most recent."),
         "path": _desc(_STR, "Target path for mkdir/move/copy/trash."),
         "to": _desc(_STR, "Destination for move/copy (a folder, or the new full path)."),
         "paths": {"type": "array", "items": _STR, "description": "For trash: several items."},
@@ -618,7 +621,67 @@ def plan_targets(ops: list[FileOp]) -> tuple[list[Path | None], list[str]]:
     return targets, problems
 
 
-def handle_system_files(args: dict[str, Any], **_: Any) -> str:
+# What each applied batch would take to reverse, per Hermes session (newest last), so "undo that"
+# replays the exact operations instead of the model retyping long paths. Paths only, a few per session.
+UNDO_PER_SESSION = 10
+UNDO_SESSIONS = 20
+
+
+def _undo_journal_path() -> Path:
+    return data_dir() / "file-undo.json"
+
+
+def _load_undo_journal() -> dict[str, list[dict[str, Any]]]:
+    try:
+        data = json.loads(_undo_journal_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k): v for k, v in data.items() if isinstance(v, list)} if isinstance(data, dict) else {}
+
+
+def _save_undo_journal(journal: dict[str, list[dict[str, Any]]]) -> None:
+    path = _undo_journal_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    kept = dict(list(journal.items())[-UNDO_SESSIONS:])
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(kept, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(path)
+
+
+def record_undo(session: str, undo: list[dict[str, str]], summary: str) -> str:
+    """Keep the reverse of an applied batch for ``action=undo``; returns its undo_id."""
+    journal = _load_undo_journal()
+    entry_id = uuid.uuid4().hex[:8]
+    entries = [*journal.pop(session, []), {"id": entry_id, "ts": datetime.now().isoformat(timespec="seconds"), "summary": summary, "undo": undo}]
+    journal[session] = entries[-UNDO_PER_SESSION:]
+    _save_undo_journal(journal)
+    return entry_id
+
+
+def find_undo(session: str, undo_id: str | None) -> dict[str, Any] | None:
+    entries = _load_undo_journal().get(session, [])
+    if undo_id:
+        return next((entry for entry in entries if entry.get("id") == undo_id), None)
+    return entries[-1] if entries else None
+
+
+def drop_undo(session: str, undo_id: str) -> None:
+    journal = _load_undo_journal()
+    journal[session] = [entry for entry in journal.get(session, []) if entry.get("id") != undo_id]
+    if not journal[session]:
+        del journal[session]
+    _save_undo_journal(journal)
+
+
+def handle_system_files(args: dict[str, Any], **context: Any) -> str:
+    # Hermes passes the conversation's session id to plugin tools; undo stays within it.
+    session = str(context.get("session_id") or context.get("task_id") or "default")
+    undoing: dict[str, Any] | None = None
+    if str(args.get("action") or "") == "undo":
+        undoing = find_undo(session, str(args.get("undo_id") or "").strip() or None)
+        if undoing is None:
+            return fail("Nothing to undo: no batch applied with system_files in this conversation is on record" + (f" under undo_id {args['undo_id']}" if args.get("undo_id") else "") + ".")
+        args = {"action": "batch", "operations": undoing["undo"], "dry_run": args.get("dry_run")}
     try:
         ops = plan_operations(args)
     except ValueError as exc:
@@ -670,17 +733,26 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
         except Exception as exc:
             if not done:
                 raise
-            raise PartialFailure(f"{exc} (stopped after {len(done)} of {len(ops)} operations)", {"applied": done, "undo": undo[::-1], "created_folders": created}) from exc
+            payload: dict[str, Any] = {"applied": done, "undo": undo[::-1], "created_folders": created}
+            if undo and undoing is None:
+                payload["undo_id"] = record_undo(session, undo[::-1], summary)
+            raise PartialFailure(f"{exc} (stopped after {len(done)} of {len(ops)} operations)", payload) from exc
         result: dict[str, Any] = {"applied": done}
-        if undo:
+        if undoing is not None:
+            # Undone: the record goes, so the next undo reaches the batch before it.
+            drop_undo(session, undoing["id"])
+            result["undone"] = undoing.get("summary")
+        elif undo:
             result["undo"] = undo[::-1]
-            result["undo_note"] = "To reverse this, call system_files action=batch with operations=undo: moved items go back, copies go to the Trash."
+            result["undo_id"] = record_undo(session, undo[::-1], summary)
+            result["undo_note"] = "If the user asks to undo this, call system_files action=undo: moved items go back, copies go to the Trash."
         if created:
             result["created_folders"] = created
         return result
 
     touched = [p for op in ops for p in op.touched()]
-    return _guarded("system_files", tier, "batch" if len(ops) > 1 else ops[0].op, summary, args, touched, execute)
+    action = "undo" if undoing is not None else "batch" if len(ops) > 1 else ops[0].op
+    return _guarded("system_files", tier, action, summary, args, touched, execute)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1317,4 +1389,4 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_os", SYSTEM_OS_SCHEMA, system_os_handler, "🐧"),
 )
 
-__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "handle_os_ui", "handle_system_documents", "normalise_duration", "plan_operations", "plan_system_os", "plan_targets", "read_one_document", "resolve_when", "system_os_handler", "tilde", "ui_summary", "ui_tier_for", "json"]
+__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "drop_undo", "find_undo", "handle_os_ui", "handle_system_documents", "normalise_duration", "plan_operations", "plan_system_os", "plan_targets", "read_one_document", "record_undo", "resolve_when", "system_os_handler", "tilde", "ui_summary", "ui_tier_for", "json"]
