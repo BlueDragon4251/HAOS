@@ -12,12 +12,14 @@ import { rest } from '../lib/rest.ts'
 import { sanitizeForSpeech } from '../lib/voice/speech-text.ts'
 import { type LocalSttConfig, sttTuningPatch } from '../lib/voice/stt-tuning.ts'
 import { assistantTextSince, runningToolsSince, textDelta, toolsSince } from '../lib/voice/turn-text.ts'
+import { decideVoiceApproval, voiceApprovalFor } from '../lib/voice/approval-answer.ts'
 import { withScreenContext } from '../lib/screen-context.ts'
 import { $prefs, updatePrefs } from './backend.ts'
 import { $chats, interruptChat, sendPrompt } from './chat.ts'
 import { $gatewayReady, onGatewayEvent } from './gateway.ts'
 import { notify } from './notifications.ts'
 import { screenContextLine } from './on-screen.ts'
+import { $pendingRequests, resolveRequest } from './requests.ts'
 import { isMainSurface, onShellCommand } from './shell.ts'
 import { fetchLiveStatus, type LiveStatus } from './voice-live-status.ts'
 import { pauseWake, resumeWake } from './wake.ts'
@@ -51,6 +53,8 @@ export const $voice = atom<VoiceSnapshot>({
 
 /** True while a conversation is running (any state past armed). */
 export const $voiceActive = computed($voice, voice => voice.state !== 'off' && voice.state !== 'armed')
+/** The Hermes session the conversation's turns go to: its approval cards can be answered by voice. */
+export const $voiceSessionId = atom<string | null>(null)
 /** Combined input/output level for the orb, 0..1. */
 export const $voiceLevel = computed([$voice, $micLevel, $speakLevel], (voice, mic, speak) => (voice.state === 'speaking' ? speak : Math.min(1, mic * 4)))
 export { $micOpen }
@@ -208,9 +212,29 @@ const host: VoiceHost = {
   setCaptions: captions => patch({ captions: { ...$voice.get().captions, ...captions } }),
   // The screen line rides with the spoken context (model input only), so "this folder" and "this
   // file" mean what Files or the viewer shows while the person's words stay exactly as said.
-  submit: (text, options) => sendPrompt(text, { surface: 'voice-live', voiceContext: withScreenContext(options.voiceContext, screenContextLine()), interrupted: options.interrupted }),
+  submit: async (text, options) => {
+    const sessionId = await sendPrompt(text, { surface: 'voice-live', voiceContext: withScreenContext(options.voiceContext, screenContextLine()), interrupted: options.interrupted })
+
+    if (sessionId) {
+      $voiceSessionId.set(sessionId)
+    }
+
+    return sessionId
+  },
   runIntent: runVoiceIntent,
   interrupt: () => interruptChat().catch(() => undefined),
+  approvalPending: () => voiceApprovalFor($pendingRequests.get(), $voiceSessionId.get()) !== null,
+  answerApproval: text => {
+    const decision = decideVoiceApproval($pendingRequests.get(), $voiceSessionId.get(), text)
+
+    if (!decision) {
+      return null
+    }
+
+    resolveRequest(decision.requestId, { choice: decision.choice })
+
+    return decision.answer
+  },
   observeTurn,
   ended: (reason, detail) => void endConversation(reason, detail),
   notify: (title, body, level = 'info') => {
@@ -310,6 +334,7 @@ export async function endConversation(reason: ConversationEndReason = 'user', de
   const current = engine
   engine = null
   hermesActed = false
+  $voiceSessionId.set(null)
   stopFallbackAudio()
 
   if (current) {
@@ -338,6 +363,20 @@ export async function endConversation(reason: ConversationEndReason = 'user', de
 
 export function stopVoice(): Promise<void> {
   return endConversation('user')
+}
+
+/**
+ * Hand a final transcript to the running conversation, exactly where the microphone path hands its
+ * own (typed fallback, tests). False when no conversation runs or its engine hears only by itself.
+ */
+export async function submitVoiceTranscript(text: string): Promise<boolean> {
+  if (!engine?.submitTranscript) {
+    return false
+  }
+
+  await engine.submitTranscript(text)
+
+  return true
 }
 
 export function toggleVoice(reason: VoiceStartReason = 'button'): Promise<void> {

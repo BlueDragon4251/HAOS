@@ -73,8 +73,9 @@ document(3).pdf or IMG_2231.pdf say nothing about the file: read the documents t
   means it is already filed); otherwise make the name unique (add the number, or " (2)").
 - Typed conversation: show the plan as "old name -> new name in folder" lines and ask before
   applying. Spoken conversation: say it in a sentence or two ("I'll rename scan0001 to the Acme
-  invoice of 14 September and put it in Invoices 2026; approve it on the card"), then apply. The
-  approval card is their confirmation: do not ask for a spoken yes and show the card as well.
+  invoice of 14 September and put it in Invoices 2026; say yes to go ahead"), then apply. The
+  approval card is their confirmation, and in a spoken conversation they answer it by saying "yes"
+  or "no": do not ask for a yes in a turn of its own before showing the card.
 - Apply with the same operations and `dry_run=false`. The person approves the card. A denial means
   stop and ask what they want instead; do not retry around it.
 
@@ -83,11 +84,12 @@ document(3).pdf or IMG_2231.pdf say nothing about the file: read the documents t
 - Say what moved where in one or two sentences and show it:
   `os_ui action=run command=files.show args={"path": "<new path>"}` opens Files with the file
   selected.
-- Keep the result's `undo` list. "Undo that", "put it back" or "that's wrong" means
-  `system_files action=batch operations=<undo>` (a dry run first if files changed since). Folders
-  you created stay where they are: mention them. Undoing a copy moves the copy to the Trash.
-- A batch that stopped partway returns `applied` and `undo` for the part that ran: say what was done
-  and offer to undo it or finish the rest.
+- "Undo that", "put it back" or "that's wrong" means `system_files action=undo`: the tool replays
+  the exact reverse of the last batch you applied in this conversation and asks again (`undo_id`
+  from an earlier result picks another; `dry_run=true` shows it first). Never retype the paths.
+  Folders you created stay where they are: mention them. Undoing a copy moves the copy to the Trash.
+- A batch that stopped partway returns `applied` and an `undo_id` for the part that ran: say what
+  was done and offer to undo it (`action=undo`) or finish the rest.
 
 ## Norms
 

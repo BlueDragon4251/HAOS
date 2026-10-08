@@ -140,6 +140,45 @@ def test_nothing_moves_when_any_target_is_taken(plugin, tmp_path, monkeypatch):
     assert (downloads / "scan0001.pdf").exists(), "checked before the first move, not halfway through"
 
 
+def test_undo_replays_the_last_batch_of_the_conversation(plugin, tmp_path, monkeypatch, isolated_home):
+    tools = _mod(plugin, "tools")
+    seen: list[str] = []
+    _approve(plugin, monkeypatch, seen)
+    downloads, invoices = _downloads(tmp_path)
+    target = invoices / "2026-09-14 Acme Corp invoice INV-1234 $560.00.pdf"
+    filed = json.loads(tools.handle_system_files({"action": "batch", "operations": [
+        {"op": "move", "path": str(downloads / "scan0001.pdf"), "to": str(target)},
+        {"op": "move", "path": str(downloads / "IMG_2231.pdf"), "to": str(invoices)},
+    ]}, session_id="voice-1"))
+    assert filed["success"] and filed["undo_id"]
+    other = json.loads(tools.handle_system_files({"action": "undo"}, session_id="typed-2"))
+    assert not other["success"] and "Nothing to undo" in other["error"], "another conversation's batch is not its to undo"
+    plan = json.loads(tools.handle_system_files({"action": "undo", "dry_run": True}, session_id="voice-1"))
+    assert plan["dry_run"] and plan["problems"] == [] and len(plan["plan"]) == 2 and target.exists()
+    undone = json.loads(tools.handle_system_files({"action": "undo"}, session_id="voice-1"))
+    assert undone["success"] and undone["undone"].startswith("2 file operations: move ")
+    assert (downloads / "scan0001.pdf").read_bytes() == b"acme" and (downloads / "IMG_2231.pdf").exists() and not target.exists()
+    audit = json.loads((isolated_home / "herald-os" / "audit.jsonl").read_text().strip().splitlines()[-1])
+    assert audit["action"] == "undo" and audit["decision"] == "approved"
+    again = json.loads(tools.handle_system_files({"action": "undo"}, session_id="voice-1"))
+    assert not again["success"] and "Nothing to undo" in again["error"], "an undone batch is not undone twice"
+
+
+def test_undo_steps_back_batch_by_batch_or_by_undo_id(plugin, tmp_path, monkeypatch):
+    tools = _mod(plugin, "tools")
+    _approve(plugin, monkeypatch)
+    downloads, invoices = _downloads(tmp_path)
+    first = json.loads(tools.handle_system_files({"action": "move", "path": str(downloads / "scan0001.pdf"), "to": str(invoices)}, session_id="s"))
+    json.loads(tools.handle_system_files({"action": "move", "path": str(downloads / "IMG_2231.pdf"), "to": str(invoices)}, session_id="s"))
+    json.loads(tools.handle_system_files({"action": "move", "path": str(downloads / "scan0002.pdf"), "to": str(invoices)}, session_id="s"))
+    assert json.loads(tools.handle_system_files({"action": "undo"}, session_id="s"))["success"]
+    assert (downloads / "scan0002.pdf").exists() and not (downloads / "IMG_2231.pdf").exists(), "the most recent batch first"
+    assert json.loads(tools.handle_system_files({"action": "undo", "undo_id": first["undo_id"]}, session_id="s"))["success"]
+    assert (downloads / "scan0001.pdf").exists() and (invoices / "IMG_2231.pdf").exists()
+    missing = json.loads(tools.handle_system_files({"action": "undo", "undo_id": "nope"}, session_id="s"))
+    assert not missing["success"] and "undo_id nope" in missing["error"]
+
+
 def test_tilde_shortens_only_the_home_folder(plugin, monkeypatch, tmp_path):
     tools = _mod(plugin, "tools")
     monkeypatch.setenv("HOME", str(tmp_path / "sam"))
