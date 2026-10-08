@@ -64,7 +64,7 @@ KS
 cp ks.cfg "$HAOS_TEST_EVIDENCE/kickstart.cfg"
 cp /usr/share/OVMF/OVMF_VARS_4M.fd vars.fd
 qemu-img create -f qcow2 system.qcow2 40G
-HAOS_TEST_QEMU=(qemu-system-x86_64 -smp 2 -m 6144 -machine q35
+HAOS_TEST_QEMU=( -smp 2 -m 6144 -machine q35
   -smbios type=1,manufacturer=HAOS-CI,product=haos-acceptance
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
   -drive if=pflash,format=raw,file=vars.fd
@@ -75,19 +75,15 @@ HAOS_TEST_QEMU=(qemu-system-x86_64 -smp 2 -m 6144 -machine q35
 python3 -m http.server 8000 >"$HAOS_TEST_EVIDENCE/http.log" 2>&1 &
 HAOS_TEST_HTTP_PID=$!
 HAOS_TEST_LABEL="$(blkid -o value -s LABEL "$HAOS_TEST_ISO")"
-select_runtime() {
-  local stage="$1"
-  # Check the actual QEMU process, not merely the device's Unix mode bits.
-  python3 "$HAOS_TEST_REPO/scripts/haos-qemu-runtime.py" "$HAOS_TEST_EVIDENCE/runtime-$stage.json" >runtime.args
-  mapfile -t HAOS_TEST_ACCEL <runtime.args
-  [[ ${#HAOS_TEST_ACCEL[@]} -eq 4 ]] || return 1
-  echo "VM phase $stage: ${HAOS_TEST_ACCEL[*]}"
+run_vm() {
+  local stage="$1" seconds="$2" log="$3"
+  shift 3
+  python3 "$HAOS_TEST_REPO/scripts/haos-qemu-runtime.py" --run --timeout "$seconds" --serial-log "$log" \
+    "$HAOS_TEST_EVIDENCE/runtime-$stage.json" -- "${HAOS_TEST_QEMU[@]}" "$@" -serial "file:$log"
 }
-select_runtime install
-timeout 120m "${HAOS_TEST_QEMU[@]}" "${HAOS_TEST_ACCEL[@]}" -drive "file=$HAOS_TEST_ISO,media=cdrom,readonly=on" \
+run_vm install 7200 "$HAOS_TEST_EVIDENCE/install.log" -drive "file=$HAOS_TEST_ISO,media=cdrom,readonly=on" \
   -kernel iso/vmlinuz -initrd iso/initrd.img \
-  -append "inst.stage2=hd:LABEL=$HAOS_TEST_LABEL inst.ks=http://10.0.2.2:8000/ks.cfg inst.text console=ttyS0,115200" \
-  -serial "file:$HAOS_TEST_EVIDENCE/install.log"
+  -append "inst.stage2=hd:LABEL=$HAOS_TEST_LABEL inst.ks=http://10.0.2.2:8000/ks.cfg inst.text console=ttyS0,115200"
 rg -qi 'reboot: Power down|Power down' "$HAOS_TEST_EVIDENCE/install.log"
 # The installer never sees the data disks. Each filesystem is created in a fresh regular file.
 for disk in a b; do
@@ -97,11 +93,9 @@ done
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000001 data-a.raw >/dev/null
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000002 data-b.raw >/dev/null
 for stage in 1 2; do
-  select_runtime "boot-$stage"
-  timeout 30m "${HAOS_TEST_QEMU[@]}" "${HAOS_TEST_ACCEL[@]}" \
+  run_vm "boot-$stage" 1800 "$HAOS_TEST_EVIDENCE/boot-$stage.log" \
     -drive file=data-a.raw,format=raw,if=none,id=data-a -device virtio-blk-pci,drive=data-a,serial=HAOS-CI-DATA-A \
-    -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B \
-    -serial "file:$HAOS_TEST_EVIDENCE/boot-$stage.log"
+    -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B
   python3 - "$HAOS_TEST_EVIDENCE/boot-$stage.log" "$stage" "$HAOS_TEST_EVIDENCE" <<'PY'
 import json, re, sys
 from pathlib import Path

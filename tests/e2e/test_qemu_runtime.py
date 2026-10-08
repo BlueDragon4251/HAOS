@@ -69,3 +69,42 @@ def test_each_phase_rechecks_kvm():
         return {"usable": len(calls) == 1 or accelerator.startswith("tcg")}
     assert runtime.select(probe)["accelerator"] == "kvm"
     assert runtime.select(probe)["accelerator"] == "tcg,thread=multi"
+
+
+def test_actual_kvm_start_failure_can_fall_back_before_guest_boot(tmp_path):
+    calls = []
+    def run(args, **kw):
+        calls.append(args)
+        if "kvm" in args:
+            return subprocess.CompletedProcess(args, 1, "", "failed to initialize kvm: Permission denied")
+        return subprocess.CompletedProcess(args, 0, "", "")
+    evidence, code = runtime.run_guest(["-smp", "2"], tmp_path / "serial.log", 60,
+                                      run=run, probe_vm=lambda a: {"accelerator": a, "usable": True})
+    assert code == 0 and len(calls) == 2
+    assert evidence["accelerator"] == "tcg,thread=multi"
+    assert evidence["launches"][0]["returncode"] == 1
+
+
+@pytest.mark.parametrize("error,code,serial", [
+    ("failed to initialize kvm: Permission denied", 1, "guest already started"),
+    ("disk I/O error", 1, ""),
+    ("failed to initialize kvm: Permission denied", 124, ""),
+])
+def test_guest_errors_and_partial_installations_are_never_retried(tmp_path, error, code, serial):
+    path = tmp_path / "serial.log"
+    path.write_text(serial)
+    calls = []
+    def run(args, **kw):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, code, "", error)
+    evidence, status = runtime.run_guest([], path, 60, run=run,
+        probe_vm=lambda a: {"accelerator": a, "usable": True})
+    assert status == code and len(calls) == 1
+
+
+def test_vm_timeout_is_a_failure_without_replay(tmp_path):
+    def run(args, **kw):
+        raise subprocess.TimeoutExpired(args, kw["timeout"])
+    evidence, code = runtime.run_guest([], tmp_path / "serial.log", 60, run=run,
+        probe_vm=lambda a: {"accelerator": a, "usable": True})
+    assert code == 124 and len(evidence["launches"]) == 1

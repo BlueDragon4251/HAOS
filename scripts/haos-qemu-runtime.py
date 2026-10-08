@@ -40,10 +40,53 @@ def select(probe_vm=probe) -> dict:
     return {"accelerator": "tcg,thread=multi", "cpu": "max", "attempts": attempts}
 
 
+def run_guest(args, serial_log: Path, timeout: int, *, run=subprocess.run, probe_vm=probe):
+    evidence = select(probe_vm)
+    evidence["launches"] = []
+    if evidence["accelerator"] is None:
+        return evidence, 1
+    for attempt in range(2):
+        accelerator = evidence["accelerator"]
+        command = ["qemu-system-x86_64", "-accel", accelerator, "-cpu", evidence["cpu"], *args]
+        print("Launching VM with " + accelerator, flush=True)
+        try:
+            result = run(command, text=True, capture_output=True, timeout=timeout, check=False)
+            code, stderr = result.returncode, result.stderr[-8192:]
+        except subprocess.TimeoutExpired:
+            code, stderr = 124, "VM phase timed out"
+        evidence["launches"].append({"accelerator": accelerator, "returncode": code, "stderr": stderr})
+        serial_empty = not serial_log.exists() or serial_log.stat().st_size == 0
+        # A successful preflight can race with runner/device policy changes. Retry
+        # only an explicit KVM initialization failure with no guest output.
+        if not (attempt == 0 and accelerator == "kvm" and code == 1 and serial_empty
+                and "failed to initialize kvm:" in stderr):
+            return evidence, code if code >= 0 else 1
+        fallback = probe_vm("tcg,thread=multi")
+        evidence["attempts"].append(fallback)
+        if not fallback["usable"]:
+            return evidence, 1
+        evidence["accelerator"], evidence["cpu"] = "tcg,thread=multi", "max"
+        evidence["fallback_reason"] = "actual KVM initialization failed before guest output"
+    raise AssertionError("unreachable")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence", type=Path)
+    parser.add_argument("--run", action="store_true")
+    parser.add_argument("--timeout", type=int)
+    parser.add_argument("--serial-log", type=Path)
+    parser.add_argument("qemu_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.run:
+        if args.timeout is None or args.timeout <= 0 or args.serial_log is None:
+            parser.error("--run requires positive --timeout and --serial-log")
+        qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
+        evidence, code = run_guest(qemu_args, args.serial_log, args.timeout)
+        args.evidence.write_text(json.dumps(evidence, indent=2) + "\n")
+        if code:
+            print(json.dumps(evidence["launches"]), flush=True)
+        raise SystemExit(code)
     evidence = select()
     args.evidence.write_text(json.dumps(evidence, indent=2) + "\n")
     if evidence["accelerator"] is None:
