@@ -3,14 +3,15 @@ name: HAOS x86_64 image and installer build
 on:
   push:
     branches: ['agent/haos-*']
-    paths: ['linux/image/**', 'linux/haos/**', 'upstream/UPSTREAM.lock', '.github/workflows/haos-image.yml']
+    paths: ['linux/**', 'apps/**', 'packages/**', 'scripts/**', 'tests/e2e/**', 'package*.json', 'upstream/*.lock', '.containerignore', '.github/workflows/haos-image.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: haos-image-${{ github.ref }}
+  # Keep evidence for each source commit when another commit is being reviewed.
+  group: haos-image-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:

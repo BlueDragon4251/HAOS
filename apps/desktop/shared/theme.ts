@@ -423,8 +423,17 @@ export function themeSlug(value: string): string {
 
 /** Check a parsed `theme.json`; returns the problem, or null when it is usable. */
 export function validateTheme(value: unknown): string | null {
-  if (!value || typeof value !== 'object') {
+  const record = (item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+  const keys = (item: Record<string, unknown>, allowed: readonly string[]) => Object.keys(item).every(key => allowed.includes(key))
+  const color = (item: unknown) => typeof item === 'string' && /^#[0-9a-f]{6}$/i.test(item)
+  const text = (item: unknown, max: number) => typeof item === 'string' && item.length <= max && !/[\x00-\x1f\x7f-\x9f]/.test(item)
+
+  if (!record(value)) {
     return 'theme.json must be a JSON object'
+  }
+
+  if (!keys(value, ['name', 'label', 'description', 'shell', 'wallpaper', 'colors', 'gtk', 'terminal'])) {
+    return 'theme.json contains unsupported fields; executable plugins are not theme data'
   }
 
   const spec = value as Partial<ThemeSpec>
@@ -433,13 +442,45 @@ export function validateTheme(value: unknown): string | null {
     return 'theme.json needs a "name" of lowercase letters, digits and dashes'
   }
 
-  if (!spec.colors || typeof spec.colors !== 'object') {
+  if (!record(spec.colors) || !keys(spec.colors, THEME_COLOR_KEYS)) {
     return 'theme.json needs "colors"'
   }
 
-  const missing = THEME_COLOR_KEYS.filter(key => !isHexColor((spec.colors as unknown as Record<string, unknown>)[key]))
+  const missing = THEME_COLOR_KEYS.filter(key => !color((spec.colors as unknown as Record<string, unknown>)[key]))
 
-  return missing.length ? `theme.json colours must be #rrggbb; check ${missing.join(', ')}` : null
+  if (missing.length) {
+    return `theme.json colours must be #rrggbb; check ${missing.join(', ')}`
+  }
+
+  if ((spec.label !== undefined && !text(spec.label, 128)) || (spec.description !== undefined && !text(spec.description, 2048))) {
+    return 'theme.json label/description must be bounded text without control characters'
+  }
+
+  if (spec.wallpaper !== undefined && spec.wallpaper !== 'default' &&
+      (typeof spec.wallpaper !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}\.(png|jpe?g|webp|avif)$/i.test(spec.wallpaper))) {
+    return 'theme.json wallpaper must name a raster image beside theme.json'
+  }
+
+  if (spec.shell !== undefined && (!record(spec.shell) || !keys(spec.shell, ['theme', 'accent', 'scheme']) ||
+      (spec.shell.theme !== undefined && !['ocean', 'graphite'].includes(spec.shell.theme)) ||
+      (spec.shell.accent !== undefined && !['blue', 'ice', 'violet'].includes(spec.shell.accent)) ||
+      (spec.shell.scheme !== undefined && !['dark', 'light'].includes(spec.shell.scheme)))) {
+    return 'theme.json shell contains invalid presets'
+  }
+
+  if (spec.gtk !== undefined && (!record(spec.gtk) || !keys(spec.gtk, ['color_scheme', 'theme']) ||
+      (spec.gtk.color_scheme !== undefined && !['default', 'prefer-dark', 'prefer-light'].includes(spec.gtk.color_scheme)) ||
+      (spec.gtk.theme !== undefined && (typeof spec.gtk.theme !== 'string' || !/^[a-z0-9][a-z0-9 ._-]{0,127}$/i.test(spec.gtk.theme))))) {
+    return 'theme.json gtk contains invalid settings'
+  }
+
+  if (spec.terminal !== undefined && (!record(spec.terminal) || !keys(spec.terminal, ['background', 'foreground', 'cursor', 'palette']) ||
+      (['background', 'foreground', 'cursor'] as const).some(key => spec.terminal?.[key] !== undefined && !color(spec.terminal[key])) ||
+      (spec.terminal.palette !== undefined && (!Array.isArray(spec.terminal.palette) || spec.terminal.palette.length !== 16 || !spec.terminal.palette.every(color))))) {
+    return 'theme.json terminal must contain hex colors and a 16-color palette'
+  }
+
+  return null
 }
 
 // ---- Hermes skins ------------------------------------------------------------------------------

@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -38,6 +40,70 @@ THEME_DIRS = [
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
 SOCKET = RUNTIME / "herald-os" / "control.sock"
 DEFAULT = "herald-ocean"
+NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+COLOR_KEYS = {"bg", "bg2", "surface", "fg", "fg_dim", "accent", "accent_strong", "border_active", "border_inactive", "urgent", "ok", "warn"}
+
+
+def validate(theme: dict) -> None:
+    """Match the native data schema before rendering KDL/CSS/INI or opening assets."""
+    if not isinstance(theme, dict) or set(theme) - {"name", "label", "description", "shell", "wallpaper", "colors", "gtk", "terminal"}:
+        raise ValueError("unsupported theme fields")
+    if not isinstance(theme.get("name"), str) or not NAME.fullmatch(theme["name"]):
+        raise ValueError("invalid theme name")
+    colors = theme.get("colors")
+    if not isinstance(colors, dict) or set(colors) != COLOR_KEYS or any(not isinstance(v, str) or not COLOR.fullmatch(v) for v in colors.values()):
+        raise ValueError("theme colors must be #rrggbb")
+    for field, limit in (("label", 128), ("description", 2048)):
+        if field in theme and (not isinstance(theme[field], str) or len(theme[field]) > limit or re.search(r"[\x00-\x1f\x7f-\x9f]", theme[field])):
+            raise ValueError("invalid theme text")
+    wallpaper = theme.get("wallpaper", "default")
+    if not isinstance(wallpaper, str) or (wallpaper != "default" and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}\.(png|jpe?g|webp|avif)", wallpaper, re.I)):
+        raise ValueError("wallpaper must be a local raster image basename")
+    for field, allowed in (("shell", {"theme", "accent", "scheme"}), ("gtk", {"color_scheme", "theme"}), ("terminal", {"background", "foreground", "cursor", "palette"})):
+        section = theme.get(field, {})
+        if not isinstance(section, dict) or set(section) - allowed:
+            raise ValueError(f"invalid theme {field}")
+    shell = theme.get("shell", {})
+    for field, allowed in (("theme", {"ocean", "graphite"}), ("accent", {"blue", "ice", "violet"}), ("scheme", {"dark", "light"})):
+        if field in shell and (not isinstance(shell[field], str) or shell[field] not in allowed):
+            raise ValueError("invalid shell preset")
+    gtk = theme.get("gtk", {})
+    if "color_scheme" in gtk and gtk["color_scheme"] not in ("default", "prefer-dark", "prefer-light"):
+        raise ValueError("invalid GTK scheme")
+    if "theme" in gtk and (not isinstance(gtk["theme"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9 ._-]{0,127}", gtk["theme"], re.I)):
+        raise ValueError("invalid GTK theme")
+    terminal = theme.get("terminal", {})
+    for field in ("background", "foreground", "cursor"):
+        if field in terminal and (not isinstance(terminal[field], str) or not COLOR.fullmatch(terminal[field])):
+            raise ValueError("invalid terminal color")
+    if "palette" in terminal and (not isinstance(terminal["palette"], list) or len(terminal["palette"]) != 16 or any(not isinstance(v, str) or not COLOR.fullmatch(v) for v in terminal["palette"])):
+        raise ValueError("terminal palette must contain 16 hex colors")
+
+
+def read_spec(directory: Path) -> dict:
+    if directory.is_symlink() or not NAME.fullmatch(directory.name):
+        raise ValueError("invalid theme directory")
+    fd = os.open(directory / "theme.json", os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 65536:
+            raise ValueError("theme.json must be a bounded regular file")
+        with os.fdopen(fd) as stream:
+            fd = -1
+            theme = json.load(stream)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    validate(theme)
+    if theme["name"] != directory.name:
+        raise ValueError("theme name does not match directory")
+    wallpaper = theme.get("wallpaper", "default")
+    if wallpaper != "default":
+        asset = (directory / wallpaper).lstat()
+        if not stat.S_ISREG(asset.st_mode) or asset.st_size > 25 * 1024 * 1024:
+            raise ValueError("wallpaper must be a bounded regular file, not a symlink")
+    return theme
 
 
 def die(message: str, code: int = 1) -> None:
@@ -46,12 +112,17 @@ def die(message: str, code: int = 1) -> None:
 
 
 def find(name: str) -> tuple[Path, dict] | None:
+    if not NAME.fullmatch(name):
+        return None
     for base in THEME_DIRS:
         if not base or not base.is_dir():
             continue
         candidate = base / name / "theme.json"
         if candidate.exists():
-            return candidate.parent, json.loads(candidate.read_text())
+            try:
+                return candidate.parent, read_spec(candidate.parent)
+            except (OSError, ValueError):
+                return None
     return None
 
 
@@ -64,8 +135,8 @@ def all_themes() -> dict[str, dict]:
             spec = entry / "theme.json"
             if entry.is_dir() and spec.exists() and entry.name not in found:
                 try:
-                    found[entry.name] = json.loads(spec.read_text())
-                except json.JSONDecodeError:
+                    found[entry.name] = read_spec(entry)
+                except (OSError, ValueError):
                     pass
     return found
 

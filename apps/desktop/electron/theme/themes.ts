@@ -38,9 +38,22 @@ function isDir(dir: string): boolean {
 
 function readSpec(file: string): ThemeSpec | null {
   try {
+    const metadata = fs.lstatSync(file)
+    if (!metadata.isFile() || metadata.size > 65536 || fs.lstatSync(path.dirname(file)).isSymbolicLink()) {
+      return null
+    }
     const spec = JSON.parse(fs.readFileSync(file, 'utf8')) as ThemeSpec
 
-    return validateTheme(spec) === null ? spec : null
+    if (validateTheme(spec) !== null || spec.name !== path.basename(path.dirname(file))) {
+      return null
+    }
+    if (spec.wallpaper && spec.wallpaper !== 'default') {
+      const asset = fs.lstatSync(path.join(path.dirname(file), spec.wallpaper))
+      if (!asset.isFile() || asset.size > MAX_IMAGE_BYTES) {
+        return null
+      }
+    }
+    return spec
   } catch {
     return null
   }
