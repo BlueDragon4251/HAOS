@@ -27,12 +27,16 @@ jobs:
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py
       - name: Record actual diskless QEMU acceleration
         run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
+      - name: Restore a deleted disposable project through actual Restic
+        run: |
+          restic version
+          sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_backup_restore.py
       - name: Validate service unit syntax
         run: systemd-analyze verify linux/haos/*.service

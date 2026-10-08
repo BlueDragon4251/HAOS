@@ -44,6 +44,12 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    backup = sub.add_parser("backup")
+    backup_sub = backup.add_subparsers(dest="backup_action", required=True)
+    for action in ("init", "create", "check"):
+        backup_sub.add_parser(action)
+    restore = backup_sub.add_parser("restore")
+    restore.add_argument("snapshot_id")
     grant = sub.add_parser("volume")
     grant.add_argument("id", help="UUID:<filesystem UUID> or PARTUUID:<partition UUID>")
     grant.add_argument("mode", choices=["blocked", "read-only", "full-data-access", "system-managed"])
@@ -53,7 +59,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "prepare":
+    if args.action == "backup":
+        from .backup import owner_backup
+        print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None)), indent=2))
+    elif args.action == "prepare":
         stopped()
         prepare()
     elif args.action == "cleanup":

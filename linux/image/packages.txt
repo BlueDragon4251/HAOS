@@ -105,3 +105,4 @@ gnome-text-editor
 bubblewrap
 python3-websockets
 uv
+restic

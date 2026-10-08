@@ -12,6 +12,6 @@ HAOS is development, not an accepted production distribution. The master prompt 
 - Autonomous themes/skills lack accepted capability manifests, isolated generation/test, whole-theme atomic swap/watchdog/revocation.
 - Provider/vault/local-model/budget provisioning unfinished. No provider-less probe proves a real model/Git mission.
 - Task/event text may contain sensitive data; complete redaction/encryption/retention not guaranteed.
-- Restic restore, broken-update rollback, GPU/resource measurements and long gateway missions remain outstanding.
+- Owner-only local encrypted Restic snapshots and staged restore are implemented; the real runner probe and installed-OS evidence are distinct gates. External/off-host backup, retention/scheduling, whole-system restore, broken-update rollback, GPU/resource measurements and long gateway missions remain outstanding.
 
 See [evidence](HAOS.md) and [release gates](RELEASE.md). A green desktop suite or syntax-checked harness does not close these gaps.
