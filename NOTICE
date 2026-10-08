@@ -32,3 +32,10 @@ https://github.com/beatgammit/base64-js). The models themselves are not
 distributed with Herald OS: Herald Canvas downloads each from where its
 publisher put it, only after the person allows it, and each keeps its own
 license (listed in apps/desktop/shared/canvas/models.ts).
+
+Herald Docs and Herald Sheets are built on Univer
+(https://github.com/dream-num/univer), Copyright 2023-present DreamNum Co.,
+Ltd., released under the Apache License, Version 2.0. Herald OS uses Univer's
+open-source packages without modifying them. They are compiled into the
+renderer, and a packaged build carries their license in
+licenses/univer-LICENSE.txt.

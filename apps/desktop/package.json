@@ -26,6 +26,30 @@
     "@herald-os/client": "*",
     "@nanostores/react": "1.1.0",
     "@tabler/icons-react": "3.46.0",
+    "@univerjs/core": "1.0.3",
+    "@univerjs/data-validation": "1.0.3",
+    "@univerjs/design": "1.0.3",
+    "@univerjs/docs": "1.0.3",
+    "@univerjs/docs-ui": "1.0.3",
+    "@univerjs/engine-formula": "1.0.3",
+    "@univerjs/engine-render": "1.0.3",
+    "@univerjs/rpc": "1.0.3",
+    "@univerjs/sheets": "1.0.3",
+    "@univerjs/sheets-conditional-formatting": "1.0.3",
+    "@univerjs/sheets-conditional-formatting-ui": "1.0.3",
+    "@univerjs/sheets-data-validation": "1.0.3",
+    "@univerjs/sheets-data-validation-ui": "1.0.3",
+    "@univerjs/sheets-filter": "1.0.3",
+    "@univerjs/sheets-filter-ui": "1.0.3",
+    "@univerjs/sheets-formula": "1.0.3",
+    "@univerjs/sheets-formula-ui": "1.0.3",
+    "@univerjs/sheets-numfmt": "1.0.3",
+    "@univerjs/sheets-numfmt-ui": "1.0.3",
+    "@univerjs/sheets-sort": "1.0.3",
+    "@univerjs/sheets-sort-ui": "1.0.3",
+    "@univerjs/sheets-ui": "1.0.3",
+    "@univerjs/themes": "1.0.3",
+    "@univerjs/ui": "1.0.3",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "6.0.0",
@@ -40,6 +64,7 @@
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
+    "rxjs": "7.8.2",
     "shiki": "4.4.3"
   },
   "devDependencies": {
@@ -69,7 +94,9 @@
     "files": [
       "dist/**",
       "package.json",
-      "!**/node_modules/usocket/**"
+      "!**/node_modules/usocket/**",
+      "!**/node_modules/@univerjs/**",
+      "!**/node_modules/@grpc/**"
     ],
     "extraResources": [
       {
@@ -79,6 +106,10 @@
       {
         "from": "../../NOTICE",
         "to": "NOTICE"
+      },
+      {
+        "from": "build/licenses",
+        "to": "licenses"
       },
       {
         "from": "../../linux/themes",

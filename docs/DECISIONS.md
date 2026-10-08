@@ -413,3 +413,74 @@ Compositor lacks. What only Herald has goes in fields of its own beside a record
   to Herald as its stand-in. Rejected: a new value in `adjustment.kind` or a format version of our
   own (Compositor would refuse the project), and colour tables inside the manifest (Compositor
   refuses manifests over 4 MB, about what one 65-entry table takes as text).
+
+## ADR-021: Herald Office is built on Univer, with Herald Slides on the Canvas engine
+
+**Status: Proposed.** A draft from the Herald Office spike; it becomes final once the format
+converters have shipped.
+
+Herald OS needs documents, spreadsheets and presentations that Hermes can work in while the person
+watches, and that open and save the files people already have. Herald Docs, Herald Sheets and
+Herald Slides are built into the shell, the way Herald Canvas is (ADR-020): Docs and Sheets on
+Univer's open-source packages, Slides on the Herald Canvas engine, Office files through converters
+of our own, and every change Hermes makes going through the command registry (ADR-014) as one
+undoable step.
+
+- **Univer for Docs and Sheets, its open-source packages only.** Univer 1.0.3's Apache-2.0 packages
+  (core, design, ui, engine-render, engine-formula, rpc, docs and docs-ui, and sheets with its
+  formula, number format, filter, sort, conditional formatting and data validation plugins) run in
+  a Herald window with React 19.3 and Electron 44 as they are. They load only when an Office window
+  opens: the shell's main chunk carries none of Univer; Docs loads a shared 3.1 MB chunk (0.85 MB
+  compressed) and Sheets another 3.3 MB (0.84 MB) and its formula worker. In the development app
+  the first Sheets canvas drew 0.8 s after the window opened and a document page 0.4 to 0.6 s.
+  Univer's paid packages (import and export, printing, charts, pivot tables, collaboration) are not
+  used.
+- **Univer in Herald's colours.** Univer reads one palette for its chrome (CSS variables on the
+  page) and for the canvas it draws on, so Herald works it out from the theme's accent and
+  background when a window opens. In dark mode Univer inverts canvas colours: Sheets keeps that, a
+  dark grid that matches the glass, and Docs turns it off for its canvas, so pages are white paper
+  on a dark desk, as they will print. The outer chrome is made transparent to sit on the window's
+  glass, and it already uses Herald's UI font.
+- **Formulas in a worker.** Sheets work formulas out in a module worker. On 20,000 rows of formulas
+  the window's thread was blocked 141 ms instead of 889 ms, with results as fast. The worker loads
+  from the app itself, so the Content Security Policy needs no change (`worker-src` falls back to
+  `script-src 'self'`), and Univer uses no `eval`.
+- **Headless Univer for Hermes.** A command that changes a file not open in a window loads it into
+  a Univer instance with no chrome and no drawing (models, commands and the formula engine), changes
+  it through Univer's Facade API and reads the snapshot back: about 40 ms for a workbook with its
+  recalculation, 5 ms for a document. In a browser Univer's formula engine waits for its Rendered
+  lifecycle stage, which only its chrome reaches, so a headless instance moves on to it itself.
+- **Herald Slides on the Canvas engine.** Univer Slides' open-source packages are not ready: in
+  1.0.3 a new slide does not appear in the slide list, Add Text always inserts "A New Text",
+  moving an element does nothing, a shape in a saved deck is not drawn, multi-line text shows only
+  its last line, slide edits cannot be undone, and there is no present mode, layouts, themes,
+  speaker notes or Facade API. Herald Slides keeps a deck of its own (slides with text boxes,
+  shapes and images, measured in points as PowerPoint measures them) and draws each slide with the
+  Canvas engine at the size it is shown. A 1920 by 1080 slide composites in about 18 ms and a
+  full-screen frame at the display's pixels in about 50 ms; text laid out at that size stays sharp,
+  and Canvas's image tools and on-device models apply to slide pictures.
+- **Office files through converters of our own.** `.xlsx` through ExcelJS (MIT); `.docx` read with
+  JSZip (MIT) and our own WordprocessingML mapper and written with docx (MIT); `.pptx` read with
+  JSZip and our own DrawingML mapper and written with PptxGenJS (MIT); CSV, Markdown and plain
+  text as well. Headless LibreOffice, when it is installed, converts `.odt`, `.ods` and `.odp`.
+- **Never less than the file had, silently.** What a file holds that Herald cannot keep is listed
+  in a fidelity report, shown before the first save over that file. Main copies the original into
+  `office-backups` under the Herald OS data folder the first time Herald saves over it in a
+  session, with a cap on their size and age. Herald saves a document by itself only after the
+  person has saved it once.
+- **Licences.** Univer is Apache-2.0: NOTICE names it and a packaged build carries its license
+  text. Everything it brings in is MIT, Apache-2.0 or ISC. electron-builder would also copy
+  Univer's npm packages into `app.asar` (148 MB the renderer bundle already contains), so the build
+  leaves them out.
+
+Alternatives considered:
+
+- **Rejected: ONLYOFFICE.** Its editors are AGPL-3.0 with added terms under section 7 that require
+  keeping its logo, and they run as a document server with a look of their own.
+- **Rejected: LibreOffice or Collabora Online as the editors.** Hundreds of megabytes per platform
+  (Collabora also a server), and their own interface rather than Herald's. LibreOffice stays an
+  optional converter.
+- **Rejected: Univer Slides for Herald Slides,** for the reasons above. To look at again once its
+  open-source edition can present and undo.
+- **Rejected: Univer's paid tier.** Its import and export, printing, charts and pivot tables are
+  closed and licensed per deployment; Herald writes the formats itself.
