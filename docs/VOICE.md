@@ -93,6 +93,25 @@ Herald OS app launcher. A transcript that looks like a web address but ends in a
 running, web pages open in a Herald OS window, files in the viewer and folders in Files; only a
 named Mac app ("open it in Preview") leaves the OS.
 
+**Documents go to Hermes whole.** "Find the invoice from Acme in my Downloads, rename it properly and
+put it where it belongs", "file the invoices in this folder", "show me the receipts from the
+plumber": the fast path never matches renaming, sorting or filing, and never treats a description
+("the invoice from Acme") as a file name, so Hermes gets the sentence as said and reads the
+documents (the `file-documents` skill). A real file name still opens instantly ("open
+invoice.pdf"). Every spoken request also carries what is on screen as context for the model only
+(the person's words stay as said): the folder the Files page shows and the selected file, or the
+document in the viewer in front, so "this folder" and "this file" mean what you are looking at.
+Moving or renaming files shows the approval card (see below). Right after Hermes has done
+something, "undo that" (or "take that back") goes to Hermes, which reverses its own change; at
+other times it is the text field's undo.
+
+**Approvals by voice.** While one of the conversation's approval cards is up, a short answer decides
+it instead of interrupting Hermes: "yes", "yes, go ahead", "do it", "approve" or "okay" allow it
+once; "no", "cancel", "don't" or "stop" deny it. The card says so ("Or say yes…") while a
+conversation runs. Anything longer ("yes, but call it Acme") interrupts and becomes the next request,
+as before. A spoken yes never picks "allow for this session" or "always"; those stay on the card's
+buttons, and cards from other sessions (a mission in the background) are never answered by voice.
+
 **Build something and watch it happen.** "Create a website for a hair salon" (also "build me …",
 "make an app that …", "start a project to …") creates a project folder under `~/Projects`
 (Settings > General > Projects folder), starts a Hermes session working there and opens the

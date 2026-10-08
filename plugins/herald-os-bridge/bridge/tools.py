@@ -11,16 +11,18 @@ import json
 import os
 import re
 import shutil
+import time
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from . import audit, ui
+from . import audit, documents, ui
 from .host import HostNotSupported, host
 from .host.base import FileSearch
-from .permissions import Tier, authorize
-from .util import expand, fail, ok, os_env, run, truncate
+from .permissions import Tier, authorize, load_policy, protected_root
+from .util import data_dir, expand, fail, ok, os_env, run, truncate
 
 _STR = {"type": "string"}
 _INT = {"type": "integer"}
@@ -80,6 +82,14 @@ def _finish(*, tool: str, tier: Tier, action: str | None, args: dict[str, Any], 
     audit.record(tool=tool, tier=tier.value, action=action, args=args, decision=decision, ok=ok_, summary=summary, error=error)
 
 
+class PartialFailure(RuntimeError):
+    """An error after part of the work was done; ``payload`` says what (and how to undo it)."""
+
+    def __init__(self, message: str, payload: dict[str, Any]):
+        super().__init__(message)
+        self.payload = payload
+
+
 def _guarded(tool: str, tier: Tier, action: str, summary: str, args: dict[str, Any], paths: Iterable[Path], execute: Callable[[], dict[str, Any]]) -> str:
     """Authorize, run, audit. Shared by every act/mutate/destructive handler."""
     decision = authorize(tool, tier, action, summary, paths=paths)
@@ -91,6 +101,9 @@ def _guarded(tool: str, tier: Tier, action: str, summary: str, args: dict[str, A
     except HostNotSupported as exc:
         _finish(tool=tool, tier=tier, action=action, args=args, decision=decision.outcome, ok_=False, summary=summary, error=str(exc))
         return fail(str(exc))
+    except PartialFailure as exc:
+        _finish(tool=tool, tier=tier, action=action, args=args, decision=decision.outcome, ok_=False, summary=summary, error=str(exc))
+        return fail(str(exc), summary=summary, **exc.payload)
     except Exception as exc:  # noqa: BLE001 - every host error becomes a tool result, never a crash.
         _finish(tool=tool, tier=tier, action=action, args=args, decision=decision.outcome, ok_=False, summary=summary, error=str(exc))
         return fail(str(exc), summary=summary)
@@ -463,9 +476,11 @@ def handle_system_kill_process(args: dict[str, Any], **_: Any) -> str:
 
 SYSTEM_FILES_SCHEMA = _schema(
     "system_files",
-    "Organise files and folders on this computer. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan; the user confirms mutating actions once per batch. Use the write_file tool to create file contents.",
+    "Organise files and folders on this computer. action=mkdir creates a folder (path); action=move moves/renames one item (path -> to); action=copy copies a file or folder (path -> to); action=trash moves items to the Trash (paths; never permanent deletion); action=batch applies a list of operations [{op: mkdir|move|copy|trash, path, to}] in one confirmation, ideal for 'organise these files'. Set dry_run=true first to show the plan: it says where each item lands and lists problems (missing items, names already taken: nothing is ever overwritten). The user confirms mutating actions once per batch. "
+    "When the user says 'undo that' or 'put it back', use action=undo: it replays the exact reverse of the most recent batch applied in this conversation (moved items go back, copies go to the Trash; undo_id picks an earlier one) and asks again; never retype the paths yourself. Use the write_file tool to create file contents.",
     {
-        "action": _enum("mkdir", "move", "copy", "trash", "batch"),
+        "action": _enum("mkdir", "move", "copy", "trash", "batch", "undo"),
+        "undo_id": _desc(_STR, "For undo: the undo_id an applied batch returned, to reverse that one instead of the most recent."),
         "path": _desc(_STR, "Target path for mkdir/move/copy/trash."),
         "to": _desc(_STR, "Destination for move/copy (a folder, or the new full path)."),
         "paths": {"type": "array", "items": _STR, "description": "For trash: several items."},
@@ -480,20 +495,29 @@ SYSTEM_FILES_SCHEMA = _schema(
 )
 
 
+def tilde(path: Path) -> str:
+    """The path with the home folder written as ``~`` (for lines a person reads)."""
+    home, text = str(Path.home()), str(path)
+    return "~" + text[len(home):] if text == home or text.startswith(home + os.sep) else text
+
+
 @dataclass
 class FileOp:
     op: str
     path: Path
     to: Path | None = None
 
-    def describe(self) -> str:
+    def describe(self, target: Path | None = None, show: Callable[[Path], str] = str) -> str:
+        """One line for the plan; ``target`` is where a move or copy lands (``to`` itself when unknown)."""
         if self.op == "mkdir":
-            return f"create folder {self.path}"
-        if self.op == "move":
-            return f"move {self.path} -> {self.to}"
-        if self.op == "copy":
-            return f"copy {self.path} -> {self.to}"
-        return f"trash {self.path}"
+            return f"create folder {show(self.path)}"
+        if self.op == "trash":
+            return f"trash {show(self.path)}"
+        landing = target or self.to
+        assert landing is not None
+        if self.op == "move" and landing.parent == self.path.parent:
+            return f"rename {show(self.path)} -> {landing.name}"
+        return f"{self.op} {show(self.path)} -> {show(landing)}"
 
     def touched(self) -> list[Path]:
         return [p for p in (self.path, self.to) if p is not None]
@@ -536,7 +560,128 @@ def _resolve_move_target(source: Path, to: Path) -> Path:
     return to / source.name if to.is_dir() else to
 
 
-def handle_system_files(args: dict[str, Any], **_: Any) -> str:
+def _same_file(a: Path, b: Path) -> bool:
+    """True when both names reach one file (a case-only rename on a case-insensitive disk)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def plan_targets(ops: list[FileOp]) -> tuple[list[Path | None], list[str]]:
+    """Where each move or copy lands (into a folder keeps the item's name) and what would go wrong.
+    Walks the batch in order, so a folder created earlier in it counts and two items cannot land on
+    the same name; nothing is ever overwritten (tested)."""
+    created: set[Path] = set()   # Folders that will exist.
+    arrived: set[Path] = set()   # Files that will exist.
+    gone: set[Path] = set()      # Items moved away or trashed.
+
+    def exists(path: Path) -> bool:
+        return path in created or path in arrived or (path not in gone and os.path.lexists(path))
+
+    def is_dir(path: Path) -> bool:
+        return path in created or (path not in gone and path not in arrived and path.is_dir())
+
+    targets: list[Path | None] = []
+    problems: list[str] = []
+    for op in ops:
+        if op.op == "mkdir":
+            if exists(op.path) and not is_dir(op.path):
+                problems.append(f"{op.path} exists and is not a folder")
+            created.add(op.path)
+            gone.discard(op.path)
+            targets.append(None)
+            continue
+        if not exists(op.path):
+            problems.append(f"{op.path} does not exist")
+            targets.append(None)
+            continue
+        source_is_dir = is_dir(op.path)
+        if op.op == "trash":
+            gone.add(op.path)
+            created.discard(op.path)
+            arrived.discard(op.path)
+            targets.append(None)
+            continue
+        assert op.to is not None
+        target = op.to / op.path.name if is_dir(op.to) else op.to
+        if target == op.path:
+            problems.append(f"{op.path} is already there")
+        elif exists(target) and not (target not in arrived and target not in created and _same_file(target, op.path)):
+            problems.append(f"{target} already exists; not overwriting")
+        elif source_is_dir and op.path in target.parents:
+            problems.append(f"cannot put {op.path} inside itself")
+        if op.op == "move":
+            gone.add(op.path)
+            created.discard(op.path)
+            arrived.discard(op.path)
+        (created if source_is_dir else arrived).add(target)
+        gone.discard(target)
+        targets.append(target)
+    return targets, problems
+
+
+# What each applied batch would take to reverse, per Hermes session (newest last), so "undo that"
+# replays the exact operations instead of the model retyping long paths. Paths only, a few per session.
+UNDO_PER_SESSION = 10
+UNDO_SESSIONS = 20
+
+
+def _undo_journal_path() -> Path:
+    return data_dir() / "file-undo.json"
+
+
+def _load_undo_journal() -> dict[str, list[dict[str, Any]]]:
+    try:
+        data = json.loads(_undo_journal_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k): v for k, v in data.items() if isinstance(v, list)} if isinstance(data, dict) else {}
+
+
+def _save_undo_journal(journal: dict[str, list[dict[str, Any]]]) -> None:
+    path = _undo_journal_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    kept = dict(list(journal.items())[-UNDO_SESSIONS:])
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(kept, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(path)
+
+
+def record_undo(session: str, undo: list[dict[str, str]], summary: str) -> str:
+    """Keep the reverse of an applied batch for ``action=undo``; returns its undo_id."""
+    journal = _load_undo_journal()
+    entry_id = uuid.uuid4().hex[:8]
+    entries = [*journal.pop(session, []), {"id": entry_id, "ts": datetime.now().isoformat(timespec="seconds"), "summary": summary, "undo": undo}]
+    journal[session] = entries[-UNDO_PER_SESSION:]
+    _save_undo_journal(journal)
+    return entry_id
+
+
+def find_undo(session: str, undo_id: str | None) -> dict[str, Any] | None:
+    entries = _load_undo_journal().get(session, [])
+    if undo_id:
+        return next((entry for entry in entries if entry.get("id") == undo_id), None)
+    return entries[-1] if entries else None
+
+
+def drop_undo(session: str, undo_id: str) -> None:
+    journal = _load_undo_journal()
+    journal[session] = [entry for entry in journal.get(session, []) if entry.get("id") != undo_id]
+    if not journal[session]:
+        del journal[session]
+    _save_undo_journal(journal)
+
+
+def handle_system_files(args: dict[str, Any], **context: Any) -> str:
+    # Hermes passes the conversation's session id to plugin tools; undo stays within it.
+    session = str(context.get("session_id") or context.get("task_id") or "default")
+    undoing: dict[str, Any] | None = None
+    if str(args.get("action") or "") == "undo":
+        undoing = find_undo(session, str(args.get("undo_id") or "").strip() or None)
+        if undoing is None:
+            return fail("Nothing to undo: no batch applied with system_files in this conversation is on record" + (f" under undo_id {args['undo_id']}" if args.get("undo_id") else "") + ".")
+        args = {"action": "batch", "operations": undoing["undo"], "dry_run": args.get("dry_run")}
     try:
         ops = plan_operations(args)
     except ValueError as exc:
@@ -544,48 +689,193 @@ def handle_system_files(args: dict[str, Any], **_: Any) -> str:
     if not ops:
         return fail("nothing to do")
     tier = Tier.DESTRUCTIVE if any(op.op == "trash" for op in ops) else Tier.MUTATE
-    plan = [op.describe() for op in ops]
-    problems: list[str] = []
-    for op in ops:
-        if op.op in ("move", "copy", "trash") and not op.path.exists():
-            problems.append(f"{op.path} does not exist")
-        if op.op == "mkdir" and op.path.exists() and not op.path.is_dir():
-            problems.append(f"{op.path} exists and is not a folder")
+    targets, problems = plan_targets(ops)
+    plan = [op.describe(target) for op, target in zip(ops, targets)]
     if args.get("dry_run"):
         audit.record(tool="system_files", tier=tier.value, action="plan", args=args, decision="dry_run", ok=not problems, summary=f"{len(ops)} operation(s) planned")
         return ok(dry_run=True, tier=tier.value, plan=plan, problems=problems, note="Call again with dry_run=false to apply; the user will be asked to confirm.")
     if problems:
         return fail("; ".join(problems), plan=plan)
-    summary = plan[0] if len(plan) == 1 else f"{len(plan)} file operations: " + "; ".join(truncate(p, 80) for p in plan[:4]) + (" …" if len(plan) > 4 else "")
+    # The approval card shows this line in full: what moves, its new name and where it goes.
+    lines = [op.describe(target, tilde) for op, target in zip(ops, targets)]
+    summary = lines[0] if len(lines) == 1 else f"{len(lines)} file operations: " + "; ".join(truncate(line, 200) for line in lines[:8]) + (f"; and {len(lines) - 8} more" if len(lines) > 8 else "")
 
     def execute() -> dict[str, Any]:
         adapter = host()
         done: list[str] = []
-        for op in ops:
-            if op.op == "mkdir":
-                op.path.mkdir(parents=True, exist_ok=True)
-            elif op.op == "move":
-                target = _resolve_move_target(op.path, op.to)  # type: ignore[arg-type]
-                if target.exists():
-                    raise FileExistsError(f"{target} already exists; not overwriting")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(op.path), str(target))
-            elif op.op == "copy":
-                target = _resolve_move_target(op.path, op.to)  # type: ignore[arg-type]
-                if target.exists():
-                    raise FileExistsError(f"{target} already exists; not overwriting")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if op.path.is_dir():
-                    shutil.copytree(str(op.path), str(target))
-                else:
-                    shutil.copy2(str(op.path), str(target))
-            elif op.op == "trash":
-                adapter.trash([op.path])
-            done.append(op.describe())
-        return {"applied": done}
+        undo: list[dict[str, str]] = []
+        created: list[str] = []
+        try:
+            for op in ops:
+                landing: Path | None = None
+                if op.op == "mkdir":
+                    if not op.path.is_dir():
+                        op.path.mkdir(parents=True, exist_ok=True)
+                        created.append(str(op.path))
+                elif op.op in ("move", "copy"):
+                    # Resolved again: the disk may have changed while the person read the approval card.
+                    landing = _resolve_move_target(op.path, op.to)  # type: ignore[arg-type]
+                    if os.path.lexists(landing) and not _same_file(landing, op.path):
+                        raise FileExistsError(f"{landing} already exists; not overwriting")
+                    landing.parent.mkdir(parents=True, exist_ok=True)
+                    if op.op == "move":
+                        shutil.move(str(op.path), str(landing))
+                        undo.append({"op": "move", "path": str(landing), "to": str(op.path)})
+                    else:
+                        if op.path.is_dir():
+                            shutil.copytree(str(op.path), str(landing))
+                        else:
+                            shutil.copy2(str(op.path), str(landing))
+                        undo.append({"op": "trash", "path": str(landing)})
+                elif op.op == "trash":
+                    adapter.trash([op.path])
+                done.append(op.describe(landing))
+        except Exception as exc:
+            if not done:
+                raise
+            payload: dict[str, Any] = {"applied": done, "undo": undo[::-1], "created_folders": created}
+            if undo and undoing is None:
+                payload["undo_id"] = record_undo(session, undo[::-1], summary)
+            raise PartialFailure(f"{exc} (stopped after {len(done)} of {len(ops)} operations)", payload) from exc
+        result: dict[str, Any] = {"applied": done}
+        if undoing is not None:
+            # Undone: the record goes, so the next undo reaches the batch before it.
+            drop_undo(session, undoing["id"])
+            result["undone"] = undoing.get("summary")
+        elif undo:
+            result["undo"] = undo[::-1]
+            result["undo_id"] = record_undo(session, undo[::-1], summary)
+            result["undo_note"] = "If the user asks to undo this, call system_files action=undo: moved items go back, copies go to the Trash."
+        if created:
+            result["created_folders"] = created
+        return result
 
     touched = [p for op in ops for p in op.touched()]
-    return _guarded("system_files", tier, "batch" if len(ops) > 1 else ops[0].op, summary, args, touched, execute)
+    action = "undo" if undoing is not None else "batch" if len(ops) > 1 else ops[0].op
+    return _guarded("system_files", tier, action, summary, args, touched, execute)
+
+
+# ---------------------------------------------------------------------------------------------
+# system_documents
+# ---------------------------------------------------------------------------------------------
+
+SYSTEM_DOCUMENTS_SCHEMA = _schema(
+    "system_documents",
+    "Read what documents say, and find where this person files them. "
+    "action=read (paths: files, or folders meaning the PDFs and images directly inside them): per document the text page by page (the PDF's text layer; scanned pages and photos of documents through OCR on this computer), page_count, sha256 (equal values mean duplicate files), "
+    "hints read from the text (kind: invoice, receipt, statement, quote, credit note, payslip, contract, order or other; vendor and other candidates; date (issued), due_date, number, total with currency; date_ambiguous when day and month could swap) and suggested_name (YYYY-MM-DD Vendor kind number total). "
+    "Hints are heuristics: check them against the text before relying on them. "
+    "action=places: the folders documents are already filed in (Invoices, Receipts, Finances, Bills, Tax, Statements and similar under Documents, Desktop, the home folder and cloud drives), each with its layout (by year, by month, by vendor or topic, flat), subfolders and newest file names, so new files follow the same structure and naming. "
+    "Read-only; rename and move with system_files. To find, rename and file documents, follow skill_view name=\"herald-os-bridge:file-documents\".",
+    {
+        "action": _enum("read", "places", description="read (default) or places."),
+        "paths": {"type": "array", "items": _STR, "description": "For read: files or folders (a folder means the PDFs and images directly inside it). Supports ~."},
+        "path": _desc(_STR, "For read: one file or folder, the same as paths with one entry."),
+        "max_pages": _desc(_INT, "For read: pages to read per document (default 3, max 20); page_count always gives the total."),
+        "max_chars": _desc(_INT, "For read: characters of text per document (default 4000 for up to 3 documents, 800 per document when reading more; max 20000)."),
+        "ocr": _desc(_BOOL, "For read: read scanned pages and images with OCR (default true)."),
+        "limit": _desc(_INT, "For read: documents per call (default 15, max 50); the rest are listed under skipped."),
+        "roots": {"type": "array", "items": _STR, "description": "For places: folders to look in instead of Documents, Desktop, the home folder and cloud drives."},
+    },
+)
+
+# Reading stops after this many seconds; the documents not reached are listed under skipped.
+DOCUMENTS_BUDGET_SECONDS = 120.0
+
+
+def _flag(args: dict[str, Any], key: str, default: bool) -> bool:
+    value = args.get(key)
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in ("false", "0", "no", "off")
+    return bool(value)
+
+
+def read_one_document(path: Path, max_pages: int, max_chars: int, ocr: bool) -> dict[str, Any]:
+    """One entry of a read result: facts about the file, its text, the hints and a suggested name.
+    A document that cannot be read gets ``error`` instead of failing the whole call."""
+    try:
+        stat = path.stat()
+    except OSError as exc:
+        return {"path": str(path), "name": path.name, "error": exc.strerror or str(exc)}
+    entry: dict[str, Any] = {
+        "path": str(path), "name": path.name, "type": documents.document_type(path), "size": stat.st_size,
+        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+    }
+    if stat.st_size > documents.MAX_DOCUMENT_BYTES:
+        entry["error"] = f"larger than {documents.MAX_DOCUMENT_BYTES // (1024 * 1024)} MB; not read"
+        return entry
+    entry["sha256"] = documents.sha256_file(path)
+    try:
+        doc = host().read_document(path, max_pages, ocr)
+    except HostNotSupported:
+        raise
+    except Exception as exc:  # noqa: BLE001 - an unreadable document is reported, the others still read.
+        entry["error"] = str(exc)
+        return entry
+    full = "\n".join(doc.pages)
+    text, truncated = documents.join_pages(doc, max_chars)
+    hints = documents.detect_fields(full)
+    entry.update({
+        "page_count": doc.page_count, "pages_read": len(doc.pages), "ocr_pages": doc.ocr_pages, "engine": doc.engine,
+        "text": text, "truncated": truncated, "hints": hints, "suggested_name": documents.suggest_name(hints, path.suffix),
+    })
+    notes = list(doc.notes)
+    if not full.strip():
+        notes.append("No text found: the document may be blank, or a scan that OCR could not read.")
+    if notes:
+        entry["notes"] = notes
+    return entry
+
+
+def handle_system_documents(args: dict[str, Any], **_: Any) -> str:
+    action = str(args.get("action") or "read").strip().lower()
+    if action == "places":
+        given = [expand(str(r)) for r in args.get("roots") or [] if str(r).strip()]
+        roots = [(root, 3) for root in given] or documents.default_roots()
+
+        def find_places() -> dict[str, Any]:
+            policy = load_policy()
+            return documents.find_places(roots, skip=lambda p: protected_root(p, policy) is not None)
+
+        return _guarded("system_documents", Tier.READ, "places", "look for the folders documents are filed in", args, given, find_places)
+    if action != "read":
+        return fail("action must be read or places")
+    raw = [str(p) for p in (args.get("paths") or []) if str(p).strip()]
+    if str(args.get("path") or "").strip():
+        raw.append(str(args["path"]))
+    if not raw:
+        return fail("paths (or path) is required for action=read")
+    targets = [expand(p) for p in raw]
+    max_pages = _int(args, "max_pages", 3, 1, 20)
+    limit = _int(args, "limit", 15, 1, 50)
+    ocr = _flag(args, "ocr", True)
+
+    def execute() -> dict[str, Any]:
+        files, skipped = documents.collect_documents(targets, limit)
+        max_chars = _int(args, "max_chars", 4000 if len(files) <= 3 else 800, 200, 20000)
+        policy = load_policy()
+        started = time.monotonic()
+        read: list[dict[str, Any]] = []
+        for path in files:
+            if protected_root(path, policy) is not None:
+                skipped.append({"path": str(path), "reason": "inside a protected location"})
+            elif time.monotonic() - started > DOCUMENTS_BUDGET_SECONDS:
+                skipped.append({"path": str(path), "reason": "time budget reached; read it in another call"})
+            else:
+                read.append(read_one_document(path, max_pages, max_chars, ocr))
+        by_hash: dict[str, list[str]] = {}
+        for entry in read:
+            if entry.get("sha256"):
+                by_hash.setdefault(entry["sha256"], []).append(entry["path"])
+        duplicates = [paths for paths in by_hash.values() if len(paths) > 1]
+        note = None if read else "No PDFs or images to read there."
+        if len(skipped) > 25:
+            skipped[25:] = [{"path": "…", "reason": f"{len(skipped) - 25} more not listed: list them with system_find_files (scope = the folder) and read them in batches with paths"}]
+        return {"count": len(read), "documents": read, "duplicates": duplicates, "skipped": skipped, "note": note}
+
+    return _guarded("system_documents", Tier.READ, "read", f"read documents: {truncate(', '.join(raw), 160)}", args, targets, execute)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -998,7 +1288,7 @@ handle_system_os = system_os_handler
 OS_UI_SCHEMA = _schema(
     "os_ui",
     "Operate the Herald OS user interface the user is looking at: open pages (missions, memory, files, automations, connections, settings) and apps (terminal, system), focus/close windows, show or add memories, list/run/pause automations, start missions, open web pages inside the OS, change appearance and voice settings. "
-    "Use action=list once to see every command with its arguments, then action=run with command=<id> and args. action=state tells you which page and windows are on screen. "
+    "Use action=list once to see every command with its arguments, then action=run with command=<id> and args. action=state tells you which page and windows are on screen, and on the Files page the folder it shows and the selected file (what \"this folder\" and \"this file\" mean). "
     "Prefer this over describing where things are: when the user asks to open, show, add, find or change something in Herald OS, do it and then say what you did. "
     "After using other tools whose result lives on a page (memory, cronjob, files), run page.open so the user sees it. Destructive commands (forget, delete, trash) ask the user for approval. "
     "When the user asks you to build, create or make something new (a website, app, landing page, store, game), do not write it yourself in a scratch or temporary folder: run command=build.start with args={\"goal\": \"<what they asked for>\"}. It creates a project folder, starts a session that builds it there and opens the Studio so they watch it happen; then just tell them it has started. "
@@ -1323,7 +1613,8 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("system_open", SYSTEM_OPEN_SCHEMA, handle_system_open, "↗️"),
     ToolSpec("system_kill_process", SYSTEM_KILL_PROCESS_SCHEMA, handle_system_kill_process, "⛔"),
     ToolSpec("system_files", SYSTEM_FILES_SCHEMA, handle_system_files, "🗂️"),
+    ToolSpec("system_documents", SYSTEM_DOCUMENTS_SCHEMA, handle_system_documents, "📄"),
     ToolSpec("system_os", SYSTEM_OS_SCHEMA, system_os_handler, "🐧"),
 )
 
-__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "canvas_command", "canvas_tier", "handle_canvas", "handle_os_ui", "normalise_duration", "plan_operations", "plan_system_os", "resolve_when", "system_os_handler", "ui_summary", "ui_tier_for", "json"]
+__all__ = ["TOOL_SPECS", "ToolSpec", "bridge_enabled", "canvas_command", "canvas_tier", "drop_undo", "find_undo", "handle_canvas", "handle_os_ui", "handle_system_documents", "normalise_duration", "plan_operations", "plan_system_os", "plan_targets", "read_one_document", "record_undo", "resolve_when", "system_os_handler", "tilde", "ui_summary", "ui_tier_for", "json"]

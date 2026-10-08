@@ -4,9 +4,10 @@ import { $activeMissions, $completedMissions, $missions, $reviewMissions, focusM
 import { startMission } from '../store/missions-actions.ts'
 import { fail, ok, type OsCommand } from '../store/os-commands.ts'
 import { $sessions, refreshSessions } from '../store/sessions.ts'
+import { readToolSearch, setToolSearch } from '../store/tool-search.ts'
 import { openApp, showPage } from '../store/windows.ts'
 
-/* Chat sessions and missions. */
+/* Chat sessions and missions, and how Hermes reaches its tools. */
 
 function findMission(query: string): { mission: Mission | null; candidates: Mission[] } {
   const needle = query.trim().toLowerCase()
@@ -258,6 +259,23 @@ export const hermesCommands: readonly OsCommand[] = [
       const result = await pauseAllAgents()
 
       return ok(`Paused all agents: ${result.interrupted} sessions, ${result.paused} automations`, { data: { ...result } })
+    }
+  },
+  {
+    id: 'toolSearch.set',
+    title: 'Tool search',
+    description: "Hermes's Tool Search for every session: on looks plugin and MCP tools up when needed (fewer prompt tokens), off keeps Herald OS's system tools directly callable. New conversations use it.",
+    tier: 'mutate',
+    args: [{ name: 'enabled', type: 'boolean', description: 'true to turn Tool Search on, false to turn it off; leave it out to flip it' }],
+    phrases: [
+      { phrase: 'turn on tool search', args: { enabled: true } },
+      { phrase: 'turn off tool search', args: { enabled: false } }
+    ],
+    run: async ({ enabled }) => {
+      const on = enabled === undefined ? !(await readToolSearch()) : Boolean(enabled)
+      await setToolSearch(on)
+
+      return ok(`Tool search ${on ? 'on' : 'off'} for new conversations`, { highlight: { kind: 'setting', id: 'agents' }, data: { enabled: on } })
     }
   }
 ]

@@ -32,6 +32,18 @@ server-side behind a `HostAdapter` abstraction. Client-side execution (for remot
 deferred until upstream exposes a generic plugin server-request hook; the adapter boundary keeps
 that move mechanical.
 
+Amendment (session scope): the tools are offered and run only in sessions Herald OS starts. Hermes
+enables a plugin toolset on every platform that has not saved a list without it, and the backend
+shares the `cli` platform's list with the `hermes` CLI, so the person's Telegram, Discord, cron and
+terminal sessions got the system tools, with read and act tiers running unprompted. No toolset list
+can say "Herald OS sessions only", and `HERALD_OS=1` is not enough either: the backend runs cron
+in-process, and a messaging gateway it starts inherits its environment. Every handler is wrapped to
+run only when the turn's bound session source is `herald_os` (ADR-003), read through
+`gateway.session_context.get_session_env` as Hermes's own tools read it; the availability check hides
+the schemas from other surfaces and is registered uncached (`tools.registry.no_cache_check_fn`) so
+one session's verdict is never served to another. Proposed upstream: pass the session source to
+handlers with the other context keywords, or let a toolset declare the session sources it serves.
+
 ## ADR-005: Permissions reuse the upstream approval gate
 
 Rather than inventing a parallel confirmation channel, mutating and destructive bridge operations
@@ -76,6 +88,16 @@ Spotlight screenshot query). There is no per-plugin "keep direct" knob upstream,
 `tools.tool_search.enabled: off` and Settings exposes the switch. Cost: ~5k prompt tokens for the
 eight schemas, cache-stable across a conversation. Proposed upstream: let a plugin manifest declare
 `direct_toolsets`, or extend `_DIRECT_SURFACE_TOOLSETS` with session-source-gated toolsets.
+
+Amendment (visible and reversible): the setting stays global, because upstream still has no
+per-session or per-plugin switch and `tools.tool_search.defer` can only add tools to the deferred
+set. With the tools kept to Herald OS sessions (ADR-004 amendment) it no longer puts Herald OS's
+schemas into other sessions; what it still changes there is that their own plugin and MCP tools are
+listed directly. So every setup (bootstrap, the app's first start, `herald-os setup`) says what each
+step changes, stops at the first `hermes` step that fails, and writes the value it found to
+`$HERMES_HOME/herald-os/tool-search-before` before turning it off; Settings > Hermes & agents > Tool
+search (and the `toolSearch.set` command) is the promised switch, and `herald-os setup --undo` puts
+the value back with the rest. docs/SYSTEM-BRIDGE.md lists everything Herald OS changes in Hermes.
 
 ## ADR-011: Backend is spawned with HERMES_DESKTOP=1
 
@@ -273,8 +295,9 @@ an aarch64 qcow2 that boots straight into Herald OS.
   `edge` follows `main`.
 - **Software on an image.** `/usr` is read-only, so apps come from Flatpak, command-line tools go
   into `~/.local` (npm, mise) or a toolbox container, and `dnf install` stays a development-VM tool.
-- **The installer asks little.** Anaconda with a kickstart that encrypts the disk by default and
-  offers installing beside Windows; a kickstart passed with `inst.ks=` installs unattended. The
+- **The installer asks little.** Anaconda with a kickstart that leaves the storage screen to the
+  person, who can encrypt the disk (Anaconda's "Encrypt my data", off by default) and install
+  beside Windows; a kickstart passed with `inst.ks=` installs unattended. The
   first-boot setup in the shell (name, password, Wi-Fi, Hermes sign-in) also covers handing a machine
   to a new owner, which `herald-os reset` returns to.
 - **Secure by default on release images.** firewalld with only LocalSend and mDNS open, SSH off,

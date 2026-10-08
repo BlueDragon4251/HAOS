@@ -94,7 +94,7 @@ hermes config set model.default <model>  # a Portal model id, as in the Mac's co
 | Piece | Role |
 | --- | --- |
 | `/etc/greetd/config.toml` | Logs `hermes` in on VT1 and runs `herald-os-compositor`. Respawns when it exits. |
-| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, then starts niri with the managed config. Without hardware GL (QEMU and Apple Virtualization without virgl) niri runs windowed inside `cage` (`herald-os-niri-nested`). `HERALD_OS_COMPOSITOR=cage` runs the Stage 1 kiosk instead. |
+| `herald-os-compositor` | Sets `XDG_*`, picks `WLR_RENDERER=pixman` when there is no GPU render node, sources `~/.config/herald-os/session.env`, renders Herald's niri config (`~/.config/niri/herald-os.kdl`, from the installed template and your keymap) and starts niri with it. A `~/.config/niri/config.kdl` of your own is never read or changed, so the session also starts on a fresh account; Herald's other files beside it are `theme.kdl`, `outputs.kdl` and `local.kdl` (yours to edit). Without hardware GL (QEMU and Apple Virtualization without virgl) niri runs windowed inside `cage` (`herald-os-niri-nested`). `HERALD_OS_COMPOSITOR=cage` runs the Stage 1 kiosk instead. |
 | `herald-os-session` | Publishes `WAYLAND_DISPLAY` to systemd/D-Bus, starts PipeWire + portals and the session services below, runs Electron on Wayland (Ozone) as panels: the menu bar, dock and Hermes window are separate windows niri places. Restarts the shell on a crash (5 per minute), exits on a clean quit. |
 | `herald-os.desktop` | `wayland-sessions` entry so a normal greeter can also start Herald OS. |
 
@@ -148,12 +148,13 @@ backed by `nmcli`, `bluetoothctl`, `pactl`, `niri msg output`, `powerprofilesctl
 Dictation (`Mod+Ctrl+X`, `herald-os dictate`) records until a pause, transcribes through Hermes's
 speech-to-text and types the words into the focused app with `wtype`; the emoji picker
 (`Mod+Ctrl+E`) types its pick the same way. `herald-os keymap omarchy` renders
-`~/.config/niri/config.kdl` from the template in `/usr/local/share/herald-os-linux/niri/` with
-Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores Herald's keys.
+`~/.config/niri/herald-os.kdl` from the installed template (`linux/niri/config.kdl`) with Omarchy's
+`Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores Herald's keys. Every session
+start renders it again, so an update's new template takes effect at the next login.
 
 ## Themes, omakase, updates
 
-- **Themes** live in `linux/themes/<name>/theme.json` (ocean, ice, violet, graphite). `herald-os
+- **Themes** live in `linux/themes/<name>/theme.json` (twelve ship, two of them light). `herald-os
   theme set <name>` (or Style → Theme in the control menu, or the agent's `system_os theme_set`)
   recolours the shell, niri borders/backdrop (`~/.config/niri/theme.kdl`), swaylock, GTK 3/4
   (`gtk.css` + `gsettings`), and the `foot` rescue terminal in one step; a theme may also ship a
@@ -196,7 +197,9 @@ Omarchy's `Super+C/X/V` copy, cut and paste; `herald-os keymap herald` restores 
   the Herald OS image updates as a whole with `bootc upgrade`) and Flatpaks, updates Hermes Agent,
   rebuilds the shell and restarts it. A daily user timer runs `herald-os update
   --check`, which lights the menu-bar indicator when anything is pending. A repo pushed from a Mac
-  (no `.git`) skips the shell step; use `linux/dev/push.sh` there.
+  (no `.git`) skips the shell step; use `linux/dev/push.sh` there. A release tarball in
+  `/opt/herald-os` updates from GitHub releases instead
+  ([Another Linux](#another-linux-the-release-tarball)).
 
 ## The Herald OS image (Fedora bootc)
 
@@ -216,9 +219,9 @@ builds it for x86_64 and aarch64 on matching runners, pushes it to the repositor
 (`ghcr.io/iamlukethedev/herald-os`) and, for a release, turns it into:
 
 - **an x86_64 installer ISO** (bootc-image-builder `anaconda-iso`, `linux/image/iso.toml`): the
-  storage screen stays interactive, so it installs next to another system and encrypts the disk
-  (btrfs). Boot it with `inst.ks=<url>` and a kickstart like `linux/image/unattended.ks` for an
-  unattended install.
+  storage screen stays interactive, so it can install next to another system and encrypt the disk
+  (btrfs) if you tick "Encrypt my data". Boot it with `inst.ks=<url>` and a kickstart like
+  `linux/image/unattended.ks` for an unattended install.
 - **an aarch64 VM disk** (`qcow2`, `linux/image/disk.toml`): `bash linux/vm/run-qemu.sh --image <disk>`
   or `bash linux/vm/run-vf.sh --image <disk>` boot it, and `bash linux/vm/try.sh` fetches the latest
   release's disk and boots it in one command.
@@ -232,7 +235,8 @@ On the image, apps install through Flatpak or into `~/.local` (the catalog picks
 there); the system itself changes only by a whole new image.
 
 **Updates you can undo.** `herald-os update` runs `bootc upgrade` (the image tag of the channel:
-`stable` for releases, `edge` for main; `herald-os channel edge` switches with `bootc switch`), then
+`stable` for releases, `edge` for main once it is published; `herald-os channel edge` switches with
+`bootc switch`), then
 Flatpaks and `hermes update`. The new image starts on the next restart and the previous one stays in
 the boot menu; `herald-os rollback` (or Update > Go back to the previous version) makes it the
 default again.
@@ -260,6 +264,54 @@ its apps and saved networks on the next restart and runs setup again; the system
   (a `sigstoreSigned` policy for `ghcr.io/iamlukethedev/herald-os`).
 - **SELinux** stays permissive for now (ADR-012).
 
+### Switching a bootc system to Herald OS
+
+Fedora Silverblue, Kinoite, Bazzite, Bluefin and other bootc systems can switch to the Herald OS
+image in place. It replaces the system you run, so try it on a spare machine or in a virtual machine,
+not on the computer you work on. What happens on its first start:
+
+- **A new account signs in by itself.** The first boot creates `hermes`, an administrator (in
+  `wheel`) with no password, and greetd signs it in with no login screen, so you cannot pick your own
+  account there. Until you set a password in Herald OS's first-start setup (or with
+  `herald-os password`), anyone at the keyboard has administrator rights. Your own account and its
+  files stay.
+- **The first start takes a while.** It installs Hermes Agent, which needs the network, before the
+  desktop appears.
+- **SELinux becomes permissive** (greetd and the compositors have no policy yet, ADR-012).
+- **The firewall changes.** firewalld's default zone becomes `herald-os`, which refuses every
+  incoming connection except LocalSend (port 53317) and mDNS, so SSH and other ports you opened are
+  closed.
+- **Nothing checks the image's signature yet.** `linux/image/cosign.pub` is not in the repository, so
+  neither the switch nor later updates verify it; you trust GHCR and the connection to it.
+- **Only the `stable` tag is published.** `edge` does not exist yet, so `herald-os channel edge`
+  fails.
+
+bootc keeps the changes you made to `/etc` yourself, so where you changed one of these settings,
+yours stays. Note the image you run now, so you can come back to it, then switch and restart:
+
+```bash
+sudo bootc status                # your current image, for later
+sudo bootc switch ghcr.io/iamlukethedev/herald-os:stable
+systemctl reboot
+```
+
+If `bootc` is missing or refuses, `sudo rpm-ostree rebase
+ostree-unverified-registry:ghcr.io/iamlukethedev/herald-os:stable` switches through rpm-ostree instead
+(`unverified`: without a signature check, as above).
+
+**Going back.** The system you switched from stays in the boot menu: `sudo bootc rollback` (on Herald
+OS, `herald-os rollback`) makes it the default again, and the next restart starts it as it was. Once
+Herald OS has updated itself, that place holds the previous Herald OS version instead; to keep your old
+system in the boot menu through updates, run `sudo ostree admin pin booted` before you switch
+(`ostree admin status` lists what is pinned). `sudo bootc switch <your old image>` works too, but it
+keeps what changed in `/etc` under Herald OS, the `hermes` account among it: remove that with
+`sudo userdel -r hermes`. After a rollback, Herald OS's files in `/var` stay behind, the `hermes`
+home folder (`/var/home/hermes`) and `/var/lib/herald-os`; delete them when you no longer want them.
+
+On bootc and ostree systems Herald OS did not make, `herald-os update` and `herald-os rollback` never
+run `bootc`: the system is left to its own updates. The install catalog uses Flatpak and `~/.local`
+there, as on the image.
+
 ## Arch Linux (and Omarchy)
 
 Fedora stays the base Herald OS builds and tests on (ADR-017); Arch gets a package.
@@ -281,6 +333,63 @@ packages a tarball you built yourself instead.
 The session needs niri (and a login screen such as greetd); the optional dependencies list what
 each panel and feature uses. `.github/workflows/arch.yml` builds the package from a fresh tarball in
 an Arch container, lints it with namcap, installs it and runs the CLIs.
+
+## Another Linux (the release tarball)
+
+Every release has `herald-os-<version>-linux-x64.tar.gz` and `-linux-arm64.tar.gz`, each with a
+`.sha256`: the app, and under `resources/` the `herald-os` commands, the session scripts, the niri
+template, themes, the install catalog and the bridge plugin. It goes in `/opt/herald-os`:
+
+```bash
+sha256sum -c herald-os-<version>-linux-x64.tar.gz.sha256
+sudo mkdir -p /opt/herald-os
+sudo tar -xzf herald-os-<version>-linux-x64.tar.gz -C /opt/herald-os --strip-components=1
+sudo /opt/herald-os/resources/herald-os-linux/bin/herald-os-tarball install
+herald-os setup        # once per user: Hermes Agent and the bridge plugin
+```
+
+`herald-os-tarball install` lays out what the Arch package does, under `/usr/local`, which package
+managers leave alone:
+
+- the `herald-os` commands and the session scripts in `/usr/local/bin`, as links into
+  `/opt/herald-os` (the commands find the catalog, themes, niri template and migrations there);
+- Herald OS on the login screen, `/usr/share/wayland-sessions/herald-os.desktop`, only when niri is
+  installed (install niri, then run the command again). On Silverblue and other ostree systems,
+  whose `/usr` is read-only, the entry goes in `/usr/local/share/wayland-sessions`, which GDM and
+  SDDM read too;
+- `herald-os-app` in the application menu (`/usr/local/share/applications/herald-os.desktop`), with
+  its icon;
+- the update-check user units in `/usr/local/lib/systemd/user`; `systemctl --user enable --now
+  herald-os-update-check.timer` turns the daily check (the menu bar's update dot) on for an account;
+- `chrome-sandbox` owned by root and setuid, which Electron needs where unprivileged user namespaces
+  are off.
+
+It is safe to run again, never replaces a file that is not one of its own links, and leaves a
+`/opt/herald-os` that a package installed (`herald-os-bin`) to the package. `herald-os-tarball
+status` shows the version and what is in place; `sudo herald-os-tarball remove` takes it all out
+again, and `sudo rm -rf /opt/herald-os /opt/herald-os.previous` then deletes the app.
+
+**The full session** needs niri and what the menu bar, dock and panels call: swaybg, swaylock,
+swayidle, cliphist, wl-clipboard, wtype, grim, slurp, brightnessctl, playerctl, PipeWire,
+NetworkManager, BlueZ, UPower, power-profiles-daemon and the portals, the rest of
+[linux/image/packages.txt](../linux/image/packages.txt) (Fedora's names; the Arch package's optional
+dependencies give Arch's). A login screen that lists `wayland-sessions` starts it (GDM, SDDM and
+LightDM do). The session applies Herald's theme to the account that runs it, rewriting
+`~/.config/gtk-3.0/gtk.css`, `~/.config/gtk-4.0/gtk.css`, `~/.config/foot/foot.ini` and
+`~/.config/swaylock/config`, and setting GNOME's `color-scheme` and `gtk-theme`, which your usual
+desktop reads as well. On a machine you already use, try the session from a second account
+(`sudo useradd -m herald && sudo passwd herald`). Picking a theme in `herald-os-app`'s Settings
+inside your own desktop changes none of those files.
+
+**Updates.** `herald-os update` asks GitHub for the newest release with a tarball for this
+architecture (releases on the `stable` channel; `edge` also takes pre-releases), downloads it with
+its `.sha256` and checks it, unpacks it beside `/opt/herald-os`, and then swaps the two folders, so
+the version in use is never half replaced. The version before stays in `/opt/herald-os.previous`,
+and `herald-os rollback` swaps back; both take effect at the next login, or the next start of
+`herald-os-app`. Replacing `/opt/herald-os` needs sudo: in a terminal it asks for your password,
+while Update in the menu bar can only use sudo without one. The checksum proves the download is the
+file the release published, not who published it, so a release is trusted as far as GitHub is.
+`herald-os update` also updates the system's packages as before (`dnf upgrade` on Fedora).
 
 ## Inside Hyprland and Omarchy (app mode)
 
@@ -336,4 +445,5 @@ can still drive Herald's UI.
   fullscreen and returns to it when closed; there is no switching between other apps' windows.
 - SELinux is permissive on the VM.
 - Apple Silicon Macs cannot boot this natively (no Asahi support for M4/M5); the VM is the target.
-  x86 hardware comes with the ISO work in the roadmap.
+  On x86_64 PCs it installs from the ISO above, which has been tested in a KVM virtual machine
+  (`installer-test.yml`) but not yet on real PC hardware.

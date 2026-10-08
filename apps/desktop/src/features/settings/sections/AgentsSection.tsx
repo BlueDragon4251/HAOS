@@ -14,6 +14,7 @@ import { $hermesAuth, loginTarget, refreshHermesAuth, requestHermesLogin } from 
 import { notify } from '../../../store/notifications.ts'
 import { readTier, withTier } from './policy.ts'
 import { errorText, InlineNote, markSaved, MenuDropdown, RadioCard, SectionTitle, SettingsBlock, SettingsGroup, SettingsRow, Stepper, useDismiss } from './shared.tsx'
+import { ToolSearchRow } from './ToolSearchRow.tsx'
 
 /*
  * Hermes & agents: the default Settings section. Every control here binds to real Hermes state:
@@ -58,6 +59,7 @@ export function AgentsSection() {
         <PreferredModelRow ready={ready} />
         <RunOnRow />
         <BackgroundAgentsRow />
+        <ToolSearchRow />
       </SettingsGroup>
 
       <SettingsGroup title="Privacy & control">
@@ -413,7 +415,7 @@ function RememberPreferencesRow() {
     try {
       await rest.put('/api/tools/toolsets/memory', { enabled: next })
       markSaved()
-      notify({ title: next ? 'Memory on' : 'Memory paused', body: next ? 'Hermes can save and recall memories again.' : 'Hermes will stop saving and recalling memories.', level: 'success' })
+      notify({ title: next ? 'Memory on' : 'Memory paused', body: next ? 'Hermes can save memories again.' : 'Hermes stops saving to its own memory, in its CLI too, but still uses it.', level: 'success' })
     } catch (error) {
       setOverride(null)
       notify({ title: 'Could not change memory', body: errorText(error), level: 'error' })

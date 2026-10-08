@@ -11,7 +11,9 @@ import { SpeakStream, speakOnce, stopFallbackAudio } from './speak-stream.ts'
 import { isNoiseTranscript, isStopPhrase, sanitizeForSpeech } from './speech-text.ts'
 import { BARGE_IN_ENDPOINTER, DEFAULT_ENDPOINTER, Endpointer } from './vad.ts'
 
-type Mode = 'idle' | 'listen' | 'monitor'
+// monitor: a turn runs and speech over it is barge-in; answer: an approval card is up, so the words
+// are heard out first (a "yes" or "no" decides the card instead of interrupting).
+type Mode = 'idle' | 'listen' | 'monitor' | 'answer'
 
 const PRE_ROLL_MS = 400
 const MAX_CONTEXT_EXCHANGES = 6
@@ -120,6 +122,8 @@ export class ChainedEngine implements ConversationEngine {
       this.onListenFrame(frame)
     } else if (this.mode === 'monitor') {
       this.onMonitorFrame(frame)
+    } else if (this.mode === 'answer') {
+      this.onAnswerFrame(frame)
     }
   }
 
@@ -169,8 +173,79 @@ export class ChainedEngine implements ConversationEngine {
     }
 
     if (event === 'speech-start') {
-      this.bargeIn(true)
+      if (this.host.approvalPending()) {
+        this.captureAnswer()
+      } else {
+        this.bargeIn(true)
+      }
     }
+  }
+
+  /** Record the words spoken over the turn without stopping it: they may answer the approval card. */
+  private captureAnswer(): void {
+    this.mode = 'answer'
+    this.endpointer = new Endpointer(DEFAULT_ENDPOINTER)
+    this.endpointer.markSpeaking()
+    this.utterance = [...this.preRoll]
+    this.preRoll = []
+    this.preRollMs = 0
+  }
+
+  private onAnswerFrame(frame: CaptureFrame): void {
+    const event = this.endpointer.feed(frame.level, frame.ms)
+    this.utterance.push(frame.pcm)
+
+    if (event === 'speech-end' || event === 'timeout') {
+      const pcm = concatInt16(this.utterance)
+      this.utterance = []
+      this.mode = 'idle'
+      void this.transcribe(pcm)
+        .catch(() => '')
+        .then(transcript => (this.stopped ? undefined : this.handleOverTurn(transcript)))
+    }
+  }
+
+  /**
+   * Words said while a turn runs (heard over it while a card was up, or handed in): a short answer to
+   * the conversation's approval card decides it and the turn carries on; anything else interrupts
+   * the turn and becomes the next request, as barge-in always has.
+   */
+  private async handleOverTurn(transcript: string): Promise<void> {
+    const words = transcript && !isNoiseTranscript(transcript) ? transcript : ''
+    const answer = words ? this.host.answerApproval(words) : null
+
+    if (!words || answer) {
+      if (answer) {
+        this.host.setCaptions({ user: words, assistant: answer === 'approve' ? 'Approved.' : 'Denied.' })
+      }
+
+      this.resumeTurn()
+
+      return
+    }
+
+    this.bargeIn(false)
+    await this.handleTranscript(words)
+  }
+
+  /** Back to watching the turn after hearing words out; when it ended meanwhile, listen instead. */
+  private resumeTurn(): void {
+    if (this.mode !== 'idle') {
+      // Still monitoring (the words were handed in), or the turn finished and listening began.
+      return
+    }
+
+    if (!this.speak) {
+      this.beginListening(true)
+
+      return
+    }
+
+    this.mode = 'monitor'
+    this.endpointer = new Endpointer(BARGE_IN_ENDPOINTER)
+    this.preRoll = []
+    this.preRollMs = 0
+    this.host.setState(this.speak.speaking ? 'speaking' : 'thinking')
   }
 
   /** The user spoke over Hermes (or pressed stop): cut speech, interrupt the turn, listen. */
@@ -219,7 +294,35 @@ export class ChainedEngine implements ConversationEngine {
       return
     }
 
+    await this.handleTranscript(transcript)
+  }
+
+  /** A final transcript handed in rather than heard (typed fallback, tests): the microphone's own path from here. */
+  async submitTranscript(text: string): Promise<void> {
+    if (this.stopped) {
+      return
+    }
+
+    if (this.mode === 'monitor' || this.mode === 'answer') {
+      await this.handleOverTurn(text.trim())
+    } else {
+      await this.handleTranscript(text.trim())
+    }
+  }
+
+  /** What a final transcript becomes: an answer to a waiting card, the end, an OS command, or a Hermes turn. */
+  private async handleTranscript(transcript: string): Promise<void> {
     if (!transcript || isNoiseTranscript(transcript)) {
+      this.beginListening(true)
+
+      return
+    }
+
+    // Before stop phrases: while a card waits, "stop" and "cancel" answer it rather than end the conversation.
+    const answer = this.host.answerApproval(transcript)
+
+    if (answer) {
+      this.host.setCaptions({ user: transcript, assistant: answer === 'approve' ? 'Approved.' : 'Denied.' })
       this.beginListening(true)
 
       return

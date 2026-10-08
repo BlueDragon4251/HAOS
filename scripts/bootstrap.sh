@@ -75,7 +75,22 @@ runtime_root="${HERALD_OS_HERMES_ROOT:-$HERMES_HOME/hermes-agent}"
 # From the runtime checkout, like the `hermes` entry point: an editable install does not map
 # top-level modules added after it was created.
 hermes_run() {
-  (cd "$runtime_root" 2>/dev/null || true; "${HERMES_CMD[@]}" "$@" </dev/null)
+  (cd "$runtime_root" 2>/dev/null || true; NO_COLOR=1 "${HERMES_CMD[@]}" "$@" </dev/null)
+}
+
+# One hermes command and what it changes; a failure stops the bootstrap with Hermes's output.
+# `hermes tools enable` reports an unknown toolset as a ✗ line and still exits 0.
+hermes_step() {
+  local change="$1" output status=0
+  shift
+  echo "    hermes $*: $change"
+  output="$(hermes_run "$@" 2>&1)" || status=$?
+  if [[ $status -ne 0 ]] || grep -q '^[[:space:]]*✗' <<<"$output"; then
+    echo "bootstrap: \`hermes $*\` failed (exit $status):" >&2
+    echo "$output" >&2
+    echo "Fix it and run npm run bootstrap again; docs/SYSTEM-BRIDGE.md says how to take back what was already changed." >&2
+    exit 1
+  fi
 }
 
 if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
@@ -88,12 +103,26 @@ if [[ ${#HERMES_CMD[@]} -gt 0 ]]; then
   # User plugins are opt-in (plugins.enabled) and a saved platform toolset list is authoritative, so
   # both must be recorded. The override prompt is answered "no" (stdin closed): the bridge never
   # replaces built-in tools.
-  hermes_run plugins enable herald-os-bridge >/dev/null 2>&1 || true
-  hermes_run tools enable herald_os 2>&1 | tail -1 || true
+  hermes_step "adds it to plugins.enabled in $HERMES_HOME/config.yaml" plugins enable herald-os-bridge
+  hermes_step "saves platform_toolsets.cli with herald_os in it (the tools run only in Herald OS sessions)" tools enable herald_os
   # Upstream defers plugin tools behind its tool-search bridge; with the system tools hidden the
-  # agent falls back to shell commands. Keep them direct (Settings -> Permissions can flip it back).
-  echo "    tools.tool_search.enabled = off (system tools stay directly callable)"
-  hermes_run config set tools.tool_search.enabled off >/dev/null 2>&1 || true
+  # agent falls back to shell commands. Keep them direct (Settings -> Hermes & agents -> Tool search
+  # turns it back on), writing down the value it had the first time so it can be put back.
+  if ! before="$(hermes_run config get tools.tool_search.enabled 2>/dev/null)"; then
+    echo "bootstrap: \`hermes config get tools.tool_search.enabled\` failed" >&2
+    exit 1
+  fi
+  before="$(tail -n 1 <<<"$before" | tr -d '[:space:]')"
+  record="$HERMES_HOME/herald-os/tool-search-before"
+  if [[ "$before" == "off" ]]; then
+    echo "    tools.tool_search.enabled is off already"
+  else
+    if [[ ! -f "$record" ]]; then
+      mkdir -p "$(dirname "$record")"
+      echo "$before" >"$record"
+    fi
+    hermes_step "turns Tool Search off for every Hermes session (it was $before; saved in $record)" config set tools.tool_search.enabled off
+  fi
 
   echo "==> Checking voice support (docs/VOICE.md)"
   # The Live engine and the spoken-reply turn note need the voice-live routes (Hermes 0.21.3 and

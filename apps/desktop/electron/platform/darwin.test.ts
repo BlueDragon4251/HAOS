@@ -1,5 +1,6 @@
+import vm from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
-import { DarwinPlatform, parseDf, parsePmset, parsePs, parseVmStat, parseWifiDevice, parseWifiSummary } from './darwin.ts'
+import { CALENDAR_JXA, DarwinPlatform, parseDf, parsePmset, parsePs, parseVmStat, parseWifiDevice, parseWifiSummary } from './darwin.ts'
 
 const commands = vi.hoisted(() => ({ outputs: new Map<string, string>(), calls: [] as string[] }))
 
@@ -66,5 +67,63 @@ describe('darwin parsers', () => {
     const rows = parsePs('  512     1 sam   12.5  0.3   204800 /Applications/Visual Studio Code.app/Contents/MacOS/Electron\n')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ pid: 512, ppid: 1, user: 'sam', cpuPercent: 12.5, rssBytes: 204800 * 1024, name: 'Electron' })
+  })
+})
+
+type AccessHandler = (granted: boolean, error: unknown) => void
+
+/**
+ * Runs the calendar script against a stand-in for the JXA bridge, which hands integers back as
+ * strings the way JXA on macOS 26 does. `answer` is the status left behind by the reply to the prompt.
+ */
+function runCalendarScript(initial: number, options: { answer?: number; fullAccessApi?: boolean } = {}) {
+  let status = initial
+  const requests: string[] = []
+  const respond = (api: string, handler: AccessHandler) => {
+    requests.push(api)
+    status = options.answer ?? status
+    handler(status === 3, null)
+  }
+  const nil = { isNil: () => true }
+  const event = { eventIdentifier: 'ev-1', title: 'Standup', startDate: { timeIntervalSince1970: 1_700_000_000 }, endDate: { timeIntervalSince1970: 1_700_000_900 }, isAllDay: false, location: nil, notes: nil, URL: nil, calendar: { title: 'Work' } }
+  const store = {
+    respondsToSelector: (selector: string) => selector === 'requestFullAccessToEventsWithCompletion:' && options.fullAccessApi !== false,
+    requestFullAccessToEventsWithCompletion: (handler: AccessHandler) => respond('full', handler),
+    requestAccessToEntityTypeCompletion: (_type: string, handler: AccessHandler) => respond('legacy', handler),
+    predicateForEventsWithStartDateEndDateCalendars: () => ({}),
+    eventsMatchingPredicate: () => ({ count: '1', objectAtIndex: () => event })
+  }
+  const bridge = Object.assign(() => nil, {
+    EKEntityTypeEvent: '0',
+    EKEventStore: { alloc: { init: store }, authorizationStatusForEntityType: () => String(status) },
+    NSCalendar: { currentCalendar: { startOfDayForDate: () => ({ dateByAddingTimeInterval: () => ({}) }) } },
+    NSDate: { date: {}, dateWithTimeIntervalSinceNow: () => ({}) },
+    NSRunLoop: { currentRunLoop: { runUntilDate: () => undefined } }
+  })
+  const output = vm.runInNewContext(CALENDAR_JXA, { ObjC: { import: () => undefined, unwrap: (value: unknown) => value }, $: bridge }) as string
+
+  return { requests, result: JSON.parse(output) as unknown }
+}
+
+describe('calendar script', () => {
+  it('asks for full access while undecided, although JXA returns the status as a string', () => {
+    expect(runCalendarScript(0, { answer: 3 })).toEqual({
+      requests: ['full'],
+      result: { status: 'authorized', events: [{ id: 'ev-1', title: 'Standup', start: 1_700_000_000_000, end: 1_700_000_900_000, allDay: false, calendar: 'Work' }] }
+    })
+  })
+
+  it('falls back to the older request on macOS 13', () => {
+    expect(runCalendarScript(0, { answer: 3, fullAccessApi: false }).requests).toEqual(['legacy'])
+  })
+
+  it('stays undecided when macOS refuses to ask (no usage string in the app)', () => {
+    expect(runCalendarScript(0)).toEqual({ requests: ['full'], result: { status: 'not-determined', events: [] } })
+  })
+
+  it('reports denied, restricted and write-only access without asking again', () => {
+    expect(runCalendarScript(2)).toEqual({ requests: [], result: { status: 'denied', events: [] } })
+    expect(runCalendarScript(1)).toEqual({ requests: [], result: { status: 'restricted', events: [] } })
+    expect(runCalendarScript(4)).toEqual({ requests: [], result: { status: 'denied', events: [] } })
   })
 })

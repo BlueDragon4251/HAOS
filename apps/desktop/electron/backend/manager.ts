@@ -177,7 +177,7 @@ export class BackendManager {
     this.update({ runtime, phase: 'starting' })
 
     try {
-      await ensureBridgePlugin(runtime)
+      const bridgeError = (await ensureBridgePlugin(runtime)) ?? undefined
       const port = await this.spawnServe(runtime, generation)
 
       if (generation !== this.startGeneration) {
@@ -192,7 +192,7 @@ export class BackendManager {
       }
 
       const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(this.token)}`
-      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined, sharedGateway: this.sharedGateway()?.pid })
+      this.update({ phase: 'ready', port, baseUrl, wsUrl, error: undefined, sharedGateway: this.sharedGateway()?.pid, bridgeError })
       log('backend', `ready on ${baseUrl} via ${runtime.label}`)
     } catch (error) {
       if (generation !== this.startGeneration) {
@@ -228,7 +228,7 @@ export class BackendManager {
 
       const url = new URL(target.baseUrl)
       const port = Number(url.port) || 80
-      this.update({ phase: 'ready', port, baseUrl: target.baseUrl, wsUrl: `ws://${url.host}/api/ws?token=${encodeURIComponent(this.token)}`, error: undefined, sharedGateway: undefined })
+      this.update({ phase: 'ready', port, baseUrl: target.baseUrl, wsUrl: `ws://${url.host}/api/ws?token=${encodeURIComponent(this.token)}`, error: undefined, sharedGateway: undefined, bridgeError: undefined })
       log('backend', `attached to ${target.baseUrl}`)
     } catch (error) {
       if (generation === this.startGeneration) {
@@ -267,6 +267,16 @@ export class BackendManager {
       HERMES_DESKTOP: '1',
       HERALD_OS: '1',
       HERMES_PARENT_PID: String(process.pid),
+      // Remove parent-identity markers inherited from an outer Hermes session
+      // (the app may have been launched from a running Hermes CLI or Desktop
+      // shell). A leaked HERMES_PARENT_START_MARKER + HERMES_PARENT_NONCE pairs
+      // with the marker-parsing watchdog in upstream web_server_lifecycle.py:
+      // the backend would conclusively decide "parent replaced" against the
+      // real Electron PID and exit immediately after setup.ready. With no
+      // marker, the watchdog degrades to plain PID liveness, which is safe.
+      HERMES_PARENT_START_MARKER: undefined,
+      HERMES_PARENT_NONCE: undefined,
+      HERMES_SPAWN: undefined,
       HERMES_DESKTOP_READY_FILE: readyFile,
       PYTHONUNBUFFERED: '1',
       ...(this.control ? { HERALD_OS_CONTROL_SOCKET: this.control.socketPath, HERALD_OS_CONTROL_TOKEN: this.control.token } : {})

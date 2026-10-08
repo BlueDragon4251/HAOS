@@ -12,15 +12,18 @@ __init__.py          register(): the `herald_os` toolset and the bundled skills 
 plugin.yaml          manifest: name, version, tools, supported platforms
 bridge/
   tools.py           tool schemas and handlers (TOOL_SPECS)
+  scope.py           where the tools are offered and run: Herald OS sessions only
   permissions.py     tiers, protected paths, the approval gate
   audit.py           one JSON line per call in $HERMES_HOME/herald-os/audit.jsonl
   crash.py           crash report summaries for system_logs (macOS .ips, Linux core dumps)
+  documents.py       system_documents: invoice hints, suggested names, scan pictures, filing places
   ui.py              client for the shell's control socket (the `os_ui` tool)
   util.py            shared helpers (data folder, HERALD_OS_* settings)
   host/              HostAdapter per OS: darwin.py, linux.py, posix.py, windows.py (stub)
 skills/
   herald-os/         when to use these tools
   diagnose-crash/    how to explain a crash from its report
+  file-documents/    how to find, read, rename and file documents such as invoices, with undo
   herald-os-tailor/  how to change Herald OS itself: themes, fonts, keybindings, settings
 tests/               pytest suite: `npm run test:bridge` from the repository root
 ```
@@ -37,3 +40,7 @@ hermes tools enable herald_os
 
 To switch the tools off without uninstalling, set `herald_os.bridge.enabled: false` in
 `~/.hermes/config.yaml`, or `HERALD_OS_BRIDGE_DISABLED=1` in the backend's environment for one run.
+
+To take it all back, `herald-os setup --undo` on Linux; elsewhere the steps, and the list of what
+Herald OS changes in Hermes, are in
+[docs/SYSTEM-BRIDGE.md](../../docs/SYSTEM-BRIDGE.md#what-herald-os-changes-in-your-hermes).

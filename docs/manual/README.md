@@ -45,6 +45,22 @@ is the coding agents and local model apps.
 - **Windows** asks how much memory, how many cores and how much disk to give it, installs itself in
   10 to 20 minutes, and shares `~/Windows` with your files. Open it from Applications.
 
+## Finding and filing documents
+
+Downloads fills up with files called scan0001.pdf and document(3).pdf. Ask Hermes, typed or spoken:
+"find the invoice from Acme in my Downloads, rename it properly and put it where it belongs", or
+open the folder in Files and say "file the invoices in this folder".
+
+- Hermes reads the documents themselves, scans and photos included (the text is recognised on this
+  computer; nothing is uploaded), and tells invoices from receipts, statements and everything else.
+- It names files the way your filed documents are already named, or like
+  `2026-09-14 Acme Corp invoice INV-1234 $560.00.pdf` when there is nothing to follow, and puts them
+  in the folder you already use (Invoices by year, say). It asks before creating new folders.
+- You see the plan first and approve it on the card. Nothing is overwritten, duplicates are pointed
+  out, and "undo that" puts everything back.
+- On Herald OS Linux, scans are read with tesseract, which is installed; `poppler-utils` makes text
+  PDFs faster to read but is optional.
+
 ## Asking about what is on screen, and typing anywhere
 
 - **Dictation:** `Cmd+Ctrl+X` (Mac) or `Super+Ctrl+X` (Linux) in any app, speak, pause, and the

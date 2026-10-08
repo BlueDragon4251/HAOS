@@ -80,6 +80,11 @@ if [[ "$MODE" == "--dev" ]]; then
 fi
 
 if [[ "$MODE" == "--image" ]]; then
+  # herald-os tells its own image from other bootc systems (Silverblue, Bazzite, Bluefin) by this
+  # line; on those it never runs bootc, since their updates and rollbacks are the person's.
+  sed -i --follow-symlinks '/^IMAGE_ID=/d' /usr/lib/os-release
+  echo 'IMAGE_ID=herald-os' >>/usr/lib/os-release
+
   step "The shell ($TARBALL)"
   install -d "$SHARE/app"
   tar -xzf "$TARBALL" -C "$SHARE/app" --strip-components=1

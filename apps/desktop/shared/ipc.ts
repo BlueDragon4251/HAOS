@@ -27,6 +27,8 @@ export interface BackendState {
   logTail: string[]
   /** Another app's messaging gateway on this Hermes home (Hermes Desktop, say): its pid. */
   sharedGateway?: number
+  /** Why the system tools could not be set up in Hermes this start (a failed `hermes` step). */
+  bridgeError?: string
 }
 
 export interface RestRequest {

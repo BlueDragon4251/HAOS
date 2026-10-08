@@ -9,4 +9,4 @@ unset HERALD_OS_KIOSK HERALD_OS_ZOOM
 unset WLR_RENDERER
 export LIBGL_ALWAYS_SOFTWARE=1
 
-exec niri --config "$HOME/.config/niri/config.kdl"
+exec niri --config "$HOME/.config/niri/herald-os.kdl"

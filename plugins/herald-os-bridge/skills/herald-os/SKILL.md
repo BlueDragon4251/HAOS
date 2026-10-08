@@ -21,7 +21,8 @@ find or change something *in Herald OS*, do it with `os_ui` and then say what yo
 sentence. Never describe where a button is when you can press it.
 
 - `os_ui action=list` once per session to learn the commands and their arguments; `action=state`
-  tells you the current page and open windows.
+  tells you the current page and open windows, and on the Files page the open folder and the
+  selected file (`files`): what "this folder" and "this file" mean.
 - `os_ui action=run command=<id> args={...}`. Common ones: `page.open name=missions`,
   `memory.add text=...` (or `file=user` for facts about the person), `memory.show query=...`,
   `automation.pause name=...`, `automation.run name=...`, `automation.create name=... schedule=...
@@ -44,8 +45,9 @@ sentence. Never describe where a button is when you can press it.
 - Results come back with `result` (one line), `page`, `highlight`, `items`; use them to answer
   ("I added it; you now have 6 memories"). If a name is ambiguous the result lists candidates: ask.
 - Destructive commands (`memory.forget`, `automation.delete`, `files.trash`) show the user an
-  approval card; do not work around a denial. Spoken requests arrive as transcripts: act on the
-  intent, and keep spoken replies to a sentence or two.
+  approval card; do not work around a denial. In a spoken conversation the person can answer a
+  card by saying "yes" or "no". Spoken requests arrive as transcripts: act on the intent, and keep
+  spoken replies to a sentence or two.
 
 ## Building things (the Studio)
 
@@ -91,6 +93,9 @@ preview of the site.
 | "What's using all my disk space?" | `system_info` for the totals, then `system_disk_usage` on ~ and drill into the biggest folder |
 | "Find the screenshots I took yesterday" | `system_find_files` kind=screenshot when=yesterday |
 | "Find my tax PDF" | `system_find_files` kind=pdf text=tax |
+| "What does this PDF say?" / "Read this scan" | `system_documents` action=read path=... (the text page by page; scans and photos through OCR) |
+| "Find the invoice from Acme in my Downloads, rename it properly and put it where it belongs" / "File the invoices in this folder" | follow the `file-documents` skill: `system_documents` read and places, a `system_files` batch with dry_run, the approval card, and `system_files` action=undo if asked |
+| "Undo that" / "Put it back" (after moving or renaming files) | `system_files` action=undo: the exact reverse of the last batch, never retyped paths |
 | "Create a folder for this project" | `system_files` action=mkdir path=~/Projects/<name> |
 | "Organise these files" | list the directory, propose groupings, then `system_files` action=batch dry_run=true to show the plan, then apply after the user agrees |
 | "Which apps are open?" | `system_apps` action=running |
@@ -153,7 +158,8 @@ logs from `journalctl`, trash from `gio trash`, notifications from `notify-send`
 
 - Do not suggest or run `open -a`, `osascript`, `mdfind`, `pmset`, `defaults` or `networksetup`
   on Linux; they do not exist there. Use the `system_*` tools, which already pick the right backend.
-- `system_find_files` matches file names (not contents) and filters by modification time on Linux.
+- `system_find_files` matches file names (not contents) and filters by modification time on Linux;
+  to find a document by what it says, read the likely folder with `system_documents`.
 - If a tool reports that a program is not installed, relay the package it names (for example
   `network-manager`, `pipewire`, `libnotify`) instead of improvising a shell workaround.
 - `sleep_display` turns the screens off through niri; any key or mouse move wakes them.

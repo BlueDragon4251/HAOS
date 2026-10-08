@@ -395,6 +395,17 @@ export class LiveEngine implements ConversationEngine {
       return
     }
 
+    // A short "yes" or "no" while this conversation's approval card is up decides the card; the
+    // running turn carries on instead of being superseded. Before stop phrases: "stop" answers it.
+    const answer = this.host.answerApproval(prompt)
+
+    if (answer) {
+      this.host.setCaptions({ user: prompt, assistant: answer === 'approve' ? 'Approved.' : 'Denied.', interim: '' })
+      this.speak(delegationId, answer === 'approve' ? 'Approved.' : 'Okay, cancelled.')
+
+      return
+    }
+
     if (isStopPhrase(prompt)) {
       this.host.ended('stop-phrase')
 

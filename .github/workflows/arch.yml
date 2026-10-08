@@ -54,6 +54,9 @@ jobs:
           herald-os commands >/dev/null
           herald-os-catalog list >/dev/null
           herald-os-catalog pkg manager
+          # The package's /opt/herald-os is the package's: the tarball updater must leave it alone.
+          status="$(herald-os-tarball status || true)"
+          grep -q 'herald-os-bin package' <<<"$status" || { echo "::error::herald-os-tarball does not see the package: $status"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: herald-os-arch

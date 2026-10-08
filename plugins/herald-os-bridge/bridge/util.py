@@ -21,12 +21,13 @@ class ExecResult:
         return self.code == 0
 
 
-def run(argv: Sequence[str], *, timeout: float = 15.0, env: Mapping[str, str] | None = None, cwd: str | None = None) -> ExecResult:
-    """Run a fixed argv (never a shell string) and never raise on non-zero exit."""
+def run(argv: Sequence[str], *, timeout: float = 15.0, env: Mapping[str, str] | None = None, cwd: str | None = None, encoding: str | None = None) -> ExecResult:
+    """Run a fixed argv (never a shell string) and never raise on non-zero exit. ``encoding`` decodes
+    the output with that codec (bad bytes replaced) instead of the locale's, for text from documents."""
     try:
         proc = subprocess.run(
             list(argv), capture_output=True, text=True, timeout=timeout, cwd=cwd,
-            env={**os.environ, **(env or {})}, check=False,
+            env={**os.environ, **(env or {})}, check=False, encoding=encoding, errors="replace" if encoding else None,
         )
     except subprocess.TimeoutExpired as exc:
         return ExecResult(124, (exc.stdout or b"").decode() if isinstance(exc.stdout, bytes) else (exc.stdout or ""), f"timed out after {timeout}s")

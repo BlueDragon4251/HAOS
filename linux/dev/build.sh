@@ -51,11 +51,11 @@ if [[ -d "$REPO/linux/session" ]] && command -v sudo >/dev/null; then
   systemctl --user daemon-reload 2>/dev/null || true
   systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
   mkdir -p "$HOME/.config/niri" "$HOME/.config/swaylock"
-  # niri reloads config.kdl as soon as it changes, so every file it includes must already exist.
+  # niri reloads its config as soon as it changes, so every file it includes must already exist.
   [[ -f "$HOME/.config/niri/outputs.kdl" ]] || echo "// Written by the Herald OS Display panel." >"$HOME/.config/niri/outputs.kdl"
   sudo install -D -m 0644 "$REPO/linux/niri/config.kdl" /usr/local/share/herald-os-linux/niri/config.kdl
-  # config.kdl is rendered from the template with the chosen keymap (herald-os keymap herald|omarchy).
-  herald-os keymap apply || install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/config.kdl"
+  # herald-os.kdl is rendered from the template with the chosen keymap (herald-os keymap herald|omarchy).
+  herald-os keymap apply || install -m 0644 "$REPO/linux/niri/config.kdl" "$HOME/.config/niri/herald-os.kdl"
   install -m 0644 "$REPO/linux/session/swaylock.conf" "$HOME/.config/swaylock/config"
   if [[ -d /usr/share/plymouth/themes ]]; then
     sudo install -d /usr/share/plymouth/themes/herald-os

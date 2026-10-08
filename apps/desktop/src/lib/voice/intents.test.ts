@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandSummary } from '../../store/os-commands.ts'
-import { matchIntent, normaliseUtterance } from './intents.ts'
+import { type MatchContext, matchIntent, normaliseUtterance } from './intents.ts'
 
 // A slice of the real catalogue's phrases (the registry itself needs the DOM to import).
 const commands: CommandSummary[] = [
@@ -133,5 +133,49 @@ describe('matchIntent', () => {
   it('reports confidence', () => {
     expect(match('new chat')?.confidence).toBe(1)
     expect(match('open missions')?.confidence).toBeLessThan(1)
+  })
+})
+
+describe('document requests', () => {
+  const withFiles: CommandSummary[] = [
+    ...commands,
+    { id: 'files.search', title: 'Search files', description: '', tier: 'read', hidden: false, args: [{ name: 'query', type: 'string', description: '', required: true }], phrases: ['find files named {query}', 'search files for {query}', 'find {query} in my files', 'look for {query} in files'] },
+    { id: 'files.newFolder', title: 'New folder', description: '', tier: 'mutate', hidden: false, args: [{ name: 'name', type: 'string', description: '', required: true }], phrases: ['create a folder called {name}', 'new folder {name}', 'make a folder named {name}'] },
+    { id: 'edit.undo', title: 'Undo', description: '', tier: 'mutate', hidden: false, args: [], phrases: ['undo', 'undo that', 'undo it', 'take that back'] }
+  ]
+  const route = (text: string, context?: MatchContext) => matchIntent(text, withFiles, context)
+
+  it('hands finding, renaming and filing documents to Hermes, whole', () => {
+    for (const text of [
+      'Find the invoice from Acme in my Downloads, rename it properly and put it where it belongs.',
+      'Hey Hermes, file the invoices in this folder.',
+      'file these',
+      'Can you rename this file properly?',
+      'put it where it belongs',
+      'organise my downloads',
+      'find the invoice from Acme in my files',
+      'show me the invoices in my Downloads',
+      'open the invoice from Acme',
+      'find and open the Acme invoice',
+      'pull up the receipt from the plumber'
+    ]) {
+      expect(route(text), text).toBeNull()
+    }
+  })
+
+  it('keeps file names and other commands on the fast path', () => {
+    expect(route('open invoice.pdf')).toMatchObject({ command: 'open.any', args: { name: 'invoice.pdf' } })
+    expect(route('find files named invoice')).toMatchObject({ command: 'files.search', args: { query: 'invoice' } })
+    expect(route('create a folder called Invoices')).toMatchObject({ command: 'files.newFolder', args: { name: 'Invoices' } })
+    expect(route('remember that I file my invoices by year')).toMatchObject({ command: 'memory.add', args: { text: 'I file my invoices by year' } })
+    expect(route('type rename the file')).toMatchObject({ command: 'text.type', args: { text: 'rename the file' } })
+    expect(route('show me my downloads')).toMatchObject({ command: 'open.any', args: { name: 'downloads' } })
+  })
+
+  it('sends "undo that" to Hermes right after Hermes acted', () => {
+    expect(route('undo that')).toMatchObject({ command: 'edit.undo' })
+    expect(route('undo that', { afterHermesAction: true })).toBeNull()
+    expect(route('Take that back.', { afterHermesAction: true })).toBeNull()
+    expect(route('copy that', { afterHermesAction: true })).toMatchObject({ command: 'edit.copy' })
   })
 })
