@@ -1,9 +1,9 @@
 ---
 name: herald-canvas
-description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows), masks, on-device background removal and content-aware fill, generated pictures placed where asked, Photoshop files opened and exported with their layers, how to plan an edit from a description, plus the .comp project format and every adjustment setting
+description: Make and edit pictures in Herald Canvas, the layered image editor in Herald OS - posters, banners, thumbnails, collages and photo fixes through the canvas tool, with editable text and shape layers, layer effects (shadows, strokes, glows) copied between layers, masks, alignment and guides, auto tone and colour, filters (sharpen, denoise, blur), colour lookup tables, on-device background removal and content-aware fill, generated pictures placed where asked, Photoshop files opened and exported with their layers, how to plan an edit from a description, plus the .comp project format and every adjustment setting
 metadata:
   hermes:
-    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks, background removal, content-aware fill, generative fill, photoshop, psd]
+    tags: [herald-os, canvas, images, design, photo, poster, layers, text, typography, effects, masks, alignment, guides, filters, sharpen, lut, background removal, content-aware fill, generative fill, photoshop, psd]
 ---
 
 # Herald Canvas
@@ -32,7 +32,12 @@ step they can undo there (⌘Z, or `canvas action=undo`).
      centred (`fit=cover` fills it, `fit=none` keeps its own size, or give `x`, `y`, `width`).
    - a colour block: `color="#ff5a36" x=0 y=1100 width=1080 height=250`.
    - a gradient: `gradient="#00000000,#000000cc" angle=90 y=700 height=650` (a fade to dark at
-     the bottom, under text).
+     the bottom, under text). Colours run first to last, each with an optional position
+     (`gradient="#1b1340 0%, #6b2d5c 55%, #ffb347"`; ones without share the space between), and
+     transparent colours fade while keeping the colour beside them. `style` lays it out: linear
+     (the default, along `angle`), radial (from the box's centre out to its corners, a vignette or
+     a spotlight), angle (a sweep around the centre), reflected (mirrored from the centre line) or
+     diamond.
    - an empty layer to group with others: no source, colour or gradient.
 3. **Words.** `add_text content="NIGHT\nMARKET" x=72 y=420 font="Helvetica Neue Bold" size=180
    color="#ffffff"` makes a text layer the person can edit later (double-click it with the Type
@@ -56,31 +61,52 @@ step they can undo there (⌘Z, or `canvas action=undo`).
    `color`, `radius` (rectangles) or `lineWidth` (lines).
 5. **Arrange.** `set_layer layer="band" x=… y=… width=…` (one side alone keeps the proportions),
    `rotation=-8`, `opacity=0.8`, `blend="Multiply"`, `order=top`, `visible=false`,
-   `folder="Background"`. `group layers="band,glow" name="Hero"` makes a folder.
-6. **Grade.** `add_adjustment kind="Hue/Saturation" settings={"saturation": 20}`. An adjustment
+   `folder="Background"`. `group layers="band,glow" name="Hero"` makes a folder. Line layers up
+   exactly with `align layers="Logo,Badge" edge=bottom` (each other; one layer, or `to=canvas`,
+   lines up with the canvas, `margin=72` keeping that far from its edges; `to=selection` with what
+   the person selected; two edges at once, `edge="center,middle"`), and space three or more evenly
+   with `align layers="A,B,C" distribute=horizontal` (equal gaps; `vertical`, or by an edge:
+   `left`, `center`, …). Layers line up by what they show, not by transparent margins.
+   **Guides** lay out the page and everything snaps to them in the window:
+   `guides guide=add margins=64 columns=12 gutter=24` (margins as pixels or `"6%"` of the short
+   side, columns between them), `guides guide=add axis=vertical position="50%"`, `guides
+   guide=add center=true`, `guides guide=remove axis=horizontal position=900`, `guides guide=clear`
+   and `guides guide=list`. They never export.
+6. **Grade.** For a photo, start with `auto_adjust` (`kind=tone`, the usual first step for a dull
+   photo, `contrast`, or `color` to take out a colour cast too): it adds an editable Levels layer
+   worked out from the picture. Then `add_adjustment kind="Hue/Saturation" settings={"saturation":
+   20}` and the like (every kind and field is under Adjustment settings below). An adjustment
    changes everything below it; with `clip=true` only the layer right below. Change it later with
    `set_adjustment layer="Hue/Saturation" settings={"saturation": 35}` (merged over what it has;
    `canvas action=layers` shows each adjustment's `settings`).
 7. **Polish.** `set_effects layer="Headline" effects={"shadow": {"distance": 8, "blur": 16,
    "opacity": 0.45}}` adds a drop shadow; strokes, glows, inner shadows and colour overlays work the
-   same way (see Layer effects below). `mask layer="Photo" mask=hide` and friends show or hide
-   parts of a layer without erasing anything.
+   same way (see Layer effects below), and `set_effects layer="Subtitle" from="Headline"` copies
+   one layer's effects onto another. `mask layer="Photo" mask=hide` and friends show or hide parts
+   of a layer without erasing anything. `filter` sharpens, denoises or blurs a layer's pixels (see
+   Filters below).
 8. **The canvas.** `resize width=1080 height=1920 anchor=top` grows or cuts the canvas around an
    anchor (layers keep their pixels, so nothing is lost); `resize scale=0.5`, or `image=true` with
-   a width, scales everything instead. `crop x=0 y=135 width=1080 height=1080` keeps a box.
+   a width, scales everything instead. `crop x=0 y=135 width=1080 height=1080` keeps a box;
+   `crop ratio=4:5` keeps the largest centred box of that shape (`1:1`, `3:2`, `16:9`, `9:16`,
+   `original`, or with a box, holds it to the ratio); `crop angle=-1.5` first turns the picture
+   that many degrees clockwise (negative is counterclockwise) to level a tilted horizon, then keeps
+   the largest box with no empty corners.
 9. **Look before you say it is done.** `canvas action=preview` answers with a PNG `file`; view it,
    then fix what is off. Do this after every few steps on anything that matters.
 10. **Deliver.** `canvas action=export to="~/Desktop/gig-poster.png"` (or `.jpg` with
    `quality=0.9`, `.webp` up to 16,383 pixels a side; `scale=0.5` for half size). For a printer
    or a designer, `.psd` (or `format=psd`) keeps the layers, folders, masks, clipping, blend modes,
-   text and the adjustments Photoshop has, at full size; Grain, the blurs and Add Noise show only in
-   its flattened image, and shapes become pixels; the answer lists what was approximated. Replacing
+   text and the adjustments Photoshop has (Herald's own eight among them), at full size; Grain, the
+   blurs and Add Noise show only in its flattened image, and shapes become pixels; the answer lists
+   what was approximated. Replacing
    a file needs `overwrite=true`, and the person is asked first. Projects save themselves after
    every change.
 
 `canvas action=layers` lists everything with ids, kinds, placement and clipping: use it to find
 names and to check what is where. Ids are stable; names are friendlier (the topmost layer with a
-name wins).
+name wins). `canvas action=history` lists every step, the person's and yours, with the current one
+marked; `undo steps=3` (or `redo`) moves through several at once.
 
 ## Good design habits
 
@@ -101,7 +127,9 @@ name wins).
 
 ```
 canvas action=new name="Night market" width=1080 height=1350 background="#0d0d12"
+canvas action=guides guide=add margins=72
 canvas action=add_layer source="~/Pictures/market.jpg" fit=cover name="Photo"
+canvas action=auto_adjust kind=color clip=true
 canvas action=add_adjustment kind="Color Balance" clip=true settings={"midCyanRed": 12, "midYellowBlue": -14, "highlightYellowBlue": -8}
 canvas action=add_layer gradient="#0d0d1200,#0d0d12f0" angle=90 y=650 height=700 name="Fade"
 canvas action=add_text content="NIGHT\nMARKET" x=72 y=700 font="Helvetica Neue Bold" size=168 leading=150 tracking=2 color="#fff4e6" name="Headline"
@@ -109,6 +137,7 @@ canvas action=set_effects layer="Headline" effects={"shadow": {"distance": 6, "b
 canvas action=add_shape kind=line x=72 y=1100 width=240 lineWidth=8 color="#ffb347" name="Accent rule"
 canvas action=add_shape kind=rounded x=72 y=1140 width=600 height=120 radius=24 color="#ffb347" name="Date panel"
 canvas action=add_text content="Saturday 9 November · 6 pm till late" x=104 y=1172 width=540 font="Helvetica Neue Medium" size=40 color="#0d0d12" name="Date"
+canvas action=align layers="Date panel,Date" edge=middle
 canvas action=preview
 canvas action=set_text layer="Headline" size=180
 canvas action=export to="~/Desktop/night-market.png"
@@ -156,14 +185,61 @@ value and try again.
 - **Add Noise**: `noiseAmount` 0.1…400 (percent), `noiseGaussian`, `noiseMonochromatic`,
   `noiseSeed`.
 
+Eight more are Herald Canvas's own; their settings are flat (no nested record of their own):
+
+- **Brightness/Contrast**: `brightness` −150…150 (lifts or lowers the midtones; black and white
+  stay), `contrast` −50…100.
+- **Vibrance**: `vibrance` −100…100 (strengthens dull colours most and spares skin tones),
+  `saturation` −100…100 (as Hue/Saturation saturates).
+- **Photo Filter**: `color` any CSS colour or `{"red", "green", "blue"}` 0…1 (a warming orange to
+  start), `density` 0…100 (percent), `preserveLuminosity` (true keeps the brightness).
+- **Channel Mixer**: `red`, `green` and `blue`, each output channel as
+  `{"red", "green", "blue", "constant"}` percentages of the inputs, with `constant` −200…200
+  (all four take −200…200); `monochrome` true makes one gray from the `gray` row (default 40, 40,
+  20).
+- **Selective Color**: per range `reds`, `yellows`, `greens`, `cyans`, `blues`, `magentas`,
+  `whites`, `neutrals`, `blacks`, an object of `cyan`, `magenta`, `yellow` and `black` −100…100
+  (percent of ink to add or take away), and `absolute` (false, the default, changes each ink by that
+  share of what is there).
+- **Posterize**: `levels` 2…255 (bands a channel).
+- **Threshold**: `level` 1…255 (brighter is white, darker black).
+- **Color Lookup**: `table`, a `.cube` file (`settings={"table": "~/LUTs/Portra.cube"}`): a 3D
+  colour table from a grading tool, 2…65 entries a side. Its name and size show in `layers`.
+
+Compositor (the Mac app that shares the format) shows Brightness/Contrast exactly, Vibrance only
+with `vibrance` 0, a Photo Filter only with `preserveLuminosity` false, and the rest as no change;
+mention that when the person says they will open the project in Compositor.
+
 An adjustment never adds opacity: over transparency it shows nothing, and a blur softens colour
 but keeps the edges of what is below it. A mask on an adjustment layer limits where it applies.
 
-Quick recipes: warmer, `Color Balance` with `midCyanRed` +10 and `midYellowBlue` −15; moodier,
-`Curves` with a lowered midpoint plus `Hue/Saturation saturation=-25`; brighter,
-`Exposure exposure=0.4`; vintage, `Gradient Map` from deep blue to cream at opacity 0.35 with
-blend Soft Light, plus `Grain amount=20`; dreamy, `Gaussian Blur blurRadius=12` at opacity 0.4
-with blend Screen.
+Quick recipes: warmer, `Color Balance` with `midCyanRed` +10 and `midYellowBlue` −15 (or a
+`Photo Filter` at density 20); moodier, `Curves` with a lowered midpoint plus
+`Hue/Saturation saturation=-25`; brighter, `Exposure exposure=0.4`, or `Brightness/Contrast` with
+`brightness` 30 to lift the midtones; punchier colour without garish skin, `Vibrance vibrance=35`;
+vintage, `Gradient Map` from deep blue to cream at opacity 0.35 with blend Soft Light, plus
+`Grain amount=20`; a film look, `Color Lookup` with the person's `.cube` at opacity 0.6 to 1;
+dramatic black and white, `Channel Mixer` with `monochrome` true and `gray` {"red": 60,
+"green": 50, "blue": -10}; a screen-print poster, `Posterize levels=5`; dreamy,
+`Gaussian Blur blurRadius=12` at opacity 0.4 with blend Screen.
+
+## Filters
+
+`filter layer="Photo" kind=… settings={…}` changes a layer's pixels for good, as one step the
+person can undo (with `inSelection=true`, only inside what they selected in the window). Prefer an
+adjustment layer when there is one for the job (the Gaussian Blur, Motion Blur and Add Noise
+adjustments stay editable). Not for text or shape layers.
+
+- **unsharp mask**: `amount` 1…500 (percent, 100), `radius` 0.1…250 pixels (1), `threshold` 0…255
+  (0; raise it to leave skin and sky alone). Gentle: 80, 1, 3; crisp detail: 150, 0.8, 2.
+- **smart sharpen**: `amount` 1…500 (150), `radius` 0.1…64 (1), `reduceNoise` 0…100 (10). Sharpens
+  brightness only and holds back halos: the better choice for portraits and noisy photos.
+- **reduce noise**: `strength` 0…10 (6), `preserveDetails` 0…100 (60), `colorNoise` 0…100 (45).
+- **gaussian blur**: `radius` 0.1…250 (4). **motion blur**: `angle` −90…90, `distance` 1…2000.
+- **high pass**: `radius` 0.1…250 (10): fine detail on gray; on a copy of the photo set to Overlay
+  or Soft Light, it sharpens.
+- **add noise**: `amount` 0.1…400 (10), `gaussian`, `monochromatic`, `seed`. **median**: `radius`
+  1…25 (2): takes out specks and dust.
 
 ## Layer effects
 
@@ -233,8 +309,10 @@ Remove Background, or the Object Select tool), then try again.
   `mask_image=…` a grayscale picture over the same box (white shows). This is how generated
   pictures land where the person asked.
 
-The person also has Select > Subject, Edit > Content-Aware Fill, the Spot Healing Brush (J) and the
-Object Select tool (W, with the Magic Wand) in the window.
+The person also has Select > Subject, Select > Select and Mask (refining an edge for hair and fur),
+Edit > Content-Aware Fill, the Spot Healing and Healing brushes (J), the Clone Stamp (S) and the
+Object Select tool (W, with the Magic Wand) in the window; point them there when a job needs a
+hand on the picture.
 
 ## Generated pictures
 
@@ -252,8 +330,10 @@ dramatic" come from the window's Ask Hermes field with the project, its layers a
 
 1. Look first: `canvas action=preview` and `canvas action=layers`. Decide what the request means
    for this picture (moodier: darker midtones, less saturation, cooler shadows, a vignette).
-2. Prefer adjustment layers over changing pixels: Curves or Levels for tone, Hue/Saturation for
-   colour strength, Color Balance or a Gradient Map for colour casts, Exposure for brightness.
+2. Prefer adjustment layers over changing pixels: `auto_adjust` as a first pass on a dull or
+   tinted photo, Curves, Levels or Brightness/Contrast for tone, Hue/Saturation or Vibrance for
+   colour strength, Color Balance, a Photo Filter or a Gradient Map for colour casts, Exposure for
+   brightness, Color Lookup for a look the person has as a `.cube` file.
    Clip an adjustment to one layer (`clip=true`) when only that layer should change, and mask an
    adjustment (a vignette is a darkening Curves layer with its centre masked out) to limit it.
 3. Keep it editable and tidy: name what you add ("Moody grade", "Vignette"), group related layers,
@@ -323,5 +403,13 @@ Rules that matter (break one and the whole file is refused):
   `cornerRadius`, and for lines `lineWidth` with `start` and `end` as fractions of the box). The
   PNG must match the record, so prefer `add_text` and `add_shape`, which draw it; painting on such
   a layer turns it into plain pixels.
+- `guides` is a list of `{"id": "<UUID>", "axis": "vertical" or "horizontal", "position": <px>}`.
+- Herald's own adjustments (Brightness/Contrast and the others above) go in `heraldAdjustment`,
+  never in `adjustment.kind`: `{"kind": "Vibrance", "vibrance": 30, "saturation": 0}`, with the
+  fields listed under Adjustment settings. The layer still needs a complete `adjustment` record
+  (Compositor reads that one); Herald makes it again from `heraldAdjustment` when it opens the
+  project, so a Levels record with its defaults will do. A Color Lookup's table is the file
+  `images/<ID>.cube`, with `"name"` and `"size"` (its LUT_3D_SIZE) in the record. Prefer
+  `add_adjustment`, which writes all of it.
 
 The same files open in Compositor on a Mac.

@@ -9,6 +9,7 @@ import {
   FORMAT_ID,
   FORMAT_VERSION,
   HERALD_ADJUSTMENT_KINDS,
+  HERALD_RANGES,
   imageFileFor,
   type LayerRecord,
   maskFileFor,
@@ -218,6 +219,26 @@ describe("Compositor's ranges", () => {
     for (const name of ['fontSize', 'tracking', 'leading', 'textBox', 'layerSize'] as const) {
       expect(skill, name).toContain(shown(name))
     }
+
+    // Herald's own adjustments, held to Herald's bounds.
+    const herald = (name: keyof typeof HERALD_RANGES) => HERALD_RANGES[name].map((value) => String(value).replace('-', '−')).join('…')
+    const heraldListed: [string, keyof typeof HERALD_RANGES][] = [
+      ['`brightness`', 'brightness'],
+      ['`contrast`', 'contrast'],
+      ['`vibrance`', 'vibrance'],
+      ['`saturation`', 'saturation'],
+      ['`density`', 'density'],
+      ['`constant`', 'mixer'],
+      ['`black`', 'inks'],
+      ['`levels`', 'posterize'],
+      ['`level`', 'threshold']
+    ]
+
+    for (const [field, name] of heraldListed) {
+      expect(skill, `${field} ${name}`).toContain(`${field} ${herald(name)}`)
+    }
+
+    expect(skill).toContain(`${herald('tableSize')} entries a side`)
   })
 })
 

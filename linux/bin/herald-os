@@ -18,9 +18,13 @@ call the tools directly.
   Capture       capture screenshot [region|window|screen] | capture record [region] [audio] | capture stop
                 capture region --ask | capture color | capture qr | capture text
                 capture transcode <file> [gif|mp4|webm] | capture share <file>
-  Canvas        canvas open [file] | canvas new [name] [WxH] | canvas status | canvas layers [project]
+  Canvas        canvas open [file] | canvas new [name] [WxH] | canvas status | canvas layers [project] | canvas history
                 canvas text <words> [--x --y --size --font --color --align] | canvas resize <WxH> [--anchor <a>]
-                canvas crop <x> <y> <w> <h> | canvas preview [project] | canvas export <file> | canvas undo|redo
+                canvas crop <x> <y> <w> <h> | canvas crop --ratio 4:5 [--angle <deg>] | canvas preview [project]
+                canvas export <file> | canvas undo|redo [--steps <n>] | canvas auto [tone|contrast|color]
+                canvas align <edges> [--layers a,b] [--to canvas|layers|selection] | canvas distribute <mode> --layers a,b,c
+                canvas guides [list|clear] | canvas guides add|remove <axis> <pos> | canvas guides add --margins <m> [--columns <n>]
+                canvas filter <kind> [--amount --radius --threshold --angle --distance --strength] [--layer <l>]
                 canvas mask <layer> reveal|hide|invert|apply|enable|disable|remove|link|unlink|reveal-selection|hide-selection
                 canvas remove-background [layer] [--cutout] | canvas fill <x> <y> <w> <h> [--layer <l>] [--new-layer]
   Crashes       crash list | crash diagnose [pid|name] | crash mute <name> [off]
@@ -89,7 +93,7 @@ COMMANDS: dict[str, str] = {
     "event": "event <name> [key=value ...]: report an event so hooks and event automations run (login, after-update, …)",
     "hook": "hook list | hook install <event> <script> | hook dir: scripts that run when something happens",
     "os": "Run a Herald OS command: os <command.id> [json args], e.g. os page.open '{\"name\": \"missions\"}'",
-    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> | preview [project] | export <file> [--project …] [--overwrite] | undo | redo | mask <layer> <action> | remove-background [layer] [--cutout] | fill <x> <y> <w> <h> [--layer …] [--new-layer]: Herald Canvas, the image editor",
+    "canvas": "canvas open [file] | new [name] [WxH] | status | layers [project] | history | text <words> [--x …] | resize <WxH> [--anchor …] | crop <x> <y> <w> <h> [--ratio …] [--angle …] | preview [project] | export <file> [--project …] [--overwrite] | undo | redo [--steps <n>] | auto [tone|contrast|color] | align <edges> [--layers …] | distribute <mode> --layers … | guides … | filter <kind> [--amount …] | mask <layer> <action> | remove-background [layer] [--cutout] | fill <x> <y> <w> <h> [--layer …] [--new-layer]: Herald Canvas, the image editor",
     "voice": "Talk to Hermes: voice [toggle|start|stop|mute] (default toggle)",
     "dictate": "Start or finish dictation: what you say is typed into the focused app",
     "emoji": "Emoji picker; the pick is typed into the focused app",
@@ -994,10 +998,14 @@ def run_os_wait(command: str, args: dict | None = None, timeout: float = 30) -> 
 # ---------------------------------------------------------------------------------------------
 # Herald Canvas: the image editor, through the same canvas.* commands Hermes uses.
 CANVAS_USAGE = (
-    "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] "
+    "canvas open [<file>] | new [<name>] [<width>x<height>] | status | layers [<project>] | history [<project>] "
     "| text <words> [--x <px>] [--y <px>] [--width <px>] [--size <px>] [--font <family>] [--color <css>] [--align left|center|right] "
-    "| resize <width>x<height> [--anchor <where>] [--image] | resize --scale <n> | crop <x> <y> <width> <height> "
-    "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo "
+    "| resize <width>x<height> [--anchor <where>] [--image] | resize --scale <n> | crop [<x> <y> <width> <height>] [--ratio <w:h>] [--angle <degrees>] "
+    "| preview [<project>] [--size <px>] | export <file> [--project <project>] [--scale <n>] [--quality <0-1>] [--overwrite] | undo | redo [--steps <n>] "
+    "| auto [tone|contrast|color] [--cutoff <percent>] | align <edges> [--layers <a,b>] [--to canvas|layers|selection] [--margin <px>] "
+    "| distribute <horizontal|vertical|left|center|right|top|middle|bottom> --layers <a,b,c> "
+    "| guides [list|clear] | guides add|remove <vertical|horizontal> <position> | guides add [--margins <m>] [--columns <n>] [--gutter <px>] [--center] "
+    "| filter <kind> [--amount <n>] [--radius <px>] [--threshold <n>] [--angle <deg>] [--distance <px>] [--strength <n>] [--settings <json>] [--layer <layer>] "
     "| mask <layer> <reveal|hide|reveal-selection|hide-selection|invert|apply|enable|disable|remove|link|unlink> [--project <project>] "
     "| remove-background [<layer>] [--cutout] [--project <project>] | fill <x> <y> <width> <height> [--layer <layer>] [--new-layer] [--project <project>]"
 )

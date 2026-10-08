@@ -41,37 +41,135 @@ Press a tool's key to pick it; press it again (or with `Shift`) for the other to
 | Rectangular and Elliptical Marquee | `M` | Selects a box or an ellipse (`Shift` adds, `Alt` takes away) |
 | Lasso and Polygonal Lasso | `L` | Selects freehand, or corner to corner (`Backspace` takes back a corner) |
 | Magic Wand and Object Select | `W` | Selects similar colours; Object Select picks the object you click or box (an AI model) |
-| Crop | `C` | Crops the canvas (`Enter` crops, `Esc` cancels); layers keep their pixels |
+| Crop | `C` | Crops the canvas, freely or to a ratio, and straightens a tilted picture (`Enter` crops, `Esc` cancels); layers keep their pixels |
 | Eyedropper | `I` | Picks a colour from the image |
-| Spot Healing Brush | `J` | Paints over a blemish and fills it from around it |
+| Spot Healing Brush and Healing Brush | `J` | Paints over a blemish and fills it from around it; the Healing Brush copies from where you `Alt`-click and takes on the colour around each stroke |
 | Brush | `B` | Paints, on the pixels or on the layer's mask |
+| Clone Stamp | `S` | Copies from where you `Alt`-click (`Option`-click), following the pointer |
 | Eraser | `E` | Erases (on a mask, hides) |
-| Paint Bucket and Gradient | `G` | Fills similar colours, or drags a gradient |
+| Paint Bucket and Gradient | `G` | Fills similar colours, or drags a gradient from the gradient editor, in five styles |
 | Type | `T` | Click for a line of text, drag a box for a paragraph; click a text layer to edit it |
 | Shape | `U` | Draws a rectangle, rounded rectangle, ellipse or line (`Shift` squares it) |
 | Hand | `H` (or hold `Space`) | Moves the view |
 | Zoom | `Z` | Zooms in (`Alt` out) |
 
 Other keys: `X` swaps the foreground and background colours and `D` resets them; `[` and `]` change
-the brush size, with `Shift` its hardness; the number keys set opacity (`5` is 50%, `4` then `5`
-quickly is 45%); the arrow keys nudge the picked layers with the Move tool (`Shift` for 10 pixels).
+the brush size (the Clone Stamp's, the healing brushes' and the Refine Edge brush's too), with
+`Shift` its hardness; the number keys set opacity (`5` is 50%, `4` then `5` quickly is 45%); the
+arrow keys nudge the picked layers with the Move tool (`Shift` for 10 pixels).
 
 | Command | macOS | Herald OS Linux |
 | --- | --- | --- |
 | New, Open, Save, Save As | `Cmd+N`, `Cmd+O`, `Cmd+S`, `Cmd+Shift+S` | `Ctrl` with the same keys |
-| Undo, Redo | `Cmd+Z`, `Cmd+Shift+Z` | `Ctrl+Z`, `Ctrl+Shift+Z` |
+| Undo, Redo, Toggle Last State | `Cmd+Z`, `Cmd+Shift+Z`, `Cmd+Alt+Z` | `Ctrl` with the same keys |
 | Cut, Copy, Copy Merged, Paste | `Cmd+X`, `Cmd+C`, `Cmd+Shift+C`, `Cmd+V` | `Ctrl` with the same keys |
 | Fill, with the foreground or background colour | `Shift+F5`, `Alt+Backspace`, `Cmd+Backspace` | `Shift+F5`, `Alt+Backspace`, `Ctrl+Backspace` |
 | Free Transform | `Cmd+T` | `Ctrl+T` |
 | Select All, Deselect, Reselect, Inverse | `Cmd+A`, `Cmd+D`, `Cmd+Shift+D`, `Cmd+Shift+I` | `Ctrl` with the same keys |
+| Select and Mask | `Cmd+Alt+R` | `Ctrl+Alt+R` |
 | Feather the selection | `Shift+F6` | `Shift+F6` |
 | New Layer, Duplicate (or Layer via Copy), Layer via Cut | `Cmd+Shift+N`, `Cmd+J`, `Cmd+Shift+J` | `Ctrl` with the same keys |
 | Group, Ungroup, Clipping Mask | `Cmd+G`, `Cmd+Shift+G`, `Cmd+Alt+G` | `Ctrl` with the same keys |
 | Bring Forward, Send Backward (to the front or back with `Shift`) | `Cmd+]`, `Cmd+[` | `Ctrl+]`, `Ctrl+[` |
 | Merge Down | `Cmd+E` | `Ctrl+E` |
 | Image Size, Canvas Size | `Cmd+Alt+I`, `Cmd+Alt+C` | `Ctrl+Alt+I`, `Ctrl+Alt+C` |
+| Auto Tone, Auto Contrast, Auto Color | `Cmd+Shift+L`, `Cmd+Alt+Shift+L`, `Cmd+Shift+B` | `Ctrl` with the same keys |
+| Last Filter | `Cmd+Alt+F` | `Ctrl+Alt+F` |
 | Zoom in, out, fit, actual pixels | `Cmd+=`, `Cmd+-`, `Cmd+0`, `Cmd+1` | `Ctrl` with the same keys |
+| Rulers, Guides, Lock Guides, Snap | `Cmd+R`, `Cmd+;`, `Cmd+Alt+;`, `Cmd+Shift+;` | `Ctrl` with the same keys |
 | Export as PNG | `Cmd+Alt+Shift+W` | `Ctrl+Alt+Shift+W` |
+
+## History
+
+The History tab, beside Properties (or Edit > History), lists every step from the top down. The
+first row is the document as it opened (or, once old steps were let go to save memory, the earliest
+state kept), and the current step is highlighted. Click a step to go back to it: the steps after it
+dim and stay until you make a new change, which drops them. Steps Hermes made are marked with a
+sparkle, and changes from outside the window (Hermes on a closed project, a script, Compositor)
+with a circling arrow. Edit > Toggle Last State flips between the last change and the state before
+it, to compare.
+
+## Cropping and straightening
+
+The Crop tool's options hold the box to a ratio: Free, Original, 1:1, 4:5, 3:2, 16:9, 9:16, or
+Custom with your own width and height; the swap button turns it between portrait and landscape.
+Straighten lets you draw along a horizon or an edge that should be level: the picture turns so it
+is, and the box keeps the largest area with no empty corners. `Enter` crops (one step, straightening
+included); `Esc` puts everything back. The box snaps to guides and to the canvas's and layers' edges.
+
+## Rulers, guides and snapping
+
+- **Rulers.** View > Rulers shows pixel rulers along the top and left, with a mark following the
+  pointer.
+- **Guides.** Drag from a ruler to pull out a guide; with the Move tool (or holding `Cmd`, `Ctrl`
+  on Linux) drag a guide to move it, or off the canvas to remove it. View > New Guide places one at
+  an exact position (or a percentage), View > Clear Guides removes them all and View > Lock Guides
+  keeps them still. Guides are saved with the project and never export.
+- **Snapping.** With View > Snap on, moves, transforms, crop boxes and marquees snap to guides, the
+  canvas's edges and centre, and other layers' edges and centres; View > Snap To picks which.
+  Dragging a guide with `Shift` places it without snapping.
+- **Smart guides.** While you move a layer, lines show where it lines up with another, and equal
+  gaps between layers are labelled with their size (View > Smart Guides).
+
+## Retouching
+
+- **Spot Healing Brush** (`J`): paint over a blemish, a wire or a small object; when you let go it
+  is filled from the pixels around it.
+- **Healing Brush** (`J` again): `Alt`-click (`Option`-click) a clean area, then paint over what
+  should go. The copy keeps its texture, and when you let go its colour and tone are matched to the
+  pixels around the stroke, so skin, sky or a wall blends in without a seam.
+- **Clone Stamp** (`S`): `Alt`-click where to copy from, then paint: the source follows the pointer
+  at the same distance. Aligned keeps that distance from one stroke to the next; turned off, every
+  stroke copies from the source point again. Sample copies the layer you paint on or all layers
+  together. While you hover, the brush shows the source under it, and a crosshair marks where the
+  copy comes from.
+
+Both work through the selection with the brush's size, hardness, opacity and flow, one step a
+stroke.
+
+## Filters
+
+The Filter menu changes the active layer's pixels, inside the selection when there is one:
+
+- **Blur:** Gaussian Blur (radius) and Motion Blur (angle, distance).
+- **Noise:** Add Noise (amount, uniform or gaussian, monochromatic), Median (radius: removes specks
+  and dust) and Reduce Noise (strength, how much detail to keep, colour noise; it smooths flat areas
+  and keeps edges).
+- **Sharpen:** Unsharp Mask (amount, radius, and a threshold below which differences are left
+  alone) and Smart Sharpen (sharpens brightness only, holding back halos and grain).
+- **Other:** High Pass (radius), the fine detail on gray: set it to Overlay or Soft Light to sharpen.
+
+Each opens with a preview on the canvas as you change it (on a reduced copy for very large images)
+and applies as one step; Filter > Last Filter runs the last one again with the same settings. A
+filter changes pixels for good: the Gaussian Blur, Motion Blur and Add Noise adjustment layers do
+the same without touching them.
+
+## Select and Mask
+
+Select > Select and Mask refines a selection, or the mask you are painting on, for hair, fur and
+soft edges. Around the edge (Radius, with Smart Radius narrowing it where the picture's edge is
+crisp), each pixel is worked out again from the colours of what is surely in and surely out near
+it; paint with the Refine Edge brush over stray hair to work it out there too (`Alt` takes the
+brush back). Smooth, Feather, Contrast and Shift Edge then shape the edge. View shows the result
+as an overlay, on black, on white, in black and white, or as marching ants.
+
+Output to the selection, a layer mask, a new layer, or a new layer with a layer mask (the original
+is hidden); Decontaminate Colours, for the new layers, takes the background's colour out of the
+edge. OK (`Enter`) refines at full size as one step; Cancel (`Esc`) leaves everything as it was.
+
+## Gradients
+
+Click the gradient in the Gradient tool's options to open the editor:
+
+- **Presets:** Foreground to Background, Foreground to Transparent, Black to White, Fade to Black,
+  Spectrum, Sunset, Ocean, Copper, Steel and Violet to Orange, then the gradients you saved. Name
+  the gradient and press Save to keep it; hover a saved one for its remove button.
+- **Stops:** opacity stops sit above the strip and colour stops below it. Click beside the strip to
+  add a stop, drag one to move it, drag it away (or press `Delete`) to remove it. A colour stop is
+  its own colour, or the foreground or background colour of the moment. The diamond between two
+  stops sets where they mix half way.
+- **Styles:** linear, radial, angle (a sweep around where you start), reflected (both ways from the
+  start) and diamond, with Reverse and Opacity beside them. `Shift` keeps the line to 45° steps.
 
 ## Layers
 
@@ -86,12 +184,28 @@ quickly is 45%); the arrow keys nudge the picked layers with the Move tool (`Shi
   shows); `Cmd`-click (`Ctrl`-click) a thumbnail to load it as a selection.
 - **Clipping.** A clipped layer shows only where the layer under it has pixels: text filled with a
   photo, a colour change on one layer.
-- **Adjustment layers.** Layer > New Adjustment Layer: Hue/Saturation, Levels, Curves, Exposure,
-  Gradient Map, Grain, Invert, Black & White, Color Balance, Gaussian Blur, Motion Blur and Add
-  Noise. They change everything under them (only the layer below when clipped) and stay editable in
-  the Properties panel.
-- **Layer effects.** Layer > Layer Effects: stroke, drop shadow, inner shadow, outer glow, inner
-  glow and colour overlay, on pictures, text and shapes. Their settings are in the Properties panel.
+- **Adjustment layers.** Layer > New Adjustment Layer: Brightness/Contrast, Levels, Curves,
+  Exposure; Vibrance, Hue/Saturation, Color Balance, Black & White, Photo Filter, Channel Mixer,
+  Color Lookup; Invert, Posterize, Threshold, Gradient Map, Selective Color; Grain, Gaussian Blur,
+  Motion Blur and Add Noise. They change everything under them (only the layer below when clipped)
+  and stay editable in the Properties panel. Color Lookup loads a 3D `.cube` table (2 to 65 entries
+  a side), as grading tools save them, and keeps it in the project. Eight of these are Herald
+  Canvas's own: see [Compositor compatibility](#compositor-compatibility) for how Compositor shows
+  them.
+- **Auto Tone, Auto Contrast and Auto Color.** The Image menu reads the picture under the active
+  layer and adds a Levels layer that fixes it: Auto Tone stretches each channel to the full range,
+  Auto Contrast stretches all three together so colours keep their balance, and Auto Color also
+  takes out a colour cast. The layer stays editable, and its opacity tones it down.
+- **Align and distribute.** With the Move tool, the options bar lines the picked layers up by their
+  left, centre, right, top, middle or bottom, and spaces three or more evenly (by their edges or
+  with equal gaps). "To" picks what they line up with: each other, the selection or the canvas
+  (automatic takes the selection when there is one, then each other with several layers, then the
+  canvas). Layer > Align and Layer > Distribute do the same. A layer lines up by what it shows, not
+  by its transparent margins.
+- **Layer styles.** Layer > Layer Style: stroke, drop shadow, inner shadow, outer glow, inner glow
+  and colour overlay, on pictures, text and shapes, with their settings in the Properties panel.
+  Copy Layer Style takes the active layer's effects; Paste Layer Style puts them on every picked
+  layer in place of theirs, and Clear Layer Style takes them off every picked layer, one step each.
 - **Text and shapes.** Text layers stay editable: pick them with the Type tool, and change font,
   size, colour, alignment, tracking and leading in the options bar. The font list is the fonts on
   your computer, by their real names. Shape layers change kind, colour, corner radius and line
@@ -131,16 +245,23 @@ window, which sends the image's layers and a preview along. Things that work wel
 - "Make an Instagram post for Saturday's market: 1080 by 1350, the photo from my Downloads, the
   date in a panel at the bottom."
 - "Make this photo moodier", "warm it up a little", "put the logo in the bottom right corner".
+- "Fix the colour cast", "straighten the horizon and crop it to 4:5", "sharpen it a little".
+- "Lay out a 12-column grid with 60-pixel margins", "line the three logos up along the bottom and
+  space them evenly", "give the subtitle the headline's style".
+- "Give it a film look with ~/LUTs/Portra.cube", "lift the shadows with Brightness/Contrast".
 - "Remove the background of the product shot", "take the wire out of the sky" (content-aware fill).
 - "Export it as a PSD for the printer" or "as a JPEG at half size".
 
 Hermes works through its `canvas` tool, the same commands the command bar and voice reach: new and
-open, layers, text, shapes, adjustments, effects, masks, resizing and cropping, previews, exports,
-and the on-device tools. Each change lands in the open window as you watch, as one step: `Cmd+Z`
-undoes it, or ask Hermes to undo. On Herald OS Linux, `herald-os canvas` does the same from a
-terminal (`herald-os canvas new Poster 1080x1350`, `herald-os canvas text "Night market"`,
-`herald-os canvas export ~/Desktop/poster.png`, `herald-os canvas undo`). Hermes never downloads a
-model: when one is missing it asks you to allow it in the window.
+open, layers, text, shapes, adjustments (Auto Tone, Contrast and Color too), effects (and copying
+them between layers), masks, aligning and distributing, guides, filters, resizing, cropping and
+straightening, previews, exports, the history, and the on-device tools. Each change lands in the
+open window as you watch, as one step: `Cmd+Z` undoes it, or ask Hermes to undo (several steps at
+once if you like). On Herald OS Linux, `herald-os canvas` does the same from a terminal
+(`herald-os canvas new Poster 1080x1350`, `herald-os canvas text "Night market"`,
+`herald-os canvas align bottom --layers Logo,Badge`, `herald-os canvas filter unsharp mask --amount
+120`, `herald-os canvas export ~/Desktop/poster.png`, `herald-os canvas undo --steps 2`). Hermes
+never downloads a model: when one is missing it asks you to allow it in the window.
 
 ## Compositor compatibility
 
@@ -153,6 +274,23 @@ font runs: Herald Canvas draws them and keeps them through edits where the edite
 (typed letters take the colour of the letter before them). Compositor's Hue/Saturation settings for
 single colour ranges are kept in the file, but Herald Canvas draws only the master setting.
 
+Eight adjustments are Herald Canvas's own: Brightness/Contrast, Vibrance, Photo Filter, Channel
+Mixer, Selective Color, Posterize, Threshold and Color Lookup. Compositor refuses a project with an
+adjustment kind it does not know, so Herald keeps their settings in a field of their own, which
+Compositor passes by, beside one of Compositor's kinds that it does read:
+
+| Herald's adjustment | What Compositor shows |
+| --- | --- |
+| Brightness/Contrast | The same change, as Curves |
+| Vibrance | With Vibrance at 0, the same change as Hue/Saturation; otherwise the picture unchanged |
+| Photo Filter | Without Preserve Luminosity, the same change as Levels; otherwise the picture unchanged |
+| Channel Mixer, Selective Color, Posterize, Threshold, Color Lookup | The picture unchanged (Levels that change nothing) |
+
+A Color Lookup's table is saved in the project as `images/<layer id>.cube`, which Compositor does
+not read. If you save the project in Compositor, it keeps the Compositor kinds and drops Herald's
+settings and tables, so those layers come back to Herald Canvas as the Curves, Hue/Saturation or
+Levels layers Compositor showed.
+
 ## Photoshop documents
 
 Herald Canvas reads and writes PSD and PSB files itself (with the ag-psd library, in the
@@ -162,18 +300,20 @@ background), and lists anything it approximated once the file is open or written
   layer and folder masks; clipping; text layers (Photoshop's pixels, and the text, font, size,
   colour, alignment, tracking, leading and colour and font runs, so they can be edited); and the
   layer effects Herald draws (drop and inner shadow, outer and inner glow, colour overlay, stroke).
-  Adjustment layers open as Hue/Saturation, Levels, Curves, Exposure, Invert, Black & White, Color
-  Balance and Gradient Map.
+  Every adjustment layer opens: Brightness/Contrast, Levels, Curves, Exposure, Vibrance,
+  Hue/Saturation, Color Balance, Black & White, Photo Filter, Channel Mixer, Color Lookup (with a
+  `.cube` table), Invert, Posterize, Threshold, Gradient Map and Selective Color. Herald draws its own
+  adjustments with its own maths, so they look close to Photoshop's rather than identical.
 - **What changes:** blend modes Herald lacks (Dissolve, Darker Color, Lighter Color) become Normal; a
-  folder's own blend mode becomes Pass Through; other adjustment layers (Brightness/Contrast,
-  Vibrance, Photo Filter, Channel Mixer, Color Lookup, Posterize, Threshold, Selective Color) and
-  effects (bevel and emboss, satin, gradient and pattern overlays) are left out; smart objects,
+  folder's own blend mode becomes Pass Through; Color Lookup layers with a `.3dl` or `.look` table
+  or a colour profile, and effects (bevel and emboss, satin, gradient and pattern overlays) are left
+  out; smart objects,
   shape layers and vector masks become pixels (vector masks only where Photoshop stored them as a
   mask too); gradient maps keep their first and last colours; text that is turned, warped, vertical
   or set in a font this computer lacks stays a picture; 16-bit colour becomes 8-bit.
 - **What exports:** layers, folders, masks, clipping, blend modes, opacity, text (as pixels with its
-  text, so Photoshop can set it again when you choose Update), the adjustments Photoshop has, layer
-  effects, and the flattened image. Grain, Gaussian Blur, Motion Blur and Add Noise are filters in
+  text, so Photoshop can set it again when you choose Update), the adjustments Photoshop has (all of
+  Herald's own among them, a Color Lookup with its table), layer effects, and the flattened image. Grain, Gaussian Blur, Motion Blur and Add Noise are filters in
   Photoshop, not adjustment layers, so they show only in the flattened image. Shapes become pixels,
   and turned, flipped or scaled layers are drawn into the document's pixel grid with their masks
   applied. Files past 30,000 pixels a side are written as PSB.

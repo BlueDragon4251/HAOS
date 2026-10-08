@@ -367,3 +367,26 @@ Alternatives considered:
   runs out of memory, and WebGPU needs more storage buffers in one shader than Chromium allows.
 - **Rejected: an inpainting model (LaMa and the like) for content-aware fill.** A large download with
   licences that need care, for results PatchMatch already gives on most photos.
+
+**Follow-up: Herald-only fields extend the format.** Compositor decodes the manifest with Swift's
+synthesized Codable: it skips keys it does not know, but a value it cannot decode, such as an
+adjustment kind outside its list, makes it refuse the whole project. So Herald never writes a kind
+Compositor lacks. What only Herald has goes in fields of its own beside a record Compositor reads:
+
+- **`heraldAdjustment` beside `adjustment`.** Brightness/Contrast, Vibrance, Photo Filter, Channel
+  Mixer, Selective Color, Posterize, Threshold and Color Lookup keep their settings in
+  `heraldAdjustment` (with its own `kind`), while `adjustment` holds a complete record of one of
+  Compositor's kinds: the very same change where one exists (Brightness/Contrast is a 32-point
+  Curves; Vibrance with no vibrance is Hue/Saturation; a Photo Filter without Preserve Luminosity is
+  Levels on each channel), otherwise Levels that change nothing. Herald draws the Herald kind and
+  makes the stand-in again from its settings on every change and every load, so the two never
+  disagree; Compositor draws the stand-in.
+- **Files Compositor does not name.** A Color Lookup's table is `images/<ID>.cube`, beside the
+  PNGs: Compositor loads only the images its layers name, and Herald's writer removes such a file
+  with its layer.
+- **Newer kinds are kept.** A `heraldAdjustment` kind this version does not know is kept as it was
+  and shown as its stand-in, as Compositor shows it.
+- **The cost.** Saving in Compositor drops the unknown keys and files, so such a layer comes back
+  to Herald as its stand-in. Rejected: a new value in `adjustment.kind` or a format version of our
+  own (Compositor would refuse the project), and colour tables inside the manifest (Compositor
+  refuses manifests over 4 MB, about what one 65-entry table takes as text).
