@@ -17,7 +17,7 @@ bridge/
   audit.py           one JSON line per call in $HERMES_HOME/herald-os/audit.jsonl
   crash.py           crash report summaries for system_logs (macOS .ips, Linux core dumps)
   documents.py       system_documents: invoice hints, suggested names, scan pictures, filing places
-  ui.py              client for the shell's control socket (the `os_ui` tool)
+  ui.py              client for the shell's control socket (the `os_ui` and `canvas` tools)
   util.py            shared helpers (data folder, HERALD_OS_* settings)
   host/              HostAdapter per OS: darwin.py, linux.py, posix.py, windows.py (stub)
 skills/
@@ -25,6 +25,7 @@ skills/
   diagnose-crash/    how to explain a crash from its report
   file-documents/    how to find, read, rename and file documents such as invoices, with undo
   herald-os-tailor/  how to change Herald OS itself: themes, fonts, keybindings, settings
+  herald-canvas/     how to make and edit pictures with the canvas tool: workflow, design habits, .comp format
 tests/               pytest suite: `npm run test:bridge` from the repository root
 ```
 
