@@ -109,7 +109,7 @@ COMMANDS: dict[str, str] = {
     "webapp-open": "Internal: open a web app window: webapp-open <url> <name>",
     "update-available": "Internal: tell the menu bar how many updates are pending",
     "channel": "Show or set the update channel: channel [stable|edge] (on the image, the image tag it follows)",
-    "rollback": "Go back to the previous version: the Herald OS image's on the next start (it stays in the boot menu), a release tarball's at once",
+    "rollback": "Go back to the previous version: the Herald OS image's at the next start (it stays in the boot menu), a release tarball's at the next login",
     "firmware": "firmware [check|update]: device firmware through fwupd (the BIOS, the dock, the SSD)",
     "reset": "reset: erase this computer's account, apps and files and start setup again (asks to confirm)",
     "omakase": "Install the curated software set (omakase install | omakase list)",
