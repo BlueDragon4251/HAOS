@@ -51,7 +51,7 @@ describe('workbookFromCsv and csvFromWorkbook', () => {
     expect(losses).toEqual([
       'Only the sheet “Totals” is saved: a CSV file holds one sheet (one other sheet has data).',
       'Formulas are saved as their results.',
-      'Formatting (fonts, colours, borders and number formats) is not saved.'
+      'Formatting (fonts, colours, borders and number formats) is not saved; numbers are saved as they show.'
     ])
   })
 
@@ -74,5 +74,23 @@ describe('workbookFromCsv and csvFromWorkbook', () => {
     const sheet = newSheet('s', 'S', { 0: { 2: { v: 'c' } }, 2: { 0: { v: 'a' } } })
 
     expect(csvFromWorkbook(newWorkbook('book', 'Book', [newSheet('t', 'T'), sheet]), { sheetId: 's' }).text).toBe(',,c\n\na\n')
+  })
+
+  it('reads TRUE and FALSE as booleans and writes booleans back as words', () => {
+    expect(cellFromField('TRUE')).toEqual({ v: 1, t: CELL_TYPE.boolean })
+    expect(cellFromField('true')).toEqual({ v: 'true', t: CELL_TYPE.string })
+    expect(fieldFromCell({ v: 0, t: CELL_TYPE.boolean })).toBe('FALSE')
+    expect(csvFromWorkbook(workbookFromCsv('a,TRUE,FALSE\n', { id: 'b', name: 'B' }).workbook).text).toBe('a,TRUE,FALSE\n')
+  })
+
+  it('writes numbers as they show in their format, from the cell, its column or its row', () => {
+    const sheet = newSheet('s', 'S', { 0: { 0: { v: 46303.5, s: 'date' }, 1: { v: 1200.5 }, 2: { v: 7 } }, 1: { 2: { v: 0.25, s: 'percent' } } })
+    sheet.columnData = { 1: { s: 'money' } }
+    const workbook = { ...newWorkbook('b', 'B', [sheet]), styles: { date: { n: { pattern: 'yyyy-mm-dd' } }, money: { n: { pattern: '#,##0.00' } }, percent: { n: { pattern: '0%' } } } }
+    const shown: Record<string, string> = { 'yyyy-mm-dd': '2026-10-08', '#,##0.00': '1,200.50', '0%': '25%' }
+    const format = (_value: number, pattern: string) => shown[pattern]
+
+    expect(csvFromWorkbook(workbook, { format }).text).toBe('2026-10-08,"1,200.50",7\n,,25%\n')
+    expect(csvFromWorkbook(workbook).text).toBe('46303.5,1200.5,7\n,,0.25\n')
   })
 })
