@@ -1,5 +1,7 @@
 import ExcelJS from 'exceljs'
 import JSZip from 'jszip'
+import type { WorkbookSnapshot } from '../workbook.ts'
+import { readResource, RESOURCES } from './rules.ts'
 
 /*
  * Workbooks for the converter tests, made here rather than taken from anywhere: one built with
@@ -35,8 +37,8 @@ export async function featureWorkbook(): Promise<Uint8Array> {
   data.getCell('A6').value = { formula: 'B2*2', result: 2401 }
   data.getCell('B6').value = { formula: 'SUM(B2:B4)', result: 1200.5 }
   data.getCell('C6').value = { formula: 'XLOOKUP(A2,A2:A3,B2:B3)', result: 1200.5 }
-  data.getCell('A7').value = { formula: 'B7+1', result: 1, shareType: 'shared', ref: 'A7:A9' } as unknown as ExcelJS.CellValue
-  data.getCell('A8').value = { sharedFormula: 'A7', result: 2 } as ExcelJS.CellSharedFormulaValue
+  data.getCell('A7').value = { formula: 'B7+1', result: 2402, shareType: 'shared', ref: 'A7:A9' } as unknown as ExcelJS.CellValue
+  data.getCell('A8').value = { sharedFormula: 'A7', result: 3 } as ExcelJS.CellSharedFormulaValue
   data.getCell('A9').value = { sharedFormula: 'A7', result: 3 } as ExcelJS.CellSharedFormulaValue
   data.getCell('B7').value = { formula: 'B2:B3*2', result: 2401, shareType: 'array', ref: 'B7:B8' } as unknown as ExcelJS.CellValue
   data.getCell('B8').value = 0
@@ -107,6 +109,40 @@ export async function featureWorkbook(): Promise<Uint8Array> {
         .replace(/<autoFilter ref="A1:D9"\/>/, '<autoFilter ref="A1:D9"><filterColumn colId="1"><customFilters><customFilter operator="greaterThan" val="100"/></customFilters></filterColumn></autoFilter>')
         .replace(/(<hyperlinks>)/, '$1<hyperlink ref="F2" location="\'Other Sheet\'!B1" display="Link inside"/>')
   })
+}
+
+type Json = Record<string, unknown>
+
+/**
+ * What a workbook says, for comparing two: styles written into the cells, and without what each
+ * reading makes up (ids of rules and links) or what Univer adds for its own view (scrolling, headers).
+ */
+export function normalized(workbook: WorkbookSnapshot): Json {
+  const style = (id: unknown) => (typeof id === 'string' ? workbook.styles[id] : id)
+  const strip = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null), (key, entry) => (key === 'rangeId' || key === 'cfId' || key === 'uid' || key === 'unitId' || key === 'sheetId' ? undefined : entry))
+  const sheets = workbook.sheetOrder.map((id) => {
+    const { cellData, rowData, columnData, scrollTop: _top, scrollLeft: _left, rowHeader: _rows, columnHeader: _columns, ...rest } = workbook.sheets[id]
+    const cells = Object.fromEntries(Object.entries(cellData ?? {}).map(([row, columns]) => [row, Object.fromEntries(Object.entries(columns).map(([column, cell]) => [column, strip({ ...cell, s: style(cell.s) })]))]))
+    const lines = (data: unknown) => Object.fromEntries(Object.entries((data ?? {}) as Record<string, Json>).map(([index, meta]) => [index, { ...meta, s: style(meta.s) }]))
+
+    return { ...rest, cells, rows: lines(rowData), columns: lines(columnData) }
+  })
+  const names = Object.values(readResource<Record<string, Json>>(workbook.resources, RESOURCES.definedNames) ?? {}).map(({ id: _id, ...name }) => name)
+  // A saved file always has a creation date: the original's, or the day it was first saved.
+  const { created: _created, ...properties } = ((workbook.custom as { herald?: { properties?: Json } } | undefined)?.herald?.properties ?? {}) as Json
+  const filters = readResource<Record<string, { cachedFilteredOut?: number[] }>>(workbook.resources, RESOURCES.filter)
+
+  return {
+    sheets,
+    activeSheetId: workbook.activeSheetId,
+    dateSystem: workbook.dateSystem,
+    defaultStyle: workbook.defaultStyle,
+    properties,
+    names,
+    filters: strip(filters),
+    validations: strip(readResource(workbook.resources, RESOURCES.validation)),
+    conditional: strip(readResource(workbook.resources, RESOURCES.conditional))
+  }
 }
 
 /** Change parts of a package: each function gets a part's XML and returns the new one. */

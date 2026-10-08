@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { CELL_TYPE, newSheet, newWorkbook, type WorkbookSnapshot } from '../workbook.ts'
-import { featureWorkbook, handmadePackage } from './fixtures.ts'
+import { featureWorkbook, handmadePackage, normalized } from './fixtures.ts'
 import { workbookFromXlsx } from './read.ts'
 import { readResource, RESOURCES } from './rules.ts'
 import { xlsxFromWorkbook } from './write.ts'
@@ -10,35 +10,6 @@ import { xlsxFromWorkbook } from './write.ts'
 type Json = Record<string, unknown>
 
 const sheetNamed = (workbook: WorkbookSnapshot, name: string) => Object.values(workbook.sheets).find((sheet) => sheet.name === name)!
-
-/** A workbook without what is made up on each read (ids of rules and links), styles written into the cells. */
-function normalized(workbook: WorkbookSnapshot): Json {
-  const style = (id: unknown) => (typeof id === 'string' ? workbook.styles[id] : id)
-  const strip = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null), (key, entry) => (key === 'rangeId' || key === 'cfId' || key === 'uid' ? undefined : entry))
-  const sheets = workbook.sheetOrder.map((id) => {
-    const { cellData, rowData, columnData, ...rest } = workbook.sheets[id]
-    const cells = Object.fromEntries(Object.entries(cellData).map(([row, columns]) => [row, Object.fromEntries(Object.entries(columns).map(([column, cell]) => [column, strip({ ...cell, s: style(cell.s) })]))]))
-    const lines = (data: unknown) => Object.fromEntries(Object.entries((data ?? {}) as Record<string, Json>).map(([index, meta]) => [index, { ...meta, s: style(meta.s) }]))
-
-    return { ...rest, cells, rows: lines(rowData), columns: lines(columnData) }
-  })
-  const names = Object.values(readResource<Record<string, Json>>(workbook.resources, RESOURCES.definedNames) ?? {}).map(({ id: _id, ...name }) => name)
-
-  // A saved file always has a creation date: the original's, or the day it was first saved.
-  const { created: _created, ...properties } = ((workbook.custom as { herald?: { properties?: Json } } | undefined)?.herald?.properties ?? {}) as Json
-
-  return {
-    sheets,
-    activeSheetId: workbook.activeSheetId,
-    dateSystem: workbook.dateSystem,
-    defaultStyle: workbook.defaultStyle,
-    properties,
-    names,
-    filters: readResource(workbook.resources, RESOURCES.filter),
-    validations: strip(readResource(workbook.resources, RESOURCES.validation)),
-    conditional: strip(readResource(workbook.resources, RESOURCES.conditional))
-  }
-}
 
 async function roundTrip(bytes: Uint8Array) {
   const first = await workbookFromXlsx(bytes, { id: 'book', name: 'Book' })
@@ -62,8 +33,8 @@ describe('xlsx import', () => {
     expect(cells[3][1]).toEqual({ v: '#DIV/0!', t: CELL_TYPE.string })
     expect(cells[5][0]).toEqual({ f: '=B2*2', v: 2401, t: CELL_TYPE.number })
     expect(cells[5][2].f).toBe('=XLOOKUP(A2,A2:A3,B2:B3)')
-    expect(cells[6][0]).toEqual({ f: '=B7+1', si: 'sheet-1!A7', v: 1, t: CELL_TYPE.number })
-    expect(cells[7][0]).toEqual({ si: 'sheet-1!A7', v: 2, t: CELL_TYPE.number })
+    expect(cells[6][0]).toEqual({ f: '=B7+1', si: 'sheet-1!A7', v: 2402, t: CELL_TYPE.number })
+    expect(cells[7][0]).toEqual({ si: 'sheet-1!A7', v: 3, t: CELL_TYPE.number })
     // An array formula is worked out again; its other cells wait for it.
     expect(cells[6][1]).toEqual({ f: '=B2:B3*2', ft: 2, ref: 'B7:B8' })
     expect(cells[7][1]).toBeUndefined()
