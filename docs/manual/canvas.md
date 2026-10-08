@@ -6,9 +6,9 @@ know from photo editors, a few that run AI models on your computer, and Hermes c
 you: ask for a poster, a thumbnail or "make this photo warmer", and watch each change land as a
 step you can undo.
 
-Open it from Applications (`Cmd+Shift+A`, `Super+A` on Linux), from Files ("Edit in Herald Canvas"
-on an image), or by asking Hermes. On Herald OS Linux it opens in its own window, three quarters of
-the screen wide.
+Open it from the Dock, from Applications (`Cmd+Shift+A`, `Super+A` on Linux), from Files ("Edit in
+Herald Canvas" on an image), or by asking Hermes. On Herald OS Linux it opens in its own window,
+three quarters of the screen wide.
 
 ## Opening and saving
 

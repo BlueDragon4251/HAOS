@@ -3,6 +3,7 @@ import { IconX } from '@tabler/icons-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { InstalledApp, WmWindow } from '../../../shared/ipc.ts'
 import { AppGlyph, AppTile, HermesAvatar } from '../../components/app-icon.tsx'
+import { openInCanvas } from '../../features/canvas/open.ts'
 import { cn } from '../../lib/cn.ts'
 import { $env } from '../../store/backend.ts'
 import { useNativeApps } from '../../store/native-apps.ts'
@@ -153,13 +154,24 @@ export function DockSurface() {
       }
     }
 
+    // A shortcut beside the one in Applications; an open Canvas window belongs to it rather than to an entry of its own.
+    const canvasWindows = ours.filter(w => ourFloatingAppId(w) === 'canvas')
+    list.push({
+      id: 'hermes:canvas',
+      label: 'Herald Canvas',
+      render: () => <AppTile id="canvas" size={44} />,
+      onClick: () => (canvasWindows.length > 0 ? focusGroup('hermes:canvas', canvasWindows) : openInCanvas()),
+      running: canvasWindows.length > 0,
+      windows: canvasWindows
+    })
+
     // Our own floating Hermes apps (terminal, system, popped-out chat) as running entries.
     const floatingGroups = new Map<FloatingAppId, WmWindow[]>()
 
     for (const win of ours) {
       const appId = ourFloatingAppId(win)
 
-      if (appId) {
+      if (appId && appId !== 'canvas') {
         floatingGroups.set(appId, [...(floatingGroups.get(appId) ?? []), win])
       }
     }

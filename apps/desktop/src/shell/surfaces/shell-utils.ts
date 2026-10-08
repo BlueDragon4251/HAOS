@@ -19,7 +19,8 @@ const OUR_FLOATING_TITLES: Record<string, FloatingAppId> = {
   'Herald OS · Terminal': 'terminal',
   'Herald OS · System': 'system',
   'Herald OS · Chat': 'chat-popout',
-  'Herald OS · Studio': 'studio'
+  'Herald OS · Studio': 'studio',
+  'Herald OS · Canvas': 'canvas'
 }
 
 export const OUR_MAIN_TITLE = 'Herald OS'

@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { InstalledApp } from '../../shared/ipc.ts'
 import { AppGlyph, HermesAvatar } from '../components/app-icon.tsx'
+import { openInCanvas } from '../features/canvas/open.ts'
 import { cn } from '../lib/cn.ts'
 import { reducedMotion } from '../lib/motion.ts'
 import { $env, $prefs } from '../store/backend.ts'
@@ -89,6 +90,7 @@ export function Dock() {
   const trashPath = platform === 'darwin' ? '~/.Trash' : '~/.local/share/Trash/files'
 
   const main = windows[MAIN_WINDOW_ID]
+  const canvasOpen = Object.values(windows).some(w => w.appId === 'canvas')
   const openHermes = () => {
     if (main && main.phase !== 'minimized') {
       focusWindow(MAIN_WINDOW_ID)
@@ -136,12 +138,14 @@ export function Dock() {
       }
     }
 
+    // A shortcut beside the one in Applications.
+    list.push({ id: 'canvas', label: 'Herald Canvas', render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="canvas" size={22} /></span>, onClick: () => openInCanvas(), running: canvasOpen })
     list.push({ id: 'applications', label: 'Applications', render: () => <span className="icon-tile size-11 rounded-[11px]"><AppGlyph id="grid" size={22} /></span>, onClick: () => $applicationsOpen.set(true) })
     list.push({ id: 'trash', label: 'Trash', render: () => <span className="flex size-11 items-center justify-center rounded-[11px] bg-white/6 text-fg-2"><AppGlyph id="trash" size={22} /></span>, onClick: () => void window.heraldOS.fs.openPath(trashPath) })
 
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apps, iconFor, main?.phase, platform])
+  }, [apps, iconFor, main?.phase, platform, canvasOpen])
 
   const barRef = useRef<HTMLDivElement>(null)
   const { onMove, onLeave } = useDockMagnification(barRef)
