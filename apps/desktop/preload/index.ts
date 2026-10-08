@@ -36,6 +36,12 @@ import {
   IPC,
   type MicPermission,
   type NetworkStatus,
+  type OfficeChangedEvent,
+  type OfficeFileData,
+  type OfficePdfRequest,
+  type OfficePresence,
+  type OfficeSaveTarget,
+  type OfficeWriteResult,
   type OsControlReply,
   type OsControlRequest,
   type ProcessInfo,
@@ -67,6 +73,7 @@ import {
 } from '../shared/ipc.ts'
 import type { BrandingPatch, BrandingView } from '../shared/branding.ts'
 import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/models.ts'
+import type { OfficeAbilities, OfficeApp } from '../shared/office/files.ts'
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
@@ -238,6 +245,29 @@ const api = {
       remove: (id: ModelId): Promise<void> => ipcRenderer.invoke(IPC.canvasModelRemove, id),
       onProgress: (listener: (progress: ModelProgress) => void): Unsubscribe => subscribe(IPC.canvasModelProgress, listener)
     }
+  },
+  office: {
+    /** What this machine adds to the formats: LibreOffice for OpenDocument files. */
+    abilities: (): Promise<OfficeAbilities> => ipcRenderer.invoke(IPC.officeAbilities),
+    /** Files to open in an Office app (none when cancelled). */
+    pickOpen: (app: OfficeApp): Promise<string[]> => ipcRenderer.invoke(IPC.officePickOpen, app),
+    /** Where to save and in which of the app's formats, `preferred` offered first (null when cancelled). */
+    pickSave: (app: OfficeApp, suggestedName: string, preferred?: string): Promise<OfficeSaveTarget | null> => ipcRenderer.invoke(IPC.officePickSave, app, suggestedName, preferred),
+    read: (file: string): Promise<OfficeFileData> => ipcRenderer.invoke(IPC.officeRead, file),
+    /** Replace a file atomically; the first write over an existing file this session backs it up first. */
+    write: (file: string, bytes: Uint8Array, options: { backup?: boolean } = {}): Promise<OfficeWriteResult> => ipcRenderer.invoke(IPC.officeWrite, file, bytes, options),
+    /** Follow a file; `loaded` is the digest of the version this window has, so nothing slips by. */
+    watch: (file: string, loaded?: string | null): Promise<string> => ipcRenderer.invoke(IPC.officeWatch, file, loaded ?? null),
+    unwatch: (watchId: string): Promise<void> => ipcRenderer.invoke(IPC.officeUnwatch, watchId),
+    onChanged: (listener: (event: OfficeChangedEvent) => void): Unsubscribe => subscribe(IPC.officeChanged, listener),
+    /** Tell main what this app's window has open, for Hermes's commands. */
+    report: (presence: Omit<OfficePresence, 'at'> & { focused?: boolean }): void => ipcRenderer.send(IPC.officeReport, presence),
+    /** Every Office window's open documents, the most recently used first. */
+    presence: (): Promise<OfficePresence[]> => ipcRenderer.invoke(IPC.officePresence),
+    /** Print a print view to a PDF the person names; resolves with its path (null when cancelled). */
+    exportPdf: (request: OfficePdfRequest): Promise<string | null> => ipcRenderer.invoke(IPC.officeExportPdf, request),
+    /** A file converted by LibreOffice to `to` (an extension without its dot), as bytes. */
+    convert: (file: string, to: string): Promise<Uint8Array> => ipcRenderer.invoke(IPC.officeConvert, file, to)
   },
   catalog: {
     /** The install catalog with each entry's state on this machine (Linux: everything; macOS: what installs here). */

@@ -14,6 +14,7 @@ import { registerAppsIpc } from './ipc/apps.ts'
 import { registerBridgeIpc } from './ipc/bridge.ts'
 import { registerCanvasIpc } from './canvas/ipc.ts'
 import { registerModelIpc } from './canvas/model-ipc.ts'
+import { registerOfficeIpc } from './office/ipc.ts'
 import { MODEL_SCHEME } from '../shared/canvas/models.ts'
 import { registerCaptureIpc } from './ipc/capture.ts'
 import { registerControlsIpc } from './ipc/controls.ts'
@@ -275,6 +276,7 @@ function registerCoreIpc(): void {
   registerFsIpc(() => mainWindow)
   registerCanvasIpc(() => mainWindow)
   registerModelIpc()
+  registerOfficeIpc(() => mainWindow)
   registerAppsIpc()
   registerBridgeIpc()
   registerServiceIpc()

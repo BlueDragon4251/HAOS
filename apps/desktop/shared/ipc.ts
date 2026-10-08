@@ -3,6 +3,7 @@
 
 import type { EventAutomation } from './events.ts'
 import type { MenuBarLayout } from './menu-bar.ts'
+import type { OfficeApp } from './office/files.ts'
 import type { ColorScheme, ThemeColors } from './theme.ts'
 
 export type BackendPhase = 'idle' | 'resolving' | 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
@@ -951,7 +952,25 @@ export const IPC = {
   canvasModelCancel: 'herald-os:canvas:model-cancel',
   canvasModelRemove: 'herald-os:canvas:model-remove',
   /** Main -> renderer: how a model download is going. */
-  canvasModelProgress: 'herald-os:canvas:model-progress'
+  canvasModelProgress: 'herald-os:canvas:model-progress',
+
+  // Herald Office (Docs, Sheets, Slides): files read and written whole, watched, backed up before Herald first saves over them.
+  /** What this machine adds to the formats (LibreOffice for OpenDocument files). */
+  officeAbilities: 'herald-os:office:abilities',
+  officePickOpen: 'herald-os:office:pick-open',
+  officePickSave: 'herald-os:office:pick-save',
+  officeRead: 'herald-os:office:read',
+  officeWrite: 'herald-os:office:write',
+  officeWatch: 'herald-os:office:watch',
+  officeUnwatch: 'herald-os:office:unwatch',
+  officeReport: 'herald-os:office:report',
+  officePresence: 'herald-os:office:presence',
+  /** Print a window's print view to a PDF the person names. */
+  officeExportPdf: 'herald-os:office:export-pdf',
+  /** A file converted by headless LibreOffice, as the converted file's bytes. */
+  officeConvert: 'herald-os:office:convert',
+  /** Main -> renderer: an open file changed on disk (Hermes, another app); its new digest, or null once it is gone. */
+  officeChanged: 'herald-os:office:changed'
 } as const
 
 /** Raw pixels for a project image or an export: RGBA layers, grayscale masks. */
@@ -1022,6 +1041,61 @@ export interface CanvasPasted {
 export interface CanvasChangedEvent {
   watchId: string
   project: CanvasProject
+}
+
+/** An Office file as read from disk; the digest identifies this version of it. */
+export interface OfficeFileData {
+  path: string
+  bytes: Uint8Array
+  digest: string
+  size: number
+  modifiedAt: number
+}
+
+export interface OfficeWriteResult {
+  digest: string
+  /** Where the original went, when this write was the first over it this session. */
+  backup: string | null
+}
+
+export interface OfficeChangedEvent {
+  watchId: string
+  path: string
+  digest: string | null
+}
+
+export interface OfficeSaveTarget {
+  path: string
+  /** The extension the file is saved in, one the app saves. */
+  extension: string
+}
+
+/** An open Office document, as a window reports it (for Hermes's commands). */
+export interface OfficeDocSummary {
+  key: string
+  path: string | null
+  name: string
+  /** The file's extension, or the format a new document saves in. */
+  format: string
+  modified: boolean
+  /** What is in front inside it: the sheet and selection, the slide. */
+  detail?: string
+}
+
+/** What one Office window has open; `at` is when it was last used. */
+export interface OfficePresence {
+  app: OfficeApp
+  at: number
+  active: string | null
+  documents: OfficeDocSummary[]
+}
+
+export interface OfficePdfRequest {
+  html: string
+  suggestedName: string
+  landscape?: boolean
+  /** A named paper size, or one in inches. */
+  pageSize?: 'A4' | 'Letter' | { width: number; height: number }
 }
 
 export type PowerAction = 'suspend' | 'reboot' | 'poweroff' | 'logout' | 'lock'
