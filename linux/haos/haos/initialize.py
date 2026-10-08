@@ -2,12 +2,12 @@
 
 import grp
 import os
-import pwd
 import secrets
 import sys
 from pathlib import Path
 
 from .policy import atomic_json
+from .observer import secure_observer
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
     user = sys.argv[1]
     if user in {"root", "haos-agent", "haos-control"}:
         raise ValueError("observer/owner and service accounts must be separate")
-    pwd.getpwnam(user)
+    secure_observer(user)
     gid = grp.getgrnam("haos-ui").gr_gid
     config = Path("/etc/haos")
     config.mkdir(mode=0o755, exist_ok=True)

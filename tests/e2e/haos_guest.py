@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Acceptance probe injected only into an explicitly marked, disposable QEMU guest."""
 
+import grp
 import hashlib
 import json
 import os
@@ -110,10 +111,34 @@ def main():
     wait_for(lambda: active("haos-controller.service"))
     wait_for(health)
     wait_for(lambda: active("greetd.service"))
+    wait_for(lambda: active("haos-observer-security.service"))
     wait_for(lambda: subprocess.run(["pgrep", "-u", "hermes", "-f", "/usr/share/herald-os/app/"], capture_output=True).returncode == 0)
+    observer = pwd.getpwnam("hermes")
+    administrator_gids = {g.gr_gid for g in grp.getgrall() if g.gr_name in {"wheel", "sudo", "admin"}}
+    assert not administrator_gids.intersection(os.getgrouplist("hermes", observer.pw_gid))
+    assert run("passwd", "--status", "hermes", capture_output=True).stdout.split()[1] in {"L", "P"}
+    denied = subprocess.run(["runuser", "-u", "hermes", "--", "sudo", "-n", "id", "-u"], capture_output=True, text=True)
+    assert denied.returncode != 0 and denied.stdout.strip() != "0"
+    observer_proof = {"observer_sudo_denied": True, "observer_administrator_groups_absent": True,
+                      "observer_empty_password_denied": True}
     stamp = ROOT / "mission.json"
     if not stamp.exists():
         run("haos-owner", "stop")
+        # Only this marked guest's own new fixture is deleted. Real owner CLI,
+        # fixed state scope and an installed Restic binary perform the recovery.
+        project = Path("/var/lib/haos-workspace/haos-deleted-project-fixture")
+        assert not project.exists()
+        payload = os.urandom(4096)
+        project.write_bytes(payload)
+        project.chmod(0o600)
+        run("haos-owner", "backup", "init", capture_output=True)
+        snapshot = json.loads(run("haos-owner", "backup", "create", capture_output=True).stdout)["snapshot_id"]
+        project.unlink()
+        restored = json.loads(run("haos-owner", "backup", "restore", snapshot, capture_output=True).stdout)
+        recovered = Path(restored["staging_directory"]) / project.relative_to("/")
+        assert recovered.read_bytes() == payload and recovered.stat().st_mode & 0o777 == 0o600
+        assert not project.exists() and restored["live_state_replaced"] is False
+        backup_proof = {"installed_owner_backup_restore": True, "restore_live_state_untouched": True}
         run("haos-owner", "volume", f"UUID:{A}", "full-data-access")
         run("haos-owner", "volume", f"UUID:{B}", "blocked")
         run("haos-owner", "prepare")
@@ -132,7 +157,7 @@ def main():
         blocked.mkdir()
         run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{B}", str(blocked))
         (blocked / "canary").write_text("blocked canary")
-        proof = {"write": sandbox_probe("rw")}
+        proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof}
         assert (data / "agent-result").read_text() == "actual write"
         run("haos-owner", "cleanup")
         run("haos-owner", "volume", f"UUID:{A}", "read-only")
@@ -167,8 +192,8 @@ def main():
         assert store.events(row["id"])
         store.close()
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 2, "journal_survives_reboot": True,
-            "backend_healthy_after_reboot": True, "mission_id": row["id"],
-            "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/backup acceptance not covered"]}), flush=True)
+            "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof,
+            "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/off-host/whole-system recovery not covered"]}), flush=True)
     run("systemctl", "poweroff")
 
 

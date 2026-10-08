@@ -1,9 +1,11 @@
 # Owner setup
 
-The development image inherits Herald's observer account/first-login configuration. Auto-login, observer wheel membership and initial password behavior are not an accepted production owner onboarding flow. Use disposable VMs until independent owner authentication, locking and recovery enrollment are implemented/tested.
+HAOS creates a locked non-administrator observer account instead of Herald's empty-password wheel account. Initialization and a mandatory pre-session service remove inherited `wheel`/`sudo`/`admin` membership, lock empty passwords and install a validated UID-specific sudo denial, including inherited per-user NOPASSWD rules. Root/service/shared UIDs and privileged primary groups are rejected. The graphical session requires successful first-boot/security units; a security-unit failure blocks its start. Membership changes take effect in new sessions; old sessions must be terminated/rebooted before relying on revocation.
+
+Automatic observer display remains enabled. It is not authenticated owner enrollment or a secure lock-screen flow. No default owner password or automatic owner privilege is created; an independently authenticated administrator/recovery console is required for owner operations. Owner enrollment, strong authentication and recovery access still need to be completed and proven before release. Continue to use disposable VMs.
 
 First boot adds the observer to haos-ui and generates per-host credentials, empty policy and managed attachment. haos-agent/haos-control are separate non-login accounts without wheel/sudo authority.
 
 Current owner authority is authenticated root console/sudo. haos-owner requires effective UID 0 and stopped execution for policy/reconciliation. It writes atomically and audits under /var/lib/haos-owner. Model output/UI/gateway text never grants root.
 
-Owner wizard, strong-auth/recovery-code enrollment, provider/Git/gateway provisioning and mobile owner authorization remain incomplete.
+The sudo denial is a managed final include in the distribution's standard sudoers layout. Root-authored custom policies or external identity/polkit grants require separate review; it is not a proof that every possible privilege mechanism is blocked. Owner wizard, strong-auth/recovery-code enrollment, provider/Git/gateway provisioning and mobile owner authorization remain incomplete.
