@@ -66,3 +66,16 @@ describe('runCommand', () => {
     expect(() => defineCommands([{ id: 'Bad Id', title: '', description: '', tier: 'read', args: [], run: () => ok('') }])).toThrow()
   })
 })
+
+describe('defineCommands', () => {
+  it('leaves out only the command with a bad id and names it', () => {
+    const define = () =>
+      defineCommands([
+        { id: 'toolSearch.set', title: '', description: '', tier: 'mutate', args: [], run: () => ok('') },
+        { id: 'test.after', title: '', description: '', tier: 'read', args: [], run: () => ok('') }
+      ])
+
+    expect(define).toThrow('invalid command id toolSearch.set')
+    expect(listCommands().map(c => c.id)).toEqual(['test.after', 'test.echo'])
+  })
+})

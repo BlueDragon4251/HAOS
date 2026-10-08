@@ -144,7 +144,7 @@ Command families: `page.open|back`, `window.focus|close|minimize|maximize|restor
 `overlay.*`, `sidebar.toggle`, `space.switch`, `help.commands`; `chat.new|open|stop|popout`; `mission.start|open|list|pause|markReviewed`;
 `memory.show|search|add|update|forget`; `file.open|openExternal`, `files.open|show|search|reveal|newFolder`; `automation.list|show|run|pause|resume|create|delete`;
 `connection.list|show|enable|disable`; `build.start`, `studio.open|preview|file|close`; `native.launch`, `web.open`; `settings.open`, `theme.set`, `accent.set`,
-`motion.reduce`, `dock.autoHide`, `voice.engine.set`, `voice.wake.set`; `agents.pauseAll`.
+`motion.reduce`, `dock.autoHide`, `voice.engine.set`, `voice.wake.set`; `agents.pauseAll`, `agents.toolSearch.set`.
 
 Tiers: `read` and `act` commands run immediately (audited when Hermes runs them); `mutate` (add a
 memory, pause an automation, change a setting) runs and is shown in the caption; `destructive`

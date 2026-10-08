@@ -50,7 +50,7 @@ export interface CommandContext {
 export type CommandPhrase = string | { phrase: string; args: Record<string, unknown> }
 
 export interface OsCommand {
-  /** Dotted id, `area.verb` (e.g. `page.open`, `memory.add`). */
+  /** Dotted id, `area.verb`, the area all lowercase (e.g. `page.open`, `agents.pauseAll`); see `COMMAND_ID`. */
   id: string
   title: string
   description: string
@@ -90,13 +90,23 @@ const MAX_LOG = 50
 /** Recent commands, newest first. The HUD shows those from voice, agent and follow. */
 export const $commandLog = atom<CommandEvent[]>([])
 
-export function defineCommands(commands: readonly OsCommand[]): void {
-  for (const command of commands) {
-    if (!/^[a-z][a-z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/.test(command.id)) {
-      throw new Error(`invalid command id ${command.id}`)
-    }
+/** A command id: a lowercase area, then camelCase words (`page.open`, `agents.pauseAll`, `voice.wake.set`). */
+export const COMMAND_ID = /^[a-z][a-z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/
 
-    registry.set(command.id, command)
+/** Register commands; any whose id breaks `COMMAND_ID` is skipped and named in the error thrown after the rest are registered. */
+export function defineCommands(commands: readonly OsCommand[]): void {
+  const invalid: string[] = []
+
+  for (const command of commands) {
+    if (COMMAND_ID.test(command.id)) {
+      registry.set(command.id, command)
+    } else {
+      invalid.push(command.id)
+    }
+  }
+
+  if (invalid.length > 0) {
+    throw new Error(`invalid command id${invalid.length > 1 ? 's' : ''} ${invalid.join(', ')} (a lowercase area, then camelCase words: page.open, agents.pauseAll)`)
   }
 }
 

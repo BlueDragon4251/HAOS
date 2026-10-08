@@ -1,4 +1,4 @@
-import { defineCommands } from '../store/os-commands.ts'
+import { defineCommands, type OsCommand } from '../store/os-commands.ts'
 import { automationCommands } from './automations.ts'
 import { canvasCommands } from './canvas.ts'
 import { captureCommands } from './capture.ts'
@@ -23,6 +23,33 @@ import { pluginCommands } from './plugins.ts'
 import { softwareCommands } from './software.ts'
 import { typingCommands } from './typing.ts'
 
+/** Every command group by file, in the order they register. A group file registers once it is listed here. */
+export const commandGroups: Record<string, readonly OsCommand[]> = {
+  navigation: navigationCommands,
+  edit: editCommands,
+  hermes: hermesCommands,
+  memory: memoryCommands,
+  files: filesCommands,
+  automations: automationCommands,
+  connections: connectionCommands,
+  system: systemCommands,
+  studio: studioCommands,
+  open: openCommands,
+  continuity: continuityCommands,
+  crash: crashCommands,
+  themes: themeCommands,
+  screen: screenCommands,
+  controls: controlCommands,
+  switches: switchCommands,
+  capture: captureCommands,
+  typing: typingCommands,
+  software: softwareCommands,
+  plugins: pluginCommands,
+  menubar: menuBarCommands,
+  branding: brandingCommands,
+  canvas: canvasCommands
+}
+
 let registered = false
 
 /** Register every OS command once at boot. New user-visible actions belong in one of these files. */
@@ -33,12 +60,13 @@ export function registerOsCommands(): void {
 
   registered = true
 
-  // A bad definition must not take the whole shell down with it; report and keep booting.
-  for (const group of [navigationCommands, editCommands, hermesCommands, memoryCommands, filesCommands, automationCommands, connectionCommands, systemCommands, studioCommands, openCommands, continuityCommands, crashCommands, themeCommands, screenCommands, controlCommands, switchCommands, captureCommands, typingCommands, softwareCommands, pluginCommands, menuBarCommands, brandingCommands, canvasCommands]) {
+  // A bad definition costs only itself: defineCommands registers the rest of its group before it
+  // throws. Report it and keep booting.
+  for (const [group, commands] of Object.entries(commandGroups)) {
     try {
-      defineCommands(group)
+      defineCommands(commands)
     } catch (error) {
-      console.error('[os-commands] registration failed:', error)
+      console.error(`[os-commands] skipped in ${group}:`, error)
     }
   }
 }

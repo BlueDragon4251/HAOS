@@ -96,7 +96,7 @@ schemas into other sessions; what it still changes there is that their own plugi
 listed directly. So every setup (bootstrap, the app's first start, `herald-os setup`) says what each
 step changes, stops at the first `hermes` step that fails, and writes the value it found to
 `$HERMES_HOME/herald-os/tool-search-before` before turning it off; Settings > Hermes & agents > Tool
-search (and the `toolSearch.set` command) is the promised switch, and `herald-os setup --undo` puts
+search (and the `agents.toolSearch.set` command) is the promised switch, and `herald-os setup --undo` puts
 the value back with the rest. docs/SYSTEM-BRIDGE.md lists everything Herald OS changes in Hermes.
 
 ## ADR-011: Backend is spawned with HERMES_DESKTOP=1

@@ -262,7 +262,7 @@ export const hermesCommands: readonly OsCommand[] = [
     }
   },
   {
-    id: 'toolSearch.set',
+    id: 'agents.toolSearch.set',
     title: 'Tool search',
     description: "Hermes's Tool Search for every session: on looks plugin and MCP tools up when needed (fewer prompt tokens), off keeps Herald OS's system tools directly callable. New conversations use it.",
     tier: 'mutate',

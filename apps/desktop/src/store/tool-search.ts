@@ -5,7 +5,8 @@ import { notify } from './notifications.ts'
 /*
  * Hermes's Tool Search (`tools.tool_search.enabled`) keeps plugin and MCP tools behind a lookup to
  * save prompt tokens. It is one setting for every Hermes session, and Herald OS turns it off at setup
- * so its system tools stay directly callable (ADR-010); Settings and `toolSearch.set` turn it back on.
+ * so its system tools stay directly callable (ADR-010); Settings and `agents.toolSearch.set` turn it
+ * back on.
  */
 
 interface ToolsConfig {
