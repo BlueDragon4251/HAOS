@@ -22,8 +22,8 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install pytest==9.0.2 websockets==15.0.1
       - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py
-      - name: Root-authority backup tests in disposable fixtures
-        run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py
+      - name: Root-authority backup and policy-access tests in disposable fixtures
+        run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py linux/haos/probes/test_policy_access.py
       - name: QEMU runtime selection regression tests
         run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py
       - name: Real local socket and kernel filesystem probes
@@ -33,7 +33,7 @@ jobs:
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py
       - name: Record actual diskless QEMU acceleration
         run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
       - name: Restore a deleted disposable project through actual Restic

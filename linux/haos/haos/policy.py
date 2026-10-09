@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -56,6 +57,29 @@ def atomic_json(path: Path, value: dict, *, mode: int = 0o600, gid: int = 0):
             os.close(parent_fd)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def agent_directory(path: Path, gid: int):
+    """Publish root-owned, group-traversable runtime directories despite UMask=0077."""
+    if os.geteuid() != 0 or type(gid) is not int or gid <= 0:
+        raise PermissionError("a root broker and separate agent group are required")
+    if os.path.ismount(path):
+        raise PermissionError("unexpected mount at a broker runtime directory")
+    path.mkdir(mode=0o700, exist_ok=True)
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        if info.st_uid != 0 or not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+            raise PermissionError("untrusted broker runtime directory")
+        # mkdir's requested mode is reduced by the service umask. Apply the
+        # minimum read/traverse rights explicitly to this verified inode.
+        os.fchown(fd, 0, gid)
+        os.fchmod(fd, 0o750)
+        info = os.fstat(fd)
+        if (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (0, gid, 0o750):
+            raise PermissionError("broker runtime directory authority could not be verified")
+    finally:
+        os.close(fd)
 
 
 def inventory() -> list[dict]:
@@ -124,14 +148,13 @@ def prepare():
         raise PermissionError("storage preparation requires the owner/root service")
     # A failed new preparation must not leave an older compiled grant usable.
     Path("/run/haos-policy/sandbox.json").unlink(missing_ok=True)
-    import grp
     import pwd
+    agent_gid = pwd.getpwnam("haos-agent").pw_gid
     policy = trusted_json(Path("/etc/haos/volumes.json"))
     grants = validate_policy(policy)
     devices = inventory()
     base = Path("/run/haos-volumes")
-    base.mkdir(mode=0o750, exist_ok=True)
-    os.chown(base, 0, pwd.getpwnam("haos-agent").pw_gid)
+    agent_directory(base, agent_gid)
     mounted = []
     try:
         for grant in grants:
@@ -139,19 +162,18 @@ def prepare():
                 continue
             target = resolve_volume(grant["id"], devices)
             destination = base / grant["key"]
-            destination.mkdir(mode=0o750, exist_ok=True)
             if destination.is_symlink() or os.path.ismount(destination):
                 raise PermissionError("unexpected existing broker mount; stop and reconcile before preparation")
+            agent_directory(destination, agent_gid)
             options = "nodev,nosuid,noexec," + ("ro" if grant["mode"] == "read-only" else "rw")
             subprocess.run(["/usr/bin/mount", "--types", target["fstype"], "--options", options,
                             "--source", target["path"], "--target", str(destination)], check=True)
             mounted.append(destination)
             verify_mount(grant, target, destination)
         runtime = Path("/run/haos-policy")
-        runtime.mkdir(mode=0o750, exist_ok=True)
-        os.chown(runtime, 0, pwd.getpwnam("haos-agent").pw_gid)
+        agent_directory(runtime, agent_gid)
         atomic_json(runtime / "sandbox.json", {"version": 1, "grants": grants}, mode=0o640,
-                    gid=pwd.getpwnam("haos-agent").pw_gid)
+                    gid=agent_gid)
     except BaseException:
         for destination in reversed(mounted):
             subprocess.run(["/usr/bin/umount", str(destination)], check=True)

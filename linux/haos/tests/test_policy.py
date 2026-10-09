@@ -107,6 +107,7 @@ def test_verification_failure_unmounts_device_and_invalidates_old_grants(monkeyp
     monkeypatch.setattr(policy, "Path", lambda path: paths.get(str(path), Path(path)))
     monkeypatch.setattr(policy.os, "geteuid", lambda: 0)
     monkeypatch.setattr(policy.os, "chown", lambda *a: None)
+    monkeypatch.setattr(policy, "agent_directory", lambda path, gid: path.mkdir(mode=0o750, exist_ok=True))
     monkeypatch.setattr("pwd.getpwnam", lambda user: SimpleNamespace(pw_gid=1001))
     monkeypatch.setattr(policy, "trusted_json", lambda path:
         {"version": 1, "volumes": [{"id": "UUID:data", "mode": "full-data-access"}]})
