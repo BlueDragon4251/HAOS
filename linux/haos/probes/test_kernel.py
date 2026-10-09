@@ -58,9 +58,9 @@ def run_agent_filesystem_probe(tmp_path, launcher=None, *, provider=False):
 import ctypes, errno, hashlib, json, os, pathlib, pwd, sys
 ro, rw, secret = map(pathlib.Path, sys.argv[1:4])
 assert os.getuid() != 0
-    # The root-owned interpreter is outside the single mapped service identity.
-    # A host UID is not an inode UID inside this user namespace.
-    assert os.stat('/usr/bin/python3').st_uid != os.getuid()
+# The root-owned interpreter is outside the single mapped service identity.
+# A host UID is not an inode UID inside this user namespace.
+assert os.stat('/usr/bin/python3').st_uid != os.getuid()
 assert pwd.getpwuid(os.getuid()).pw_name == 'haos-agent'
 assert len(pwd.getpwall()) == 1
 credential = pathlib.Path('/run/haos-credentials/backend-token').read_bytes()
@@ -112,7 +112,7 @@ assert not pathlib.Path('/proc/1/root' + str(secret)).exists()
 print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
                   'symlink_escape_denied': True, 'owner_and_devices_hidden': True,
                   'no_new_privileges': True, 'nested_userns_denied': True, 'mount_denied': True,
-                      'kernel_tunables_read_only': True, 'foreign_host_uid_unmapped': True}))
+                  'kernel_tunables_read_only': True, 'foreign_host_uid_unmapped': True}))
 """
     args = args[:args.index("--") + 1] + ["/usr/bin/python3", "-I", "-c", probe,
             f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret), digest, provider_digest]

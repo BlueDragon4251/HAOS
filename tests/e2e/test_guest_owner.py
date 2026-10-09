@@ -1,5 +1,6 @@
 """Owner fixture provisioning must fail before any mutation outside a marked guest."""
 
+import ast
 import importlib.util
 import os
 from pathlib import Path
@@ -14,6 +15,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "linux/haos"))
 spec = importlib.util.spec_from_file_location("guest_owner_probe", Path(__file__).with_name("haos_guest.py"))
 guest = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guest)
+
+
+@pytest.mark.parametrize("file,function,variable", [
+    ("tests/e2e/haos_guest.py", "sandbox_probe", "script"),
+    ("linux/haos/probes/test_kernel.py", "run_agent_filesystem_probe", "probe"),
+])
+def test_actual_embedded_filesystem_programs_compile_before_privileged_launch(file, function, variable):
+    # Compiling the outer module does not compile strings later passed to -c.
+    path = Path(__file__).resolve().parents[2] / file
+    fn = next(node for node in ast.parse(path.read_text()).body if isinstance(node, ast.FunctionDef) and node.name == function)
+    programs = [ast.literal_eval(node.value) for node in fn.body if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == variable for target in node.targets)]
+    assert len(programs) == 1
+    compile(programs[0], file + ":" + function, "exec")
 
 
 @pytest.mark.parametrize("uid,product,owner,mode", [
