@@ -133,8 +133,10 @@ def main():
         note = json.dumps({key: result[key] for key in ("run_id", "workflow_source_commit", "artifact_id", "archive_digest")}
                           | receipt, ensure_ascii=True).replace("%", "%25")
         print(f"::notice title=HAOS verified guest boot {receipt['stage']}::{note}", flush=True)
-    for error in result["startup_errors"]:
-        note = json.dumps(error, ensure_ascii=True).replace("%", "%25")
+    if result["startup_errors"]:
+        # GitHub caps per-step annotations. Group bounded diagnostics so the
+        # terminal exception is not discarded after earlier unit-state notices.
+        note = json.dumps({"run_id": run_id, "errors": result["startup_errors"]}, ensure_ascii=True).replace("%", "%25")
         print(f"::notice title=HAOS bounded startup diagnostic::{note}", flush=True)
     # Owner-created isolated VM evidence only; no automatic success is invented.
     if not result["guest_receipts"] and not result["startup_errors"]:
