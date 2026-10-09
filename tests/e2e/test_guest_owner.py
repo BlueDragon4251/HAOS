@@ -1,9 +1,11 @@
 """Owner fixture provisioning must fail before any mutation outside a marked guest."""
 
 import importlib.util
+import os
 from pathlib import Path
 import stat
 import sys
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -29,3 +31,27 @@ def test_owner_provisioning_cannot_mutate_an_unmarked_or_forged_guest(monkeypatc
     monkeypatch.setattr(Path, "mkdir", lambda *args, **kwargs: pytest.fail("untrusted guest created owner credentials"))
     with pytest.raises(PermissionError):
         guest.owner_authentication_proof(first_boot=True)
+    with pytest.raises(PermissionError):
+        guest.sandbox_probe("rw")
+
+
+def test_sandbox_failure_reports_bounded_redacted_stderr_without_command_or_stdout(tmp_path, monkeypatch):
+    monkeypatch.setattr(guest, "require_disposable_guest", lambda: None)
+    monkeypatch.setattr(guest, "ROOT", tmp_path)
+    monkeypatch.setattr(guest, "trusted_json", lambda path: {"grants": []})
+    monkeypatch.setattr(guest.pwd, "getpwnam", lambda name: SimpleNamespace(pw_uid=12345, pw_gid=12345))
+    descriptors = []
+    def failed(args, **kwargs):
+        descriptors.extend(kwargs["pass_fds"])
+        assert kwargs["timeout"] == 60
+        return subprocess.CompletedProcess(args, 1, "stdout-private-fixture",
+            "x" * 10000 + "\nPermissionError: acceptance-unused-token")
+    monkeypatch.setattr(guest.subprocess, "run", failed)
+    with pytest.raises(RuntimeError) as error:
+        guest.sandbox_probe("rw")
+    message = str(error.value)
+    assert "PermissionError" in message and "[REDACTED]" in message
+    assert len(message) < 2100 and "acceptance-unused-token" not in message
+    assert "stdout-private-fixture" not in message and "--reuid" not in message
+    with pytest.raises(OSError):
+        os.fstat(descriptors[0])

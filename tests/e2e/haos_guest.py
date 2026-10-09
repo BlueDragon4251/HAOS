@@ -192,6 +192,7 @@ def active(unit):
 
 
 def sandbox_probe(mode):
+    require_disposable_guest()
     grants = trusted_json(Path("/run/haos-policy/sandbox.json"))["grants"]
     credential = ROOT / "probe-credential"
     credential.write_text("acceptance-unused-token")
@@ -220,14 +221,16 @@ except OSError: pass
 else: raise AssertionError('agent rewrote owner policy')
 if mode == 'rw':
     foreign = volume / 'foreign-private' / 'foreign-file'
-    assert foreign.stat().st_uid == 65533
+    # Host ownership is verified by the root fixture below. Only the service
+    # UID is mapped by Bubblewrap; other host UIDs appear as overflow UID here.
+    assert foreign.stat().st_uid != os.getuid()
     assert foreign.read_text() == 'foreign owner fixture'
     foreign.write_text('edited foreign owner fixture')
     renamed = foreign.with_name('renamed')
     foreign.rename(renamed)
     renamed.unlink()
     sticky = volume / 'sticky' / 'foreign-delete'
-    assert sticky.stat().st_uid == 65533
+    assert sticky.stat().st_uid != os.getuid()
     sticky.unlink()
     (volume / 'agent-result').write_text('actual write')
     (pathlib.Path('/workspace') / 'acceptance-result').write_text('actual workspace write')
@@ -248,11 +251,17 @@ print(json.dumps({'mode': mode, 'data_access': True, 'blocked_volume_hidden': Tr
         f"/volumes/{key}", mode, str(ROOT / "blocked" / "canary")]
     account = pwd.getpwnam("haos-agent")
     try:
-        result = run("/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
+        result = subprocess.run(["/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
             "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
-            *args, pass_fds=(fd,), capture_output=True)
+            *args], pass_fds=(fd,), capture_output=True, text=True, timeout=60)
     finally:
         os.close(fd)
+    if result.returncode:
+        from haos.redaction import Redactor
+        # Never dump the command (which embeds the complete script), arbitrary
+        # stdout, or real service credentials. This probe has only a fixture FD.
+        detail = Redactor(["acceptance-unused-token"]).text(result.stderr[-2000:])
+        raise RuntimeError(f"sandbox {mode} probe failed (exit {result.returncode}): {detail}")
     return json.loads(result.stdout)
 
 
@@ -343,6 +352,8 @@ def main():
         run("haos-owner", "prepare")
         key = hashlib.sha256(f"UUID:{A}".encode()).hexdigest()
         data = Path("/run/haos-volumes") / key
+        assert (data / "foreign-private" / "foreign-file").stat().st_uid == 65533
+        assert (data / "sticky" / "foreign-delete").stat().st_uid == 65533
         owner_canary = Path("/home/hermes/haos-owner-canary")
         owner_canary.write_text("owner canary")
         owner_canary.chmod(0o644)

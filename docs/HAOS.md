@@ -13,6 +13,14 @@ filesystem/restart/corruption/failure and native-to-Linux contract tests pass lo
 Agent generation, actual graphical preview, whole-session activation and an
 independent automatic crash rollback remain open.
 
+At `405cdcc`, [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981424478),
+[PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981432542) and
+[general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37981432631) passed.
+Local verification is **752 desktop tests**, both TypeScript checks, production
+bundling and **313 bridge/Linux tests with one existing skip**. Ten new revision
+and consumer cases use actual isolated files; the loader/config rendering test
+is explicitly distinct from graphical/model acceptance.
+
 Installed provider images `e954dd3` / `720c08c` built but failed their first guest
 boot at controller startup. [Bounded evidence inspection](https://github.com/BlueDragon4251/HAOS/actions/runs/37963970719)
 verified their exact ZIP digests and exposed `PermissionError: untrusted provider
@@ -32,6 +40,25 @@ The fixture now stages the unchanged production loader/ACL modules under its
 private `/run` directory before launching the hardened service. No production
 restriction or assertion is relaxed. Local **175 ordinary** and **30
 guest/harness/privacy** tests pass; the actual runner gate must pass separately.
+
+Both actual `de2b989` [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37966221954)
+and [PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37966227906)
+passed the delivered-credential and all ext4/XFS/Btrfs gates (PR merge source
+`fd4f1e10bb56bc2c443fc3c8021e86ec536f65af`). General CI and packaging passed.
+Its [installed gate](https://github.com/BlueDragon4251/HAOS/actions/runs/37966222034)
+built/installed and passed the initial runtime health wait, but failed inside
+the first new foreign-owner sandbox probe. Guest ZIP `11639610761` was downloaded
+and verified against SHA256
+`792714eabac652945661af924a28f5739fa81ab775fb4b24ec5c41c20b16c6da`.
+It has no completed boot receipt; captured child stderr was lost from the original
+exception. New errors retain bounded, redacted stderr and never dump the command
+or stdout. The fixture also fixes an independent namespace-contract error: exact
+host UID 65533 is verified before launch, whereas inside Bubblewrap an unmapped
+owner is checked as distinct from the service UID. Both checks remain required;
+the real kernel probe separately checks the root-owned interpreter is unmapped.
+Local **175 ordinary and 31 harness/privacy** cases pass. New actual namespace
+and installed gates must confirm the corrected probe; other guest failures remain
+possible and no complete `de2b989` installed acceptance is claimed.
 
 Owner/recovery image `d8f95c8` passed both installed boots. Evidence inspection
 verified guest ZIP `11630797221` / SHA256
