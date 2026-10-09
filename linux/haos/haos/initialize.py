@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .policy import atomic_json
 from .observer import secure_observer
+from .ui_credentials import prepare as prepare_ui_credentials
 
 
 def main():
@@ -20,16 +21,7 @@ def main():
     gid = grp.getgrnam("haos-ui").gr_gid
     config = Path("/etc/haos")
     config.mkdir(mode=0o755, exist_ok=True)
-    token = config / "backend-token"
-    if not token.exists():
-        fd = os.open(token, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o640)
-        try:
-            os.fchown(fd, 0, gid)
-            os.write(fd, (secrets.token_urlsafe(48) + "\n").encode())
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-    atomic_json(config / "backend.json", {"version": 1, "baseUrl": "http://127.0.0.1:9119", "tokenFile": str(token)}, mode=0o644)
+    prepare_ui_credentials(config, gid)
     atomic_json(config / "controller.json", {"backend_url": "http://127.0.0.1:9119", "control_users": [user]}, mode=0o644)
     if not (config / "provider-token").exists():
         atomic_json(config / "provider-token", {"token": secrets.token_urlsafe(48)})

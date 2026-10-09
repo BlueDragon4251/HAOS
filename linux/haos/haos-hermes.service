@@ -1,8 +1,8 @@
 [Unit]
 Description=HAOS isolated upstream Hermes core
-Requires=haos-policy.service haos-owner-ready.service
+Requires=haos-policy.service haos-owner-ready.service haos-dashboard-policy.service
 BindsTo=haos-network.service
-After=haos-network.service haos-policy.service haos-owner-ready.service network-online.target herald-os-firstboot.service
+After=haos-network.service haos-policy.service haos-owner-ready.service haos-dashboard-policy.service network-online.target herald-os-firstboot.service
 Wants=network-online.target
 ConditionPathExists=/etc/haos/enabled
 StartLimitIntervalSec=120
@@ -15,6 +15,7 @@ Group=haos-agent
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=backend-token:/etc/haos/backend-token
+LoadCredential=ui-token:/etc/haos/ui-token
 LoadCredential=provider-token:/etc/haos/provider-token
 ExecStart=/usr/bin/python3 -m haos.sandbox
 Restart=on-failure

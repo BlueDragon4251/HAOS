@@ -20,7 +20,7 @@ const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 export function attachTarget(env: NodeJS.ProcessEnv = process.env, readFile: (file: string) => string = file => fs.readFileSync(file, 'utf8')): AttachTarget | null {
   if (env.HAOS_BACKEND_CONFIG) {
     const config = JSON.parse(readFile(env.HAOS_BACKEND_CONFIG)) as { version?: unknown; baseUrl?: unknown; tokenFile?: unknown }
-    if (config.version !== 1 || typeof config.baseUrl !== 'string' || config.tokenFile !== '/etc/haos/backend-token') {
+    if (config.version !== 2 || typeof config.baseUrl !== 'string' || config.tokenFile !== '/etc/haos/ui-token') {
       throw new Error('Invalid HAOS system service descriptor')
     }
     const target = new URL(config.baseUrl)

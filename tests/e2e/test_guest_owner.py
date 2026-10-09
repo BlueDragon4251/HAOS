@@ -31,6 +31,14 @@ def test_actual_embedded_filesystem_programs_compile_before_privileged_launch(fi
     compile(programs[0], file + ":" + function, "exec")
 
 
+def test_actual_installed_observer_http_program_compiles_before_launch():
+    module = ast.parse(Path(guest.__file__).read_text())
+    assignment = next(node for node in ast.walk(module) if isinstance(node, ast.Assign)
+                      and any(isinstance(t, ast.Name) and t.id == "observer_dashboard_code" for t in node.targets))
+    assert isinstance(assignment.value, ast.Call) and assignment.value.func.attr == "join"
+    compile("\n".join(ast.literal_eval(assignment.value.args[0])), "installed-observer-dashboard", "exec")
+
+
 @pytest.mark.parametrize("uid,product,owner,mode", [
     (1000, "haos-acceptance", 0, stat.S_IFREG | 0o644),
     (0, "actual-workstation", 0, stat.S_IFREG | 0o644),

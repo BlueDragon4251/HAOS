@@ -245,7 +245,8 @@ class Controller:
 async def serve():
     config = json.loads(Path("/etc/haos/controller.json").read_text())
     uids = {pwd.getpwnam(user).pw_uid for user in config["control_users"]}
-    token = Path("/etc/haos/backend-token").read_text().strip()
+    from .credentials import private_credential
+    token = private_credential(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "backend-token").strip()
     lock = open("/var/lib/haos-control/controller.lock", "a")
     fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     from .redaction import Redactor

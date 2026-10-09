@@ -59,6 +59,7 @@ jobs:
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/requirements.txt > evidence/python-runtime-requirements.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/installed.txt > evidence/python-runtime-installed.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/backend-build-probe.json > evidence/backend-build-probe.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/ui-access-build-probe.json > evidence/ui-access-build-probe.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/gateway-build-probe.json > evidence/gateway-build-probe.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/provider-build-probe.json > evidence/provider-build-probe.json
       - name: Catalog the actual built image with a digest-pinned offline scanner
@@ -136,6 +137,7 @@ jobs:
             evidence/build-manifest.json
             evidence/SHA256SUMS
             evidence/backend-build-probe.json
+            evidence/ui-access-build-probe.json
             evidence/gateway-build-probe.json
             evidence/provider-build-probe.json
             evidence/python-runtime-*.json

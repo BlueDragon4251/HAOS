@@ -1,7 +1,7 @@
 [Unit]
 Description=HAOS durable mission controller
-Requires=haos-owner-ready.service
-After=haos-hermes.service haos-owner-ready.service
+Requires=haos-owner-ready.service haos-dashboard-policy.service
+After=haos-hermes.service haos-owner-ready.service haos-dashboard-policy.service
 Wants=haos-hermes.service
 ConditionPathExists=/etc/haos/enabled
 StartLimitIntervalSec=120
@@ -15,6 +15,7 @@ SupplementaryGroups=haos-gateway
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=provider-token:/etc/haos/provider-token
+LoadCredential=backend-token:/etc/haos/backend-token
 ExecStart=/usr/bin/python3 -m haos.controller
 Restart=on-failure
 RestartSec=3

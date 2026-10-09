@@ -292,6 +292,36 @@ def main():
     assert denied.returncode != 0 and denied.stdout.strip() != "0"
     observer_proof = {"observer_sudo_denied": True, "observer_administrator_groups_absent": True,
                       "observer_empty_password_denied": True}
+    wait_for(lambda: active("haos-dashboard-policy.service"))
+    descriptor = json.loads(Path("/etc/haos/backend.json").read_text())
+    assert descriptor == {"version": 2, "baseUrl": "http://127.0.0.1:9119", "tokenFile": "/etc/haos/ui-token"}
+    observer_dashboard_code = "\n".join([
+        "import json,pathlib,urllib.request,urllib.error",
+        "try:",
+        " pathlib.Path('/etc/haos/backend-token').read_bytes()",
+        "except PermissionError:",
+        " pass",
+        "else:",
+        " raise RuntimeError('observer read the private backend credential')",
+        "token=pathlib.Path('/etc/haos/ui-token').read_text().strip()",
+        "headers={'X-Hermes-Session-Token':token}",
+        "base='http://127.0.0.1:9119'",
+        "with urllib.request.urlopen(urllib.request.Request(base+'/api/host/identity',headers=headers),timeout=10) as response:",
+        " identity=json.load(response)",
+        "assert identity['ok'] is True and not identity['servesSpa']",
+        "for path in ('/api/config','/api/env','/api/providers/oauth/openai-codex/start','/api/pty'):",
+        " try:",
+        "  urllib.request.urlopen(urllib.request.Request(base+path,headers=headers),timeout=10)",
+        " except urllib.error.HTTPError as error:",
+        "  assert error.code==403",
+        " else:",
+        "  raise RuntimeError('observer reached a protected dashboard route')",
+        "print(json.dumps({'observer_backend_credential_denied':True,'observer_dashboard_read_authenticated':True,'observer_privileged_dashboard_routes_denied':True}))",
+    ])
+    dashboard = subprocess.run(["runuser", "-u", "hermes", "--", "python3", "-I", "-c", observer_dashboard_code],
+                               capture_output=True, text=True, timeout=50)
+    assert dashboard.returncode == 0, "installed observer dashboard boundary failed"
+    observer_proof.update(json.loads(dashboard.stdout))
     agent = pwd.getpwnam("haos-agent")
     # A real owner-side listener is reachable by root but denied to the service
     # UID. Only fresh sockets and a marked guest are used; no host rule is changed.

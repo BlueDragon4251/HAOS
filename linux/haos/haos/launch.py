@@ -17,8 +17,8 @@ def main():
         if not re.fullmatch(r"[A-Za-z0-9_-]{43,128}", scoped_token):
             raise ValueError("invalid scoped model credential")
         os.environ["HAOS_MODEL_TOKEN"] = scoped_token
-    executable = "/usr/lib/haos/hermes/.venv/bin/hermes"
-    os.execv(executable, [executable, "serve", "--host", "127.0.0.1", "--port", "9119", "--no-open"])
+    executable = "/usr/lib/haos/hermes/.venv/bin/python"
+    os.execv(executable, [executable, "/usr/lib/haos/haos/serve.py"])
 
 
 if __name__ == "__main__":

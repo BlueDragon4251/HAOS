@@ -23,7 +23,7 @@ install -Dm0644 "$HAOS_SOURCE/../bin/haos-recovery" /usr/lib/haos/recovery-conso
 install -d /etc/systemd/system/greetd.service.d
 cat >/etc/systemd/system/greetd.service.d/haos-observer.conf <<'UNIT'
 [Unit]
-Requires=herald-os-firstboot.service haos-observer-security.service
-After=herald-os-firstboot.service haos-observer-security.service
+Requires=herald-os-firstboot.service haos-observer-security.service haos-dashboard-policy.service
+After=herald-os-firstboot.service haos-observer-security.service haos-dashboard-policy.service
 UNIT
-systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-gateway.service haos-recovery.service haos-provider.socket
+systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-dashboard-policy.service haos-gateway.service haos-recovery.service haos-provider.socket

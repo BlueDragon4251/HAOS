@@ -1,0 +1,28 @@
+[Unit]
+Description=HAOS private controller and scoped observer dashboard credentials
+After=herald-os-firstboot.service
+Before=haos-hermes.service haos-controller.service greetd.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.ui_credentials
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_CHOWN
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/haos
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+
+[Install]
+WantedBy=multi-user.target

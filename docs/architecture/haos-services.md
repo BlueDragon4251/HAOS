@@ -57,14 +57,16 @@ provider identity. Neither terminal tools nor gateway events can grant models,
 change provider endpoints or read the real provider credential store. External
 model/gateway acceptance still requires credentials and real receipts.
 
-The native shell still attaches to the upstream dashboard's authenticated REST
-and WebSocket interfaces using an observer-readable backend token. Its legacy
-provider/configuration/OAuth routes are not yet restricted by a separate owner
-facade, and raw upstream submission is not yet replaced by a controller-only UI
-transport. The managed conversation path uses persistent HAOS admission, but this
-does not prove all legacy dashboard routes enforce that boundary. A scoped UI
-proxy and independent owner provisioning gate remain required; frontend controls
-alone cannot supply this security property.
+The native shell now uses a separate [observer capability](../DASHBOARD-ACCESS.md).
+An image-owned middleware on the actual pinned upstream ASGI app permits only
+explicit read scopes; raw configuration/OAuth, turns/session changes, terminals,
+browser registration and server-request answers are denied independently of the
+UI. The root boot migration rotates the former observer-readable backend token;
+the private controller receives its independent credential via systemd. Native
+version-2 attach refuses the former private-token descriptor. Real local pinned
+HTTP/WS and UID migration probes pass; matching installed acceptance remains
+required. Native graphical owner flows and full GUI/plugin capability brokerage
+are still missing; legacy protected settings must use authenticated owner setup.
 
 ## Filesystem enforcement
 

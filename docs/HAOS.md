@@ -6,6 +6,19 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+The [dashboard observer gate](DASHBOARD-ACCESS.md) now enforces an explicit HTTP/
+WebSocket read scope on the real pinned Hermes app. Root boot migration replaces
+the former full observer-readable token; the controller receives its private
+credential via systemd and native version-2 attach uses only the separate UI
+capability. Raw config/OAuth/terminal/turn/session changes and server-request
+answers are denied before upstream dispatch. Local **211 ordinary HAOS tests**,
+**six actual UID/file migration probes**, native descriptor tests, both TypeScript
+checks and production bundling pass. A real pinned providerless Hermes process
+passes authenticated reads, HTTP/RPC denials, preserved actual controller session
+creation and process-log credential checks. Image build and both guest boots now
+require additional real boundary assertions; matching installed results remain
+required. Graphical owner setup and full GUI/plugin authorization remain open.
+
 The QEMU phase runner now reports its own child PID, CPU/RSS, serial-file size/age,
 output filesystem space and deadline every 30 seconds without exposing command
 arguments or serial content. Timeout terminates only its new process group and
