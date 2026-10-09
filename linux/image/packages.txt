@@ -107,5 +107,6 @@ nftables
 python3-websockets
 sudo
 shadow-utils
+libpwquality
 uv
 restic

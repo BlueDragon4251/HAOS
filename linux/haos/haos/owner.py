@@ -44,6 +44,8 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    enroll = sub.add_parser("enroll", help="create a separate password-authenticated owner from a trusted root console")
+    enroll.add_argument("username")
     backup = sub.add_parser("backup")
     backup_sub = backup.add_subparsers(dest="backup_action", required=True)
     for action in ("init", "create", "check"):
@@ -59,7 +61,11 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "backup":
+    if args.action == "enroll":
+        from .enrollment import enroll_interactive
+        stopped()
+        print(json.dumps(enroll_interactive(args.username), indent=2))
+    elif args.action == "backup":
         from .backup import owner_backup
         print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None)), indent=2))
     elif args.action == "prepare":

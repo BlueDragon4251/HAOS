@@ -29,11 +29,11 @@ jobs:
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py
       - name: Record actual diskless QEMU acceleration
         run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
       - name: Restore a deleted disposable project through actual Restic
@@ -53,3 +53,5 @@ jobs:
         run: systemd-analyze verify linux/haos/*.service
       - name: Enforce the actual agent socket UID boundary with nftables
         run: sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_network_boundary.py
+      - name: Verify real owner password authentication and fixed CLI authority
+        run: sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 "$(command -v python)" -m pytest -q -s linux/haos/probes/test_owner_enrollment.py

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Independent HAOS owner CLI; installed with the immutable system image."""
 import sys
 sys.path.insert(0, "/usr/lib/haos")
