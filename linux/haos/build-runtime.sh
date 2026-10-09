@@ -19,4 +19,5 @@ uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/insta
 test -x .venv/bin/hermes
 .venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3, 11)'
 .venv/bin/python -I -c 'import importlib.metadata,json;from pathlib import Path;s=json.loads(Path("/usr/lib/haos/runtime-provenance/source.json").read_text());assert all(importlib.metadata.version(n)==v for n,v in s["security_versions"].items())'
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_backend.py" .venv/bin/hermes /usr/lib/haos/runtime-provenance/backend-build-probe.json
 rpm -q python3.11 python3.11-libs > /usr/lib/haos/python-runtime.txt

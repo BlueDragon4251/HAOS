@@ -84,6 +84,8 @@ jobs:
               raise AssertionError('expired JWT accepted after options reuse')
           print('Patched package versions, Hermes CLI and JWT claim regression passed')
           PY
+      - name: Start the real backend and verify authenticated durable sessions
+        run: upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_backend.py upstream/hermes-agent/.venv/bin/hermes evidence/real-backend.json
       - name: Record the reproducible dependency artifact
         run: |
           sha256sum evidence/runtime.requirements.txt > evidence/runtime.requirements.sha256
