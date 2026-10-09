@@ -17,7 +17,7 @@ def read_resolvers() -> list[str]:
     if not link.exists():
         return []  # An offline machine can still run its local backend.
     path = link.resolve(strict=True)
-    for candidate in (link, path, *path.parents):
+    for candidate in (link, path, *link.parents, *path.parents):
         metadata = candidate.lstat()
         if metadata.st_uid != 0 or (not stat.S_ISLNK(metadata.st_mode) and metadata.st_mode & 0o022):
             raise PermissionError("untrusted system DNS configuration")

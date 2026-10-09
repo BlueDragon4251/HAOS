@@ -1,4 +1,6 @@
 import subprocess
+import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -57,3 +59,30 @@ def test_private_resolver_exception_is_limited_to_exact_address_and_dns_port():
     for address in ("10.0.2.3; flush ruleset", "fe80::1%eth0"):
         with pytest.raises(ValueError):
             network.rules(1001, resolvers=[address])
+
+
+def resolver_fixture(monkeypatch, content, uid=0, mode=stat.S_IFREG | 0o644):
+    node = SimpleNamespace(exists=lambda: True, parents=(),
+        lstat=lambda: SimpleNamespace(st_uid=uid, st_mode=mode), read_text=lambda: content)
+    node.resolve = lambda **kw: node
+    monkeypatch.setattr(network, "Path", lambda path: node)
+
+
+@pytest.mark.parametrize("uid,mode", [(1001, stat.S_IFREG | 0o644), (0, stat.S_IFREG | 0o664),
+                                      (0, stat.S_IFREG | 0o666)])
+def test_agent_writable_resolver_configuration_cannot_whitelist_services(monkeypatch, uid, mode):
+    resolver_fixture(monkeypatch, "nameserver 127.0.0.1", uid, mode)
+    with pytest.raises(PermissionError):
+        network.read_resolvers()
+
+
+@pytest.mark.parametrize("content", ["nameserver 127.0.0.1 extra", "nameserver not-an-address", "nameserver fe80::1%eth0"])
+def test_unsupported_resolver_configuration_fails_closed(monkeypatch, content):
+    resolver_fixture(monkeypatch, content)
+    with pytest.raises(ValueError):
+        network.read_resolvers()
+
+
+def test_actual_resolver_addresses_are_canonical_and_deduplicated(monkeypatch):
+    resolver_fixture(monkeypatch, "# fixture\nnameserver 10.0.2.3 # DHCP DNS\nnameserver 2001:0db8::53\nnameserver 10.0.2.3\nsearch example.invalid")
+    assert network.read_resolvers() == ["10.0.2.3", "2001:db8::53"]

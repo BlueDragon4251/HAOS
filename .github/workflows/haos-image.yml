@@ -3,7 +3,9 @@ name: HAOS x86_64 image and installer build
 on:
   push:
     branches: ['agent/haos-*']
-    paths: ['linux/**', 'apps/**', 'packages/**', 'scripts/**', 'tests/e2e/**', 'package*.json', 'upstream/*.lock', '.containerignore', '.github/workflows/haos-image.yml']
+    # Harness/diagnostics-only edits retest an existing ISO; they do not need
+    # another multi-gigabyte image build. Keep actual image and guest inputs here.
+    paths: ['linux/**', 'apps/**', 'packages/**', 'plugins/**', 'scripts/sync-upstream.sh', 'tests/e2e/haos_guest.py', 'package*.json', 'upstream/*.lock', '.containerignore', '.github/workflows/haos-image.yml']
   workflow_dispatch:
 
 permissions:
