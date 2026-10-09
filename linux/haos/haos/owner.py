@@ -68,6 +68,18 @@ def main():
     enroll.add_argument("username")
     recovery = sub.add_parser("recovery-codes", help="issue ten single-use codes at an authenticated owner console")
     recovery.add_argument("username")
+    provider = sub.add_parser("provider", help="owner-only credential-isolated model configuration")
+    provider_sub = provider.add_subparsers(dest="provider_action", required=True)
+    for action in ("status", "stop", "disable", "login-codex", "logout-codex"):
+        provider_sub.add_parser(action)
+    configure = provider_sub.add_parser("configure")
+    configure.add_argument("provider", choices=["openai-codex", "openai", "openrouter", "local"])
+    configure.add_argument("--model", required=True)
+    configure.add_argument("--allow-model", action="append", default=[])
+    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions"])
+    configure.add_argument("--endpoint", help="local loopback /v1 endpoint; remote endpoints are fixed")
+    configure.add_argument("--requests-per-day", type=int, default=200)
+    configure.add_argument("--requests-per-minute", type=int, default=30)
     backup = sub.add_parser("backup")
     backup_sub = backup.add_subparsers(dest="backup_action", required=True)
     for action in ("init", "create", "check"):
@@ -83,7 +95,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "recovery-codes":
+    if args.action == "provider":
+        from .provider_setup import owner_provider
+        print(json.dumps(owner_provider(args), indent=2))
+    elif args.action == "recovery-codes":
         from .owner_recovery import print_codes
         print_codes(args.username)
     elif args.action == "gateway":
@@ -111,7 +126,11 @@ def main():
         units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]
         if verb == "stop":
             subprocess.run(["/usr/bin/systemctl", "stop", "haos-gateway.service"], check=True)
+        if verb == "start" and Path("/etc/haos/provider.json").exists():
+            subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"], check=True)
         subprocess.run(["/usr/bin/systemctl", verb, *units], check=True)
+        if verb == "stop":
+            subprocess.run(["/usr/bin/systemctl", "stop", "haos-provider.socket", "haos-provider.service"], check=True)
         if verb == "start":
             subprocess.run(["/usr/bin/systemctl", "start", "haos-gateway.service"], check=True)
         audit(f"runtime.{verb}", {})

@@ -14,7 +14,7 @@ def main():
     if os.geteuid() != 0:
         raise PermissionError("host initialization requires root")
     user = sys.argv[1]
-    if user in {"root", "haos-agent", "haos-control", "haos-gateway"}:
+    if user in {"root", "haos-agent", "haos-control", "haos-gateway", "haos-provider"}:
         raise ValueError("observer/owner and service accounts must be separate")
     secure_observer(user)
     gid = grp.getgrnam("haos-ui").gr_gid
@@ -31,6 +31,10 @@ def main():
             os.close(fd)
     atomic_json(config / "backend.json", {"version": 1, "baseUrl": "http://127.0.0.1:9119", "tokenFile": str(token)}, mode=0o644)
     atomic_json(config / "controller.json", {"backend_url": "http://127.0.0.1:9119", "control_users": [user]}, mode=0o644)
+    if not (config / "provider-token").exists():
+        atomic_json(config / "provider-token", {"token": secrets.token_urlsafe(48)})
+    if not (config / "provider-credentials").exists():
+        atomic_json(config / "provider-credentials", {"api_key": None})
     if not (config / "volumes.json").exists():
         atomic_json(config / "volumes.json", {"version": 1, "volumes": []})
     (config / "enabled").touch(mode=0o644)

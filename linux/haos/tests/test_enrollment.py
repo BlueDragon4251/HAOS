@@ -31,7 +31,7 @@ def root_file_identity(monkeypatch, tmp_path, uid=0):
     monkeypatch.setattr(e.os, "fchown", chown)
 
 
-@pytest.mark.parametrize("name", ["root", "hermes", "haos-agent", "haos-control", "observer", "a;id", "-a", "A", "a" * 32])
+@pytest.mark.parametrize("name", ["root", "hermes", "haos-agent", "haos-control", "haos-gateway", "haos-provider", "observer", "a;id", "-a", "A", "a" * 32])
 def test_reject_unsafe_or_reserved_identity(name):
     with pytest.raises((PermissionError, ValueError)):
         e.validate_name(name, "observer")

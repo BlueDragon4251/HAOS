@@ -13,7 +13,7 @@ from haos.policy import validate_policy
 from haos.sandbox import command
 
 
-def run_agent_filesystem_probe(tmp_path, launcher=None):
+def run_agent_filesystem_probe(tmp_path, launcher=None, *, provider=False):
     home, workspace, ro, rw = [tmp_path / name for name in ("home", "workspace", "ro", "rw")]
     for path in (home, workspace, ro, rw):
         path.mkdir()
@@ -28,7 +28,14 @@ def run_agent_filesystem_probe(tmp_path, launcher=None):
     credential.write_text(credential_value)
     digest = hashlib.sha256(credential_value.encode()).hexdigest()
     fd = os.open(credential, os.O_RDONLY)
-    args = command(grants, fd, certificates=[])
+    provider_fd, provider_digest = None, ""
+    if provider:
+        assert launcher is None, "use the explicit production socket/credential fixture for systemd provider probes"
+        proxy_credential = tmp_path / "model-capability"
+        proxy_credential.write_text(json.dumps({"token": secrets.token_urlsafe(48)}))
+        provider_digest = hashlib.sha256(proxy_credential.read_bytes()).hexdigest()
+        provider_fd = os.open(proxy_credential, os.O_RDONLY)
+    args = command(grants, fd, certificates=[], provider_fd=provider_fd)
     passwd, group = tmp_path / "passwd", tmp_path / "group"
     passwd.write_text(f"haos-agent:x:{os.getuid()}:{os.getgid()}:HAOS agent:/home/agent:/usr/sbin/nologin\n")
     group.write_text(f"haos-agent:x:{os.getgid()}:\n")
@@ -38,6 +45,14 @@ def run_agent_filesystem_probe(tmp_path, launcher=None):
                     f"/run/haos-volumes/{grants[1]['key']}": str(rw),
                     "/usr/lib/haos/passwd": str(passwd), "/usr/lib/haos/group": str(group)}
     args = [replacements.get(arg, arg) for arg in args]
+    if provider:
+        from haos.provider_policy import ENDPOINTS, ProviderPolicy
+        policy = ProviderPolicy({"version": 1, "provider": "openai-codex", "endpoint": ENDPOINTS["openai-codex"],
+            "models": ["fixture-model"], "default_model": "fixture-model", "api_mode": "codex_responses",
+            "requests_per_day": 20, "requests_per_minute": 10})
+        client_config = tmp_path / "provider-client.json"
+        client_config.write_text(json.dumps(policy.client_config()))
+        args = [str(client_config) if arg == "/etc/haos/provider-client.json" else arg for arg in args]
     probe = """
 import ctypes, errno, hashlib, json, os, pathlib, pwd, sys
 ro, rw, secret = map(pathlib.Path, sys.argv[1:4])
@@ -47,6 +62,21 @@ assert len(pwd.getpwall()) == 1
 credential = pathlib.Path('/run/haos-credentials/backend-token').read_bytes()
 assert hashlib.sha256(credential).hexdigest() == sys.argv[4]
 assert credential not in pathlib.Path('/proc/1/cmdline').read_bytes()
+model_capability = pathlib.Path('/run/haos-credentials/provider-token')
+if sys.argv[5]:
+    assert hashlib.sha256(model_capability.read_bytes()).hexdigest() == sys.argv[5]
+    config = pathlib.Path('/home/agent/.hermes/config.yaml')
+    assert json.loads(config.read_text())['model']['provider'] == 'custom:haos-model'
+    try:
+        config.write_text('{}')
+    except OSError as error:
+        assert error.errno == errno.EROFS
+    else:
+        raise AssertionError('agent modified owner model routing')
+    assert not pathlib.Path('/etc/haos/provider-credentials').exists()
+    assert not pathlib.Path('/var/lib/haos-provider/.hermes/auth.json').exists()
+else:
+    assert not model_capability.exists()
 status = pathlib.Path('/proc/self/status').read_text().splitlines()
 assert 'NoNewPrivs:\t1' in status
 assert 'CapEff:\t0000000000000000' in status
@@ -81,15 +111,17 @@ print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
                   'kernel_tunables_read_only': True}))
 """
     args = args[:args.index("--") + 1] + ["/usr/bin/python3", "-I", "-c", probe,
-            f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret), digest]
+            f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret), digest, provider_digest]
     # Exercise the launcher's NoNewPrivileges setting as used by the service.
     try:
         if launcher is None:
-            result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], pass_fds=(fd,), capture_output=True, text=True, timeout=30)
+            result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], pass_fds=(fd, provider_fd) if provider else (fd,), capture_output=True, text=True, timeout=30)
         else:
             result = launcher(args, fd)
     finally:
         os.close(fd)
+        if provider_fd is not None:
+            os.close(provider_fd)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["symlink_escape_denied"]
     assert (rw / "result").read_text() == "actual permitted write"
@@ -100,3 +132,7 @@ print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
 
 def test_agent_filesystem_view_cannot_escape_grants(tmp_path):
     run_agent_filesystem_probe(tmp_path)
+
+
+def test_model_route_is_immutable_and_real_provider_secrets_are_absent(tmp_path):
+    run_agent_filesystem_probe(tmp_path, provider=True)

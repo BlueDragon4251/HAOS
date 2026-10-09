@@ -43,7 +43,7 @@ def read_resolvers() -> list[str]:
     return servers
 
 
-def rules(uid: int, table: str = TABLE, resolvers: list[str] | None = None) -> str:
+def rules(uid: int, table: str = TABLE, resolvers: list[str] | None = None, *, provider=False) -> str:
     if type(uid) is not int or not 1 <= uid < 2**32 - 1:
         raise ValueError("a non-root service UID is required")
     if not isinstance(table, str) or not re.fullmatch(r"haos_[a-z0-9_]{1,48}", table):
@@ -56,6 +56,10 @@ def rules(uid: int, table: str = TABLE, resolvers: list[str] | None = None) -> s
         f"add chain inet {table} output {{ type filter hook output priority 0; policy accept; }}",
         prefix + "ct state { established, related } ct direction reply counter accept",
         prefix + "ip daddr 127.0.0.1 tcp dport 9119 counter accept"]
+    if type(provider) is not bool:
+        raise ValueError("model exception requires validated owner policy")
+    if provider:
+        commands.append(prefix + "ip daddr 127.0.0.1 tcp dport 9120 counter accept")
     for resolver in dict.fromkeys(["127.0.0.53", *(resolvers or [])]):
         if "%" in resolver:
             raise ValueError("scoped DNS resolver addresses are not supported")
@@ -73,7 +77,13 @@ def rules(uid: int, table: str = TABLE, resolvers: list[str] | None = None) -> s
 def install(uid: int, table: str = TABLE):
     if os.geteuid() != 0:
         raise PermissionError("network authority requires root")
-    script = rules(uid, table, read_resolvers())
+    descriptor = Path("/etc/haos/provider.json")
+    enabled = descriptor.exists() or descriptor.is_symlink()
+    if enabled:
+        from .provider_policy import ProviderPolicy
+        from .sandbox import trusted_json
+        ProviderPolicy(trusted_json(descriptor))
+    script = rules(uid, table, read_resolvers(), provider=enabled)
     # Check and apply whole transactions; never flush other host firewall tables.
     for args in ([NFT, "--check", "--file", "-"], [NFT, "--file", "-"]):
         try:

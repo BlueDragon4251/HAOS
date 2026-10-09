@@ -38,7 +38,7 @@ def trusted_resolver(monkeypatch):
         yield path
 
 
-def test_agent_local_sockets_are_guarded_without_breaking_backend_replies(trusted_resolver):
+def test_agent_local_sockets_are_guarded_without_breaking_backend_replies(trusted_resolver, monkeypatch):
     assert os.geteuid() == 0, "run only on the disposable CI runner as root"
     suffix = uuid.uuid4().hex[:10]
     user, table = "haos-net-" + suffix, "haos_test_" + suffix
@@ -112,6 +112,34 @@ def test_agent_local_sockets_are_guarded_without_breaking_backend_replies(truste
         assert backend.stdout.readline().strip() == "READY"
         assert run(sys.executable, "-I", "-c", client, "127.0.0.1", "9119").returncode == 0
         assert run(*drop, client, "127.0.0.1", "9119").returncode == 0
+        # A model endpoint is permitted only with a root-approved provider
+        # descriptor. Removing it must revoke even an existing TCP connection.
+        model_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sockets.append(model_socket)
+        model_socket.bind(("127.0.0.1", 9120))
+        model_socket.listen(8)
+        threading.Thread(target=accept, args=(model_socket,), daemon=True).start()
+        assert run(*drop, client, "127.0.0.1", "9120").returncode != 0
+        provider_path = trusted_resolver.parent / "provider.json"
+        provider_path.write_text(json.dumps({"version": 1, "provider": "openai", "endpoint": "https://api.openai.com/v1",
+            "models": ["fixture-model"], "default_model": "fixture-model", "api_mode": "codex_responses",
+            "requests_per_day": 20, "requests_per_minute": 10}))
+        provider_path.chmod(0o600)
+        original_path = network.Path
+        monkeypatch.setattr(network, "Path", lambda value: provider_path if value == "/etc/haos/provider.json" else original_path(value))
+        install(account.pw_uid, table)
+        assert run(*drop, client, "127.0.0.1", "9120").returncode == 0
+        assert run(*drop, client, "127.0.0.1", str(owner_port)).returncode != 0
+        model_persistent = subprocess.Popen([*drop,
+            "import socket,sys;s=socket.create_connection(('127.0.0.1',9120),timeout=2);s.sendall(b'before');assert s.recv(6)==b'before';print('READY',flush=True);sys.stdin.readline();\ntry:\n s.sendall(b'after');assert s.recv(5)!=b'after'\nexcept OSError:\n pass\nprint('DENIED',flush=True)"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        children.append(model_persistent)
+        assert model_persistent.stdout.readline().strip() == "READY"
+        provider_path.unlink()
+        install(account.pw_uid, table)
+        out, err = model_persistent.communicate(input="continue\n", timeout=5)
+        assert model_persistent.returncode == 0 and out.strip() == "DENIED", err
+        assert run(*drop, client, "127.0.0.1", "9120").returncode != 0
         mutation = run("/usr/sbin/runuser", "-u", user, "--", NFT, "flush", "table", "inet", table)
         assert mutation.returncode != 0
         assert run(*drop, client, "127.0.0.1", str(owner_port)).returncode != 0
@@ -121,7 +149,8 @@ def test_agent_local_sockets_are_guarded_without_breaking_backend_replies(truste
         print(json.dumps({"agent_ipv4_local_service_denied": True, "agent_ipv6_local_service_denied": True,
             "ipv4_mapped_ipv6_denied": True, "existing_agent_connection_revoked": True,
             "backend_self_connection_permitted": True, "backend_replies_to_owner_permitted": True,
-            "agent_firewall_mutation_denied": True, "other_uid_traffic_preserved": True}))
+            "agent_firewall_mutation_denied": True, "other_uid_traffic_preserved": True,
+            "configured_model_endpoint_only_permitted": True, "existing_model_connection_revoked": True}))
     finally:
         stop.set()
         for listener in sockets:

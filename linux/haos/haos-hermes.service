@@ -15,6 +15,7 @@ Group=haos-agent
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=backend-token:/etc/haos/backend-token
+LoadCredential=provider-token:/etc/haos/provider-token
 ExecStart=/usr/bin/python3 -m haos.sandbox
 Restart=on-failure
 RestartSec=5

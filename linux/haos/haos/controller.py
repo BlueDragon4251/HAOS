@@ -222,7 +222,9 @@ async def serve():
     lock = open("/var/lib/haos-control/controller.lock", "a")
     fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     from .redaction import Redactor
-    store = MissionStore(Path("/var/lib/haos-control/missions.db"), redactor=Redactor([token]))
+    from .provider_proxy import private_credential
+    model_capability = json.loads(private_credential(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "provider-token"))["token"]
+    store = MissionStore(Path("/var/lib/haos-control/missions.db"), redactor=Redactor([token, model_capability]))
     controller = Controller(store, websocket_url(config["backend_url"], token), uids)
     controller.gateway_uids = {pwd.getpwnam("haos-gateway").pw_uid}
     loop = asyncio.get_running_loop()

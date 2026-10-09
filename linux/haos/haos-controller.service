@@ -14,6 +14,7 @@ Group=haos-ui
 SupplementaryGroups=haos-gateway
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=provider-token:/etc/haos/provider-token
 ExecStart=/usr/bin/python3 -m haos.controller
 Restart=on-failure
 RestartSec=3

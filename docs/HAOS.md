@@ -12,6 +12,25 @@ commit `52c1c3c` passed [services](https://github.com/BlueDragon4251/HAOS/action
 [Arch packaging](https://github.com/BlueDragon4251/HAOS/actions/runs/37943090895). Its separate
 new image/guest gate is not inferred from those results.
 
+Owner-onboarding/recovery commits `5fe8dfb` / `d8f95c8` add the independent tty2
+console, private hashed single-use recovery codes, initial-owner locking and a
+mandatory owner-readiness gate. A duplicate unit dependency line broke the
+strict existing sandbox parser; `b668f40` preserves both requirements in one line.
+The corrected [services](https://github.com/BlueDragon4251/HAOS/actions/runs/37950553668),
+[CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37950553671) and
+[packaging](https://github.com/BlueDragon4251/HAOS/actions/runs/37950553642) passed.
+Matching installed enrollment/password-recovery receipts remain pending.
+
+The subsequent [provider integration](PROVIDER-SETUP.md) supplies a separate
+credential UID, root-bound scoped model socket, protected owner Codex/API setup,
+explicit local-model routes and immutable named-provider configuration. Local
+checks pass **166 ordinary HAOS tests**, **27 guest/harness regressions**, and
+**30 root fixture tests** (nine provider, seven recovery, seven gateway, seven
+backup). Actual pinned Hermes resolver/Responses/OAuth API contracts passed
+without network/model calls. New actual namespace, nftables, socket activation
+and ISO gates are separately pending. No real model/Git/gateway mission is
+claimed; the owner confirmed those credentials are not available.
+
 The next gateway change supplies root-owned Telegram/Discord pairing and credential setup,
 a separate transport UID/kernel-peer ingress, atomic replay-safe mission admission and durable
 transport inbox/result outbox. Local evidence: **144 ordinary service tests**, **one real Unix

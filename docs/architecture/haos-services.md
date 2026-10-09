@@ -14,6 +14,8 @@ fallback child. Quitting or restarting Electron does not stop that service.
 | Enrolled owner (separate new account) | Password-authenticated fixed recovery/policy CLI; no unrestricted sudo | Separate home; protected identity registry |
 | `haos-agent` | Upstream Hermes and ordinary commands inside the restricted filesystem view; no wheel, login, owner API, controller socket or container socket | `/var/lib/haos-agent`, `/var/lib/haos-workspace` |
 | `haos-control` | Queue, dispatch receipts, local API authenticated with Linux `SO_PEERCRED`; cannot grant volumes or run privileged commands | `/var/lib/haos-control/missions.db` |
+| `haos-gateway` | Pinned messaging adapters, exact owner-paired senders and scoped mission ingress/outbox; no general control/owner API | Private transport inbox and credentials delivered by systemd |
+| `haos-provider` | Fixed model API routes under owner allowlists; real provider/OAuth credentials kept outside agent/gateway namespaces | Private OAuth and bounded usage metadata; root-private API key store |
 | Root owner broker | Stable-volume resolution, mount preparation and offline recovery; no arbitrary command/path/options endpoint | `/etc/haos/volumes.json`, `/var/lib/haos-owner/audit.jsonl` |
 
 The UI's existing bridge permissions are not this authority. The isolated agent is deliberately
@@ -40,6 +42,14 @@ recorded from received Hermes frames. `completed` means an upstream successful *
 it does not independently certify the user's goal, artifact contents or external side effects.
 Approvals permit only the offered `once`/`deny` choices. Sudo, secret and vault requests are rejected;
 provider setup uses upstream's authenticated setup interfaces instead.
+
+HAOS now provisions providers through the authenticated owner CLI and a separate
+[credential-isolated model broker](../PROVIDER-SETUP.md). The unmodified pinned
+Hermes runtime receives an immutable named custom provider and only a scoped
+loopback capability. Codex's real OAuth resolver/refresh runs in the separate
+provider identity. Neither terminal tools nor gateway events can grant models,
+change provider endpoints or read the real provider credential store. External
+model/gateway acceptance still requires credentials and real receipts.
 
 ## Filesystem enforcement
 
