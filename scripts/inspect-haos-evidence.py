@@ -93,6 +93,8 @@ def inspect(files):
                     errors.append({"stage": stage, "message": redactor.text(line[:1000])})
         # The acceptance service's own exception can precede its bounded journal.
         for line in log.splitlines():
+            if "HAOS_DIAGNOSTICS_JSON=" in line or "HAOS_ACCEPTANCE_JSON=" in line:
+                continue
             if re.search(r"haos_guest\.py.*(?:Error|Exception)|(?:RuntimeError|PermissionError|TimeoutError|AssertionError):", line):
                 errors.append({"stage": stage, "message": redactor.text(line[:1000])})
     source = None
