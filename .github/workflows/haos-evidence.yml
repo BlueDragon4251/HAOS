@@ -1,0 +1,33 @@
+name: HAOS bounded guest evidence inspection
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    paths: ['.github/workflows/haos-evidence.yml', 'scripts/inspect-haos-evidence.py']
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed HAOS image run containing a small QEMU guest artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    strategy:
+      fail-fast: false
+      matrix:
+        run_id: ['37954353008', '37949433859', '37954071132']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify archive digest and inspect bounded guest receipts
+        if: github.event_name != 'workflow_dispatch' || inputs.run_id == matrix.run_id
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAOS_EVIDENCE_RUN: ${{ matrix.run_id }}
+        run: python3 scripts/inspect-haos-evidence.py
