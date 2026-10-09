@@ -47,6 +47,8 @@ export interface ThemeSummary {
   scheme: ColorScheme
   colors: ThemeColors
   source: 'builtin' | 'user'
+  /** Exact checksum of a complete saved bundle; absent for legacy/built-in themes. */
+  revision?: string
 }
 
 // ---- Colour maths ------------------------------------------------------------------------------

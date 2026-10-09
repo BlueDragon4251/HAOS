@@ -7,7 +7,7 @@ import { events } from '../events/bus.ts'
 import { log } from '../log.ts'
 import { run } from '../platform/exec.ts'
 import { writePrefs } from '../prefs.ts'
-import { findTheme, installTheme, listFonts, listThemes, prefsForTheme, saveTheme, writeHermesSkin } from '../theme/themes.ts'
+import { findTheme, installTheme, listFonts, listThemes, prefsForTheme, saveTheme, themeHistory, writeHermesSkin } from '../theme/themes.ts'
 
 export interface ThemeIpcDeps {
   panels: boolean
@@ -40,8 +40,8 @@ export function syncHermesSkin(spec: ThemeSpec, backend: BackendManager): void {
 }
 
 /** Apply an installed theme everywhere it reaches. */
-export async function applyTheme(name: string, deps: ThemeIpcDeps): Promise<HeraldOSPrefs> {
-  const found = findTheme(name)
+export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: string): Promise<HeraldOSPrefs> {
+  const found = findTheme(name, revision)
 
   if (!found) {
     throw new Error(`No theme called "${name}"`)
@@ -49,14 +49,14 @@ export async function applyTheme(name: string, deps: ThemeIpcDeps): Promise<Hera
 
   // Herald OS Linux: the engine recolours the session (niri, GTK, the lock screen, the terminal).
   if (deps.panels && process.platform === 'linux') {
-    const result = await run('herald-os-theme', ['set', found.spec.name], 30_000)
+    const result = await run('herald-os-theme', ['set', found.spec.name, ...(found.revision ? ['--revision', found.revision] : [])], 30_000)
 
     if (result.code !== 0 && result.code !== 127) {
       throw new Error(result.stderr.trim() || result.stdout.trim() || 'the theme engine failed')
     }
   }
 
-  const next = writePrefs(prefsForTheme(found.spec, found.dir))
+  const next = writePrefs({ ...prefsForTheme(found.spec, found.dir), themeRevision: found.revision })
   deps.broadcast(next)
   syncHermesSkin(found.spec, deps.backend)
   events.emit('theme-set', { theme: found.spec.name })
@@ -89,8 +89,9 @@ function sampleImage(target: string): string | null {
 
 export function registerThemeIpc(deps: ThemeIpcDeps): void {
   ipcMain.handle(IPC.themeList, () => listThemes())
+  ipcMain.handle(IPC.themeHistory, (_event, name: string) => themeHistory(name))
   ipcMain.handle(IPC.themeSample, (_event, target: string) => sampleImage(String(target)))
-  ipcMain.handle(IPC.themeApply, (_event, name: string) => applyTheme(String(name), deps))
+  ipcMain.handle(IPC.themeApply, (_event, name: string, revision?: string) => applyTheme(String(name), deps, revision))
   ipcMain.handle(IPC.themeSave, (_event, spec: ThemeSpec, imagePath?: string) => saveTheme(spec, imagePath ? String(imagePath) : undefined))
   ipcMain.handle(IPC.themeInstall, (_event, url: string) => installTheme(String(url)))
   ipcMain.handle(IPC.fontsList, () => listFonts())

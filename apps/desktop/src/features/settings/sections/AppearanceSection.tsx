@@ -47,6 +47,7 @@ export function AppearanceSection() {
       <SectionTitle title="Appearance" subtitle="Theme, accent, wallpaper, fonts and the menu bar." />
 
       <ThemeGallery />
+      <ThemeHistory />
       <ThemeTools />
 
       <SettingsGroup title="Look">
@@ -135,7 +136,7 @@ function ThemeGallery() {
         <h3 className="px-0.5 text-[12.5px] font-medium text-fg-2">Theme</h3>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5" role="radiogroup" aria-label="Theme">
           {themes.map(theme => {
-            const active = theme.name === current
+            const active = theme.name === current && theme.revision === prefs.themeRevision
 
             return (
               <GlassCard
@@ -170,6 +171,41 @@ function ThemeGallery() {
         </div>
       </section>
     </Filterable>
+  )
+}
+
+function ThemeHistory() {
+  const prefs = useStore($prefs)
+  const [history, setHistory] = useState<ThemeSummary[]>([])
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let stopped = false
+    setHistory([])
+    if (prefs.themeName && prefs.themeRevision) {
+      void window.heraldOS.theme.history(prefs.themeName).then(items => {
+        if (!stopped) setHistory(items)
+      }).catch(() => undefined)
+    }
+    return () => { stopped = true }
+  }, [prefs.themeName, prefs.themeRevision])
+  if (history.length < 2) return null
+  const restore = async (theme: ThemeSummary) => {
+    setBusy(true)
+    try { await applyTheme(theme.name, theme.revision); markSaved() }
+    catch (error) { notify({ title: 'Could not restore theme', body: errorText(error), level: 'error' }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <SettingsGroup title="Saved theme versions">
+      {history.map(theme => (
+        <SettingsRow key={theme.revision} icon={<IconDroplet style={{ color: theme.colors.accent }} />} label={theme.label}
+          description={theme.description || 'A saved version of this theme.'} keywords="theme version restore rollback">
+          <GlassButton disabled={busy || theme.revision === prefs.themeRevision} onClick={() => void restore(theme)}>
+            {theme.revision === prefs.themeRevision ? 'In use' : 'Use this version'}
+          </GlassButton>
+        </SettingsRow>
+      ))}
+    </SettingsGroup>
   )
 }
 

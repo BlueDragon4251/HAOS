@@ -494,6 +494,8 @@ export interface HeraldOSPrefs {
   theme: 'ocean' | 'graphite'
   /** The installed theme in use (a folder name under the theme directories). */
   themeName?: string
+  /** Exact saved bundle in use, independent of a later update to the same name. */
+  themeRevision?: string
   /** Colours of a theme without a hand-tuned preset; the shell derives its whole palette from them. */
   themeColors?: ThemeColors
   themeScheme?: ColorScheme
@@ -764,6 +766,7 @@ export const IPC = {
 
   /** Installed themes (built in and the user's own). */
   themeList: 'herald-os:theme:list',
+  themeHistory: 'herald-os:theme:history',
   /** Apply a theme everywhere: the shell, Hermes's skin and, on Herald OS Linux, the whole session. */
   themeApply: 'herald-os:theme:apply',
   /** Save a theme the shell made (from an image) into the user's theme folder. */

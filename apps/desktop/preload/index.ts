@@ -167,9 +167,10 @@ const api = {
   },
   theme: {
     list: (): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeList),
+    history: (name: string): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeHistory, name),
     /** Apply an installed theme everywhere; resolves with the new preferences. */
-    apply: (name: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name),
-    /** Save a theme into ~/.config/herald-os/themes (with its wallpaper image copied in). */
+    apply: (name: string, revision?: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name, revision),
+    /** Save a complete versioned bundle; previous manifests/assets remain available. */
     save: (spec: ThemeSpec, imagePath?: string): Promise<string> => ipcRenderer.invoke(IPC.themeSave, spec, imagePath),
     /** A small PNG data URL of an image, to take theme colours from (null when it is not an image). */
     sample: (imagePath: string): Promise<string | null> => ipcRenderer.invoke(IPC.themeSample, imagePath),

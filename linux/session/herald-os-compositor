@@ -72,7 +72,10 @@ fi
 
 # theme.kdl is included by the managed config; make sure the active theme has written it.
 if [[ ! -f "$HOME/.config/niri/theme.kdl" ]] && command -v herald-os-theme >/dev/null; then
-  herald-os-theme set "$(herald-os-theme current)" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
+  theme_args=(set "$(herald-os-theme current)")
+  theme_revision="$(herald-os-theme current-revision 2>/dev/null || true)"
+  [[ "$theme_revision" =~ ^[a-f0-9]{64}$ ]] && theme_args+=(--revision "$theme_revision")
+  herald-os-theme "${theme_args[@]}" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
 fi
 [[ -f "$HOME/.config/niri/theme.kdl" ]] || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
 # The Display panel writes outputs.kdl; the managed config includes it, so it must exist.

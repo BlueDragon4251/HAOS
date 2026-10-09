@@ -25,6 +25,7 @@ interface ControlRequest {
   /** `theme`: the shell part of a theme definition. */
   shell?: Record<string, unknown>
   wallpaper?: string
+  revision?: string
   /** `theme`: the theme's colours. */
   colors?: Record<string, unknown>
 }
@@ -288,8 +289,9 @@ export class ControlSocket {
 
         // The shell reads the same theme.json the engine applied; a theme only the engine can see
         // (an unusual folder) still applies from the fields it sent.
-        const found = findTheme(name)
+        const found = findTheme(name, request.revision)
         const patch: Partial<HeraldOSPrefs> = found ? prefsForTheme(found.spec, found.dir) : this.themeFromRequest(name, request)
+        patch.themeRevision = found?.revision
 
         if (!found && typeof request.wallpaper === 'string') {
           patch.wallpaper = request.wallpaper || undefined

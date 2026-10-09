@@ -3,15 +3,16 @@
 
 One theme definition (linux/themes/<name>/theme.json) recolours the whole system at once: the
 shell (theme + accent preference), niri (borders, backdrop), swaylock, GTK 3/4 apps, the foot
-rescue terminal, and the wallpaper. Applied atomically: every file is written before the shell is
-told, and the previous theme is restored if a step fails.
+rescue terminal, and the wallpaper. Each generated file is replaced before the shell is told,
+and previous files are restored on a caught error. This is not a crash-safe whole-session swap.
 
-  herald-os-theme list | current | set <name> | show <name>
+  herald-os-theme list | current | current-revision | set <name> [--revision <sha256>] | show <name>
 """
 
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import shutil
@@ -41,6 +42,7 @@ RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
 SOCKET = RUNTIME / "herald-os" / "control.sock"
 DEFAULT = "herald-ocean"
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+REVISION = re.compile(r"^[a-f0-9]{64}$")
 COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 COLOR_KEYS = {"bg", "bg2", "surface", "fg", "fg_dim", "accent", "accent_strong", "border_active", "border_inactive", "urgent", "ok", "warn"}
 
@@ -111,10 +113,63 @@ def die(message: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def find(name: str) -> tuple[Path, dict] | None:
+def revision_theme(name: str, revision: str | None = None) -> tuple[Path, dict]:
+    """Read the same complete, checksum-verified bundle as the native shell."""
+    if not NAME.fullmatch(name):
+        raise ValueError("invalid theme name")
+    base = STATE / "theme-versions" / name
+    for parent in (HOME, CONFIG, STATE, base.parent, base):
+        info = parent.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+            raise ValueError("unsafe theme bundle directory")
+
+    def bounded(file: Path, limit: int) -> bytes:
+        fd = os.open(file, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > limit:
+                raise ValueError("unsafe theme bundle file")
+            with os.fdopen(fd, "rb") as stream:
+                fd = -1
+                data = stream.read(limit + 1)
+            if len(data) != info.st_size:
+                raise ValueError("theme bundle file changed")
+            return data
+        finally:
+            if fd >= 0:
+                os.close(fd)
+
+    if revision is None:
+        index = json.loads(bounded(base / "current.json", 1024))
+        if not isinstance(index, dict) or set(index) != {"schema", "revision"} or type(index["schema"]) is not int or index["schema"] != 1:
+            raise ValueError("invalid theme revision index")
+        revision = index["revision"]
+    if not isinstance(revision, str) or not REVISION.fullmatch(revision):
+        raise ValueError("invalid theme revision")
+    directory = base / revision
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+        raise ValueError("unsafe theme revision directory")
+    manifest = bounded(directory / "theme.json", 65536)
+    theme = json.loads(manifest)
+    validate(theme)
+    if theme["name"] != name:
+        raise ValueError("theme revision identity changed")
+    wallpaper = theme.get("wallpaper", "default")
+    image = bounded(directory / wallpaper, 25 * 1024 * 1024) if wallpaper != "default" else b""
+    if hashlib.sha256(manifest + b"\0" + image).hexdigest() != revision:
+        raise ValueError("theme revision failed its checksum")
+    return directory, theme
+
+
+def find(name: str, revision: str | None = None) -> tuple[Path, dict] | None:
     if not NAME.fullmatch(name):
         return None
+    if revision is not None:
+        return revision_theme(name, revision)
     for base in THEME_DIRS:
+        if base == STATE / "themes" and (STATE / "theme-versions" / name).exists():
+            return revision_theme(name)
         if not base or not base.is_dir():
             continue
         candidate = base / name / "theme.json"
@@ -123,11 +178,14 @@ def find(name: str) -> tuple[Path, dict] | None:
                 return candidate.parent, read_spec(candidate.parent)
             except (OSError, ValueError):
                 return None
+    if (STATE / "theme-versions" / name).exists():
+        return revision_theme(name)
     return None
 
 
 def all_themes() -> dict[str, dict]:
     found: dict[str, dict] = {}
+    builtin = set()
     for base in THEME_DIRS:
         if not base or not base.is_dir():
             continue
@@ -136,8 +194,20 @@ def all_themes() -> dict[str, dict]:
             if entry.is_dir() and spec.exists() and entry.name not in found:
                 try:
                     found[entry.name] = read_spec(entry)
+                    if base != STATE / "themes":
+                        builtin.add(entry.name)
                 except (OSError, ValueError):
                     pass
+    versions = STATE / "theme-versions"
+    if versions.exists():
+        for entry in sorted(versions.iterdir()):
+            if entry.name in builtin:
+                continue
+            found.pop(entry.name, None)
+            try:
+                found[entry.name] = revision_theme(entry.name)[1]
+            except (OSError, ValueError):
+                pass
     return found
 
 
@@ -317,11 +387,12 @@ def gsettings(schema: str, key: str, value: str) -> None:
 
 
 # ---------------------------------------------------------------------------------------------
-def apply(name: str) -> int:
-    found = find(name)
+def apply(name: str, revision: str | None = None) -> int:
+    found = find(name, revision)
     if not found:
         die(f"no theme named {name!r} (see `herald-os-theme list`)", 1)
     theme_dir, theme = found
+    selected_revision = theme_dir.name if REVISION.fullmatch(theme_dir.name) else None
     c = theme["colors"]
     shell = theme.get("shell", {})
     gtk = theme.get("gtk", {})
@@ -334,6 +405,8 @@ def apply(name: str) -> int:
         CONFIG / "gtk-4.0" / "gtk.css": render_gtk_css(c),
         CONFIG / "foot" / "foot.ini": render_foot(theme),
         hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
+        STATE / "theme": name + "\n",
+        STATE / "theme-revision": (selected_revision or "") + "\n",
     }
     backups = {path: (path.read_text() if path.exists() else None) for path in targets}
     try:
@@ -342,7 +415,6 @@ def apply(name: str) -> int:
         gsettings("org.gnome.desktop.interface", "color-scheme", gtk.get("color_scheme", "prefer-dark"))
         if gtk.get("theme"):
             gsettings("org.gnome.desktop.interface", "gtk-theme", gtk["theme"])
-        write(STATE / "theme", name + "\n")
     except Exception as exc:  # noqa: BLE001 - restore whatever was written.
         for path, text in backups.items():
             if text is None:
@@ -355,6 +427,8 @@ def apply(name: str) -> int:
     wallpaper = theme.get("wallpaper", "default")
     wallpaper_path = "" if wallpaper in ("default", "", None) else str((theme_dir / wallpaper).resolve())
     payload = {"cmd": "theme", "args": [name], "shell": shell, "wallpaper": wallpaper_path, "colors": c}
+    if selected_revision:
+        payload["revision"] = selected_revision
     if not relay(payload):
         print("shell not running; it will pick the theme up on next start")
     print(f"applied {theme.get('label', name)}")
@@ -375,6 +449,13 @@ def main(argv: list[str]) -> int:
     if cmd == "current":
         print(current())
         return 0
+    if cmd == "current-revision":
+        marker = STATE / "theme-revision"
+        revision = marker.read_text().strip() if marker.exists() else ""
+        if revision and not REVISION.fullmatch(revision):
+            die("invalid current theme revision", 1)
+        print(revision)
+        return 0
     if cmd == "show":
         found = find(args[0]) if args else None
         if not found:
@@ -382,9 +463,9 @@ def main(argv: list[str]) -> int:
         print(json.dumps(found[1], indent=2))
         return 0
     if cmd == "set":
-        if not args:
-            die("set <name>", 2)
-        return apply(args[0])
+        if len(args) not in (1, 3) or (len(args) == 3 and args[1] != "--revision"):
+            die("set <name> [--revision <sha256>]", 2)
+        return apply(args[0], args[2] if len(args) == 3 else None)
     die(f"unknown command {cmd!r}", 2)
     return 2
 

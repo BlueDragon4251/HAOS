@@ -7,10 +7,15 @@ import { HERALD_SKIN, hermesSkinYaml, schemeOf, type ThemeSpec, type ThemeSummar
 import { log } from '../log.ts'
 import { hermesHome } from '../paths.ts'
 import { run } from '../platform/exec.ts'
+import { readThemeFile, ThemeRevisions } from './revisions.ts'
 
 /** Where people's own themes live, on every platform (the Linux theme engine reads it too). */
 export function userThemesDir(): string {
   return path.join(os.homedir(), '.config', 'herald-os', 'themes')
+}
+
+function revisions(): ThemeRevisions {
+  return new ThemeRevisions(path.join(os.homedir(), '.config', 'herald-os', 'theme-versions'), os.homedir())
 }
 
 /** Theme folders shipped with Herald OS, first match wins (the same order as linux/bin/herald-os-theme). */
@@ -63,6 +68,7 @@ interface FoundTheme {
   spec: ThemeSpec
   dir: string
   source: ThemeSummary['source']
+  revision?: string
 }
 
 function scan(): Map<string, FoundTheme> {
@@ -88,24 +94,38 @@ function scan(): Map<string, FoundTheme> {
     }
   }
 
+  for (const name of revisions().names()) {
+    if (found.get(name)?.source === 'builtin') continue
+    found.delete(name)
+    try { found.set(name, { ...revisions().read(name), source: 'user' }) } catch { /* Corrupt current indexes/bundles are unavailable. */ }
+  }
+
   return found
 }
 
 export function listThemes(): ThemeSummary[] {
-  return [...scan().values()].map(({ spec, source }) => ({
+  return [...scan().values()].map(({ spec, source, revision }) => ({
     name: spec.name,
     label: spec.label || spec.name,
     description: spec.description ?? '',
     scheme: schemeOf(spec.colors, spec.shell?.scheme),
     colors: spec.colors,
-    source
+    source,
+    revision
   }))
 }
 
-export function findTheme(name: string): FoundTheme | null {
+export function findTheme(name: string, revision?: string): FoundTheme | null {
+  if (revision !== undefined) return { ...revisions().read(name, revision), source: 'user' }
   const themes = scan()
 
   return themes.get(name) ?? themes.get(`herald-${name}`) ?? null
+}
+
+export function themeHistory(name: string): ThemeSummary[] {
+  return revisions().history(name).map(bundle => ({ name, label: bundle.spec.label || name,
+    description: bundle.spec.description || '', scheme: schemeOf(bundle.spec.colors, bundle.spec.shell?.scheme),
+    colors: bundle.spec.colors, source: 'user', revision: bundle.revision }))
 }
 
 /** The shell's part of a theme: a hand-tuned preset, or colours the shell derives its palette from. */
@@ -114,10 +134,10 @@ export function prefsForTheme(spec: ThemeSpec, dir: string): Partial<HeraldOSPre
   const preset = spec.shell?.theme
 
   if (preset === 'ocean' || preset === 'graphite') {
-    return { themeName: spec.name, theme: preset, accent: spec.shell?.accent ?? 'blue', themeColors: undefined, themeScheme: undefined, wallpaper }
+    return { themeName: spec.name, theme: preset, accent: spec.shell?.accent ?? 'blue', themeColors: undefined, themeScheme: undefined, themeRevision: undefined, wallpaper }
   }
 
-  return { themeName: spec.name, theme: 'ocean', accent: 'blue', themeColors: spec.colors, themeScheme: schemeOf(spec.colors, spec.shell?.scheme), wallpaper }
+  return { themeName: spec.name, theme: 'ocean', accent: 'blue', themeColors: spec.colors, themeScheme: schemeOf(spec.colors, spec.shell?.scheme), themeRevision: undefined, wallpaper }
 }
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif'])
@@ -137,9 +157,8 @@ export function saveTheme(spec: ThemeSpec, imagePath?: string): string {
     throw new Error(`"${spec.name}" is a built-in theme; choose another name`)
   }
 
-  const dir = path.join(userThemesDir(), spec.name)
-  fs.mkdirSync(dir, { recursive: true })
   const next: ThemeSpec = { ...spec }
+  let image: Buffer | undefined
 
   if (imagePath) {
     const extension = path.extname(imagePath).toLowerCase()
@@ -148,11 +167,14 @@ export function saveTheme(spec: ThemeSpec, imagePath?: string): string {
       throw new Error(`${path.basename(imagePath)} is not a PNG, JPEG, WebP or AVIF image`)
     }
 
-    fs.copyFileSync(imagePath, path.join(dir, `wallpaper${extension}`))
+    image = readThemeFile(imagePath, MAX_IMAGE_BYTES)
     next.wallpaper = `wallpaper${extension}`
+  } else if (spec.wallpaper && spec.wallpaper !== 'default') {
+    if (!existing) throw new Error('Provide the wallpaper when saving a new theme')
+    image = readThemeFile(path.join(existing.dir, spec.wallpaper), MAX_IMAGE_BYTES)
   }
 
-  fs.writeFileSync(path.join(dir, 'theme.json'), `${JSON.stringify(next, null, 2)}\n`)
+  revisions().publish(next, image)
 
   return spec.name
 }
@@ -190,7 +212,8 @@ export async function installTheme(url: string): Promise<string[]> {
     const installed: string[] = []
 
     for (const folder of folders) {
-      const spec = JSON.parse(fs.readFileSync(path.join(folder, 'theme.json'), 'utf8')) as ThemeSpec
+      if (!fs.lstatSync(folder).isDirectory()) throw new Error('Theme folders must not be symlinks')
+      const spec = JSON.parse(readThemeFile(path.join(folder, 'theme.json'), 65536).toString('utf8')) as ThemeSpec
       const problem = validateTheme(spec)
 
       if (problem) {
@@ -203,22 +226,10 @@ export async function installTheme(url: string): Promise<string[]> {
         throw new Error(`"${spec.name}" is a built-in theme name`)
       }
 
-      const target = path.join(userThemesDir(), spec.name)
-      fs.rmSync(target, { recursive: true, force: true })
-      fs.mkdirSync(target, { recursive: true })
-
-      for (const entry of fs.readdirSync(folder)) {
-        const source = path.join(folder, entry)
-        const stat = fs.lstatSync(source)
-
-        if (stat.isFile() && IMAGE_EXTENSIONS.has(path.extname(entry).toLowerCase()) && stat.size <= MAX_IMAGE_BYTES) {
-          fs.copyFileSync(source, path.join(target, entry))
-        }
-      }
-
-      const wallpaper = spec.wallpaper && spec.wallpaper !== 'default' && fs.existsSync(path.join(target, path.basename(spec.wallpaper))) ? path.basename(spec.wallpaper) : 'default'
+      const wallpaper = spec.wallpaper || 'default'
+      const image = wallpaper !== 'default' ? readThemeFile(path.join(folder, wallpaper), MAX_IMAGE_BYTES) : undefined
       const clean: ThemeSpec = { name: spec.name, label: spec.label, description: spec.description, shell: spec.shell?.scheme ? { scheme: spec.shell.scheme } : undefined, wallpaper, colors: spec.colors, gtk: spec.gtk, terminal: spec.terminal }
-      fs.writeFileSync(path.join(target, 'theme.json'), `${JSON.stringify(clean, null, 2)}\n`)
+      revisions().publish(clean, image)
       installed.push(spec.name)
     }
 

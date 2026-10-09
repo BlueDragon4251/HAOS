@@ -6,6 +6,13 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+Complete [theme revisions](THEME-SDK.md) now preserve previous manifests/assets,
+publish a fully written checksum-verified bundle before switching its index and
+expose explicit version selection in native Appearance and the Linux CLI. Real
+filesystem/restart/corruption/failure and native-to-Linux contract tests pass locally.
+Agent generation, actual graphical preview, whole-session activation and an
+independent automatic crash rollback remain open.
+
 Installed provider images `e954dd3` / `720c08c` built but failed their first guest
 boot at controller startup. [Bounded evidence inspection](https://github.com/BlueDragon4251/HAOS/actions/runs/37963970719)
 verified their exact ZIP digests and exposed `PermissionError: untrusted provider
