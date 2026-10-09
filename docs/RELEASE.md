@@ -1,6 +1,6 @@
 # Release gates
 
-No production release is approved. Development artifacts are private/unsigned. SHA-256 verifies bytes against a manifest, not signer identity or safe behavior.
+No production release is approved. The repository and its development Actions artifacts are public; builds remain unsigned. SHA-256 verifies bytes against a manifest, not signer identity or safe behavior. Public evidence uploads must contain only intentionally disposable fixtures and bounded redacted receipts, never real credentials, chats or desktop captures.
 
 Manifest records source/repository, architecture, Herald/Hermes pins, OCI/base metadata and checksum. npm CycloneDX plus RPM inventory is partial evidence, not a complete Python/system/application SBOM. Mutable base/builder tags prevent full reproducibility claims.
 

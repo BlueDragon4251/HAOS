@@ -767,6 +767,7 @@ export const IPC = {
   /** Installed themes (built in and the user's own). */
   themeList: 'herald-os:theme:list',
   themeHistory: 'herald-os:theme:history',
+  themePreview: 'herald-os:theme:preview',
   /** Apply a theme everywhere: the shell, Hermes's skin and, on Herald OS Linux, the whole session. */
   themeApply: 'herald-os:theme:apply',
   /** Save a theme the shell made (from an image) into the user's theme folder. */

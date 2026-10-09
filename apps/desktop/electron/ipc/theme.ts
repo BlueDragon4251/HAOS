@@ -8,6 +8,7 @@ import { log } from '../log.ts'
 import { run } from '../platform/exec.ts'
 import { writePrefs } from '../prefs.ts'
 import { findTheme, installTheme, listFonts, listThemes, prefsForTheme, saveTheme, themeHistory, writeHermesSkin } from '../theme/themes.ts'
+import { previewTheme } from '../theme/preview.ts'
 
 export interface ThemeIpcDeps {
   panels: boolean
@@ -45,6 +46,12 @@ export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: st
 
   if (!found) {
     throw new Error(`No theme called "${name}"`)
+  }
+
+  // Validate new saved bundles in a real isolated renderer before touching the
+  // current session or preferences. An unreadable/undecodable update is a draft.
+  if (found.revision && !(await previewTheme(found, deps.panels)).passed) {
+    throw new Error('Theme preview failed its readability, raster or isolation checks; the previous theme remains in use')
   }
 
   // Herald OS Linux: the engine recolours the session (niri, GTK, the lock screen, the terminal).
@@ -90,6 +97,11 @@ function sampleImage(target: string): string | null {
 export function registerThemeIpc(deps: ThemeIpcDeps): void {
   ipcMain.handle(IPC.themeList, () => listThemes())
   ipcMain.handle(IPC.themeHistory, (_event, name: string) => themeHistory(name))
+  ipcMain.handle(IPC.themePreview, (_event, name: string, revision?: string) => {
+    const found = findTheme(name, revision)
+    if (!found) throw new Error('Theme is unavailable')
+    return previewTheme(found, deps.panels)
+  })
   ipcMain.handle(IPC.themeSample, (_event, target: string) => sampleImage(String(target)))
   ipcMain.handle(IPC.themeApply, (_event, name: string, revision?: string) => applyTheme(String(name), deps, revision))
   ipcMain.handle(IPC.themeSave, (_event, spec: ThemeSpec, imagePath?: string) => saveTheme(spec, imagePath ? String(imagePath) : undefined))

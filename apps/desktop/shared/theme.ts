@@ -51,6 +51,18 @@ export interface ThemeSummary {
   revision?: string
 }
 
+export interface ThemePreview {
+  revision?: string
+  passed: boolean
+  checks: { sandbox: boolean; rendered: boolean; controlsVisible: boolean; textContrast: boolean;
+    secondaryContrast: boolean; controlContrast: boolean; rasterDecoded: boolean }
+  width: number
+  height: number
+  png: string
+  screenshotSha256: string
+  stylesheetSha256: string
+}
+
 // ---- Colour maths ------------------------------------------------------------------------------
 
 export interface Rgb {

@@ -19,6 +19,7 @@
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
+    "test:theme-preview": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-theme-preview.mjs",
     "dist:mac": "npm run build && electron-builder --mac --arm64 -c.npmRebuild=false --publish never",
     "dist:linux": "npm run build && electron-builder --linux --publish never"
   },

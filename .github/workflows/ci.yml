@@ -32,6 +32,45 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Permit the exact Electron launcher to create its Chromium sandbox
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apparmor libgtk-3-0t64 libnss3 libasound2t64 libgbm1
+          HAOS_PREVIEW_EXECUTABLE="$(realpath node_modules/electron/dist/electron)"
+          case "$HAOS_PREVIEW_EXECUTABLE" in
+            "$GITHUB_WORKSPACE"/node_modules/electron/dist/electron) ;;
+            *) exit 1 ;;
+          esac
+          # Only this disposable runner's exact launcher gets userns permission.
+          # AppArmor stays enabled; the actual renderer must attest seccomp,
+          # NoNewPrivs, zero capabilities and absence of Node in the next step.
+          HAOS_PREVIEW_PROFILE="$RUNNER_TEMP/haos-theme-preview.apparmor"
+          cat > "$HAOS_PREVIEW_PROFILE" <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile haos-theme-preview "$HAOS_PREVIEW_EXECUTABLE" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r "$HAOS_PREVIEW_PROFILE"
+      - name: Actual isolated Chromium theme render and rejection cases
+        if: runner.os == 'Linux'
+        id: theme-preview
+        timeout-minutes: 2
+        env:
+          HAOS_DISPOSABLE_SCREEN_TEST: '1'
+        run: npm run test:theme-preview --workspace @herald-os/desktop
+      - name: Retain only disposable theme screenshots and source-bound receipt
+        if: always() && runner.os == 'Linux' && steps.theme-preview.outputs.evidence != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: theme-preview-${{ github.sha }}
+          path: ${{ steps.theme-preview.outputs.evidence }}
+          if-no-files-found: error
+          retention-days: 7
 
   bridge:
     name: Bridge plugin (${{ matrix.os }})

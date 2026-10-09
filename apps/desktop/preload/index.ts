@@ -70,7 +70,7 @@ import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/model
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
-import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { ThemePreview, ThemeSpec, ThemeSummary } from '../shared/theme.ts'
 import type { MissionMethods } from '../shared/missions.ts'
 
 type Unsubscribe = () => void
@@ -168,6 +168,7 @@ const api = {
   theme: {
     list: (): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeList),
     history: (name: string): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeHistory, name),
+    preview: (name: string, revision?: string): Promise<ThemePreview> => ipcRenderer.invoke(IPC.themePreview, name, revision),
     /** Apply an installed theme everywhere; resolves with the new preferences. */
     apply: (name: string, revision?: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name, revision),
     /** Save a complete versioned bundle; previous manifests/assets remain available. */

@@ -10,8 +10,14 @@ Complete [theme revisions](THEME-SDK.md) now preserve previous manifests/assets,
 publish a fully written checksum-verified bundle before switching its index and
 expose explicit version selection in native Appearance and the Linux CLI. Real
 filesystem/restart/corruption/failure and native-to-Linux contract tests pass locally.
-Agent generation, actual graphical preview, whole-session activation and an
-independent automatic crash rollback remain open.
+An isolated Chromium preview now renders production CSS, captures a real screenshot,
+checks the actual composed text/control contrast and wallpaper decoding, and rejects
+unusable new saved revisions before changing the session/prefs. Five actual local
+renderer cases pass, including zero requests to a real network canary and corrupt
+raster rejection. Linux CI now requires this probe and retains only fixture PNGs
+and a source-bound receipt. Matching CI remains required; this is a representative
+preview, not whole-shell/compositor or autonomous model acceptance. Agent generation,
+whole-session activation and independent automatic crash rollback remain open.
 
 At `405cdcc`, [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981424478),
 [PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981432542) and
@@ -59,6 +65,16 @@ the real kernel probe separately checks the root-owned interpreter is unmapped.
 Local **175 ordinary and 31 harness/privacy** cases pass. New actual namespace
 and installed gates must confirm the corrected probe; other guest failures remain
 possible and no complete `de2b989` installed acceptance is claimed.
+
+The new embedded kernel program initially failed indentation in both `41b97fe`
+service runs. `fed663588608791ba1acfe310cd53e0bdbb6d441` corrects it and adds tests
+that compile both actual extracted `python -c` programs. Local **33 harness/privacy**
+cases pass. Both [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37982281888)
+and [PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37982288085),
+[general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37982288072) and Arch
+passed at that source. These actual kernel gates confirm the host interpreter's
+foreign UID becomes unmapped inside the single-UID namespace. Matching installed
+foreign-owner read/write/delete and both boot receipts remain required.
 
 Owner/recovery image `d8f95c8` passed both installed boots. Evidence inspection
 verified guest ZIP `11630797221` / SHA256

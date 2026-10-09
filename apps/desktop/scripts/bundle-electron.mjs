@@ -43,3 +43,14 @@ await build({
   format: 'cjs',
   external: ['electron']
 })
+
+// The integration probe imports the exact production renderer/store functions,
+// without starting the shell, its bridge or a model/backend process.
+await build({
+  ...common,
+  entryPoints: { 'theme-preview': path.join(root, 'electron/theme/preview.ts'), 'theme-revisions': path.join(root, 'electron/theme/revisions.ts') },
+  outdir: path.join(root, 'dist/electron'),
+  outExtension: { '.js': '.mjs' },
+  format: 'esm',
+  external: ['electron']
+})
