@@ -95,9 +95,35 @@ def resolve_volume(identifier: str, devices: list[dict]) -> dict:
     return target
 
 
+def verify_mount(grant: dict, target: dict, destination: Path):
+    """Do not publish a device name that was reused between discovery and mount."""
+    mounted = json.loads(subprocess.check_output([
+        "/usr/bin/findmnt", "--json", "--first-only", "--mountpoint", str(destination),
+        "--output", "TARGET,FSTYPE,UUID,PARTUUID,MAJ:MIN,OPTIONS"], text=True)).get("filesystems", [])
+    if len(mounted) != 1:
+        raise PermissionError("broker mount is missing or ambiguous")
+    actual = mounted[0]
+    match = IDENTITY.fullmatch(grant["id"])
+    options = set((actual.get("options") or "").split(","))
+    expected_access = "ro" if grant["mode"] == "read-only" else "rw"
+    if (not match or actual.get(match[1].lower()) != match[2]
+            or actual.get("target") != str(destination) or actual.get("fstype") != target["fstype"]
+            or not target.get("maj:min") or actual.get("maj:min") != target["maj:min"]
+            or not {"nodev", "nosuid", "noexec", expected_access}.issubset(options)
+            or ("rw" if expected_access == "ro" else "ro") in options):
+        raise PermissionError("mounted device identity or access flags differ from owner policy")
+    # Re-read topology as well: a changed UUID or a newly ambiguous/system disk
+    # must fail before the independently protected runtime grant is committed.
+    current = resolve_volume(grant["id"], inventory())
+    if current["path"] != target["path"] or current.get("maj:min") != target["maj:min"]:
+        raise PermissionError("data device topology changed during preparation")
+
+
 def prepare():
     if os.geteuid() != 0:
         raise PermissionError("storage preparation requires the owner/root service")
+    # A failed new preparation must not leave an older compiled grant usable.
+    Path("/run/haos-policy/sandbox.json").unlink(missing_ok=True)
     import grp
     import pwd
     policy = trusted_json(Path("/etc/haos/volumes.json"))
@@ -120,6 +146,7 @@ def prepare():
             subprocess.run(["/usr/bin/mount", "--types", target["fstype"], "--options", options,
                             "--source", target["path"], "--target", str(destination)], check=True)
             mounted.append(destination)
+            verify_mount(grant, target, destination)
         runtime = Path("/run/haos-policy")
         runtime.mkdir(mode=0o750, exist_ok=True)
         os.chown(runtime, 0, pwd.getpwnam("haos-agent").pw_gid)
