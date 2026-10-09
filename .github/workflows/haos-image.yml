@@ -42,7 +42,11 @@ jobs:
           npm run dist:linux --workspace apps/desktop -- --x64
           cp apps/desktop/release/herald-os-*-linux-x64.tar.gz herald-os-linux.tar.gz
           mkdir -p evidence
-          npm sbom --sbom-format cyclonedx --omit dev > evidence/npm.cdx.json
+          # The pinned CLI handles the intentional security overrides. Retain
+          # its raw graph; normalize duplicate package occurrences without
+          # losing locations/edges or permitting conflicting identities/hashes.
+          npm exec --yes --package=npm@10.9.4 -- npm sbom --sbom-format cyclonedx --omit dev > evidence/npm.raw.cdx.json
+          python3 linux/haos/runtime/verify_sbom.py --normalize-npm evidence/npm.raw.cdx.json evidence/npm.cdx.json
       - name: Build the pinned-runtime Fedora bootc image
         run: |
           set -euo pipefail
@@ -50,12 +54,30 @@ jobs:
           sudo podman image inspect localhost/haos:ci > evidence/image.json
           sudo podman image inspect quay.io/fedora/fedora-bootc:44 > evidence/base-image.json
           sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-packages.txt
+          sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-with-epochs.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/source.json > evidence/python-runtime-source.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/requirements.txt > evidence/python-runtime-requirements.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/installed.txt > evidence/python-runtime-installed.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/backend-build-probe.json > evidence/backend-build-probe.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/gateway-build-probe.json > evidence/gateway-build-probe.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/provider-build-probe.json > evidence/provider-build-probe.json
+      - name: Catalog the actual built image with a digest-pinned offline scanner
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          HAOS_SBOM_ARCHIVE="$RUNNER_TEMP/haos-sbom-image.tar"
+          trap 'rm -f -- "$HAOS_SBOM_ARCHIVE"' EXIT
+          sudo podman save --format oci-archive --output "$HAOS_SBOM_ARCHIVE" localhost/haos:ci
+          sudo chown "$(id -u):$(id -g)" "$HAOS_SBOM_ARCHIVE"
+          chmod 0600 "$HAOS_SBOM_ARCHIVE"
+          docker run --rm --network none --read-only --cap-drop ALL --memory 3g --cpus 2 \
+            --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
+            -e SYFT_CACHE_DIR=/tmp/cache -v "$HAOS_SBOM_ARCHIVE:/image.tar:ro" -v "$PWD/evidence:/evidence:rw" \
+            ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa \
+            scan oci-archive:/image.tar --parallelism 2 --quiet \
+            --source-name "$GITHUB_REPOSITORY" --source-version "$GITHUB_SHA" \
+            --output cyclonedx-json@1.6=/evidence/image.cdx.json --output syft-json=/evidence/image.syft.json
+          python3 linux/haos/runtime/verify_sbom.py evidence --commit "$GITHUB_SHA"
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
           set -euo pipefail
@@ -81,8 +103,9 @@ jobs:
                       'image': json.loads(Path('evidence/image.json').read_text()),
                       'base_image': json.loads(Path('evidence/base-image.json').read_text()),
                       'checksums': Path('evidence/SHA256SUMS').read_text(),
+                      'sbom': json.loads(Path('evidence/sbom-index.json').read_text()),
                       'limitations': ['unsigned development build', 'requires successful QEMU and security acceptance before release',
-                                      'npm SBOM and RPM inventory do not constitute a complete multi-ecosystem release SBOM']}
+                                      'image catalog and npm build graph require embedded-component, vulnerability and license review before release']}
           Path('evidence/build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
           PY
       - name: Upload small build identity and checksum evidence separately
@@ -101,7 +124,12 @@ jobs:
             evidence/image.json
             evidence/base-image.json
             evidence/rpm-packages.txt
+            evidence/rpm-with-epochs.txt
             evidence/npm.cdx.json
+            evidence/npm.raw.cdx.json
+            evidence/image.cdx.json
+            evidence/image.syft.json
+            evidence/sbom-index.json
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4

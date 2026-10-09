@@ -6,6 +6,18 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+The new [image SBOM gate](SBOM.md) catalogs the actual OCI image with a digest-pinned
+offline scanner, preserves/normalizes the pinned npm build graph, and requires
+exact source/image identity plus all frozen/installed Python and RPM epoch/version/
+architecture entries. The index hashes the documents and is embedded in the build
+manifest. Local **9 negative contract cases** and actual Docker/OCI catalog probes
+passed on a disposable Fedora metadata fixture (147 actual RPM records, 80 actual
+installed Python metadata directories), with the separate actual 188-package npm
+graph. This is no actual HAOS-image/execution claim; matching CI remains required.
+Local ordinary HAOS verification now passes **184 cases**. Complete embedded-component
+coverage, license/vulnerability review, signing/provenance and reproducibility
+remain independent release requirements.
+
 Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
 inventory and explicit scoped retention, previewed by default. Full encrypted data
 is checked before/after actual deletion/prune, and the final inventory must match
@@ -16,6 +28,14 @@ integrity/event/cancellation verification. Local **21 backup unit/real integrati
 **175 ordinary** and **33 harness/privacy** cases pass. New matching CI is required.
 No whole-system/off-host/scheduled recovery or automatic live-state replacement
 is claimed.
+
+At `4bd2728469c91104a1fe5db9209dc6592414e167`, both actual
+[push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37986821269)/
+[PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37986826502) and
+[general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37986826164) passed.
+The downloaded complete push-run log archive confirms Restic **0.16.4** and all
+four actual encrypted retention/deleted-project/damaged-state/corrupt-pack probes
+passed in 29.97 seconds. No root fixture or security check was removed.
 
 Complete [theme revisions](THEME-SDK.md) now preserve previous manifests/assets,
 publish a fully written checksum-verified bundle before switching its index and
