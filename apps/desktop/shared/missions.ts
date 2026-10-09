@@ -39,6 +39,19 @@ export interface MissionServiceHealth {
   backend_connected: boolean
   current_mission: string | null
   pending_requests: MissionQuestion[]
+  system: {
+    at: number
+    status: 'ok' | 'degraded' | 'critical' | 'unavailable'
+    can_dispatch: boolean
+    cpu_busy_percent?: number | null
+    memory?: { total: number; available: number } | null
+    disks?: Record<string, { total: number; free: number }>
+    temperatures?: { sensor: string; celsius: number; critical_celsius?: number }[]
+    gpus?: { device: string; busy_percent: number }[]
+    services?: { unit: string; active: string; state: string; memory_bytes?: number; cpu_nanoseconds?: number; tasks?: number }[]
+    alerts: string[]
+    errors: string[]
+  } | null
 }
 
 export interface MissionMethods {

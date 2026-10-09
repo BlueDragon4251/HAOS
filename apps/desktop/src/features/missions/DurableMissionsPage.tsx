@@ -10,6 +10,7 @@ import { runCommand } from '../../store/os-commands.ts'
 import { MissionComposer } from './MissionComposer.tsx'
 import { $pendingMissionMessages, recoverMissionMessages } from '../../store/mission-conversation.ts'
 import { MissionMessageComposer } from './MissionMessageComposer.tsx'
+import { SystemHealth } from './SystemHealth.tsx'
 
 const STATE_COLOR: Record<DurableMissionState, string> = {
   queued: 'text-fg-3', running: 'text-progress', waiting: 'text-warn', blocked: 'text-warn',
@@ -118,6 +119,7 @@ export function DurableMissionsPage({ conversation = false }: { conversation?: b
         </p>
         {admissionError && <p role="alert" className="text-xs text-danger">Could not check pending messages: {admissionError}</p>}
         {pending.length > 0 && <p role="status" className="text-xs text-warn">{pending.length} submission receipt(s) pending. Hermes checks saved admissions without resending. To retry, enter the exact original message.</p>}
+        <SystemHealth value={health?.system ?? null} />
         <div className="flex min-h-0 flex-1 gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
             {missions.length === 0 ? <EmptyGlass icon={<IconTarget />} title="No queued missions" description="Give Hermes a goal. The controller records it before execution." /> : missions.map(row => (

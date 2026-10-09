@@ -6,6 +6,13 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+[System health](SYSTEM-HEALTH.md) now exposes real kernel/filesystem/service metrics
+in the native workspace. An independent controller sampler pauses new dispatch on
+stale/unknown required measurements or critical space/memory/temperature pressure,
+without replaying jobs or modifying owner policy. Local ordinary/wire/harness tests
+and native TypeScript/production bundling passed. Matching service/installed results
+remain required; no repair or per-mission resource/cost accounting is claimed.
+
 [Volume permission delegation](VOLUME-ACCESS.md) now uses root-broker POSIX ACLs
 and private generation-aware permission journals on ext4/XFS/Btrfs. Read-only
 mount publication, safe rollback/unmount and ownership-free filesystem masks are

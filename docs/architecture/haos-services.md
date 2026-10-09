@@ -36,6 +36,12 @@ whose admission is uncertain. Owner reconciliation requires both services to be 
 inspection receipt. Deadline and cancellation interrupt Hermes and wait for a terminal event;
 missing receipts block rather than invent an outcome.
 
+The controller's separate [read-only health sampler](../SYSTEM-HEALTH.md) reports
+actual kernel, filesystem and fixed-service measurements. New dispatch requires
+fresh safe storage/memory/thermal measurements; pressure leaves saved jobs queued
+without consuming attempts. No UI/model request can invoke repair or modify this
+root-independent measurement surface. Existing in-flight ambiguity handling remains.
+
 The adapter uses the pinned `session.create`, `prompt.submit`, `session.interrupt`, server
 `approval`/`clarify` requests and `message.complete` event. Tool events, usage and result text are
 recorded from received Hermes frames. `completed` means an upstream successful **turn receipt**;

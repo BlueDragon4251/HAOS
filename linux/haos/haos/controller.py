@@ -40,6 +40,28 @@ class Controller:
         self.gateway = GatewayEngine(store)
         self.gateway_uids: set[int] = set()
         self.gateway_policy = lambda: GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+        self.system_health: dict | None = None
+
+    async def monitor(self):
+        from .health import HealthSampler
+        sampler = HealthSampler()
+        previous = None
+        while not self.stop.is_set():
+            try:
+                self.system_health = await asyncio.to_thread(sampler.sample)
+            except Exception:
+                self.system_health = {"at": time.time(), "status": "unavailable", "can_dispatch": False,
+                                      "errors": ["monitor"], "alerts": []}
+            signature = (self.system_health["status"], tuple(self.system_health["alerts"]), tuple(self.system_health["errors"]))
+            if signature != previous:
+                # No chat, journal excerpts, credentials, commands or filenames.
+                print(json.dumps({"event": "system.health", "status": signature[0],
+                                  "alerts": signature[1], "errors": signature[2]}), flush=True)
+                previous = signature
+            try:
+                await asyncio.wait_for(self.stop.wait(), 5)
+            except TimeoutError:
+                pass
 
     async def gateway_dispatch(self, request: dict):
         policy = self.gateway_policy()
@@ -91,6 +113,7 @@ class Controller:
         if method == "health":
             return {"service": "haos-controller", "backend_connected": self.connection is not None,
                     "current_mission": self.current,
+                    "system": self.system_health,
                     "pending_requests": self.store.redactor.clean(list(self.questions.values()))}
         if method == "missions.list":
             return self.store.list()
@@ -207,7 +230,9 @@ class Controller:
     async def worker(self):
         self.store.recover()
         while not self.stop.is_set():
-            row = self.store.claim()
+            healthy = self.system_health is not None and self.system_health.get("can_dispatch") is True
+            fresh = healthy and 0 <= time.time() - self.system_health.get("at", 0) < 20
+            row = self.store.claim() if fresh else None
             if row:
                 await self.execute(row)
             else:
@@ -248,7 +273,12 @@ async def serve():
     os.chmod(gateway_path, 0o660)
     try:
         async with server, gateway_server:
-            await controller.worker()
+            monitor = asyncio.create_task(controller.monitor())
+            try:
+                await controller.worker()
+            finally:
+                controller.stop.set()
+                await monitor
     finally:
         server.close()
         await server.wait_closed()
