@@ -33,7 +33,13 @@ jobs:
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py --ignore=linux/haos/probes/test_systemd_sandbox.py
+      - name: Launch the isolated filesystem view under actual production systemd hardening
+        run: |
+          HAOS_SYSTEMD_TEST_DIR="$(sudo mktemp -d /run/haos-systemd-XXXXXXXX)"
+          trap 'sudo rm -rf -- "$HAOS_SYSTEMD_TEST_DIR"' EXIT
+          sudo chown "$(id -u):$(id -g)" "$HAOS_SYSTEMD_TEST_DIR"
+          HAOS_DISPOSABLE_CI=1 HAOS_SYSTEMD_FIXTURE_DIR="$HAOS_SYSTEMD_TEST_DIR" python -m pytest -q -s linux/haos/probes/test_systemd_sandbox.py
       - name: Record actual diskless QEMU acceleration
         run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
       - name: Restore a deleted disposable project through actual Restic

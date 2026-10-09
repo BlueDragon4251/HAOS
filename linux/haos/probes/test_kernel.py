@@ -13,7 +13,7 @@ from haos.policy import validate_policy
 from haos.sandbox import command
 
 
-def test_agent_filesystem_view_cannot_escape_grants(tmp_path):
+def run_agent_filesystem_probe(tmp_path, launcher=None):
     home, workspace, ro, rw = [tmp_path / name for name in ("home", "workspace", "ro", "rw")]
     for path in (home, workspace, ro, rw):
         path.mkdir()
@@ -50,6 +50,15 @@ assert credential not in pathlib.Path('/proc/1/cmdline').read_bytes()
 status = pathlib.Path('/proc/self/status').read_text().splitlines()
 assert 'NoNewPrivs:\t1' in status
 assert 'CapEff:\t0000000000000000' in status
+assert os.statvfs('/proc').f_flag & os.ST_RDONLY
+assert os.statvfs('/proc/sys').f_flag & os.ST_RDONLY
+control = pathlib.Path('/proc/self/oom_score_adj')
+try:
+    control.write_text(control.read_text())
+except OSError as error:
+    assert error.errno == errno.EROFS
+else:
+    raise AssertionError('sandbox procfs is writable')
 libc = ctypes.CDLL(None, use_errno=True)
 assert libc.unshare(0x10000000) == -1 and ctypes.get_errno() in (errno.EPERM, errno.ENOSPC)
 assert libc.mount(b'/usr', b'/workspace', None, 4096, None) == -1 and ctypes.get_errno() == errno.EPERM
@@ -68,13 +77,17 @@ assert 'HERMES_PARENT_PID' not in os.environ
 assert not pathlib.Path('/proc/1/root' + str(secret)).exists()
 print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
                   'symlink_escape_denied': True, 'owner_and_devices_hidden': True,
-                  'no_new_privileges': True, 'nested_userns_denied': True, 'mount_denied': True}))
+                  'no_new_privileges': True, 'nested_userns_denied': True, 'mount_denied': True,
+                  'kernel_tunables_read_only': True}))
 """
     args = args[:args.index("--") + 1] + ["/usr/bin/python3", "-I", "-c", probe,
             f"/volumes/{grants[0]['key']}", f"/volumes/{grants[1]['key']}", str(host_secret), digest]
     # Exercise the launcher's NoNewPrivileges setting as used by the service.
     try:
-        result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], pass_fds=(fd,), capture_output=True, text=True, timeout=30)
+        if launcher is None:
+            result = subprocess.run(["/usr/bin/setpriv", "--no-new-privs", *args], pass_fds=(fd,), capture_output=True, text=True, timeout=30)
+        else:
+            result = launcher(args, fd)
     finally:
         os.close(fd)
     assert result.returncode == 0, result.stderr
@@ -82,3 +95,8 @@ print(json.dumps({'read_only_enforced': True, 'write_grant_enforced': True,
     assert (rw / "result").read_text() == "actual permitted write"
     assert not (ro / "changed").exists()
     assert host_secret.read_text() == "owner data outside the agent view"
+    return json.loads(result.stdout)
+
+
+def test_agent_filesystem_view_cannot_escape_grants(tmp_path):
+    run_agent_filesystem_probe(tmp_path)

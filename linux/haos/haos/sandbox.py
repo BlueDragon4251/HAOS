@@ -39,7 +39,7 @@ def command(grants: list[dict], credential_fd: int, *, certificates: list[str]) 
             "--disable-userns", "--assert-userns-disabled", "--cap-drop", "ALL", "--clearenv",
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin", "--symlink", "usr/sbin", "/sbin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
-            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/run", "--dir", "/etc",
+            "--proc", "/proc", "--remount-ro", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/run", "--dir", "/etc",
             "--dir", "/run/haos-credentials", "--perms", "0400", "--ro-bind-data", str(credential_fd), "/run/haos-credentials/backend-token",
             "--ro-bind", "/usr/lib/haos/passwd", "/etc/passwd", "--ro-bind", "/usr/lib/haos/group", "/etc/group",
             "--dir", "/var", "--dir", "/home", "--bind", "/var/lib/haos-agent", "/home/agent",

@@ -31,7 +31,9 @@ PrivateTmp=yes
 ProtectSystem=strict
 ReadWritePaths=/run/haos-volumes
 ProtectHome=yes
-ProtectKernelTunables=yes
+# Pre-masking /proc/sys prevents an unprivileged PID namespace from mounting
+# its procfs. Bubblewrap mounts its own read-only /proc; /sys is not exposed.
+ProtectKernelTunables=no
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 ProtectProc=invisible
