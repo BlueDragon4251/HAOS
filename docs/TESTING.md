@@ -15,6 +15,8 @@ The observer-authority probe runs exclusively on the disposable CI runner. It cr
 
 HAOS unit setup uses Python 3.11, pytest 9.0.2, websockets 15.0.1; HAOS_TEST_PYTHON selects a prepared interpreter. Tests cover idempotency, deadlines, resource locks, ambiguous crash recovery, protocol framing and denied authority. Fake unit wires are not provider execution evidence.
 
+Enrollment unit fixtures simulate root file identity and ownership changes while keeping real file modes, atomic registry writes and rollback assertions. They do not require the development account to own files as root. Foreign-owner, readable and symlinked enrollment locks must still fail before provisioning. The nftables validation-failure test uses fixed resolver input rather than trusting the developer machine's actual `/etc/resolv.conf`. Real ownership, password authentication and firewall enforcement remain separate probes.
+
 Real probes:
 
 ```sh

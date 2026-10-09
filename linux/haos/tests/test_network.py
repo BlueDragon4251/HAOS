@@ -23,6 +23,7 @@ def test_unprivileged_agent_cannot_install_a_guard(monkeypatch):
 
 def test_failed_validation_does_not_apply_or_remove_existing_rules(monkeypatch):
     monkeypatch.setattr(network.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(network, "read_resolvers", lambda: ["10.0.2.3"])
     calls = []
     def run(args, **kwargs):
         calls.append(args)

@@ -3,11 +3,32 @@
 from pathlib import Path
 from types import SimpleNamespace
 import os
+import stat
 import subprocess
 
 import pytest
 
 from haos import enrollment as e
+
+
+def root_file_identity(monkeypatch, tmp_path, uid=0):
+    # Unit fixtures simulate ownership; the disposable root probe checks real UIDs.
+    original = os.fstat
+    def metadata(fd):
+        real = original(fd)
+        lock = e.LOCK
+        if lock.is_relative_to(tmp_path) and lock.exists():
+            info = lock.stat()
+            if (real.st_dev, real.st_ino) == (info.st_dev, info.st_ino):
+                fields = list(real)
+                fields[4] = uid
+                return os.stat_result(fields)
+        return real
+    def chown(fd, owner, group):
+        assert stat.S_ISREG(original(fd).st_mode)
+        assert (owner, group) == (0, 0)
+    monkeypatch.setattr(e.os, "fstat", metadata)
+    monkeypatch.setattr(e.os, "fchown", chown)
 
 
 @pytest.mark.parametrize("name", ["root", "hermes", "haos-agent", "haos-control", "observer", "a;id", "-a", "A", "a" * 32])
@@ -74,6 +95,7 @@ def test_account_rejects_aliases_and_authority_groups(monkeypatch, shared, group
 
 
 def test_full_sudoers_validation_failure_removes_published_grant(monkeypatch, tmp_path):
+    root_file_identity(monkeypatch, tmp_path)
     monkeypatch.setattr(e, "protected_directory", lambda _: None)
     def validate(*args, **kwargs):
         if len(args) == 2:
@@ -86,6 +108,7 @@ def test_full_sudoers_validation_failure_removes_published_grant(monkeypatch, tm
 
 
 def provisioning_fixture(monkeypatch, tmp_path, fail_at=None):
+    root_file_identity(monkeypatch, tmp_path)
     entry = SimpleNamespace(pw_name="owner", pw_uid=1500, pw_gid=1500)
     accounts = {}
     calls = []
@@ -148,6 +171,25 @@ def test_failed_audit_rolls_back_registry_and_locks_account(monkeypatch, tmp_pat
         e.enroll("owner", "fixture-password")
     assert not rule.exists() and '"owners": []' in e.REGISTRY.read_text()
     assert ("/usr/sbin/usermod", "--lock", "owner") in [a for a, k in calls]
+
+
+@pytest.mark.parametrize("kind", ["foreign-owner", "readable", "symlink"])
+def test_untrusted_enrollment_lock_never_provisions(monkeypatch, tmp_path, kind):
+    calls, rule = provisioning_fixture(monkeypatch, tmp_path)
+    if kind == "symlink":
+        target = tmp_path / "target"
+        target.write_text("untouched")
+        e.LOCK.symlink_to(target)
+    else:
+        e.LOCK.write_text("")
+        e.LOCK.chmod(0o640 if kind == "readable" else 0o600)
+        if kind == "foreign-owner":
+            root_file_identity(monkeypatch, tmp_path, uid=1001)
+    with pytest.raises((PermissionError, OSError)):
+        e.enroll("owner", "fixture-password")
+    assert not calls and not rule.exists() and not e.REGISTRY.exists()
+    if kind == "symlink":
+        assert target.read_text() == "untouched"
 
 
 def test_nonroot_and_noninteractive_enrollment_rejected(monkeypatch):
