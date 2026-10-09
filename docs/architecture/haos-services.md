@@ -10,7 +10,8 @@ fallback child. Quitting or restarting Electron does not stop that service.
 
 | Identity | Authority | Persistent state |
 | --- | --- | --- |
-| Observer/owner session (`hermes` by default) | Native UI, mission submission and one-time tool responses; owner actions require sudo authentication | Herald preferences in its own home |
+| Observer session (`hermes` by default) | Native UI, mission submission and one-time tool responses; no owner/sudo authority | Herald preferences in its own home |
+| Enrolled owner (separate new account) | Password-authenticated fixed recovery/policy CLI; no unrestricted sudo | Separate home; protected identity registry |
 | `haos-agent` | Upstream Hermes and ordinary commands inside the restricted filesystem view; no wheel, login, owner API, controller socket or container socket | `/var/lib/haos-agent`, `/var/lib/haos-workspace` |
 | `haos-control` | Queue, dispatch receipts, local API authenticated with Linux `SO_PEERCRED`; cannot grant volumes or run privileged commands | `/var/lib/haos-control/missions.db` |
 | Root owner broker | Stable-volume resolution, mount preparation and offline recovery; no arbitrary command/path/options endpoint | `/etc/haos/volumes.json`, `/var/lib/haos-owner/audit.jsonl` |
@@ -19,6 +20,8 @@ The UI's existing bridge permissions are not this authority. The isolated agent 
 not given the unrestricted Herald UI bridge or observer home: that bridge can execute commands
 outside the agent namespace. A restricted native GUI execution broker still needs implementation
 and adversarial testing before agent-driven host applications are enabled.
+
+The root network guard installs a dedicated agent socket-UID table with only CAP_NET_ADMIN and is required before Hermes. See [network policy](../NETWORK-POLICY.md); actual kernel/installed acceptance is pending.
 
 ## Missions
 
@@ -55,9 +58,7 @@ the agent view. All other volumes default to absent. Encrypted data must first b
 owner recovery; automatic LUKS secret acquisition is not implemented. Policy changes require the
 services to be stopped, so a running process cannot retain a revoked bind.
 
-The runtime retains host networking for provider access. Isolation of privileged services exposed
-over loopback TCP, per-mission network policy, desktop capture and gateway-to-controller identity
-mapping remain unfinished. Do not deploy privileged unauthenticated loopback services alongside it.
+The runtime retains host networking for provider access. A required [socket-UID guard](../NETWORK-POLICY.md) restricts local/private destinations with narrow backend/DNS/reply exceptions; local unit checks passed, actual kernel/guest proof is pending. AF_UNIX abstract services, per-mission network policy, desktop capture and gateway-to-controller identity mapping remain unfinished. Do not deploy privileged unauthenticated loopback services alongside it.
 
 ## Verification status
 

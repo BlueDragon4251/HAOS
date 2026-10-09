@@ -18,7 +18,7 @@ HAOS unit setup uses Python 3.11, pytest 9.0.2, websockets 15.0.1; HAOS_TEST_PYT
 Real probes:
 
 ```sh
-python -m pytest -q linux/haos/probes
+python -m pytest -q linux/haos/probes/test_unix_control.py linux/haos/probes/test_kernel.py
 systemd-analyze verify linux/haos/*.service
 ```
 
@@ -35,3 +35,13 @@ Before each installer/boot phase, `haos-qemu-runtime.py` initializes a diskless 
 `python -m pytest -q tests/e2e/test_qemu_runtime.py` covers denied/hung KVM, the TCG fallback, changing permissions and failed QMP initialization. These unit tests do not constitute real VM acceptance.
 
 Run `37836993147` demonstrated a race: diskless KVM initialization succeeded, then the actual QEMU launch immediately lost permission. The launcher now also permits one verified TCG retry for an explicit KVM initialization failure, only if the serial log is absent/empty. Guest output, disk errors, signals and timeouts do not trigger replay. Actual launch return codes/errors are retained alongside probes in the phase evidence.
+
+## Continuation on 2026-10-09
+
+The real nftables boundary probe and owner enrollment probe are separate root-only disposable CI steps, not ordinary workstation tests. They create only fresh accounts and their own fixture rules. The owner probe additionally requires `GITHUB_ACTIONS=true` and `HAOS_DISPOSABLE_CI=1`, verifies real password installation, correct/incorrect sudo authentication, per-call authentication, denied arbitrary commands/environment override, and password absence in registry/audit. Neither probe has executed: GitHub billing blocks new jobs before any step. Never run account/firewall probes on a personal or production machine.
+
+The actual frozen backend contract probe at `ab2e521` passed dependency CI and actual Fedora image builds: health, missing/wrong-token denial, child PID identity and durable session creation. It creates no provider turn. Mount identity checks at `e8dd0aa` passed service CI (87 units and six real probes). At owner code `8f2957f`, local checks passed 133 unit/regression tests, actual hostile Python-startup/package denial, real sudoers syntax and systemd/shell syntax. These source-specific results do not certify installed authentication/networking or the complete OS.
+
+`haos_guest_diagnostics.py` runs only for root in a DMI/marker-verified disposable acceptance VM. Successful probes do nothing; failed probes print bounded, token-redacted service state and journals, then power off even when diagnostics fail. It records diagnostic-harness provenance separately from the matching image/guest protocol. Seven regression tests passed in real service CI at `19e73a9`. Earlier image `9e0d4a3` installed and booted but failed the backend health assertion; host timeout alone had hidden that failure.
+
+Harness-only changes now reuse an image rather than rebuilding it. Actual image inputs, including bridge plugins and guest protocol, still trigger new builds. Future builds also upload a small separate metadata artifact containing manifest, ISO checksum, runtime backend receipt and inventories, avoiding multi-gigabyte downloads merely to inspect identity. An artifact ZIP digest is never an ISO checksum.

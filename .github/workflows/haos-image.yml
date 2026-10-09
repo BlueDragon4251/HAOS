@@ -53,6 +53,7 @@ jobs:
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/source.json > evidence/python-runtime-source.json
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/requirements.txt > evidence/python-runtime-requirements.txt
           sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/installed.txt > evidence/python-runtime-installed.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/backend-build-probe.json > evidence/backend-build-probe.json
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
           set -euo pipefail
@@ -65,6 +66,7 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" output
           mv output/bootiso/install.iso evidence/haos-x86_64-development.iso
           (cd evidence && sha256sum haos-x86_64-development.iso > SHA256SUMS)
+          cat evidence/SHA256SUMS
           python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -81,6 +83,23 @@ jobs:
                                       'npm SBOM and RPM inventory do not constitute a complete multi-ecosystem release SBOM']}
           Path('evidence/build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
           PY
+      - name: Upload small build identity and checksum evidence separately
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-build-metadata-${{ github.sha }}
+          path: |
+            evidence/build-manifest.json
+            evidence/SHA256SUMS
+            evidence/backend-build-probe.json
+            evidence/python-runtime-*.json
+            evidence/python-runtime-*.txt
+            evidence/image.json
+            evidence/base-image.json
+            evidence/rpm-packages.txt
+            evidence/npm.cdx.json
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:
