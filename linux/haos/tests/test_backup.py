@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from haos.backup import Repository, private_password, owner_backup
+from haos.backup import Repository, Retention, private_password, owner_backup
 
 
 @pytest.fixture
@@ -74,3 +74,44 @@ def test_snapshot_requires_a_complete_receipt(repository, tmp_path, monkeypatch)
         repository.create([source])
     with pytest.raises(ValueError, match="overlap"):
         repository.create([tmp_path])
+
+
+@pytest.mark.parametrize("policy", [Retention(0), Retention(True), Retention(513),
+                                    Retention(1, -1), Retention(1, 367), Retention(1, 0, 105),
+                                    Retention(1, 0, 0, 121)])
+def test_retention_cannot_delete_every_scope_or_accept_invalid_counts(policy):
+    with pytest.raises(ValueError, match="retention"):
+        policy.arguments()
+
+
+def test_retention_defaults_to_preview_and_hides_snapshot_metadata(repository, monkeypatch):
+    commands = []
+    def execute(*args):
+        commands.append(args)
+        return json.dumps([{"host": "private-test-host", "paths": ["private-file-name"],
+                            "keep": [{"id": "a" * 64, "hostname": "private-test-host"}],
+                            "remove": [{"id": "b" * 64, "username": "private-owner"}]}])
+    monkeypatch.setattr(repository, "command", execute)
+    result = repository.retain(Retention(1, 0, 0, 0))
+    assert "--dry-run" in commands[-1] and "--prune" not in commands[-1]
+    assert commands[0] == ("check", "--read-data")
+    assert result["dry_run"] and result["selected_for_removal"] == ["b" * 64]
+    assert "private-" not in json.dumps(result)
+
+
+def test_failed_integrity_check_prevents_any_retention(repository, monkeypatch):
+    commands = []
+    def execute(*args):
+        commands.append(args)
+        raise RuntimeError("damaged encrypted data")
+    monkeypatch.setattr(repository, "command", execute)
+    with pytest.raises(RuntimeError):
+        repository.retain(Retention(1, 0, 0, 0), apply=True)
+    assert commands == [("check", "--read-data")]
+
+
+def test_hardlinked_backup_key_is_not_accepted(repository):
+    import os
+    os.link(repository.password, repository.root / "key-copy")
+    with pytest.raises(PermissionError):
+        private_password(repository.password)

@@ -7,10 +7,30 @@ import secrets
 import stat
 import subprocess
 import tempfile
+from dataclasses import dataclass
 
 SNAPSHOT = re.compile(r"[a-f0-9]{64}")
 SOURCES = [Path(p) for p in ("/var/lib/haos-workspace", "/var/lib/haos-agent",
                            "/var/lib/haos-control", "/etc/haos")]
+
+
+@dataclass(frozen=True)
+class Retention:
+    keep_last: int = 7
+    keep_daily: int = 7
+    keep_weekly: int = 4
+    keep_monthly: int = 12
+
+    def arguments(self):
+        limits = {"keep_last": (1, 512), "keep_daily": (0, 366),
+                  "keep_weekly": (0, 104), "keep_monthly": (0, 120)}
+        result = []
+        for key, (low, high) in limits.items():
+            value = getattr(self, key)
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError("retention requires bounded whole counts and at least one latest snapshot per group")
+            result.extend(["--" + key.replace("_", "-"), str(value)])
+        return result
 
 
 def private_directory(path: Path):
@@ -22,7 +42,7 @@ def private_directory(path: Path):
 
 def private_password(path: Path):
     info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_nlink != 1:
         raise PermissionError("backup password must be a private root-owned regular file")
 
 
@@ -92,8 +112,60 @@ class Repository:
             raise
         return {"snapshot_id": identifier, "staging_directory": str(destination), "live_state_replaced": False}
 
+    def snapshots(self):
+        # Never return file names, host/user identities or arbitrary Restic output.
+        rows = json.loads(self.command("snapshots", "--tag", "haos-owner"))
+        if not isinstance(rows, list):
+            raise ValueError("invalid encrypted snapshot inventory")
+        result = []
+        for row in rows:
+            identifier = row.get("id") if isinstance(row, dict) else None
+            if not isinstance(identifier, str) or not SNAPSHOT.fullmatch(identifier):
+                raise ValueError("snapshot inventory lacks exact identifiers")
+            result.append(identifier)
+        return {"snapshot_ids": result}
 
-def owner_backup(action: str, identifier=None):
+    def retain(self, policy: Retention, *, apply=False):
+        if type(apply) is not bool:
+            raise ValueError("retention application must be an explicit boolean")
+        arguments = policy.arguments()
+        # Verify encrypted data before a destructive operation. Grouping by host
+        # and source paths preserves at least one snapshot for every backup scope.
+        self.command("check", "--read-data")
+        # Do not combine --prune with forget: even with --json, Restic emits
+        # prune's human progress after forget's JSON array. Keep the structured
+        # deletion receipt separate from garbage collection and verify both.
+        output = self.command("forget", "--tag", "haos-owner", "--group-by", "host,paths",
+                              *arguments, *([] if apply else ["--dry-run"]))
+        groups = json.loads(output)
+        if not isinstance(groups, list):
+            raise ValueError("invalid retention receipt")
+        keep, remove = set(), set()
+        for group in groups:
+            if not isinstance(group, dict):
+                raise ValueError("invalid retention group")
+            for field, identifiers in (("keep", keep), ("remove", remove)):
+                rows = group.get(field) or []
+                if not isinstance(rows, list):
+                    raise ValueError("invalid retention snapshots")
+                for row in rows:
+                    identifier = row.get("id") if isinstance(row, dict) else None
+                    if not isinstance(identifier, str) or not SNAPSHOT.fullmatch(identifier):
+                        raise ValueError("retention requires exact snapshot identifiers")
+                    identifiers.add(identifier)
+        if keep.intersection(remove):
+            raise ValueError("contradictory retention receipt")
+        if apply:
+            self.command("prune")
+            self.command("check", "--read-data")
+            remaining = set(self.snapshots()["snapshot_ids"])
+            if remove.intersection(remaining) or not keep.issubset(remaining):
+                raise RuntimeError("encrypted retention inventory differs from the deletion receipt")
+        return {"dry_run": not apply, "kept_snapshot_ids": sorted(keep), "selected_for_removal": sorted(remove),
+                "encrypted_data_checked": True, "scope": "haos-owner; grouped by host and source paths"}
+
+
+def owner_backup(action: str, identifier=None, *, retention=None, apply=False):
     # Fixed local scope, no CLI option that accepts arbitrary paths or remote URLs.
     from .owner import audit, stopped
     stopped()
@@ -113,6 +185,16 @@ def owner_backup(action: str, identifier=None):
         result = {"repository_checked": True}
     elif action == "restore":
         result = repository.restore(identifier)
+    elif action == "snapshots":
+        result = repository.snapshots()
+    elif action == "retention":
+        try:
+            result = repository.retain(retention or Retention(), apply=apply)
+        except Exception:
+            # A failed post-operation receipt/check must not hide a possible
+            # deletion. Never log the raw Restic exception or repository data.
+            audit("backup.retention-failed", {"may_have_modified_repository": apply})
+            raise
     else:
         raise ValueError("unsupported backup operation")
     audit("backup." + action, result)

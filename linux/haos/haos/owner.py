@@ -82,10 +82,16 @@ def main():
     configure.add_argument("--requests-per-minute", type=int, default=30)
     backup = sub.add_parser("backup")
     backup_sub = backup.add_subparsers(dest="backup_action", required=True)
-    for action in ("init", "create", "check"):
+    for action in ("init", "create", "check", "snapshots"):
         backup_sub.add_parser(action)
     restore = backup_sub.add_parser("restore")
     restore.add_argument("snapshot_id")
+    retention = backup_sub.add_parser("retention", help="preview scoped retention; deletion requires --apply")
+    retention.add_argument("--keep-last", type=int, default=7)
+    retention.add_argument("--keep-daily", type=int, default=7)
+    retention.add_argument("--keep-weekly", type=int, default=4)
+    retention.add_argument("--keep-monthly", type=int, default=12)
+    retention.add_argument("--apply", action="store_true")
     grant = sub.add_parser("volume")
     grant.add_argument("id", help="UUID:<filesystem UUID> or PARTUUID:<partition UUID>")
     grant.add_argument("mode", choices=["blocked", "read-only", "full-data-access", "system-managed"])
@@ -111,8 +117,11 @@ def main():
         print(json.dumps(enroll_interactive(args.username), indent=2))
         print_codes(args.username)
     elif args.action == "backup":
-        from .backup import owner_backup
-        print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None)), indent=2))
+        from .backup import Retention, owner_backup
+        retention = (Retention(args.keep_last, args.keep_daily, args.keep_weekly, args.keep_monthly)
+                     if args.backup_action == "retention" else None)
+        print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None),
+                                     retention=retention, apply=getattr(args, "apply", False)), indent=2))
     elif args.action == "prepare":
         stopped()
         prepare()

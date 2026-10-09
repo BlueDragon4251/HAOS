@@ -6,6 +6,17 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
+inventory and explicit scoped retention, previewed by default. Full encrypted data
+is checked before/after actual deletion/prune, and the final inventory must match
+the structured receipt. Real Restic 0.18.0 probes preserve another tag/source group,
+recover retained data, reject corrupted encrypted packs, and restore intentionally
+damaged configuration/mission/theme fixtures into staging with actual SQLite
+integrity/event/cancellation verification. Local **21 backup unit/real integration**,
+**175 ordinary** and **33 harness/privacy** cases pass. New matching CI is required.
+No whole-system/off-host/scheduled recovery or automatic live-state replacement
+is claimed.
+
 Complete [theme revisions](THEME-SDK.md) now preserve previous manifests/assets,
 publish a fully written checksum-verified bundle before switching its index and
 expose explicit version selection in native Appearance and the Linux CLI. Real
@@ -18,6 +29,19 @@ raster rejection. Linux CI now requires this probe and retains only fixture PNGs
 and a source-bound receipt. Matching CI remains required; this is a representative
 preview, not whole-shell/compositor or autonomous model acceptance. Agent generation,
 whole-session activation and independent automatic crash rollback remain open.
+
+At `e6a63051acd4d4132bf4ee733641f5cf7936ce8b`, actual
+[Linux/macOS CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37984778123)
+and both [push](https://github.com/BlueDragon4251/HAOS/actions/runs/37984772780)/
+[PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37984778110) passed.
+The actual Linux renderer step/upload passed at PR merge source
+`fa30ace784851a3b9e5c8eee7511189cb3738dd6`; fixture artifact `11641984766` has GitHub
+ZIP digest `d021eb10b17be5ab115c226f97bf2ee3c8a1ef81c5b89901009ab3d09acade2d`.
+The cloud's download is blocked at `productionresultssa2.blob.core.windows.net`,
+so those remote ZIP bytes were not locally verified. All five same production
+renderer cases also passed locally at the clean exact branch commit, recording
+`work_tree_dirty: false`. The saved onboarding draft adds the observed Actions
+hosts and tested headless-render instructions; publishing it remains a user setting.
 
 At `405cdcc`, [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981424478),
 [PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37981432542) and
