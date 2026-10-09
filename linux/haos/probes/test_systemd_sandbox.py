@@ -4,6 +4,7 @@ import configparser
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import uuid
@@ -40,6 +41,12 @@ def test_production_systemd_hardening_allows_only_the_isolated_agent_view():
 
     with tempfile.TemporaryDirectory(prefix="probe-", dir=fixture) as directory:
         root = Path(directory)
+        # ProtectHome hides the runner checkout. Stage the actual production
+        # loader unchanged in the disposable /run fixture, not a weaker copy.
+        modules = root / "haos"
+        modules.mkdir()
+        for name in ("__init__.py", "credentials.py", "posix_acl.py"):
+            shutil.copyfile(Path(__file__).parents[1] / "haos" / name, modules / name)
 
         def launch(args, fd):
             # systemd owns the actual service credential descriptor. No credential
@@ -60,7 +67,7 @@ fd = os.open(credential, os.O_RDONLY | os.O_NOFOLLOW)
 os.set_inheritable(fd, True)
 args[args.index("--ro-bind-data") + 1] = str(fd)
 os.execv(args[0], args)
-'''.replace("HAOS_TEST_MODULE_ROOT", repr(str(Path(__file__).parents[1]))))
+'''.replace("HAOS_TEST_MODULE_ROOT", repr(str(root))))
             unit = "haos-systemd-probe-" + uuid.uuid4().hex
             command = ["sudo", "-n", "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
                        "--unit=" + unit, f"--property=User={os.getuid()}", f"--property=Group={os.getgid()}",

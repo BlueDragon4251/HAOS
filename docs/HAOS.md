@@ -18,6 +18,14 @@ ordinary/wire/harness/privacy cases** pass locally. The production-hardening
 systemd probe now invokes this loader on its real delivered credential. Matching
 runner/Fedora installed results remain required; no failed ISO is marked accepted.
 
+At `edbf8dc`, the actual ext4/XFS/Btrfs ACL gates passed on both service runs,
+including all four credential ACL cases. The subsequent transient-systemd probe
+failed to import `haos`: `ProtectHome` correctly hides the runner's checkout.
+The fixture now stages the unchanged production loader/ACL modules under its
+private `/run` directory before launching the hardened service. No production
+restriction or assertion is relaxed. Local **175 ordinary** and **30
+guest/harness/privacy** tests pass; the actual runner gate must pass separately.
+
 Owner/recovery image `d8f95c8` passed both installed boots. Evidence inspection
 verified guest ZIP `11630797221` / SHA256
 `23f50479f3b370d17385aa5b03e216896fcb6c6062b492a7640bd1c8fb40de74`
