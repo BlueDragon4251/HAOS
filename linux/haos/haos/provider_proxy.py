@@ -21,6 +21,7 @@ import uuid
 from .provider_policy import PORT, ProviderPolicy
 from .redaction import Redactor
 from .sandbox import trusted_json
+from .credentials import private_credential
 
 MAX_INPUT = 4 * 1024 * 1024
 MAX_LINE = 1024 * 1024
@@ -268,20 +269,6 @@ class Handler(BaseHTTPRequestHandler):
             return response.status, usage
         finally:
             conn.close()
-
-
-def private_credential(path):
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o077 or info.st_size > 32768:
-            raise PermissionError("untrusted provider service credential")
-        with os.fdopen(fd) as stream:
-            fd = -1
-            return stream.read()
-    finally:
-        if fd >= 0:
-            os.close(fd)
 
 
 def main():

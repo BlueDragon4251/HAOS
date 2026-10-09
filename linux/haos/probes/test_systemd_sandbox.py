@@ -49,14 +49,18 @@ def test_production_systemd_hardening_allows_only_the_isolated_agent_view():
             arguments = root / "arguments.json"
             arguments.write_text(json.dumps(args))
             stager = root / "launch.py"
-            stager.write_text('''import json, os
+            stager.write_text('''import json, os, sys
 from pathlib import Path
+sys.path.insert(0, HAOS_TEST_MODULE_ROOT)
+from haos.credentials import private_credential
 args = json.loads((Path(__file__).parent / "arguments.json").read_text())
-fd = os.open(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "backend-token", os.O_RDONLY | os.O_NOFOLLOW)
+credential = Path(os.environ["CREDENTIALS_DIRECTORY"]) / "backend-token"
+assert private_credential(credential)
+fd = os.open(credential, os.O_RDONLY | os.O_NOFOLLOW)
 os.set_inheritable(fd, True)
 args[args.index("--ro-bind-data") + 1] = str(fd)
 os.execv(args[0], args)
-''')
+'''.replace("HAOS_TEST_MODULE_ROOT", repr(str(Path(__file__).parents[1]))))
             unit = "haos-systemd-probe-" + uuid.uuid4().hex
             command = ["sudo", "-n", "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
                        "--unit=" + unit, f"--property=User={os.getuid()}", f"--property=Group={os.getgid()}",
@@ -68,4 +72,4 @@ os.execv(args[0], args)
                                   capture_output=True, text=True, timeout=60)
 
         proof = run_agent_filesystem_probe(root, launcher=launch)
-        print(json.dumps({"production_systemd_hardening": True, **proof}))
+        print(json.dumps({"production_systemd_hardening": True, "systemd_credential_acl_checked": True, **proof}))

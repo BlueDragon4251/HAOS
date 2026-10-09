@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from haos.volume_acl import (ACCESS, DEFAULT, GROUP_OBJ, MASK, OTHER, UNDEFINED, USER,
                             USER_OBJ, Journal, decode, encode)
+from haos.credentials import private_credential
 
 AGENT, FOREIGN, MASKED = 65534, 65533, 65532
 
@@ -146,6 +147,61 @@ def test_read_delegation_never_grants_write(fixture):
         os.getxattr(data, DEFAULT)
     journal.restore(data)
     assert stat.S_IMODE(file.stat().st_mode) == 0o600
+
+
+def test_systemd_style_credential_acl_is_readable_only_by_its_service_uid(fixture):
+    data, _, _ = fixture
+    data.chmod(0o755)
+    file = data / "scoped-credential"
+    file.write_text("disposable-scoped-fixture")
+    os.setxattr(file, ACCESS, encode([(USER_OBJ, 4, UNDEFINED), (USER, 4, AGENT),
+                                   (GROUP_OBJ, 0, UNDEFINED), (MASK, 4, UNDEFINED), (OTHER, 0, UNDEFINED)]))
+    assert stat.S_IMODE(file.stat().st_mode) == 0o440
+    for uid, expected in ((AGENT, 0), (FOREIGN, 1)):
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setgroups([])
+                os.setgid(uid)
+                os.setuid(uid)
+                try:
+                    assert private_credential(file) == "disposable-scoped-fixture"
+                except PermissionError:
+                    os._exit(1)
+                os._exit(0)
+            except BaseException:
+                os._exit(3)
+        _, status = os.waitpid(pid, 0)
+        assert os.waitstatus_to_exitcode(status) == expected
+
+
+@pytest.mark.parametrize("leak", ["group", "other-user", "write"])
+def test_credential_acl_cannot_grant_other_principals_or_service_write(fixture, leak):
+    data, _, _ = fixture
+    data.chmod(0o755)
+    file = data / "credential"
+    file.write_text("disposable-fixture")
+    entries = [(USER_OBJ, 4, UNDEFINED), (USER, 6 if leak == "write" else 4, AGENT),
+               (GROUP_OBJ, 4 if leak == "group" else 0, UNDEFINED),
+               (MASK, 6 if leak == "write" else 4, UNDEFINED), (OTHER, 0, UNDEFINED)]
+    if leak == "other-user":
+        entries.append((USER, 4, FOREIGN))
+    os.setxattr(file, ACCESS, encode(entries))
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.setgroups([])
+            os.setgid(AGENT)
+            os.setuid(AGENT)
+            try:
+                private_credential(file)
+            except PermissionError:
+                os._exit(0)
+            os._exit(2)
+        except BaseException:
+            os._exit(3)
+    _, status = os.waitpid(pid, 0)
+    assert os.waitstatus_to_exitcode(status) == 0
 
 
 def test_journal_is_private_durable_and_wrong_authority_is_rejected(fixture):

@@ -6,6 +6,29 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+Installed provider images `e954dd3` / `720c08c` built but failed their first guest
+boot at controller startup. [Bounded evidence inspection](https://github.com/BlueDragon4251/HAOS/actions/runs/37963970719)
+verified their exact ZIP digests and exposed `PermissionError: untrusted provider
+service credential`. systemd 259.9 gives root-owned 0400 credentials a named
+service-UID read ACL; its mask appears as mode 0440 even though the owning group
+has no access. The loader now validates actual effective ACL permissions, rejecting
+ordinary group-readable files, foreign users, writable service grants, symlinks,
+hardlinks and oversized payloads. Four actual UID/ACL credential probes and **206
+ordinary/wire/harness/privacy cases** pass locally. The production-hardening
+systemd probe now invokes this loader on its real delivered credential. Matching
+runner/Fedora installed results remain required; no failed ISO is marked accepted.
+
+Owner/recovery image `d8f95c8` passed both installed boots. Evidence inspection
+verified guest ZIP `11630797221` / SHA256
+`23f50479f3b370d17385aa5b03e216896fcb6c6062b492a7640bd1c8fb40de74`
+and checked saved receipts against actual serial output. Receipt SHA256 values are
+`1710552a4539cee6bcc09fdd44e4afa4749547dc0c42dedde81be869350305ce`
+and `73e1de272f94862bb98f2cd669cafcee7e265c191cd0fb304b1de336a552979e`.
+Checks attest real console enrollment/PAM, denied wrong/cached/arbitrary-root/Python
+override authentication, single-use recovery codes, password reset after reboot
+and denied code replay. This does not certify graphical locking, later provider
+or ACL changes, external models/gateways or full production recovery.
+
 [System health](SYSTEM-HEALTH.md) now exposes real kernel/filesystem/service metrics
 in the native workspace. An independent controller sampler pauses new dispatch on
 stale/unknown required measurements or critical space/memory/temperature pressure,

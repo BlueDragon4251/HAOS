@@ -115,3 +115,15 @@ Installed socket activation, first-boot credential delivery and matching new
 ISO integration still require exact-source VM evidence. General encryption at
 rest, every upstream log/vault path, full exfiltration controls, GUI provisioning,
 additional providers and monetary budgets remain separate open requirements.
+
+## systemd credential ACL compatibility
+
+The loader validates effective POSIX ACL rights as well as owner/type/size. A
+systemd root-owned 0400 credential with a named read ACL for the current service
+UID has a visible 0440 mask; its owning group still has no access. This precise
+case is accepted. Ordinary group-readable files, named foreign users/groups,
+service write grants, world access, symlinks, hardlinks and oversized credentials
+remain rejected. Actual root/dropped-UID fixtures exercise each case; the real
+production-hardening systemd probe reads its delivered credential through this
+same loader. Corrected Fedora image acceptance remains required after the
+concrete controller-startup failure in `e954dd3` / `720c08c` guest evidence.
