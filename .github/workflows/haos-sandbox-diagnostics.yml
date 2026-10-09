@@ -1,0 +1,66 @@
+name: HAOS disposable systemd sandbox diagnosis
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    paths: ['.github/workflows/haos-sandbox-diagnostics.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare the packaged Bubblewrap profile
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+      - name: Compare transient service mount restrictions without host provisioning
+        run: |
+          sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 HAOS_DIAGNOSTIC_USER="$(id -un)" HAOS_DIAGNOSTIC_SOURCE="$GITHUB_SHA" python3 - <<'PY'
+          import configparser, itertools, json, os, pwd, subprocess
+          from pathlib import Path
+          assert os.geteuid() == 0
+          assert os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('HAOS_DISPOSABLE_CI') == '1'
+          user = pwd.getpwnam(os.environ['HAOS_DIAGNOSTIC_USER'])
+          assert user.pw_uid != 0
+          config = configparser.ConfigParser(interpolation=None)
+          config.optionxform = str
+          config.read('linux/haos/haos-hermes.service')
+          keys = ['UMask', 'NoNewPrivileges', 'CapabilityBoundingSet', 'AmbientCapabilities',
+                  'PrivateDevices', 'PrivateTmp', 'ProtectSystem', 'ProtectHome',
+                  'ProtectKernelTunables', 'ProtectKernelModules', 'ProtectControlGroups',
+                  'ProtectProc', 'RestrictSUIDSGID', 'RestrictAddressFamilies', 'LockPersonality']
+          properties = {key: config['Service'][key] for key in keys}
+          command = ['/usr/bin/bwrap', '--unshare-all', '--unshare-user', '--share-net',
+                     '--die-with-parent', '--new-session', '--disable-userns', '--assert-userns-disabled',
+                     '--cap-drop', 'ALL', '--clearenv', '--ro-bind', '/usr', '/usr',
+                     '--symlink', 'usr/bin', '/bin', '--symlink', 'usr/sbin', '/sbin',
+                     '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib64', '/lib64',
+                     '--proc', '/proc', '--dev', '/dev', '--', '/usr/bin/true']
+          results = []
+          for index, (proc, tunables, devices) in enumerate(itertools.product(
+                  ['invisible', 'default'], ['yes', 'no'], ['yes', 'no'])):
+              case = dict(properties, ProtectProc=proc, ProtectKernelTunables=tunables, PrivateDevices=devices)
+              args = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+                      '--unit=haos-sandbox-diag-' + str(index), '--property=User=' + user.pw_name]
+              args += ['--property=' + key + '=' + value for key, value in case.items()]
+              result = subprocess.run(args + command, capture_output=True, text=True, timeout=30)
+              report = {'ProtectProc': proc, 'ProtectKernelTunables': tunables, 'PrivateDevices': devices,
+                        'returncode': result.returncode, 'output': (result.stdout + result.stderr)[-2400:]}
+              results.append(report)
+              notice = json.dumps(report).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::notice title=Disposable systemd sandbox case::' + notice, flush=True)
+          Path('sandbox-diagnosis.json').write_text(json.dumps({'source': os.environ['HAOS_DIAGNOSTIC_SOURCE'],
+              'base_properties': properties, 'cases': results}, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: haos-systemd-sandbox-diagnosis-${{ github.sha }}
+          path: sandbox-diagnosis.json
+          retention-days: 7
+          if-no-files-found: error
