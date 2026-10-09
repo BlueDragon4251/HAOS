@@ -18,14 +18,24 @@ def test_production_systemd_hardening_allows_only_the_isolated_agent_view():
     fixture = Path(os.environ["HAOS_SYSTEMD_FIXTURE_DIR"]).resolve(strict=True)
     assert fixture.parent == Path("/run") and fixture.name.startswith("haos-systemd-")
     assert fixture.stat().st_uid == os.getuid()
-    config = configparser.ConfigParser(interpolation=None)
-    config.optionxform = str
-    config.read(Path(__file__).parents[1] / "haos-hermes.service")
     keys = ("UMask", "NoNewPrivileges", "CapabilityBoundingSet", "AmbientCapabilities",
             "PrivateDevices", "PrivateTmp", "ProtectSystem", "ProtectHome",
             "ProtectKernelTunables", "ProtectKernelModules", "ProtectControlGroups",
             "ProtectProc", "RestrictSUIDSGID", "RestrictAddressFamilies", "LockPersonality",
             "TasksMax", "MemoryHigh", "MemoryMax")
+    # systemd list directives legitimately repeat (e.g. LoadCredential). Read
+    # the scalar hardening properties this probe actually launches, retaining
+    # strict duplicate/missing-key rejection for every tested restriction.
+    # Full unit syntax and credential delivery remain separate actual checks.
+    service, selected = False, []
+    for line in (Path(__file__).parents[1] / "haos-hermes.service").read_text().splitlines():
+        if line.strip().startswith("["):
+            service = line.strip() == "[Service]"
+        elif service and line.partition("=")[0].strip() in keys:
+            selected.append(line)
+    config = configparser.ConfigParser(interpolation=None)
+    config.optionxform = str
+    config.read_string("[Service]\n" + "\n".join(selected))
     properties = {key: config["Service"][key] for key in keys}
 
     with tempfile.TemporaryDirectory(prefix="probe-", dir=fixture) as directory:
