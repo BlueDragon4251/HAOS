@@ -14,7 +14,7 @@ def main():
     if os.geteuid() != 0:
         raise PermissionError("host initialization requires root")
     user = sys.argv[1]
-    if user in {"root", "haos-agent", "haos-control"}:
+    if user in {"root", "haos-agent", "haos-control", "haos-gateway"}:
         raise ValueError("observer/owner and service accounts must be separate")
     secure_observer(user)
     gid = grp.getgrnam("haos-ui").gr_gid

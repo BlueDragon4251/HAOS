@@ -24,8 +24,8 @@ jobs:
       - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py
       - name: Root-authority backup and policy-access tests in disposable fixtures
         run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py linux/haos/probes/test_policy_access.py linux/haos/probes/test_gateway_authority.py
-      - name: QEMU runtime selection regression tests
-        run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py
+      - name: QEMU runtime selection and privileged guest fixture regression tests
+        run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py tests/e2e/test_guest_owner.py
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq

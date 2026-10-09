@@ -27,7 +27,21 @@ sudo haos-owner start
 
 Provisioning failures remove the new sudo rule, lock the new account and revert any published owner registry record. The new home remains for root inspection; user data is never automatically deleted. A failed cleanup is an error requiring console recovery. Root-authored policies, external identities and later custom sudo includes can change authority and need separate review.
 
-Local verification on 2026-10-09: 133 unit/regression tests, an actual hostile Python-startup/package denial, real `visudo` parsing and systemd/shell syntax passed. The additional disposable CI probe exercises actual PAM password installation, correct/incorrect sudo authentication, denied arbitrary commands/environment changes and absence of cached authentication. **It has not run:** GitHub account billing prevents new jobs from starting. Neither local tests nor this pending probe prove installer onboarding, a secure graphical lock screen, recovery codes or installed-OS authentication.
+Historical local verification included 133 unit/regression tests and hostile Python-startup/package
+denial. Public-runner [services at `2cebd11`](https://github.com/BlueDragon4251/HAOS/actions/runs/37915395770)
+subsequently passed actual PAM password installation, correct/incorrect sudo authentication,
+denied arbitrary commands/environment changes and absence of cached authentication. Historical
+billing failures do not describe these successful runs. Neither runner fixtures nor ordinary unit
+tests prove installed owner onboarding, a secure graphical lock screen or recovery codes.
+
+The installed QEMU acceptance harness now drives the **actual interactive `haos-owner enroll` CLI
+through a private PTY**, requires both password prompts with echo suppressed, then checks real
+PAM/sudo and denial of wrong/cached authentication, arbitrary root commands and Python overrides.
+It repeats authentication after the second boot. The generated fixture credential is root-private,
+outside the artifact directory, and removed after that boot. No shared password is built into the
+ISO. Guard regressions reject an unmarked machine, writable/foreign marker and symlink before any
+owner mutation. These new installed assertions require a successful exact-source ISO/guest run;
+their presence in source is not a passing installed receipt.
 
 First boot adds the observer to haos-ui and generates per-host credentials, empty policy and managed attachment. haos-agent/haos-control are separate non-login accounts without wheel/sudo authority.
 

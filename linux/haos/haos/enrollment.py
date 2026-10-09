@@ -45,7 +45,7 @@ def protected_directory(path):
 def validate_name(user, observer):
     if not isinstance(user, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", user):
         raise ValueError("owner username must be a simple lowercase account name")
-    if user in {"root", "hermes", "haos-agent", "haos-control", observer}:
+    if user in {"root", "hermes", "haos-agent", "haos-control", "haos-gateway", observer}:
         raise PermissionError("owner must be separate from observer and service accounts")
     try:
         pwd.getpwnam(user)
@@ -72,7 +72,7 @@ def verify_account(user, expected_uid=None):
     if any(other.pw_uid == entry.pw_uid and other.pw_name != user for other in pwd.getpwall()):
         raise PermissionError("owner UID must not be shared")
     for group in grp.getgrall():
-        if group.gr_name in PRIVILEGED_GROUPS | {"haos-ui", "haos-agent", "haos-control"}:
+        if group.gr_name in PRIVILEGED_GROUPS | {"haos-ui", "haos-agent", "haos-control", "haos-gateway"}:
             if entry.pw_gid == group.gr_gid or user in group.gr_mem:
                 raise PermissionError("owner must not inherit administrator, observer or service groups")
     return entry

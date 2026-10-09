@@ -6,7 +6,11 @@ import hashlib
 import json
 import os
 import pwd
+import pty
+import secrets
+import select
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -19,6 +23,111 @@ from haos.sandbox import command, trusted_json
 ROOT = Path("/var/lib/haos-acceptance")
 A = "42514251-0000-4000-8000-000000000001"
 B = "42514251-0000-4000-8000-000000000002"
+
+
+def require_disposable_guest():
+    if os.geteuid() != 0 or Path("/sys/class/dmi/id/product_name").read_text().strip() != "haos-acceptance":
+        raise PermissionError("this test may run only in the explicitly marked acceptance VM")
+    marker = ROOT / "disposable-ci-guest"
+    metadata = marker.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o022:
+        raise PermissionError("missing or untrusted disposable guest marker")
+
+
+def enroll_owner_at_console(username, password):
+    require_disposable_guest()
+    master, slave = pty.openpty()
+    process = subprocess.Popen(["/usr/bin/haos-owner", "enroll", username], stdin=slave, stdout=slave, stderr=slave,
+                               close_fds=True, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8"})
+    os.close(slave)
+    output, prompts = b"", 0
+    deadline = time.monotonic() + 60
+    try:
+        while time.monotonic() < deadline:
+            ready, _, _ = select.select([master], [], [], 0.2)
+            if ready:
+                try:
+                    block = os.read(master, 4096)
+                except OSError:
+                    break
+                if not block:
+                    break
+                output += block
+                if len(output) > 65536:
+                    raise RuntimeError("owner enrollment console output exceeded its limit")
+                expected = b"New owner password" if prompts == 0 else b"Repeat owner password"
+                if prompts < 2 and expected in output and output.rstrip().endswith(b":"):
+                    os.write(master, password.encode() + b"\n")
+                    prompts += 1
+            if process.poll() is not None and not ready:
+                break
+        if process.poll() is None:
+            process.kill()
+        code = process.wait(timeout=5)
+        if code != 0 or prompts != 2 or password.encode() in output:
+            # Never put a captured enrollment conversation/password into a diagnostic exception.
+            raise RuntimeError("installed owner console enrollment did not finish safely")
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+        os.close(master)
+
+
+def owner_authentication_proof(*, first_boot):
+    require_disposable_guest()
+    # Never place this generated credential among collected acceptance artifacts.
+    private = Path("/var/lib/haos-owner-ci")
+    secret_path = private / "credential.json"
+    if first_boot:
+        assert not private.exists() and not private.is_symlink()
+        private.mkdir(mode=0o700)
+        assert not secret_path.exists() and not secret_path.is_symlink()
+        username = "haos-owner-ci-" + secrets.token_hex(4)
+        password = secrets.token_urlsafe(32) + "!Aa42"
+        enroll_owner_at_console(username, password)
+        entry = pwd.getpwnam(username)
+        fd = os.open(secret_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"username": username, "password": password, "uid": entry.pw_uid}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+    else:
+        parent = private.lstat()
+        if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_mode & 0o077:
+            raise PermissionError("untrusted owner acceptance credential directory")
+        metadata = secret_path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o077:
+            raise PermissionError("untrusted owner acceptance credential")
+        saved = json.loads(secret_path.read_text())
+        username, password = saved["username"], saved["password"]
+        assert pwd.getpwnam(username).pw_uid == saved["uid"]
+    prefix = ["/usr/sbin/runuser", "-u", username, "--", "/usr/bin/sudo"]
+    def authentication(*args, supplied=None):
+        return subprocess.run([*prefix, *args], input=(supplied + "\n") if supplied is not None else None,
+                              stdin=None if supplied is not None else subprocess.DEVNULL,
+                              env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"},
+                              capture_output=True, text=True, timeout=30)
+    correct = authentication("-S", "-k", "/usr/bin/haos-owner", "status", supplied=password)
+    if correct.returncode != 0:
+        raise RuntimeError("installed owner PAM authentication failed")
+    assert "volumes" in json.loads(correct.stdout)["policy"]
+    assert authentication("-n", "/usr/bin/haos-owner", "status").returncode != 0
+    assert authentication("-S", "-k", "/usr/bin/haos-owner", "status", supplied="incorrect-acceptance-password").returncode != 0
+    arbitrary = authentication("-S", "-k", "/usr/bin/id", "-u", supplied=password)
+    assert arbitrary.returncode != 0 and arbitrary.stdout.strip() != "0"
+    assert authentication("-S", "-k", "PYTHONPATH=/tmp", "/usr/bin/haos-owner", "status", supplied=password).returncode != 0
+    for path in [Path("/var/lib/haos-owner/owners.json"), Path("/var/lib/haos-owner/audit.jsonl")]:
+        assert password not in path.read_text()
+    assert password not in correct.stdout and password not in correct.stderr
+    assert pwd.getpwnam(username).pw_uid != pwd.getpwnam("hermes").pw_uid
+    if not first_boot:
+        secret_path.unlink()
+        private.rmdir()
+    return {"installed_owner_console_enrollment": True, "installed_owner_password_authentication": True,
+            "installed_owner_wrong_password_denied": True, "installed_owner_cached_auth_denied": True,
+            "installed_owner_arbitrary_root_denied": True, "installed_owner_python_override_denied": True,
+            "installed_owner_credential_absent_from_audit": True, "installed_owner_authentication_after_reboot": not first_boot}
 
 
 def run(*args, **kwargs):
@@ -102,10 +211,7 @@ print(json.dumps({'mode': mode, 'data_access': True, 'blocked_volume_hidden': Tr
 
 
 def main():
-    if os.geteuid() != 0 or Path("/sys/class/dmi/id/product_name").read_text().strip() != "haos-acceptance":
-        raise PermissionError("this test may run only in the explicitly marked acceptance VM")
-    if not (ROOT / "disposable-ci-guest").is_file():
-        raise PermissionError("missing disposable guest marker")
+    require_disposable_guest()
     devices = json.loads(subprocess.check_output(["lsblk", "-J", "-o", "PATH,UUID,SERIAL"], text=True))["blockdevices"]
     assert any(d.get("uuid") == A and d.get("serial") == "HAOS-CI-DATA-A" for d in devices)
     assert any(d.get("uuid") == B and d.get("serial") == "HAOS-CI-DATA-B" for d in devices)
@@ -140,6 +246,7 @@ def main():
     stamp = ROOT / "mission.json"
     if not stamp.exists():
         run("haos-owner", "stop")
+        installed_owner_proof = owner_authentication_proof(first_boot=True)
         # Only this marked guest's own new fixture is deleted. Real owner CLI,
         # fixed state scope and an installed Restic binary perform the recovery.
         project = Path("/var/lib/haos-workspace/haos-deleted-project-fixture")
@@ -173,7 +280,7 @@ def main():
         blocked.mkdir()
         run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{B}", str(blocked))
         (blocked / "canary").write_text("blocked canary")
-        proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof}
+        proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof, **installed_owner_proof}
         assert (data / "agent-result").read_text() == "actual write"
         run("haos-owner", "cleanup")
         run("haos-owner", "volume", f"UUID:{A}", "read-only")
@@ -200,6 +307,7 @@ def main():
         stamp.write_text(json.dumps({"mission": mission, "proof": proof}))
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 1, **proof}), flush=True)
     else:
+        installed_owner_proof = owner_authentication_proof(first_boot=False)
         from haos.store import MissionStore
         saved = json.loads(stamp.read_text())
         store = MissionStore(Path("/var/lib/haos-control/missions.db"))
@@ -208,7 +316,7 @@ def main():
         assert store.events(row["id"])
         store.close()
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 2, "journal_survives_reboot": True,
-            "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof,
+            "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof, **installed_owner_proof,
             "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/off-host/whole-system recovery not covered"]}), flush=True)
     run("systemctl", "poweroff")
 
