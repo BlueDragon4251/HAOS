@@ -6,6 +6,20 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+Three newer installed-image runs are now verified against their exact source,
+GitHub archive digest and matching actual serial/saved receipts:
+
+- `fed663588608791ba1acfe310cd53e0bdbb6d441`: [image/installation/both boots](https://github.com/BlueDragon4251/HAOS/actions/runs/37982281962), [digest/guest-output verification](https://github.com/BlueDragon4251/HAOS/actions/runs/37995834544). Artifact `11645093765`, ZIP SHA256 `42a900b8030012059ecadf01f321039303ee12ec8f1dd69d0297d3b97e6b1026`; boot 1 `1778d86bb0aaa54c273bbca27ec0c0e6dfd7498dd42ba80ad2758749980287b7`, boot 2 `64b341a4990b9e11bd87aaf93626c35c7eb1654efc47264c2cab57dcd61fb0e8`.
+- `e6a63051acd4d4132bf4ee733641f5cf7936ce8b`: [image/installation/both boots](https://github.com/BlueDragon4251/HAOS/actions/runs/37984772853), [digest/guest-output verification](https://github.com/BlueDragon4251/HAOS/actions/runs/37995837850). Artifact `11646666149`, ZIP SHA256 `14e40ceb942a5d064cc14e4e2c1076946829452312d45543c3bf49558c89181c`; boot 1 `1778d86bb0aaa54c273bbca27ec0c0e6dfd7498dd42ba80ad2758749980287b7`, boot 2 `85c11a25739f3634d8a7a2c20d1411a2d4adb92f13a6a912ed2a76e1fce5987f`.
+- `4bd2728469c91104a1fe5db9209dc6592414e167`: [image/installation/both boots](https://github.com/BlueDragon4251/HAOS/actions/runs/37986821163), [digest/guest-output verification](https://github.com/BlueDragon4251/HAOS/actions/runs/37995840704). Artifact `11645484613`, ZIP SHA256 `b459548f0a97a48b838edddc8e0cbe5d8086a29bc860d9679af51bd667bd5c07`; boot 1 `1778d86bb0aaa54c273bbca27ec0c0e6dfd7498dd42ba80ad2758749980287b7`, boot 2 `b7b7499487e5abba20c111afa2b16e4336c3580a5ea2183c61450572e075a7a3`.
+
+All three prove the installed foreign-owner write/rename/delete boundary, read-only/
+blocked/device/mount isolation, owner/PAM and reboot/single-use recovery, persisted
+missions and UI/backend restart separation. The first boot intentionally reports
+post-reboot recovery flags as false; the second boot verifies them. These source-
+specific foundation gates do **not** prove autonomous theme generation, the newer
+observer gate, live models/gateways, full-system restore or complete release readiness.
+
 The [dashboard observer gate](DASHBOARD-ACCESS.md) now enforces an explicit HTTP/
 WebSocket read scope on the real pinned Hermes app. Root boot migration replaces
 the former full observer-readable token; the controller receives its private
@@ -67,8 +81,9 @@ anonymous pull limit, before running packaging checks. Its input now uses Arch's
 at digest `sha256:ed261ac99d13e9636940e88df26ccd22b0d8d1c2139699870f0427c765352689`.
 The actual image pulled and reported Arch build `20261009.0.609227`, base-devel
 and its packaged keyring; package signatures, build/lint/install/CLI tests remain
-unchanged. Matching package CI remains required; rolling package inputs are not
-yet reproducible release pins.
+unchanged. The matching [Arch packaging run](https://github.com/BlueDragon4251/HAOS/actions/runs/37991916114)
+passed all existing package/signature/build/install checks. Rolling package inputs
+are not yet reproducible release pins.
 
 Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
 inventory and explicit scoped retention, previewed by default. Full encrypted data
