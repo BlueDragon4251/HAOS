@@ -8,10 +8,14 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import uuid
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parents[1]))
+from haos import network
 from haos.network import NFT, install
 
 
@@ -19,7 +23,22 @@ def run(*args, **kwargs):
     return subprocess.run(args, text=True, capture_output=True, timeout=10, **kwargs)
 
 
-def test_agent_local_sockets_are_guarded_without_breaking_backend_replies():
+@pytest.fixture
+def trusted_resolver(monkeypatch):
+    assert os.geteuid() == 0, "use only disposable root-owned resolver fixtures"
+    # The runner's DNS files need not meet HAOS's root ownership contract.
+    # Keep the real trust checks with a private file under protected /run.
+    with tempfile.TemporaryDirectory(prefix="haos-net-resolver-", dir="/run") as directory:
+        path = Path(directory) / "resolv.conf"
+        path.write_text("nameserver 127.0.0.53\n")
+        path.chmod(0o600)
+        original = network.Path
+        monkeypatch.setattr(network, "Path", lambda value: path if value == "/etc/resolv.conf" else original(value))
+        assert network.read_resolvers() == ["127.0.0.53"]
+        yield path
+
+
+def test_agent_local_sockets_are_guarded_without_breaking_backend_replies(trusted_resolver):
     assert os.geteuid() == 0, "run only on the disposable CI runner as root"
     suffix = uuid.uuid4().hex[:10]
     user, table = "haos-net-" + suffix, "haos_test_" + suffix

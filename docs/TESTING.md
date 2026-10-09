@@ -17,6 +17,8 @@ HAOS unit setup uses Python 3.11, pytest 9.0.2, websockets 15.0.1; HAOS_TEST_PYT
 
 Enrollment unit fixtures simulate root file identity and ownership changes while keeping real file modes, atomic registry writes and rollback assertions. They do not require the development account to own files as root. Foreign-owner, readable and symlinked enrollment locks must still fail before provisioning. The nftables validation-failure test uses fixed resolver input rather than trusting the developer machine's actual `/etc/resolv.conf`. Real ownership, password authentication and firewall enforcement remain separate probes.
 
+The real nftables probe supplies a separate root-owned resolver file in a private directory under `/run`. It exercises the actual resolver trust checks and kernel rules without changing the runner's DNS configuration. The hosted runner's system-managed DNS files are not assumed to meet the installed HAOS root-ownership contract; an untrusted runner file must not weaken production validation.
+
 Real probes:
 
 ```sh
