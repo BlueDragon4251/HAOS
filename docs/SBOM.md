@@ -4,10 +4,10 @@ The HAOS image build now scans the actual image before producing its installer.
 Syft 1.54.1 is pinned to its official container digest
 `sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa`.
 The scan runs as the runner's non-root UID in a read-only container with no network,
-no Linux capabilities, no new privileges, two CPUs and a 3 GiB memory/swap limit.
+no Linux capabilities, no new privileges, two CPUs, 256 PIDs and a 5 GiB memory/swap limit.
 Its mounts are the newly exported OCI layout (read-only), private disk-backed
 extraction/cache scratch and this build's evidence directory. Go's soft heap limit
-is 2 GiB; catalogers and inventory requirements are retained. All temporary layout/
+is 1536 MiB with one cataloger worker; catalogers and inventory requirements are retained. All temporary layout/
 scratch data and the owned scanner container are removed before ISO generation;
 scanning has an 18-minute command deadline and separate 20-minute job-step timeout.
 It neither executes software from the cataloged image nor connects to a
@@ -25,6 +25,10 @@ Evidence includes:
   SHA-256 values, checked inventory counts and explicit remaining limitations.
 - `sbom-scanner-status.json`: actual Docker exit/status/OOM flags, captured before
   removing this build's scanner; only an exited, zero-code, non-OOM scan proceeds.
+- `sbom-resource-samples.jsonl`: only the owned scanner's aggregate memory, CPU
+  and PID samples every 15 seconds, without command arguments, paths or environment.
+- `sbom-host-resources.json`: actual host RAM/available RAM, scratch filesystem
+  free bytes and scanner limit. Insufficient host memory fails before scanning.
 
 The verifier requires the catalog's source version/image ID to equal this build.
 Every frozen Python version must be actually installed, every installed Python
@@ -63,6 +67,15 @@ verifier accepts the exact image ID, all 147 RPM and 80 installed/frozen Python
 records and 188 npm identities. The fix therefore changes the supported image
 source format and scratch storage, rather than raising/removing the memory limit
 or discarding catalogers. Matching HAOS-image verification remains required.
+
+The subsequent actual HAOS image at `bba8f3b` ([37991730553](https://github.com/BlueDragon4251/HAOS/actions/runs/37991730553))
+still exceeded 3 GiB even with disk scratch and an OCI layout. Its retained Docker
+state proves `exit_code: 137, oom_killed: true`; the small fixture does not substitute
+for this failure. The build scanner now reserves 5 GiB only after checking actual
+host memory with additional headroom, lowers Go's soft limit to 1536 MiB and uses one worker to reduce concurrent
+allocation. No input, cataloger, installed package or verification assertion is
+removed. Metrics are recorded before cleanup; successful full-image inventory
+verification remains required. This build-tool limit is not a mission budget.
 
 Catalogs and inventories improve release evidence; they do not prove exhaustive
 identification of every vendored/embedded C/C++/Rust/Go/WASM component or complete

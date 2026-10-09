@@ -114,6 +114,8 @@ def inspect_build(files, source):
     image = images[0]
     identifier = image.get("Id")
     size = image.get("Size")
+    if isinstance(identifier, str) and re.fullmatch(r"[0-9a-f]{64}", identifier):
+        identifier = "sha256:" + identifier
     if not isinstance(identifier, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", identifier):
         raise ValueError("invalid build image identity")
     if type(size) is not int or not 0 < size < 2 ** 63:

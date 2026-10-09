@@ -60,6 +60,8 @@ def test_build_diagnosis_exposes_only_fixed_size_identity_and_real_process_flags
     assert result["scanner"] == {"status": "exited", "exit_code": 137, "oom_killed": True}
     assert result["installed_guest_acceptance"] is False and result["installed_inventory_acceptance"] is False
     assert "private" not in str(result) and result["image_bytes"] == 12345
+    files["image.json"] = json.dumps([{"Id": "a" * 64, "Size": 12345}]).encode()
+    assert evidence.inspect_build(files, "b" * 40)["image_id"] == "sha256:" + "a" * 64
     files["build-manifest.json"] = json.dumps({"source_commit": "c" * 40}).encode()
     with pytest.raises(ValueError, match="workflow source"):
         evidence.inspect_build(files, "b" * 40)

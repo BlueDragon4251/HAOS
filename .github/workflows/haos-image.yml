@@ -73,24 +73,51 @@ jobs:
             rm -rf -- "$HAOS_SBOM_DIRECTORY"
           }
           trap cleanup_sbom EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
           # The outer OCI archive reader exceeded memory on the large fixture.
           # An actual OCI layout keeps the same image identity/catalogers and
           # passed the same limit; extraction scratch also belongs on disk.
           sudo podman save --format oci-dir --output "$HAOS_SBOM_DIRECTORY/image" localhost/haos:ci
           sudo chown -R "$(id -u):$(id -g)" "$HAOS_SBOM_DIRECTORY"
           mkdir -m 0700 "$HAOS_SBOM_DIRECTORY/scratch"
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          memory = {}
+          for line in Path('/proc/meminfo').read_text().splitlines():
+              name, *rest = line.split()
+              if name in {'MemTotal:', 'MemAvailable:'} and len(rest) == 2 and rest[1] == 'kB':
+                  memory[name[:-1]] = int(rest[0]) * 1024
+          report = {'host_memory_total_bytes': memory['MemTotal'],
+                    'host_memory_available_bytes': memory['MemAvailable'],
+                    'scratch_filesystem_free_bytes': shutil.disk_usage(os.environ['RUNNER_TEMP']).free,
+                    'scanner_memory_limit_bytes': 5 * 1024 ** 3}
+          Path('evidence/sbom-host-resources.json').write_text(json.dumps(report) + '\n')
+          print(json.dumps(report))
+          if report['host_memory_available_bytes'] < report['scanner_memory_limit_bytes'] + 512 * 1024 ** 2:
+              raise ValueError('Insufficient available host memory for the bounded image scan')
+          PY
           HAOS_SBOM_CONTAINER="$(docker create --network none --read-only --cap-drop ALL \
-            --security-opt no-new-privileges --memory 3g --memory-swap 3g --cpus 2 \
+            --security-opt no-new-privileges --memory 5g --memory-swap 5g --cpus 2 --pids-limit 256 \
             --user "$(id -u):$(id -g)" \
-            -e GOMEMLIMIT=2GiB -e SYFT_CACHE_DIR=/tmp/cache -e SYFT_CHECK_FOR_APP_UPDATE=false \
+            -e GOMEMLIMIT=1536MiB -e SYFT_CACHE_DIR=/tmp/cache -e SYFT_CHECK_FOR_APP_UPDATE=false \
             -v "$HAOS_SBOM_DIRECTORY/image:/image:ro" -v "$HAOS_SBOM_DIRECTORY/scratch:/tmp:rw" \
             -v "$PWD/evidence:/evidence:rw" \
             ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa \
-            scan oci-dir:/image --parallelism 2 --quiet \
+            scan oci-dir:/image --parallelism 1 --quiet \
             --source-name "$GITHUB_REPOSITORY" --source-version "$GITHUB_SHA" \
             --output cyclonedx-json@1.6=/evidence/image.cdx.json --output syft-json=/evidence/image.syft.json)"
           set +e
-          timeout --signal=TERM --kill-after=10s 18m docker start --attach "$HAOS_SBOM_CONTAINER"
+          timeout --signal=TERM --kill-after=10s 18m docker start --attach "$HAOS_SBOM_CONTAINER" &
+          HAOS_SBOM_WATCH_PID=$!
+          while kill -0 "$HAOS_SBOM_WATCH_PID" 2>/dev/null; do
+            # Only the owned scanner's aggregate metrics. No args, files or env.
+            docker stats --no-stream --format '{"memory":"{{.MemUsage}}","memory_percent":"{{.MemPerc}}","cpu_percent":"{{.CPUPerc}}","pids":"{{.PIDs}}"}' \
+              "$HAOS_SBOM_CONTAINER" | tee -a evidence/sbom-resource-samples.jsonl
+            sleep 15
+          done
+          wait "$HAOS_SBOM_WATCH_PID"
           HAOS_SBOM_STATUS=$?
           set -e
           # Inspect before cleanup: exit 137 alone cannot prove an OOM kill.
@@ -152,6 +179,8 @@ jobs:
             evidence/image.syft.json
             evidence/sbom-index.json
             evidence/sbom-scanner-status.json
+            evidence/sbom-resource-samples.jsonl
+            evidence/sbom-host-resources.json
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4

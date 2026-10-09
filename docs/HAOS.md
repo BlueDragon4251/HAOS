@@ -50,10 +50,16 @@ installation did not run. The scanner failure must be resolved before claiming
 HAOS-image SBOM or newer installed acceptance.
 
 The scanner correction uses a real OCI layout and private disk-backed scratch,
-retaining its 3 GiB cap and all catalog/inventory gates. A large disposable image
+initially retaining its 3 GiB cap and all catalog/inventory gates. A large disposable image
 reproduces actual archive-reader OOM at 1 GiB; its OCI-directory scan passes under
 the same limit and verifies all fixture inventories. Actual scanner exit/OOM
 state is now captured before cleanup; matching HAOS-image results remain required.
+
+The actual `bba8f3b` image still exceeded 3 GiB: its retained process receipt
+proves an OOM kill, and ISO/installation were skipped. The scanner now has a
+bounded 5 GiB build allocation, 1536 MiB Go soft limit, one worker and aggregate
+resource samples. All catalogers/inventory assertions remain required; neither
+the large local fixture nor a successful image build accepts the full-image SBOM.
 
 The Arch job at `f6640c0` failed during container initialization with Docker Hub's
 anonymous pull limit, before running packaging checks. Its input now uses Arch's
