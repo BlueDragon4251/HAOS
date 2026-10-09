@@ -9,6 +9,8 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
+from .redaction import Redactor
+
 ACTIVE = {"running", "waiting"}
 TERMINAL = {"completed", "failed", "cancelled"}
 
@@ -18,7 +20,8 @@ class Conflict(ValueError):
 
 
 class MissionStore:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, redactor: Redactor | None = None):
+        self.redactor = redactor or Redactor()
         self.db = sqlite3.connect(path, isolation_level=None, timeout=10)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
@@ -77,7 +80,7 @@ class MissionStore:
 
     def _event(self, mid: str, kind: str, payload: dict, receipt: str | None = None):
         self.db.execute("INSERT OR IGNORE INTO events(mission_id,at,kind,payload,receipt) VALUES(?,?,?,?,?)",
-                        (mid, time.time(), kind, json.dumps(payload, ensure_ascii=False), receipt))
+                        (mid, time.time(), kind, json.dumps(self.redactor.clean(payload), ensure_ascii=False), receipt))
 
     def events(self, mid: str, after: int = 0) -> list[dict]:
         return [{**dict(r), "payload": json.loads(r["payload"])} for r in self.db.execute(
@@ -92,7 +95,7 @@ class MissionStore:
             raise ValueError("timeout must be 60–86400 seconds")
         if type(max_attempts) is not int or not 1 <= max_attempts <= 5:
             raise ValueError("max_attempts must be 1–5")
-        goal = goal.strip()
+        goal = self.redactor.text(goal.strip())
         with self.transaction():
             old = self.db.execute("SELECT * FROM missions WHERE actor=? AND idempotency_key=?", (actor, key)).fetchone()
             if old:
@@ -174,6 +177,8 @@ class MissionStore:
         return self.get(mid)
 
     def _settle(self, mid: str, state: str, error: str | None, result: str | None = None):
+        error = self.redactor.clean(error)
+        result = self.redactor.clean(result)
         self.db.execute("UPDATE missions SET state=?,error=?,result=?,updated_at=? WHERE id=?",
                         (state, error, result, time.time(), mid))
         if state in TERMINAL:
@@ -189,6 +194,7 @@ class MissionStore:
             self._settle(mid, state, error, result)
 
     def unavailable(self, mid: str, error: str):
+        error = self.redactor.text(error)
         with self.transaction():
             row = self.get(mid)
             if row["phase"] == "dispatching":

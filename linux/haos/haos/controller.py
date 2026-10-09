@@ -71,7 +71,8 @@ class Controller:
             raise ValueError("params must be an object")
         if method == "health":
             return {"service": "haos-controller", "backend_connected": self.connection is not None,
-                    "current_mission": self.current, "pending_requests": list(self.questions.values())}
+                    "current_mission": self.current,
+                    "pending_requests": self.store.redactor.clean(list(self.questions.values()))}
         if method == "missions.list":
             return self.store.list()
         if method == "missions.create":
@@ -125,9 +126,8 @@ class Controller:
             print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
             reply = {"ok": False, "error": str(exc)}
         except Exception:
-            # Traceback remains in the independent service journal; never expose secrets to a peer.
-            import traceback
-            traceback.print_exc()
+            # Exceptions can embed request text, URLs and credentials; journal only their type.
+            print(json.dumps({"event": "control.error", "actor": actor}), flush=True)
             reply = {"ok": False, "error": "control service error"}
         try:
             writer.write(json.dumps(reply, ensure_ascii=False).encode() + b"\n")
@@ -202,7 +202,8 @@ async def serve():
     token = Path("/etc/haos/backend-token").read_text().strip()
     lock = open("/var/lib/haos-control/controller.lock", "a")
     fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    store = MissionStore(Path("/var/lib/haos-control/missions.db"))
+    from .redaction import Redactor
+    store = MissionStore(Path("/var/lib/haos-control/missions.db"), redactor=Redactor([token]))
     controller = Controller(store, websocket_url(config["backend_url"], token), uids)
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
