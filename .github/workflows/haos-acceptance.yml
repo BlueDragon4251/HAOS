@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import json, os, re, urllib.request
+          import json, os, re, subprocess, urllib.request
           from pathlib import Path
           base = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}"
           def get(path):
@@ -47,6 +47,14 @@ jobs:
                   continue
               if match[1] != run.get('head_sha'):
                   continue
+              # A queued old harness may start after a newer image is uploaded.
+              # Never select that descendant and attribute its result to this source.
+              ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', match[1], 'HEAD'],
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              if ancestor.returncode == 1:
+                  continue
+              if ancestor.returncode != 0:
+                  raise RuntimeError('Cannot verify the candidate image commit ancestry')
               jobs = get(f"/actions/runs/{run['id']}/jobs?per_page=100")['jobs']
               if not any(j['name'] == 'build' and j['conclusion'] == 'success' for j in jobs):
                   continue

@@ -54,6 +54,13 @@ The rebuilt `2cebd11` ISO passed actual runner byte verification, installed thro
 
 The following evidence is chronological: earlier failures and pending statements belong to the source revision and date where they were recorded.
 
+Queued reuse run [37949433898](https://github.com/BlueDragon4251/HAOS/actions/runs/37949433898)
+selected a newer descendant image after its old harness commit. The existing ancestry
+assertion correctly rejected it before QEMU; no guest receipt exists. Artifact selection
+now checks ancestry before downloading, skips descendants and preserves the final
+assertion and exact image/guest/harness identities. The selection rule was checked with
+a real isolated two-commit Git repository; a new runner result remains required.
+
 | Component | Implementation |
 | --- | --- |
 | Independent Hermes | `linux/haos/haos-hermes.service`; pinned immutable runtime, Fedora Python 3.11, service account, systemd credential, mandatory Bubblewrap namespace |
