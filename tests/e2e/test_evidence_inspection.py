@@ -52,6 +52,27 @@ def test_bounded_failure_diagnostics_are_redacted_and_not_whole_journals():
     assert "normal user chat" not in str(result)
 
 
+def test_build_diagnosis_exposes_only_fixed_size_identity_and_real_process_flags():
+    files = {"image.json": json.dumps([{"Id": "sha256:" + "a" * 64, "Size": 12345,
+             "Config": {"Env": ["private user content"]}, "History": "private build arguments"}]).encode(),
+             "sbom-scanner-status.json": b'{"status":"exited","exit_code":137,"oom_killed":true,"error":"private path"}'}
+    result = evidence.inspect_build(files, "b" * 40)
+    assert result["scanner"] == {"status": "exited", "exit_code": 137, "oom_killed": True}
+    assert result["installed_guest_acceptance"] is False and result["installed_inventory_acceptance"] is False
+    assert "private" not in str(result) and result["image_bytes"] == 12345
+    files["build-manifest.json"] = json.dumps({"source_commit": "c" * 40}).encode()
+    with pytest.raises(ValueError, match="workflow source"):
+        evidence.inspect_build(files, "b" * 40)
+
+
+@pytest.mark.parametrize("field,value", [("Id", "private image text"), ("Size", True), ("Size", -1)])
+def test_untrusted_build_identity_is_not_published(field, value):
+    image = {"Id": "sha256:" + "a" * 64, "Size": 123}
+    image[field] = value
+    with pytest.raises(ValueError):
+        evidence.inspect_build({"image.json": json.dumps([image]).encode()}, "b" * 40)
+
+
 @pytest.mark.parametrize("field,value", [("path", ".github/workflows/foreign.yml"),
                                          ("event", "pull_request"), ("head_branch", "foreign-branch")])
 def test_foreign_workflow_or_branch_is_denied_before_archive_access(monkeypatch, field, value):

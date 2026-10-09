@@ -10,6 +10,12 @@ on:
         description: Completed HAOS image run containing a small QEMU guest artifact
         required: true
         type: string
+      evidence_kind:
+        description: Guest receipts or bounded failed-build process/image metadata
+        required: true
+        default: guest
+        type: choice
+        options: [guest, build]
 
 permissions:
   contents: read
@@ -84,4 +90,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HAOS_EVIDENCE_RUN: ${{ matrix.run_id }}
+          HAOS_EVIDENCE_KIND: ${{ inputs.evidence_kind || 'guest' }}
         run: python3 scripts/inspect-haos-evidence.py
