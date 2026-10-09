@@ -19,6 +19,9 @@ def test_creation_is_durable_and_idempotency_is_actor_scoped(tmp_path):
     reopened = MissionStore(path)
     assert reopened.get(first["id"])["goal"] == first["goal"]
     assert reopened.events(first["id"])[0]["kind"] == "mission.queued"
+    assert reopened.lookup("uid:1000", "request-1")["id"] == first["id"]
+    assert reopened.lookup("gateway:foreign", "request-1") is None
+    assert reopened.lookup("uid:1000", "not-admitted") is None
     reopened.close()
 
 

@@ -8,6 +8,7 @@ import { MissionCard } from './MissionCard.tsx'
 import { MissionComposer } from './MissionComposer.tsx'
 import { MissionDetail } from './MissionDetail.tsx'
 import { DurableMissionsPage } from './DurableMissionsPage.tsx'
+import { $managedMissions, $missionModeError, resolveMissionMode } from '../../store/mission-mode.ts'
 
 type TabId = 'active' | 'review' | 'completed'
 
@@ -21,13 +22,9 @@ const EMPTY_COPY: Record<TabId, { title: string; description: string }> = {
 }
 
 export function MissionsPage() {
-  const [managed, setManaged] = useState<boolean | null>(null)
-  const [serviceError, setServiceError] = useState<string | null>(null)
-  useEffect(() => {
-    let active = true
-    void window.heraldOS.missions.serviceInfo().then(info => { if (active) setManaged(info.managed) }).catch(cause => { if (active) setServiceError(String(cause)) })
-    return () => { active = false }
-  }, [])
+  const managed = useStore($managedMissions)
+  const serviceError = useStore($missionModeError)
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
   if (serviceError) return <p role="alert" className="p-6 text-sm text-danger">Could not identify the mission service: {serviceError}</p>
   if (managed === null) return <p role="status" className="p-6 text-sm text-fg-3">Loading mission service…</p>
   return managed ? <DurableMissionsPage /> : <SessionMissionsPage />

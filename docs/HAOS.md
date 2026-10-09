@@ -6,6 +6,14 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+The [native conversation](NATIVE-MISSIONS.md) now routes managed text and existing
+voice-transcript callers into the durable controller and opens the Hermes workspace
+at startup. Lost replies retain opaque request metadata; reload performs peer-scoped
+lookup without resubmission. Local verification passes **742 desktop tests**, both
+TypeScript checks and production bundling. SQLite/reopened-store and actual Unix
+peer tests cover admission lookup. Real model turns, GUI control and complete
+voice-response playback remain separate open gates.
+
 Ongoing development after `b809009` preserves the installed foundation. Credential-redaction
 commit `52c1c3c` passed [services](https://github.com/BlueDragon4251/HAOS/actions/runs/37943091005),
 [general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37943090859) and
@@ -59,7 +67,7 @@ The following evidence is chronological: earlier failures and pending statements
 | Native UI | Managed attachment, real mission/event list, cancellation requests, once/deny approvals and clarification |
 | Image/VM gates | `haos-image.yml`, `test-haos-iso.sh`, `haos_guest.py`; real ISO build and guarded disposable multi-disk acceptance harness |
 
-Native host-command GUI bridge access is not exposed to the isolated agent. A safe GUI broker remains missing. Ordinary chat/gateways are not automatically durable HAOS missions.
+Native host-command GUI bridge access is not exposed to the isolated agent. A safe GUI broker remains missing. Managed local conversation and paired Telegram/Discord messages enter durable HAOS missions; real provider/gateway acceptance and additional channels remain open.
 
 ## Recorded evidence
 

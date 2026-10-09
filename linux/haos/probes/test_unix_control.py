@@ -37,6 +37,13 @@ def test_kernel_peer_identity_and_mission_roundtrip(tmp_path):
             assert created["ok"] and created["result"]["actor"] == f"uid:{os.getuid()}"
             repeated = await request("missions.create", {"goal": "Real Unix roundtrip", "idempotency_key": "probe"})
             assert repeated["result"]["id"] == created["result"]["id"]
+            recovered = await request("missions.lookup", {"idempotency_key": "probe", "actor": "owner:0"})
+            assert recovered["ok"] and recovered["result"]["id"] == created["result"]["id"]
+            assert recovered["result"]["actor"] == f"uid:{os.getuid()}"
+            store.create("owner:0", "foreign-receipt", "Another actor's private receipt")
+            foreign = await request("missions.lookup", {"idempotency_key": "foreign-receipt", "actor": "owner:0"})
+            assert foreign["ok"] and foreign["result"] is None
+            assert (await request("missions.lookup", {"idempotency_key": "never-admitted"}))["result"] is None
             denied = await request("volume.unlock", {"id": "UUID:blocked"})
             assert not denied["ok"]
             events = await request("missions.events", {"id": created["result"]["id"]})

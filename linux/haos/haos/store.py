@@ -84,6 +84,12 @@ class MissionStore:
         return [dict(r) for r in self.db.execute(
             "SELECT * FROM missions ORDER BY created_at DESC LIMIT ?", (min(max(limit, 1), 200),))]
 
+    def lookup(self, actor: str, key: str) -> dict | None:
+        if not isinstance(key, str) or not 1 <= len(key) <= 128:
+            raise ValueError("an idempotency key is required")
+        row = self.db.execute("SELECT * FROM missions WHERE actor=? AND idempotency_key=?", (actor, key)).fetchone()
+        return dict(row) if row is not None else None
+
     def _event(self, mid: str, kind: str, payload: dict, receipt: str | None = None):
         self.db.execute("INSERT OR IGNORE INTO events(mission_id,at,kind,payload,receipt) VALUES(?,?,?,?,?)",
                         (mid, time.time(), kind, json.dumps(self.redactor.clean(payload), ensure_ascii=False), receipt))

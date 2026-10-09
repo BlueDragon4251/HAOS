@@ -97,6 +97,8 @@ class Controller:
         if method == "missions.create":
             return self.store.create(actor, params.get("idempotency_key"), params.get("goal"),
                                      timeout=params.get("timeout", 3600), max_attempts=params.get("max_attempts", 3))
+        if method == "missions.lookup":
+            return self.store.lookup(actor, params.get("idempotency_key"))
         if method == "missions.get":
             return self.store.get(params["id"])
         if method == "missions.events":

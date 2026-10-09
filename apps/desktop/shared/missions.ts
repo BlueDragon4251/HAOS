@@ -4,6 +4,7 @@ export type DurableMissionState = 'queued' | 'running' | 'waiting' | 'blocked' |
 export interface DurableMission {
   id: string
   actor: string
+  idempotency_key: string
   goal: string
   state: DurableMissionState
   phase: string
@@ -44,10 +45,11 @@ export interface MissionMethods {
   health: { params: Record<string, never>; result: MissionServiceHealth }
   'missions.list': { params: Record<string, never>; result: DurableMission[] }
   'missions.create': { params: { goal: string; idempotency_key: string; timeout?: number }; result: DurableMission }
+  'missions.lookup': { params: { idempotency_key: string }; result: DurableMission | null }
   'missions.get': { params: { id: string }; result: DurableMission }
   'missions.events': { params: { id: string; after?: number }; result: MissionEvent[] }
   'missions.cancel': { params: { id: string }; result: DurableMission }
   'missions.answer': { params: { request_id: string; choice?: 'once' | 'deny'; answer?: string }; result: { accepted: boolean } }
 }
 
-export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.get', 'missions.events', 'missions.cancel', 'missions.answer'])
+export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.lookup', 'missions.get', 'missions.events', 'missions.cancel', 'missions.answer'])

@@ -8,6 +8,8 @@ import { $missionFocus } from '../../store/missions.ts'
 import { notify } from '../../store/notifications.ts'
 import { runCommand } from '../../store/os-commands.ts'
 import { MissionComposer } from './MissionComposer.tsx'
+import { $pendingMissionMessages, recoverMissionMessages } from '../../store/mission-conversation.ts'
+import { MissionMessageComposer } from './MissionMessageComposer.tsx'
 
 const STATE_COLOR: Record<DurableMissionState, string> = {
   queued: 'text-fg-3', running: 'text-progress', waiting: 'text-warn', blocked: 'text-warn',
@@ -51,15 +53,17 @@ function PendingQuestion({ question }: { question: MissionQuestion }) {
   )
 }
 
-export function DurableMissionsPage() {
+export function DurableMissionsPage({ conversation = false }: { conversation?: boolean }) {
   const missions = useStore($durableMissions)
   const health = useStore($missionServiceHealth)
   const error = useStore($missionServiceError)
   const allEvents = useStore($missionEvents)
   const focus = useStore($missionFocus)
+  const pending = useStore($pendingMissionMessages)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
   const [eventError, setEventError] = useState<string | null>(null)
+  const [admissionError, setAdmissionError] = useState<string | null>(null)
   const selected = missions.find(row => row.id === selectedId) ?? missions[0] ?? null
   const id = selected?.id
   const events = id ? allEvents[id] ?? [] : []
@@ -70,6 +74,18 @@ export function DurableMissionsPage() {
     const timer = setInterval(() => void refreshDurableMissions(), 2000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!conversation) return
+    let active = true
+    const recover = async () => {
+      try { await recoverMissionMessages(); if (active) setAdmissionError(null) }
+      catch (cause) { if (active) setAdmissionError(cause instanceof Error ? cause.message : String(cause)) }
+    }
+    void recover()
+    const timer = setInterval(() => void recover(), 5000)
+    return () => { active = false; clearInterval(timer) }
+  }, [conversation])
 
   useEffect(() => {
     if (focus?.missionId) setSelectedId(focus.missionId)
@@ -94,16 +110,18 @@ export function DurableMissionsPage() {
 
   return (
     <div className="page-enter flex h-full flex-col">
-      <PageHeader icon="missions" title="Missions" subtitle="Durable work, supervised independently of this window."
+      <PageHeader icon={conversation ? 'hermes' : 'missions'} title={conversation ? 'Hermes' : 'Missions'} subtitle="Durable work, supervised independently of this window."
         actions={<GlassButton onClick={() => void command('mission.compose', {})}><IconPlus />New mission</GlassButton>} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
         <p role="status" className={`text-xs ${error ? 'text-danger' : 'text-fg-3'}`}>
           {error ? `Controller unavailable: ${error}. Stored work is not resubmitted by the UI.` : health ? 'Mission controller connected' : 'Connecting to the mission controller…'}
         </p>
+        {admissionError && <p role="alert" className="text-xs text-danger">Could not check pending messages: {admissionError}</p>}
+        {pending.length > 0 && <p role="status" className="text-xs text-warn">{pending.length} submission receipt(s) pending. Hermes checks saved admissions without resending. To retry, enter the exact original message.</p>}
         <div className="flex min-h-0 flex-1 gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
             {missions.length === 0 ? <EmptyGlass icon={<IconTarget />} title="No queued missions" description="Give Hermes a goal. The controller records it before execution." /> : missions.map(row => (
-              <button key={row.id} onClick={() => { setSelectedId(row.id); void command('mission.openDurable', { id: row.id }) }}
+              <button key={row.id} onClick={() => { setSelectedId(row.id); if (!conversation) void command('mission.openDurable', { id: row.id }) }}
                 className={`flex flex-col gap-2 rounded-xl p-4 text-left ${selected?.id === row.id ? 'glass-card-selected' : 'glass-card-hover'}`}>
                 <div className="flex items-center justify-between gap-3">
                   <span className="truncate text-sm font-semibold text-fg">{row.goal.slice(0, 60)}</span>
@@ -136,13 +154,14 @@ export function DurableMissionsPage() {
                   <section className="flex flex-col gap-3" aria-label="Recorded mission events">
                     <h3 className="text-sm font-semibold text-fg">Recorded activity</h3>
                     {eventError && <p role="alert" className="text-xs text-danger">Could not load events: {eventError}</p>}
-                    {events.map(event => <div key={event.seq} className="border-l border-line pl-3"><div className="flex justify-between gap-2 text-xs"><span className="font-medium text-fg-2">{event.kind}</span><time className="text-fg-4">{new Date(event.at * 1000).toLocaleTimeString()}</time></div><pre className="mt-1 whitespace-pre-wrap break-words text-[11px] text-fg-3">{JSON.stringify(event.payload, null, 2).slice(0, 2000)}</pre></div>)}
+                    {events.map(event => <details key={event.seq} className="border-l border-line pl-3"><summary className="flex cursor-pointer justify-between gap-2 text-xs"><span className="font-medium text-fg-2">{event.kind}</span><time className="text-fg-4">{new Date(event.at * 1000).toLocaleTimeString()}</time></summary><pre className="mt-1 whitespace-pre-wrap break-words text-[11px] text-fg-3">{JSON.stringify(event.payload, null, 2)}</pre></details>)}
                   </section>
                 </>
               ) : <EmptyGlass icon={<IconTarget />} title="Select a mission" description="Its saved state, real Hermes events and result appear here." />}
             </GlassCard>
           </div>
         </div>
+        {conversation && <MissionMessageComposer />}
       </div>
     </div>
   )
