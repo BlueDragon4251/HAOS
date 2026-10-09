@@ -114,6 +114,10 @@ def main():
     source = run["head_sha"]
     if run["status"] != "completed" or not re.fullmatch(r"[0-9a-f]{40}", source):
         raise ValueError("inspect only completed, source-bound HAOS runs")
+    if (run.get("path") != ".github/workflows/haos-image.yml"
+            or run.get("event") not in {"push", "workflow_dispatch"}
+            or not run.get("head_branch", "").startswith("agent/haos-")):
+        raise ValueError("inspect only owner-branch HAOS image workflow evidence")
     artifacts = get(f"actions/runs/{run_id}/artifacts?per_page=100")["artifacts"]
     accepted = []
     for artifact in artifacts:

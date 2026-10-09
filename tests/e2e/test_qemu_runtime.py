@@ -1,7 +1,10 @@
 """Acceleration regression tests; these are not installed-guest evidence."""
 import importlib.util
+import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -108,3 +111,34 @@ def test_vm_timeout_is_a_failure_without_replay(tmp_path):
     evidence, code = runtime.run_guest([], tmp_path / "serial.log", 60, run=run,
         probe_vm=lambda a: {"accelerator": a, "usable": True})
     assert code == 124 and len(evidence["launches"]) == 1
+
+
+def test_actual_supervisor_reports_only_own_process_metadata(tmp_path):
+    serial = tmp_path / "private-serial.log"
+    serial.write_text("private disposable serial message, never public")
+    reports = []
+    result = runtime.supervised_run([sys.executable, "-c", "import time; print('private disposable output'); time.sleep(.2)"],
+        serial_log=serial, timeout=5, interval=.05, progress=reports.append,
+        text=True, capture_output=True, check=False)
+    assert result.returncode == 0
+    assert len(reports) >= 3 and any(row["alive"] for row in reports)
+    assert reports[-1]["returncode"] == 0 and not reports[-1]["alive"]
+    assert all(row.get("serial_bytes") == serial.stat().st_size for row in reports)
+    assert "private disposable" not in json.dumps(reports)
+    assert str(tmp_path) not in json.dumps(reports)
+    if sys.platform == "linux":
+        assert any(row.get("resident_bytes", 0) > 0 for row in reports)
+        assert any("cpu_seconds" in row for row in reports)
+
+
+def test_actual_supervisor_timeout_terminates_its_own_group(tmp_path):
+    reports = []
+    serial = tmp_path / "serial.log"
+    serial.touch()
+    with pytest.raises(subprocess.TimeoutExpired):
+        runtime.supervised_run([sys.executable, "-c", "import time; time.sleep(60)"],
+            serial_log=serial, timeout=.15, interval=.05, progress=reports.append,
+            text=True, capture_output=True, check=False)
+    assert reports[-1]["phase_timed_out"] and not reports[-1]["alive"]
+    with pytest.raises(ProcessLookupError):
+        os.kill(reports[-1]["pid"], 0)

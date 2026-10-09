@@ -6,6 +6,17 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+The QEMU phase runner now reports its own child PID, CPU/RSS, serial-file size/age,
+output filesystem space and deadline every 30 seconds without exposing command
+arguments or serial content. Timeout terminates only its new process group and
+remains failure; guest output, I/O failures and timeouts never trigger replay.
+Local harness/privacy verification passes **38 cases**; three actual diskless
+QEMU probes pass in a non-root, network-disabled container, including live TCG
+metrics and timeout termination. These are process/acceleration probes, not an
+installed guest receipt. Evidence inspection now selects a nonempty available
+completed image run or one explicitly requested numeric ID, and rejects foreign
+workflow/event/branch provenance before downloading source-bound guest archives.
+
 The new [image SBOM gate](SBOM.md) catalogs the actual OCI image with a digest-pinned
 offline scanner, preserves/normalizes the pinned npm build graph, and requires
 exact source/image identity plus all frozen/installed Python and RPM epoch/version/
@@ -17,6 +28,13 @@ graph. This is no actual HAOS-image/execution claim; matching CI remains require
 Local ordinary HAOS verification now passes **184 cases**. Complete embedded-component
 coverage, license/vulnerability review, signing/provenance and reproducibility
 remain independent release requirements.
+
+At `aeac4ad14b935ccb4a9e63e61f4b2b07743bab21`, general CI, both service runs,
+dependency verification and Arch packaging passed. The actual
+[image run](https://github.com/BlueDragon4251/HAOS/actions/runs/37988845635)
+built the Fedora image but failed its new catalog step; ISO construction and
+installation did not run. The scanner failure must be resolved before claiming
+HAOS-image SBOM or newer installed acceptance.
 
 Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
 inventory and explicit scoped retention, previewed by default. Full encrypted data

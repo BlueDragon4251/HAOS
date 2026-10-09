@@ -50,3 +50,20 @@ def test_bounded_failure_diagnostics_are_redacted_and_not_whole_journals():
     assert result["startup_errors"]
     assert "disposable-private-token" not in str(result)
     assert "normal user chat" not in str(result)
+
+
+@pytest.mark.parametrize("field,value", [("path", ".github/workflows/foreign.yml"),
+                                         ("event", "pull_request"), ("head_branch", "foreign-branch")])
+def test_foreign_workflow_or_branch_is_denied_before_archive_access(monkeypatch, field, value):
+    run = {"head_sha": "a" * 40, "status": "completed", "path": ".github/workflows/haos-image.yml",
+           "event": "push", "head_branch": "agent/haos-foundation"}
+    run[field] = value
+    reads = []
+    def get(path, **kwargs):
+        reads.append(path)
+        return run
+    monkeypatch.setenv("HAOS_EVIDENCE_RUN", "123")
+    monkeypatch.setattr(evidence, "get", get)
+    with pytest.raises(ValueError, match="owner-branch"):
+        evidence.main()
+    assert reads == ["actions/runs/123"]

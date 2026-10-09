@@ -2,8 +2,92 @@
 """Probe actual QEMU acceleration as the caller, before opening fixture disks."""
 import argparse
 import json
+import os
 from pathlib import Path
+import shutil
+import signal
 import subprocess
+import tempfile
+import time
+
+
+def process_progress(process, serial_log, started, timeout):
+    """Own child metadata only: never log command arguments or serial contents."""
+    report = {"event": "haos.qemu.progress", "pid": process.pid,
+              "alive": process.poll() is None, "elapsed_seconds": round(time.monotonic() - started, 2),
+              "timeout_seconds": timeout}
+    try:
+        serial = serial_log.stat()
+        report.update(serial_bytes=serial.st_size, serial_age_seconds=round(max(0, time.time() - serial.st_mtime), 2))
+        report["output_disk_free_bytes"] = shutil.disk_usage(serial_log.parent).free
+    except OSError:
+        report["serial_metadata_available"] = False
+    try:
+        # /proc/stat's comm can contain spaces or ')'; fields follow its last ')'.
+        fields = Path(f"/proc/{process.pid}/stat").read_text().rsplit(")", 1)[1].split()
+        if fields[0] not in {"R", "S", "D", "T", "t", "Z", "X", "I"}:
+            raise ValueError("invalid kernel process state")
+        report.update(process_state=fields[0],
+                      cpu_seconds=round((int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK"), 3),
+                      resident_bytes=int(fields[21]) * os.sysconf("SC_PAGE_SIZE"))
+    except (OSError, ValueError, IndexError):
+        report["process_metrics_available"] = False
+    return report
+
+
+def stop_owned_group(process):
+    if process.poll() is not None:
+        return
+    # Only a child created below in its own new session/group is eligible.
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=5)
+
+
+def supervised_run(command, *, serial_log, timeout, progress, interval=30, **options):
+    if interval <= 0 or timeout <= 0:
+        raise ValueError("VM supervision needs positive intervals and timeout")
+    if options != {"text": True, "capture_output": True, "check": False}:
+        raise ValueError("unsupported VM supervision options")
+    started = time.monotonic()
+    # Private bounded-on-read files avoid accumulating all QEMU output in RAM.
+    # Guest serial has its own fixture file and is never replayed by this logger.
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=output, stderr=errors,
+                                   start_new_session=True)
+        try:
+            progress(process_progress(process, serial_log, started, timeout))
+            while process.poll() is None:
+                remaining = timeout - (time.monotonic() - started)
+                if remaining <= 0:
+                    stop_owned_group(process)
+                    report = process_progress(process, serial_log, started, timeout)
+                    progress({**report, "phase_timed_out": True})
+                    raise subprocess.TimeoutExpired(command, timeout)
+                try:
+                    process.wait(timeout=min(interval, remaining))
+                except subprocess.TimeoutExpired:
+                    if time.monotonic() - started >= timeout:
+                        stop_owned_group(process)
+                        report = process_progress(process, serial_log, started, timeout)
+                        progress({**report, "phase_timed_out": True})
+                        raise subprocess.TimeoutExpired(command, timeout)
+                    progress(process_progress(process, serial_log, started, timeout))
+            progress({**process_progress(process, serial_log, started, timeout), "returncode": process.returncode})
+            errors.seek(0, os.SEEK_END)
+            errors.seek(max(0, errors.tell() - 8192))
+            return subprocess.CompletedProcess(command, process.returncode, "", errors.read().decode(errors="replace"))
+        finally:
+            stop_owned_group(process)
 
 
 def probe(accelerator: str, run=subprocess.run) -> dict:
@@ -40,9 +124,18 @@ def select(probe_vm=probe) -> dict:
     return {"accelerator": "tcg,thread=multi", "cpu": "max", "attempts": attempts}
 
 
-def run_guest(args, serial_log: Path, timeout: int, *, run=subprocess.run, probe_vm=probe):
+def run_guest(args, serial_log: Path, timeout: int, *, run=None, probe_vm=probe):
     evidence = select(probe_vm)
     evidence["launches"] = []
+    evidence["recent_progress"] = []
+    def progress(report):
+        evidence["recent_progress"].append(report)
+        del evidence["recent_progress"][:-20]
+        print(json.dumps(report), flush=True)
+    if run is None:
+        def run(command, **options):
+            return supervised_run(command, serial_log=serial_log, progress=progress,
+                                  interval=min(30, timeout / 2), **options)
     if evidence["accelerator"] is None:
         return evidence, 1
     for attempt in range(2):

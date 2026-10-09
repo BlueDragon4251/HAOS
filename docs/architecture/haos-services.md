@@ -23,7 +23,7 @@ not given the unrestricted Herald UI bridge or observer home: that bridge can ex
 outside the agent namespace. A restricted native GUI execution broker still needs implementation
 and adversarial testing before agent-driven host applications are enabled.
 
-The root network guard installs a dedicated agent socket-UID table with only CAP_NET_ADMIN and is required before Hermes. See [network policy](../NETWORK-POLICY.md); actual kernel/installed acceptance is pending.
+The root network guard installs a dedicated agent socket-UID table with only CAP_NET_ADMIN and is required before Hermes. See [network policy](../NETWORK-POLICY.md) for actual kernel evidence and the bounded historical installed receipts; newer installed and complete egress acceptance remain required.
 
 ## Missions
 
@@ -57,6 +57,15 @@ provider identity. Neither terminal tools nor gateway events can grant models,
 change provider endpoints or read the real provider credential store. External
 model/gateway acceptance still requires credentials and real receipts.
 
+The native shell still attaches to the upstream dashboard's authenticated REST
+and WebSocket interfaces using an observer-readable backend token. Its legacy
+provider/configuration/OAuth routes are not yet restricted by a separate owner
+facade, and raw upstream submission is not yet replaced by a controller-only UI
+transport. The managed conversation path uses persistent HAOS admission, but this
+does not prove all legacy dashboard routes enforce that boundary. A scoped UI
+proxy and independent owner provisioning gate remain required; frontend controls
+alone cannot supply this security property.
+
 ## Filesystem enforcement
 
 The core runs as `haos-agent`, with no ambient capabilities, no new privileges, private devices,
@@ -74,9 +83,14 @@ the agent view. All other volumes default to absent. Encrypted data must first b
 owner recovery; automatic LUKS secret acquisition is not implemented. Policy changes require the
 services to be stopped, so a running process cannot retain a revoked bind.
 
-The runtime retains host networking for provider access. A required [socket-UID guard](../NETWORK-POLICY.md) restricts local/private destinations with narrow backend/DNS/reply exceptions; local unit checks passed, actual kernel/guest proof is pending. AF_UNIX abstract services, per-mission network policy, desktop capture and gateway-to-controller identity mapping remain unfinished. Do not deploy privileged unauthenticated loopback services alongside it.
+The runtime retains host networking for provider access. A required [socket-UID guard](../NETWORK-POLICY.md) restricts local/private destinations with narrow backend/provider/DNS/reply exceptions. Kernel CI and bounded historical installed receipts are linked there. Root-paired Telegram/Discord identity mapping and persistent gateway ingress exist; real credentialed round trips, additional adapters, AF_UNIX abstract services, per-mission network policy and desktop capture remain unfinished. Do not deploy privileged unauthenticated loopback services alongside it.
 
 ## Verification status
+
+Current source-specific component and installed evidence is maintained in
+[HAOS.md](../HAOS.md) and [Issue #2](https://github.com/BlueDragon4251/HAOS/issues/2).
+The following initial verification entries are historical and must not replace
+the newer exact-commit results or imply full release acceptance.
 
 Local checks on 2026-10-08: 19 HAOS unit/SQLite/wire-contract tests and 726 existing desktop tests
 passed; desktop typecheck and production build passed. Service syntax was parsed with
