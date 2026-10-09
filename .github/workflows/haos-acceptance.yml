@@ -92,7 +92,8 @@ jobs:
           assert manifest['source_repository'] == os.environ['GITHUB_REPOSITORY']
           assert manifest['architecture'] == 'x86_64'
           evidence = {'image_source_commit': manifest['source_commit'], 'guest_probe_commit': manifest['source_commit'],
-                      'harness_commit': os.environ['GITHUB_SHA'], 'image_run_id': os.environ['IMAGE_RUN_ID'],
+                      'harness_commit': os.environ['GITHUB_SHA'], 'diagnostics_commit': os.environ['GITHUB_SHA'],
+                      'image_run_id': os.environ['IMAGE_RUN_ID'],
                       'checksums': Path('image-evidence/SHA256SUMS').read_text(), 'production_acceptance': False}
           Path('vm-evidence/test-source.json').write_text(json.dumps(evidence, indent=2) + '\n')
           PY

@@ -27,6 +27,7 @@ fi
 7z e -oiso "$HAOS_TEST_ISO" "${HAOS_TEST_KS#/}" >/dev/null
 cp "iso/$(basename "$HAOS_TEST_KS")" ks.cfg
 cp "$HAOS_TEST_GUEST_PROBE" haos_guest.py
+cp "$HAOS_TEST_REPO/tests/e2e/haos_guest_diagnostics.py" haos_guest_diagnostics.py
 cat >>ks.cfg <<'KS'
 text
 lang en_US.UTF-8
@@ -43,6 +44,7 @@ poweroff
 mkdir -p /var/lib/haos-acceptance
 touch /var/lib/haos-acceptance/disposable-ci-guest
 curl --fail --retry 3 http://10.0.2.2:8000/haos_guest.py -o /var/lib/haos-acceptance/haos_guest.py
+curl --fail --retry 3 http://10.0.2.2:8000/haos_guest_diagnostics.py -o /var/lib/haos-acceptance/haos_guest_diagnostics.py
 cat >/etc/systemd/system/haos-acceptance.service <<'UNIT'
 [Unit]
 Description=Disposable QEMU acceptance probe
@@ -51,9 +53,11 @@ After=haos-hermes.service haos-controller.service greetd.service herald-os-first
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 /var/lib/haos-acceptance/haos_guest.py
+ExecStopPost=/usr/bin/python3 /var/lib/haos-acceptance/haos_guest_diagnostics.py
 StandardOutput=journal+console
 StandardError=journal+console
 TimeoutStartSec=10min
+TimeoutStopSec=60s
 [Install]
 WantedBy=multi-user.target
 UNIT
