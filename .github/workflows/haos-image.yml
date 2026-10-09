@@ -65,18 +65,37 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          HAOS_SBOM_ARCHIVE="$RUNNER_TEMP/haos-sbom-image.tar"
-          trap 'rm -f -- "$HAOS_SBOM_ARCHIVE"' EXIT
-          sudo podman save --format oci-archive --output "$HAOS_SBOM_ARCHIVE" localhost/haos:ci
-          sudo chown "$(id -u):$(id -g)" "$HAOS_SBOM_ARCHIVE"
-          chmod 0600 "$HAOS_SBOM_ARCHIVE"
-          docker run --rm --network none --read-only --cap-drop ALL --memory 3g --cpus 2 \
-            --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
-            -e SYFT_CACHE_DIR=/tmp/cache -v "$HAOS_SBOM_ARCHIVE:/image.tar:ro" -v "$PWD/evidence:/evidence:rw" \
+          HAOS_SBOM_DIRECTORY="$(mktemp -d "$RUNNER_TEMP/haos-sbom.XXXXXX")"
+          HAOS_SBOM_CONTAINER=""
+          cleanup_sbom() {
+            if [[ -n "$HAOS_SBOM_CONTAINER" ]]; then docker rm --force "$HAOS_SBOM_CONTAINER" >/dev/null; fi
+            rm -rf -- "$HAOS_SBOM_DIRECTORY"
+          }
+          trap cleanup_sbom EXIT
+          # The outer OCI archive reader exceeded memory on the large fixture.
+          # An actual OCI layout keeps the same image identity/catalogers and
+          # passed the same limit; extraction scratch also belongs on disk.
+          sudo podman save --format oci-dir --output "$HAOS_SBOM_DIRECTORY/image" localhost/haos:ci
+          sudo chown -R "$(id -u):$(id -g)" "$HAOS_SBOM_DIRECTORY"
+          mkdir -m 0700 "$HAOS_SBOM_DIRECTORY/scratch"
+          HAOS_SBOM_CONTAINER="$(docker create --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory 3g --memory-swap 3g --cpus 2 \
+            --user "$(id -u):$(id -g)" \
+            -e GOMEMLIMIT=2GiB -e SYFT_CACHE_DIR=/tmp/cache -e SYFT_CHECK_FOR_APP_UPDATE=false \
+            -v "$HAOS_SBOM_DIRECTORY/image:/image:ro" -v "$HAOS_SBOM_DIRECTORY/scratch:/tmp:rw" \
+            -v "$PWD/evidence:/evidence:rw" \
             ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa \
-            scan oci-archive:/image.tar --parallelism 2 --quiet \
+            scan oci-dir:/image --parallelism 2 --quiet \
             --source-name "$GITHUB_REPOSITORY" --source-version "$GITHUB_SHA" \
-            --output cyclonedx-json@1.6=/evidence/image.cdx.json --output syft-json=/evidence/image.syft.json
+            --output cyclonedx-json@1.6=/evidence/image.cdx.json --output syft-json=/evidence/image.syft.json)"
+          set +e
+          timeout --signal=TERM --kill-after=10s 18m docker start --attach "$HAOS_SBOM_CONTAINER"
+          HAOS_SBOM_STATUS=$?
+          set -e
+          # Inspect before cleanup: exit 137 alone cannot prove an OOM kill.
+          docker inspect --format '{{json .State}}' "$HAOS_SBOM_CONTAINER" | python3 -c \
+            'import json,sys; s=json.load(sys.stdin); r={"event":"haos.sbom.scanner", "status":s["Status"], "exit_code":s["ExitCode"], "oom_killed":s["OOMKilled"]}; print(json.dumps(r)); open("evidence/sbom-scanner-status.json","x").write(json.dumps(r)+"\n"); sys.exit(0 if s["Status"]=="exited" and s["ExitCode"]==0 and not s["OOMKilled"] else 1)'
+          if [[ "$HAOS_SBOM_STATUS" -ne 0 ]]; then exit "$HAOS_SBOM_STATUS"; fi
           python3 linux/haos/runtime/verify_sbom.py evidence --commit "$GITHUB_SHA"
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
@@ -130,6 +149,7 @@ jobs:
             evidence/image.cdx.json
             evidence/image.syft.json
             evidence/sbom-index.json
+            evidence/sbom-scanner-status.json
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4

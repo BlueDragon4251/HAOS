@@ -36,6 +36,12 @@ built the Fedora image but failed its new catalog step; ISO construction and
 installation did not run. The scanner failure must be resolved before claiming
 HAOS-image SBOM or newer installed acceptance.
 
+The scanner correction uses a real OCI layout and private disk-backed scratch,
+retaining its 3 GiB cap and all catalog/inventory gates. A large disposable image
+reproduces actual archive-reader OOM at 1 GiB; its OCI-directory scan passes under
+the same limit and verifies all fixture inventories. Actual scanner exit/OOM
+state is now captured before cleanup; matching HAOS-image results remain required.
+
 Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
 inventory and explicit scoped retention, previewed by default. Full encrypted data
 is checked before/after actual deletion/prune, and the final inventory must match
