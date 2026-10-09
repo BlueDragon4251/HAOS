@@ -18,7 +18,10 @@ jobs:
   package:
     name: herald-os-bin (x86_64)
     runs-on: ubuntu-24.04
-    container: archlinux:base-devel
+    # Arch's documented official GHCR publication avoids anonymous Docker Hub
+    # rate limits. Pin the verified 20261009.0.609227 image; pacman signatures
+    # and every existing build/install/CLI assertion remain enabled.
+    container: ghcr.io/archlinux/archlinux:base-devel@sha256:ed261ac99d13e9636940e88df26ccd22b0d8d1c2139699870f0427c765352689
     steps:
       - name: Tools and the package's dependencies
         run: pacman -Syu --noconfirm --needed git nodejs npm python namcap gtk3 nss alsa-lib libsecret libnotify curl wl-clipboard wtype grim slurp

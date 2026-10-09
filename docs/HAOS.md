@@ -42,6 +42,15 @@ reproduces actual archive-reader OOM at 1 GiB; its OCI-directory scan passes und
 the same limit and verifies all fixture inventories. Actual scanner exit/OOM
 state is now captured before cleanup; matching HAOS-image results remain required.
 
+The Arch job at `f6640c0` failed during container initialization with Docker Hub's
+anonymous pull limit, before running packaging checks. Its input now uses Arch's
+[documented official GHCR publication](https://github.com/archlinux/archlinux-docker)
+at digest `sha256:ed261ac99d13e9636940e88df26ccd22b0d8d1c2139699870f0427c765352689`.
+The actual image pulled and reported Arch build `20261009.0.609227`, base-devel
+and its packaged keyring; package signatures, build/lint/install/CLI tests remain
+unchanged. Matching package CI remains required; rolling package inputs are not
+yet reproducible release pins.
+
 Owner [backup retention and recovery](RECOVERY.md) now offer an exact snapshot
 inventory and explicit scoped retention, previewed by default. Full encrypted data
 is checked before/after actual deletion/prune, and the final inventory must match
