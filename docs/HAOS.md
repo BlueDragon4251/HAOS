@@ -10,9 +10,14 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 and private generation-aware permission journals on ext4/XFS/Btrfs. Read-only
 mount publication, safe rollback/unmount and ownership-free filesystem masks are
 integrated with the existing mount authority. Ordinary/harness checks pass; cloud
-scratch ACL/handle support is insufficient for the new full kernel probe. A guarded
-real three-filesystem runner and the matching foreign-owner QEMU image gate remain
-required; no full-volume acceptance is claimed from earlier chowned fixtures.
+scratch ACL/handle support is insufficient for the new full kernel probe. At
+`672ff3a`, both [push services](https://github.com/BlueDragon4251/HAOS/actions/runs/37960339846)
+and [PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/37960347710)
+passed, including the guarded actual ext4/XFS/Btrfs ACL disk step. [General CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37960347573)
+also passed. Results were read from the job/step API; full logs are blocked on the
+separate cloud host `productionresultssa11.blob.core.windows.net`. The follow-up
+emits source-bound per-filesystem GitHub Checks receipts. The matching foreign-owner
+QEMU image gate remains required; earlier chowned fixtures do not accept full access.
 
 The [native conversation](NATIVE-MISSIONS.md) now routes managed text and existing
 voice-transcript callers into the durable controller and opens the Hermes workspace

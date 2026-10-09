@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -23,6 +24,9 @@ def run(*args, **kwargs):
 def main():
     if os.geteuid() != 0 or os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("HAOS_DISPOSABLE_CI") != "1":
         raise PermissionError("file-backed disk probes require explicitly marked disposable GitHub CI")
+    source = os.environ.get("GITHUB_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", source):
+        raise PermissionError("ACL disk evidence requires an exact source commit")
     root = Path(tempfile.mkdtemp(prefix="haos-acl-disks-", dir="/run"))
     root.chmod(0o755)
     try:
@@ -48,7 +52,10 @@ def main():
                 mount.chmod(0o755)
                 environment = {**os.environ, "TMPDIR": str(mount), "HAOS_ACL_DISK_FIXTURE": str(mount), "PYTHONDONTWRITEBYTECODE": "1"}
                 run(sys.executable, "-m", "pytest", "-q", "-s", str(Path(__file__).with_name("test_volume_acl.py")), env=environment)
-                print(json.dumps({"filesystem": filesystem, "file_backed_disk": True, "actual_acl_probe": True}), flush=True)
+                receipt = json.dumps({"source_commit": source, "filesystem": filesystem,
+                                      "file_backed_disk": True, "actual_acl_probe": True})
+                print(receipt, flush=True)
+                print(f"::notice title=HAOS real {filesystem} ACL gate::{receipt}", flush=True)
             finally:
                 run("/usr/bin/umount", str(mount))
             image.unlink()
