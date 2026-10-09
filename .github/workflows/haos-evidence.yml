@@ -25,6 +25,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Verify evidence authenticity and privacy before publishing
+        run: |
+          python -m pip install pytest==9.0.2
+          python -m pytest -q tests/e2e/test_evidence_inspection.py
       - name: Verify archive digest and inspect bounded guest receipts
         if: github.event_name != 'workflow_dispatch' || inputs.run_id == matrix.run_id
         env:
