@@ -162,6 +162,19 @@ def test_success_records_identity_without_secret(monkeypatch, tmp_path):
     assert not any(a[0].endswith("usermod") for a, k in calls)
 
 
+def test_initial_onboarding_cannot_reopen_after_another_owner_won_the_lock(monkeypatch, tmp_path):
+    calls, rule = provisioning_fixture(monkeypatch, tmp_path)
+    e.REGISTRY.parent.mkdir()
+    e.REGISTRY.write_text('{"schema_version": 1, "owners": [{"username": "previous-owner", "uid": 1501}]}')
+    def configuration(path):
+        import json
+        return json.loads(path.read_text()) if path == e.REGISTRY else {"control_users": ["observer"]}
+    monkeypatch.setattr(e, "trusted_json", configuration)
+    with pytest.raises(PermissionError, match="already completed"):
+        e.enroll("owner", "fixture-password", initial_only=True)
+    assert calls == [] and not rule.exists()
+
+
 def test_failed_audit_rolls_back_registry_and_locks_account(monkeypatch, tmp_path):
     calls, rule = provisioning_fixture(monkeypatch, tmp_path)
     def fail(*args):

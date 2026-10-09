@@ -1,8 +1,9 @@
 [Unit]
 Description=HAOS isolated upstream Hermes core
 Requires=haos-policy.service
+Requires=haos-owner-ready.service
 BindsTo=haos-network.service
-After=haos-network.service haos-policy.service network-online.target herald-os-firstboot.service
+After=haos-network.service haos-policy.service haos-owner-ready.service network-online.target herald-os-firstboot.service
 Wants=network-online.target
 ConditionPathExists=/etc/haos/enabled
 StartLimitIntervalSec=120

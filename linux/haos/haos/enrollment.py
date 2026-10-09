@@ -114,7 +114,7 @@ def install_rule(uid, directory=SUDOERS):
         Path(name).unlink(missing_ok=True)
 
 
-def enroll(user, password):
+def enroll(user, password, *, initial_only=False):
     if os.geteuid() != 0:
         raise PermissionError("owner enrollment requires an authenticated root console")
     config = trusted_json(Path("/etc/haos/controller.json"))
@@ -138,6 +138,8 @@ def enroll(user, password):
         registry = trusted_json(REGISTRY) if REGISTRY.exists() else {"schema_version": 1, "owners": []}
         if registry.get("schema_version") != 1 or not isinstance(registry.get("owners"), list):
             raise PermissionError("invalid owner enrollment registry")
+        if initial_only and registry["owners"]:
+            raise PermissionError("initial owner onboarding has already completed")
         registry_before = registry
         created = True  # Also clean up an account left by a failed/timed-out useradd.
         run("/usr/sbin/useradd", "--create-home", "--user-group", "--shell", "/bin/bash", "--", user)
@@ -176,10 +178,10 @@ def enroll(user, password):
             os.close(fd)
 
 
-def enroll_interactive(user):
+def enroll_interactive(user, *, initial_only=False):
     if not sys.stdin.isatty() or not sys.stderr.isatty():
         raise PermissionError("owner passwords must be entered at a trusted interactive console")
     password = getpass.getpass("New owner password (at least 20 characters): ")
     if password != getpass.getpass("Repeat owner password: "):
         raise ValueError("owner passwords do not match")
-    return enroll(user, password)
+    return enroll(user, password, initial_only=initial_only)

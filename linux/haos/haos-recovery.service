@@ -1,0 +1,41 @@
+[Unit]
+Description=HAOS independent owner onboarding and recovery console on tty2
+After=systemd-user-sessions.service herald-os-firstboot.service
+Wants=herald-os-firstboot.service
+Conflicts=getty@tty2.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I /usr/lib/haos/recovery-console.py
+Restart=always
+RestartSec=5
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty2
+UtmpMode=user
+UMask=0077
+StateDirectory=haos-owner
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE
+PrivateDevices=yes
+ProtectSystem=strict
+ReadWritePaths=/etc /home /var/lib/haos-owner /run
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+TasksMax=32
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

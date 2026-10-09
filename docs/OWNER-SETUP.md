@@ -4,7 +4,11 @@ HAOS creates a locked non-administrator observer account instead of Herald's emp
 
 At `739bc62`, [CI run `37842665703`](https://github.com/BlueDragon4251/HAOS/actions/runs/37842665703) verified this against a real disposable account, first demonstrating inherited passwordless root execution and then verifying group removal, locked password, root-command and sudoedit denial. Installed-OS/session evidence is still required.
 
-Automatic observer display remains enabled. A secure lock-screen and installer/recovery bootstrap flow are still missing. No default owner password or automatic owner privilege is created. Continue to use disposable VMs.
+Automatic observer display remains enabled. The new [independent tty2 owner console](OWNER-RECOVERY.md)
+supplies initial enrollment and single-use-code recovery; autonomous execution requires a validated
+enrolled owner and recovery codes. Exact-source installed acceptance is pending. A graphical
+wizard/lock screen and recovery-media flow remain unfinished. No default owner password or
+automatic owner privilege is created. Continue to use disposable VMs.
 
 ## Separate owner console enrollment
 

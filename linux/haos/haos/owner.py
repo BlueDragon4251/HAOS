@@ -66,6 +66,8 @@ def main():
     remove.add_argument("connector")
     enroll = sub.add_parser("enroll", help="create a separate password-authenticated owner from a trusted root console")
     enroll.add_argument("username")
+    recovery = sub.add_parser("recovery-codes", help="issue ten single-use codes at an authenticated owner console")
+    recovery.add_argument("username")
     backup = sub.add_parser("backup")
     backup_sub = backup.add_subparsers(dest="backup_action", required=True)
     for action in ("init", "create", "check"):
@@ -81,13 +83,18 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "gateway":
+    if args.action == "recovery-codes":
+        from .owner_recovery import print_codes
+        print_codes(args.username)
+    elif args.action == "gateway":
         from .gateway_setup import owner_gateway
         print(json.dumps(owner_gateway(args), indent=2))
     elif args.action == "enroll":
         from .enrollment import enroll_interactive
+        from .owner_recovery import print_codes
         stopped()
         print(json.dumps(enroll_interactive(args.username), indent=2))
+        print_codes(args.username)
     elif args.action == "backup":
         from .backup import owner_backup
         print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None)), indent=2))

@@ -1,6 +1,7 @@
 [Unit]
 Description=HAOS durable mission controller
-After=haos-hermes.service
+Requires=haos-owner-ready.service
+After=haos-hermes.service haos-owner-ready.service
 Wants=haos-hermes.service
 ConditionPathExists=/etc/haos/enabled
 StartLimitIntervalSec=120

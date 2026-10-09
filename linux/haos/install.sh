@@ -17,10 +17,12 @@ Path('/usr/lib/haos/group').write_text(f'haos-agent:x:{agent.pw_gid}:\n')
 PY
 chmod 0644 /usr/lib/haos/passwd /usr/lib/haos/group
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-owner" /usr/bin/haos-owner
+install -Dm0755 "$HAOS_SOURCE/../bin/haos-recovery" /usr/bin/haos-recovery
+install -Dm0644 "$HAOS_SOURCE/../bin/haos-recovery" /usr/lib/haos/recovery-console.py
 install -d /etc/systemd/system/greetd.service.d
 cat >/etc/systemd/system/greetd.service.d/haos-observer.conf <<'UNIT'
 [Unit]
 Requires=herald-os-firstboot.service haos-observer-security.service
 After=herald-os-firstboot.service haos-observer-security.service
 UNIT
-systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-gateway.service
+systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-gateway.service haos-recovery.service

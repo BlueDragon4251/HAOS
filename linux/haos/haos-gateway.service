@@ -1,6 +1,7 @@
 [Unit]
 Description=HAOS pinned Hermes messaging adapters
-After=haos-controller.service network-online.target
+Requires=haos-owner-ready.service
+After=haos-controller.service haos-owner-ready.service network-online.target
 Wants=network-online.target haos-controller.service
 ConditionPathExists=/etc/haos/gateways.json
 ConditionPathExists=/etc/haos/gateway-credentials

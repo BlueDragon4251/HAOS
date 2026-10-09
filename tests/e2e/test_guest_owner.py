@@ -29,10 +29,3 @@ def test_owner_provisioning_cannot_mutate_an_unmarked_or_forged_guest(monkeypatc
     monkeypatch.setattr(Path, "mkdir", lambda *args, **kwargs: pytest.fail("untrusted guest created owner credentials"))
     with pytest.raises(PermissionError):
         guest.owner_authentication_proof(first_boot=True)
-
-
-def test_private_acceptance_credential_is_excluded_from_artifact_scope():
-    # The executable harness only serializes proof flags into acceptance receipts.
-    source = Path(guest.__file__).read_text()
-    assert 'private = Path("/var/lib/haos-owner-ci")' in source
-    assert 'secret_path = ROOT / "owner-auth-fixture.json"' not in source

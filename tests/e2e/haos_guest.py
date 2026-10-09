@@ -34,10 +34,10 @@ def require_disposable_guest():
         raise PermissionError("missing or untrusted disposable guest marker")
 
 
-def enroll_owner_at_console(username, password):
+def drive_owner_console(argv, exchanges):
     require_disposable_guest()
     master, slave = pty.openpty()
-    process = subprocess.Popen(["/usr/bin/haos-owner", "enroll", username], stdin=slave, stdout=slave, stderr=slave,
+    process = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave,
                                close_fds=True, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8"})
     os.close(slave)
     output, prompts = b"", 0
@@ -55,23 +55,41 @@ def enroll_owner_at_console(username, password):
                 output += block
                 if len(output) > 65536:
                     raise RuntimeError("owner enrollment console output exceeded its limit")
-                expected = b"New owner password" if prompts == 0 else b"Repeat owner password"
-                if prompts < 2 and expected in output and output.rstrip().endswith(b":"):
-                    os.write(master, password.encode() + b"\n")
+                if prompts < len(exchanges) and exchanges[prompts][0] in output and output.rstrip().endswith(b":"):
+                    os.write(master, exchanges[prompts][1].encode() + b"\n")
                     prompts += 1
             if process.poll() is not None and not ready:
                 break
-        if process.poll() is None:
+        try:
+            code = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
             process.kill()
-        code = process.wait(timeout=5)
-        if code != 0 or prompts != 2 or password.encode() in output:
-            # Never put a captured enrollment conversation/password into a diagnostic exception.
-            raise RuntimeError("installed owner console enrollment did not finish safely")
+            code = process.wait(timeout=5)
+        # Never put captured conversations or submitted credentials into a diagnostic exception.
+        if prompts != len(exchanges):
+            raise RuntimeError("installed owner console did not finish its authentication exchange")
+        for prompt, answer in exchanges:
+            if b"password" in prompt.lower() or b"code" in prompt.lower():
+                if answer.encode() in output:
+                    raise RuntimeError("installed owner console echoed a credential")
+        return code, output
     finally:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=5)
         os.close(master)
+
+
+def enroll_owner_at_console(username, password):
+    code, output = drive_owner_console(["/usr/bin/haos-owner", "enroll", username], [
+        (b"New owner password", password), (b"Repeat owner password", password)])
+    if code != 0:
+        raise RuntimeError("installed owner console enrollment failed")
+    import re
+    codes = re.findall(rb"(?m)^[A-Za-z0-9_-]{43}\r?$", output)
+    if len(codes) != 10:
+        raise RuntimeError("installed owner console did not issue ten recovery codes")
+    return codes[0].strip().decode()
 
 
 def owner_authentication_proof(*, first_boot):
@@ -85,11 +103,11 @@ def owner_authentication_proof(*, first_boot):
         assert not secret_path.exists() and not secret_path.is_symlink()
         username = "haos-owner-ci-" + secrets.token_hex(4)
         password = secrets.token_urlsafe(32) + "!Aa42"
-        enroll_owner_at_console(username, password)
+        recovery_code = enroll_owner_at_console(username, password)
         entry = pwd.getpwnam(username)
         fd = os.open(secret_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, "w") as stream:
-            json.dump({"username": username, "password": password, "uid": entry.pw_uid}, stream)
+            json.dump({"username": username, "password": password, "recovery_code": recovery_code, "uid": entry.pw_uid}, stream)
             stream.flush()
             os.fsync(stream.fileno())
     else:
@@ -101,6 +119,7 @@ def owner_authentication_proof(*, first_boot):
             raise PermissionError("untrusted owner acceptance credential")
         saved = json.loads(secret_path.read_text())
         username, password = saved["username"], saved["password"]
+        recovery_code = saved["recovery_code"]
         assert pwd.getpwnam(username).pw_uid == saved["uid"]
     prefix = ["/usr/sbin/runuser", "-u", username, "--", "/usr/bin/sudo"]
     def authentication(*args, supplied=None):
@@ -122,12 +141,28 @@ def owner_authentication_proof(*, first_boot):
     assert password not in correct.stdout and password not in correct.stderr
     assert pwd.getpwnam(username).pw_uid != pwd.getpwnam("hermes").pw_uid
     if not first_boot:
+        replacement = secrets.token_urlsafe(32) + "!Aa42"
+        code, _ = drive_owner_console(["/usr/bin/haos-recovery"], [
+            (b"Enrolled owner account", username), (b"Single-use recovery code", recovery_code),
+            (b"Action:", "reset-password"), (b"New owner password", replacement), (b"Repeat owner password", replacement)])
+        if code != 0:
+            raise RuntimeError("installed independent owner recovery failed")
+        assert authentication("-S", "-k", "/usr/bin/haos-owner", "status", supplied=password).returncode != 0
+        replacement_login = authentication("-S", "-k", "/usr/bin/haos-owner", "status", supplied=replacement)
+        if replacement_login.returncode != 0:
+            raise RuntimeError("recovered owner password was not accepted")
+        # The same code cannot perform a second recovery.
+        replay, _ = drive_owner_console(["/usr/bin/haos-recovery"], [
+            (b"Enrolled owner account", username), (b"Single-use recovery code", recovery_code)])
+        assert replay != 0
         secret_path.unlink()
         private.rmdir()
     return {"installed_owner_console_enrollment": True, "installed_owner_password_authentication": True,
             "installed_owner_wrong_password_denied": True, "installed_owner_cached_auth_denied": True,
             "installed_owner_arbitrary_root_denied": True, "installed_owner_python_override_denied": True,
-            "installed_owner_credential_absent_from_audit": True, "installed_owner_authentication_after_reboot": not first_boot}
+            "installed_owner_credential_absent_from_audit": True, "installed_owner_authentication_after_reboot": not first_boot,
+            "installed_owner_recovery_codes_issued": True, "installed_owner_password_recovery": not first_boot,
+            "installed_owner_used_recovery_code_denied": not first_boot}
 
 
 def run(*args, **kwargs):
@@ -215,6 +250,14 @@ def main():
     devices = json.loads(subprocess.check_output(["lsblk", "-J", "-o", "PATH,UUID,SERIAL"], text=True))["blockdevices"]
     assert any(d.get("uuid") == A and d.get("serial") == "HAOS-CI-DATA-A" for d in devices)
     assert any(d.get("uuid") == B and d.get("serial") == "HAOS-CI-DATA-B" for d in devices)
+    stamp = ROOT / "mission.json"
+    if not stamp.exists():
+        # Fresh production systems hold execution until the owner is enrolled.
+        run("haos-owner", "stop")
+        installed_owner_proof = owner_authentication_proof(first_boot=True)
+        run("haos-owner", "start")
+    else:
+        installed_owner_proof = owner_authentication_proof(first_boot=False)
     wait_for(lambda: active("haos-controller.service"))
     wait_for(health)
     wait_for(lambda: active("greetd.service"))
@@ -243,10 +286,8 @@ def main():
             "--clear-groups", "--no-new-privs", "python3", "-I", "-c", code, str(port)], timeout=5)
         assert result.returncode == 0, "agent reached a privileged localhost listener"
     observer_proof["installed_agent_local_network_guard"] = True
-    stamp = ROOT / "mission.json"
     if not stamp.exists():
         run("haos-owner", "stop")
-        installed_owner_proof = owner_authentication_proof(first_boot=True)
         # Only this marked guest's own new fixture is deleted. Real owner CLI,
         # fixed state scope and an installed Restic binary perform the recovery.
         project = Path("/var/lib/haos-workspace/haos-deleted-project-fixture")
@@ -307,7 +348,6 @@ def main():
         stamp.write_text(json.dumps({"mission": mission, "proof": proof}))
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 1, **proof}), flush=True)
     else:
-        installed_owner_proof = owner_authentication_proof(first_boot=False)
         from haos.store import MissionStore
         saved = json.loads(stamp.read_text())
         store = MissionStore(Path("/var/lib/haos-control/missions.db"))
