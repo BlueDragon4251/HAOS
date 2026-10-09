@@ -56,26 +56,34 @@ jobs:
       - name: Verify real owner password authentication and fixed CLI authority
         run: |
           sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 "$(command -v python)" - <<'PY'
-          import os, shutil, subprocess, sys, tempfile
+          import os, shutil, stat, subprocess, sys, tempfile
           from pathlib import Path
           assert os.geteuid() == 0
           assert os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('HAOS_DISPOSABLE_CI') == '1'
           env = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C', 'LC_ALL': 'C'}
           def command(*args):
               return subprocess.run(args, env=env, check=True, capture_output=True, text=True, timeout=30)
-          defaults = command('/usr/sbin/useradd', '--defaults').stdout.splitlines()
-          original = next(line.split('=', 1)[1] for line in defaults if line.startswith('SKEL='))
-          assert Path(original).is_absolute()
+          defaults = command('/usr/sbin/useradd', '--defaults').stdout
+          configuration = Path('/etc/default/useradd')
+          metadata = configuration.lstat()
+          assert stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and not metadata.st_mode & 0o022
+          original = configuration.read_bytes()
           skeleton = Path(tempfile.mkdtemp(prefix='haos-owner-skel-', dir='/run'))
           try:
               # Hosted /etc/skel includes ~815 MiB of unrelated toolchains. Use
               # a root-private fixture while retaining the actual enrollment CLI,
               # its deadline and every PAM/sudo assertion.
-              command('/usr/sbin/useradd', '--defaults', '--skel', str(skeleton))
+              lines = [line for line in original.decode().splitlines() if not line.lstrip().startswith('SKEL=')]
+              configuration.write_text('\n'.join(lines) + '\nSKEL=' + str(skeleton) + '\n')
+              assert 'SKEL=' + str(skeleton) in command('/usr/sbin/useradd', '--defaults').stdout.splitlines()
               result = subprocess.run([sys.executable, '-m', 'pytest', '-q', '-s',
                                        'linux/haos/probes/test_owner_enrollment.py'])
           finally:
-              command('/usr/sbin/useradd', '--defaults', '--skel', original)
-              shutil.rmtree(skeleton)
+              try:
+                  configuration.write_bytes(original)
+                  assert configuration.read_bytes() == original
+                  assert command('/usr/sbin/useradd', '--defaults').stdout == defaults
+              finally:
+                  shutil.rmtree(skeleton)
           raise SystemExit(result.returncode)
           PY
