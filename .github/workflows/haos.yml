@@ -29,11 +29,13 @@ jobs:
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools e2fsprogs xfsprogs btrfs-progs
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py --ignore=linux/haos/probes/test_systemd_sandbox.py --ignore=linux/haos/probes/test_gateway_authority.py --ignore=linux/haos/probes/test_owner_recovery.py --ignore=linux/haos/probes/test_provider_authority.py
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py --ignore=linux/haos/probes/test_systemd_sandbox.py --ignore=linux/haos/probes/test_gateway_authority.py --ignore=linux/haos/probes/test_owner_recovery.py --ignore=linux/haos/probes/test_provider_authority.py --ignore=linux/haos/probes/test_volume_acl.py
+      - name: Delegate and revoke real ACLs on isolated ext4 xfs btrfs disks
+        run: sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 "$(command -v python)" linux/haos/probes/run_volume_acl.py
       - name: Launch the isolated filesystem view under actual production systemd hardening
         run: |
           HAOS_SYSTEMD_TEST_DIR="$(sudo mktemp -d /run/haos-systemd-XXXXXXXX)"

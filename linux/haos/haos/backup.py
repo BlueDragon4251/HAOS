@@ -103,7 +103,11 @@ def owner_backup(action: str, identifier=None):
     if action == "init":
         result = repository.initialize()
     elif action == "create":
-        result = repository.create(SOURCES)
+        permissions = root / "volume-acls"
+        # The permission journal is a sibling of the repository, not its parent;
+        # include it when present without recursively backing up the backup.
+        sources = SOURCES + ([permissions] if permissions.exists() or permissions.is_symlink() else [])
+        result = repository.create(sources)
     elif action == "check":
         repository.command("check", "--read-data")
         result = {"repository_checked": True}

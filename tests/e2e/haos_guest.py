@@ -219,6 +219,16 @@ try: pathlib.Path('/etc/haos/volumes.json').write_text('{}')
 except OSError: pass
 else: raise AssertionError('agent rewrote owner policy')
 if mode == 'rw':
+    foreign = volume / 'foreign-private' / 'foreign-file'
+    assert foreign.stat().st_uid == 65533
+    assert foreign.read_text() == 'foreign owner fixture'
+    foreign.write_text('edited foreign owner fixture')
+    renamed = foreign.with_name('renamed')
+    foreign.rename(renamed)
+    renamed.unlink()
+    sticky = volume / 'sticky' / 'foreign-delete'
+    assert sticky.stat().st_uid == 65533
+    sticky.unlink()
     (volume / 'agent-result').write_text('actual write')
     (pathlib.Path('/workspace') / 'acceptance-result').write_text('actual workspace write')
 else:
@@ -230,6 +240,7 @@ assert libc.unshare(0x10000000) == -1 and ctypes.get_errno() in (errno.EPERM, er
 assert libc.mount(b'/usr', b'/workspace', None, 4096, None) == -1 and ctypes.get_errno() == errno.EPERM
 assert not pathlib.Path('/proc/1/root/home/hermes/haos-owner-canary').exists()
 print(json.dumps({'mode': mode, 'data_access': True, 'blocked_volume_hidden': True,
+                  'foreign_owner_write_rename_delete': mode == 'rw',
                   'owner_policy_immutable': True, 'raw_devices_hidden': True,
                   'mount_denied': True, 'nested_userns_denied': True}))
 '''
@@ -303,17 +314,35 @@ def main():
         assert recovered.read_bytes() == payload and recovered.stat().st_mode & 0o777 == 0o600
         assert not project.exists() and restored["live_state_replaced"] is False
         backup_proof = {"installed_owner_backup_restore": True, "restore_live_state_untouched": True}
+        # Prepare foreign-owned, restrictive fixtures BEFORE any ACL grant. Only
+        # the serial/UUID-verified disposable data disk is formatted/mounted.
+        fixture_data = ROOT / "foreign-owner-fixture"
+        fixture_data.mkdir()
+        run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{A}", str(fixture_data))
+        try:
+            fixture_data.chmod(0o700)
+            (fixture_data / "canary").write_text("approved fixture")
+            (fixture_data / "canary").chmod(0o600)
+            os.chown(fixture_data / "canary", 65533, 65533)
+            foreign = fixture_data / "foreign-private"
+            foreign.mkdir(mode=0o700)
+            (foreign / "foreign-file").write_text("foreign owner fixture")
+            (foreign / "foreign-file").chmod(0o600)
+            os.chown(foreign / "foreign-file", 65533, 65533)
+            os.chown(foreign, 65533, 65533)
+            sticky = fixture_data / "sticky"
+            sticky.mkdir(mode=0o1770)
+            sticky.chmod(0o1770)
+            (sticky / "foreign-delete").write_text("foreign delete fixture")
+            os.chown(sticky / "foreign-delete", 65533, 65533)
+            (fixture_data / "escape").symlink_to("/home/hermes/haos-owner-canary")
+        finally:
+            run("umount", str(fixture_data))
         run("haos-owner", "volume", f"UUID:{A}", "full-data-access")
         run("haos-owner", "volume", f"UUID:{B}", "blocked")
         run("haos-owner", "prepare")
         key = hashlib.sha256(f"UUID:{A}".encode()).hexdigest()
         data = Path("/run/haos-volumes") / key
-        agent = pwd.getpwnam("haos-agent")
-        # Only these disposable, serial-verified fixture files receive POSIX ownership.
-        os.chown(data, agent.pw_uid, agent.pw_gid)
-        (data / "canary").write_text("approved fixture")
-        (data / "canary").chmod(0o644)
-        (data / "escape").symlink_to("/home/hermes/haos-owner-canary")
         owner_canary = Path("/home/hermes/haos-owner-canary")
         owner_canary.write_text("owner canary")
         owner_canary.chmod(0o644)

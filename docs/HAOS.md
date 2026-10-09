@@ -6,6 +6,14 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+[Volume permission delegation](VOLUME-ACCESS.md) now uses root-broker POSIX ACLs
+and private generation-aware permission journals on ext4/XFS/Btrfs. Read-only
+mount publication, safe rollback/unmount and ownership-free filesystem masks are
+integrated with the existing mount authority. Ordinary/harness checks pass; cloud
+scratch ACL/handle support is insufficient for the new full kernel probe. A guarded
+real three-filesystem runner and the matching foreign-owner QEMU image gate remain
+required; no full-volume acceptance is claimed from earlier chowned fixtures.
+
 The [native conversation](NATIVE-MISSIONS.md) now routes managed text and existing
 voice-transcript callers into the durable controller and opens the Hermes workspace
 at startup. Lost replies retain opaque request metadata; reload performs peer-scoped
