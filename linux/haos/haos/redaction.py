@@ -9,7 +9,7 @@ _SENSITIVE = re.compile(
     r"(?:password|passwd|secret|(?:^|[_-])token(?:$|[_-])|api[_-]?key|authorization|cookie|private[_-]?key|credential)", re.I)
 _KEY = re.compile(
     r"\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|"
-    r"github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16})\b")
+    r"github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|[0-9]{6,12}:[A-Za-z0-9_-]{25,})\b")
 _BEARER = re.compile(r"(?i)\b(Bearer\s+|Basic\s+)[A-Za-z0-9+/_.=:-]+")
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 _ASSIGNMENT = re.compile(

@@ -23,4 +23,4 @@ cat >/etc/systemd/system/greetd.service.d/haos-observer.conf <<'UNIT'
 Requires=herald-os-firstboot.service haos-observer-security.service
 After=herald-os-firstboot.service haos-observer-security.service
 UNIT
-systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service
+systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-gateway.service

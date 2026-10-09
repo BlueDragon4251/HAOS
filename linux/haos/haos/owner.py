@@ -44,6 +44,26 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    gateway = sub.add_parser("gateway", help="owner-authenticated transport credentials and exact sender pairing")
+    gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
+    for action in ("status", "start", "stop"):
+        gateway_sub.add_parser(action)
+    setup = gateway_sub.add_parser("setup")
+    setup.add_argument("connector")
+    setup.add_argument("platform", choices=["telegram", "discord"])
+    pair = gateway_sub.add_parser("pair")
+    pair.add_argument("binding")
+    pair.add_argument("connector")
+    pair.add_argument("sender")
+    pair.add_argument("chat")
+    pair.add_argument("--identity", required=True)
+    pair.add_argument("--scope", default="")
+    pair.add_argument("--thread", default="")
+    pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer"], default=["create", "read", "cancel", "answer"])
+    revoke = gateway_sub.add_parser("revoke")
+    revoke.add_argument("binding")
+    remove = gateway_sub.add_parser("remove")
+    remove.add_argument("connector")
     enroll = sub.add_parser("enroll", help="create a separate password-authenticated owner from a trusted root console")
     enroll.add_argument("username")
     backup = sub.add_parser("backup")
@@ -61,7 +81,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "enroll":
+    if args.action == "gateway":
+        from .gateway_setup import owner_gateway
+        print(json.dumps(owner_gateway(args), indent=2))
+    elif args.action == "enroll":
         from .enrollment import enroll_interactive
         stopped()
         print(json.dumps(enroll_interactive(args.username), indent=2))
@@ -79,7 +102,11 @@ def main():
     elif args.action in {"stop", "start"}:
         verb = args.action
         units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]
+        if verb == "stop":
+            subprocess.run(["/usr/bin/systemctl", "stop", "haos-gateway.service"], check=True)
         subprocess.run(["/usr/bin/systemctl", verb, *units], check=True)
+        if verb == "start":
+            subprocess.run(["/usr/bin/systemctl", "start", "haos-gateway.service"], check=True)
         audit(f"runtime.{verb}", {})
     elif args.action == "volume":
         stopped()

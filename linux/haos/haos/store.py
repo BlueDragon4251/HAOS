@@ -22,6 +22,7 @@ class Conflict(ValueError):
 class MissionStore:
     def __init__(self, path: Path, *, redactor: Redactor | None = None):
         self.redactor = redactor or Redactor()
+        self._savepoint = 0
         self.db = sqlite3.connect(path, isolation_level=None, timeout=10)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
@@ -57,12 +58,17 @@ class MissionStore:
 
     @contextmanager
     def transaction(self):
-        self.db.execute("BEGIN IMMEDIATE")
+        nested = self.db.in_transaction
+        self._savepoint += 1
+        name = f"haos_{self._savepoint}"
+        self.db.execute(f"SAVEPOINT {name}" if nested else "BEGIN IMMEDIATE")
         try:
             yield
-            self.db.execute("COMMIT")
+            self.db.execute(f"RELEASE {name}" if nested else "COMMIT")
         except BaseException:
-            self.db.execute("ROLLBACK")
+            self.db.execute(f"ROLLBACK TO {name}" if nested else "ROLLBACK")
+            if nested:
+                self.db.execute(f"RELEASE {name}")
             raise
 
     def close(self):

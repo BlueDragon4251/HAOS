@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import fcntl
+import grp
 import json
 import os
 import pwd
@@ -15,6 +16,8 @@ from pathlib import Path
 
 from .hermes import HermesConnection, mission_prompt, outcome, websocket_url
 from .store import ACTIVE, Conflict, MissionStore
+from .gateway import GatewayEngine, GatewayPolicy
+from .sandbox import trusted_json
 
 MAX_FRAME = 131072
 
@@ -34,6 +37,22 @@ class Controller:
         self.questions: dict[str, dict] = {}
         self.finished = asyncio.Event()
         self.stop = asyncio.Event()
+        self.gateway = GatewayEngine(store)
+        self.gateway_uids: set[int] = set()
+        self.gateway_policy = lambda: GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+
+    async def gateway_dispatch(self, request: dict):
+        policy = self.gateway_policy()
+        params = request.get("params", {})
+        if not isinstance(params, dict):
+            raise ValueError("params must be an object")
+        if request.get("method") == "gateway.receive":
+            return await self.gateway.receive(policy, params["connector"], params["envelope"], self)
+        if request.get("method") == "gateway.next":
+            return self.gateway.next_delivery(policy)
+        if request.get("method") == "gateway.ack":
+            return self.gateway.acknowledge(policy, params["id"], params["result"])
+        raise PermissionError("gateway method denied")
 
     async def event(self, event: dict, epoch: str | None):
         if not self.current or event.get("session_id") != self.store.get(self.current)["session_id"]:
@@ -110,21 +129,21 @@ class Controller:
             return {"accepted": True}
         raise ValueError("unknown control method")
 
-    async def client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, *, gateway=False):
         actor = "unverified"
         try:
-            actor = peer_actor(writer.get_extra_info("socket"), self.allowed_uids)
+            actor = peer_actor(writer.get_extra_info("socket"), self.gateway_uids if gateway else self.allowed_uids)
             line = await asyncio.wait_for(reader.readline(), 10)
             if len(line) > MAX_FRAME or not line.endswith(b"\n"):
                 raise ValueError("invalid control frame")
             request = json.loads(line)
             if not isinstance(request, dict):
                 raise ValueError("request must be an object")
-            result = await self.dispatch(actor, request)
+            result = await self.gateway_dispatch(request) if gateway else await self.dispatch(actor, request)
             reply = {"ok": True, "result": result}
         except (ValueError, KeyError, PermissionError, Conflict, TimeoutError) as exc:
             print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
-            reply = {"ok": False, "error": str(exc)}
+            reply = {"ok": False, "error": self.store.redactor.text(str(exc))}
         except Exception:
             # Exceptions can embed request text, URLs and credentials; journal only their type.
             print(json.dumps({"event": "control.error", "actor": actor}), flush=True)
@@ -205,6 +224,7 @@ async def serve():
     from .redaction import Redactor
     store = MissionStore(Path("/var/lib/haos-control/missions.db"), redactor=Redactor([token]))
     controller = Controller(store, websocket_url(config["backend_url"], token), uids)
+    controller.gateway_uids = {pwd.getpwnam("haos-gateway").pw_uid}
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, controller.stop.set)
@@ -212,12 +232,24 @@ async def serve():
     path.unlink(missing_ok=True)
     server = await asyncio.start_unix_server(controller.client, path=path, limit=MAX_FRAME)
     os.chmod(path, 0o660)
+    gateway_dir = Path("/run/haos-gateway-control")
+    gateway_gid = grp.getgrnam("haos-gateway").gr_gid
+    os.chown(gateway_dir, -1, gateway_gid)
+    gateway_path = gateway_dir / "gateway.sock"
+    gateway_path.unlink(missing_ok=True)
+    async def gateway_client(reader, writer):
+        await controller.client(reader, writer, gateway=True)
+    gateway_server = await asyncio.start_unix_server(gateway_client, path=gateway_path, limit=MAX_FRAME)
+    os.chown(gateway_path, -1, gateway_gid)
+    os.chmod(gateway_path, 0o660)
     try:
-        async with server:
+        async with server, gateway_server:
             await controller.worker()
     finally:
         server.close()
         await server.wait_closed()
+        gateway_server.close()
+        await gateway_server.wait_closed()
         store.close()
         lock.close()
 

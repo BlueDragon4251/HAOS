@@ -6,6 +6,21 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+Ongoing development after `b809009` preserves the installed foundation. Credential-redaction
+commit `52c1c3c` passed [services](https://github.com/BlueDragon4251/HAOS/actions/runs/37943091005),
+[general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/37943090859) and
+[Arch packaging](https://github.com/BlueDragon4251/HAOS/actions/runs/37943090895). Its separate
+new image/guest gate is not inferred from those results.
+
+The next gateway change supplies root-owned Telegram/Discord pairing and credential setup,
+a separate transport UID/kernel-peer ingress, atomic replay-safe mission admission and durable
+transport inbox/result outbox. Local evidence: **144 ordinary service tests**, **one real Unix
+transport test**, **seven root-authority fixture tests** in an offline container, plus construction
+and interface checks of both real pinned upstream adapters with 80 hash-verified dependencies.
+No external gateway, model turn or new installed service result is claimed. Required first live
+credentials are OpenAI Codex and Telegram, confirmed unavailable by the owner. Physical hardware
+is also unavailable. See [gateway setup and limits](GATEWAY-MISSIONS.md); full product gates stay open.
+
 At branch `2cebd11`, public GitHub runners passed both service runs, general CI and Arch packaging. Service checks include **119 ordinary HAOS tests, seven root backup cases, 22 QEMU/diagnostics regressions, four actual policy-access probes and nine further integration probes**. The real nftables, owner PAM/sudo and new production-hardening systemd sandbox boundaries passed. See the immutable runs in the final evidence section below.
 
 The rebuilt `2cebd11` ISO passed actual runner byte verification, installed through UEFI and completed both real multi-disk/reboot guest receipts. The verified artifact proves isolated Hermes health, native UI process presence, observer and localhost network denial, fixture RW/RO/blocked-volume boundaries, local staged backup recovery, UI restart without backend PID change and cancelled offline queue/event persistence across reboot. DNS and procfs startup corrections are proven in the installed guest. This is the bounded foundation acceptance, not production release, graphical owner onboarding, general ACL access or a real provider/gateway mission.
