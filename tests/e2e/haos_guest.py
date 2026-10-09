@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pwd
+import socket
 import subprocess
 import sys
 import time
@@ -112,6 +113,7 @@ def main():
     wait_for(health)
     wait_for(lambda: active("greetd.service"))
     wait_for(lambda: active("haos-observer-security.service"))
+    wait_for(lambda: active("haos-network.service"))
     wait_for(lambda: subprocess.run(["pgrep", "-u", "hermes", "-f", "/usr/share/herald-os/app/"], capture_output=True).returncode == 0)
     observer = pwd.getpwnam("hermes")
     administrator_gids = {g.gr_gid for g in grp.getgrall() if g.gr_name in {"wheel", "sudo", "admin"}}
@@ -121,6 +123,20 @@ def main():
     assert denied.returncode != 0 and denied.stdout.strip() != "0"
     observer_proof = {"observer_sudo_denied": True, "observer_administrator_groups_absent": True,
                       "observer_empty_password_denied": True}
+    agent = pwd.getpwnam("haos-agent")
+    # A real owner-side listener is reachable by root but denied to the service
+    # UID. Only fresh sockets and a marked guest are used; no host rule is changed.
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(4)
+        port = listener.getsockname()[1]
+        with socket.create_connection(("127.0.0.1", port), timeout=2):
+            pass
+        code = "import socket,sys;\ntry:\n socket.create_connection(('127.0.0.1',int(sys.argv[1])),timeout=2)\nexcept OSError:\n sys.exit(0)\nsys.exit(1)"
+        result = subprocess.run(["setpriv", f"--reuid={agent.pw_uid}", f"--regid={agent.pw_gid}",
+            "--clear-groups", "--no-new-privs", "python3", "-I", "-c", code, str(port)], timeout=5)
+        assert result.returncode == 0, "agent reached a privileged localhost listener"
+    observer_proof["installed_agent_local_network_guard"] = True
     stamp = ROOT / "mission.json"
     if not stamp.exists():
         run("haos-owner", "stop")

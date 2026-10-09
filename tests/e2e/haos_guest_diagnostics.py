@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path("/var/lib/haos-acceptance")
-UNITS = ("herald-os-firstboot.service", "haos-policy.service", "haos-hermes.service",
+UNITS = ("herald-os-firstboot.service", "haos-network.service", "haos-policy.service", "haos-hermes.service",
          "haos-controller.service", "haos-observer-security.service", "greetd.service")
 
 
