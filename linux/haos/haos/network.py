@@ -16,11 +16,19 @@ def read_resolvers() -> list[str]:
     link = Path("/etc/resolv.conf")
     if not link.exists():
         return []  # An offline machine can still run its local backend.
-    path = link.resolve(strict=True)
-    for candidate in (link, path, *link.parents, *path.parents):
+    # Root controls the system link and its ancestry. systemd-resolved owns its
+    # runtime stub file; never derive firewall exceptions from that file's data.
+    for candidate in (link, *link.parents):
         metadata = candidate.lstat()
         if metadata.st_uid != 0 or (not stat.S_ISLNK(metadata.st_mode) and metadata.st_mode & 0o022):
-            raise PermissionError("untrusted system DNS configuration")
+            raise PermissionError(f"untrusted system DNS configuration: {candidate}")
+    path = link.resolve(strict=True)
+    if stat.S_ISLNK(link.lstat().st_mode) and str(path) == "/run/systemd/resolve/stub-resolv.conf":
+        return ["127.0.0.53"]
+    for candidate in (path, *path.parents):
+        metadata = candidate.lstat()
+        if metadata.st_uid != 0 or (not stat.S_ISLNK(metadata.st_mode) and metadata.st_mode & 0o022):
+            raise PermissionError(f"untrusted system DNS configuration: {candidate}")
     servers = []
     for line in path.read_text().splitlines():
         fields = line.split("#", 1)[0].split()

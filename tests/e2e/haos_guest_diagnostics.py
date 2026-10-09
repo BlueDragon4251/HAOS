@@ -22,7 +22,8 @@ def require_disposable_guest():
 
 def collect():
     # Fixed commands only. Never dump process environments, credentials or config.
-    commands = [("unit states", ["systemctl", "show", *UNITS,
+    commands = [("resolver path metadata", ["namei", "--long", "/etc/resolv.conf"]),
+        ("unit states", ["systemctl", "show", *UNITS,
         "--property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ConditionResult"]),
         ("service journal", ["journalctl", "--boot", "--no-pager", "--output=short-monotonic", "--lines=120",
                              *[argument for unit in UNITS for argument in ("--unit", unit)]])]
