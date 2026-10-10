@@ -9,7 +9,7 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 The [mission-scoped GUI broker](GUI-CAPABILITIES.md) now creates real native local
 browser windows for the active Hermes mission, with separate kernel-authenticated
 agent ingress, targeted renderer input/capture and durable no-replay receipts.
-Local verification: **307 ordinary HAOS tests**, **three real Unix probes**,
+Local verification: **321 ordinary HAOS tests**, **three real Unix probes**,
 **773 native tests**, TypeScript and production build pass. Actual Chromium
 checks fill two fields, read their actual DOM values, mask password/file fields,
 capture changed pixels and verify both renderer sandbox states plus
@@ -24,6 +24,17 @@ installed niri or hardware claim. General CI, services and Arch packaging passed
 at `9815847` and `71cc361`; their new installer runs remain pending. Installed
 Wayland/model-driven acceptance remains required. Arbitrary host apps, online
 browsing and complete GUI autonomy are still open.
+
+Owner-configured encrypted local daily/weekly scheduling now reuses Restic and
+retention, defers active execution and durably blocks uncertain modifying attempts.
+**28 root-authority/real Restic tests** pass in a disposable offline container,
+including seven new scheduler cases and existing corrupt-data/staged restore gates.
+The real PAM/sudo owner probe passes after selecting a disposable password through
+the unchanged production quality check. A prior PR run rejected a random fixture
+password; this is retained as failed evidence. The installed QEMU gate now requires
+the actual scheduled service/snapshot restore; matching new receipts are pending.
+Always-running execution defers scheduling until owner maintenance; live coherent
+snapshots and complete system recovery remain open.
 
 Three newer installed-image runs are now verified against their exact source,
 GitHub archive digest and matching actual serial/saved receipts:

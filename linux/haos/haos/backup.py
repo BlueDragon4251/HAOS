@@ -14,6 +14,12 @@ SOURCES = [Path(p) for p in ("/var/lib/haos-workspace", "/var/lib/haos-agent",
                            "/var/lib/haos-control", "/etc/haos")]
 
 
+def owner_sources():
+    permissions = Path("/var/lib/haos-owner/volume-acls")
+    # Include the journal, never its parent containing the backup itself.
+    return SOURCES + ([permissions] if permissions.exists() or permissions.is_symlink() else [])
+
+
 @dataclass(frozen=True)
 class Retention:
     keep_last: int = 7
@@ -175,11 +181,7 @@ def owner_backup(action: str, identifier=None, *, retention=None, apply=False):
     if action == "init":
         result = repository.initialize()
     elif action == "create":
-        permissions = root / "volume-acls"
-        # The permission journal is a sibling of the repository, not its parent;
-        # include it when present without recursively backing up the backup.
-        sources = SOURCES + ([permissions] if permissions.exists() or permissions.is_symlink() else [])
-        result = repository.create(sources)
+        result = repository.create(owner_sources())
     elif action == "check":
         repository.command("check", "--read-data")
         result = {"repository_checked": True}

@@ -101,6 +101,17 @@ def main():
     retention.add_argument("--keep-weekly", type=int, default=4)
     retention.add_argument("--keep-monthly", type=int, default=12)
     retention.add_argument("--apply", action="store_true")
+    schedule = backup_sub.add_parser("schedule", help="configure local scheduling; running missions defer the backup")
+    schedule.add_argument("interval", choices=["off", "daily", "weekly"])
+    schedule.add_argument("--prune", action="store_true", help="explicitly authorize applying scoped retention")
+    schedule.add_argument("--keep-last", type=int, default=7)
+    schedule.add_argument("--keep-daily", type=int, default=7)
+    schedule.add_argument("--keep-weekly", type=int, default=4)
+    schedule.add_argument("--keep-monthly", type=int, default=12)
+    backup_sub.add_parser("schedule-status")
+    clear = backup_sub.add_parser("schedule-clear", help="clear an interrupted attempt after owner inspection, without deleting snapshots")
+    clear.add_argument("--note", required=True)
+    clear.add_argument("--confirm-inspected", action="store_true")
     grant = sub.add_parser("volume")
     grant.add_argument("id", help="UUID:<filesystem UUID> or PARTUUID:<partition UUID>")
     grant.add_argument("mode", choices=["blocked", "read-only", "full-data-access", "system-managed"])
@@ -126,6 +137,22 @@ def main():
         print(json.dumps(enroll_interactive(args.username), indent=2))
         print_codes(args.username)
     elif args.action == "backup":
+        if args.backup_action in {"schedule", "schedule-status", "schedule-clear"}:
+            from .backup_schedule import installed_scheduler
+            scheduler = installed_scheduler()
+            if args.backup_action == "schedule":
+                value = {"version": 1, "interval": args.interval, "prune": args.prune, "retention": {
+                    "keep_last": args.keep_last, "keep_daily": args.keep_daily,
+                    "keep_weekly": args.keep_weekly, "keep_monthly": args.keep_monthly}}
+                result = scheduler.configure(value)
+                subprocess.run(["/usr/bin/systemctl", "disable" if args.interval == "off" else "enable", "--now",
+                                "haos-backup-schedule.timer"], check=True)
+            elif args.backup_action == "schedule-clear":
+                result = scheduler.clear(args.note, args.confirm_inspected)
+            else:
+                result = scheduler.status()
+            print(json.dumps(result, indent=2))
+            return
         from .backup import Retention, owner_backup
         retention = (Retention(args.keep_last, args.keep_daily, args.keep_weekly, args.keep_monthly)
                      if args.backup_action == "retention" else None)

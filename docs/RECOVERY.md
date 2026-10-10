@@ -35,7 +35,7 @@ sudo haos-owner backup snapshots
 sudo haos-owner backup restore FULL_64_CHARACTER_SNAPSHOT_ID
 ```
 
-Initialization generates a unique key in `/etc/haos/backup-password`, never the process arguments or audit log. Key loading rejects symlinks, hardlinks and non-private ownership/modes. Preserve that key independently through an authenticated owner workflow; loss of the key cannot be repaired by generating another password. A local repository on the OS disk does not protect against failure/loss of that disk. External/off-host destinations and scheduled snapshots remain unfinished.
+Initialization generates a unique key in `/etc/haos/backup-password`, never the process arguments or audit log. Key loading rejects symlinks, hardlinks and non-private ownership/modes. Preserve that key independently through an authenticated owner workflow; loss of the key cannot be repaired by generating another password. A local repository on the OS disk does not protect against failure/loss of that disk. External/off-host destinations remain unfinished.
 
 Restore checks repository data and verifies the recovered files in a newly created directory below `/var/lib/haos-owner/backup/restores`. It leaves live state untouched; inspect and explicitly apply selected recovered files from the owner console. Interrupted restores retain an incomplete marker and never produce a success receipt. Partial backup exit codes also fail. Snapshot inventory returns exact identifiers, without exposing Restic's file names or host/user metadata.
 
@@ -59,8 +59,8 @@ prune and the final data check run separately; Restic's prune progress is not
 mistaken for a JSON receipt. A final actual inventory must agree with retained and
 removed identifiers. Responses/audit include identifiers and flags, never raw
 Restic output, file names or credentials. A failure during application is audited
-as possibly modified; inspect the inventory before retrying. There is no automatic
-timer or remote destination yet. Current receipt compatibility was exercised with
+as possibly modified; inspect the inventory before retrying. Scheduled retention
+also requires an explicit owner grant; remote destinations remain open. Current receipt compatibility was exercised with
 Restic 0.18.0; the older deleted-project probe passed with 0.16.4. Restic 0.14's
 short backup receipt is rejected rather than accepted as an exact snapshot ID.
 
@@ -76,5 +76,56 @@ theme/plugin homes, provider/gateway private state and full owner identity recov
 still need complete snapshot/restore integration.
 
 The CI probe uses an actual disposable Restic repository, deletes only its own fixture project, restores it, verifies bytes and permissions, checks a neighboring canary and rejects the wrong key. This passed with Restic 0.16.4 at `88425fb` in [run `37839452538`](https://github.com/BlueDragon4251/HAOS/actions/runs/37839452538). A green runner probe is distinct from installed-OS and whole-system recovery. Bootc rollback remains inherited architecture without a passed broken-update drill.
+
+## Owner-configured scheduling
+
+The immutable `haos-backup-schedule.service` reuses the same fixed local Restic
+repository, source scope, key validation, integrity checks and retention. Its timer
+is installed disabled. Configure it only through the independent owner flow:
+
+```sh
+sudo haos-owner stop
+sudo haos-owner backup init
+sudo haos-owner backup schedule daily
+sudo haos-owner backup schedule-status
+sudo systemctl start haos-backup-schedule.service
+sudo haos-owner start
+```
+
+`weekly` is also supported; `schedule off` disables the timer. The timer checks
+every 15 minutes after boot with bounded jitter; the durable last-success time
+decides whether a snapshot is due. Clock rollback does not cause duplicate work.
+Both execution units must be fully stopped. Busy/activating/deactivating execution
+defers the snapshot without stopping a mission. **An always-running system will
+defer until an owner maintenance stop**; consistent automatic live snapshots are
+still open. The oneshot orders before concurrent controller/Hermes starts.
+
+Retention previews by default. Add `--prune` and bounded `--keep-last`,
+`--keep-daily`, `--keep-weekly`, `--keep-monthly` counts when configuring the
+schedule to expressly authorize future scoped deletion. At least one latest
+snapshot per scope is always retained. No agent/gateway can enable the timer,
+change destinations, initialize credentials or authorize retention.
+
+A private nonblocking lock prevents concurrent scheduler/configuration work.
+Modifying intent is fsynced before backup/prune. Lost receipts, process death or
+modifying failures block automatic retries, including after reconfiguration.
+Inspect encrypted snapshot inventory/data from the owner console, then explicitly
+clear the attempt while execution is stopped:
+
+```sh
+sudo haos-owner backup schedule-clear --note 'Inspection evidence without secrets' --confirm-inspected
+```
+
+This records a digest of the note and never deletes a snapshot or claims completion.
+Missing keys/media and failed read-only integrity checks report unavailable. Logs
+contain fixed phase/reason/identifier receipts, with no Restic output or key values.
+The root oneshot has read-only sources, no network, private devices, a bounded
+process group, memory/CPU limits and a six-hour deadline.
+
+Actual Restic tests cover encrypted scheduling/restore, durable due state, explicit
+prune versus preview, runtime deferral, missing key, configuration/lock attacks,
+concurrency and lost modifying receipts. The installed QEMU gate now requires the
+actual timer/job and restoration of its snapshot; matching run receipts remain
+required before claiming installed scheduling. No full OS recovery is implied.
 
 Contracts follow [Restic backup/scripting](https://restic.readthedocs.io/en/stable/075_scripting.html) and [restore](https://restic.readthedocs.io/en/stable/050_restore.html) documentation.

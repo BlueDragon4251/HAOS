@@ -6,6 +6,8 @@ install -d /usr/lib/haos /usr/lib/systemd/system /usr/lib/sysusers.d /etc/haos
 cp -R "$HAOS_SOURCE/haos" /usr/lib/haos/
 install -m 0644 "$HAOS_SOURCE"/*.service /usr/lib/systemd/system/
 install -m 0644 "$HAOS_SOURCE"/*.socket /usr/lib/systemd/system/
+install -m 0644 "$HAOS_SOURCE"/*.timer /usr/lib/systemd/system/
+install -m 0644 "$HAOS_SOURCE/runtime/backup-schedule-entry.py" /usr/lib/haos/backup-schedule-entry.py
 install -m 0644 "$HAOS_SOURCE/haos.sysusers" /usr/lib/sysusers.d/haos.conf
 systemd-sysusers /usr/lib/sysusers.d/haos.conf
 python3 - <<'PY'

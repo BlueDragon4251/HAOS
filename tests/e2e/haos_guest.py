@@ -395,6 +395,25 @@ def main():
         assert recovered.read_bytes() == payload and recovered.stat().st_mode & 0o777 == 0o600
         assert not project.exists() and restored["live_state_replaced"] is False
         backup_proof = {"installed_owner_backup_restore": True, "restore_live_state_untouched": True}
+        # Actual installed timer/job, production hardening and encrypted snapshot.
+        # Recreate only our disposable project; disable scheduling before reboot.
+        project.write_bytes(payload)
+        project.chmod(0o600)
+        try:
+            run("haos-owner", "backup", "schedule", "daily", capture_output=True)
+            assert run("systemctl", "is-enabled", "haos-backup-schedule.timer", capture_output=True).stdout.strip() == "enabled"
+            run("systemctl", "start", "haos-backup-schedule.service")
+            scheduled = json.loads(run("haos-owner", "backup", "schedule-status", capture_output=True).stdout)
+            assert scheduled["phase"] == "idle" and scheduled["last_success"] is not None and scheduled["due"] is False
+            staged = json.loads(run("haos-owner", "backup", "restore", scheduled["snapshot_id"], capture_output=True).stdout)
+            recovered_schedule = Path(staged["staging_directory"]) / project.relative_to("/")
+            assert recovered_schedule.read_bytes() == payload and staged["live_state_replaced"] is False
+            backup_proof.update(installed_encrypted_scheduler=True, installed_scheduled_snapshot_restored=True,
+                                installed_schedule_retention_preview=True)
+        finally:
+            run("haos-owner", "backup", "schedule", "off", capture_output=True)
+            project.unlink(missing_ok=True)
+        assert subprocess.run(("systemctl", "is-enabled", "haos-backup-schedule.timer"), capture_output=True).returncode != 0
         # Prepare foreign-owned, restrictive fixtures BEFORE any ACL grant. Only
         # the serial/UUID-verified disposable data disk is formatted/mounted.
         fixture_data = ROOT / "foreign-owner-fixture"
