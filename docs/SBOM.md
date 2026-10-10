@@ -110,6 +110,19 @@ This is real full-image inventory evidence, while the matching corrected CI,
 ISO and installed acceptance remain separate required gates. No installed guest
 success is attributed to the failed `41e58d3` workflow.
 
+The corrected `e12a55d6d74c07d8f430947aad541efdf1371645` image now has a
+successful actual [build job](https://github.com/BlueDragon4251/HAOS/actions/runs/38024496453/job/114132325410),
+including scanner/verifier and UEFI ISO construction. Its 200,184-byte metadata
+archive was independently downloaded and checked against GitHub's SHA-256;
+the fixed source/image/scanner/index/UI receipts passed the bounded inspector.
+The permanent [build receipt](evidence/haos-e12a55d-build-inventory.json) retains
+80 installed/frozen Python versions, 1,210 RPM identities and 188 npm build
+packages, document hashes/sizes and the actual offline scanner exit-zero/non-OOM
+receipt without publishing image configuration or credentials. Full catalogs
+remain in the separate image SBOM artifact. Installation and both guest boots
+were still running when inspected; this successful build receipt does not accept
+those guests, a real model turn or the complete release.
+
 Catalogs and inventories improve release evidence; they do not prove exhaustive
 identification of every vendored/embedded C/C++/Rust/Go/WASM component or complete
 license/vulnerability review. The npm build graph and image catalog are distinct
