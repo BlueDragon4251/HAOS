@@ -4,7 +4,7 @@ Herald's complete history was imported into the independent `BlueDragon4251/HAOS
 
 The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery target, not implemented-feature claims.
 
-## Current acceptance status (2026-10-09)
+## Current acceptance status (2026-10-10)
 
 The [mission-scoped GUI broker](GUI-CAPABILITIES.md) now creates real native local
 browser windows for the active Hermes mission, with separate kernel-authenticated
@@ -15,8 +15,14 @@ checks fill two fields, read their actual DOM values, mask password/file fields,
 capture changed pixels and verify both renderer sandbox states plus
 network/chooser/clipboard/foreign-window denials. The pinned Hermes
 registry exposes the real tool through its terminal/deferred catalog. These are
-component receipts from the working change; matching CI/source and installed
-Wayland/model-driven acceptance remain required. Arbitrary host apps, online
+component receipts. The actual native/controller Unix pipeline also passes input,
+capture, denied methods, lost acknowledgement and controller process restart;
+the interrupted fixture mission is blocked without replay. A real private Weston
+14.0.2 virtual Wayland session passes both gates and records actual mission
+toplevel/surface protocol. It uses an explicit providerless fixture, with no
+installed niri or hardware claim. General CI, services and Arch packaging passed
+at `9815847` and `71cc361`; their new installer runs remain pending. Installed
+Wayland/model-driven acceptance remains required. Arbitrary host apps, online
 browsing and complete GUI autonomy are still open.
 
 Three newer installed-image runs are now verified against their exact source,
@@ -299,7 +305,11 @@ a real isolated two-commit Git repository; a new runner result remains required.
 | Native UI | Managed attachment, real mission/event list, cancellation requests, once/deny approvals and clarification |
 | Image/VM gates | `haos-image.yml`, `test-haos-iso.sh`, `haos_guest.py`; real ISO build and guarded disposable multi-disk acceptance harness |
 
-Native host-command GUI bridge access is not exposed to the isolated agent. A safe GUI broker remains missing. Managed local conversation and paired Telegram/Discord messages enter durable HAOS missions; real provider/gateway acceptance and additional channels remain open.
+Native host-command GUI bridge access is not exposed to the isolated agent. The
+bounded local browser capability now has real input/capture/inspection and durable
+no-replay receipts; general host GUI control remains incomplete. Managed local
+conversation and paired Telegram/Discord messages enter durable HAOS missions;
+real provider/gateway acceptance and additional channels remain open.
 
 ## Recorded evidence
 

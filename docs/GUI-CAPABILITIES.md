@@ -62,6 +62,25 @@ chooser, clipboard, foreign-window/mission and malformed capability attacks.
 CI retains only its source-bound receipt and disposable screenshot. This is a
 providerless component test, not a real model turn or installed niri acceptance.
 
+`npm run test:gui-integration --workspace @herald-os/desktop` connects the actual
+production native broker to real private Unix controller sockets and the durable
+mission database. It drives input/inspection/capture, denies forged sessions and
+general control methods, loses one acknowledgement deliberately, refuses replay
+and restarts the real controller process. The mission becomes blocked and its
+audit survives. Its offline session and same-UID fixture are explicit; installed
+agent/observer UID separation is covered separately by the kernel probes.
+
+`HAOS_DISPOSABLE_SCREEN_TEST=1 npm run test:gui-wayland --workspace @herald-os/desktop`
+requires an installed Weston and starts a private non-root virtual headless
+Wayland compositor with a software renderer. Both real browser and socket gates
+run as actual Wayland clients. The receipt checks actual mission `xdg_toplevel`
+titles and surface commits, the compositor staying alive and all adversarial
+checks. CI retains only bounded JSON and a disposable form screenshot, excluding
+protocol logs, profiles, database and any host screen. Processes run in private
+groups and are stopped on success, failure and timeout. This supports monitorless
+component testing; it does not install a remote service or prove the installed
+niri session, physical display, model turn or remote viewer.
+
 The full GUI requirement remains **incomplete**: arbitrary host applications,
 online/scripted browsing, compositor/workspace control, complete per-process
 budgets, GUI owner setup and remote streaming need additional capabilities.

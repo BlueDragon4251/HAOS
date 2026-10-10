@@ -175,6 +175,7 @@ export class NativeGuiBroker {
   private stopped = true
   private browser = new MissionBrowser()
   private epoch = randomUUID()
+  constructor(private transport: typeof nativeGuiRequest = nativeGuiRequest) {}
   start(): void {
     if (!managedMissions() || !this.stopped) return
     this.stopped = false
@@ -186,10 +187,10 @@ export class NativeGuiBroker {
     while (!this.stopped) {
       try {
         if (!attached) {
-          await nativeGuiRequest('gui.attach', { epoch: this.epoch })
+          await this.transport('gui.attach', { epoch: this.epoch })
           attached = true
         }
-        const poll = await nativeGuiRequest('gui.poll', { epoch: this.epoch }) as GuiPoll
+        const poll = await this.transport('gui.poll', { epoch: this.epoch }) as GuiPoll
         if (this.stopped) break
         this.browser.retain(poll.mission)
         if (poll.request) {
@@ -204,7 +205,7 @@ export class NativeGuiBroker {
           finally { if (timer) clearTimeout(timer) }
           // Lost acknowledgements are not retried as executions; the durable action
           // remains uncertain and the agent must inspect it using its original UUID.
-          await nativeGuiRequest('gui.ack', { epoch: this.epoch, id: poll.request.id, ok, result })
+          await this.transport('gui.ack', { epoch: this.epoch, id: poll.request.id, ok, result })
         }
       } catch {
         this.browser.retain(null)
