@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path("/var/lib/haos-acceptance")
 UNITS = ("herald-os-firstboot.service", "haos-network.service", "haos-policy.service", "haos-hermes.service",
-         "haos-controller.service", "haos-observer-security.service", "greetd.service")
+         "haos-controller.service", "haos-observer-security.service", "greetd.service", "haos-acceptance.service")
 
 
 def require_disposable_guest():

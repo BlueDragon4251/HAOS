@@ -25,6 +25,21 @@ ROOT = Path("/var/lib/haos-acceptance")
 A = "42514251-0000-4000-8000-000000000001"
 B = "42514251-0000-4000-8000-000000000002"
 C = "42514251-0000-4000-8000-000000000003"
+PROBE_STARTED = time.monotonic()
+PHASES = frozenset({"device-identity", "owner-authentication", "runtime-readiness",
+    "observer-boundaries", "encrypted-backup-restore", "scheduled-backup-restore",
+    "live-ledger-backup-restore", "foreign-owner-volume-setup", "volume-read-write",
+    "volume-read-only", "ui-restart-and-journal", "reboot-persistence", "complete"})
+
+
+def progress(phase):
+    # Fixed fixture phase and elapsed time only: never commands, paths, submitted
+    # credentials, captured stdout or private state. These are progress, not pass
+    # receipts; only the final assertions can accept a boot.
+    if phase not in PHASES:
+        raise ValueError("unknown acceptance phase")
+    print("HAOS_ACCEPTANCE_PROGRESS=" + json.dumps({"phase": phase,
+          "elapsed_seconds": round(time.monotonic() - PROBE_STARTED, 2)}), flush=True)
 
 
 def require_disposable_guest():
@@ -306,6 +321,7 @@ print(json.dumps({'installed_disconnected_volume_namespace_denied': True,
 
 def main():
     require_disposable_guest()
+    progress("device-identity")
     devices = json.loads(subprocess.check_output(["lsblk", "-J", "-o", "PATH,UUID,SERIAL"], text=True))["blockdevices"]
     assert any(d.get("uuid") == A and d.get("serial") == "HAOS-CI-DATA-A" for d in devices)
     assert any(d.get("uuid") == B and d.get("serial") == "HAOS-CI-DATA-B" for d in devices)
@@ -314,6 +330,7 @@ def main():
         assert any(d.get("uuid") == C and d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
     else:
         assert not any(d.get("uuid") == C or d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
+    progress("owner-authentication")
     if not stamp.exists():
         # Fresh production systems hold execution until the owner is enrolled.
         run("haos-owner", "stop")
@@ -321,12 +338,14 @@ def main():
         run("haos-owner", "start")
     else:
         installed_owner_proof = owner_authentication_proof(first_boot=False)
+    progress("runtime-readiness")
     wait_for(lambda: active("haos-controller.service"))
     wait_for(health)
     wait_for(lambda: active("greetd.service"))
     wait_for(lambda: active("haos-observer-security.service"))
     wait_for(lambda: active("haos-network.service"))
     wait_for(lambda: subprocess.run(["pgrep", "-u", "hermes", "-f", "/usr/share/herald-os/app/"], capture_output=True).returncode == 0)
+    progress("observer-boundaries")
     observer = pwd.getpwnam("hermes")
     administrator_gids = {g.gr_gid for g in grp.getgrall() if g.gr_name in {"wheel", "sudo", "admin"}}
     assert not administrator_gids.intersection(os.getgrouplist("hermes", observer.pw_gid))
@@ -380,6 +399,7 @@ def main():
         assert result.returncode == 0, "agent reached a privileged localhost listener"
     observer_proof["installed_agent_local_network_guard"] = True
     if not stamp.exists():
+        progress("encrypted-backup-restore")
         run("haos-owner", "stop")
         # Only this marked guest's own new fixture is deleted. Real owner CLI,
         # fixed state scope and an installed Restic binary perform the recovery.
@@ -401,6 +421,7 @@ def main():
         project.write_bytes(payload)
         project.chmod(0o600)
         try:
+            progress("scheduled-backup-restore")
             run("haos-owner", "backup", "schedule", "daily", capture_output=True)
             assert run("systemctl", "is-enabled", "haos-backup-schedule.timer", capture_output=True).stdout.strip() == "enabled"
             run("systemctl", "start", "haos-backup-schedule.service")
@@ -414,6 +435,7 @@ def main():
             # A second owner-selected scope checkpoints the WAL-aware mission
             # ledger under the actual read-only hardened systemd job while both
             # runtime services stay active. No provider turn is inferred here.
+            progress("live-ledger-backup-restore")
             run('haos-owner', 'start')
             wait_for(health)
             wait_for(lambda: active('haos-controller.service'))
@@ -444,6 +466,7 @@ def main():
         assert subprocess.run(("systemctl", "is-enabled", "haos-backup-schedule.timer"), capture_output=True).returncode != 0
         # Prepare foreign-owned, restrictive fixtures BEFORE any ACL grant. Only
         # the serial/UUID-verified disposable data disk is formatted/mounted.
+        progress("foreign-owner-volume-setup")
         fixture_data = ROOT / "foreign-owner-fixture"
         fixture_data.mkdir()
         run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{A}", str(fixture_data))
@@ -490,16 +513,19 @@ def main():
         blocked.mkdir()
         run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{B}", str(blocked))
         (blocked / "canary").write_text("blocked canary")
+        progress("volume-read-write")
         proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof, **installed_owner_proof}
         assert (data / "agent-result").read_text() == "actual write"
         run("haos-owner", "cleanup")
         run("haos-owner", "volume", f"UUID:{A}", "read-only")
         run("haos-owner", "prepare")
+        progress("volume-read-only")
         proof["read_only"] = sandbox_probe("ro")
         assert (data / "agent-result").read_text() == "actual write"
         assert (blocked / "canary").read_text() == "blocked canary"
         run("umount", str(blocked))
         run("haos-owner", "cleanup")
+        progress("ui-restart-and-journal")
         run("haos-owner", "start")
         wait_for(health)
         pid = subprocess.check_output(["systemctl", "show", "-p", "MainPID", "--value", "haos-hermes.service"], text=True).strip()
@@ -517,6 +543,7 @@ def main():
         stamp.write_text(json.dumps({"mission": mission, "proof": proof}))
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 1, **proof}), flush=True)
     else:
+        progress("reboot-persistence")
         from haos.store import MissionStore
         saved = json.loads(stamp.read_text())
         store = MissionStore(Path("/var/lib/haos-control/missions.db"))
@@ -529,6 +556,7 @@ def main():
             "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof, **installed_owner_proof,
             **disconnected_proof,
             "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/off-host/whole-system recovery not covered"]}), flush=True)
+    progress("complete")
     run("systemctl", "poweroff")
 
 

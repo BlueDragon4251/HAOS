@@ -5,6 +5,11 @@ on:
     branches: ['agent/haos-*']
     paths: ['scripts/test-haos-iso.sh', 'scripts/haos-qemu-runtime.py', 'tests/e2e/**', '.github/workflows/haos-acceptance.yml']
   workflow_dispatch:
+    inputs:
+      image_run_id:
+        description: 'Optional completed HAOS image run to retest (including a failed guest gate)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -24,10 +29,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Select a completed image artifact from this branch
+      - name: Select a finished image run without duplicating active QEMU
         id: image
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUESTED_IMAGE_RUN: ${{ inputs.image_run_id }}
         run: |
           python3 - <<'PY'
           import json, os, re, subprocess, urllib.request
@@ -39,13 +45,19 @@ jobs:
                   'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
               with urllib.request.urlopen(request, timeout=30) as response:
                   return json.load(response)
-          candidates = get('/actions/artifacts?per_page=100')['artifacts']
+          requested = os.environ.get('REQUESTED_IMAGE_RUN', '')
+          if requested and not re.fullmatch(r'[0-9]{1,20}', requested):
+              raise ValueError('Requested image run must be a numeric run ID')
+          endpoint = f'/actions/runs/{requested}/artifacts?per_page=100' if requested else '/actions/artifacts?per_page=100'
+          candidates = get(endpoint)['artifacts']
           for artifact in candidates:
               match = re.fullmatch(r'haos-x86_64-build-([0-9a-f]{40})', artifact['name'])
               run = artifact.get('workflow_run', {})
               if not match or artifact['expired'] or run.get('head_branch') != os.environ['GITHUB_REF_NAME']:
                   continue
               if match[1] != run.get('head_sha'):
+                  continue
+              if requested and str(run.get('id')) != requested:
                   continue
               # A queued old harness may start after a newer image is uploaded.
               # Never select that descendant and attribute its result to this source.
@@ -55,6 +67,15 @@ jobs:
                   continue
               if ancestor.returncode != 0:
                   raise RuntimeError('Cannot verify the candidate image commit ancestry')
+              identity = get(f"/actions/runs/{run['id']}")
+              if (identity.get('path') != '.github/workflows/haos-image.yml'
+                      or identity.get('head_sha') != match[1]
+                      or identity.get('head_branch') != os.environ['GITHUB_REF_NAME']):
+                  continue
+              if identity.get('status') != 'completed':
+                  if requested:
+                      raise RuntimeError('Requested image run is still active; do not duplicate its QEMU job')
+                  continue
               jobs = get(f"/actions/runs/{run['id']}/jobs?per_page=100")['jobs']
               if not any(j['name'] == 'build' and j['conclusion'] == 'success' for j in jobs):
                   continue

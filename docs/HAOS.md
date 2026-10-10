@@ -552,3 +552,14 @@ RSS and serial progress continued with available disk space; the failure is not
 accepted as an installation pass or erased by the later successful source. The
 expanded real backup/runtime-restart matrix needs an appropriately bounded guest
 budget and explicit phase progress; all positive/negative assertions remain required.
+
+The harness now grants the disposable guest matrix 20 minutes, inside the unchanged
+30-minute host boot deadline, with room for firstboot and bounded failure shutdown.
+Fixed phase/elapsed-time messages and the acceptance unit's own journal make later
+timeouts diagnosable without logging commands, credentials or private state. **71
+harness/evidence cases** pass, including execution of the actual workflow selector
+against offline unit fixtures. Automatic reuse skips image runs still performing
+QEMU; an optional numeric `image_run_id` selects a finished source-specific run,
+including a failed guest gate whose build passed. Branch/workflow/source/ancestry
+checks and the matching image's frozen guest protocol remain mandatory. A retry
+must supply its own original installed receipts before it is called successful.

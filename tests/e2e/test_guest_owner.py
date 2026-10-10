@@ -17,6 +17,32 @@ guest = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guest)
 
 
+def test_progress_contains_only_fixed_phase_and_elapsed_time(monkeypatch, capsys):
+    monkeypatch.setenv("HAOS_PRIVATE_FIXTURE", "never-log-this-credential")
+    monkeypatch.setattr(guest.time, "monotonic", lambda: guest.PROBE_STARTED + 123.456)
+    guest.progress("live-ledger-backup-restore")
+    output = capsys.readouterr().out
+    import json
+    assert json.loads(output.split("=", 1)[1]) == {"phase": "live-ledger-backup-restore", "elapsed_seconds": 123.46}
+    assert "never-log-this-credential" not in output and "HAOS_ACCEPTANCE_JSON" not in output
+    with pytest.raises(ValueError, match="unknown acceptance phase"):
+        guest.progress("never-log-this-credential")
+    assert not capsys.readouterr().out
+
+
+def test_guest_budget_leaves_time_for_boot_diagnostics_and_shutdown():
+    # An expanded guest matrix must fit inside the outer QEMU phase; otherwise
+    # SIGTERM kills diagnostics and hides the original failure.
+    import re
+    text = (Path(__file__).resolve().parents[2] / "scripts/test-haos-iso.sh").read_text()
+    unit = text.split("cat >/etc/systemd/system/haos-acceptance.service <<'UNIT'", 1)[1].split("\nUNIT", 1)[0]
+    start = re.search(r"^TimeoutStartSec=(\d+)min$", unit, re.M)
+    stop = re.search(r"^TimeoutStopSec=(\d+)s$", unit, re.M)
+    host = re.search(r'run_vm "boot-\$stage" (\d+) ', text)
+    assert start and stop and host
+    assert 0 < int(start[1]) * 60 + int(stop[1]) + 300 < int(host[1]) <= 1800
+
+
 @pytest.mark.parametrize("file,function,variable", [
     ("tests/e2e/haos_guest.py", "sandbox_probe", "script"),
     ("tests/e2e/haos_guest.py", "disconnected_volume_probe", "script"),

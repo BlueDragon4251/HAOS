@@ -56,7 +56,11 @@ ExecStart=/usr/bin/python3 /var/lib/haos-acceptance/haos_guest.py
 ExecStopPost=/usr/bin/python3 /var/lib/haos-acceptance/haos_guest_diagnostics.py
 StandardOutput=journal+console
 StandardError=journal+console
-TimeoutStartSec=10min
+# Multiple actual Hermes starts, encrypted snapshots and both volume modes are
+# CPU-heavy under TCG. Keep this below the host's 30-minute boot deadline, with
+# room for firstboot, bounded failure diagnostics and shutdown. Production unit
+# deadlines and every guest assertion remain unchanged.
+TimeoutStartSec=20min
 TimeoutStopSec=60s
 [Install]
 WantedBy=multi-user.target
