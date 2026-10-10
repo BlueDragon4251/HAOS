@@ -115,6 +115,15 @@ def main():
                 for line in output.splitlines():
                     if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
                         print(line[:640], flush=True)
+                # A native compositor/protocol failure can exit Chromium before
+                # JavaScript's catch executes. Only this credential-free fixture's
+                # last bounded error lines, never ordinary Wayland protocol traffic.
+                native_errors = [line for line in output.splitlines() if
+                    (re.search(r'(?:ERROR|FATAL):[A-Za-z0-9_./:-]+\]', line) and 'dbus/' not in line)
+                    or re.search(r'\b(?:wl_display|wp_viewport)[@#]\d+.*\berror\b', line)]
+                for line in native_errors[-6:]:
+                    line = re.sub(r'(?:https?|data|file):\S+', '[redacted-url]', line)
+                    print('Disposable native error: ' + line[:800], flush=True)
                 raise AssertionError('real Wayland GUI probe failed: ' + name)
             stop(client)
             client = None
