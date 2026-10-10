@@ -36,8 +36,27 @@ online checkpoint. **39 root/actual Restic cases** prove concurrent committed
 transactions, real read-only source mounts, encrypted backup/staged restore and
 no blind redispatch of restored uncertain missions. System scope still requires
 stopped execution; whole-file-system consistency/off-host/full bootable recovery
-remain open. **58 harness/evidence cases** pass. New installed live-scope receipts
-are evaluated separately from an image build.
+remain open. **58 harness/evidence cases** pass. Installed run
+[38049123871](https://github.com/BlueDragon4251/HAOS/actions/runs/38049123871)
+now proves that live scope at source `0a2221a`: actual timer/job, encrypted snapshot,
+staged ledger restore, unchanged Hermes/controller PIDs and a persistent second
+boot. It does not prove a running model turn or whole-system recovery.
+
+At implementation source `82e6ca5`, [general CI](https://github.com/BlueDragon4251/HAOS/actions/runs/38054327172),
+[push services](https://github.com/BlueDragon4251/HAOS/actions/runs/38054323947),
+[PR services](https://github.com/BlueDragon4251/HAOS/actions/runs/38054327071)
+and [Arch packaging](https://github.com/BlueDragon4251/HAOS/actions/runs/38054327069)
+passed. The original CI artifact identifies actual PR merge source `2aacca886b933672374fc232fd54cbf84857162a`
+and verifies **33 real Wayland checks** (17 browser, nine controller, seven theme).
+The Linux bridge/CLI suite passed **334 tests with one existing skip**; its count
+includes the 21 Linux watchdog cases. Services additionally ran actual disposable
+ext4/XFS/Btrfs ACL, production-systemd, nftables, owner/PAM and encrypted Restic
+gates. Installed niri/theme acceptance remains distinct and open.
+
+The checked-in [source-bound evidence index](evidence/2026-10-10/index.json) records
+archive digests, ISO checksum, exact boot receipts, merge parents and component
+counts. Its neighboring JSON files are unchanged originals from verified archives
+or the clean local source gate; they contain fixture metadata and assertions only.
 
 All five earlier requested image/QEMU runs are successful and their original
 ZIP/source/checksum/two-boot receipts have been checked; the full identity table
@@ -514,6 +533,22 @@ The next implementation adds an explicit owner-configured live mission-ledger
 scope to that same scheduler, with actual WAL-aware online SQLite checkpoint,
 root-private export, integrity/ownership/size/deadline checks and unchanged encrypted
 Restic/staged restore/no-replay guards. Separate real writer/mount/restore probes
-and source-bound installed assertions cover its contract. The new installed
-assertions need their own finished image run; no live model/GUI or full system
-recovery follows from these component tests.
+and source-bound installed assertions cover its contract. Run
+[38049123871](https://github.com/BlueDragon4251/HAOS/actions/runs/38049123871)
+has now completed those installed assertions at `0a2221a15a19b361e79716ecafb7eb18979fe27b`.
+ISO SHA-256: `6b26859c21aa70e0100b0992915029f43eab5925b5746153f39b3bb4f41ad6ab`.
+Original guest archive `11670798449` has ZIP SHA-256
+`84138f9a054204612cb8d635fa97395b694910b7e3cde900a6fcf16ca887a871`.
+Boot receipts match actual serial output and are retained in the
+[evidence index](evidence/2026-10-10/index.json). Build and guest checkouts were
+checked separately, and the job verified the downloaded ISO bytes before QEMU.
+No live model/GUI or full system recovery follows from this bounded installed gate.
+
+Earlier run [38048845903](https://github.com/BlueDragon4251/HAOS/actions/runs/38048845903)
+at `327f3cd` failed without a success receipt. Its original guest archive
+`11669864370` (ZIP SHA-256 `7f92eda7241c184720c38885bbbf7a092637593eacd27ddefe5e85a35a4aff6f`)
+reports the disposable acceptance service's ten-minute timeout. Actual QEMU CPU,
+RSS and serial progress continued with available disk space; the failure is not
+accepted as an installation pass or erased by the later successful source. The
+expanded real backup/runtime-restart matrix needs an appropriately bounded guest
+budget and explicit phase progress; all positive/negative assertions remain required.

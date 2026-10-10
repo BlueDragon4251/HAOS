@@ -18,9 +18,10 @@ HAOS is development, not an accepted production distribution. The master prompt 
 
 Owner-configured daily/weekly local scheduling now reuses the encrypted Restic
 scope, with default retention preview and blocked interrupted attempts. Actual
-encrypted/restart/restore tests pass; matching installed timer/job receipts remain
-required. Due snapshots defer while execution is running, so automatic consistent
-live snapshots, external/off-host media and full system recovery remain open.
+encrypted/restart/restore tests and source-bound installed timer/job receipts pass.
+System/workspace snapshots defer while execution is running. The later explicit
+mission-ledger scope permits consistent SQLite checkpoints during runtime; general
+live filesystem snapshots, external/off-host media and full system recovery remain open.
 See [scheduling and recovery](RECOVERY.md).
 
 See [evidence](HAOS.md) and [release gates](RELEASE.md). A green desktop suite or syntax-checked harness does not close these gaps.
@@ -29,5 +30,9 @@ Live scheduled backups now offer an explicitly owner-selected, transaction-consi
 **mission-ledger** checkpoint using the real SQLite online backup API. The normal
 system/workspace backup still requires stopped execution; arbitrary live files,
 upstream sessions, owner/observer state and off-host/full bootable restore need
-additional snapshot and recovery integration. The new installed live-scope gate
-must pass at its own image source before it is called installed acceptance.
+additional snapshot and recovery integration. Installed run `38049123871` passed
+the live-scope timer, encrypted checkpoint, staged restore, unchanged runtime PIDs
+and second boot at source `0a2221a`; original receipts and exact ISO identity are
+linked in [the evidence index](evidence/2026-10-10/index.json). This does not prove
+an active model mission or whole-system recovery. The newer `82e6ca5` saved-theme
+watchdog has real component/Wayland CI proof; installed full-session proof is still open.
