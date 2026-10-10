@@ -115,11 +115,14 @@ async function main() {
     const opened = await submit({ operation: 'open', html: '<input id="field" style="margin:0;width:300px;height:40px"><p>Integrated private visible report</p>' })
     assert.equal(opened.state, 'succeeded')
     const window = opened.result.window
-    mark('input-and-inspection')
+    mark('click')
     assert.equal((await submit({ operation: 'click', window, x: 40, y: 70 })).state, 'succeeded')
+    mark('type')
     assert.equal((await submit({ operation: 'type', window, text: 'Integrated real native input' })).state, 'succeeded')
+    mark('inspect')
     const inspected = await submit({ operation: 'inspect', window })
     assert.equal(inspected.state, 'succeeded')
+    mark('verify-input')
     assert.equal(inspected.result.fields[0].value, 'Integrated real native input')
     mark('capture')
     const captured = await submit({ operation: 'capture', window })
@@ -170,12 +173,16 @@ async function main() {
     clearTimeout(deadline)
     app.quit()
   } catch (error) {
+    fs.writeSync(2, `Actual native/socket GUI gate failed: ${stage} ${error.name}\n`)
+    if (error instanceof assert.AssertionError) {
+      const length = value => typeof value === 'string' ? value.length : -1
+      fs.writeSync(2, `Actual native/socket GUI assertion lengths: ${length(error.actual)} ${length(error.expected)}\n`)
+    }
     native?.stop()
     await stopController()
     clearTimeout(deadline)
     // Electron app.exit can terminate an asynchronous console write. Preserve
     // the fixed phase/error class synchronously, never bodies or session values.
-    fs.writeSync(2, `Actual native/socket GUI gate failed: ${stage} ${error.name}\n`)
     app.exit(1)
   }
 }

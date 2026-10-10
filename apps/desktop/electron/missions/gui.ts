@@ -97,6 +97,10 @@ export class MissionBrowser {
         if (setupFailed || documents.length !== 1) throw new Error('Mission document target is ambiguous')
         entry.documentSession = documents[0]
         if (this.visible) win.showInactive()
+        // IPC target attachment/load completion precede the Wayland surface's
+        // first frame. Input hit-tests must not race that first mapped frame.
+        const frame = await win.webContents.capturePage({ x: 0, y: 0, width: 800, height: 600 })
+        if (frame.isEmpty() || frame.getSize().width !== 800 || frame.getSize().height !== 600) throw new Error('Mission frame is not ready')
         return { window, width: 800, height: 600 }
       } catch {
         if (!win.isDestroyed()) win.destroy()
