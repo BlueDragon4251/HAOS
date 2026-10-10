@@ -24,3 +24,10 @@ live snapshots, external/off-host media and full system recovery remain open.
 See [scheduling and recovery](RECOVERY.md).
 
 See [evidence](HAOS.md) and [release gates](RELEASE.md). A green desktop suite or syntax-checked harness does not close these gaps.
+
+Live scheduled backups now offer an explicitly owner-selected, transaction-consistent
+**mission-ledger** checkpoint using the real SQLite online backup API. The normal
+system/workspace backup still requires stopped execution; arbitrary live files,
+upstream sessions, owner/observer state and off-host/full bootable restore need
+additional snapshot and recovery integration. The new installed live-scope gate
+must pass at its own image source before it is called installed acceptance.

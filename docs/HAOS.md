@@ -478,3 +478,31 @@ changed viewport and separate-window contents, not a canned screenshot. Their
 private headless Wayland run verifies actual surface protocol too. This remains
 an explicit providerless fixture; arbitrary host applications, installed niri
 GUI acceptance and credentialed model autonomy remain open.
+
+### Installed local scheduler verified at its exact source
+
+All five previously active image/install workflows have now completed successfully.
+The additional original guest archives were digest-verified and both receipts were
+matched against actual guest serial output:
+
+| Source | Run | ISO SHA-256 | Guest artifact / ZIP SHA-256 |
+| --- | --- | --- | --- |
+| `ab90e506e42544446403b1f900987f8359fdea2f` | [38041315272](https://github.com/BlueDragon4251/HAOS/actions/runs/38041315272) | `a20f60e2e24c722d7aa8b3cb3fa5404f7aadf5de8c6add53b2889fd27db2086f` | `11668017400` / `6bcb7d9320621c0a6c4ff8ab501230c6eca6ceaadcb497d034ec935f939f48ca` |
+| `1d6e14ea7107f2619b7e02ca6339c95960eb9d9f` | [38042380903](https://github.com/BlueDragon4251/HAOS/actions/runs/38042380903) | `b1b9dafc3cb6af0065a21d28a580ac1728360846fb5ab54a23ca6adc43b59327` | `11668402962` / `36bee46ec20cb1ccfdf5a1d1d1009ad205df577f66d388f0dd762fc6ac0c6308` |
+
+`ab90e50`: boot receipt hashes `eb330e32c4110b077be041d150840fa863b2c562249baa0df8e32e0c149b9b54`
+and `da4abe9a873858e3eca84508fc921029d1f723d1bc744705607653f61311103c`.
+`1d6e14e`: `1a10bd9c370d2295b61e6e0abe6ba72fe7a64af3a734b32aa3d58e82b22b8154`
+and `3a44c36b49ac722e71b80906a1bb0124b140234dbe7b4dd33630f0e9f56d16e4`.
+The latter's actual first guest boot additionally asserts installed encrypted
+scheduler, scheduled snapshot restore and retention preview. Its second boot
+preserves the existing journal/owner/recovery/volume proofs. This validates the
+**stopped-runtime local scheduler**, not the newer live-checkpoint code.
+
+The next implementation adds an explicit owner-configured live mission-ledger
+scope to that same scheduler, with actual WAL-aware online SQLite checkpoint,
+root-private export, integrity/ownership/size/deadline checks and unchanged encrypted
+Restic/staged restore/no-replay guards. Separate real writer/mount/restore probes
+and source-bound installed assertions cover its contract. The new installed
+assertions need their own finished image run; no live model/GUI or full system
+recovery follows from these component tests.

@@ -10,6 +10,7 @@ import pty
 import secrets
 import select
 import socket
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -410,8 +411,35 @@ def main():
             assert recovered_schedule.read_bytes() == payload and staged["live_state_replaced"] is False
             backup_proof.update(installed_encrypted_scheduler=True, installed_scheduled_snapshot_restored=True,
                                 installed_schedule_retention_preview=True)
+            # A second owner-selected scope checkpoints the WAL-aware mission
+            # ledger under the actual read-only hardened systemd job while both
+            # runtime services stay active. No provider turn is inferred here.
+            run('haos-owner', 'start')
+            wait_for(health)
+            wait_for(lambda: active('haos-controller.service'))
+            pids = {unit: run('systemctl', 'show', '--value', '--property=MainPID', unit, capture_output=True).stdout.strip()
+                    for unit in ('haos-controller.service', 'haos-hermes.service')}
+            assert all(pid.isdigit() and int(pid) > 0 for pid in pids.values())
+            run('haos-owner', 'backup', 'schedule', 'daily', '--scope', 'mission-ledger', capture_output=True)
+            run('systemctl', 'start', 'haos-backup-schedule.service')
+            online = json.loads(run('haos-owner', 'backup', 'schedule-status', capture_output=True).stdout)
+            assert online['phase'] == 'idle' and online['last_success'] is not None and online['configuration']['scope'] == 'mission-ledger'
+            for unit, pid in pids.items():
+                assert active(unit) and run('systemctl', 'show', '--value', '--property=MainPID', unit, capture_output=True).stdout.strip() == pid
+            run('haos-owner', 'stop')
+            restored_online = json.loads(run('haos-owner', 'backup', 'restore', online['snapshot_id'], capture_output=True).stdout)
+            exported = Path(restored_online['staging_directory']) / 'var/lib/haos-owner/live-mission-checkpoint'
+            manifest = json.loads((exported / 'checkpoint.json').read_text())
+            assert manifest['database_sha256'] == hashlib.sha256((exported / 'missions.db').read_bytes()).hexdigest()
+            with sqlite3.connect(exported / 'missions.db') as database:
+                assert database.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+                assert not database.execute('PRAGMA foreign_key_check').fetchall()
+            assert restored_online['live_state_replaced'] is False and manifest['complete_system_backup'] is False
+            backup_proof.update(installed_live_ledger_scheduler=True, installed_live_ledger_restore_verified=True,
+                                installed_live_backup_runtime_pids_preserved=True)
         finally:
             run("haos-owner", "backup", "schedule", "off", capture_output=True)
+            run('haos-owner', 'stop')
             project.unlink(missing_ok=True)
         assert subprocess.run(("systemctl", "is-enabled", "haos-backup-schedule.timer"), capture_output=True).returncode != 0
         # Prepare foreign-owned, restrictive fixtures BEFORE any ACL grant. Only

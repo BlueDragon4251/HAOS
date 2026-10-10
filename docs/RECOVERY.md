@@ -97,8 +97,8 @@ every 15 minutes after boot with bounded jitter; the durable last-success time
 decides whether a snapshot is due. Clock rollback does not cause duplicate work.
 Both execution units must be fully stopped. Busy/activating/deactivating execution
 defers the snapshot without stopping a mission. **An always-running system will
-defer until an owner maintenance stop**; consistent automatic live snapshots are
-still open. The oneshot orders before concurrent controller/Hermes starts.
+defer until an owner maintenance stop**; general live filesystem snapshots are
+still open; the separate mission-ledger scope below now supports live SQLite checkpoints. The oneshot orders before concurrent controller/Hermes starts.
 
 Retention previews by default. Add `--prune` and bounded `--keep-last`,
 `--keep-daily`, `--keep-weekly`, `--keep-monthly` counts when configuring the
@@ -129,3 +129,54 @@ actual timer/job and restoration of its snapshot; matching run receipts remain
 required before claiming installed scheduling. No full OS recovery is implied.
 
 Contracts follow [Restic backup/scripting](https://restic.readthedocs.io/en/stable/075_scripting.html) and [restore](https://restic.readthedocs.io/en/stable/050_restore.html) documentation.
+
+### Consistent live mission-ledger scope
+
+Owners can now select a narrower scope that runs while the controller and Hermes
+remain active:
+
+```sh
+# Initialize the encrypted repository/key once during owner maintenance first.
+sudo haos-owner backup schedule daily --scope mission-ledger
+sudo haos-owner backup schedule-status
+```
+
+The production root scheduler uses SQLite's online backup API through a normal
+read-only, WAL-aware connection to the fixed controller database. It never copies
+active WAL/SHM files, uses `immutable=1`, stops a mission or gives an agent a backup
+endpoint. It verifies source ownership, all ancestors, file/link types, database
+version, integrity/foreign keys and source inode stability. Work is bounded to
+512 MiB, a 30-second checkpoint deadline and small page/cache batches; existing
+systemd CPU/RAM/process/I/O limits remain in force. An actual read-only bind-mount
+probe verifies that committed WAL data remains available under the production
+read-only source restriction.
+
+Only a validated standalone database and a bounded checksum/scope manifest are
+exported into the fixed root-private `/var/lib/haos-owner/live-mission-checkpoint`
+scope. Restic encrypts that scope; its source path stays stable for retention.
+The online API gives a transaction-consistent database at the checkpoint's point
+in time, not a globally synchronized system/files snapshot. Exports are prepared
+under the scheduler's private lock before Restic is called. Failure after any
+modifying intent remains blocked for owner inspection, including an interrupted
+export/receipt. It must not be mistaken for a successful new backup. Scope changes
+cannot clear blocked attempts; changing an idle scope resets its due receipt
+without deleting existing repository snapshots.
+
+This scope contains missions, events, resource locks and controller-owned gateway,
+GUI and provider ledger tables. It excludes workspace files, upstream sessions,
+owner identities/credentials, observer themes/plugins and system configuration.
+Use `--scope system` for the existing full configured source list during an owner
+maintenance stop. A stopped whole-system snapshot and a live ledger checkpoint
+are separate recovery scopes. Enabling the live scope does not complete general
+live backup or full bootable-system recovery.
+
+Restore remains owner-authorized and staged with the existing stopped-runtime
+requirement. Verify `checkpoint.json` against the restored `missions.db` and
+inspect identities, effects and recovery state before any live replacement.
+A saved running/dispatched mission becomes blocked when the real controller store
+recovers it; it is never blindly resubmitted. Root probes exercise an actual
+separate WAL writer, encrypted scheduled backup/staged restore, atomic transaction
+pairs and real recovery refusing redispatch, with the original writer continuing.
+New installed-QEMU assertions verify the hardened systemd job, unchanged live
+runtime PIDs and encrypted ledger restore; they remain pending until their matching
+source/image run provides actual receipts.

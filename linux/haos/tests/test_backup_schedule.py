@@ -15,6 +15,8 @@ def valid():
     lambda value: value.update(interval="* * * * *"),
     lambda value: value.update(prune="false"),
     lambda value: value.update(version=True),
+    lambda value: value.update(scope='live-files-without-snapshot'),
+    lambda value: value.update(scope=True),
     lambda value: value["retention"].update(keep_last=0),
     lambda value: value["retention"].update(keep_last=True),
     lambda value: value["retention"].update(keep_monthly=1000000),

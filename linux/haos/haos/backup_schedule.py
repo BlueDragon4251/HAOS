@@ -20,14 +20,16 @@ from .sandbox import trusted_json
 
 INTERVALS = {"off": None, "daily": 86400, "weekly": 604800}
 COUNTS = {"keep_last", "keep_daily", "keep_weekly", "keep_monthly"}
+SCOPES = {"system", "mission-ledger"}
 
 
 def policy(value):
-    if (not isinstance(value, dict) or set(value) != {"version", "interval", "prune", "retention"}
+    if (not isinstance(value, dict) or set(value) not in ({"version", "interval", "prune", "retention"}, {"version", "interval", "prune", "retention", "scope"})
             or type(value["version"]) is not int or value["version"] != 1
             or not isinstance(value["interval"], str) or value["interval"] not in INTERVALS
             or type(value["prune"]) is not bool
-            or not isinstance(value["retention"], dict) or set(value["retention"]) != COUNTS):
+            or not isinstance(value["retention"], dict) or set(value["retention"]) != COUNTS
+            or not isinstance(value.get("scope", "system"), str) or value.get("scope", "system") not in SCOPES):
         raise ValueError("invalid owner backup schedule")
     Retention(**value["retention"]).arguments()
     return value
@@ -40,11 +42,12 @@ def timestamp(value):
 
 
 class Scheduler:
-    def __init__(self, root, configuration, repository, sources, check_stopped, audit):
+    def __init__(self, root, configuration, repository, sources, check_stopped, audit, *, live_sources=None):
         if os.geteuid() != 0:
             raise PermissionError("backup scheduling requires owner/root authority")
         self.root, self.configuration, self.repository = root, configuration, repository
         self.sources, self.check_stopped, self.audit = sources, check_stopped, audit
+        self.live_sources = live_sources
         private_directory(root)
 
     @contextmanager
@@ -86,6 +89,12 @@ class Scheduler:
     def configure(self, value):
         policy(value)
         with self.lock():
+            if value.get('scope', 'system') == 'mission-ledger' and not callable(self.live_sources):
+                raise PermissionError('online checkpoint capability unavailable')
+            changed_scope = value.get('scope', 'system') != self.configuration_value().get('scope', 'system')
+            state = self.state()
+            if changed_scope and state['phase'] != 'idle':
+                raise PermissionError('inspect interrupted attempt before changing backup scope')
             if value["interval"] != "off":
                 # Timer setup must not silently initialize a new/missing key.
                 private_password(self.repository.password)
@@ -96,6 +105,8 @@ class Scheduler:
             if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_mode & 0o022:
                 raise PermissionError("untrusted schedule configuration directory")
             atomic_json(self.configuration, value)
+            if changed_scope:
+                atomic_json(self.root / 'state.json', {**state, 'last_success': None, 'snapshot_id': None})
             self.audit("backup.schedule-configured", value)
         return value
 
@@ -134,10 +145,12 @@ class Scheduler:
                 return {"phase": "blocked", "requires_owner_inspection": True}
             if not status["due"]:
                 return {"phase": "not-due"}
-            try:
-                self.check_stopped()
-            except PermissionError:
-                return {"phase": "deferred", "reason": "execution-not-stopped"}
+            live = status['configuration'].get('scope', 'system') == 'mission-ledger'
+            if not live:
+                try:
+                    self.check_stopped()
+                except PermissionError:
+                    return {"phase": "deferred", "reason": "execution-not-stopped"}
             # These read-only checks precede durable modifying intent. An unavailable
             # medium/key is retried later without claiming a snapshot was produced.
             try:
@@ -147,14 +160,17 @@ class Scheduler:
                 self.repository.command("check", "--read-data")
             except Exception:
                 return {"phase": "unavailable", "reason": "repository-or-key"}
-            try:
-                self.check_stopped()
-            except PermissionError:
-                return {"phase": "deferred", "reason": "execution-not-stopped"}
+            if not live:
+                try:
+                    self.check_stopped()
+                except PermissionError:
+                    return {"phase": "deferred", "reason": "execution-not-stopped"}
             state.update(phase="running", attempt=str(uuid.uuid4()), snapshot_id=None)
             atomic_json(self.root / "state.json", state)
             try:
-                created = self.repository.create(self.sources())
+                if live and not callable(self.live_sources):
+                    raise PermissionError('online checkpoint capability unavailable')
+                created = self.repository.create(self.live_sources() if live else self.sources())
                 state["snapshot_id"] = created["snapshot_id"]
                 atomic_json(self.root / "state.json", state)
                 value = status["configuration"]
@@ -167,17 +183,20 @@ class Scheduler:
                 self.audit("backup.schedule-blocked", {"attempt": state["attempt"], "snapshot_id": state["snapshot_id"],
                            "repository_may_have_changed": True})
                 return {"phase": "blocked", "requires_owner_inspection": True}
-            result = {"phase": "succeeded", "snapshot_id": created["snapshot_id"], "retention_applied": not retained["dry_run"]}
+            result = {"phase": "succeeded", "snapshot_id": created["snapshot_id"], "retention_applied": not retained["dry_run"], 'scope': status['configuration'].get('scope', 'system')}
             self.audit("backup.schedule-succeeded", result)
             return result
 
 
 def installed_scheduler():
+    import pwd
+    from .backup_checkpoint import MissionCheckpoint
     from .owner import stopped, audit
     root = Path("/var/lib/haos-owner")
     private_directory(root)
     repository = Repository(root / "backup", Path("/etc/haos/backup-password"))
-    return Scheduler(root / "backup-scheduler", Path("/etc/haos/backup-schedule.json"), repository, owner_sources, stopped, audit)
+    checkpoint = MissionCheckpoint(root / 'live-mission-checkpoint', Path('/var/lib/haos-control/missions.db'), pwd.getpwnam('haos-control').pw_uid)
+    return Scheduler(root / "backup-scheduler", Path("/etc/haos/backup-schedule.json"), repository, owner_sources, stopped, audit, live_sources=checkpoint.prepare)
 
 
 def main():
