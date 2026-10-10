@@ -103,7 +103,15 @@ def main():
             with log_path.open("wb") as log:
                 client = subprocess.Popen([str(electron), "--ozone-platform=wayland", "--disable-gpu",
                     str(REPO / "apps/desktop/scripts" / script)], cwd=REPO, env=client_env, stdout=log, stderr=log, start_new_session=True)
-            assert client.wait(timeout=75) == 0, "real Wayland GUI probe failed"
+            code = client.wait(timeout=75)
+            if code != 0:
+                # Only the explicitly disposable probe's own bounded failure label,
+                # never complete protocol logs, profiles, sessions or journal data.
+                output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
+                for line in output.splitlines():
+                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:')):
+                        print(line[:640], flush=True)
+                raise AssertionError('real Wayland GUI probe failed: ' + name)
             stop(client)
             client = None
             assert compositor.poll() is None, "compositor exited during GUI work"
