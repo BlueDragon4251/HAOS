@@ -55,7 +55,15 @@ async def main():
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stopped.set)
-    print(json.dumps({"ready": True, "mission": row["id"], "state": row["state"], "fixture_session": "offline-runtime-fixture", "real_model_turn": False}), flush=True)
+    readiness = json.dumps({"ready": True, "mission": row["id"], "state": row["state"], "fixture_session": "offline-runtime-fixture", "real_model_turn": False})
+    if os.environ.get('HAOS_DISPOSABLE_SPLIT_READY') == '1':
+        # Actual fragmented stdout from the actual controller process. The old
+        # listener tried JSON.parse on this incomplete first line and crashed.
+        sys.stdout.write(readiness[:16]); sys.stdout.flush()
+        await asyncio.sleep(0.05)
+        sys.stdout.write(readiness[16:] + '\n'); sys.stdout.flush()
+    else:
+        print(readiness, flush=True)
     try:
         await stopped.wait()
     finally:

@@ -44,7 +44,7 @@ function request(socket, method, params) {
 
 async function startController() {
   child = spawn('python3', [path.join(repo, 'linux/haos/runtime/probe_gui_controller.py'), root], {
-    env: { PATH: process.env.PATH, LANG: 'C.UTF-8', PYTHONDONTWRITEBYTECODE: '1', HAOS_DISPOSABLE_SCREEN_TEST: '1' }, stdio: ['ignore', 'pipe', 'pipe']
+    env: { PATH: process.env.PATH, LANG: 'C.UTF-8', PYTHONDONTWRITEBYTECODE: '1', HAOS_DISPOSABLE_SCREEN_TEST: '1', HAOS_DISPOSABLE_SPLIT_READY: '1' }, stdio: ['ignore', 'pipe', 'pipe']
   })
   // Fixture stdout contains only readiness/scalar receipts; no inherited env/secrets.
   return await new Promise((resolve, reject) => {
@@ -155,7 +155,7 @@ async function main() {
       work_tree_dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }).trim()),
       actual_native_socket_pipeline: true, session_is_explicit_fixture: true, real_model_turn: false, installed_system: false,
       checks: { actual_input_and_inspection: true, actual_capture: true, actual_read_without_body_persistence: true, private_bodies_absent_from_audit: true, unauthorized_methods_denied: true,
-        lost_ack_not_reexecuted: true, controller_restart_blocks_mission: true, durable_audit_survives: true } }
+        lost_ack_not_reexecuted: true, controller_restart_blocks_mission: true, durable_audit_survives: true, actual_fragmented_readiness_framed: true } }
     fs.writeFileSync(path.join(evidence, 'gui-integration.json'), JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 })
     if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `evidence=${evidence}\n`)
     console.log(JSON.stringify({ evidence, ...report }))
