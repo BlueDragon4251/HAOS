@@ -27,7 +27,7 @@ B = "42514251-0000-4000-8000-000000000002"
 C = "42514251-0000-4000-8000-000000000003"
 PROBE_STARTED = time.monotonic()
 PHASES = frozenset({"device-identity", "owner-authentication", "runtime-readiness",
-    "observer-boundaries", "encrypted-backup-restore", "scheduled-backup-restore",
+    "observer-boundaries", "theme-watchdog-rollback", "encrypted-backup-restore", "scheduled-backup-restore",
     "live-ledger-backup-restore", "foreign-owner-volume-setup", "volume-read-write",
     "volume-read-only", "ui-restart-and-journal", "reboot-persistence", "complete"})
 
@@ -398,6 +398,8 @@ def main():
             "--clear-groups", "--no-new-privs", "python3", "-I", "-c", code, str(port)], timeout=5)
         assert result.returncode == 0, "agent reached a privileged localhost listener"
     observer_proof["installed_agent_local_network_guard"] = True
+    progress("theme-watchdog-rollback")
+    theme_proof = installed_theme_watchdog_proof(observer, first_boot=not stamp.exists())
     if not stamp.exists():
         progress("encrypted-backup-restore")
         run("haos-owner", "stop")
@@ -514,7 +516,7 @@ def main():
         run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{B}", str(blocked))
         (blocked / "canary").write_text("blocked canary")
         progress("volume-read-write")
-        proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof, **installed_owner_proof}
+        proof = {"write": sandbox_probe("rw"), **observer_proof, **backup_proof, **installed_owner_proof, **theme_proof}
         assert (data / "agent-result").read_text() == "actual write"
         run("haos-owner", "cleanup")
         run("haos-owner", "volume", f"UUID:{A}", "read-only")
@@ -554,10 +556,79 @@ def main():
         disconnected_proof = disconnected_volume_probe()
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 2, "journal_survives_reboot": True,
             "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof, **installed_owner_proof,
-            **disconnected_proof,
+            **disconnected_proof, **theme_proof,
             "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/off-host/whole-system recovery not covered"]}), flush=True)
     progress("complete")
     run("systemctl", "poweroff")
+
+
+def installed_theme_watchdog_proof(observer, *, first_boot):
+    require_disposable_guest()
+    # Actual installed code and actual observer home, executed without root. The
+    # fixed fixture mutates only the watchdog's eight theme outputs and theme
+    # preferences; snapshots must be restored before a pass receipt is emitted.
+    script = r'''
+import json,os,runpy,select,signal,subprocess,sys,time
+assert os.geteuid()!=0
+watchdog,engine=sys.argv[1:3]
+guard=runpy.run_path(watchdog)['ThemeGuard']()
+if sys.argv[3]=='reboot':
+    state=guard.load()
+    assert state and state['status']=='rolled_back'
+    assert guard.recover() is False
+    print(json.dumps({'installed_theme_watchdog_journal_survives_reboot':True}))
+    raise SystemExit(0)
+before={target:guard.read(target) for target in guard.targets.values()}
+prefs=guard.preferences()
+child_code=r"""
+import json,os,runpy,sys
+g=runpy.run_path(sys.argv[1])['ThemeGuard']()
+outputs={target:'intentionally invalid disposable theme '+key for key,target in g.targets.items()}
+token=g.begin('haos-test-damage','b'*64,os.getpid(),outputs)
+with g.lock():
+    assert not g.expired(g.pending(token))
+    for target in list(outputs)[:3]:g.write(target,outputs[target].encode())
+    g.write(g.prefs,json.dumps(g.preferences()|{'themeName':'haos-test-damage','themeRevision':'b'*64}).encode())
+print(token,flush=True)
+sys.stdin.read()
+"""
+env={key:os.environ[key] for key in ('HOME','HERMES_HOME','PATH','LANG')}
+child=subprocess.Popen([sys.executable,'-I','-c',child_code,watchdog],env=env,
+    stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+try:
+    assert select.select([child.stdout],[],[],20)[0],'theme parent did not arm'
+    token=child.stdout.readline().strip()
+    state=guard.load()
+    assert state and state['token']==token and state['status']=='pending'
+    assert state['watcher'] not in (0,child.pid,os.getpid())
+    assert sum(guard.read(target)!=original for target,original in before.items())==3
+    child.send_signal(signal.SIGKILL)
+    assert child.wait(timeout=10)==-signal.SIGKILL
+    deadline=time.monotonic()+20
+    while guard.load()['status']=='pending' and time.monotonic()<deadline:time.sleep(.1)
+    assert guard.load()['status']=='rolled_back','independent watchdog did not restore'
+    assert all(guard.read(target)==original for target,original in before.items())
+    assert guard.preferences()==prefs
+    restarted=subprocess.run([sys.executable,'-I',engine,'recover'],env=env,
+        capture_output=True,text=True,timeout=10)
+    assert restarted.returncode==0 and guard.load()['status']=='rolled_back'
+    print(json.dumps({'installed_theme_watchdog_parent_sigkill':True,
+        'installed_theme_fixed_outputs_restored':True,'installed_theme_recovery_cli_restart':True}))
+finally:
+    if child.poll() is None:child.kill();child.wait(timeout=10)
+    state=guard.load()
+    if state and state['status']=='pending':guard.recover(state['token'])
+'''
+    response = run("runuser", "-u", observer.pw_name, "--", "env",
+                   f"HOME={observer.pw_dir}", f"HERMES_HOME={observer.pw_dir}/.hermes",
+                   "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "/usr/bin/python3", "-I", "-c", script,
+                   "/usr/bin/herald-os-theme-watchdog", "/usr/bin/herald-os-theme",
+                   "first" if first_boot else "reboot", capture_output=True, timeout=70)
+    proof = json.loads(response.stdout)
+    expected = {"installed_theme_watchdog_parent_sigkill", "installed_theme_fixed_outputs_restored",
+                "installed_theme_recovery_cli_restart"} if first_boot else {"installed_theme_watchdog_journal_survives_reboot"}
+    assert set(proof) == expected and all(value is True for value in proof.values())
+    return proof
 
 
 if __name__ == "__main__":

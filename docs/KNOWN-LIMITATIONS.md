@@ -36,3 +36,10 @@ and second boot at source `0a2221a`; original receipts and exact ISO identity ar
 linked in [the evidence index](evidence/2026-10-10/index.json). This does not prove
 an active model mission or whole-system recovery. The newer `82e6ca5` saved-theme
 watchdog has real component/Wayland CI proof; installed full-session proof is still open.
+
+The installed guest matrix now additionally exercises actual observer-UID theme
+watchdog parent-SIGKILL, fixed-output/preference restoration, restarted recovery
+CLI and durable journal after reboot. Its embedded program passes locally with
+real processes, but source-bound installed receipts for these new flags remain
+required. This is a bounded file/watchdog gate; it cannot accept whole-session
+visual health, autonomous theme generation or general host GUI access.

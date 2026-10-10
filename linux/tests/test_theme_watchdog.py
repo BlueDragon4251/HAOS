@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import uuid
+import ast
 
 import pytest
 
@@ -110,6 +111,22 @@ sys.stdin.read()
         if child.poll() is None:
             child.kill()
             child.wait(timeout=5)
+
+
+def test_actual_installed_guest_theme_program_before_and_after_restart(guard):
+    tree = ast.parse((ROOT / "tests/e2e/haos_guest.py").read_text())
+    function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "installed_theme_watchdog_proof")
+    script = next(ast.literal_eval(n.value) for n in function.body if isinstance(n, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == "script" for t in n.targets))
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(guard.home), "HERMES_HOME": str(guard.hermes), "LANG": "C.UTF-8"}
+    for stage, expected in [("first", {"installed_theme_watchdog_parent_sigkill", "installed_theme_fixed_outputs_restored",
+                                     "installed_theme_recovery_cli_restart"}),
+                            ("reboot", {"installed_theme_watchdog_journal_survives_reboot"})]:
+        result = subprocess.run([sys.executable, "-I", "-c", script, str(WATCHDOG), str(ENGINE), stage],
+                                env=env, capture_output=True, text=True, timeout=70)
+        assert result.returncode == 0, result.stderr
+        proof = json.loads(result.stdout)
+        assert set(proof) == expected and all(value is True for value in proof.values())
 
 
 @pytest.mark.parametrize("cause", ["deadline", "different-boot", "different-parent-start"])

@@ -563,3 +563,14 @@ QEMU; an optional numeric `image_run_id` selects a finished source-specific run,
 including a failed guest gate whose build passed. Branch/workflow/source/ancestry
 checks and the matching image's frozen guest protocol remain mandatory. A retry
 must supply its own original installed receipts before it is called successful.
+
+The next guest matrix also executes the installed theme watchdog as the actual
+unprivileged observer in its bootc home. It snapshots the fixed outputs/theme
+preferences, deliberately writes three invalid candidate outputs, kills only its
+own new parent process, and requires the separate watchdog to restore every output
+and preference before accepting. The installed recovery CLI is restarted; boot 2
+requires the durable rolled-back journal to survive. The same embedded program
+passes with real local parent/watchdog processes; launch/guard/compilation tests
+also pass. **74 harness cases** and **335 Linux bridge/CLI cases with one existing
+skip** pass. These new installed assertions remain pending their own image run;
+they do not prove an autonomous model-generated theme or full visual session health.

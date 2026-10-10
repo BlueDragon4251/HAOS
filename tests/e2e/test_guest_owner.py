@@ -17,6 +17,23 @@ guest = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guest)
 
 
+@pytest.mark.parametrize("first", [True, False])
+def test_installed_theme_program_uses_fixed_unprivileged_observer_launch(monkeypatch, first):
+    import json
+    flags = {"installed_theme_watchdog_parent_sigkill", "installed_theme_fixed_outputs_restored",
+             "installed_theme_recovery_cli_restart"} if first else {"installed_theme_watchdog_journal_survives_reboot"}
+    monkeypatch.setattr(guest, "require_disposable_guest", lambda: None)
+    def execute(args, **kwargs):
+        assert args[:4] == ("runuser", "-u", "hermes", "--")
+        assert "HOME=/var/home/hermes" in args and "HERMES_HOME=/var/home/hermes/.hermes" in args
+        assert args[-3:] == ("/usr/bin/herald-os-theme-watchdog", "/usr/bin/herald-os-theme", "first" if first else "reboot")
+        assert kwargs == {"check": True, "text": True, "capture_output": True, "timeout": 70}
+        return subprocess.CompletedProcess(args, 0, json.dumps(dict.fromkeys(flags, True)))
+    monkeypatch.setattr(guest.subprocess, "run", execute)
+    proof = guest.installed_theme_watchdog_proof(SimpleNamespace(pw_name="hermes", pw_dir="/var/home/hermes"), first_boot=first)
+    assert set(proof) == flags
+
+
 def test_progress_contains_only_fixed_phase_and_elapsed_time(monkeypatch, capsys):
     monkeypatch.setenv("HAOS_PRIVATE_FIXTURE", "never-log-this-credential")
     monkeypatch.setattr(guest.time, "monotonic", lambda: guest.PROBE_STARTED + 123.456)
@@ -46,6 +63,7 @@ def test_guest_budget_leaves_time_for_boot_diagnostics_and_shutdown():
 @pytest.mark.parametrize("file,function,variable", [
     ("tests/e2e/haos_guest.py", "sandbox_probe", "script"),
     ("tests/e2e/haos_guest.py", "disconnected_volume_probe", "script"),
+    ("tests/e2e/haos_guest.py", "installed_theme_watchdog_proof", "script"),
     ("linux/haos/probes/test_kernel.py", "run_agent_filesystem_probe", "probe"),
 ])
 def test_actual_embedded_filesystem_programs_compile_before_privileged_launch(file, function, variable):
