@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
-      - run: python -m pip install pytest==9.0.2 websockets==15.0.1
+      - run: python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3
       - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py
       - name: Root-authority backup and policy-access tests in disposable fixtures
         run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py linux/haos/probes/test_policy_access.py linux/haos/probes/test_gateway_authority.py linux/haos/probes/test_gateway_recovery_authority.py linux/haos/probes/test_owner_recovery.py linux/haos/probes/test_provider_authority.py linux/haos/probes/test_ui_authority.py
