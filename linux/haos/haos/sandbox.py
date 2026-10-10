@@ -32,7 +32,7 @@ def trusted_json(path: Path) -> dict:
     return config
 
 
-def command(grants: list[dict], credential_fd: int, *, certificates: list[str], provider_fd=None, ui_fd=None) -> list[str]:
+def command(grants: list[dict], credential_fd: int, *, certificates: list[str], provider_fd=None, ui_fd=None, gui=False) -> list[str]:
     if type(credential_fd) is not int or credential_fd < 3:
         raise ValueError("a private credential descriptor is required")
     args = ["/usr/bin/bwrap", "--unshare-all", "--unshare-user", "--share-net", "--die-with-parent", "--new-session",
@@ -45,6 +45,8 @@ def command(grants: list[dict], credential_fd: int, *, certificates: list[str], 
             "--dir", "/var", "--dir", "/home", "--bind", "/var/lib/haos-agent", "/home/agent",
             "--bind", "/var/lib/haos-workspace", "/workspace", "--dir", "/volumes"]
     # Do not bind the host's /etc, /run, /var, home folders, /sys or raw devices.
+    if gui:
+        args.extend(["--ro-bind", "/run/haos-gui-agent", "/run/haos-gui-agent"])
     for path in certificates:
         if path not in {"/etc/ssl", "/etc/pki", "/etc/hosts", "/etc/resolv.conf", "/etc/nsswitch.conf", "/etc/localtime"}:
             raise ValueError("unexpected runtime configuration path")
@@ -99,7 +101,7 @@ def main():
                 raise PermissionError("model client configuration differs from owner policy")
             provider_fd = os.open(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "provider-token", os.O_RDONLY | os.O_NOFOLLOW)
             os.set_inheritable(provider_fd, True)
-        args = command(config["grants"], fd, certificates=certs, provider_fd=provider_fd, ui_fd=ui_fd)
+        args = command(config["grants"], fd, certificates=certs, provider_fd=provider_fd, ui_fd=ui_fd, gui=True)
         os.execv(args[0], args)
     finally:
         os.close(fd)

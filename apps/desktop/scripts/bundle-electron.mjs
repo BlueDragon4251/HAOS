@@ -48,7 +48,7 @@ await build({
 // without starting the shell, its bridge or a model/backend process.
 await build({
   ...common,
-  entryPoints: { 'theme-preview': path.join(root, 'electron/theme/preview.ts'), 'theme-revisions': path.join(root, 'electron/theme/revisions.ts') },
+  entryPoints: { 'theme-preview': path.join(root, 'electron/theme/preview.ts'), 'theme-revisions': path.join(root, 'electron/theme/revisions.ts'), 'gui-broker': path.join(root, 'electron/missions/gui.ts') },
   outdir: path.join(root, 'dist/electron'),
   outExtension: { '.js': '.mjs' },
   format: 'esm',

@@ -1,0 +1,13 @@
+[Unit]
+Description=HAOS mission-scoped native GUI ingress
+
+[Socket]
+ListenStream=/run/haos-gui-agent/gui.sock
+SocketUser=haos-control
+SocketGroup=haos-agent
+SocketMode=0660
+DirectoryMode=0755
+Service=haos-controller.service
+
+[Install]
+WantedBy=sockets.target

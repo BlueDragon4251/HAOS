@@ -17,6 +17,12 @@ def run(backend, observer, *, port=9119, isolated=False):
     os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] = backend
     os.environ["HERMES_SERVE_HEADLESS"] = "1"
     from hermes_cli.web_server import app
+    # HAOS supplies a scoped tool through the public registry; upstream is unmodified.
+    if __package__:
+        from .gui_tool import register
+    else:
+        from gui_tool import register
+    register()
     scoped = os.environ.get("HAOS_MODEL_TOKEN", "")
     app.add_middleware(DashboardAccess, backend_token=backend, observer_token=observer,
                        redact_tokens=[scoped] if scoped else [])

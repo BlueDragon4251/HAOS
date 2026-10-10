@@ -6,6 +6,18 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-09)
 
+The [mission-scoped GUI broker](GUI-CAPABILITIES.md) now creates real native local
+browser windows for the active Hermes mission, with separate kernel-authenticated
+agent ingress, targeted renderer input/capture and durable no-replay receipts.
+Local verification: **302 ordinary HAOS tests**, **three real Unix probes**,
+**773 native tests**, TypeScript and production build pass. Actual Chromium
+checks fill two fields, capture changed pixels and verify both renderer sandbox
+states plus network/chooser/clipboard/foreign-window denials. The pinned Hermes
+registry exposes the real tool through its terminal/deferred catalog. These are
+component receipts from the working change; matching CI/source and installed
+Wayland/model-driven acceptance remain required. Arbitrary host apps, online
+browsing and complete GUI autonomy are still open.
+
 Three newer installed-image runs are now verified against their exact source,
 GitHub archive digest and matching actual serial/saved receipts:
 

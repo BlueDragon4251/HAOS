@@ -18,6 +18,7 @@ from .hermes import HermesConnection, mission_prompt, outcome, websocket_url
 from .store import ACTIVE, Conflict, MissionStore
 from .gateway import GatewayEngine, GatewayPolicy
 from .sandbox import trusted_json
+from .gui import GuiBroker
 
 MAX_FRAME = 131072
 
@@ -43,6 +44,8 @@ class Controller:
         self.system_health: dict | None = None
         self.usage_sampler = None
         self.provider_usage: dict | None = None
+        self.gui = GuiBroker(store)
+        self.agent_uid = None
 
     async def monitor(self):
         from .health import HealthSampler
@@ -117,6 +120,12 @@ class Controller:
         params = request.get("params", {})
         if not isinstance(params, dict):
             raise ValueError("params must be an object")
+        if method == "gui.attach":
+            return self.gui.attach(params)
+        if method == "gui.poll":
+            return self.gui.poll(self.current, params)
+        if method == "gui.ack":
+            return self.gui.acknowledge(params)
         if method == "health":
             return {"service": "haos-controller", "backend_connected": self.connection is not None,
                     "current_mission": self.current,
@@ -166,17 +175,28 @@ class Controller:
             return {"accepted": True}
         raise ValueError("unknown control method")
 
-    async def client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, *, gateway=False):
+    async def client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, *, gateway=False, gui=False):
         actor = "unverified"
         try:
-            actor = peer_actor(writer.get_extra_info("socket"), self.gateway_uids if gateway else self.allowed_uids)
+            actor = peer_actor(writer.get_extra_info("socket"), {self.agent_uid} if gui else self.gateway_uids if gateway else self.allowed_uids)
             line = await asyncio.wait_for(reader.readline(), 10)
             if len(line) > MAX_FRAME or not line.endswith(b"\n"):
                 raise ValueError("invalid control frame")
             request = json.loads(line)
             if not isinstance(request, dict):
                 raise ValueError("request must be an object")
-            result = await self.gateway_dispatch(request) if gateway else await self.dispatch(actor, request)
+            if gui:
+                params = request.get("params", {})
+                if not isinstance(params, dict):
+                    raise ValueError("params must be an object")
+                if request.get("method") == "gui.submit":
+                    result = self.gui.submit(self.current, params)
+                elif request.get("method") == "gui.result":
+                    result = self.gui.result(self.current, params)
+                else:
+                    raise PermissionError("agent GUI method denied")
+            else:
+                result = await self.gateway_dispatch(request) if gateway else await self.dispatch(actor, request)
             reply = {"ok": True, "result": result}
         except (ValueError, KeyError, PermissionError, Conflict, TimeoutError) as exc:
             print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
@@ -269,6 +289,15 @@ async def serve():
     from .provider_usage import UsageSampler
     controller.usage_sampler = UsageSampler(model_capability)
     controller.gateway_uids = {pwd.getpwnam("haos-gateway").pw_uid}
+    controller.agent_uid = pwd.getpwnam("haos-agent").pw_uid
+    if (os.environ.get("LISTEN_PID") != str(os.getpid()) or os.environ.get("LISTEN_FDS") != "1"):
+        raise PermissionError("GUI listener must be supplied by its system socket unit")
+    gui_socket = socket.socket(fileno=3)
+    if gui_socket.family != socket.AF_UNIX or gui_socket.getsockname() != "/run/haos-gui-agent/gui.sock":
+        raise PermissionError("unexpected GUI listener")
+    async def gui_client(reader, writer):
+        await controller.client(reader, writer, gui=True)
+    gui_server = await asyncio.start_unix_server(gui_client, sock=gui_socket, limit=MAX_FRAME)
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, controller.stop.set)
@@ -287,7 +316,7 @@ async def serve():
     os.chown(gateway_path, -1, gateway_gid)
     os.chmod(gateway_path, 0o660)
     try:
-        async with server, gateway_server:
+        async with server, gateway_server, gui_server:
             monitor = asyncio.create_task(controller.monitor())
             try:
                 await controller.worker()
@@ -299,6 +328,8 @@ async def serve():
         await server.wait_closed()
         gateway_server.close()
         await gateway_server.wait_closed()
+        gui_server.close()
+        await gui_server.wait_closed()
         store.close()
         lock.close()
 

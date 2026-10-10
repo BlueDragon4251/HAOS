@@ -20,8 +20,11 @@ fallback child. Quitting or restarting Electron does not stop that service.
 
 The UI's existing bridge permissions are not this authority. The isolated agent is deliberately
 not given the unrestricted Herald UI bridge or observer home: that bridge can execute commands
-outside the agent namespace. A restricted native GUI execution broker still needs implementation
-and adversarial testing before agent-driven host applications are enabled.
+outside the agent namespace. A [mission-scoped native browser broker](../GUI-CAPABILITIES.md)
+now connects the agent to real isolated local document windows, with independent
+capability checks, targeted input/capture and durable no-replay receipts. Arbitrary
+host applications and online/scripted browsing still require additional boundaries
+and acceptance.
 
 The root network guard installs a dedicated agent socket-UID table with only CAP_NET_ADMIN and is required before Hermes. See [network policy](../NETWORK-POLICY.md) for actual kernel evidence and the bounded historical installed receipts; newer installed and complete egress acceptance remain required.
 

@@ -71,6 +71,21 @@ jobs:
           path: ${{ steps.theme-preview.outputs.evidence }}
           if-no-files-found: error
           retention-days: 7
+      - name: Actual scoped GUI input, capture and adversarial browser gate
+        if: runner.os == 'Linux'
+        id: gui-broker
+        timeout-minutes: 2
+        env:
+          HAOS_DISPOSABLE_SCREEN_TEST: '1'
+        run: npm run test:gui-broker --workspace @herald-os/desktop
+      - name: Retain only disposable GUI fixture and source-bound receipt
+        if: always() && runner.os == 'Linux' && steps.gui-broker.outputs.evidence != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-broker-${{ github.sha }}
+          path: ${{ steps.gui-broker.outputs.evidence }}
+          if-no-files-found: error
+          retention-days: 7
 
   bridge:
     name: Bridge plugin (${{ matrix.os }})

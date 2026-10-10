@@ -5,6 +5,7 @@ import { type EnvInfo, type HeraldOSPrefs, IPC, type RestRequest, type ShellComm
 import { BackendManager } from './backend/manager.ts'
 import { controllerRequest, managedMissions } from './missions/client.ts'
 import type { MissionMethods } from '../shared/missions.ts'
+import { NativeGuiBroker } from './missions/gui.ts'
 import { forgetInheritedSession } from './backend/session-env.ts'
 import { CrashWatcher } from './crash/watch.ts'
 import { fireEventAutomations } from './events/automations.ts'
@@ -82,6 +83,7 @@ for (const line of migrateLegacyData({ hermesHome: hermesHome(), appData: app.ge
 }
 
 const backend = new BackendManager()
+const nativeGui = new NativeGuiBroker()
 let mainWindow: BrowserWindow | null = null
 const mode = shellMode()
 // Panels mode (niri): several surface windows, compositor state mirror, control socket for hotkeys.
@@ -371,6 +373,7 @@ app.whenReady().then(async () => {
     }
   })
   createWindow()
+  nativeGui.start()
   // Cmd+Ctrl+F is the standard macOS fullscreen toggle; register it as a local shortcut so the
   // user can always leave the environment. Only this shortcut follows focus: the voice hotkey
   // (ipc/voice.ts) must keep working while another app is in front.
@@ -413,6 +416,7 @@ app.on('before-quit', event => {
   }
 
   quitting = true
+  nativeGui.stop()
   event.preventDefault()
   globalShortcut.unregisterAll()
   crashes.stop()

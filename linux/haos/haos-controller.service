@@ -1,7 +1,7 @@
 [Unit]
 Description=HAOS durable mission controller
-Requires=haos-owner-ready.service haos-dashboard-policy.service
-After=haos-hermes.service haos-owner-ready.service haos-dashboard-policy.service
+Requires=haos-owner-ready.service haos-dashboard-policy.service haos-gui.socket
+After=haos-hermes.service haos-owner-ready.service haos-dashboard-policy.service haos-gui.socket
 Wants=haos-hermes.service
 ConditionPathExists=/etc/haos/enabled
 StartLimitIntervalSec=120

@@ -1,5 +1,6 @@
 import net from 'node:net'
 import { MISSION_METHODS, type MissionMethods } from '../../shared/missions.ts'
+import type { GuiPoll } from '../../shared/gui.ts'
 
 export function managedMissions(env: NodeJS.ProcessEnv = process.env): boolean {
   return Boolean(env.HAOS_BACKEND_CONFIG)
@@ -16,18 +17,28 @@ export function controllerRequest<M extends keyof MissionMethods>(method: M, par
   if (!MISSION_METHODS.has(method)) {
     return Promise.reject(new Error('Unknown mission method'))
   }
+  return localRequest<MissionMethods[M]['result']>(method, params)
+}
+
+/** Main-process broker only: never exposed through renderer IPC/preload. */
+export function nativeGuiRequest(method: 'gui.attach' | 'gui.poll' | 'gui.ack', params: Record<string, unknown>): Promise<GuiPoll | { attached: boolean } | { accepted: boolean }> {
+  if (!['gui.attach', 'gui.poll', 'gui.ack'].includes(method)) return Promise.reject(new Error('Unknown native GUI method'))
+  return localRequest(method, params)
+}
+
+function localRequest<T>(method: string, params: unknown): Promise<T> {
   const path = missionSocket()
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ path })
     const chunks: Buffer[] = []
     let length = 0
     let settled = false
-    const finish = (error?: Error, value?: MissionMethods[M]['result']) => {
+    const finish = (error?: Error, value?: T) => {
       if (settled) return
       settled = true
       socket.destroy()
       if (error) reject(error)
-      else resolve(value as MissionMethods[M]['result'])
+      else resolve(value as T)
     }
     socket.setTimeout(15_000, () => finish(new Error('The HAOS controller did not respond')))
     socket.once('error', error => finish(error))
@@ -42,7 +53,7 @@ export function controllerRequest<M extends keyof MissionMethods>(method: M, par
       chunks.push(chunk)
       if (!chunk.includes(10)) return
       try {
-        const reply = JSON.parse(Buffer.concat(chunks).toString('utf8').split('\n')[0]) as { ok?: boolean; result?: MissionMethods[M]['result']; error?: string }
+        const reply = JSON.parse(Buffer.concat(chunks).toString('utf8').split('\n')[0]) as { ok?: boolean; result?: T; error?: string }
         finish(reply.ok ? undefined : new Error(reply.error || 'The HAOS request failed'), reply.result)
       } catch {
         finish(new Error('The HAOS controller returned an invalid reply'))
