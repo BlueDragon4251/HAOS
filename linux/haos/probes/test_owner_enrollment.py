@@ -11,12 +11,25 @@ import sys
 import uuid
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from haos.enrollment import enroll
+from haos.enrollment import enroll, password_quality
 from haos.observer import ENV
 
 
 def run(*args, secret=None, check=True):
     return subprocess.run(list(args), input=secret, env=ENV, capture_output=True, text=True, check=check, timeout=30)
+
+
+def fixture_password(user):
+    # Cracklib can reject even a high-entropy random string. Select a fixture
+    # accepted by the unchanged production policy before testing real PAM/sudo.
+    for _ in range(16):
+        candidate = secrets.token_urlsafe(40) + "!Aa42"
+        try:
+            password_quality(user, candidate)
+        except RuntimeError:
+            continue
+        return candidate
+    raise RuntimeError("no strong disposable password accepted by the real quality policy")
 
 
 def test_password_authenticated_owner_has_only_fixed_cli(tmp_path):
@@ -26,7 +39,7 @@ def test_password_authenticated_owner_has_only_fixed_cli(tmp_path):
     registry = Path("/var/lib/haos-owner")
     assert all(not p.exists() and not p.is_symlink() for p in (config, installed, launcher, registry))
     user = "haos-owner-" + uuid.uuid4().hex[:10]
-    password = secrets.token_urlsafe(28) + "!Aa42"
+    password = fixture_password(user)
     try:
         config.mkdir(mode=0o700)
         (config / "controller.json").write_text(json.dumps({"control_users": ["haos-observer-fixture"]}))
