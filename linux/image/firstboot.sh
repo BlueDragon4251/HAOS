@@ -31,9 +31,14 @@ done
 system_phase() {
   step "The session user ($HERMES_USER)"
   if ! id "$HERMES_USER" >/dev/null 2>&1; then
-    # No password yet: the lock screen refuses until one is set (first-boot setup or herald-os password).
-    useradd -m -G wheel "$HERMES_USER"
-    passwd -d "$HERMES_USER" >/dev/null
+    if [[ -d /usr/lib/haos/haos ]]; then
+      # Locked, non-administrator observer. Owner enrollment is a separate gate.
+      useradd -m "$HERMES_USER"
+    else
+      # Original Herald development behavior.
+      useradd -m -G wheel "$HERMES_USER"
+      passwd -d "$HERMES_USER" >/dev/null
+    fi
   fi
   HOME_DIR="$(getent passwd "$HERMES_USER" | cut -d: -f6)"
   usermod -aG video,input,render,audio "$HERMES_USER" 2>/dev/null || true
@@ -61,6 +66,17 @@ system_phase() {
   install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/session/swaylock.conf" "$HOME_DIR/.config/swaylock/config"
 
   step "Hermes Agent for $HERMES_USER"
+  if [[ -d /usr/lib/haos/haos ]]; then
+    [[ -x /usr/lib/haos/hermes/.venv/bin/hermes ]] || {
+      echo "firstboot: the mandatory HAOS runtime is missing; refusing unrestricted fallback" >&2
+      exit 1
+    }
+    # Never install an unrestricted second agent in the observer's account.
+    usermod -aG haos-ui "$HERMES_USER"
+    (cd /usr/lib/haos && python3 -m haos.initialize "$HERMES_USER")
+    date -Is >"$STATE/firstboot-done"
+    return
+  fi
   if [[ -f /etc/herald-os/ref ]]; then
     # shellcheck disable=SC1091
     source /etc/herald-os/ref

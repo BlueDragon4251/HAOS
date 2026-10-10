@@ -9,14 +9,16 @@ FROM quay.io/fedora/fedora-bootc:44
 ARG SHELL_TARBALL=herald-os-linux.tar.gz
 COPY linux /tmp/herald-os/linux
 COPY ${SHELL_TARBALL} /tmp/herald-os/shell.tar.gz
+COPY upstream/hermes-agent /usr/lib/haos/hermes
 
 RUN bash /tmp/herald-os/linux/image/packages.sh --image /tmp/herald-os/shell.tar.gz \
+ && bash /tmp/herald-os/linux/haos/build-runtime.sh \
  && dnf clean all \
- && rm -rf /tmp/herald-os /var/cache/* /var/log/* /var/lib/dnf
+ && rm -rf /tmp/herald-os /tmp/haos-uv-cache /var/cache/* /var/log/* /var/lib/dnf
 
-LABEL org.opencontainers.image.title="Herald OS" \
-      org.opencontainers.image.description="An AI-native desktop built around Hermes Agent" \
-      org.opencontainers.image.source="https://github.com/iamlukethedev/Herald-OS" \
+LABEL org.opencontainers.image.title="HAOS" \
+      org.opencontainers.image.description="Hermes Autonomous OS, based on Herald OS" \
+      org.opencontainers.image.source="https://github.com/BlueDragon4251/HAOS" \
       org.opencontainers.image.licenses="MIT" \
       containers.bootc="1"
 

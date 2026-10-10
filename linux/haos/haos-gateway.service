@@ -1,0 +1,51 @@
+[Unit]
+Description=HAOS pinned Hermes messaging adapters
+Requires=haos-owner-ready.service
+After=haos-controller.service haos-owner-ready.service network-online.target
+Wants=network-online.target haos-controller.service
+ConditionPathExists=/etc/haos/gateways.json
+ConditionPathExists=/etc/haos/gateway-credentials
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=haos-gateway
+Group=haos-gateway
+WorkingDirectory=/usr/lib/haos/hermes
+Environment=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/haos-gateway
+Environment=HERMES_HOME=/var/lib/haos-gateway/.hermes
+LoadCredential=gateway-credentials:/etc/haos/gateway-credentials
+ExecStart=/usr/bin/python3 -m haos.gateway_launch
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+StateDirectory=haos-gateway
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner
+InaccessiblePaths=-/var/lib/haos-workspace -/run/haos-control -/run/haos-volumes -/run/haos-policy
+InaccessiblePaths=-/etc/haos/backend-token -/etc/haos/gateway-credentials
+TasksMax=128
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

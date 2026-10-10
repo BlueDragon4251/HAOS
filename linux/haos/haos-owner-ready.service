@@ -1,0 +1,25 @@
+[Unit]
+Description=Verify HAOS owner enrollment before autonomous execution
+After=herald-os-firstboot.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -m haos.owner_ready
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+RemainAfterExit=yes
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes

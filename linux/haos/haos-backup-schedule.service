@@ -1,0 +1,38 @@
+[Unit]
+Description=HAOS owner-configured encrypted local backup scheduler
+After=local-fs.target
+# Concurrent execution starts wait for this oneshot; never stop running missions.
+Before=haos-controller.service haos-hermes.service
+ConditionPathExists=/etc/haos/enabled
+ConditionPathExists=/etc/haos/backup-schedule.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /usr/lib/haos/backup-schedule-entry.py
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+StateDirectory=haos-owner/backup-scheduler
+StateDirectoryMode=0700
+TimeoutStartSec=6h
+KillMode=control-group
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/haos-owner
+ReadOnlyPaths=-/var/lib/haos-workspace -/var/lib/haos-agent -/var/lib/haos-control /etc/haos
+PrivateDevices=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+TasksMax=64
+MemoryMax=512M
+CPUQuota=50%
+IOWeight=10

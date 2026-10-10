@@ -1,0 +1,207 @@
+"""Recovery and policy authority; callable by an authenticated owner via sudo/console."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import time
+from pathlib import Path
+
+from .policy import atomic_json, cleanup, inventory, prepare, resolve_volume, validate_policy
+from .sandbox import trusted_json
+from .store import MissionStore
+
+
+def stopped():
+    for unit in ("haos-controller.service", "haos-hermes.service"):
+        result = subprocess.run(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,MainPID,ControlPID", unit],
+                                check=True, capture_output=True, text=True)
+        state = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        # is-active's exit 3 also covers activating/deactivating units: neither is stopped.
+        if (state.get("LoadState") not in {"loaded", "masked"} or state.get("ActiveState") != "inactive"
+                or state.get("MainPID") != "0" or state.get("ControlPID") != "0"):
+            raise PermissionError(f"stop {unit} before modifying authority or reconciling a mission")
+
+
+def audit(kind: str, details: dict):
+    path = Path("/var/lib/haos-owner")
+    path.mkdir(mode=0o700, exist_ok=True)
+    fd = os.open(path / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        os.write(fd, (json.dumps({"at": time.time(), "kind": kind, "owner_uid": os.environ.get("SUDO_UID", "0"), **details}) + "\n").encode())
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="HAOS owner recovery; agent and UI policy cannot grant root authority")
+    sub = parser.add_subparsers(dest="action", required=True)
+    sub.add_parser("prepare")
+    sub.add_parser("cleanup")
+    sub.add_parser("status")
+    sub.add_parser("stop")
+    sub.add_parser("start")
+    gateway = sub.add_parser("gateway", help="owner-authenticated transport credentials and exact sender pairing")
+    gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
+    for action in ("status", "start", "stop"):
+        gateway_sub.add_parser(action)
+    setup = gateway_sub.add_parser("setup")
+    setup.add_argument("connector")
+    setup.add_argument("platform", choices=["telegram", "discord"])
+    pair = gateway_sub.add_parser("pair")
+    pair.add_argument("binding")
+    pair.add_argument("connector")
+    pair.add_argument("sender")
+    pair.add_argument("chat")
+    pair.add_argument("--identity", required=True)
+    pair.add_argument("--scope", default="")
+    pair.add_argument("--thread", default="")
+    pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer", "pause", "resume"], default=["create", "read", "cancel", "answer"])
+    revoke = gateway_sub.add_parser("revoke")
+    revoke.add_argument("binding")
+    remove = gateway_sub.add_parser("remove")
+    remove.add_argument("connector")
+    deliveries = gateway_sub.add_parser("deliveries", help="list unresolved outbox metadata with all runtime services stopped")
+    deliveries.add_argument("--after", type=int, default=0)
+    delivery = gateway_sub.add_parser("reconcile-delivery", help="record inspected delivery; never blindly resend an uncertain reply")
+    delivery.add_argument("delivery_id")
+    delivery.add_argument("--attempt", type=int, required=True)
+    delivery.add_argument("--decision", choices=["delivered", "retry", "discard"], required=True)
+    delivery.add_argument("--note", required=True, help="non-secret inspection evidence; only its digest is persisted")
+    delivery.add_argument("--receipt", help="inspected numeric remote message ID, required for delivered")
+    delivery.add_argument("--confirm-not-delivered", action="store_true")
+    enroll = sub.add_parser("enroll", help="create a separate password-authenticated owner from a trusted root console")
+    enroll.add_argument("username")
+    recovery = sub.add_parser("recovery-codes", help="issue ten single-use codes at an authenticated owner console")
+    recovery.add_argument("username")
+    provider = sub.add_parser("provider", help="owner-only credential-isolated model configuration")
+    provider_sub = provider.add_subparsers(dest="provider_action", required=True)
+    for action in ("status", "stop", "disable", "login-codex", "logout-codex"):
+        provider_sub.add_parser(action)
+    configure = provider_sub.add_parser("configure")
+    configure.add_argument("provider", choices=["openai-codex", "openai", "openrouter", "local"])
+    configure.add_argument("--model", required=True)
+    configure.add_argument("--allow-model", action="append", default=[])
+    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions"])
+    configure.add_argument("--endpoint", help="local loopback /v1 endpoint; remote endpoints are fixed")
+    configure.add_argument("--requests-per-day", type=int, default=200)
+    configure.add_argument("--requests-per-minute", type=int, default=30)
+    backup = sub.add_parser("backup")
+    backup_sub = backup.add_subparsers(dest="backup_action", required=True)
+    for action in ("init", "create", "check", "snapshots"):
+        backup_sub.add_parser(action)
+    restore = backup_sub.add_parser("restore")
+    restore.add_argument("snapshot_id")
+    retention = backup_sub.add_parser("retention", help="preview scoped retention; deletion requires --apply")
+    retention.add_argument("--keep-last", type=int, default=7)
+    retention.add_argument("--keep-daily", type=int, default=7)
+    retention.add_argument("--keep-weekly", type=int, default=4)
+    retention.add_argument("--keep-monthly", type=int, default=12)
+    retention.add_argument("--apply", action="store_true")
+    schedule = backup_sub.add_parser("schedule", help="configure encrypted system or consistent live mission-ledger backups")
+    schedule.add_argument("interval", choices=["off", "daily", "weekly"])
+    schedule.add_argument('--scope', choices=['system', 'mission-ledger'], help='system requires stopped execution; mission-ledger uses an online SQLite checkpoint')
+    schedule.add_argument("--prune", action="store_true", help="explicitly authorize applying scoped retention")
+    schedule.add_argument("--keep-last", type=int, default=7)
+    schedule.add_argument("--keep-daily", type=int, default=7)
+    schedule.add_argument("--keep-weekly", type=int, default=4)
+    schedule.add_argument("--keep-monthly", type=int, default=12)
+    backup_sub.add_parser("schedule-status")
+    clear = backup_sub.add_parser("schedule-clear", help="clear an interrupted attempt after owner inspection, without deleting snapshots")
+    clear.add_argument("--note", required=True)
+    clear.add_argument("--confirm-inspected", action="store_true")
+    grant = sub.add_parser("volume")
+    grant.add_argument("id", help="UUID:<filesystem UUID> or PARTUUID:<partition UUID>")
+    grant.add_argument("mode", choices=["blocked", "read-only", "full-data-access", "system-managed"])
+    reconciler = sub.add_parser("reconcile")
+    reconciler.add_argument("mission_id")
+    reconciler.add_argument("--note", required=True, help="evidence from inspection of Hermes/processes/files")
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        raise PermissionError("authenticate as the owner with sudo or a recovery console")
+    if args.action == "provider":
+        from .provider_setup import owner_provider
+        print(json.dumps(owner_provider(args), indent=2))
+    elif args.action == "recovery-codes":
+        from .owner_recovery import print_codes
+        print_codes(args.username)
+    elif args.action == "gateway":
+        from .gateway_setup import owner_gateway
+        print(json.dumps(owner_gateway(args), indent=2))
+    elif args.action == "enroll":
+        from .enrollment import enroll_interactive
+        from .owner_recovery import print_codes
+        stopped()
+        print(json.dumps(enroll_interactive(args.username), indent=2))
+        print_codes(args.username)
+    elif args.action == "backup":
+        if args.backup_action in {"schedule", "schedule-status", "schedule-clear"}:
+            from .backup_schedule import installed_scheduler
+            scheduler = installed_scheduler()
+            if args.backup_action == "schedule":
+                value = {"version": 1, "interval": args.interval, "scope": args.scope or scheduler.configuration_value().get('scope', 'system'), "prune": args.prune, "retention": {
+                    "keep_last": args.keep_last, "keep_daily": args.keep_daily,
+                    "keep_weekly": args.keep_weekly, "keep_monthly": args.keep_monthly}}
+                result = scheduler.configure(value)
+                subprocess.run(["/usr/bin/systemctl", "disable" if args.interval == "off" else "enable", "--now",
+                                "haos-backup-schedule.timer"], check=True)
+            elif args.backup_action == "schedule-clear":
+                result = scheduler.clear(args.note, args.confirm_inspected)
+            else:
+                result = scheduler.status()
+            print(json.dumps(result, indent=2))
+            return
+        from .backup import Retention, owner_backup
+        retention = (Retention(args.keep_last, args.keep_daily, args.keep_weekly, args.keep_monthly)
+                     if args.backup_action == "retention" else None)
+        print(json.dumps(owner_backup(args.backup_action, getattr(args, "snapshot_id", None),
+                                     retention=retention, apply=getattr(args, "apply", False)), indent=2))
+    elif args.action == "prepare":
+        stopped()
+        prepare()
+    elif args.action == "cleanup":
+        stopped()
+        cleanup()
+    elif args.action == "status":
+        runtime = Path("/run/haos-policy/sandbox.json")
+        print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory(),
+                          "runtime_volumes": trusted_json(runtime) if runtime.exists() or runtime.is_symlink() else None}, indent=2))
+    elif args.action in {"stop", "start"}:
+        verb = args.action
+        units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]
+        if verb == "stop":
+            subprocess.run(["/usr/bin/systemctl", "stop", "haos-gateway.service"], check=True)
+        if verb == "start" and Path("/etc/haos/provider.json").exists():
+            subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"], check=True)
+        subprocess.run(["/usr/bin/systemctl", verb, *units], check=True)
+        if verb == "stop":
+            subprocess.run(["/usr/bin/systemctl", "stop", "haos-provider.socket", "haos-provider.service"], check=True)
+        if verb == "start":
+            subprocess.run(["/usr/bin/systemctl", "start", "haos-gateway.service"], check=True)
+        audit(f"runtime.{verb}", {})
+    elif args.action == "volume":
+        stopped()
+        policy = trusted_json(Path("/etc/haos/volumes.json"))
+        new = {"id": args.id, "mode": args.mode}
+        policy["volumes"] = [v for v in policy["volumes"] if v["id"] != args.id] + [new]
+        validate_policy(policy)
+        if args.mode in {"read-only", "full-data-access"}:
+            resolve_volume(args.id, inventory())
+        cleanup()
+        atomic_json(Path("/etc/haos/volumes.json"), policy)
+        audit("volume.policy", new)
+    elif args.action == "reconcile":
+        stopped()
+        store = MissionStore(Path("/var/lib/haos-control/missions.db"))
+        try:
+            store.reconcile(args.mission_id, f"owner:{os.environ.get('SUDO_UID', '0')}", args.note)
+        finally:
+            store.close()
+        audit("mission.reconciled", {"id": args.mission_id, "note": args.note})
+
+
+if __name__ == "__main__":
+    main()

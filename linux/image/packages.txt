@@ -53,6 +53,8 @@ dejavu-sans-fonts
 liberation-fonts
 # What the CLIs and the shell shell out to.
 python3
+python3.11
+python3.11-devel
 python3-pyyaml
 git
 tar
@@ -99,3 +101,12 @@ foot
 firefox
 nautilus
 gnome-text-editor
+# HAOS independent controller and mandatory rootless filesystem sandbox.
+bubblewrap
+nftables
+python3-websockets
+sudo
+shadow-utils
+libpwquality
+uv
+restic

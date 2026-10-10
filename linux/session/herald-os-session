@@ -9,6 +9,11 @@ export MOZ_ENABLE_WAYLAND=1
 export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland,x11
 export HERALD_OS_LINUX_SESSION=1
+if [[ -f /etc/haos/enabled ]]; then
+  # A failed service shows an error; it never falls back to an unsandboxed UI child.
+  export HAOS_BACKEND_CONFIG=/etc/haos/backend.json
+  export HAOS_CONTROL_SOCKET=/run/haos-control/control.sock
+fi
 # desktop (cage): the shell is one fullscreen kiosk window. panels (niri): menu bar, dock and the
 # Hermes window are separate windows the compositor places; HERALD_OS_KIOSK stays off.
 export HERALD_OS_SHELL_MODE="${HERALD_OS_SHELL_MODE:-desktop}"

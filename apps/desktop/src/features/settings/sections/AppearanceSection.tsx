@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { IconBrandGit, IconCode, IconDroplet, IconLayoutBottombar, IconPhoto, IconSparkles, IconTypography, IconWand } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import type { ThemeSummary } from '../../../../shared/theme.ts'
+import type { ThemePreview, ThemeSummary } from '../../../../shared/theme.ts'
 import { GlassButton, GlassCard, Toggle } from '../../../components/ui/glass.tsx'
 import { cn } from '../../../lib/cn.ts'
 import { $prefs, updatePrefs } from '../../../store/backend.ts'
@@ -47,6 +47,7 @@ export function AppearanceSection() {
       <SectionTitle title="Appearance" subtitle="Theme, accent, wallpaper, fonts and the menu bar." />
 
       <ThemeGallery />
+      <ThemeHistory />
       <ThemeTools />
 
       <SettingsGroup title="Look">
@@ -107,6 +108,8 @@ function ThemeGallery() {
   const prefs = useStore($prefs)
   const current = prefs.themeName ?? `herald-${prefs.theme}`
   const [busy, setBusy] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ label: string; result: ThemePreview } | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
 
   useEffect(() => {
     void loadThemes()
@@ -125,6 +128,14 @@ function ThemeGallery() {
     }
   }
 
+  const inspect = async (theme: ThemeSummary) => {
+    setPreviewBusy(true)
+    setPreview(null)
+    try { setPreview({ label: theme.label, result: await window.heraldOS.theme.preview(theme.name, theme.revision) }) }
+    catch (error) { notify({ title: 'Could not preview theme', body: errorText(error), level: 'error' }) }
+    finally { setPreviewBusy(false) }
+  }
+
   if (themes.length === 0) {
     return null
   }
@@ -135,41 +146,84 @@ function ThemeGallery() {
         <h3 className="px-0.5 text-[12.5px] font-medium text-fg-2">Theme</h3>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5" role="radiogroup" aria-label="Theme">
           {themes.map(theme => {
-            const active = theme.name === current
+            const active = theme.name === current && theme.revision === prefs.themeRevision
 
             return (
-              <GlassCard
-                key={theme.name}
-                as="button"
-                interactive
-                selected={active}
-                role="radio"
-                aria-checked={active}
-                aria-label={theme.label}
-                data-os-target={`theme:${theme.name}`}
-                onClick={() => void choose(theme)}
-                className={cn('flex flex-col gap-2 p-2.5 text-left', busy === theme.name && 'opacity-60')}
-              >
-                <span className="flex h-12 overflow-hidden rounded-md border border-line" style={{ background: theme.colors.bg }} aria-hidden="true">
-                  <span className="m-1.5 flex-1 rounded-sm" style={{ background: theme.colors.surface }}>
-                    <span className="mx-1.5 mt-1.5 block h-1.5 w-8 rounded-full" style={{ background: theme.colors.fg }} />
-                    <span className="mx-1.5 mt-1 block h-1.5 w-12 rounded-full" style={{ background: theme.colors.fg_dim }} />
+              <div key={theme.name} className="flex flex-col gap-1.5">
+                <GlassCard
+                  as="button"
+                  interactive
+                  selected={active}
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={theme.label}
+                  data-os-target={`theme:${theme.name}`}
+                  onClick={() => void choose(theme)}
+                  className={cn('flex flex-col gap-2 p-2.5 text-left', busy === theme.name && 'opacity-60')}
+                >
+                  <span className="flex h-12 overflow-hidden rounded-md border border-line" style={{ background: theme.colors.bg }} aria-hidden="true">
+                    <span className="m-1.5 flex-1 rounded-sm" style={{ background: theme.colors.surface }}>
+                      <span className="mx-1.5 mt-1.5 block h-1.5 w-8 rounded-full" style={{ background: theme.colors.fg }} />
+                      <span className="mx-1.5 mt-1 block h-1.5 w-12 rounded-full" style={{ background: theme.colors.fg_dim }} />
+                    </span>
+                    <span className="my-1.5 mr-1.5 w-4 rounded-sm" style={{ background: theme.colors.accent }} />
                   </span>
-                  <span className="my-1.5 mr-1.5 w-4 rounded-sm" style={{ background: theme.colors.accent }} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[12.5px] font-medium text-fg">{theme.label}</span>
-                  <span className="block truncate text-[11px] text-fg-3">
-                    {theme.scheme === 'light' ? 'Light' : 'Dark'}
-                    {theme.source === 'user' ? ' · yours' : ''}
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12.5px] font-medium text-fg">{theme.label}</span>
+                    <span className="block truncate text-[11px] text-fg-3">
+                      {theme.scheme === 'light' ? 'Light' : 'Dark'}
+                      {theme.source === 'user' ? ' · yours' : ''}
+                    </span>
                   </span>
-                </span>
-              </GlassCard>
+                </GlassCard>
+                <GlassButton disabled={previewBusy} onClick={() => void inspect(theme)}>Preview</GlassButton>
+              </div>
             )
           })}
         </div>
+        {preview && <figure className="mt-3 flex flex-col gap-2">
+          <img src={preview.result.png} alt={`Isolated preview of ${preview.label}`} className="w-full max-w-2xl rounded-xl border border-line" />
+          <figcaption className="text-sm text-fg-2">{preview.result.passed
+            ? 'Preview checks passed. Your current theme is unchanged.'
+            : 'This preview failed its checks. Your current theme is unchanged.'}</figcaption>
+        </figure>}
       </section>
     </Filterable>
+  )
+}
+
+function ThemeHistory() {
+  const prefs = useStore($prefs)
+  const [history, setHistory] = useState<ThemeSummary[]>([])
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let stopped = false
+    setHistory([])
+    if (prefs.themeName && prefs.themeRevision) {
+      void window.heraldOS.theme.history(prefs.themeName).then(items => {
+        if (!stopped) setHistory(items)
+      }).catch(() => undefined)
+    }
+    return () => { stopped = true }
+  }, [prefs.themeName, prefs.themeRevision])
+  if (history.length < 2) return null
+  const restore = async (theme: ThemeSummary) => {
+    setBusy(true)
+    try { await applyTheme(theme.name, theme.revision); markSaved() }
+    catch (error) { notify({ title: 'Could not restore theme', body: errorText(error), level: 'error' }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <SettingsGroup title="Saved theme versions">
+      {history.map(theme => (
+        <SettingsRow key={theme.revision} icon={<IconDroplet style={{ color: theme.colors.accent }} />} label={theme.label}
+          description={theme.description || 'A saved version of this theme.'} keywords="theme version restore rollback">
+          <GlassButton disabled={busy || theme.revision === prefs.themeRevision} onClick={() => void restore(theme)}>
+            {theme.revision === prefs.themeRevision ? 'In use' : 'Use this version'}
+          </GlassButton>
+        </SettingsRow>
+      ))}
+    </SettingsGroup>
   )
 }
 

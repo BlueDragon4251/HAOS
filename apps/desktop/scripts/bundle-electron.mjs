@@ -43,3 +43,20 @@ await build({
   format: 'cjs',
   external: ['electron']
 })
+
+// The integration probe imports the exact production renderer/store functions,
+// without starting the shell, its bridge or a model/backend process.
+await build({
+  ...common,
+  entryPoints: { 'theme-preview': path.join(root, 'electron/theme/preview.ts'), 'theme-revisions': path.join(root, 'electron/theme/revisions.ts'),
+    'theme-activation': path.join(root, 'electron/ipc/theme.ts'), 'theme-health': path.join(root, 'electron/theme/health.ts'),
+    'gui-broker': path.join(root, 'electron/missions/gui.ts') },
+  outdir: path.join(root, 'dist/electron'),
+  outExtension: { '.js': '.mjs' },
+  format: 'esm',
+  external: ['electron']
+})
+
+// Disposable renderer gates use the exact production preference-to-DOM code.
+await build({ ...common, platform: 'browser', entryPoints: [path.join(root, 'src/store/backend.ts')],
+  outfile: path.join(root, 'dist/electron/theme-document.js'), format: 'iife', globalName: 'HeraldThemeDocument' })

@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-10T13:20:47.090318+00:00",
+  "repository": "BlueDragon4251/HAOS",
+  "implementation_head": "82e6ca5511700ec165a9985f24bcd44520baec9a",
+  "new_implementation_commits": [
+    {
+      "sha": "aa6fc073e36895c609e534d5e066ed9335e29bf7",
+      "subject": "Extend scoped GUI navigation with real visible text, scrolling and multiple windows"
+    },
+    {
+      "sha": "f6b76e58767bea555b2e33517bc368882a616076",
+      "subject": "Preserve bounded real GUI failure diagnostics without exporting protocol logs"
+    },
+    {
+      "sha": "327f3cdcffd8cf5da1be494c3e176c77196fd867",
+      "subject": "Back up the live mission ledger through bounded consistent SQLite checkpoints"
+    },
+    {
+      "sha": "221e9b5267e12cdbfe59df34f117554900c6e084",
+      "subject": "Report bounded disposable GUI startup error classes and process exit status"
+    },
+    {
+      "sha": "0a2221a15a19b361e79716ecafb7eb18979fe27b",
+      "subject": "Frame actual controller readiness and preserve GUI failure phase before Electron exit"
+    },
+    {
+      "sha": "a20c1fcacfdfb673a3f2f118197432713256198f",
+      "subject": "Exercise fragmented real controller startup through the native Wayland pipeline"
+    },
+    {
+      "sha": "d7a2b4ffef3779f6cc0e90771936ecf6285a61f8",
+      "subject": "Handshake real readiness fragments and bound signal-terminated fixture cleanup"
+    },
+    {
+      "sha": "bcd733474af9e705a819f2f26b1fc8fb6ebaf85f",
+      "subject": "Wait for the actual first mission frame before admitting native input"
+    },
+    {
+      "sha": "c280af0bc4c0ebb55894dc866d9a25fe4f3b883d",
+      "subject": "Expose bounded disposable Chromium protocol failures before JavaScript exit"
+    },
+    {
+      "sha": "82e6ca5511700ec165a9985f24bcd44520baec9a",
+      "subject": "Guard saved session themes with independent durable rollback and real renderer verification"
+    }
+  ],
+  "file_sha256": {
+    "guest-0a-boot-1.json": "388b024249575206dbf5955d7d30f05340c16cb8b13f996c063d1d7ba0e8029e",
+    "guest-0a-boot-2.json": "1a17d68e5ba1fe668aad4f129df64807bb7edc552b15d6cf204d3614f6d02e81",
+    "wayland-ci-2aacca.json": "fb384e52b17112bef0dcbcab433b5aef536e315a4bdc2c7f91ccc2b66fe499d8",
+    "theme-ci-2aacca.json": "462e32068f2248b2b086ff3c28f0f4e7c478e96a1d3eac75abe31cd95bb00365",
+    "wayland-local-82e6.json": "fd3e5b1e982a91d8d73e6f8fc42971f3e9455ae5641d28b4c6f5723e7370fbf9"
+  },
+  "installed": {
+    "workflow_run": 38049123871,
+    "source_commit": "0a2221a15a19b361e79716ecafb7eb18979fe27b",
+    "iso_sha256": "6b26859c21aa70e0100b0992915029f43eab5925b5746153f39b3bb4f41ad6ab",
+    "iso_name": "haos-x86_64-development.iso",
+    "build_artifact": 11669412365,
+    "build_archive_digest": "sha256:dbace9d4b3b4022880da6dc7bc7d65558158e3bc986519840f9d036d293fa0f9",
+    "guest_artifact": 11670798449,
+    "guest_archive_digest": "sha256:84138f9a054204612cb8d635fa97395b694910b7e3cde900a6fcf16ca887a871",
+    "checkout_source_verified_for_build_and_guest": true,
+    "downloaded_iso_checksum_checked_in_job": true,
+    "boot_stages": [
+      1,
+      2
+    ],
+    "live_ledger_scheduler": true,
+    "staged_live_ledger_restore": true,
+    "runtime_pids_preserved": true,
+    "real_model_turn": false,
+    "complete_system_restore": false
+  },
+  "ci": {
+    "run": 38054327172,
+    "implementation_head": "82e6ca5511700ec165a9985f24bcd44520baec9a",
+    "actual_pr_merge_source": "2aacca886b933672374fc232fd54cbf84857162a",
+    "merge_parents": [
+      "3c891adcd1f5c3b6eeadf4d20472d10d9516a999",
+      "82e6ca5511700ec165a9985f24bcd44520baec9a"
+    ],
+    "wayland_artifact": 11670098815,
+    "archive_digest": "sha256:2b407b2335cc28cf8307b4e0b97c6671df2b405ef98762be29d2f0b626fe8cbd",
+    "checks": {
+      "browser": 17,
+      "socket": 9,
+      "theme": 7
+    },
+    "actual_virtual_wayland": true,
+    "installed_niri": false,
+    "real_model_turn": false,
+    "services_runs": [
+      38054323947,
+      38054327071
+    ],
+    "arch_packaging_run": 38054327069,
+    "services_pytest_counts": {
+      "ordinary_haos": 330,
+      "root_authority": 54,
+      "harness": 58,
+      "socket_kernel": 5,
+      "production_systemd": 1,
+      "qemu_actual": 3,
+      "actual_restic": 22,
+      "observer": 1,
+      "nftables": 1,
+      "owner_pam": 1
+    }
+  },
+  "local_counts": {
+    "ordinary_haos": 330,
+    "native": 781,
+    "native_files": 108,
+    "bridge_linux": 334,
+    "bridge_linux_existing_skip": 1,
+    "watchdog_included_in_bridge": 21,
+    "root_restic_at_327": 39,
+    "harness": 58
+  },
+  "release": false,
+  "signed": false,
+  "physical_hardware": false,
+  "limitations": [
+    "Component and installed live-ledger evidence are separate sources.",
+    "Native theme fixture is representative, not the full installed Herald session.",
+    "Provider/Gateway remote integrations, arbitrary host GUI, remote viewer, autonomous themes/plugins, full-system recovery, signing and hardware remain open."
+  ],
+  "historical_failed_installed": {
+    "run": 38048845903,
+    "source_commit": "327f3cdcffd8cf5da1be494c3e176c77196fd867",
+    "guest_artifact": 11669864370,
+    "archive_digest": "sha256:7f92eda7241c184720c38885bbbf7a092637593eacd27ddefe5e85a35a4aff6f",
+    "acceptance_receipt": false,
+    "service_result": "timeout",
+    "guest_budget_seconds": 600,
+    "qemu_cpu_and_serial_progress": true,
+    "installed_success": false
+  }
+}

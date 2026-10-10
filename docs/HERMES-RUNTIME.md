@@ -1,0 +1,21 @@
+# Hermes runtime
+
+`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with web/messaging extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
+
+The reviewed `linux/haos/runtime` overlay pins all runtime requirements with package hashes, including fixes for anyio, multidict, PyJWT, tornado and urllib3. Its preparation checks the exact upstream commit, original pyproject/uv.lock hashes and requirements digest before changing the conflicting PyJWT metadata. Installation requires hashes and `uv pip check`; installed versions and the source/requirements provenance remain in immutable `/usr/lib/haos/runtime-provenance`. Run `37818579514` verified the resolved dependencies with pip-audit, the actual pinned Hermes CLI and an expired-JWT regression. That CI result validates dependencies; the resulting updated Fedora image still requires its own build and guest evidence.
+
+Writable home `/var/lib/haos-agent` appears as `/home/agent`; Hermes data is `/home/agent/.hermes`. `/var/lib/haos-workspace` appears as `/workspace`. Host homes, policy, raw devices, /sys and host sockets are not shared. Minimal passwd/group contains only the agent.
+
+Backend is literal loopback `127.0.0.1:9119`. UI descriptor `/etc/haos/backend.json` points to the protected host token. Invalid managed configuration fails without unrestricted child fallback. Closing the UI does not stop the attached service.
+
+The sandbox launcher passes the systemd credential through an inherited descriptor into a read-only file. The immutable sandbox-side launcher validates it and sets the backend environment before exec. The value is not included in Bubblewrap's public process arguments. The corresponding real kernel probe verifies file transfer and absence from process arguments; require a green result for the latest source commit.
+
+The root-managed [network guard](NETWORK-POLICY.md) is an additional required startup dependency. Its socket-UID rules permit the literal backend and narrow DNS/reply traffic while denying other host/private destinations. Kernel and installed-guest acceptance of this new guard remain pending.
+
+`runtime/probe_backend.py` starts the actual frozen `hermes serve` in fresh isolated state, verifies health and child PID identity, rejects absent/wrong tokens, and creates an authenticated runtime plus durable session through the actual JSON-RPC API. It terminates the child process group on all exits. At `ab2e521`, dependency run `37879468377` passed this real probe, the 80-package audit and JWT regression. The actual Fedora image builds at `ab2e521` and `e8dd0aa` also returned the successful backend receipt; build-time import/start failures now stop image creation. This proves the process/API/dependency contract, not installed systemd namespace startup or model execution.
+
+Downloaded evidence for image `9e0d4a3` from acceptance `37842665549` shows successful installer completion and installed UEFI boot/firstboot, followed by the backend health assertion failing around guest uptime 303 seconds. The later host timeout did not identify the underlying failure. New guarded diagnostics capture bounded, token-redacted service state/journals and power off a failed disposable guest. Full installed-service acceptance remains open.
+
+Provider setup remains upstream configuration inside agent state. A validated HAOS credential wizard/vault is incomplete. Do not copy a human's credential/session directories. No provider-less probe is a real model mission. Bounded restarts do not prove unknown background work stopped; use [recovery](RECOVERY.md).
+
+The replacement reuse `37878610539` completed with the exact cause: Hermes could not traverse the root-created runtime policy directory because systemd `UMask=0077` masked its requested group bits. The broker now explicitly applies root:agent-group 0750 to verified runtime directory inodes, retaining root:agent-group 0640 on the compiled policy. Mounted, writable, foreign-owned and symlinked directories are rejected. The real diagnostic/poweroff path worked; a rebuilt installed guest must still validate the correction.

@@ -7,6 +7,7 @@ import { notify } from '../../store/notifications.ts'
 export function MissionComposer({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState('')
   const [starting, setStarting] = useState(false)
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID())
   const ready = text.trim().length > 0 && !starting
 
   const start = async () => {
@@ -19,7 +20,7 @@ export function MissionComposer({ onClose }: { onClose: () => void }) {
     setStarting(true)
 
     try {
-      await startMission(goal)
+      await startMission(goal, requestKey)
       onClose()
     } catch (error) {
       notify({ title: 'Could not start mission', body: error instanceof Error ? error.message : String(error), level: 'error' })
@@ -37,7 +38,8 @@ export function MissionComposer({ onClose }: { onClose: () => void }) {
         value={text}
         autoFocus
         rows={3}
-        onChange={event => setText(event.target.value)}
+        disabled={starting}
+        onChange={event => { setText(event.target.value); setRequestKey(crypto.randomUUID()) }}
         onKeyDown={event => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()

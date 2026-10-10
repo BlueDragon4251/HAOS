@@ -1,0 +1,242 @@
+name: HAOS x86_64 image and installer build
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    # Harness/diagnostics-only edits retest an existing ISO; they do not need
+    # another multi-gigabyte image build. Keep actual image and guest inputs here.
+    paths: ['linux/**', 'apps/**', 'packages/**', 'plugins/**', 'scripts/sync-upstream.sh', 'tests/e2e/haos_guest.py', 'package*.json', 'upstream/*.lock', '.containerignore', '.github/workflows/haos-image.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keep evidence for each source commit when another commit is being reviewed.
+  group: haos-image-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Reclaim unused toolchains on the disposable build runner
+        run: |
+          set -euo pipefail
+          df -h /
+          # These preinstalled SDKs are not inputs to the HAOS build.
+          for path in /usr/share/dotnet /usr/local/lib/android /opt/ghc; do
+            if [[ -d "$path" ]]; then sudo du -sh "$path"; sudo rm -rf -- "$path"; fi
+          done
+          df -h /
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the native shell from this commit
+        run: |
+          npm run sync-upstream
+          npm ci
+          npm run dist:linux --workspace apps/desktop -- --x64
+          cp apps/desktop/release/herald-os-*-linux-x64.tar.gz herald-os-linux.tar.gz
+          mkdir -p evidence
+          # The pinned CLI handles the intentional security overrides. Retain
+          # its raw graph; normalize duplicate package occurrences without
+          # losing locations/edges or permitting conflicting identities/hashes.
+          npm exec --yes --package=npm@10.9.4 -- npm sbom --sbom-format cyclonedx --omit dev > evidence/npm.raw.cdx.json
+          python3 linux/haos/runtime/verify_sbom.py --normalize-npm evidence/npm.raw.cdx.json evidence/npm.cdx.json
+      - name: Build the pinned-runtime Fedora bootc image
+        run: |
+          set -euo pipefail
+          sudo podman build -f linux/image/Containerfile --build-arg SHELL_TARBALL=herald-os-linux.tar.gz -t localhost/haos:ci . 2>&1 | tee evidence/image-build.log
+          sudo podman image inspect localhost/haos:ci > evidence/image.json
+          sudo podman image inspect quay.io/fedora/fedora-bootc:44 > evidence/base-image.json
+          sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-packages.txt
+          sudo podman run --rm localhost/haos:ci rpm -qa --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\n' > evidence/rpm-with-epochs.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/source.json > evidence/python-runtime-source.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/requirements.txt > evidence/python-runtime-requirements.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/installed.txt > evidence/python-runtime-installed.txt
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/backend-build-probe.json > evidence/backend-build-probe.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/ui-access-build-probe.json > evidence/ui-access-build-probe.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/gateway-build-probe.json > evidence/gateway-build-probe.json
+          sudo podman run --rm localhost/haos:ci cat /usr/lib/haos/runtime-provenance/provider-build-probe.json > evidence/provider-build-probe.json
+      - name: Catalog the actual built image with a digest-pinned offline scanner
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          HAOS_SBOM_DIRECTORY="$(mktemp -d "$RUNNER_TEMP/haos-sbom.XXXXXX")"
+          HAOS_SBOM_CONTAINER=""
+          cleanup_sbom() {
+            if [[ -n "$HAOS_SBOM_CONTAINER" ]]; then docker rm --force "$HAOS_SBOM_CONTAINER" >/dev/null; fi
+            rm -rf -- "$HAOS_SBOM_DIRECTORY"
+          }
+          trap cleanup_sbom EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          # The outer OCI archive reader exceeded memory on the large fixture.
+          # An actual OCI layout keeps the same image identity/catalogers and
+          # passed the same limit; extraction scratch also belongs on disk.
+          sudo podman save --format oci-dir --output "$HAOS_SBOM_DIRECTORY/image" localhost/haos:ci
+          sudo chown -R "$(id -u):$(id -g)" "$HAOS_SBOM_DIRECTORY"
+          mkdir -m 0700 "$HAOS_SBOM_DIRECTORY/scratch"
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          memory = {}
+          for line in Path('/proc/meminfo').read_text().splitlines():
+              name, *rest = line.split()
+              if name in {'MemTotal:', 'MemAvailable:'} and len(rest) == 2 and rest[1] == 'kB':
+                  memory[name[:-1]] = int(rest[0]) * 1024
+          report = {'host_memory_total_bytes': memory['MemTotal'],
+                    'host_memory_available_bytes': memory['MemAvailable'],
+                    'scratch_filesystem_free_bytes': shutil.disk_usage(os.environ['RUNNER_TEMP']).free,
+                    'scanner_memory_limit_bytes': 5 * 1024 ** 3}
+          Path('evidence/sbom-host-resources.json').write_text(json.dumps(report) + '\n')
+          print(json.dumps(report))
+          if report['host_memory_available_bytes'] < report['scanner_memory_limit_bytes'] + 512 * 1024 ** 2:
+              raise ValueError('Insufficient available host memory for the bounded image scan')
+          PY
+          HAOS_SBOM_CONTAINER="$(docker create --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory 5g --memory-swap 5g --cpus 2 --pids-limit 256 \
+            --user "$(id -u):$(id -g)" \
+            -e GOMEMLIMIT=1536MiB -e SYFT_CACHE_DIR=/tmp/cache -e SYFT_CHECK_FOR_APP_UPDATE=false \
+            -v "$HAOS_SBOM_DIRECTORY/image:/image:ro" -v "$HAOS_SBOM_DIRECTORY/scratch:/tmp:rw" \
+            -v "$PWD/evidence:/evidence:rw" \
+            ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa \
+            scan oci-dir:/image --parallelism 1 --quiet \
+            --source-name "$GITHUB_REPOSITORY" --source-version "$GITHUB_SHA" \
+            --output cyclonedx-json@1.6=/evidence/image.cdx.json --output syft-json=/evidence/image.syft.json)"
+          set +e
+          timeout --signal=TERM --kill-after=10s 18m docker start --attach "$HAOS_SBOM_CONTAINER" &
+          HAOS_SBOM_WATCH_PID=$!
+          while kill -0 "$HAOS_SBOM_WATCH_PID" 2>/dev/null; do
+            # Only the owned scanner's aggregate metrics. No args, files or env.
+            docker stats --no-stream --format '{"memory":"{{.MemUsage}}","memory_percent":"{{.MemPerc}}","cpu_percent":"{{.CPUPerc}}","pids":"{{.PIDs}}"}' \
+              "$HAOS_SBOM_CONTAINER" | tee -a evidence/sbom-resource-samples.jsonl
+            sleep 15
+          done
+          wait "$HAOS_SBOM_WATCH_PID"
+          HAOS_SBOM_STATUS=$?
+          set -e
+          # Inspect before cleanup: exit 137 alone cannot prove an OOM kill.
+          docker inspect --format '{{json .State}}' "$HAOS_SBOM_CONTAINER" | python3 -c \
+            'import json,sys; s=json.load(sys.stdin); r={"event":"haos.sbom.scanner", "status":s["Status"], "exit_code":s["ExitCode"], "oom_killed":s["OOMKilled"]}; print(json.dumps(r)); open("evidence/sbom-scanner-status.json","x").write(json.dumps(r)+"\n"); sys.exit(0 if s["Status"]=="exited" and s["ExitCode"]==0 and not s["OOMKilled"] else 1)'
+          if [[ "$HAOS_SBOM_STATUS" -ne 0 ]]; then exit "$HAOS_SBOM_STATUS"; fi
+          python3 linux/haos/runtime/verify_sbom.py evidence --commit "$GITHUB_SHA"
+      - name: Build the UEFI x86_64 installer ISO from the local image
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          sudo podman run --rm --privileged --pull=newer --security-opt label=type:unconfined_t \
+            -v ./output:/output -v ./linux/image/iso.toml:/config.toml:ro \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest --type anaconda-iso --rootfs btrfs --local localhost/haos:ci \
+            2>&1 | tee evidence/iso-build.log
+          sudo chown -R "$(id -u):$(id -g)" output
+          mv output/bootiso/install.iso evidence/haos-x86_64-development.iso
+          (cd evidence && sha256sum haos-x86_64-development.iso > SHA256SUMS)
+          cat evidence/SHA256SUMS
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          def pin(file):
+              return dict(line.split('=', 1) for line in Path(file).read_text().splitlines() if line and not line.startswith('#'))
+          manifest = {'schema': 1, 'release': False, 'signed': False, 'source_commit': os.environ['GITHUB_SHA'],
+                      'source_repository': os.environ['GITHUB_REPOSITORY'], 'architecture': 'x86_64',
+                      'herald': pin('upstream/HERALD.lock'), 'hermes': pin('upstream/UPSTREAM.lock'),
+                      'python_runtime': json.loads(Path('evidence/python-runtime-source.json').read_text()),
+                      'image': json.loads(Path('evidence/image.json').read_text()),
+                      'base_image': json.loads(Path('evidence/base-image.json').read_text()),
+                      'checksums': Path('evidence/SHA256SUMS').read_text(),
+                      'sbom': json.loads(Path('evidence/sbom-index.json').read_text()),
+                      'limitations': ['unsigned development build', 'requires successful QEMU and security acceptance before release',
+                                      'image catalog and npm build graph require embedded-component, vulnerability and license review before release']}
+          Path('evidence/build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - name: Upload small build identity and checksum evidence separately
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-build-metadata-${{ github.sha }}
+          path: |
+            evidence/build-manifest.json
+            evidence/SHA256SUMS
+            evidence/backend-build-probe.json
+            evidence/ui-access-build-probe.json
+            evidence/gateway-build-probe.json
+            evidence/provider-build-probe.json
+            evidence/python-runtime-*.json
+            evidence/python-runtime-*.txt
+            evidence/image.json
+            evidence/base-image.json
+            evidence/rpm-packages.txt
+            evidence/rpm-with-epochs.txt
+            evidence/npm.cdx.json
+            evidence/npm.raw.cdx.json
+            evidence/sbom-index.json
+            evidence/sbom-scanner-status.json
+            evidence/sbom-resource-samples.jsonl
+            evidence/sbom-host-resources.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain full actual image catalogs separately from bounded metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-image-sbom-${{ github.sha }}
+          path: |
+            evidence/image.cdx.json
+            evidence/image.syft.json
+            evidence/npm.cdx.json
+            evidence/npm.raw.cdx.json
+            evidence/image.json
+            evidence/python-runtime-*.json
+            evidence/python-runtime-*.txt
+            evidence/rpm-with-epochs.txt
+            evidence/sbom-index.json
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-x86_64-build-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 7
+
+  install:
+    name: Install and verify in disposable QEMU
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 210
+    steps:
+      - uses: actions/checkout@v7
+      - name: Reclaim unused SDKs on the disposable VM runner
+        run: |
+          for path in /usr/share/dotnet /usr/local/lib/android /opt/ghc; do
+            if [[ -d "$path" ]]; then sudo rm -rf -- "$path"; fi
+          done
+          df -h /
+      - uses: actions/download-artifact@v4
+        with:
+          name: haos-x86_64-build-${{ github.sha }}
+          path: image-evidence
+      - name: Verify ISO checksum and prepare the VM tools
+        run: |
+          (cd image-evidence && sha256sum -c SHA256SUMS)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf p7zip-full e2fsprogs acl ripgrep
+          if [[ -c /dev/kvm ]]; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm || echo 'KVM ACL unavailable; the harness will probe TCG'
+          fi
+      - name: Install, enforce multi-disk boundaries and reboot
+        run: bash scripts/test-haos-iso.sh image-evidence/haos-x86_64-development.iso vm-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-qemu-acceptance-${{ github.sha }}
+          path: vm-evidence/
+          if-no-files-found: error
+          retention-days: 7

@@ -70,7 +70,8 @@ import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/model
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
-import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { ThemePreview, ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { MissionMethods } from '../shared/missions.ts'
 
 type Unsubscribe = () => void
 
@@ -88,6 +89,10 @@ const subscribe = <T,>(channel: string, listener: (payload: T) => void): Unsubsc
 
 /** The whole capability surface the renderer gets. Keep it narrow and typed. */
 const api = {
+  missions: {
+    serviceInfo: (): Promise<{ managed: boolean }> => ipcRenderer.invoke(IPC.missionServiceInfo),
+    request: <M extends keyof MissionMethods>(method: M, params: MissionMethods[M]['params']): Promise<MissionMethods[M]['result']> => ipcRenderer.invoke(IPC.missionRequest, method, params)
+  },
   backend: {
     getState: (): Promise<BackendState> => ipcRenderer.invoke(IPC.backendGetState),
     onState: (listener: (state: BackendState) => void): Unsubscribe => subscribe(IPC.backendState, listener),
@@ -162,9 +167,11 @@ const api = {
   },
   theme: {
     list: (): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeList),
+    history: (name: string): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeHistory, name),
+    preview: (name: string, revision?: string): Promise<ThemePreview> => ipcRenderer.invoke(IPC.themePreview, name, revision),
     /** Apply an installed theme everywhere; resolves with the new preferences. */
-    apply: (name: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name),
-    /** Save a theme into ~/.config/herald-os/themes (with its wallpaper image copied in). */
+    apply: (name: string, revision?: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name, revision),
+    /** Save a complete versioned bundle; previous manifests/assets remain available. */
     save: (spec: ThemeSpec, imagePath?: string): Promise<string> => ipcRenderer.invoke(IPC.themeSave, spec, imagePath),
     /** A small PNG data URL of an image, to take theme colours from (null when it is not an image). */
     sample: (imagePath: string): Promise<string | null> => ipcRenderer.invoke(IPC.themeSample, imagePath),

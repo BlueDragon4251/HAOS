@@ -1,3 +1,23 @@
+# Hermes Autonomous OS (HAOS)
+
+Private development repository based on [Herald OS](https://github.com/iamlukethedev/Herald-OS), with its full imported history, MIT license and authorship preserved. HAOS is independent of Herald and Nous Research.
+
+HAOS adds an independent systemd Hermes runtime, persistent SQLite missions, root-owned UUID/PARTUUID storage policy and native mission controls. The UI attaches to the service. Agent code runs without owner privileges in a mandatory Bubblewrap namespace.
+
+**Development status:** no accepted production release. Desktop build/type checks and 731 tests passed; 108 Linux tests passed locally. The current service revision passed 33 HAOS unit tests, two real socket/kernel probes (including protected credential transfer) and systemd syntax in CI. The Fedora image and installer generation passed at `06fda70`; artifact upload and installation acceptance are separate gates. A green desktop suite or generated ISO does not prove an accepted OS.
+
+- [Implementation and evidence](docs/HAOS.md)
+- [Install](docs/INSTALL.md), [runtime](docs/HERMES-RUNTIME.md), [missions](docs/MISSIONS.md), [storage](docs/STORAGE-POLICY.md)
+- [Owner setup](docs/OWNER-SETUP.md), [recovery](docs/RECOVERY.md), [known limitations](docs/KNOWN-LIMITATIONS.md)
+- [Testing](docs/TESTING.md), [release gates](docs/RELEASE.md), [threat model](docs/THREAT-MODEL.md)
+- [Complete requirements](docs/requirements/HAOS-MASTER-PROMPT.md)
+
+Work is on `agent/haos-foundation` in draft PR #1 against `dev`; `main` retains the imported baseline. Hermes remains an independently pinned upstream dependency.
+
+The original Herald README follows as upstream reference. Its downloads, platform support and installation commands describe Herald, not a verified HAOS release. HAOS build artifacts remain private.
+
+---
+
 <p align="center">
   <img src="apps/desktop/build/icon.png" alt="Herald OS" width="112">
 </p>

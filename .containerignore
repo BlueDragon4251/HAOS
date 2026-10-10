@@ -1,0 +1,7 @@
+**
+!linux/
+!linux/**
+!upstream/
+!upstream/hermes-agent/
+!upstream/hermes-agent/**
+!herald-os-linux.tar.gz

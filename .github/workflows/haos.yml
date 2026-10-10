@@ -1,0 +1,97 @@
+name: HAOS services and kernel boundaries
+
+on:
+  pull_request:
+  push:
+    branches: [dev, 'agent/haos-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: haos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  services:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3
+      - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py
+      - name: Root-authority backup and policy-access tests in disposable fixtures
+        run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py linux/haos/probes/test_policy_access.py linux/haos/probes/test_gateway_authority.py linux/haos/probes/test_gateway_recovery_authority.py linux/haos/probes/test_owner_recovery.py linux/haos/probes/test_provider_authority.py linux/haos/probes/test_ui_authority.py
+      - name: QEMU runtime selection and privileged guest fixture regression tests
+        run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py tests/e2e/test_guest_owner.py tests/e2e/test_evidence_inspection.py tests/e2e/test_image_selection.py
+      - name: Real local socket and kernel filesystem probes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools e2fsprogs xfsprogs btrfs-progs
+          # Ubuntu's packaged profile permits the launcher to create its sandbox,
+          # then removes capabilities from its children. Keep AppArmor enabled.
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          python -m pytest -q linux/haos/probes --ignore=linux/haos/probes/test_qemu_runtime.py --ignore=linux/haos/probes/test_backup_restore.py --ignore=linux/haos/probes/test_backup_lifecycle.py --ignore=linux/haos/probes/test_backup_schedule.py --ignore=linux/haos/probes/test_backup_checkpoint.py --ignore=linux/haos/probes/test_observer_authority.py --ignore=linux/haos/probes/test_network_boundary.py --ignore=linux/haos/probes/test_owner_enrollment.py --ignore=linux/haos/probes/test_policy_access.py --ignore=linux/haos/probes/test_systemd_sandbox.py --ignore=linux/haos/probes/test_gateway_authority.py --ignore=linux/haos/probes/test_gateway_recovery_authority.py --ignore=linux/haos/probes/test_owner_recovery.py --ignore=linux/haos/probes/test_provider_authority.py --ignore=linux/haos/probes/test_ui_authority.py --ignore=linux/haos/probes/test_volume_acl.py
+      - name: Delegate and revoke real ACLs on isolated ext4 xfs btrfs disks
+        run: sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 GITHUB_SHA="$GITHUB_SHA" "$(command -v python)" linux/haos/probes/run_volume_acl.py
+      - name: Launch the isolated filesystem view under actual production systemd hardening
+        run: |
+          HAOS_SYSTEMD_TEST_DIR="$(sudo mktemp -d /run/haos-systemd-XXXXXXXX)"
+          trap 'sudo rm -rf -- "$HAOS_SYSTEMD_TEST_DIR"' EXIT
+          sudo chown "$(id -u):$(id -g)" "$HAOS_SYSTEMD_TEST_DIR"
+          HAOS_DISPOSABLE_CI=1 HAOS_SYSTEMD_FIXTURE_DIR="$HAOS_SYSTEMD_TEST_DIR" python -m pytest -q -s linux/haos/probes/test_systemd_sandbox.py
+      - name: Record actual diskless QEMU acceleration
+        run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
+      - name: Actual encrypted retention, corrupt-data denial and damaged fixture restore
+        run: |
+          restic version
+          sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_backup_restore.py linux/haos/probes/test_backup_lifecycle.py linux/haos/probes/test_backup_schedule.py linux/haos/probes/test_backup_checkpoint.py
+      - name: Deny inherited observer administrator rights on a disposable account
+        run: |
+          # Hosted runner's existing rule has a nonstandard mode; tighten only
+          # that disposable fixture file before the strict full visudo check.
+          if sudo test -f /etc/sudoers.d/runner; then
+            sudo stat -c '%a %U %n' /etc/sudoers.d/runner
+            sudo chmod 0440 /etc/sudoers.d/runner
+          fi
+          sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_observer_authority.py
+      - name: Validate service unit syntax
+        run: systemd-analyze verify linux/haos/*.service linux/haos/*.socket linux/haos/*.timer
+      - name: Enforce the actual agent socket UID boundary with nftables
+        run: sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_network_boundary.py
+      - name: Verify real owner password authentication and fixed CLI authority
+        run: |
+          sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 "$(command -v python)" - <<'PY'
+          import os, shutil, stat, subprocess, sys, tempfile
+          from pathlib import Path
+          assert os.geteuid() == 0
+          assert os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('HAOS_DISPOSABLE_CI') == '1'
+          env = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C', 'LC_ALL': 'C'}
+          def command(*args):
+              return subprocess.run(args, env=env, check=True, capture_output=True, text=True, timeout=30)
+          defaults = command('/usr/sbin/useradd', '--defaults').stdout
+          configuration = Path('/etc/default/useradd')
+          metadata = configuration.lstat()
+          assert stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and not metadata.st_mode & 0o022
+          original = configuration.read_bytes()
+          skeleton = Path(tempfile.mkdtemp(prefix='haos-owner-skel-', dir='/run'))
+          try:
+              # Hosted /etc/skel includes ~815 MiB of unrelated toolchains. Use
+              # a root-private fixture while retaining the actual enrollment CLI,
+              # its deadline and every PAM/sudo assertion.
+              lines = [line for line in original.decode().splitlines() if not line.lstrip().startswith('SKEL=')]
+              configuration.write_text('\n'.join(lines) + '\nSKEL=' + str(skeleton) + '\n')
+              assert 'SKEL=' + str(skeleton) in command('/usr/sbin/useradd', '--defaults').stdout.splitlines()
+              result = subprocess.run([sys.executable, '-m', 'pytest', '-q', '-s',
+                                       'linux/haos/probes/test_owner_enrollment.py'])
+          finally:
+              try:
+                  configuration.write_bytes(original)
+                  assert configuration.read_bytes() == original
+                  assert command('/usr/sbin/useradd', '--defaults').stdout == defaults
+              finally:
+                  shutil.rmtree(skeleton)
+          raise SystemExit(result.returncode)
+          PY
