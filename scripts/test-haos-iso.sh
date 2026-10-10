@@ -90,16 +90,25 @@ run_vm install 7200 "$HAOS_TEST_EVIDENCE/install.log" -drive "file=$HAOS_TEST_IS
   -append "inst.stage2=hd:LABEL=$HAOS_TEST_LABEL inst.ks=http://10.0.2.2:8000/ks.cfg inst.text console=ttyS0,115200"
 rg -qi 'reboot: Power down|Power down' "$HAOS_TEST_EVIDENCE/install.log"
 # The installer never sees the data disks. Each filesystem is created in a fresh regular file.
-for disk in a b; do
+for disk in a b c; do
   truncate -s 256M "data-$disk.raw"
   [[ -f "data-$disk.raw" && ! -b "data-$disk.raw" ]]
 done
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000001 data-a.raw >/dev/null
 mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000002 data-b.raw >/dev/null
+mkfs.ext4 -F -U 42514251-0000-4000-8000-000000000003 data-c.raw >/dev/null
 for stage in 1 2; do
+  # The removable fixture exists on boot 1 and is physically absent from boot
+  # 2's VM topology. Never detach a live host device or discard its backing file.
+  HAOS_TEST_REMOVABLE=()
+  if [[ "$stage" == 1 ]]; then
+    HAOS_TEST_REMOVABLE=( -drive file=data-c.raw,format=raw,if=none,id=data-c
+      -device virtio-blk-pci,drive=data-c,serial=HAOS-CI-DATA-C )
+  fi
   run_vm "boot-$stage" 1800 "$HAOS_TEST_EVIDENCE/boot-$stage.log" \
     -drive file=data-a.raw,format=raw,if=none,id=data-a -device virtio-blk-pci,drive=data-a,serial=HAOS-CI-DATA-A \
-    -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B
+    -drive file=data-b.raw,format=raw,if=none,id=data-b -device virtio-blk-pci,drive=data-b,serial=HAOS-CI-DATA-B \
+    "${HAOS_TEST_REMOVABLE[@]}"
   python3 - "$HAOS_TEST_EVIDENCE/boot-$stage.log" "$stage" "$HAOS_TEST_EVIDENCE" <<'PY'
 import json, re, sys
 from pathlib import Path

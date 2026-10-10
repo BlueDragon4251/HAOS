@@ -19,6 +19,7 @@ spec.loader.exec_module(guest)
 
 @pytest.mark.parametrize("file,function,variable", [
     ("tests/e2e/haos_guest.py", "sandbox_probe", "script"),
+    ("tests/e2e/haos_guest.py", "disconnected_volume_probe", "script"),
     ("linux/haos/probes/test_kernel.py", "run_agent_filesystem_probe", "probe"),
 ])
 def test_actual_embedded_filesystem_programs_compile_before_privileged_launch(file, function, variable):
@@ -56,6 +57,10 @@ def test_owner_provisioning_cannot_mutate_an_unmarked_or_forged_guest(monkeypatc
         guest.owner_authentication_proof(first_boot=True)
     with pytest.raises(PermissionError):
         guest.sandbox_probe("rw")
+    with pytest.raises(PermissionError):
+        guest.disconnected_volume_probe()
+    with pytest.raises(PermissionError):
+        guest.namespace_probe([], "never executed", [], "forged-guest")
 
 
 def test_sandbox_failure_reports_bounded_redacted_stderr_without_command_or_stdout(tmp_path, monkeypatch):
@@ -76,5 +81,21 @@ def test_sandbox_failure_reports_bounded_redacted_stderr_without_command_or_stdo
     assert "PermissionError" in message and "[REDACTED]" in message
     assert len(message) < 2100 and "acceptance-unused-token" not in message
     assert "stdout-private-fixture" not in message and "--reuid" not in message
+    with pytest.raises(OSError):
+        os.fstat(descriptors[0])
+
+
+def test_namespace_configuration_failure_closes_its_actual_fixture_descriptor(tmp_path, monkeypatch):
+    monkeypatch.setattr(guest, "require_disposable_guest", lambda: None)
+    monkeypatch.setattr(guest, "ROOT", tmp_path)
+    descriptors = []
+    def reject(grants, fd, **kwargs):
+        descriptors.append(fd)
+        raise ValueError("invalid namespace plan")
+    monkeypatch.setattr(guest, "command", reject)
+    monkeypatch.setattr(guest.subprocess, "run", lambda *a, **k: pytest.fail("rejected plan launched a process"))
+    with pytest.raises(ValueError, match="namespace plan"):
+        guest.namespace_probe([], "never executed", [], "configuration-failure")
+    assert len(descriptors) == 1
     with pytest.raises(OSError):
         os.fstat(descriptors[0])

@@ -23,6 +23,7 @@ from haos.sandbox import command, trusted_json
 ROOT = Path("/var/lib/haos-acceptance")
 A = "42514251-0000-4000-8000-000000000001"
 B = "42514251-0000-4000-8000-000000000002"
+C = "42514251-0000-4000-8000-000000000003"
 
 
 def require_disposable_guest():
@@ -191,25 +192,45 @@ def active(unit):
     return subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0
 
 
-def sandbox_probe(mode):
+def namespace_probe(grants, script, arguments, label):
     require_disposable_guest()
-    grants = trusted_json(Path("/run/haos-policy/sandbox.json"))["grants"]
     credential = ROOT / "probe-credential"
     credential.write_text("acceptance-unused-token")
     fd = os.open(credential, os.O_RDONLY)
     # The root test drops to the service UID before Bubblewrap; the inherited fd
     # still carries only this disposable fixture, never the real service token.
-    args = command(grants, fd, certificates=[])
+    try:
+        args = command(grants, fd, certificates=[])
+        args = args[:args.index("--") + 1] + ["/usr/bin/python3.11", "-I", "-c", script, *arguments]
+        account = pwd.getpwnam("haos-agent")
+        result = subprocess.run(["/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
+            "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
+            *args], pass_fds=(fd,), capture_output=True, text=True, timeout=60)
+    finally:
+        os.close(fd)
+    if result.returncode:
+        from haos.redaction import Redactor
+        # Only a disposable credential FD; no command/script or stdout dump.
+        detail = Redactor(["acceptance-unused-token"]).text(result.stderr[-2000:])
+        raise RuntimeError(f"sandbox {label} probe failed (exit {result.returncode}): {detail}")
+    return json.loads(result.stdout)
+
+
+def sandbox_probe(mode):
+    require_disposable_guest()
+    grants = trusted_json(Path("/run/haos-policy/sandbox.json"))["grants"]
     key = hashlib.sha256(f"UUID:{A}".encode()).hexdigest()
+    removable = hashlib.sha256(f"UUID:{C}".encode()).hexdigest()
     script = r'''
 import ctypes, errno, json, os, pathlib, sys
 volume, mode, blocked = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+removable = pathlib.Path(sys.argv[4])
 assert os.getuid() != 0
 status = pathlib.Path('/proc/self/status').read_text()
 assert 'NoNewPrivs:\t1' in status and 'CapEff:\t0000000000000000' in status
 assert (volume / 'canary').read_text() == 'approved fixture'
 for path in [pathlib.Path('/home/hermes/haos-owner-canary'), pathlib.Path(blocked),
-             pathlib.Path('/dev/vda'), pathlib.Path('/dev/vdb'), pathlib.Path('/dev/vdc'),
+             pathlib.Path('/dev/vda'), pathlib.Path('/dev/vdb'), pathlib.Path('/dev/vdc'), pathlib.Path('/dev/vdd'),
              pathlib.Path('/etc/haos/volumes.json'), pathlib.Path('/run/haos-policy/sandbox.json'),
              pathlib.Path('/run/haos-control/control.sock'), pathlib.Path('/run/docker.sock'),
              pathlib.Path('/sys/kernel'), volume / 'escape']:
@@ -219,6 +240,8 @@ for path in [pathlib.Path('/home/hermes/haos-owner-canary'), pathlib.Path(blocke
 try: pathlib.Path('/etc/haos/volumes.json').write_text('{}')
 except OSError: pass
 else: raise AssertionError('agent rewrote owner policy')
+assert (removable / 'canary').read_text() in ('removable fixture', 'edited removable fixture')
+(removable / 'canary').write_text('edited removable fixture')
 if mode == 'rw':
     foreign = volume / 'foreign-private' / 'foreign-file'
     # Host ownership is verified by the root fixture below. Only the service
@@ -243,26 +266,41 @@ assert libc.unshare(0x10000000) == -1 and ctypes.get_errno() in (errno.EPERM, er
 assert libc.mount(b'/usr', b'/workspace', None, 4096, None) == -1 and ctypes.get_errno() == errno.EPERM
 assert not pathlib.Path('/proc/1/root/home/hermes/haos-owner-canary').exists()
 print(json.dumps({'mode': mode, 'data_access': True, 'blocked_volume_hidden': True,
+                  'connected_removable_volume_read_write': True,
                   'foreign_owner_write_rename_delete': mode == 'rw',
                   'owner_policy_immutable': True, 'raw_devices_hidden': True,
                   'mount_denied': True, 'nested_userns_denied': True}))
 '''
-    args = args[:args.index("--") + 1] + ["/usr/bin/python3.11", "-I", "-c", script,
-        f"/volumes/{key}", mode, str(ROOT / "blocked" / "canary")]
-    account = pwd.getpwnam("haos-agent")
-    try:
-        result = subprocess.run(["/usr/bin/setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}",
-            "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
-            *args], pass_fds=(fd,), capture_output=True, text=True, timeout=60)
-    finally:
-        os.close(fd)
-    if result.returncode:
-        from haos.redaction import Redactor
-        # Never dump the command (which embeds the complete script), arbitrary
-        # stdout, or real service credentials. This probe has only a fixture FD.
-        detail = Redactor(["acceptance-unused-token"]).text(result.stderr[-2000:])
-        raise RuntimeError(f"sandbox {mode} probe failed (exit {result.returncode}): {detail}")
-    return json.loads(result.stdout)
+    return namespace_probe(grants, script,
+        [f"/volumes/{key}", mode, str(ROOT / "blocked" / "canary"), f"/volumes/{removable}"], mode)
+
+
+def disconnected_volume_probe():
+    require_disposable_guest()
+    policy = trusted_json(Path("/etc/haos/volumes.json"))
+    assert {"id": f"UUID:{C}", "mode": "full-data-access"} in policy["volumes"]
+    runtime = trusted_json(Path("/run/haos-policy/sandbox.json"))
+    key = hashlib.sha256(f"UUID:{C}".encode()).hexdigest()
+    assert runtime["unavailable"] == [{"id": f"UUID:{C}", "mode": "full-data-access", "key": key,
+                                        "reason": "not-connected"}]
+    assert all(grant["key"] != key for grant in runtime["grants"])
+    script = r'''
+import json, os, pathlib, sys
+assert os.getuid() != 0
+volume = pathlib.Path('/volumes') / sys.argv[1]
+assert not volume.exists()
+assert str(volume) not in {line.split()[4] for line in pathlib.Path('/proc/self/mountinfo').read_text().splitlines()}
+for operation in (lambda: (volume / 'canary').read_bytes(), lambda: (volume / 'canary').write_text('forbidden')):
+    try: operation()
+    except OSError: pass
+    else: raise AssertionError('disconnected volume remained accessible')
+assert pathlib.Path('/workspace/acceptance-result').read_text() == 'actual workspace write'
+print(json.dumps({'installed_disconnected_volume_namespace_denied': True,
+                  'installed_remaining_workspace_access_preserved': True}))
+'''
+    return {**namespace_probe(runtime["grants"], script, [key], "disconnected-volume"),
+            "installed_disconnected_volume_owner_policy_preserved": True,
+            "installed_disconnected_volume_compiled_bind_absent": True}
 
 
 def main():
@@ -271,6 +309,10 @@ def main():
     assert any(d.get("uuid") == A and d.get("serial") == "HAOS-CI-DATA-A" for d in devices)
     assert any(d.get("uuid") == B and d.get("serial") == "HAOS-CI-DATA-B" for d in devices)
     stamp = ROOT / "mission.json"
+    if not stamp.exists():
+        assert any(d.get("uuid") == C and d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
+    else:
+        assert not any(d.get("uuid") == C or d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
     if not stamp.exists():
         # Fresh production systems hold execution until the owner is enrolled.
         run("haos-owner", "stop")
@@ -379,6 +421,16 @@ def main():
             run("umount", str(fixture_data))
         run("haos-owner", "volume", f"UUID:{A}", "full-data-access")
         run("haos-owner", "volume", f"UUID:{B}", "blocked")
+        removable_fixture = ROOT / "removable-fixture"
+        removable_fixture.mkdir()
+        run("mount", "-o", "nodev,nosuid,noexec", f"/dev/disk/by-uuid/{C}", str(removable_fixture))
+        try:
+            (removable_fixture / "canary").write_text("removable fixture")
+            (removable_fixture / "canary").chmod(0o600)
+            os.chown(removable_fixture / "canary", 65533, 65533)
+        finally:
+            run("umount", str(removable_fixture))
+        run("haos-owner", "volume", f"UUID:{C}", "full-data-access")
         run("haos-owner", "prepare")
         key = hashlib.sha256(f"UUID:{A}".encode()).hexdigest()
         data = Path("/run/haos-volumes") / key
@@ -425,8 +477,10 @@ def main():
         assert row["state"] == "cancelled" and row["idempotency_key"] == "reboot-persistence"
         assert store.events(row["id"])
         store.close()
+        disconnected_proof = disconnected_volume_probe()
         print("HAOS_ACCEPTANCE_JSON=" + json.dumps({"stage": 2, "journal_survives_reboot": True,
             "backend_healthy_after_reboot": True, "mission_id": row["id"], **observer_proof, **installed_owner_proof,
+            **disconnected_proof,
             "limitations": ["offline cancelled queue fixture; no real provider mission", "theme/gateway/off-host/whole-system recovery not covered"]}), flush=True)
     run("systemctl", "poweroff")
 
