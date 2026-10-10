@@ -58,8 +58,8 @@ per principal per minute is the limit. The outbox persists status, terminal resu
 notifications without exporting arbitrary tool logs. Replies are redacted and durably chunked.
 Explicit retryable failures use bounded retries/server delay. An uncertain send or crashed sender
 is retained as `uncertain`, because the adapters do not promise idempotent delivery. HAOS never
-silently treats it as delivered or blindly repeats it. Owner reconciliation of these rows remains
-to be implemented. Model dispatch ambiguity retains the existing blocked-mission behavior.
+silently treats it as delivered or blindly repeats it. Model dispatch ambiguity retains the
+existing blocked-mission behavior.
 
 Queue pause/resume and their inbox/outbox receipts commit in the same transaction.
 Pause survives restart without holding an execution lock. Resume preserves the
@@ -72,6 +72,41 @@ Stop the gateway before editing pairing/credentials. `gateway revoke BINDING_ID`
 authority; `gateway remove CONNECTOR_ID` also removes its credential. Start afterward. Changed
 bindings cannot redirect old results. Queued deliveries to revoked routes are marked revoked.
 Revocation does not automatically cancel an already admitted mission; cancel it separately.
+
+## Owner recovery of uncertain replies
+
+Stop all runtime services with `sudo haos-owner stop`, then run
+`sudo haos-owner gateway deliveries`. This paginated metadata list includes the
+delivery ID, actual attempt number, mission ID and content digest; it exports no
+message text, recipient or credential. Use `--after CURSOR` to continue.
+Inspect the actual authenticated transport separately before deciding:
+
+```sh
+# A confirmed existing Telegram/Discord message: no resend.
+sudo haos-owner gateway reconcile-delivery DELIVERY_ID --attempt 1 --decision delivered --receipt REMOTE_NUMERIC_MESSAGE_ID --note 'Inspected the transport receipt'
+# Retry only if inspection established that the reply was not delivered.
+sudo haos-owner gateway reconcile-delivery DELIVERY_ID --attempt 1 --decision retry --confirm-not-delivered --note 'Verified non-delivery in the transport'
+# Otherwise permanently revoke this particular delivery.
+sudo haos-owner gateway reconcile-delivery DELIVERY_ID --attempt 1 --decision discard --note 'Uncertainty cannot be resolved safely'
+sudo haos-owner start
+```
+
+Do not put secrets in notes or command arguments. Only the inspection note's
+SHA-256 is stored in the mission and owner audit; keep detailed evidence privately.
+A hash is trace metadata, not encryption. A retry requires the unchanged authorized
+binding, `read` capability, explicit non-delivery confirmation and an unexhausted
+five-attempt budget. Attempts are never reset. Stale decisions cannot affect a
+later send, pending/delivered/revoked rows cannot be reconciled again, and repair
+never changes/requeues the mission. Discard is terminal for that delivery.
+
+The authenticated root CLI verifies stopped services and delegates SQLite work to
+the unprivileged `haos-control` UID with no supplemental groups. It never opens the
+service-owned ledger as root or sends a transport token to that child. The helper
+requires private, correctly owned regular SQLite files, rejects links/missing
+ledgers, bounds memory/CPU/runtime/input/output and emits error types without private
+payloads. None of these operations is exposed by the UI/gateway sockets. Local
+SQLite, validation and actual demoted-UID/canary tests are separate from real provider
+delivery evidence; live Codex/Telegram acceptance remains blocked on credentials.
 
 ## Evidence and remaining acceptance
 

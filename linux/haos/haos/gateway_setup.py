@@ -2,7 +2,10 @@
 
 import getpass
 import grp
+import hashlib
+import json
 import os
+import pwd
 import stat
 import subprocess
 from pathlib import Path
@@ -12,6 +15,41 @@ from .policy import atomic_json
 from .sandbox import trusted_json
 
 CONFIG = Path("/etc/haos")
+
+
+def owner_delivery(args, policy):
+    """Drop root before opening controller-owned SQLite; keep credentials out of the child."""
+    from .owner import audit, stopped
+    if os.geteuid() != 0:
+        raise PermissionError("outbox reconciliation requires authenticated owner authority")
+    stopped_gateway()
+    stopped()
+    GatewayPolicy(policy)
+    params = {"after": args.after} if args.gateway_action == "deliveries" else None
+    if params is None:
+        if not isinstance(args.note, str) or not 1 <= len(args.note.strip()) <= 2000:
+            raise ValueError("bounded non-secret owner inspection evidence is required")
+        params = {"delivery_id": args.delivery_id, "attempt": args.attempt, "decision": args.decision,
+                  "owner_uid": int(os.environ.get("SUDO_UID", "0")),
+                  "note_sha256": hashlib.sha256(args.note.strip().encode()).hexdigest(), "receipt": args.receipt,
+                  "confirmed_not_delivered": args.confirm_not_delivered}
+    directory = Path("/usr/lib/haos").lstat()
+    if not stat.S_ISDIR(directory.st_mode) or directory.st_uid != 0 or directory.st_mode & 0o022:
+        raise PermissionError("untrusted installed recovery code")
+    account = pwd.getpwnam("haos-control")
+    if account.pw_uid == 0 or account.pw_gid == 0:
+        raise PermissionError("controller recovery may not retain root")
+    result = subprocess.run(["/usr/bin/python3", "-E", "-s", "-m", "haos.gateway_recovery"],
+                            input=json.dumps({"action": args.gateway_action, "policy": policy, "params": params}),
+                            text=True, capture_output=True, check=False, timeout=15,
+                            user=account.pw_uid, group=account.pw_gid, extra_groups=[], umask=0o077,
+                            cwd="/usr/lib/haos", env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"})
+    if result.returncode or len(result.stdout) > 256 * 1024:
+        raise RuntimeError("offline outbox recovery failed; inspect the private ledger and selected attempt")
+    value = json.loads(result.stdout)
+    if args.gateway_action == "reconcile-delivery":
+        audit("gateway.delivery-reconciled", {**value, "note_sha256": params["note_sha256"]})
+    return value
 
 
 def stopped_gateway():
@@ -63,6 +101,8 @@ def owner_gateway(args):
     policy, credentials = load()
     if args.gateway_action == "status":
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
+    if args.gateway_action in {"deliveries", "reconcile-delivery"}:
+        return owner_delivery(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
         if args.platform not in {"telegram", "discord"}:

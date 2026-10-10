@@ -75,7 +75,7 @@ def test_local_api_has_no_owner_policy_or_privileged_execution_endpoint(tmp_path
         controller = Controller(store, "ws://127.0.0.1:9119/api/ws", {1000})
         row = await controller.dispatch("uid:1000", {"method": "missions.create", "params": {"goal": "Build", "idempotency_key": "a", "actor": "owner:0"}})
         assert row["actor"] == "uid:1000"
-        for method in ("policy.write", "volume.unlock", "owner.reconcile", "exec"):
+        for method in ("policy.write", "volume.unlock", "owner.reconcile", "gateway.reconcile-delivery", "gateway.deliveries", "exec"):
             with pytest.raises(ValueError, match="unknown"):
                 await controller.dispatch("uid:1000", {"method": method, "params": {}})
         store.close()

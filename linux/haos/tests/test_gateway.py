@@ -189,7 +189,7 @@ def test_gateway_api_has_no_general_controller_or_owner_capability(tmp_path, pol
     store = MissionStore(tmp_path / "missions.db")
     controller = Controller(store, "ws://127.0.0.1:9119", set())
     controller.gateway_policy = lambda: GatewayPolicy(policy_config)
-    for method in ("missions.list", "missions.create", "owner.reconcile", "exec", "volume.unlock"):
+    for method in ("missions.list", "missions.create", "owner.reconcile", "gateway.reconcile-delivery", "gateway.deliveries", "exec", "volume.unlock"):
         with pytest.raises(PermissionError):
             asyncio.run(controller.gateway_dispatch({"method": method}))
     store.close()
