@@ -20,6 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
     "test:theme-preview": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-theme-preview.mjs",
+    "test:theme-activation": "electron --ozone-platform=wayland --disable-gpu scripts/test-theme-activation.mjs",
     "test:gui-broker": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-broker.mjs",
     "test:gui-integration": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-integration.mjs",
     "test:gui-wayland": "python3 ../../scripts/test-gui-wayland.py",

@@ -6,35 +6,46 @@ The [complete requirements](requirements/HAOS-MASTER-PROMPT.md) are the delivery
 
 ## Current acceptance status (2026-10-10)
 
-The [mission-scoped GUI broker](GUI-CAPABILITIES.md) now creates real native local
-browser windows for the active Hermes mission, with separate kernel-authenticated
-agent ingress, targeted renderer input/capture and durable no-replay receipts.
-Local verification: **321 ordinary HAOS tests**, **three real Unix probes**,
-**773 native tests**, TypeScript and production build pass. Actual Chromium
-checks fill two fields, read their actual DOM values, mask password/file fields,
-capture changed pixels and verify both renderer sandbox states plus
-network/chooser/clipboard/foreign-window denials. The pinned Hermes
-registry exposes the real tool through its terminal/deferred catalog. These are
-component receipts. The actual native/controller Unix pipeline also passes input,
-capture, denied methods, lost acknowledgement and controller process restart;
-the interrupted fixture mission is blocked without replay. A real private Weston
-14.0.2 virtual Wayland session passes both gates and records actual mission
-toplevel/surface protocol. It uses an explicit providerless fixture, with no
-installed niri or hardware claim. General CI, services and Arch packaging passed
-at `9815847` and `71cc361`; their new installer runs remain pending. Installed
-Wayland/model-driven acceptance remains required. Arbitrary host apps, online
-browsing and complete GUI autonomy are still open.
+The existing [mission-scoped GUI broker](GUI-CAPABILITIES.md) now coordinates
+four real isolated native local browser windows, reads bounded visible layout text
+without persisting its body, and scrolls the actual renderer. Current local checks
+include **330 ordinary HAOS tests**, **three actual Unix probes**, **781 native
+tests**, TypeScript and the production build. The real browser/controller pipeline
+retains sandbox, network/chooser/clipboard/foreign-window denials, acknowledgement
+loss without replay and controller restart with a blocked interrupted mission.
+The historical Weston kiosk fixture exhibited an actual compositor SIGSEGV; the
+real desktop-shell fixture preserves all these assertions and records compositor
+status. Its Ubuntu 24.04/Weston 13 gate also exercises production saved-theme
+activation and rollback with actual renderer pixels. Installed niri, arbitrary
+host apps, online browsing, remote streaming and model-driven GUI acceptance are
+still open.
 
-Owner-configured encrypted local daily/weekly scheduling now reuses Restic and
-retention, defers active execution and durably blocks uncertain modifying attempts.
-**28 root-authority/real Restic tests** pass in a disposable offline container,
-including seven new scheduler cases and existing corrupt-data/staged restore gates.
-The real PAM/sudo owner probe passes after selecting a disposable password through
-the unchanged production quality check. A prior PR run rejected a random fixture
-password; this is retained as failed evidence. The installed QEMU gate now requires
-the actual scheduled service/snapshot restore; matching new receipts are pending.
-Always-running execution defers scheduling until owner maintenance; live coherent
-snapshots and complete system recovery remain open.
+[Saved Linux session themes](THEME-SDK.md) now use a separate unprivileged
+30-second watchdog, fixed-output/theme-only durable snapshots, atomic preference
+publication and actual connected-renderer confirmation. **21 Linux watchdog
+cases** exercise real parent SIGKILL, partial writes, expiry, changed identities,
+killed watcher, private-file/path denials, conflict preservation, bootc home aliases
+and recovery before compositor launch. The virtual Wayland fixture checks real
+preview/engine/renderer activation, unreadable draft denial and restoration of the
+prior visible renderer after an intentionally unusable candidate. These are
+component gates, not autonomous theme generation or installed full-session proof.
+
+The [same encrypted backup scheduler](RECOVERY.md) now supports an explicit
+owner-selected live `mission-ledger` scope through a bounded, WAL-aware SQLite
+online checkpoint. **39 root/actual Restic cases** prove concurrent committed
+transactions, real read-only source mounts, encrypted backup/staged restore and
+no blind redispatch of restored uncertain missions. System scope still requires
+stopped execution; whole-file-system consistency/off-host/full bootable recovery
+remain open. **58 harness/evidence cases** pass. New installed live-scope receipts
+are evaluated separately from an image build.
+
+All five earlier requested image/QEMU runs are successful and their original
+ZIP/source/checksum/two-boot receipts have been checked; the full identity table
+below includes `9815847`, `71cc361`, `ab90e50`, `531efd5` and `1d6e14e`.
+Run [38042380903](https://github.com/BlueDragon4251/HAOS/actions/runs/38042380903)
+proves the actual installed stopped-runtime systemd scheduler, encrypted snapshot,
+staged restore, retention preview and persistent second boot. This does not prove
+the later live-ledger or GUI changes.
 
 Three newer installed-image runs are now verified against their exact source,
 GitHub archive digest and matching actual serial/saved receipts:

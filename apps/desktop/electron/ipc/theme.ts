@@ -6,7 +6,7 @@ import type { BackendManager } from '../backend/manager.ts'
 import { events } from '../events/bus.ts'
 import { log } from '../log.ts'
 import { run } from '../platform/exec.ts'
-import { writePrefs } from '../prefs.ts'
+import { readPrefs, writePrefs } from '../prefs.ts'
 import { findTheme, installTheme, listFonts, listThemes, prefsForTheme, saveTheme, themeHistory, writeHermesSkin } from '../theme/themes.ts'
 import { previewTheme } from '../theme/preview.ts'
 
@@ -15,6 +15,8 @@ export interface ThemeIpcDeps {
   /** Push new preferences to every window (and the wallpaper service). */
   broadcast: (prefs: HeraldOSPrefs) => void
   backend: BackendManager
+  /** Verify the actual connected shell after applying preferences, before confirmation. */
+  verify?: (prefs: HeraldOSPrefs) => Promise<boolean>
 }
 
 /**
@@ -54,21 +56,46 @@ export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: st
     throw new Error('Theme preview failed its readability, raster or isolation checks; the previous theme remains in use')
   }
 
-  // Herald OS Linux: the engine recolours the session (niri, GTK, the lock screen, the terminal).
+  let guard: string | undefined
+  // Saved Linux session themes use an independent, unprivileged rollback process.
+  // The fixed file outputs and theme-only preferences remain pending until the
+  // actual connected shell renders the new preference state successfully.
   if (deps.panels && process.platform === 'linux') {
-    const result = await run('herald-os-theme', ['set', found.spec.name, ...(found.revision ? ['--revision', found.revision] : [])], 30_000)
+    if (found.revision && !deps.verify) throw new Error('Actual shell verification is unavailable')
+    const result = await run('herald-os-theme', found.revision
+      ? ['guarded-set', found.spec.name, '--revision', found.revision, '--parent', String(process.pid)]
+      : ['set', found.spec.name], 10_000)
 
-    if (result.code !== 0 && result.code !== 127) {
-      throw new Error(result.stderr.trim() || result.stdout.trim() || 'the theme engine failed')
+    if (result.code !== 0 && (found.revision || result.code !== 127)) {
+      throw new Error('The theme engine could not start a verified activation; inspect its private recovery state')
+    }
+    if (found.revision) {
+      const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1) || '{}') as Record<string, unknown>
+      if (receipt.pending !== true || typeof receipt.theme_guard !== 'string' || !/^[a-f0-9-]{36}$/.test(receipt.theme_guard)) throw new Error('Invalid theme activation receipt')
+      guard = receipt.theme_guard
     }
   }
 
-  const next = writePrefs({ ...prefsForTheme(found.spec, found.dir), themeRevision: found.revision })
-  deps.broadcast(next)
-  syncHermesSkin(found.spec, deps.backend)
-  events.emit('theme-set', { theme: found.spec.name })
+  try {
+    const next = writePrefs({ ...prefsForTheme(found.spec, found.dir), themeRevision: found.revision })
+    deps.broadcast(next)
+    if (guard) {
+      if (!(await deps.verify!(next))) throw new Error('The actual shell did not verify the tested theme')
+      const result = await run('herald-os-theme', ['confirm', guard], 8_000)
+      if (result.code !== 0) throw new Error('Theme activation could not be confirmed')
+    }
+    syncHermesSkin(found.spec, deps.backend)
+    events.emit('theme-set', { theme: found.spec.name })
 
-  return next
+    return next
+  } catch (error) {
+    if (guard) {
+      const recovery = await run('herald-os-theme', ['recover'], 8_000)
+      if (recovery.code !== 0) throw new Error('Theme recovery preserved a conflict; inspect the private activation journal')
+      deps.broadcast(readPrefs())
+    }
+    throw error
+  }
 }
 
 const SAMPLE_MAX_BYTES = 80 * 1024 * 1024

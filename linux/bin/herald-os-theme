@@ -20,6 +20,7 @@ import socket
 import stat
 import subprocess
 import sys
+import runpy
 from pathlib import Path
 
 HOME = Path.home()
@@ -383,11 +384,36 @@ def relay(payload: dict) -> bool:
 
 def gsettings(schema: str, key: str, value: str) -> None:
     if shutil.which("gsettings"):
-        subprocess.run(["gsettings", "set", schema, key, value], check=False, capture_output=True)
+        try:
+            subprocess.run(["gsettings", "set", schema, key, value], check=False, capture_output=True, timeout=3)
+        except subprocess.TimeoutExpired:
+            pass  # Existing best-effort GTK synchronization must not hang the shell.
+
+
+def theme_guard():
+    # Installed beside this command by the existing Linux packaging rules.
+    return runpy.run_path(str(Path(__file__).resolve().with_name("herald-os-theme-watchdog")))["ThemeGuard"]()
 
 
 # ---------------------------------------------------------------------------------------------
-def apply(name: str, revision: str | None = None) -> int:
+def generated_outputs(theme: dict, revision: str | None, guard=None) -> dict:
+    c = theme["colors"]
+    config = guard.home / ".config" if guard else CONFIG
+    state = config / "herald-os" if guard else STATE
+    hermes_home = guard.hermes if guard else Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
+    return {
+        config / "niri" / "theme.kdl": render_niri(c),
+        config / "swaylock" / "config": render_swaylock(c),
+        config / "gtk-3.0" / "gtk.css": render_gtk_css(c),
+        config / "gtk-4.0" / "gtk.css": render_gtk_css(c),
+        config / "foot" / "foot.ini": render_foot(theme),
+        hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
+        state / "theme": theme["name"] + "\n",
+        state / "theme-revision": (revision or "") + "\n",
+    }
+
+
+def apply(name: str, revision: str | None = None, guard=None, token=None) -> int:
     found = find(name, revision)
     if not found:
         die(f"no theme named {name!r} (see `herald-os-theme list`)", 1)
@@ -397,17 +423,20 @@ def apply(name: str, revision: str | None = None) -> int:
     shell = theme.get("shell", {})
     gtk = theme.get("gtk", {})
 
-    hermes_home = Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
-    targets = {
-        CONFIG / "niri" / "theme.kdl": render_niri(c),
-        CONFIG / "swaylock" / "config": render_swaylock(c),
-        CONFIG / "gtk-3.0" / "gtk.css": render_gtk_css(c),
-        CONFIG / "gtk-4.0" / "gtk.css": render_gtk_css(c),
-        CONFIG / "foot" / "foot.ini": render_foot(theme),
-        hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
-        STATE / "theme": name + "\n",
-        STATE / "theme-revision": (selected_revision or "") + "\n",
-    }
+    targets = generated_outputs(theme, selected_revision, guard)
+    if guard is not None:
+        state = guard.pending(token)
+        if guard.expired(state) or state["name"] != name or state["revision"] != selected_revision:
+            raise PermissionError("guarded theme identity changed or expired")
+        for target, text in targets.items():
+            key = next(key for key, value in guard.targets.items() if value == target)
+            if hashlib.sha256(text.encode()).hexdigest() != state["files"][key]["expected"]:
+                raise PermissionError("guarded theme outputs changed before activation")
+            guard.write(target, text.encode())
+        # Keep Dconf unchanged while pending. Its existing best-effort GTK
+        # synchronization runs only after the actual shell confirms the revision.
+        print("saved revision awaiting actual shell verification")
+        return 0
     backups = {path: (path.read_text() if path.exists() else None) for path in targets}
     try:
         for path, text in targets.items():
@@ -465,7 +494,48 @@ def main(argv: list[str]) -> int:
     if cmd == "set":
         if len(args) not in (1, 3) or (len(args) == 3 and args[1] != "--revision"):
             die("set <name> [--revision <sha256>]", 2)
+        # A normal CLI operation must not trample a pending guarded activation.
+        if (STATE / "theme-activation").exists():
+            guard = theme_guard()
+            with guard.lock():
+                state = guard.load()
+                if state and state["status"] in {"pending", "rollback_conflict"}:
+                    raise PermissionError("recover the pending theme activation first")
+                return apply(args[0], args[2] if len(args) == 3 else None)
         return apply(args[0], args[2] if len(args) == 3 else None)
+    if cmd == "guarded-set":
+        if len(args) != 5 or args[1] != "--revision" or args[3] != "--parent" or not args[4].isdigit():
+            die("guarded-set <name> --revision <sha256> --parent <shell-pid>", 2)
+        found = find(args[0], args[2])
+        if not found or found[0].name != args[2]:
+            raise ValueError("an exact verified saved revision is required")
+        guard = theme_guard()
+        token = guard.begin(args[0], args[2], int(args[4]), generated_outputs(found[1], args[2], guard))
+        with guard.lock():
+            apply(args[0], args[2], guard, token)
+        print(json.dumps({"theme_guard": token, "pending": True}))
+        return 0
+    if cmd == "confirm":
+        if len(args) != 1:
+            die("confirm <theme-guard-id>", 2)
+        guard = theme_guard()
+        state = guard.pending(args[0])
+        found = find(state["name"], state["revision"])
+        if not found:
+            raise ValueError("confirmed revision became unavailable")
+        guard.commit(args[0])
+        gtk = found[1].get("gtk", {})
+        gsettings("org.gnome.desktop.interface", "color-scheme", gtk.get("color_scheme", "prefer-dark"))
+        if gtk.get("theme"):
+            gsettings("org.gnome.desktop.interface", "gtk-theme", gtk["theme"])
+        return 0
+    if cmd == "recover":
+        if args:
+            die("recover", 2)
+        if not (STATE / "theme-activation").exists():
+            return 0
+        theme_guard().recover()
+        return 0
     die(f"unknown command {cmd!r}", 2)
     return 2
 

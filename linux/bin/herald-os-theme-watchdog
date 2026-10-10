@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+"""Independent, unprivileged rollback of the theme engine's fixed outputs.
+
+The journal contains no executable command or caller-selected target. A shell must
+confirm a tested saved revision within 30 seconds. Parent death, boot identity
+change, expiry, or explicit recovery restores only the matching candidate outputs.
+"""
+from __future__ import annotations
+
+import base64
+from contextlib import contextmanager
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+THEME_KEYS = {"themeName", "theme", "themeRevision", "themeColors", "themeScheme", "accent", "wallpaper"}
+LIMIT = 1024 * 1024
+
+
+def checksum(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def process_identity(pid):
+    try:
+        directory = Path(f"/proc/{pid}")
+        if directory.stat().st_uid != os.geteuid():
+            return None
+        fields = (directory / "stat").read_text().rsplit(")", 1)[1].split()
+        return None if fields[0] == "Z" else fields[19]
+    except (OSError, IndexError):
+        return None
+
+
+def boot_identity():
+    value = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    if str(uuid.UUID(value)) != value:
+        raise ValueError("invalid boot identity")
+    return value
+
+
+class ThemeGuard:
+    def __init__(self):
+        if os.geteuid() == 0:
+            raise PermissionError("theme watchdog must not have administrator authority")
+        declared_home = Path.home()
+        declared_hermes = Path(os.environ.get("HERMES_HOME") or declared_home / ".hermes")
+        # bootc's trusted /home -> /var/home alias is expected. Canonicalize the
+        # home anchor once, then reject redirection within its private children.
+        if (not declared_hermes.is_absolute() or declared_hermes == declared_home
+                or declared_home not in declared_hermes.parents or ".." in declared_hermes.parts):
+            raise PermissionError("guarded theme state must stay inside the observer home")
+        self.home = declared_home.resolve(strict=True)
+        self.hermes = self.home / declared_hermes.relative_to(declared_home)
+        config = self.home / ".config"
+        state = config / "herald-os"
+        self.root = state / "theme-activation"
+        self.targets = {
+            "niri": config / "niri/theme.kdl", "lock": config / "swaylock/config",
+            "gtk3": config / "gtk-3.0/gtk.css", "gtk4": config / "gtk-4.0/gtk.css",
+            "terminal": config / "foot/foot.ini", "skin": self.hermes / "skins/herald-os.yaml",
+            "name": state / "theme", "revision": state / "theme-revision",
+        }
+        self.prefs = self.hermes / "herald-os/prefs.json"
+        self.directory(self.root, create=True)
+        if self.root.stat().st_mode & 0o077:
+            raise PermissionError("theme transaction directory must be private")
+
+    def directory(self, target, create=False):
+        if ".." in target.parts or (target != self.home and self.home not in target.parents):
+            raise PermissionError("theme output escapes observer home")
+        # Walk components before creation; never mkdir through a redirected parent.
+        cursor = self.home
+        for component in (None, *target.relative_to(self.home).parts):
+            if component is not None:
+                cursor /= component
+            try:
+                meta = cursor.lstat()
+            except FileNotFoundError:
+                if not create:
+                    return False
+                cursor.mkdir(mode=0o700)
+                meta = cursor.lstat()
+            if not stat.S_ISDIR(meta.st_mode) or meta.st_uid != os.geteuid() or meta.st_mode & 0o022:
+                raise PermissionError("unsafe theme output directory")
+        return True
+
+    def read(self, target, limit=65536):
+        if not self.directory(target.parent):
+            return None
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        except FileNotFoundError:
+            return None
+        try:
+            meta = os.fstat(fd)
+            if (not stat.S_ISREG(meta.st_mode) or meta.st_uid != os.geteuid()
+                    or meta.st_nlink != 1 or meta.st_mode & 0o022 or meta.st_size > limit):
+                raise PermissionError("unsafe theme output file")
+            data = os.read(fd, limit + 1)
+            if len(data) != meta.st_size or len(data) > limit:
+                raise ValueError("theme output changed during read")
+            return data
+        finally:
+            os.close(fd)
+
+    def write(self, target, data):
+        self.directory(target.parent, create=True)
+        self.read(target, LIMIT)
+        fd, scratch = tempfile.mkstemp(prefix=".theme-", dir=target.parent)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(scratch, target)
+            directory = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+        finally:
+            Path(scratch).unlink(missing_ok=True)
+
+    @contextmanager
+    def lock(self):
+        self.directory(self.root)
+        target = self.root / "lock"
+        fd = os.open(target, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+        try:
+            meta = os.fstat(fd)
+            if not stat.S_ISREG(meta.st_mode) or meta.st_uid != os.geteuid() or meta.st_nlink != 1 or meta.st_mode & 0o077:
+                raise PermissionError("unsafe theme transaction lock")
+            # A crashed writer releases the lock. A live stuck writer is bounded
+            # by the native command timeout; watchdog does not spin unboundedly.
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("theme transaction lock is busy")
+                    time.sleep(0.05)
+            yield
+        finally:
+            os.close(fd)
+
+    def load(self):
+        raw = self.read(self.root / "state.json", LIMIT)
+        if raw is None:
+            return None
+        state = json.loads(raw)
+        keys = {"schema", "token", "status", "name", "revision", "parent", "parent_start", "boot", "deadline_ns", "files", "prefs", "watcher", "watcher_start"}
+        if (not isinstance(state, dict) or set(state) != keys or state["schema"] != 1
+                or state["status"] not in {"pending", "committed", "rolled_back", "rollback_conflict"}
+                or not isinstance(state["name"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", state["name"])
+                or not isinstance(state["revision"], str) or not re.fullmatch(r"[a-f0-9]{64}", state["revision"])
+                or type(state["parent"]) is not int or not 1 <= state["parent"] <= 2**31
+                or type(state["watcher"]) is not int or not 0 <= state["watcher"] <= 2**31
+                or not isinstance(state["watcher_start"], str) or not re.fullmatch(r"[0-9]{0,30}", state["watcher_start"])
+                or type(state["deadline_ns"]) is not int or state["deadline_ns"] < 0
+                or not isinstance(state["parent_start"], str) or not re.fullmatch(r"[0-9]{1,30}", state["parent_start"])
+                or not isinstance(state["prefs"], dict) or set(state["prefs"]) - THEME_KEYS
+                or not isinstance(state["files"], dict) or set(state["files"]) != set(self.targets)):
+            raise ValueError("invalid theme transaction journal")
+        if str(uuid.UUID(state["token"])) != state["token"] or str(uuid.UUID(state["boot"])) != state["boot"]:
+            raise ValueError("invalid theme transaction identity")
+        for row in state["files"].values():
+            if not isinstance(row, dict) or set(row) != {"before", "expected"} or not re.fullmatch(r"[a-f0-9]{64}", row["expected"]):
+                raise ValueError("invalid theme rollback output")
+            if row["before"] is not None and len(base64.b64decode(row["before"], validate=True)) > 65536:
+                raise ValueError("oversized theme rollback output")
+        return state
+
+    def save(self, state):
+        raw = (json.dumps(state, sort_keys=True) + "\n").encode()
+        if len(raw) > LIMIT:
+            raise ValueError("theme rollback journal is oversized")
+        self.write(self.root / "state.json", raw)
+
+    def preferences(self):
+        raw = self.read(self.prefs, 512 * 1024)
+        prefs = json.loads(raw) if raw is not None else {}
+        if not isinstance(prefs, dict):
+            raise ValueError("invalid observer preferences")
+        return prefs
+
+    def begin(self, name, revision, parent, outputs):
+        with self.lock():
+            old = self.load()
+            if old and old["status"] in {"pending", "rollback_conflict"}:
+                raise PermissionError("recover the previous theme transaction before another activation")
+            start = process_identity(parent)
+            if not start or set(outputs) != set(self.targets.values()):
+                raise PermissionError("invalid theme parent or output set")
+            state = {"schema": 1, "token": str(uuid.uuid4()), "status": "pending", "name": name,
+                     "revision": revision, "parent": parent, "parent_start": start, "boot": boot_identity(),
+                     "deadline_ns": time.monotonic_ns() + 30_000_000_000, "watcher": 0, "watcher_start": "",
+                     "prefs": {key: value for key, value in self.preferences().items() if key in THEME_KEYS},
+                     "files": {}}
+            for key, target in self.targets.items():
+                before = self.read(target)
+                state["files"][key] = {"before": None if before is None else base64.b64encode(before).decode(),
+                                      "expected": checksum(outputs[target].encode())}
+            self.save(state)
+            self.load()  # Validate our persisted contract before starting a watcher.
+        executable = Path(__file__).resolve()
+        env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": str(self.home), "HERMES_HOME": str(self.hermes)}
+        child = subprocess.Popen([sys.executable, str(executable), "watch", state["token"]], env=env,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True, close_fds=True)
+        deadline = time.monotonic() + 3
+        while child.poll() is None and time.monotonic() < deadline:
+            with self.lock():
+                current = self.load()
+                if current["token"] == state["token"] and current["watcher"] == child.pid:
+                    return state["token"]
+            time.sleep(0.025)
+        self.recover(state["token"])
+        raise RuntimeError("independent theme watchdog did not become ready")
+
+    def pending(self, token):
+        state = self.load()
+        if not state or state["token"] != token or state["status"] != "pending":
+            raise PermissionError("no matching pending theme activation")
+        return state
+
+    def expired(self, state):
+        return (state["boot"] != boot_identity() or time.monotonic_ns() >= state["deadline_ns"]
+                or process_identity(state["parent"]) != state["parent_start"])
+
+    def commit(self, token):
+        with self.lock():
+            state = self.pending(token)
+            if (self.expired(state) or not state["watcher"] or process_identity(state["watcher"]) != state["watcher_start"]
+                    or any(checksum(self.read(target) or b"") != state["files"][key]["expected"] for key, target in self.targets.items())):
+                raise PermissionError("theme activation expired or its outputs changed")
+            prefs = self.preferences()
+            if prefs.get("themeName") != state["name"] or prefs.get("themeRevision") != state["revision"]:
+                raise PermissionError("shell did not persist the exact tested theme")
+            state["status"] = "committed"
+            self.save(state)
+
+    def recover(self, token=None):
+        with self.lock():
+            state = self.load()
+            if not state or state["status"] in {"committed", "rolled_back"}:
+                return False
+            if token is not None and state["token"] != token:
+                raise PermissionError("wrong theme recovery identity")
+            conflict = False
+            for key, target in self.targets.items():
+                row = state["files"][key]
+                before = None if row["before"] is None else base64.b64decode(row["before"], validate=True)
+                current = self.read(target)
+                if current == before:
+                    continue
+                if current is None or checksum(current) != row["expected"]:
+                    conflict = True  # Preserve an unrelated/manual edit and its evidence.
+                    continue
+                if before is None:
+                    target.unlink()
+                    directory = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                    try:
+                        os.fsync(directory)
+                    finally:
+                        os.close(directory)
+                else:
+                    self.write(target, before)
+            prefs = self.preferences()
+            current_theme = {key: value for key, value in prefs.items() if key in THEME_KEYS}
+            if current_theme != state["prefs"]:
+                if prefs.get("themeName") == state["name"] and prefs.get("themeRevision") == state["revision"]:
+                    prefs = {key: value for key, value in prefs.items() if key not in THEME_KEYS} | state["prefs"]
+                    self.write(self.prefs, (json.dumps(prefs, indent=2) + "\n").encode())
+                else:
+                    conflict = True
+            state["status"] = "rollback_conflict" if conflict else "rolled_back"
+            self.save(state)
+            if conflict:
+                raise PermissionError("theme rollback preserved conflicting changes; inspect the private journal")
+            return True
+
+    def watch(self, token):
+        with self.lock():
+            state = self.pending(token)
+            state["watcher"] = os.getpid()
+            state["watcher_start"] = process_identity(os.getpid())
+            self.save(state)
+        while True:
+            with self.lock():
+                state = self.load()
+                if state["token"] != token or state["status"] != "pending":
+                    return
+                expired = self.expired(state)
+            if expired:
+                self.recover(token)
+                return
+            time.sleep(0.25)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3 or sys.argv[1] != "watch":
+        raise SystemExit("internal theme watchdog; use herald-os-theme recover")
+    ThemeGuard().watch(sys.argv[2])

@@ -36,7 +36,8 @@ import { log, logTail } from './log.ts'
 import { migrateLegacyData } from './migrate.ts'
 import { registerNotificationHistoryIpc } from './notifications-history.ts'
 import { SwitchService } from './switches.ts'
-import { hermesHome, heraldOsDataDir, isDev } from './paths.ts'
+import { hermesHome, heraldOsDataDir, isDev, isShellPage } from './paths.ts'
+import { verifyThemeShell } from './theme/health.ts'
 import { readPrefs, writePrefs } from './prefs.ts'
 import { isOmarchy, readOmarchyTheme } from './theme/omarchy.ts'
 import { prefsForTheme } from './theme/themes.ts'
@@ -291,7 +292,12 @@ function registerCoreIpc(): void {
     () => BrowserWindow.getAllWindows(),
     back => events.emit('returned', { reason: back.reason, away_minutes: Math.round(back.awayMs / 60_000) })
   )
-  registerThemeIpc({ panels: Boolean(panels), broadcast: broadcastPrefs, backend })
+  registerThemeIpc({ panels: Boolean(panels), broadcast: broadcastPrefs, backend,
+    verify: next => {
+      const windows = BrowserWindow.getAllWindows().filter(win => !win.isDestroyed() && win.isVisible() && isShellPage(win.webContents.getURL()))
+      return verifyThemeShell(windows, next)
+    }
+  })
   registerCaptureIpc(state => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.captureRecordChanged, state)
@@ -354,6 +360,10 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  if (panels && process.platform === 'linux') {
+    const recovered = await run('herald-os-theme', ['recover'], 8_000)
+    if (recovered.code !== 0 && recovered.code !== 127) log('theme', 'theme recovery needs inspection of the private activation journal')
+  }
   log('main', `Herald OS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
   // A packaged app carries its icon in the bundle; `electron .` would show Electron's.
   const icon = isDev ? appIconPath() : undefined

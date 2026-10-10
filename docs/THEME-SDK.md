@@ -79,6 +79,55 @@ requires this gate and retains its narrow evidence for seven days. Its launcher
 gets an exact-path user-namespace AppArmor permission on the disposable runner;
 AppArmor and the renderer sandbox remain enabled.
 
-Whole-session atomic activation, independent crash watchdog/automatic rollback,
-agent generation/broker and capability-managed plugins remain required. Saving
-and previewing complete versions is not autonomous theme acceptance.
+## Independent guard for saved Linux session themes
+
+The existing native saved-revision selection now arms an independent, unprivileged
+`herald-os-theme-watchdog` before changing the session. Its durable private journal
+snapshots only eight fixed generated theme files and seven theme preference fields.
+There is no caller-selected path, shell command, root access or agent credential.
+The home anchor supports Fedora bootc's `/home` alias while rejecting redirected
+private children, file links, foreign ownership and writable/oversized state.
+
+The watcher requires a matching live parent PID/start time and boot identity. The
+30-second lease expires if the shell dies or fails to confirm the exact revision.
+Native activation confirms only after the connected shell windows actually paint,
+have the expected preference attributes, produce real pixels and retain the Linux
+NoNewPrivs/seccomp/zero-capability sandbox. The independent process restores files
+and theme preferences on parent death or expiry; native failure also broadcasts the
+restored preferences. Session startup runs recovery before niri reads its includes.
+Preference publication uses private fsynced staging and atomic replacement.
+
+Recovery preserves non-theme preferences changed during the lease. It only replaces
+outputs still matching the candidate or original bytes; a manual/unrelated change
+remains intact and leaves a durable `rollback_conflict` which blocks new guarded
+activation. `herald-os-theme recover` retries the same fixed recovery operation.
+A corrupt or conflicting journal requires inspection; it does not authorize a
+default-theme overwrite. Existing CLI selection remains available after recovery.
+GTK's existing best-effort Dconf synchronization runs after successful confirmation;
+Dconf, whole-session atomic activation and automatic compositor restart are outside
+this fixed-file transaction. A service-manager kill of the complete user cgroup may
+kill the watcher too; durable startup recovery remains necessary.
+
+Linux tests use actual separate watcher processes, SIGKILL, partial writes, expired
+leases, changed parent/boot identities, a killed watcher, restart recovery, path
+attacks, failed publication, conflict preservation and a bootc-style home alias.
+The virtual Wayland gate also calls the production native apply/preview/DOM code
+and actual Linux engine. Its representative renderer is explicitly a fixture, not
+the installed full Herald session or a model-generated theme. An intentionally
+hidden renderer rolls back to the first revision and becomes visible again.
+
+Run all real GUI/socket/theme gates in a disposable non-root environment with the
+packaged Weston desktop shell and its actual helper/assets:
+
+```sh
+HAOS_DISPOSABLE_SCREEN_TEST=1 npm run test:gui-wayland --workspace @herald-os/desktop
+```
+
+The old headless kiosk-shell fixture exhibited an actual compositor SIGSEGV.
+The gate reports compositor status and uses the real desktop shell, retaining
+surface/input/pixel/sandbox/denial assertions and only bounded source-bound receipts.
+No physical display, provider, model response or installed niri result is invented.
+
+Restricted agent theme generation/activation, widgets, capability-managed plugins,
+complete resource/visual regressions and installed whole-session acceptance remain
+required. This guard does not grant Hermes access to the observer's theme store.

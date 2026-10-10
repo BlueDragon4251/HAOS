@@ -35,6 +35,13 @@ mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/compositor.log" 2>&1
 echo "$(date -Is) starting $COMPOSITOR (renderer=${WLR_RENDERER:-gpu})"
 
+# Recover an interrupted saved-theme activation before niri reads its includes.
+# This runs as the observer, touches only the fixed private theme outputs and
+# preserves conflicts for inspection. Hermes services are independent of it.
+if command -v herald-os-theme >/dev/null 2>&1; then
+  herald-os-theme recover >/dev/null 2>&1 || echo "theme recovery needs inspection of the private activation journal"
+fi
+
 # Herald's own niri config, rendered at every start from the installed template and the person's
 # keymap (and written only when that changed, as after an update). niri is given it by path, so a
 # personal ~/.config/niri/config.kdl is never read or rewritten. Without it niri would start bare,

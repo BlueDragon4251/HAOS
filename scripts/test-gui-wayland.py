@@ -74,7 +74,7 @@ def main():
     major = int(re.search(r"\b(\d+)\.", version).group(1))
     flags = ["--backend=headless", "--renderer=pixman"] if major >= 14 else ["--backend=headless-backend.so", "--use-pixman"]
     flags += ["--width=1024", "--height=768", "--idle-time=0", "--socket=haos-disposable-wayland", "--no-config",
-              "--shell=" + os.environ.get("HAOS_TEST_WESTON_SHELL", "kiosk-shell.so")]
+              "--shell=" + os.environ.get("HAOS_TEST_WESTON_SHELL", "desktop-shell.so")]
     compositor = client = None
     identity = source()
     try:
@@ -98,6 +98,7 @@ def main():
         for name, script, prefix, files in (
             ("browser", "test-gui-broker.mjs", "haos-gui-broker-", ("gui-broker.json", "disposable-form.jpg")),
             ("integration", "test-gui-integration.mjs", "haos-gui-integration-", ("gui-integration.json",)),
+            ("theme", "test-theme-activation.mjs", "haos-theme-activation-", ("theme-activation.json",)),
         ):
             log_path = root / (name + ".log")
             with log_path.open("wb") as log:
@@ -109,11 +110,16 @@ def main():
                 # never complete protocol logs, profiles, sessions or journal data.
                 output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
                 print(f'Disposable {name} process exit: {code}', flush=True)
-                phases = re.findall(r'^HAOS_GUI_FIXTURE_PHASE ([a-z-]{1,64})$', output, re.M)
+                print('Disposable compositor exit: ' + str(compositor.poll()), flush=True)
+                server_output = bounded_file(root / 'compositor.log', 8 * 1024 * 1024).decode('utf-8', errors='replace')
+                server_errors = [line for line in server_output.splitlines() if re.search(r'\b(?:error|fatal|invalid|disconnect)\b', line, re.I)]
+                for line in server_errors[-4:]:
+                    print('Disposable compositor error: ' + line[:640], flush=True)
+                phases = re.findall(r'^HAOS_(?:GUI|THEME)_FIXTURE_PHASE ([a-z-]{1,64})$', output, re.M)
                 if phases:
                     print('Disposable GUI last phase: ' + phases[-1], flush=True)
                 for line in output.splitlines():
-                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
+                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Actual theme activation gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
                         print(line[:640], flush=True)
                 # A native compositor/protocol failure can exit Chromium before
                 # JavaScript's catch executes. Only this credential-free fixture's
@@ -143,11 +149,12 @@ def main():
             reports[name] = {key: receipts[0][key] for key in ("checks", "source_commit")}
             assert reports[name]["checks"] and all(value is True for value in reports[name]["checks"].values())
             # Chromium/Wayland protocol uses '#' or '@' object IDs across versions.
-            titles = len(re.findall(r'xdg_toplevel[@#]\d+\.set_title\("HAOS Mission ', output))
+            title = 'HAOS Theme activation fixture' if name == 'theme' else 'HAOS Mission '
+            titles = len(re.findall(r'xdg_toplevel[@#]\d+\.set_title\("' + re.escape(title), output))
             commits = len(re.findall(r'wl_surface[@#]\d+\.commit\(', output))
             assert titles > 0 and commits > 0, "no real mission surface protocol"
             protocol[name] = {"mission_toplevels": titles, "surface_commits": commits}
-        report = {**identity, "weston": version, "actual_virtual_wayland": True,
+        report = {**identity, "weston": version, "compositor_shell": Path(flags[-1].split('=', 1)[1]).name, "actual_virtual_wayland": True,
                   "installed_niri": False, "physical_hardware": False, "real_model_turn": False,
                   "session_is_explicit_fixture": True, "protocol": protocol, "gates": reports}
         (evidence / "virtual-wayland.json").write_text(json.dumps(report, indent=2) + "\n")

@@ -69,17 +69,19 @@ async function renderTheme(bundle: Omit<ThemeBundle, 'revision'> & { revision?: 
   isolated.setPermissionCheckHandler(() => false)
   isolated.webRequest.onBeforeRequest((details, respond) => respond({ cancel: details.url !== url && !details.url.startsWith('data:image/') }))
   isolated.on('will-download', event => event.preventDefault())
-  const win = new BrowserWindow({ width: 960, height: 640, useContentSize: true, show: false,
+  const win = new BrowserWindow({ width: 960, height: 640, useContentSize: true, show: false, frame: false, resizable: false,
     backgroundColor: spec.colors.bg,
     webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false,
       webSecurity: true, offscreen: true, backgroundThrottling: false } })
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', event => event.preventDefault())
   let deadline: ReturnType<typeof setTimeout> | undefined
+  let phase = 'load'
   try {
     return await Promise.race([
       (async () => {
         await win.loadURL(url)
+        phase = 'layout'
         const rendered = await win.webContents.executeJavaScript(`(async()=>{
           const image=document.getElementById('wallpaper');let rasterDecoded=true;
           if(image){try{await image.decode();rasterDecoded=image.naturalWidth>0&&image.naturalHeight>0&&image.naturalWidth<=8192&&image.naturalHeight<=8192&&image.naturalWidth*image.naturalHeight<=16777216}catch{rasterDecoded=false}}
@@ -93,10 +95,12 @@ async function renderTheme(bundle: Omit<ThemeBundle, 'revision'> & { revision?: 
           const visible=['heading','foreground','secondary','button'].every(id=>{const el=document.getElementById(id),r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)>0});
           return {width:innerWidth,height:innerHeight,background:sample(body.backgroundColor),foreground:foregroundColor,foregroundBackground,heading:sample(getComputedStyle(document.getElementById('heading')).color),secondary:sample(getComputedStyle(document.getElementById('secondary')).color),accent:sample(button.backgroundColor),accentText:sample(button.color,button.backgroundColor),controlsVisible:visible,noNode:typeof process==='undefined'&&typeof require==='undefined',rasterDecoded};
         })()`) as Rendered
+        phase = 'capture'
         const screenshot = await win.webContents.capturePage({ x: 0, y: 0, width: 960, height: 640 })
         const size = screenshot.getSize()
         const bitmap = screenshot.toBitmap()
         const png = screenshot.toPNG()
+        phase = 'sandbox'
         const hex = (color: number[]) => toHex({ r: color[0], g: color[1], b: color[2] })
         const status = process.platform === 'linux' ? fs.readFileSync(`/proc/${win.webContents.getOSProcessId()}/status`, 'utf8') : ''
         const restricted = process.platform !== 'linux' || (/^NoNewPrivs:\s*1$/m.test(status) && /^Seccomp:\s*2$/m.test(status) && /^CapEff:\s*0+$/m.test(status))
@@ -118,7 +122,8 @@ async function renderTheme(bundle: Omit<ThemeBundle, 'revision'> & { revision?: 
       })(),
       new Promise<never>((_resolve, reject) => { deadline = setTimeout(() => reject(new Error('Isolated theme preview timed out')), 15000) })
     ])
-  } catch {
+  } catch (error) {
+    if (process.env.HAOS_DISPOSABLE_SCREEN_TEST === '1') fs.writeSync(2, `HAOS_THEME_PREVIEW_FAILURE ${phase} ${error instanceof Error ? error.name : 'UnknownError'}\n`)
     // load/capture errors can contain the complete private data URL.
     throw new Error('Isolated theme preview failed; the current theme was not changed')
   } finally {
