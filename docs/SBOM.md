@@ -98,6 +98,14 @@ all **80 installed/frozen Python versions, 1,210 RPM epoch/version/architecture
 records and 188 npm build identities** passed. The CycloneDX document is
 33,322,515 bytes. Verification also completed in a non-root, offline, read-only
 container limited to 2 GiB; actual maximum resident usage was 564,812 KiB.
+The permanent [source-bound receipt](evidence/haos-41e58d3-image-inventory.json)
+retains the original artifact/input hashes, scanner state, checked counts, fixed
+runtime boundary flags and exact verifier source. It labels the original failed
+workflow and subsequent local verification separately; it does not relabel CI as
+successful or store image configuration, history or credentials. The bounded
+build inspector validates the matching small index/process/probe receipt and
+publishes only fixed counts/hashes/booleans. Contradictory source/image/scanner
+claims or a providerless build claiming installed/model acceptance fail inspection.
 This is real full-image inventory evidence, while the matching corrected CI,
 ISO and installed acceptance remain separate required gates. No installed guest
 success is attributed to the failed `41e58d3` workflow.

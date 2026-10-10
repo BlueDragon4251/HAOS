@@ -75,6 +75,72 @@ def test_untrusted_build_identity_is_not_published(field, value):
         evidence.inspect_build({"image.json": json.dumps([image]).encode()}, "b" * 40)
 
 
+def inventory_files():
+    index = {"source_commit": "b" * 40, "image_id": "sha256:" + "a" * 64,
+        "installed_inventory_checks_passed": True, "complete_release_acceptance": False,
+        "scanner": {"version": "1.54.1", "network_disabled": True,
+                    "container": "ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa"},
+        "coverage": {key: 80 if "python" in key else 100 for key in evidence.INVENTORY_COUNTS},
+        "document_sha256": {key: "c" * 64 for key in evidence.INVENTORY_DOCUMENTS},
+        "document_bytes": {key: 123 for key in evidence.INVENTORY_DOCUMENTS},
+        "private": "must never be published"}
+    return index, {"image.json": json.dumps([{"Id": "a" * 64, "Size": 12345}]).encode(),
+                   "sbom-scanner-status.json": b'{"status":"exited","exit_code":0,"oom_killed":false}'}
+
+
+def test_small_index_proves_image_inventory_without_claiming_guest_or_publishing_full_catalog():
+    index, files = inventory_files()
+    files["sbom-index.json"] = json.dumps(index).encode()
+    flags = {key: key not in {"real_model_turn", "installed_owner_ui_acceptance"} for key in evidence.UI_FLAGS}
+    files["ui-access-build-probe.json"] = json.dumps({**flags, "private": "must never be published"}).encode()
+    report = evidence.inspect_build(files, "b" * 40)
+    assert report["image_inventory"]["checks_passed"]
+    assert not report["installed_guest_acceptance"] and not report["installed_inventory_acceptance"]
+    assert not report["image_syft_json"]["present_in_this_artifact"]
+    assert report["runtime_ui_boundary"] == flags and not flags["real_model_turn"]
+    assert "must never" not in json.dumps(report) and "private" not in json.dumps(report)
+
+
+@pytest.mark.parametrize("field,value", [("source_commit", "c" * 40), ("image_id", "sha256:" + "d" * 64),
+                                        ("complete_release_acceptance", True), ("installed_inventory_checks_passed", 1)])
+def test_conflicting_source_image_or_release_claim_in_index_is_denied(field, value):
+    index, files = inventory_files()
+    index[field] = value
+    files["sbom-index.json"] = json.dumps(index).encode()
+    with pytest.raises(ValueError, match="inventory index"):
+        evidence.inspect_build(files, "b" * 40)
+
+
+@pytest.mark.parametrize("section,key,value", [("coverage", "python_installed_versions", True),
+    ("coverage", "rpm_installed_versions_architectures", 0), ("document_sha256", "image.syft.json", "private text"),
+    ("document_bytes", "image.cdx.json", 128 * 1024 ** 2 + 1)])
+def test_inventory_counts_hashes_and_document_sizes_remain_bounded(section, key, value):
+    index, files = inventory_files()
+    index[section][key] = value
+    files["sbom-index.json"] = json.dumps(index).encode()
+    with pytest.raises(ValueError, match="bounded image inventory"):
+        evidence.inspect_build(files, "b" * 40)
+
+
+def test_index_cannot_hide_scanner_failure_in_the_same_actual_run():
+    index, files = inventory_files()
+    files["sbom-index.json"] = json.dumps(index).encode()
+    files["sbom-scanner-status.json"] = b'{"status":"exited","exit_code":137,"oom_killed":true}'
+    with pytest.raises(ValueError, match="inventory index"):
+        evidence.inspect_build(files, "b" * 40)
+
+
+@pytest.mark.parametrize("field,value", [("observer_read_rpc_works", "private text"),
+                                        ("real_model_turn", True), ("installed_owner_ui_acceptance", True)])
+def test_providerless_build_probe_cannot_claim_a_real_turn_or_installed_owner(field, value):
+    _, files = inventory_files()
+    flags = {key: key not in {"real_model_turn", "installed_owner_ui_acceptance"} for key in evidence.UI_FLAGS}
+    flags[field] = value
+    files["ui-access-build-probe.json"] = json.dumps(flags).encode()
+    with pytest.raises(ValueError, match="runtime UI boundary"):
+        evidence.inspect_build(files, "b" * 40)
+
+
 @pytest.mark.parametrize("field,value", [("path", ".github/workflows/foreign.yml"),
                                          ("event", "pull_request"), ("head_branch", "foreign-branch")])
 def test_foreign_workflow_or_branch_is_denied_before_archive_access(monkeypatch, field, value):

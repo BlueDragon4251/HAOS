@@ -17,6 +17,15 @@ from haos.redaction import Redactor
 REPOSITORY = "BlueDragon4251/HAOS"
 LIMIT = 2 * 1024 * 1024
 EXPANDED_LIMIT = 16 * 1024 * 1024
+INVENTORY_COUNTS = ("python_installed_versions", "python_frozen_versions",
+                    "rpm_installed_versions_architectures", "npm_build_packages")
+INVENTORY_DOCUMENTS = ("image.cdx.json", "image.syft.json", "npm.cdx.json", "npm.raw.cdx.json", "image.json",
+                       "python-runtime-installed.txt", "python-runtime-requirements.txt", "rpm-with-epochs.txt")
+UI_FLAGS = ("actual_pinned_backend", "observer_identity_matches_child", "observer_read_rpc_works",
+            "observer_config_credentials_terminal_denied", "observer_direct_turn_and_session_mutations_denied",
+            "wrong_or_missing_identity_denied", "controller_session_creation_preserved",
+            "dashboard_credentials_absent_from_process_log", "runtime_session_created", "durable_session_created",
+            "real_model_turn", "installed_owner_ui_acceptance")
 
 
 def get(endpoint, *, binary=False):
@@ -134,7 +143,7 @@ def inspect_build(files, source):
         result["scanner"] = {k: state[k] for k in ("status", "exit_code", "oom_killed")}
     for name in ("image.cdx.json", "image.syft.json"):
         data = files.get(name, b"")
-        row = {"bytes": len(data), "json_valid": False}
+        row = {"present_in_this_artifact": name in files, "bytes": len(data), "json_valid": False}
         if data:
             try:
                 document = json.loads(data)
@@ -142,6 +151,38 @@ def inspect_build(files, source):
             except (ValueError, UnicodeError):
                 pass
         result[name.replace(".", "_")] = row
+    if "sbom-index.json" in files:
+        index = json.loads(files["sbom-index.json"])
+        scanner = index.get("scanner", {})
+        counts = index.get("coverage", {})
+        hashes = index.get("document_sha256", {})
+        sizes = index.get("document_bytes", {})
+        if (index.get("source_commit") != source or index.get("image_id") != identifier
+                or index.get("installed_inventory_checks_passed") is not True
+                or index.get("complete_release_acceptance") is not False
+                or scanner.get("version") != "1.54.1"
+                or scanner.get("container") != "ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa"
+                or scanner.get("network_disabled") is not True
+                or result.get("scanner") != {"status": "exited", "exit_code": 0, "oom_killed": False}):
+            raise ValueError("inventory index differs from the source/image/scanner or claims release acceptance")
+        if (any(type(counts.get(k)) is not int or not 1 <= counts[k] <= 2 ** 24 for k in INVENTORY_COUNTS)
+                or counts["python_frozen_versions"] > counts["python_installed_versions"]
+                or any(not isinstance(hashes.get(k), str) or not re.fullmatch(r"[0-9a-f]{64}", hashes[k])
+                       for k in INVENTORY_DOCUMENTS)
+                or any(type(sizes.get(k)) is not int or not 0 < sizes[k] <= 128 * 1024 ** 2
+                       for k in INVENTORY_DOCUMENTS)):
+            raise ValueError("invalid bounded image inventory receipt")
+        result["image_inventory"] = {"checks_passed": True, "complete_release_acceptance": False,
+            "counts": {k: counts[k] for k in INVENTORY_COUNTS},
+            "document_sha256": {k: hashes[k] for k in INVENTORY_DOCUMENTS},
+            "document_bytes": {k: sizes[k] for k in INVENTORY_DOCUMENTS},
+            "index_sha256": hashlib.sha256(files["sbom-index.json"]).hexdigest()}
+    if "ui-access-build-probe.json" in files:
+        probe = json.loads(files["ui-access-build-probe.json"])
+        if (any(type(probe.get(k)) is not bool for k in UI_FLAGS)
+                or probe["real_model_turn"] is not False or probe["installed_owner_ui_acceptance"] is not False):
+            raise ValueError("invalid fixed runtime UI boundary receipt")
+        result["runtime_ui_boundary"] = {k: probe[k] for k in UI_FLAGS}
     return result
 
 
