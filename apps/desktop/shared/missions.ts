@@ -44,6 +44,7 @@ export interface MissionServiceHealth {
   backend_connected: boolean
   current_mission: string | null
   pending_requests: MissionQuestion[]
+  provider_usage?: ProviderUsageSnapshot | null
   system: {
     at: number
     status: 'ok' | 'degraded' | 'critical' | 'unavailable'
@@ -57,6 +58,25 @@ export interface MissionServiceHealth {
     alerts: string[]
     errors: string[]
   } | null
+}
+
+export interface ProviderUsageSnapshot {
+  snapshot_at: number
+  scope: 'broker'
+  window_seconds: 86400
+  requests_day: number
+  requests_minute: number
+  requests_per_day: number
+  requests_per_minute: number
+  finished_requests_day: number
+  unfinished_requests_day: number
+  http_success_day: number
+  http_error_day: number
+  usage_reported_requests_day: number
+  input_tokens_reported_day: number | null
+  output_tokens_reported_day: number | null
+  cost_available: false
+  monetary_cost: null
 }
 
 export interface MissionMethods {

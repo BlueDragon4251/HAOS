@@ -43,6 +43,7 @@ class UsageLedger:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.execute("CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, at REAL NOT NULL, route TEXT NOT NULL, model TEXT NOT NULL, status INTEGER, input_tokens INTEGER, output_tokens INTEGER)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS requests_at ON requests(at)")
         self.db.commit()
 
     def admit(self, policy, model, *, now=None):
@@ -67,6 +68,21 @@ class UsageLedger:
 
     def close(self):
         self.db.close()
+
+    def snapshot(self, policy, *, now=None):
+        now = time.time() if now is None else now
+        with self.lock:
+            row = self.db.execute("""SELECT COUNT(*),COALESCE(SUM(at>=?),0),COUNT(status),
+                COALESCE(SUM(status>=200 AND status<300),0),COALESCE(SUM(status>=400),0),
+                COALESCE(SUM(input_tokens IS NOT NULL AND output_tokens IS NOT NULL),0),
+                SUM(input_tokens),SUM(output_tokens) FROM requests WHERE at>=?""", (now - 60, now - 86400)).fetchone()
+        return {"snapshot_at": now, "scope": "broker", "window_seconds": 86400,
+                "requests_day": row[0], "requests_minute": row[1],
+                "requests_per_day": policy.data["requests_per_day"], "requests_per_minute": policy.data["requests_per_minute"],
+                "finished_requests_day": row[2], "unfinished_requests_day": row[0] - row[2],
+                "http_success_day": row[3], "http_error_day": row[4], "usage_reported_requests_day": row[5],
+                "input_tokens_reported_day": row[6], "output_tokens_reported_day": row[7],
+                "cost_available": False, "monetary_cost": None}
 
 
 class Credentials:
@@ -151,12 +167,39 @@ class Handler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def do_GET(self):
-        self.reply(405, "only authorized model POST requests are supported")
+        if not self.authorized():
+            self.reply(401, "model capability required")
+            return
+        if self.path != "/v1/haos/usage":
+            self.reply(405, "only fixed model and aggregate usage routes are supported")
+            return
+        sizes = self.headers.get_all("Content-Length", [])
+        if self.headers.get("Transfer-Encoding") or sizes not in ([], ["0"]):
+            self.reply(400, "usage requests cannot carry a body")
+            return
+        try:
+            from .provider_usage import validate_snapshot
+            data = json.dumps(validate_snapshot(self.server.ledger.snapshot(self.server.policy))).encode()
+        except Exception:
+            self.reply(503, "provider usage unavailable")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(data)
+        self.close_connection = True
+
+    def authorized(self):
+        supplied = self.headers.get_all("Authorization", [])
+        return len(supplied) == 1 and hmac.compare_digest(supplied[0].encode(), ("Bearer " + self.server.token).encode())
 
     def do_POST(self):
         self.close_connection = True
-        supplied = self.headers.get_all("Authorization", [])
-        if len(supplied) != 1 or not hmac.compare_digest(supplied[0].encode(), ("Bearer " + self.server.token).encode()):
+        if not self.authorized():
             self.reply(401, "model capability required")
             return
         sizes = self.headers.get_all("Content-Length", [])

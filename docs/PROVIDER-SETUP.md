@@ -99,6 +99,24 @@ values split across transport writes. Mission usage events still come from
 Hermes. Request limits are not a verified monetary budget; dollar pricing and
 per-mission cost limits remain open.
 
+The fixed authenticated `GET /v1/haos/usage` route exposes only rolling
+24-hour/minute aggregates and current request limits from this durable broker
+ledger. It includes unfinished requests, HTTP status counts, token **subtotals**
+actually reported, and coverage of complete token receipts. Missing tokens stay
+null; actual reported zero stays zero. These totals include previous provider
+configurations and have no per-mission attribution. `cost_available=false` and
+`monetary_cost=null` explicitly avoid a dollar-price claim.
+
+The controller samples this bounded literal-loopback route with its existing
+scoped capability and sends fixed validated fields to Herald's Hermes workspace.
+UI/backend restart does not reset usage. Broker outages clear the current receipt
+rather than fabricating zero; the UI labels absent/stale observations. Reads
+cannot request history/configuration, carry bodies, refresh OAuth credentials,
+call a model or consume a model admission. Duplicate/missing capabilities,
+query variants, arbitrary fields, inconsistent counts and monetary claims fail.
+Local SQLite and real loopback HTTP probes verify this independent aggregate
+path; they do not prove a real provider/model turn or actual billable usage.
+
 Unit/local HTTP tests include hostile credential reflection and refused routes.
 Root probes verify actual private modes, UID denial, capability rotation and
 interrupted switches. The runtime build verifies the actual pinned Hermes

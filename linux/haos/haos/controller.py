@@ -41,6 +41,8 @@ class Controller:
         self.gateway_uids: set[int] = set()
         self.gateway_policy = lambda: GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
         self.system_health: dict | None = None
+        self.usage_sampler = None
+        self.provider_usage: dict | None = None
 
     async def monitor(self):
         from .health import HealthSampler
@@ -52,6 +54,11 @@ class Controller:
             except Exception:
                 self.system_health = {"at": time.time(), "status": "unavailable", "can_dispatch": False,
                                       "errors": ["monitor"], "alerts": []}
+            if self.usage_sampler is not None:
+                try:
+                    self.provider_usage = await asyncio.to_thread(self.usage_sampler.sample)
+                except Exception:
+                    self.provider_usage = None  # no fabricated zero usage after a broker outage
             signature = (self.system_health["status"], tuple(self.system_health["alerts"]), tuple(self.system_health["errors"]))
             if signature != previous:
                 # No chat, journal excerpts, credentials, commands or filenames.
@@ -114,6 +121,7 @@ class Controller:
             return {"service": "haos-controller", "backend_connected": self.connection is not None,
                     "current_mission": self.current,
                     "system": self.system_health,
+                    "provider_usage": self.provider_usage,
                     "pending_requests": self.store.redactor.clean(list(self.questions.values()))}
         if method == "missions.list":
             return self.store.list()
@@ -258,6 +266,8 @@ async def serve():
     model_capability = json.loads(private_credential(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "provider-token"))["token"]
     store = MissionStore(Path("/var/lib/haos-control/missions.db"), redactor=Redactor([token, model_capability]))
     controller = Controller(store, websocket_url(config["backend_url"], token), uids)
+    from .provider_usage import UsageSampler
+    controller.usage_sampler = UsageSampler(model_capability)
     controller.gateway_uids = {pwd.getpwnam("haos-gateway").pw_uid}
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
