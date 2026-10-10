@@ -28,3 +28,12 @@ preserved, not arbitrary live filesystem consistency or a provider-backed missio
 Real model/gateway turns, general host applications, remote streaming, autonomous
 theme/skill generation, complete system recovery, signing and physical hardware
 remain open. These receipts do not authorize a stable release.
+
+`supplement.json` records later installed successes at `82e6ca5` and `fd7987d`,
+and the successful repeat of the original `327f3cd` image/guest protocol with the
+corrected `fd7987d` harness. The retry's unchanged `test-source.json` is retained
+separately: image, guest, harness and diagnostics remain distinct identities.
+The three matching boot-1 receipt byte sequences are identical to the original
+`guest-0a-boot-1.json`; supplemental second-boot receipts remain source-bound by
+archive and file digests. The newer theme parent-SIGKILL/recovery assertions are
+explicitly marked unaccepted until their own installed run supplies real receipts.

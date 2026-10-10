@@ -10,7 +10,9 @@ The existing [mission-scoped GUI broker](GUI-CAPABILITIES.md) now coordinates
 four real isolated native local browser windows, reads bounded visible layout text
 without persisting its body, and scrolls the actual renderer. Current local checks
 include **330 ordinary HAOS tests**, **three actual Unix probes**, **781 native
-tests**, TypeScript and the production build. The real browser/controller pipeline
+tests**, TypeScript and the production build. The current Linux bridge/CLI gate
+has **335 passed and one existing skip**, including 22 real watchdog cases;
+the current harness/evidence gate has **74 passed**. The real browser/controller pipeline
 retains sandbox, network/chooser/clipboard/foreign-window denials, acknowledgement
 loss without replay and controller restart with a blocked interrupted mission.
 The historical Weston kiosk fixture exhibited an actual compositor SIGSEGV; the
@@ -544,6 +546,19 @@ Boot receipts match actual serial output and are retained in the
 checked separately, and the job verified the downloaded ISO bytes before QEMU.
 No live model/GUI or full system recovery follows from this bounded installed gate.
 
+Later originals also verify installation, first boot, second boot and live-ledger
+restore at the following exact sources:
+
+| Source | Installed run | ISO SHA-256 |
+| --- | --- | --- |
+| `82e6ca5511700ec165a9985f24bcd44520baec9a` | [38054323950](https://github.com/BlueDragon4251/HAOS/actions/runs/38054323950) | `b57236f3d4fbd43df18f6ba6a529812ef8902fd906da4e5a413875198bd75358` |
+| `fd7987d35aabd62f0b3d6f6e3b13190c51ffbac5` | [38056420037](https://github.com/BlueDragon4251/HAOS/actions/runs/38056420037) | `1d2dd15b6fcec348466dfb1b1839b16c6c9d94b5a83e8b572f7f16256f2723f9` |
+
+Build and guest checkouts, downloaded ISO-byte checks and both saved/serial receipts
+were verified independently. [The supplement](evidence/2026-10-10/supplement.json)
+retains exact artifact/file digests and assertions. The installed foundation at
+`82e6ca5` does not itself accept a theme switch or the later theme crash test.
+
 Earlier run [38048845903](https://github.com/BlueDragon4251/HAOS/actions/runs/38048845903)
 at `327f3cd` failed without a success receipt. Its original guest archive
 `11669864370` (ZIP SHA-256 `7f92eda7241c184720c38885bbbf7a092637593eacd27ddefe5e85a35a4aff6f`)
@@ -552,6 +567,19 @@ RSS and serial progress continued with available disk space; the failure is not
 accepted as an installation pass or erased by the later successful source. The
 expanded real backup/runtime-restart matrix needs an appropriately bounded guest
 budget and explicit phase progress; all positive/negative assertions remain required.
+
+The repaired harness now has an actual successful same-image repeat:
+[38056420006](https://github.com/BlueDragon4251/HAOS/actions/runs/38056420006), image
+and frozen guest `327f3cd`, harness/diagnostics `fd7987d`. Original artifact
+`11673561020`, ZIP SHA-256 `610028f48f05bdca13114bfb66f8e836969339f16519b93e159812f5528713b1`,
+contains both real boot receipts with no startup errors and the unchanged source
+identity file. The original failed run remains failed in history.
+
+`fd7987d` services failed collecting the new selector test because the runner did
+not install PyYAML. `54b0f20` adds exactly `PyYAML==6.0.3`; a fresh minimal Python
+environment passed 330 HAOS and 71 harness cases. [CI](https://github.com/BlueDragon4251/HAOS/actions/runs/38092163232)
+and both [push](https://github.com/BlueDragon4251/HAOS/actions/runs/38092159250)/[PR](https://github.com/BlueDragon4251/HAOS/actions/runs/38092163207)
+services then passed. No existing assertion or test was removed.
 
 The harness now grants the disposable guest matrix 20 minutes, inside the unchanged
 30-minute host boot deadline, with room for firstboot and bounded failure shutdown.
