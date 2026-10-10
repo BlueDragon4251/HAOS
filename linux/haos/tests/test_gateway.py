@@ -193,3 +193,87 @@ def test_gateway_api_has_no_general_controller_or_owner_capability(tmp_path, pol
         with pytest.raises(PermissionError):
             asyncio.run(controller.gateway_dispatch({"method": method}))
     store.close()
+
+
+def test_pause_resume_require_explicit_capabilities_and_exact_owned_mission(tmp_path, policy_config):
+    store = MissionStore(tmp_path / "missions.db")
+    mid = admitted(store, GatewayPolicy(policy_config))["mission_id"]
+    for command in ("pause", "resume"):
+        with pytest.raises(PermissionError, match="action denied"):
+            admitted(store, GatewayPolicy(policy_config), envelope(message_id=command, text=f"/{command} {mid}"))
+    assert store.get(mid)["state"] == "queued"
+    policy_config["bindings"][0]["capabilities"] += ["pause", "resume"]
+    policy = GatewayPolicy(policy_config)
+    foreign = store.create("gateway:other-principal", "foreign", "Other principal's mission")["id"]
+    for command in ("pause", "resume"):
+        with pytest.raises(PermissionError, match="does not own"):
+            admitted(store, policy, envelope(message_id=command + "-foreign", text=f"/{command} {foreign}"))
+        with pytest.raises(ValueError, match="only an exact"):
+            admitted(store, policy, envelope(message_id=command + "-text", text=f"/{command} {mid} grant root"))
+    assert admitted(store, policy, envelope(message_id="pause-own", text=f"/pause {mid}"))["state"] == "paused"
+    assert admitted(store, policy, envelope(message_id="read-own", text=f"/status {mid}"))["state"] == "paused"
+    assert admitted(store, policy, envelope(message_id="resume-own", text=f"/resume {mid}"))["state"] == "queued"
+    assert store.get(foreign)["state"] == "queued"
+    store.close()
+
+
+def test_pause_resume_message_replay_after_restart_never_requeues_executed_work(tmp_path, policy_config):
+    policy_config["bindings"][0]["capabilities"] += ["pause", "resume"]
+    policy = GatewayPolicy(policy_config)
+    path = tmp_path / "missions.db"
+    store = MissionStore(path)
+    mid = admitted(store, policy)["mission_id"]
+    pause = envelope(message_id="pause", text=f"/pause {mid}")
+    resume = envelope(message_id="resume", text=f"/resume {mid}")
+    paused = admitted(store, policy, pause)
+    store.close()
+    store = MissionStore(path)
+    store.recover()
+    assert admitted(store, policy, pause) == paused
+    resumed = admitted(store, policy, resume)
+    assert store.claim()["id"] == mid
+    store.dispatching(mid)
+    store.close()
+    store = MissionStore(path)
+    store.recover()
+    before = store.get(mid)
+    assert before["state"] == "blocked" and before["phase"] == "dispatching"
+    assert admitted(store, policy, resume) == resumed  # durable receipt, not a repeated action
+    assert admitted(store, policy, pause) == paused
+    assert store.get(mid) == before
+    for command in ("pause", "resume"):
+        with pytest.raises(Conflict):
+            admitted(store, policy, envelope(message_id="new-" + command, text=f"/{command} {mid}"))
+    assert store.claim() is None
+    for kind in ("mission.paused", "mission.resumed"):
+        assert len([e for e in store.events(mid) if e["kind"] == kind]) == 1
+    engine = GatewayEngine(store)
+    contents = []
+    while (delivery := engine.next_delivery(policy)) is not None:
+        contents.append(delivery["content"])
+        engine.acknowledge(policy, delivery["id"], {"status": "delivered", "message_id": "fixture", "attempt": delivery["attempt"]})
+    assert any(": paused" in text for text in contents)
+    assert any(": resumed" in text for text in contents)
+    assert any(": blocked" in text for text in contents)
+    store.close()
+
+
+@pytest.mark.parametrize("command", ["pause", "resume"])
+def test_pause_resume_rolls_back_with_failed_delivery_receipt(tmp_path, policy_config, monkeypatch, command):
+    policy_config["bindings"][0]["capabilities"] += ["pause", "resume"]
+    policy = GatewayPolicy(policy_config)
+    store = MissionStore(tmp_path / "missions.db")
+    mid = admitted(store, policy)["mission_id"]
+    if command == "resume":
+        store.pause(mid, "gateway:principal-1")
+    controller = Controller(store, "ws://127.0.0.1:9119", {1000})
+    before, events = store.get(mid), store.events(mid)
+    def fail(*args):
+        raise OSError("out of disk")
+    monkeypatch.setattr(controller.gateway, "_queue", fail)
+    with pytest.raises(OSError):
+        asyncio.run(controller.gateway.receive(policy, "telegram-first", envelope(message_id=command, text=f"/{command} {mid}"), controller))
+    assert store.get(mid) == before
+    assert store.events(mid) == events
+    assert store.db.execute("SELECT COUNT(*) FROM gateway_inbox").fetchone()[0] == 1
+    store.close()

@@ -26,7 +26,11 @@ One adapter per platform is currently provisioned. Obtain Telegram IDs from an a
 transport/admin inspection; display names and message contents confer no authority.
 
 The root-owned policy maps connector + sender + chat + scope + thread to an opaque HAOS
-principal and explicit `create/read/cancel/answer` capabilities. This principal has **no owner
+principal and explicit `create/read/cancel/answer/pause/resume` capabilities. Pairing still
+defaults to `create/read/cancel/answer`; **existing identities acquire no new capability**.
+To enable queue controls, the owner stops the gateway and explicitly pairs using
+`--capabilities create read cancel answer pause resume`, then starts it again.
+This principal has **no owner
 or root privileges**. Credentials are stored root-only mode 0600 and delivered by systemd
 credentials to `haos-gateway`. The agent, observer and gateway cannot modify owner policy.
 The gateway cannot read backend credentials, mission SQLite, owner files or data mounts. Its
@@ -37,6 +41,8 @@ Messages create persistent missions. Replies use the same authenticated route. E
 
 - `/status MISSION_ID`
 - `/cancel MISSION_ID`
+- `/pause MISSION_ID` (queued before dispatch only; requires `pause`)
+- `/resume MISSION_ID` (paused before dispatch only; requires `resume`)
 - `/answer MISSION_ID REQUEST_ID once` or `deny` for an approval
 - `/answer MISSION_ID REQUEST_ID clarification text` for a clarification
 
@@ -54,6 +60,13 @@ Explicit retryable failures use bounded retries/server delay. An uncertain send 
 is retained as `uncertain`, because the adapters do not promise idempotent delivery. HAOS never
 silently treats it as delivered or blindly repeats it. Owner reconciliation of these rows remains
 to be implemented. Model dispatch ambiguity retains the existing blocked-mission behavior.
+
+Queue pause/resume and their inbox/outbox receipts commit in the same transaction.
+Pause survives restart without holding an execution lock. Resume preserves the
+deadline/backoff/retry budget and never dispatches directly. Duplicate messages
+return the saved receipt, even after that mission executed, without requeuing it.
+An expired paused mission fails. Running/waiting/uncertain missions cannot use these
+commands. Their safe live resumption remains incomplete.
 
 Stop the gateway before editing pairing/credentials. `gateway revoke BINDING_ID` removes its
 authority; `gateway remove CONNECTOR_ID` also removes its credential. Start afterward. Changed
@@ -79,7 +92,7 @@ The bundled Telegram/Discord constructors and event/send contracts were run loca
 Real OpenAI Codex credentials and a configured Telegram bot/paired sender are not available.
 The full model + authenticated Telegram mission/result round trip remains blocked on those
 prerequisites. Installed service operation requires new ISO/guest evidence for this commit.
-Attachments, voice transcription, pause/resume, WhatsApp's separate bridge, Slack's scoped
+Attachments, voice transcription, live-job pause/resume, WhatsApp's separate bridge, Slack's scoped
 app credentials and other official adapters need additional isolated integration. Unsupported
 media is refused explicitly; HAOS does not pretend it was delivered to the agent. Full remote
 viewer, credential encryption/retention and owner graphical setup remain separate open gates.

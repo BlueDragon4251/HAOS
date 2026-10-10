@@ -20,6 +20,11 @@ export interface DurableMission {
   result: string | null
 }
 
+/** Pausing before dispatch holds no execution lock and is safe to resume. */
+export function isPausedDurableMission(mission: DurableMission): boolean {
+  return mission.state === 'blocked' && mission.phase === 'paused-before-dispatch'
+}
+
 export interface MissionEvent {
   seq: number
   mission_id: string
@@ -62,7 +67,9 @@ export interface MissionMethods {
   'missions.get': { params: { id: string }; result: DurableMission }
   'missions.events': { params: { id: string; after?: number }; result: MissionEvent[] }
   'missions.cancel': { params: { id: string }; result: DurableMission }
+  'missions.pause': { params: { id: string }; result: DurableMission }
+  'missions.resume': { params: { id: string }; result: DurableMission }
   'missions.answer': { params: { request_id: string; choice?: 'once' | 'deny'; answer?: string }; result: { accepted: boolean } }
 }
 
-export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.lookup', 'missions.get', 'missions.events', 'missions.cancel', 'missions.answer'])
+export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.lookup', 'missions.get', 'missions.events', 'missions.cancel', 'missions.pause', 'missions.resume', 'missions.answer'])

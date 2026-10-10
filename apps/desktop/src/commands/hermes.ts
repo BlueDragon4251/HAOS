@@ -2,7 +2,7 @@ import { pauseAllAgents } from '../store/agents-control.ts'
 import { $activeChat, createChat, interruptChat, openStoredSession, sendPrompt } from '../store/chat.ts'
 import { $activeMissions, $completedMissions, $missions, $reviewMissions, focusMissions, markReviewed, type Mission } from '../store/missions.ts'
 import { startMission } from '../store/missions-actions.ts'
-import { $durableMissions, $missionServiceError, answerMissionRequest, cancelDurableMission, refreshDurableMissions } from '../store/durable-missions.ts'
+import { $durableMissions, $missionServiceError, answerMissionRequest, cancelDurableMission, pauseDurableMission, resumeDurableMission, refreshDurableMissions } from '../store/durable-missions.ts'
 import { fail, ok, type OsCommand } from '../store/os-commands.ts'
 import { $sessions, refreshSessions } from '../store/sessions.ts'
 import { readToolSearch, setToolSearch } from '../store/tool-search.ts'
@@ -241,19 +241,19 @@ export const hermesCommands: readonly OsCommand[] = [
   {
     id: 'mission.pause',
     title: 'Pause a mission',
-    description: 'Interrupt a running mission.',
+    description: 'In HAOS, hold queued work before dispatch. Running work cannot safely be paused.',
     tier: 'act',
     args: [{ name: 'name', type: 'string', description: 'Part of the mission title', required: true }],
-    phrases: ['pause the {name} mission', 'stop the {name} mission'],
+    phrases: ['pause the {name} mission'],
     run: async ({ name }) => {
       if ((await window.heraldOS.missions.serviceInfo()).managed) {
         await refreshDurableMissions()
         if ($missionServiceError.get()) return fail($missionServiceError.get()!)
         const matches = $durableMissions.get().filter(row => row.id === String(name) || row.goal.toLowerCase().includes(String(name).toLowerCase()))
         if (matches.length !== 1) return fail('Choose one stored mission by its stable ID.')
-        await cancelDurableMission(matches[0].id)
+        await pauseDurableMission(matches[0].id)
         showPage('missions'); focusMissions({ missionId: matches[0].id })
-        return ok('Stop requested; interruption is confirmed by the controller.', { page: 'missions' })
+        return ok('Paused before dispatch. The existing deadline still applies.', { page: 'missions' })
       }
       const { mission, candidates } = findMission(String(name))
 
@@ -270,6 +270,16 @@ export const hermesCommands: readonly OsCommand[] = [
       focusMissions({ missionId: mission.id })
 
       return ok(`Paused "${mission.title}"`, { page: 'missions', highlight: { kind: 'mission', id: mission.id } })
+    }
+  },
+  {
+    id: 'mission.resume', title: 'Resume a queued mission', description: 'Return work paused before dispatch to the durable queue.', tier: 'act',
+    args: [{ name: 'id', type: 'string', description: 'Stable mission ID', required: true }],
+    run: async ({ id }) => {
+      if (!(await window.heraldOS.missions.serviceInfo()).managed) return fail('Durable resume requires the HAOS controller.')
+      const mission = await resumeDurableMission(String(id))
+      showPage('missions'); focusMissions({ missionId: mission.id })
+      return mission.state === 'queued' ? ok('Returned to the queue.', { page: 'missions' }) : fail('The paused mission deadline expired; the controller marked it failed.')
     }
   },
   {

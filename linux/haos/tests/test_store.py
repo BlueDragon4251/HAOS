@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from haos.store import Conflict, MissionStore
+from haos.store import Conflict, MissionStore, PAUSED_PHASE
 
 
 def test_creation_is_durable_and_idempotency_is_actor_scoped(tmp_path):
@@ -128,3 +128,110 @@ def test_newer_database_schema_is_not_silently_downgraded(tmp_path):
         db.execute("PRAGMA user_version=2")
     with pytest.raises(RuntimeError, match="unsupported"):
         MissionStore(path)
+
+
+def test_paused_queue_survives_restart_without_locking_other_work(tmp_path):
+    path = tmp_path / "missions.db"
+    store = MissionStore(path)
+    first = store.create("uid:1000", "pause", "Hold this work")
+    assert store.pause(first["id"], "uid:1000")["phase"] == PAUSED_PHASE
+    store.pause(first["id"], "uid:1000")
+    assert len([e for e in store.events(first["id"]) if e["kind"] == "mission.paused"]) == 1
+    store.close()
+    store = MissionStore(path)
+    store.recover()
+    assert store.get(first["id"])["state"] == "blocked"
+    assert store.claim() is None
+    other = store.create("uid:1000", "other", "Independent queued work")
+    assert store.claim()["id"] == other["id"]
+    resumed = store.resume(first["id"], "uid:1000")
+    assert (resumed["state"], resumed["attempt"], resumed["deadline"]) == ("queued", 0, first["deadline"])
+    assert store.claim() is None  # resuming cannot steal another mission's execution lock
+    with pytest.raises(Conflict):
+        store.resume(first["id"], "uid:1000")
+    store.request_cancel(other["id"], "uid:1000")
+    store.settle(other["id"], "cancelled")
+    assert store.claim()["id"] == first["id"]
+    assert len([e for e in store.events(first["id"]) if e["kind"] == "mission.resumed"]) == 1
+    store.close()
+
+
+def test_pause_preserves_retry_backoff_and_does_not_extend_expired_deadline(tmp_path):
+    store = MissionStore(tmp_path / "missions.db")
+    row = store.create("uid:1000", "a", "Unavailable before dispatch", timeout=60)
+    store.claim()
+    store.unavailable(row["id"], "ConnectionRefusedError")
+    before = store.get(row["id"])
+    store.pause(row["id"], "uid:1000")
+    after = store.resume(row["id"], "uid:1000")
+    assert {k: before[k] for k in ("attempt", "max_attempts", "next_run", "deadline")} == {
+        k: after[k] for k in ("attempt", "max_attempts", "next_run", "deadline")}
+    assert store.claim() is None
+    store.pause(row["id"], "uid:1000")
+    store.db.execute("UPDATE missions SET deadline=? WHERE id=?", (time.time() - 1, row["id"]))
+    assert store.resume(row["id"], "uid:1000")["state"] == "failed"
+    assert not any(e["kind"] == "mission.resumed" for e in store.events(row["id"])[-1:])
+    assert store.claim() is None
+    store.close()
+
+
+def test_paused_work_can_be_cancelled_without_any_dispatch(tmp_path):
+    store = MissionStore(tmp_path / "missions.db")
+    row = store.create("uid:1000", "a", "Never execute")
+    store.pause(row["id"], "uid:1000")
+    cancelled = store.request_cancel(row["id"], "uid:1000")
+    assert (cancelled["state"], cancelled["cancel_requested"], cancelled["attempt"]) == ("cancelled", 1, 0)
+    with pytest.raises(Conflict):
+        store.resume(row["id"], "uid:1000")
+    assert store.claim() is None
+    store.close()
+
+
+@pytest.mark.parametrize("phase", ["connecting", "session-created", "waiting", "dispatching", "uncertain"])
+def test_pause_resume_never_releases_executing_or_ambiguous_work(tmp_path, phase):
+    store = MissionStore(tmp_path / "missions.db")
+    row = store.create("uid:1000", "a", "Possibly executing")
+    store.claim()
+    if phase != "connecting":
+        store.session(row["id"], "session", "stored")
+    if phase == "waiting":
+        store.waiting(row["id"], {"method": "clarify"})
+    if phase in {"dispatching", "uncertain"}:
+        store.dispatching(row["id"])
+    if phase == "uncertain":
+        store.recover()
+    before = store.get(row["id"])
+    events = store.events(row["id"])
+    for operation in (store.pause, store.resume):
+        with pytest.raises(Conflict):
+            operation(row["id"], "uid:1000")
+    assert store.get(row["id"]) == before
+    assert store.events(row["id"]) == events
+    assert store.db.execute("SELECT mission_id FROM locks").fetchone()[0] == row["id"]
+    store.create("uid:1000", "b", "Must not start")
+    assert store.claim() is None
+    store.close()
+
+
+def test_pause_and_claim_from_competing_controllers_are_mutually_exclusive(tmp_path):
+    path = tmp_path / "missions.db"
+    store = MissionStore(path)
+    row = store.create("uid:1000", "a", "Race admission")
+
+    def contender(operation):
+        peer = MissionStore(path)
+        try:
+            return peer.claim() if operation == "claim" else peer.pause(row["id"], "uid:1000")
+        except Conflict:
+            return None
+        finally:
+            peer.close()
+
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        claimed, paused = pool.map(contender, ("claim", "pause"))
+    assert (claimed is None) != (paused is None)
+    current = store.get(row["id"])
+    assert current["state"] == ("running" if claimed else "blocked")
+    assert current["attempt"] == (1 if claimed else 0)
+    assert store.db.execute("SELECT COUNT(*) FROM locks").fetchone()[0] == (1 if claimed else 0)
+    store.close()

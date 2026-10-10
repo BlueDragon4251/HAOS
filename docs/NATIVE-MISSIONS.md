@@ -13,6 +13,15 @@ expandable recorded events. The model/backend process remains independent of
 the window. This does not implement graphical application control, screenshots,
 remote streaming or complete voice-response playback.
 
+Queued work offers Pause; a persisted pause before dispatch offers Resume and
+Stop. The UI uses the actual controller methods, displays its returned state and
+recorded `mission.paused`/`mission.resumed` events, and never restarts the model
+itself. The original deadline continues while paused. Uncertain blocked work
+keeps its separate owner-reconciliation message and offers no Resume. If a worker
+claims the mission before a Pause request arrives, the controller refuses the
+request. The HAOS `mission.pause` command now pauses the durable queue rather than
+cancelling an execution. Standalone Herald retains its existing interruption path.
+
 Before admission, the renderer saves only a random request UUID, SHA-256 goal
 digest and timestamp. It stores no plaintext message in these receipt records.
 The digest is metadata, not encryption: someone with browser-storage access can

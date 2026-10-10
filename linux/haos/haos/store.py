@@ -13,6 +13,7 @@ from .redaction import Redactor
 
 ACTIVE = {"running", "waiting"}
 TERMINAL = {"completed", "failed", "cancelled"}
+PAUSED_PHASE = "paused-before-dispatch"
 
 
 class Conflict(ValueError):
@@ -175,11 +176,47 @@ class MissionStore:
             self.db.execute("UPDATE missions SET state='running',updated_at=? WHERE id=? AND state='waiting'", (time.time(), mid))
             self._event(mid, "mission.answer", {"actor": actor, "choice": choice})
 
+    def pause(self, mid: str, actor: str) -> dict:
+        with self.transaction():
+            row = self.get(mid)
+            if row["state"] == "blocked" and row["phase"] == PAUSED_PHASE:
+                return row
+            if (row["state"] != "queued" or row["phase"] != "pending"
+                    or self.db.execute("SELECT 1 FROM locks WHERE mission_id=?", (mid,)).fetchone()):
+                raise Conflict("only undispatched queued missions can be safely paused")
+            # Existing blocked state makes older controllers fail closed too.
+            # Never release an execution lock or change a dispatching receipt.
+            self.db.execute("UPDATE missions SET state='blocked',phase=?,updated_at=? WHERE id=?",
+                            (PAUSED_PHASE, time.time(), mid))
+            self._event(mid, "mission.paused", {"actor": actor, "before_dispatch": True})
+        return self.get(mid)
+
+    def resume(self, mid: str, actor: str) -> dict:
+        with self.transaction():
+            row = self.get(mid)
+            if (row["state"] != "blocked" or row["phase"] != PAUSED_PHASE
+                    or self.db.execute("SELECT 1 FROM locks WHERE mission_id=?", (mid,)).fetchone()):
+                raise Conflict("only a mission paused before dispatch can be resumed")
+            if row["deadline"] <= time.time():
+                self._settle(mid, "failed", "deadline expired while paused before dispatch")
+            else:
+                # Preserve attempts, backoff and absolute deadline. Resuming is
+                # queue admission, never a repeated prompt or external action.
+                self.db.execute("UPDATE missions SET state='queued',phase='pending',updated_at=? WHERE id=?",
+                                (time.time(), mid))
+                self._event(mid, "mission.resumed", {"actor": actor, "before_dispatch": True})
+        return self.get(mid)
+
     def request_cancel(self, mid: str, actor: str) -> dict:
         with self.transaction():
             row = self.get(mid)
             if row["state"] in TERMINAL:
                 return row
+            if row["state"] == "blocked" and row["phase"] == PAUSED_PHASE:
+                self.db.execute("UPDATE missions SET cancel_requested=1 WHERE id=?", (mid,))
+                self._event(mid, "mission.cancel-requested", {"actor": actor})
+                self._settle(mid, "cancelled", None)
+                return self.get(mid)
             if row["state"] == "blocked":
                 raise Conflict("blocked execution must be reconciled before releasing its lock")
             self.db.execute("UPDATE missions SET cancel_requested=1,updated_at=? WHERE id=?", (time.time(), mid))

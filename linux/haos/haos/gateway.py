@@ -7,11 +7,11 @@ import json
 import re
 import time
 
-from .store import Conflict, MissionStore
+from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
 SUPPORTED = {"telegram", "discord"}
-CAPABILITIES = {"create", "read", "cancel", "answer"}
+CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
 def digest(value) -> str:
@@ -142,17 +142,22 @@ class GatewayEngine:
             parts = text.strip().split(maxsplit=2)
             command = parts[0]
             if command.startswith("/"):
-                if command not in {"/status", "/cancel", "/answer"} or len(parts) < 2:
-                    raise ValueError("supported commands: /status ID, /cancel ID, /answer ID REQUEST_ID ANSWER")
+                if command not in {"/status", "/cancel", "/answer", "/pause", "/resume"} or len(parts) < 2:
+                    raise ValueError("supported commands: /status ID, /cancel ID, /pause ID, /resume ID, /answer ID REQUEST_ID ANSWER")
                 mid = parts[1]
                 mission = self.store.get(mid)
                 if mission["actor"] != actor:
                     raise PermissionError("gateway identity does not own this mission")
-                capability = {"/status": "read", "/cancel": "cancel", "/answer": "answer"}[command]
+                capability = {"/status": "read", "/cancel": "cancel", "/answer": "answer",
+                              "/pause": "pause", "/resume": "resume"}[command]
                 if capability not in binding["capabilities"]:
                     raise PermissionError("gateway action denied")
                 if command == "/cancel":
                     mission = self.store.request_cancel(mid, actor)
+                elif command in {"/pause", "/resume"}:
+                    if len(parts) != 2:
+                        raise ValueError("pause/resume requires only an exact mission ID")
+                    mission = (self.store.pause if command == "/pause" else self.store.resume)(mid, actor)
                 elif command == "/answer":
                     if len(parts) != 3 or controller.current != mid:
                         raise Conflict("mission question is not active")
@@ -163,7 +168,8 @@ class GatewayEngine:
                     answer_request = {"method": "missions.answer", "params": {
                         "request_id": request_id, "answer": answer, "choice": answer}}
                     self.store._event(mid, "gateway.answer-dispatching", {"request_id": request_id, "actor": actor})
-                content = f"Mission {mid}: {mission['state']}\n{mission['result'] or mission['error'] or ''}"
+                state = "paused" if mission["state"] == "blocked" and mission["phase"] == PAUSED_PHASE else mission["state"]
+                content = f"Mission {mid}: {state}\n{mission['result'] or mission['error'] or ''}"
             else:
                 if "create" not in binding["capabilities"]:
                     raise PermissionError("gateway mission creation denied")
@@ -175,7 +181,8 @@ class GatewayEngine:
                 (id,mission_id,binding_id,binding_digest,connector,chat,thread,scope,reply_to)
                 VALUES(?,?,?,?,?,?,?,?,?)""", (route_id, mid, binding["id"], digest(binding), connector,
                                               binding["chat"], binding["thread"], binding["scope"], envelope["message_id"]))
-            reply = {"mission_id": mid, "state": mission["state"]}
+            state = "paused" if mission["state"] == "blocked" and mission["phase"] == PAUSED_PHASE else mission["state"]
+            reply = {"mission_id": mid, "state": state}
             self.store.db.execute("INSERT INTO gateway_inbox VALUES(?,?,?,?,?,?,?)",
                                   (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
@@ -209,7 +216,8 @@ class GatewayEngine:
                         content = (f"Mission {route['mission_id']}: waiting for {payload.get('method')}\n"
                                    f"Request {payload.get('id')}; inspect details in Herald. "
                                    "Reply /answer MISSION_ID REQUEST_ID once|deny (approval) or your clarification.")
-                    elif kind in {"mission.claimed", "mission.completed", "mission.failed", "mission.blocked", "mission.cancelled"}:
+                    elif kind in {"mission.claimed", "mission.completed", "mission.failed", "mission.blocked", "mission.cancelled",
+                                  "mission.paused", "mission.resumed"}:
                         content = f"Mission {route['mission_id']}: {kind.removeprefix('mission.')}\n{payload.get('result') or payload.get('error') or ''}"
                     else:
                         continue

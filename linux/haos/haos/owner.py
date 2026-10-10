@@ -59,7 +59,7 @@ def main():
     pair.add_argument("--identity", required=True)
     pair.add_argument("--scope", default="")
     pair.add_argument("--thread", default="")
-    pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer"], default=["create", "read", "cancel", "answer"])
+    pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer", "pause", "resume"], default=["create", "read", "cancel", "answer"])
     revoke = gateway_sub.add_parser("revoke")
     revoke.add_argument("binding")
     remove = gateway_sub.add_parser("remove")

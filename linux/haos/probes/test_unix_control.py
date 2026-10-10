@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from haos.controller import Controller, peer_actor
-from haos.store import MissionStore
+from haos.store import MissionStore, PAUSED_PHASE
 
 
 def test_kernel_peer_identity_and_mission_roundtrip(tmp_path):
@@ -48,7 +48,28 @@ def test_kernel_peer_identity_and_mission_roundtrip(tmp_path):
             assert not denied["ok"]
             events = await request("missions.events", {"id": created["result"]["id"]})
             assert events["result"][0]["kind"] == "mission.queued"
+            mid = created["result"]["id"]
+            paused = await request("missions.pause", {"id": mid, "actor": "owner:0"})
+            assert paused["ok"] and paused["result"]["phase"] == PAUSED_PHASE
+            # Restart the actual SQLite connection while the transport stays open.
+            store.close()
+            controller.store = reopened = MissionStore(tmp_path / "missions.db")
+            reopened.recover()
+            assert reopened.get(mid)["phase"] == PAUSED_PHASE
+            other = reopened.claim()
+            assert other["goal"] == "Another actor's private receipt"
+            reopened.settle(other["id"], "cancelled")
+            assert reopened.claim() is None
+            resumed = await request("missions.resume", {"id": mid, "actor": "owner:0"})
+            assert resumed["ok"] and resumed["result"]["state"] == "queued"
+            assert not (await request("missions.resume", {"id": mid}))["ok"]
+            assert reopened.claim()["id"] == mid
+            assert not (await request("missions.pause", {"id": mid}))["ok"]
+            assert not (await request("missions.resume", {"id": mid}))["ok"]
+            actions = reopened.events(mid)
+            for kind in ("mission.paused", "mission.resumed"):
+                assert [e["payload"]["actor"] for e in actions if e["kind"] == kind] == [f"uid:{os.getuid()}"]
         server.close()
         await server.wait_closed()
-        store.close()
+        controller.store.close()
     asyncio.run(exercise())

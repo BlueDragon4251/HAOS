@@ -131,6 +131,10 @@ class Controller:
             return self.store.events(params["id"], after)
         if method == "missions.cancel":
             return self.store.request_cancel(params["id"], actor)
+        if method == "missions.pause":
+            return self.store.pause(params["id"], actor)
+        if method == "missions.resume":
+            return self.store.resume(params["id"], actor)
         if method == "missions.answer":
             frame = self.questions.get(params["request_id"])
             if not frame or not self.connection or not self.current:

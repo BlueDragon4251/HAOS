@@ -49,6 +49,17 @@ export async function cancelDurableMission(id: string): Promise<void> {
   await refreshDurableMissions()
 }
 
+export async function pauseDurableMission(id: string): Promise<void> {
+  await window.heraldOS.missions.request('missions.pause', { id })
+  await refreshDurableMissions()
+}
+
+export async function resumeDurableMission(id: string): Promise<DurableMission> {
+  const mission = await window.heraldOS.missions.request('missions.resume', { id })
+  await refreshDurableMissions()
+  return mission
+}
+
 export async function answerMissionRequest(requestId: string, choice?: 'once' | 'deny', answer?: string): Promise<void> {
   await window.heraldOS.missions.request('missions.answer', { request_id: requestId, choice, answer })
   await refreshDurableMissions()

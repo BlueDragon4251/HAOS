@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { IconPlus, IconTarget } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import type { DurableMissionState, MissionQuestion } from '../../../shared/missions.ts'
+import { isPausedDurableMission, type DurableMissionState, type MissionQuestion } from '../../../shared/missions.ts'
 import { EmptyGlass, GlassButton, GlassCard, PageHeader } from '../../components/ui/glass.tsx'
 import { $durableMissions, $missionEvents, $missionServiceError, $missionServiceHealth, loadMissionEvents, refreshDurableMissions } from '../../store/durable-missions.ts'
 import { $missionFocus } from '../../store/missions.ts'
@@ -127,7 +127,7 @@ export function DurableMissionsPage({ conversation = false }: { conversation?: b
                 className={`flex flex-col gap-2 rounded-xl p-4 text-left ${selected?.id === row.id ? 'glass-card-selected' : 'glass-card-hover'}`}>
                 <div className="flex items-center justify-between gap-3">
                   <span className="truncate text-sm font-semibold text-fg">{row.goal.slice(0, 60)}</span>
-                  <span className={`text-xs ${STATE_COLOR[row.state]}`}>{row.state}</span>
+                  <span className={`text-xs ${STATE_COLOR[row.state]}`}>{isPausedDurableMission(row) ? 'paused' : row.state}</span>
                 </div>
                 <p className="line-clamp-2 text-xs text-fg-3">{row.goal}</p>
                 <span className="text-xs text-fg-4">Attempt {row.attempt}/{row.max_attempts} · {new Date(row.updated_at * 1000).toLocaleString()}</span>
@@ -141,16 +141,21 @@ export function DurableMissionsPage({ conversation = false }: { conversation?: b
                 <>
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="text-sm font-semibold text-fg">{selected.goal.slice(0, 60)}</h2>
-                    {ACTIVE.has(selected.state) && <GlassButton size="sm" disabled={Boolean(selected.cancel_requested)} onClick={() => void command('mission.cancel', { id: selected.id })}>{selected.cancel_requested ? 'Stop requested' : 'Stop'}</GlassButton>}
+                    <div className="flex gap-2">
+                      {selected.state === 'queued' && <GlassButton size="sm" onClick={() => void command('mission.pause', { name: selected.id })}>Pause</GlassButton>}
+                      {isPausedDurableMission(selected) && <GlassButton size="sm" onClick={() => void command('mission.resume', { id: selected.id })}>Resume</GlassButton>}
+                      {(ACTIVE.has(selected.state) || isPausedDurableMission(selected)) && <GlassButton size="sm" disabled={Boolean(selected.cancel_requested)} onClick={() => void command('mission.cancel', { id: selected.id })}>{selected.cancel_requested ? 'Stop requested' : 'Stop'}</GlassButton>}
+                    </div>
                   </div>
                   <p className="whitespace-pre-wrap text-sm text-fg-2">{selected.goal}</p>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-                    <dt className="text-fg-4">State</dt><dd className={STATE_COLOR[selected.state]}>{selected.state}</dd>
+                    <dt className="text-fg-4">State</dt><dd className={STATE_COLOR[selected.state]}>{isPausedDurableMission(selected) ? 'paused' : selected.state}</dd>
                     <dt className="text-fg-4">Mission</dt><dd className="break-all font-mono text-fg-3">{selected.id}</dd>
                     <dt className="text-fg-4">Deadline</dt><dd className="text-fg-3">{new Date(selected.deadline * 1000).toLocaleString()}</dd>
                   </dl>
                   {selected.error && <p role="alert" className="whitespace-pre-wrap text-xs text-warn">{selected.error}</p>}
-                  {selected.state === 'blocked' && <p className="text-xs text-warn">Execution may have changed files or external services. Owner recovery must inspect and reconcile it before another mission uses this workspace.</p>}
+                  {isPausedDurableMission(selected) && <p className="text-xs text-fg-3">Paused before dispatch. Resume returns this mission to the queue; its original deadline and retry budget still apply.</p>}
+                  {selected.state === 'blocked' && !isPausedDurableMission(selected) && <p className="text-xs text-warn">Execution may have changed files or external services. Owner recovery must inspect and reconcile it before another mission uses this workspace.</p>}
                   {questions.map(q => <PendingQuestion key={String(q.id)} question={q} />)}
                   {selected.result && <section className="flex flex-col gap-2"><h3 className="text-sm font-semibold text-fg">Hermes result</h3><p className="text-xs text-fg-4">Recorded upstream turn receipt. Review its evidence and remaining work.</p><pre className="whitespace-pre-wrap break-words text-xs text-fg-2">{selected.result}</pre></section>}
                   <section className="flex flex-col gap-3" aria-label="Recorded mission events">
