@@ -18,7 +18,7 @@ fs.chmodSync(root, 0o700)
 app.setPath('userData', path.join(root, 'profile'))
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 process.env.HAOS_BACKEND_CONFIG = '/etc/haos/backend.json'
-let child, native
+let child, native, stage = 'startup'
 const deadline = setTimeout(() => { native?.stop(); child?.kill('SIGKILL'); app.exit(2) }, 60000)
 
 function request(socket, method, params) {
@@ -54,7 +54,7 @@ async function startController() {
     child.stdout.on('data', data => {
       output += data.toString()
       if (output.length > 16384) return reject(new Error('Readiness limit'))
-      const line = output.split('\n').find(item => item.startsWith('{"ready"'))
+      const line = output.split('\n').slice(0, -1).find(item => item.startsWith('{"ready"'))
       if (line) { clearTimeout(timer); resolve(JSON.parse(line)) }
     })
   })
@@ -73,6 +73,7 @@ async function main() {
   try {
     await app.whenReady()
     const { NativeGuiBroker } = await import('../dist/electron/gui-broker.mjs')
+    stage = 'controller-start'
     const ready = await startController()
     assert.equal(ready.real_model_turn, false)
     let dropAck = false
@@ -92,6 +93,7 @@ async function main() {
       }
       throw new Error('Integrated GUI receipt deadline')
     }
+    stage = 'native-attach'
     await wait(async () => {
       try { return await request('gui.sock', 'gui.submit', { session, id: randomUUID(), action: { operation: 'state' } }) }
       catch { return null }
@@ -103,21 +105,26 @@ async function main() {
         return ['succeeded', 'failed', 'uncertain'].includes(receipt.state) ? receipt : null
       })
     }
+    stage = 'open'
     const opened = await submit({ operation: 'open', html: '<input id="field" style="margin:0;width:300px;height:40px"><p>Integrated private visible report</p>' })
     assert.equal(opened.state, 'succeeded')
     const window = opened.result.window
+    stage = 'input-and-inspection'
     assert.equal((await submit({ operation: 'click', window, x: 40, y: 70 })).state, 'succeeded')
     assert.equal((await submit({ operation: 'type', window, text: 'Integrated real native input' })).state, 'succeeded')
     const inspected = await submit({ operation: 'inspect', window })
     assert.equal(inspected.state, 'succeeded')
     assert.equal(inspected.result.fields[0].value, 'Integrated real native input')
+    stage = 'capture'
     const captured = await submit({ operation: 'capture', window })
     assert.equal(captured.state, 'succeeded')
     assert(Buffer.from(captured.result.jpeg, 'base64').length > 1000)
+    stage = 'read-visible-text'
     const read = await submit({ operation: 'read', window })
     assert.equal(read.state, 'succeeded')
     assert.match(read.result.text, /Integrated private visible report/)
     assert.doesNotMatch(read.result.text, /Integrated real native input/)
+    stage = 'audit-and-denials'
     const events = await request('control.sock', 'missions.events', { id: ready.mission })
     assert(events.some(event => event.kind === 'gui.succeeded'))
     assert.equal(JSON.stringify(events).includes('Integrated real native input'), false)
@@ -126,11 +133,13 @@ async function main() {
     await assert.rejects(request('gui.sock', 'missions.create', { goal: 'owner', idempotency_key: 'attack' }))
     await assert.rejects(request('gui.sock', 'gui.submit', { session: 'forged', id: randomUUID(), action: { operation: 'state' } }))
     const lostId = randomUUID(), captureAction = { operation: 'capture', window }
+    stage = 'lost-ack'
     dropAck = true
     const lost = await submit(captureAction, lostId)
     assert.equal(lost.state, 'uncertain')
     const retry = await request('gui.sock', 'gui.submit', { session, id: lostId, action: captureAction })
     assert.equal(retry.state, 'uncertain')
+    stage = 'controller-restart'
     await stopController()
     const restarted = await startController()
     assert.equal(restarted.mission, ready.mission)
@@ -156,7 +165,9 @@ async function main() {
     native?.stop()
     await stopController()
     clearTimeout(deadline)
-    console.error('Actual native/socket GUI gate failed:', error.name)
+    // Electron app.exit can terminate an asynchronous console write. Preserve
+    // the fixed phase/error class synchronously, never bodies or session values.
+    fs.writeSync(2, `Actual native/socket GUI gate failed: ${stage} ${error.name}\n`)
     app.exit(1)
   }
 }
