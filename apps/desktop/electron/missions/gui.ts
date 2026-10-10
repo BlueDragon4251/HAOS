@@ -54,6 +54,14 @@ export class MissionBrowser {
       // Agent input goes directly to the scoped renderer. Seat input must not paste
       // owner clipboard contents into a mission or select files in a native dialog.
       win.setIgnoreMouseEvents(true)
+      // Also deny privileged physical keyboard shortcuts if a compositor attempts
+      // to activate this surface. Scoped broker key events never use modifiers.
+      win.webContents.on('before-input-event', (event, input) => {
+        if (input.control || input.meta || input.alt) event.preventDefault()
+      })
+      win.webContents.on('before-mouse-event', (event, input) => {
+        if (input.button === 'middle' || input.button === 'right') event.preventDefault()
+      })
       const entry = { mission: request.mission, win, documentSession: '' }
       this.windows.set(window, entry)
       win.on('closed', () => {
@@ -133,6 +141,30 @@ export class MissionBrowser {
         const jpeg = shot.toJPEG(50)
         if (jpeg.length > 73728) throw new Error('Mission capture exceeds budget')
         return { window: action.window, width: 800, height: 600, jpeg: jpeg.toString('base64') }
+      }
+      case 'inspect': {
+        // Fixed read-only DOM snapshot on the mission document. No selectors,
+        // JavaScript, owner frame or arbitrary debugger method from callers.
+        const snapshot = await win.webContents.debugger.sendCommand('DOMSnapshot.captureSnapshot', { computedStyles: [] }, entry.documentSession)
+        const fields: Record<string, unknown>[] = []
+        for (const document of snapshot.documents) {
+          const sources = [document.nodes.inputValue, document.nodes.textValue].filter(Boolean)
+          for (const values of sources) for (let i = 0; i < values.index.length; i++) {
+            if (fields.length >= 32) throw new Error('Document field limit exceeded')
+            const index = values.index[i] as number
+            const attributes: number[] = document.nodes.attributes[index] || []
+            const names: Record<string, string> = {}
+            for (let a = 0; a < attributes.length; a += 2) names[snapshot.strings[attributes[a]]] = snapshot.strings[attributes[a + 1]]
+            const requestedType = names.type || (snapshot.strings[document.nodes.nodeName[index]] === 'TEXTAREA' ? 'textarea' : 'text')
+            const type = ['text', 'number', 'checkbox', 'password', 'file', 'textarea', 'email', 'url'].includes(requestedType) ? requestedType : 'other'
+            const sensitive = type === 'password' || type === 'file'
+            const value = snapshot.strings[values.value[i]] || ''
+            fields.push({ index, name: (names.id || names.name || '').slice(0, 128), type, value: sensitive ? '[redacted]' : value.slice(0, 512), truncated: value.length > 512, sensitive })
+          }
+        }
+        const result = { window: action.window, fields }
+        if (Buffer.byteLength(JSON.stringify(result)) > 16384) throw new Error('Document inspection exceeds budget')
+        return result
       }
     }
     return { window: action.window }

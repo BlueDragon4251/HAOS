@@ -2,7 +2,7 @@
 export type GuiAction =
   | { operation: 'open'; html: string }
   | { operation: 'state' }
-  | { operation: 'focus' | 'close' | 'capture'; window: string }
+  | { operation: 'focus' | 'close' | 'capture' | 'inspect'; window: string }
   | { operation: 'click'; window: string; x: number; y: number }
   | { operation: 'type'; window: string; text: string }
   | { operation: 'key'; window: string; key: string }
@@ -23,7 +23,7 @@ export function validateGuiAction(value: unknown): GuiAction {
     if (typeof data.html !== 'string' || new TextEncoder().encode(data.html).length > 32768 || !data.html.length) throw new Error('Invalid local document')
     if (/<\s*(?:iframe|frame|frameset|object|embed|applet)\b/i.test(data.html)) throw new Error('Nested application surfaces denied')
   } else if (op !== 'state') {
-    if (!['focus', 'close', 'capture', 'click', 'type', 'key'].includes(String(op))) throw new Error('GUI capability denied')
+    if (!['focus', 'close', 'capture', 'inspect', 'click', 'type', 'key'].includes(String(op))) throw new Error('GUI capability denied')
     fields.push('window')
     if (!guiId(data.window)) throw new Error('Invalid window ID')
   }

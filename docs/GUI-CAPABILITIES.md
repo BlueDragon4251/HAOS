@@ -15,7 +15,12 @@ the window’s mission. Private random window UUIDs prevent compositor IDs, titl
 other missions or owner windows from authorizing input or capture.
 
 Actions: `open` (static local HTML, 32 KiB maximum), `state`, `focus`, `close`,
-`click`, `type`, `key`, `capture`. One 800×600 window per mission; the first 48
+`click`, `type`, `key`, `capture`, `inspect`. Inspection reads actual input/textarea
+values through a fixed DOM snapshot on the mission document. Password/file fields
+are masked independently; long values report truncation. The owner renderer and
+caller-supplied debugger/JavaScript/selector APIs are inaccessible. Inspection
+bodies expire like captures; only their digest/count persist in the GUI ledger.
+One 800×600 window per mission; the first 48
 pixels contain a fixed mission banner outside caller content. `focus` raises the
 window without granting seat keyboard focus. Input uses the isolated document
 renderer’s fixed CDP commands and actual DOM hit-tests, not caller JavaScript.

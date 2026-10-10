@@ -69,10 +69,10 @@ def register():
     registry.register(name="haos_gui", toolset="terminal", handler=handler, check_fn=lambda: True,
                       description="Operate mission-owned native browser windows", schema={
         "name": "haos_gui",
-        "description": "Operate a real isolated native local browser window in Herald. No network, scripts, files, clipboard, owner windows or system bridge access. Open accepts static local HTML (reports/forms); capture saves a real JPEG in /workspace/.haos-captures for vision tools, never the whole screen. Use state to get opaque window IDs; click coordinates refer to an 800x600 window (document begins at y=48), type plain text, key allows Tab/Enter/Backspace/Delete/arrows/Home/End/Escape. Every action belongs to the active mission and is audited. Reuse the returned action id with identical action to inspect an uncertain response; never blindly repeat a side effect. A GUI receipt does not certify the mission goal.",
+        "description": "Operate a real isolated native local browser window in Herald. No network, scripts, files, clipboard, owner windows or system bridge access. Open accepts static local HTML (reports/forms); capture saves a real JPEG in /workspace/.haos-captures for vision tools, never the whole screen. Inspect reads actual form values (password/file fields redacted; truncation reported) to verify work. Use state for opaque window IDs; click coordinates refer to an 800x600 window (document begins at y=48), type plain text, key allows Tab/Enter/Backspace/Delete/arrows/Home/End/Escape. Every action belongs to the active mission and is audited. Reuse the returned action id with identical action to inspect uncertain responses; never blindly repeat side effects. A GUI receipt does not certify the mission goal.",
         "parameters": {"type": "object", "properties": {
             "id": {"type": "string", "description": "Optional action UUID for safe retry; use returned id"},
             "action": {"type": "object", "properties": {
-                "operation": {"type": "string", "enum": ["open", "state", "focus", "close", "click", "type", "key", "capture"]},
+                "operation": {"type": "string", "enum": ["open", "state", "focus", "close", "click", "type", "key", "capture", "inspect"]},
                 "html": {"type": "string"}, "window": {"type": "string"}, "x": {"type": "integer"}, "y": {"type": "integer"},
                 "text": {"type": "string"}, "key": {"type": "string"}}, "required": ["operation"]}}, "required": ["action"]}})

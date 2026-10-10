@@ -13,7 +13,7 @@ import uuid
 
 from .store import Conflict
 
-OPERATIONS = {"open", "state", "focus", "close", "click", "type", "key", "capture"}
+OPERATIONS = {"open", "state", "focus", "close", "click", "type", "key", "capture", "inspect"}
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
 
@@ -59,6 +59,25 @@ def receipt(op, data):
     if not isinstance(data, dict):
         raise ValueError("invalid GUI receipt")
     fields = {"window", "width", "height"}
+    if op == "inspect":
+        if set(data) != {"window", "fields"} or not isinstance(data["fields"], list) or len(data["fields"]) > 32:
+            raise ValueError("invalid document inspection")
+        identifier(data["window"])
+        indices = set()
+        for field in data["fields"]:
+            if (not isinstance(field, dict) or set(field) != {"index", "name", "type", "value", "truncated", "sensitive"}
+                    or type(field["index"]) is not int or not 0 <= field["index"] < 65536 or field["index"] in indices
+                    or field["type"] not in {"text", "number", "checkbox", "password", "file", "textarea", "email", "url", "other"}
+                    or type(field["truncated"]) is not bool or type(field["sensitive"]) is not bool
+                    or not isinstance(field["name"], str) or len(field["name"]) > 128
+                    or not isinstance(field["value"], str) or len(field["value"]) > 512):
+                raise ValueError("invalid document field")
+            indices.add(field["index"])
+            if field["sensitive"] != (field["type"] in {"password", "file"}) or field["sensitive"] and field["value"] != "[redacted]":
+                raise PermissionError("sensitive document field denied")
+        if len(json.dumps(data).encode()) > 16384:
+            raise ValueError("document inspection exceeds its limit")
+        return data
     if op == "state":
         if set(data) != {"windows"} or not isinstance(data["windows"], list) or len(data["windows"]) > 1:
             raise ValueError("invalid window inventory")
@@ -209,6 +228,16 @@ class GuiBroker:
                 image = base64.b64decode(data["jpeg"])
                 data = {"window": data["window"], "width": 800, "height": 600, "sha256": hashlib.sha256(image).hexdigest(),
                         "bytes": len(image), "capture_available": False}
+            elif row["operation"] == "inspect" and params["ok"]:
+                self.prune_images()
+                self.images[row["id"]] = (time.time(), self.store.redactor.clean(data))
+                try:
+                    asyncio.get_running_loop().call_later(15, self.images.pop, row["id"], None)
+                except RuntimeError:
+                    pass
+                encoded = json.dumps(data, sort_keys=True).encode()
+                data = {"window": data["window"], "sha256": hashlib.sha256(encoded).hexdigest(), "bytes": len(encoded),
+                        "field_count": len(data["fields"]), "inspection_available": False}
             state = "succeeded" if params["ok"] else "failed"
             self.store.db.execute("UPDATE gui_actions SET state=?,result=? WHERE id=?", (state, json.dumps(data), row["id"]))
             self.store._event(row["mission_id"], "gui." + state, {"id": row["id"], "operation": row["operation"],

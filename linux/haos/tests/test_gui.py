@@ -159,3 +159,38 @@ def test_gui_binding_is_only_fixed_read_only_directory():
     index = args.index("/run/haos-gui-agent")
     assert args[index - 1:index + 2] == ["--ro-bind", "/run/haos-gui-agent", "/run/haos-gui-agent"]
     assert "/run/haos-control" not in args and "WAYLAND_DISPLAY" not in args and "NIRI_SOCKET" not in args
+
+
+def test_inspection_receipt_ephemeral_and_sensitive_fields_denied(live):
+    store, gui, mid, epoch = live
+    rid = submit(gui, mid, {"operation": "inspect", "window": key()})["id"]
+    gui.poll(mid, {"epoch": epoch})
+    data = {"window": key(), "fields": [{"index": 12, "name": "actual-field", "type": "text", "value": "private-form-value", "truncated": False, "sensitive": False}]}
+    gui.acknowledge({"epoch": epoch, "id": rid, "ok": True, "result": data})
+    assert gui.result(mid, {"session": "runtime-session", "id": rid})["result"] == data
+    assert "private-form-value" not in json.dumps(store.events(mid))
+    assert "private-form-value" not in store.db.execute("SELECT result FROM gui_actions").fetchone()[0]
+    gui.images[rid] = (0, data)
+    result = gui.result(mid, {"session": "runtime-session", "id": rid})["result"]
+    assert "fields" not in result and result["inspection_available"] is False
+    data["fields"][0].update(type="password", sensitive=True)
+    with pytest.raises(PermissionError):
+        receipt("inspect", data)
+    data["fields"][0]["value"] = "[redacted]"
+    assert receipt("inspect", data) == data
+
+
+@pytest.mark.parametrize("alter", ["duplicate", "extra", "oversized", "unmarked-password"])
+def test_inspection_result_validation(alter):
+    field = {"index": 1, "name": "field", "type": "text", "value": "value", "truncated": False, "sensitive": False}
+    fields = [field]
+    if alter == "duplicate":
+        fields.append(dict(field))
+    elif alter == "extra":
+        field["credentials"] = "private"
+    elif alter == "oversized":
+        field["value"] = "x" * 513
+    else:
+        field["type"] = "password"
+    with pytest.raises((ValueError, PermissionError)):
+        receipt("inspect", {"window": key(), "fields": fields})

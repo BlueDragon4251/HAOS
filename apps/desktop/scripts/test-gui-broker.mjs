@@ -58,13 +58,10 @@ async function main() {
     await execute({ operation: 'type', window, text: 'Real GUI input 4251' })
     await execute({ operation: 'key', window, key: 'Tab' })
     await execute({ operation: 'type', window, text: 'Second actual field' })
-    const targets = await win.webContents.debugger.sendCommand('Target.getTargets')
-    const child = targets.targetInfos.find(target => target.type === 'iframe' && target.url === 'about:srcdoc').targetId
-    const attached = await win.webContents.debugger.sendCommand('Target.attachToTarget', {targetId:child,flatten:true})
-    const snapshot = await win.webContents.debugger.sendCommand('DOMSnapshot.captureSnapshot', { computedStyles: [] }, attached.sessionId)
-    const values = snapshot.documents.flatMap(doc => (doc.nodes.inputValue?.value || []).map(index => snapshot.strings[index]))
-    assert(values.includes('Real GUI input 4251'))
-    assert(values.includes('Second actual field'))
+    const inspected = await execute({ operation: 'inspect', window })
+    assert.equal(inspected.fields.find(field => field.name === 'first').value, 'Real GUI input 4251')
+    assert.equal(inspected.fields.find(field => field.name === 'second').value, 'Second actual field')
+    assert.equal(inspected.fields.find(field => field.name === 'files').value, '[redacted]')
     assert.equal(received, 0)
     const typed = await execute({ operation: 'capture', window })
     assert.notEqual(typed.jpeg, first.jpeg)
@@ -83,6 +80,7 @@ async function main() {
     assert(choosers > 0, 'actual chooser request must be intercepted before host dialog')
     await assert.rejects(browser.execute({ id: randomUUID(), mission: randomUUID(), action: { operation: 'capture', window } }))
     await assert.rejects(execute({ operation: 'capture', window: randomUUID() }))
+    await assert.rejects(execute({ operation: 'inspect', window: randomUUID() }))
     await assert.rejects(execute({ operation: 'open', html: 'second browser' }))
     await assert.rejects(execute({ operation: 'click', window, x: 10, y: 10 }))
     await assert.rejects(execute({ operation: 'type', window, text: '\u0001' }))
@@ -96,12 +94,18 @@ async function main() {
     const another = await execute({ operation: 'open', html: '<p>New real window</p>' })
     browser.retain(null)
     await assert.rejects(execute({ operation: 'capture', window: another.window }))
+    const privateFields = await execute({ operation: 'open', html: '<input id="secret" type="password" value="DISPOSABLE_FORM_SECRET"><textarea id="notes">Real text area</textarea>' })
+    const privateInspection = await execute({ operation: 'inspect', window: privateFields.window })
+    assert.equal(privateInspection.fields.find(field => field.name === 'secret').value, '[redacted]')
+    assert.equal(privateInspection.fields.find(field => field.name === 'notes').value, 'Real text area')
+    assert.equal(JSON.stringify(privateInspection).includes('DISPOSABLE_FORM_SECRET'), false)
+    browser.retain(null)
     const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
     const report = { source_commit: source, work_tree_dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()), electron: process.versions.electron,
       chromium: process.versions.chrome, actual_renderer: true, model_turn: false, installed_wayland: false,
       checks: { typed_actual_fields: true, captured_actual_pixels: true, renderer_sandbox: true, no_caller_scripts: true,
         network_canary_denied: received === 0, chooser_intercepted: choosers > 0, clipboard_shortcut_denied: true,
-        mission_and_window_denials: true, closed_window_denied: true, mission_cleanup: true },
+        mission_and_window_denials: true, closed_window_denied: true, mission_cleanup: true, actual_form_inspection: true, sensitive_fields_masked: true },
       capture_sha256: createHash('sha256').update(Buffer.from(typed.jpeg, 'base64')).digest('hex') }
     fs.writeFileSync(path.join(evidence, 'gui-broker.json'), JSON.stringify(report, null, 2), { mode: 0o600, flag: 'wx' })
     fs.writeFileSync(path.join(evidence, 'disposable-form.jpg'), Buffer.from(typed.jpeg, 'base64'), { mode: 0o600, flag: 'wx' })
