@@ -81,7 +81,6 @@ async function main() {
     await assert.rejects(browser.execute({ id: randomUUID(), mission: randomUUID(), action: { operation: 'capture', window } }))
     await assert.rejects(execute({ operation: 'capture', window: randomUUID() }))
     await assert.rejects(execute({ operation: 'inspect', window: randomUUID() }))
-    await assert.rejects(execute({ operation: 'open', html: 'second browser' }))
     await assert.rejects(execute({ operation: 'click', window, x: 10, y: 10 }))
     await assert.rejects(execute({ operation: 'type', window, text: '\u0001' }))
     await assert.rejects(execute({ operation: 'open', html: 'report', url: address }))
@@ -100,12 +99,32 @@ async function main() {
     assert.equal(privateInspection.fields.find(field => field.name === 'notes').value, 'Real text area')
     assert.equal(JSON.stringify(privateInspection).includes('DISPOSABLE_FORM_SECRET'), false)
     browser.retain(null)
+    const document = await execute({ operation: 'open', html: '<style>body{margin:0}.space{height:1200px}</style><p>Actual visible report</p><p hidden>HIDDEN_CANARY</p><p style="visibility:hidden">VISIBILITY_CANARY</p><div style="opacity:0"><p>OPACITY_CANARY</p></div><textarea>TEXTAREA_CANARY</textarea><div class="space"></div><p>Actual lower result</p>' })
+    const beforeScroll = await execute({ operation: 'read', window: document.window })
+    assert.match(beforeScroll.text, /Actual visible report/)
+    assert.doesNotMatch(beforeScroll.text, /CANARY|Actual lower result/)
+    for (let i = 0; i < 3; i++) await execute({ operation: 'scroll', window: document.window, x: 700, y: 300, deltaX: 0, deltaY: 552 })
+    const afterScroll = await execute({ operation: 'read', window: document.window })
+    assert.match(afterScroll.text, /Actual lower result/)
+    assert.doesNotMatch(afterScroll.text, /Actual visible report|CANARY/)
+    const others = []
+    for (let i = 0; i < 3; i++) others.push(await execute({ operation: 'open', html: `<p>Independent report ${i}</p><input>` }))
+    assert.equal((await execute({ operation: 'state' })).windows.length, 4)
+    assert.match((await execute({ operation: 'read', window: others[1].window })).text, /Independent report 1/)
+    assert.match((await execute({ operation: 'read', window: document.window })).text, /Actual lower result/)
+    await assert.rejects(execute({ operation: 'open', html: 'fifth report' }))
+    await assert.rejects(execute({ operation: 'scroll', window: others[0].window, x: 20, y: 70, deltaX: 0, deltaY: 1000 }))
+    await execute({ operation: 'close', window: others[1].window })
+    assert.equal((await execute({ operation: 'state' })).windows.length, 3)
+    browser.retain(null)
+    assert.deepEqual(await execute({ operation: 'state' }), { windows: [] })
     const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
     const report = { source_commit: source, work_tree_dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()), electron: process.versions.electron,
       chromium: process.versions.chrome, actual_renderer: true, model_turn: false, installed_wayland: false,
       checks: { typed_actual_fields: true, captured_actual_pixels: true, renderer_sandbox: true, no_caller_scripts: true,
         network_canary_denied: received === 0, chooser_intercepted: choosers > 0, clipboard_shortcut_denied: true,
-        mission_and_window_denials: true, closed_window_denied: true, mission_cleanup: true, actual_form_inspection: true, sensitive_fields_masked: true },
+        mission_and_window_denials: true, closed_window_denied: true, mission_cleanup: true, actual_form_inspection: true, sensitive_fields_masked: true,
+        visible_text_from_actual_layout: true, hidden_and_form_text_excluded: true, actual_scrolling_verified: true, multiple_windows_isolated: true, window_and_scroll_budgets_enforced: true },
       capture_sha256: createHash('sha256').update(Buffer.from(typed.jpeg, 'base64')).digest('hex') }
     fs.writeFileSync(path.join(evidence, 'gui-broker.json'), JSON.stringify(report, null, 2), { mode: 0o600, flag: 'wx' })
     fs.writeFileSync(path.join(evidence, 'disposable-form.jpg'), Buffer.from(typed.jpeg, 'base64'), { mode: 0o600, flag: 'wx' })

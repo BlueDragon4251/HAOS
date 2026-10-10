@@ -1,7 +1,7 @@
 /** Actual native mission windows. Chromium renderer isolation is the authority boundary. */
 import { randomUUID } from 'node:crypto'
 import { BrowserWindow, session } from 'electron'
-import { guiId, missionDocument, validateGuiAction, type GuiRequest, type GuiPoll } from '../../shared/gui.ts'
+import { GUI_WINDOW_LIMIT, guiId, missionDocument, validateGuiAction, type GuiRequest, type GuiPoll } from '../../shared/gui.ts'
 import { managedMissions, nativeGuiRequest } from './client.ts'
 
 export class MissionBrowser {
@@ -24,7 +24,7 @@ export class MissionBrowser {
       return { windows: [...this.windows].filter(([, e]) => e.mission === request.mission && !e.win.isDestroyed()).map(([window]) => ({ window, width: 800, height: 600 })) }
     }
     if (action.operation === 'open') {
-      if ([...this.windows.values()].some(e => e.mission === request.mission && !e.win.isDestroyed())) throw new Error('Mission already has a browser')
+      if (this.windows.size >= GUI_WINDOW_LIMIT) throw new Error('Mission window budget exhausted')
       const window = randomUUID()
       const isolated = session.fromPartition(`haos-mission-${window}`, { cache: false })
       isolated.setPermissionRequestHandler((_wc, _permission, reply) => reply(false))
@@ -109,6 +109,10 @@ export class MissionBrowser {
     switch (action.operation) {
       case 'close': win.destroy(); break
       case 'focus': win.moveTop(); break
+      case 'scroll':
+        await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseWheel', x: action.x, y: action.y - 48, deltaX: action.deltaX, deltaY: action.deltaY }, entry.documentSession)
+        await new Promise(resolve => setTimeout(resolve, 100))
+        break
       case 'click':
         // Focus only this renderer; the native surface stays non-focusable to the seat.
         // CDP targets this renderer, never the seat/global pointer. No native window shortcuts.
@@ -165,6 +169,37 @@ export class MissionBrowser {
         const result = { window: action.window, fields }
         if (Buffer.byteLength(JSON.stringify(result)) > 16384) throw new Error('Document inspection exceeds budget')
         return result
+      }
+      case 'read': {
+        // Only layout text in the visible mission viewport. No global accessibility
+        // tree, hidden DOM, form values, caller selectors or JavaScript execution.
+        const snapshot = await win.webContents.debugger.sendCommand('DOMSnapshot.captureSnapshot', { computedStyles: ['visibility', 'opacity'] }, entry.documentSession)
+        const parts: string[] = []
+        let bytes = 0, truncated = false
+        for (const document of snapshot.documents) {
+          const { nodes, layout } = document
+          for (let i = 0; i < layout.nodeIndex.length; i++) {
+            const index = layout.nodeIndex[i] as number
+            if (snapshot.strings[nodes.nodeName[index]] !== '#text') continue
+            const [x, y, width, height] = layout.bounds[i] as number[]
+            if (width <= 0 || height <= 0 || x + width <= document.scrollOffsetX || x >= document.scrollOffsetX + 800 || y + height <= document.scrollOffsetY || y >= document.scrollOffsetY + 552) continue
+            let excluded = false
+            for (let parent = index; parent >= 0; parent = nodes.parentIndex[parent]) {
+              if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'SCRIPT', 'STYLE', 'NOSCRIPT'].includes(snapshot.strings[nodes.nodeName[parent]])) { excluded = true; break }
+              const ancestorLayout = layout.nodeIndex.indexOf(parent)
+              if (ancestorLayout >= 0) {
+                const styles = layout.styles[ancestorLayout] as number[]
+                if (styles.length === 2 && (snapshot.strings[styles[0]] !== 'visible' || Number(snapshot.strings[styles[1]]) === 0)) { excluded = true; break }
+              }
+            }
+            if (excluded) continue
+            const text = snapshot.strings[layout.text[i]] as string
+            if (!text?.trim()) continue
+            if (bytes + Buffer.byteLength(text) + (parts.length ? 1 : 0) > 8192) { truncated = true; break }
+            parts.push(text); bytes += Buffer.byteLength(text) + (parts.length > 1 ? 1 : 0)
+          }
+        }
+        return { window: action.window, text: parts.join('\n'), truncated }
       }
     }
     return { window: action.window }

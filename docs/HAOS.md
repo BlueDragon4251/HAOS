@@ -445,3 +445,36 @@ Install job `113777488746` passed actual ISO-byte verification and began its com
 - Second boot: backend healthy again; observer and localhost denials still enforced; the same cancelled offline mission and its event history survive reboot.
 
 The data-volume test deliberately assigns ownership only to its serial/UUID-verified disposable fixture; this does not accept general ACL/idmapped access. Backup restores into staging and does not test whole-system/off-host or broken-update recovery. UI evidence is process presence and restart separation, not graphical task execution, owner bootstrap/locking or autonomous themes. The queue fixture is offline/cancelled and proves no provider/model/Git/gateway mission. Builds remain unsigned and the remaining production release gates stay open.
+
+### Further verified ISO receipts and mission document navigation
+
+The completed image runs were rechecked against the original, digest-verified
+GitHub metadata and guest archives. Each saved boot receipt equals the JSON
+emitted in its original guest serial log. Their installation jobs also checked
+`SHA256SUMS` against the downloaded ISO before starting QEMU.
+
+| Source | Image/install run | ISO SHA-256 | Guest artifact / ZIP SHA-256 |
+| --- | --- | --- | --- |
+| `9815847ca45847a05ccb8d257a761c5dd182fff4` | [38039680624](https://github.com/BlueDragon4251/HAOS/actions/runs/38039680624) | `73e8e259807b51de81790861c4fcbf697aec6892d2ad5b4dad27a933d5b3bae3` | `11667228563` / `818101965b63be8ad5a5e64db7f779a55f120ee8faca4021c9e1ba4ffbdf40c3` |
+| `71cc36126c6fddbccb8e3193a41261dfc842f511` | [38040379372](https://github.com/BlueDragon4251/HAOS/actions/runs/38040379372) | `a99902b48d4f8234f132aa078433da020fb6a6e2581dd381f071d9ae4c9e843f` | `11667529928` / `a62ec73ddc2ce05b4dba36c98ff771432c22a19d8b0d7ba383d376d1a4e54845` |
+| `531efd5a2d205fdc310a2a093b057d38fe671624` | [38042101057](https://github.com/BlueDragon4251/HAOS/actions/runs/38042101057) | `d6e559de141f6aa9f0b41bcebedac5cd5086140a9cee23d8563654f9f94a28fe` | `11666968681` / `8c23430bf2d660ca4ffe8a33e47bc5d772ab2a9eff75c5ba877bd16a2fc697a7` |
+
+Boot 1 receipt SHA-256 for all three: `eb330e32c4110b077be041d150840fa863b2c562249baa0df8e32e0c149b9b54`.
+Boot 2 receipt SHA-256 respectively: `a9d9b516d9f3810a83d02b59722f050a98e2b6254ad10b81e37f2e4b034af30e`,
+`d3e3b987dda3c00969edebb075f88b48796d22d81692cb843de0447b4c40f3e0`,
+`aa01795d45af69cf31b21d8caaa7c3415fe8cf729202bba38ac12970206cbf73`.
+These prove the existing foreign-owner/blocked/read-only volume, observer,
+network, owner/PAM/recovery, staged encrypted restore, UI-independent backend and
+second-boot persistence/disconnected-volume assertions. They do not contain an
+installed graphical mission or the later backup scheduler assertions.
+
+The existing GUI capability now coordinates up to four separately isolated real
+native documents and provides actual visible-layout text plus bounded renderer
+scrolling. Hidden/zero-opacity/field contents are excluded from text, and text
+receipts expire without persisting their bodies. Independent Python and native
+checks preserve exact parameters, scoped UUIDs, replay rules and action budgets.
+The real Chromium and Unix/controller gates verify scrolling by reading the
+changed viewport and separate-window contents, not a canned screenshot. Their
+private headless Wayland run verifies actual surface protocol too. This remains
+an explicit providerless fixture; arbitrary host applications, installed niri
+GUI acceptance and credentialed model autonomy remain open.

@@ -9,7 +9,11 @@ describe('GUI independent native admission boundary', () => {
     { operation: 'click', window, x: 1, y: 1 }, { operation: 'click', window, x: true, y: 50 },
     { operation: 'type', window, text: '\n' }, { operation: 'key', window, key: 'Control+V' },
     { operation: 'open', html: 'é'.repeat(20000) }, { operation: 'shell', command: 'sudo' },
-    { operation: 'open', html: '<iframe srcdoc="nested"></iframe>' }
+    { operation: 'open', html: '<iframe srcdoc="nested"></iframe>' },
+    { operation: 'scroll', window, x: 30, y: 60, deltaX: 0, deltaY: 553 },
+    { operation: 'scroll', window, x: 30, y: 60, deltaX: true, deltaY: 100 },
+    { operation: 'scroll', window, x: 30, y: 60, deltaX: 0, deltaY: 0 },
+    { operation: 'read', window, selector: 'owner' }
   ])('denies authority outside the local browser: %j', value => expect(() => validateGuiAction(value)).toThrow())
   it('contains caller markup in an opaque sandbox below the immutable mission banner', () => {
     const html = missionDocument(window, '"></iframe><script>owner()</script>')

@@ -8,6 +8,7 @@ import pytest
 from haos.gui import GuiBroker, action, receipt
 from haos.store import Conflict, MissionStore
 from haos.sandbox import command
+from haos.redaction import Redactor
 
 
 def key():
@@ -95,6 +96,10 @@ def test_mission_scope_denials(live, change):
     {"operation": "key", "window": str(uuid.UUID(int=1)), "key": "Control+V"},
     {"operation": "open", "html": "é" * 20000}, {"operation": "state", "mission": "owner"},
     {"operation": "open", "html": '<IFRAME srcdoc="nested"></IFRAME>'},
+    {"operation": "scroll", "window": str(uuid.UUID(int=1)), "x": 40, "y": 60, "deltaX": 0, "deltaY": 553},
+    {"operation": "scroll", "window": str(uuid.UUID(int=1)), "x": 40, "y": 60, "deltaX": True, "deltaY": 100},
+    {"operation": "scroll", "window": str(uuid.UUID(int=1)), "x": 40, "y": 60, "deltaX": 0, "deltaY": 0},
+    {"operation": "read", "window": str(uuid.UUID(int=1)), "selector": "owner"},
 ])
 def test_host_privilege_clipboard_and_parameter_denials(data):
     with pytest.raises((ValueError, PermissionError)):
@@ -194,3 +199,29 @@ def test_inspection_result_validation(alter):
         field["type"] = "password"
     with pytest.raises((ValueError, PermissionError)):
         receipt("inspect", {"window": key(), "fields": fields})
+
+
+def test_read_text_redacted_ephemeral_and_excluded_from_persistent_ledger(live):
+    store, gui, mid, epoch = live
+    store.redactor = Redactor(['DISPOSABLE_SECRET_CANARY'])
+    rid = submit(gui, mid, {"operation": "read", "window": key()})["id"]
+    gui.poll(mid, {"epoch": epoch})
+    data = {"window": key(), "text": "Private visible text DISPOSABLE_SECRET_CANARY", "truncated": False}
+    gui.acknowledge({"epoch": epoch, "id": rid, "ok": True, "result": data})
+    result = gui.result(mid, {"session": "runtime-session", "id": rid})["result"]
+    assert 'Private visible text' in result['text'] and 'DISPOSABLE_SECRET_CANARY' not in result['text']
+    assert 'Private visible text' not in json.dumps(store.events(mid))
+    assert 'Private visible text' not in store.db.execute('SELECT result FROM gui_actions').fetchone()[0]
+    gui.images[rid] = (0, result)
+    assert gui.result(mid, {"session": "runtime-session", "id": rid})["result"]["text_available"] is False
+
+
+def test_multiwindow_receipts_are_bounded_unique_and_text_is_utf8_bounded():
+    windows = [{"window": key(), "width": 800, "height": 600} for _ in range(4)]
+    assert receipt('state', {"windows": windows})['windows'] == windows
+    for invalid in (windows + [dict(windows[0])], [windows[0], windows[0]]):
+        with pytest.raises(ValueError):
+            receipt('state', {"windows": invalid})
+    for text in ('x' * 8193, 'é' * 4097):
+        with pytest.raises(ValueError):
+            receipt('read', {"window": key(), "text": text, "truncated": False})

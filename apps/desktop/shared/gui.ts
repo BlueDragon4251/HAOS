@@ -2,13 +2,15 @@
 export type GuiAction =
   | { operation: 'open'; html: string }
   | { operation: 'state' }
-  | { operation: 'focus' | 'close' | 'capture' | 'inspect'; window: string }
+  | { operation: 'focus' | 'close' | 'capture' | 'inspect' | 'read'; window: string }
   | { operation: 'click'; window: string; x: number; y: number }
+  | { operation: 'scroll'; window: string; x: number; y: number; deltaX: number; deltaY: number }
   | { operation: 'type'; window: string; text: string }
   | { operation: 'key'; window: string; key: string }
 
 export interface GuiRequest { id: string; mission: string; action: GuiAction }
 export interface GuiPoll { mission: string | null; request: GuiRequest | null }
+export const GUI_WINDOW_LIMIT = 4
 export const GUI_KEYS = new Set(['Tab', 'Enter', 'Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape'])
 export const guiId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
 
@@ -23,13 +25,17 @@ export function validateGuiAction(value: unknown): GuiAction {
     if (typeof data.html !== 'string' || new TextEncoder().encode(data.html).length > 32768 || !data.html.length) throw new Error('Invalid local document')
     if (/<\s*(?:iframe|frame|frameset|object|embed|applet)\b/i.test(data.html)) throw new Error('Nested application surfaces denied')
   } else if (op !== 'state') {
-    if (!['focus', 'close', 'capture', 'inspect', 'click', 'type', 'key'].includes(String(op))) throw new Error('GUI capability denied')
+    if (!['focus', 'close', 'capture', 'inspect', 'read', 'click', 'scroll', 'type', 'key'].includes(String(op))) throw new Error('GUI capability denied')
     fields.push('window')
     if (!guiId(data.window)) throw new Error('Invalid window ID')
   }
-  if (op === 'click') {
+  if (op === 'click' || op === 'scroll') {
     fields.push('x', 'y')
     if (!Number.isInteger(data.x) || !Number.isInteger(data.y) || Number(data.x) < 0 || Number(data.x) >= 800 || Number(data.y) < 48 || Number(data.y) >= 600) throw new Error('Click outside mission document')
+  }
+  if (op === 'scroll') {
+    fields.push('deltaX', 'deltaY')
+    if (!Number.isInteger(data.deltaX) || !Number.isInteger(data.deltaY) || Math.abs(Number(data.deltaX)) > 552 || Math.abs(Number(data.deltaY)) > 552 || (data.deltaX === 0 && data.deltaY === 0)) throw new Error('Invalid scoped scroll')
   }
   if (op === 'type') {
     fields.push('text')

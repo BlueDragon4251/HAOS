@@ -13,7 +13,8 @@ import uuid
 
 from .store import Conflict
 
-OPERATIONS = {"open", "state", "focus", "close", "click", "type", "key", "capture", "inspect"}
+OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read"}
+WINDOW_LIMIT = 4
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
 
@@ -37,10 +38,15 @@ def action(data):
     elif op != "state":
         fields.add("window")
         identifier(data.get("window"))
-    if op == "click":
+    if op in {"click", "scroll"}:
         fields.update({"x", "y"})
         if any(type(data.get(k)) is not int for k in ("x", "y")) or not 0 <= data["x"] < 800 or not 48 <= data["y"] < 600:
             raise ValueError("click must target the mission document")
+    if op == "scroll":
+        fields.update({"deltaX", "deltaY"})
+        if (any(type(data.get(k)) is not int or abs(data[k]) > 552 for k in ("deltaX", "deltaY"))
+                or data["deltaX"] == data["deltaY"] == 0):
+            raise ValueError("scroll must contain bounded nonzero document offsets")
     if op == "type":
         fields.add("text")
         if not isinstance(data.get("text"), str) or not 1 <= len(data["text"].encode()) <= 4096 or any(ord(c) < 32 for c in data["text"]):
@@ -59,6 +65,12 @@ def receipt(op, data):
     if not isinstance(data, dict):
         raise ValueError("invalid GUI receipt")
     fields = {"window", "width", "height"}
+    if op == "read":
+        if (set(data) != {"window", "text", "truncated"} or not isinstance(data["text"], str)
+                or len(data["text"].encode()) > 8192 or type(data["truncated"]) is not bool):
+            raise ValueError("invalid visible document text")
+        identifier(data["window"])
+        return data
     if op == "inspect":
         if set(data) != {"window", "fields"} or not isinstance(data["fields"], list) or len(data["fields"]) > 32:
             raise ValueError("invalid document inspection")
@@ -79,10 +91,14 @@ def receipt(op, data):
             raise ValueError("document inspection exceeds its limit")
         return data
     if op == "state":
-        if set(data) != {"windows"} or not isinstance(data["windows"], list) or len(data["windows"]) > 1:
+        if set(data) != {"windows"} or not isinstance(data["windows"], list) or len(data["windows"]) > WINDOW_LIMIT:
             raise ValueError("invalid window inventory")
+        identifiers = set()
         for win in data["windows"]:
             receipt("open", win)
+            if win["window"] in identifiers:
+                raise ValueError("duplicate window identity")
+            identifiers.add(win["window"])
         return data
     if op in {"open", "capture"}:
         if op == "capture":
@@ -228,7 +244,7 @@ class GuiBroker:
                 image = base64.b64decode(data["jpeg"])
                 data = {"window": data["window"], "width": 800, "height": 600, "sha256": hashlib.sha256(image).hexdigest(),
                         "bytes": len(image), "capture_available": False}
-            elif row["operation"] == "inspect" and params["ok"]:
+            elif row["operation"] in {"inspect", "read"} and params["ok"]:
                 self.prune_images()
                 self.images[row["id"]] = (time.time(), self.store.redactor.clean(data))
                 try:
@@ -236,8 +252,8 @@ class GuiBroker:
                 except RuntimeError:
                     pass
                 encoded = json.dumps(data, sort_keys=True).encode()
-                data = {"window": data["window"], "sha256": hashlib.sha256(encoded).hexdigest(), "bytes": len(encoded),
-                        "field_count": len(data["fields"]), "inspection_available": False}
+                metadata = {"field_count": len(data["fields"]), "inspection_available": False} if row["operation"] == "inspect" else {"text_available": False}
+                data = {"window": data["window"], "sha256": hashlib.sha256(encoded).hexdigest(), "bytes": len(encoded), **metadata}
             state = "succeeded" if params["ok"] else "failed"
             self.store.db.execute("UPDATE gui_actions SET state=?,result=? WHERE id=?", (state, json.dumps(data), row["id"]))
             self.store._event(row["mission_id"], "gui." + state, {"id": row["id"], "operation": row["operation"],

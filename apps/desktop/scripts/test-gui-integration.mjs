@@ -103,7 +103,7 @@ async function main() {
         return ['succeeded', 'failed', 'uncertain'].includes(receipt.state) ? receipt : null
       })
     }
-    const opened = await submit({ operation: 'open', html: '<input id="field" style="margin:0;width:300px;height:40px">' })
+    const opened = await submit({ operation: 'open', html: '<input id="field" style="margin:0;width:300px;height:40px"><p>Integrated private visible report</p>' })
     assert.equal(opened.state, 'succeeded')
     const window = opened.result.window
     assert.equal((await submit({ operation: 'click', window, x: 40, y: 70 })).state, 'succeeded')
@@ -114,10 +114,15 @@ async function main() {
     const captured = await submit({ operation: 'capture', window })
     assert.equal(captured.state, 'succeeded')
     assert(Buffer.from(captured.result.jpeg, 'base64').length > 1000)
+    const read = await submit({ operation: 'read', window })
+    assert.equal(read.state, 'succeeded')
+    assert.match(read.result.text, /Integrated private visible report/)
+    assert.doesNotMatch(read.result.text, /Integrated real native input/)
     const events = await request('control.sock', 'missions.events', { id: ready.mission })
     assert(events.some(event => event.kind === 'gui.succeeded'))
     assert.equal(JSON.stringify(events).includes('Integrated real native input'), false)
     assert.equal(JSON.stringify(events).includes(captured.result.jpeg), false)
+    assert.equal(JSON.stringify(events).includes('Integrated private visible report'), false)
     await assert.rejects(request('gui.sock', 'missions.create', { goal: 'owner', idempotency_key: 'attack' }))
     await assert.rejects(request('gui.sock', 'gui.submit', { session: 'forged', id: randomUUID(), action: { operation: 'state' } }))
     const lostId = randomUUID(), captureAction = { operation: 'capture', window }
@@ -140,7 +145,7 @@ async function main() {
     const report = { source_commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
       work_tree_dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }).trim()),
       actual_native_socket_pipeline: true, session_is_explicit_fixture: true, real_model_turn: false, installed_system: false,
-      checks: { actual_input_and_inspection: true, actual_capture: true, private_bodies_absent_from_audit: true, unauthorized_methods_denied: true,
+      checks: { actual_input_and_inspection: true, actual_capture: true, actual_read_without_body_persistence: true, private_bodies_absent_from_audit: true, unauthorized_methods_denied: true,
         lost_ack_not_reexecuted: true, controller_restart_blocks_mission: true, durable_audit_survives: true } }
     fs.writeFileSync(path.join(evidence, 'gui-integration.json'), JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 })
     if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `evidence=${evidence}\n`)
