@@ -129,7 +129,9 @@ def main():
         stopped()
         cleanup()
     elif args.action == "status":
-        print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory()}, indent=2))
+        runtime = Path("/run/haos-policy/sandbox.json")
+        print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory(),
+                          "runtime_volumes": trusted_json(runtime) if runtime.exists() or runtime.is_symlink() else None}, indent=2))
     elif args.action in {"stop", "start"}:
         verb = args.action
         units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]

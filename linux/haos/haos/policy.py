@@ -121,6 +121,29 @@ def resolve_volume(identifier: str, devices: list[dict]) -> dict:
     return target
 
 
+def connected_grants(grants: list[dict], devices: list[dict], base: Path):
+    """Keep absent owner grants, but never publish a bind or reuse an old mount."""
+    available, unavailable = [], []
+    for grant in grants:
+        if grant["mode"] in {"blocked", "system-managed"}:
+            available.append(grant)
+            continue
+        match = IDENTITY.fullmatch(grant["id"])
+        if not match:
+            raise ValueError("invalid stable identity")
+        field, value = match[1].lower(), match[2]
+        if any(device.get(field) == value for device in devices):
+            # Ambiguity, unsupported filesystems and system ancestry still fail.
+            resolve_volume(grant["id"], devices)
+            available.append(grant)
+            continue
+        destination = base / grant["key"]
+        if destination.is_symlink() or os.path.ismount(destination):
+            raise PermissionError("absent volume has a stale broker mount; reconcile before starting execution")
+        unavailable.append({**grant, "reason": "not-connected"})
+    return available, unavailable
+
+
 def verify_mount(grant: dict, target: dict, destination: Path):
     """Do not publish a device name that was reused between discovery and mount."""
     mounted = json.loads(subprocess.check_output([
@@ -195,6 +218,7 @@ def prepare():
     devices = inventory()
     base = Path("/run/haos-volumes")
     agent_directory(base, agent_gid)
+    grants, unavailable = connected_grants(grants, devices, base)
     mounted = []
     try:
         for grant in grants:
@@ -229,7 +253,8 @@ def prepare():
             verify_mount(grant, target, destination)
         runtime = Path("/run/haos-policy")
         agent_directory(runtime, agent_gid)
-        atomic_json(runtime / "sandbox.json", {"version": 1, "grants": grants}, mode=0o640,
+        atomic_json(runtime / "sandbox.json", {"version": 1, "grants": grants,
+                                              "unavailable": unavailable}, mode=0o640,
                     gid=agent_gid)
     except BaseException:
         for mounted_grant, target, destination in reversed(mounted):

@@ -35,6 +35,52 @@ def test_missing_duplicate_and_system_disk_identities_are_denied():
             resolve_volume(identifier, inventory)
 
 
+def test_disconnected_grants_preserve_owner_intent_without_a_namespace_bind(tmp_path):
+    grants = validate_policy({"version": 1, "volumes": [
+        {"id": "UUID:missing", "mode": "full-data-access"},
+        {"id": "PARTUUID:absent", "mode": "read-only"},
+        {"id": "UUID:blocked", "mode": "blocked"},
+        {"id": "UUID:present", "mode": "read-only"}]})
+    devices = [{"path": "/dev/fixture1", "type": "part", "fstype": "ext4", "uuid": "present",
+                "mountpoints": [], "ancestors": ("/dev/fixture",)}]
+    available, unavailable = policy.connected_grants(grants, devices, tmp_path)
+    assert available == grants[2:]
+    assert unavailable == [{**grant, "reason": "not-connected"} for grant in grants[:2]]
+    args = command(available, 3, certificates=[])
+    assert all(f"/run/haos-volumes/{grant['key']}" not in args for grant in grants[:3])
+    assert f"/run/haos-volumes/{grants[3]['key']}" in args
+    # Reconnection is considered only by the next stopped-runtime preparation.
+    devices += [{"path": "/dev/other1", "type": "part", "fstype": "xfs", "uuid": "missing",
+                 "mountpoints": [], "ancestors": ("/dev/other",)}]
+    connected, deferred = policy.connected_grants(grants, devices, tmp_path)
+    assert connected == [grants[0], *grants[2:]] and deferred == [unavailable[1]]
+    assert available == grants[2:], "reconnection mutated an already prepared namespace plan"
+
+
+@pytest.mark.parametrize("unsafe", ["ambiguous", "system", "unsupported"])
+def test_connected_unsafe_volume_cannot_be_disguised_as_disconnected(tmp_path, unsafe):
+    grants = validate_policy({"version": 1, "volumes": [{"id": "UUID:data", "mode": "full-data-access"}]})
+    target = {"path": "/dev/fixture1", "type": "part", "fstype": "ext4", "uuid": "data",
+              "mountpoints": ["/"] if unsafe == "system" else [], "ancestors": ("/dev/fixture",)}
+    if unsafe == "unsupported":
+        target["fstype"] = "crypto_LUKS"
+    devices = [target, *([{**target, "path": "/dev/second1"}] if unsafe == "ambiguous" else [])]
+    with pytest.raises(PermissionError):
+        policy.connected_grants(grants, devices, tmp_path)
+
+
+@pytest.mark.parametrize("unsafe", ["symlink", "stale-mount"])
+def test_absent_volume_never_reuses_a_stale_mount_or_symlink(tmp_path, monkeypatch, unsafe):
+    grants = validate_policy({"version": 1, "volumes": [{"id": "UUID:absent", "mode": "full-data-access"}]})
+    destination = tmp_path / grants[0]["key"]
+    if unsafe == "symlink":
+        destination.symlink_to(tmp_path / "missing-target")
+    else:
+        monkeypatch.setattr(policy.os.path, "ismount", lambda path: path == destination)
+    with pytest.raises(PermissionError, match="stale broker mount"):
+        policy.connected_grants(grants, [], tmp_path)
+
+
 def test_sandbox_binds_only_explicit_grants_and_never_inherits_parent_authority():
     grants = validate_policy({"version": 1, "volumes": [
         {"id": "UUID:ro", "mode": "read-only"}, {"id": "UUID:rw", "mode": "full-data-access"},

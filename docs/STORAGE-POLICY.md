@@ -18,7 +18,11 @@ sudo haos-owner volume UUID:your-filesystem-uuid read-only
 sudo haos-owner start
 ```
 
-Actual lsblk metadata must resolve uniquely. Missing, ambiguous, unsupported and system/owner disks fail closed. Data partitions sharing the physical system disk are conservatively refused. Supported types: ext4/xfs/btrfs/vfat/ntfs3. Owner must unlock LUKS first and grant its filesystem identity. Missing/hotplug volumes need owner reconciliation.
+Actual lsblk metadata must resolve uniquely. Ambiguous, unsupported and system/owner disks fail closed. Data partitions sharing the physical system disk are conservatively refused. Supported types: ext4/xfs/btrfs/vfat/ntfs3. Owner must unlock LUKS first and grant its filesystem identity.
+
+If a previously granted UUID/PARTUUID is not connected during stopped-runtime preparation, its owner policy remains intact but no mount or sandbox bind is published for it. The read-only compiled plan records `unavailable` with reason `not-connected`; `sudo haos-owner status` includes that actual published plan. Other safe volumes and Hermes can start. An old mount or symlink at the absent identity's broker destination is still refused, as are duplicate identities, an unsupported connected device or a protected system disk. Explicit new owner grants still require the actual device to be present.
+
+Reconnecting a device does not expand a running agent namespace. Stop execution, inspect the stable identity and prepare/start again to make an existing grant available. Live USB removal/reinsertion, automatic hotplug refresh and complete old-process revocation across such events remain separate unfinished gates. Local contracts cover absence/reconnection selection and all unsafe cases; an isolated root probe uses actual `lsblk`, publication and a dropped service UID without modifying any device. Matching installed/hotplug acceptance remains required.
 
 After mounting, `findmnt` must report the exact target, filesystem, selected UUID/PARTUUID, kernel major:minor device identity, `nodev,nosuid,noexec` and requested read-only/read-write mode. The block inventory is read again before grants are published; changed, ambiguous or newly protected topology fails closed. Preparation invalidates old compiled grants first. A failed check rolls back newly created mounts and leaves no stale sandbox configuration. Nine regression tests for this behavior passed in service CI at `e8dd0aa`, run `37879539364`; actual installed/hotplug receipts remain required.
 
