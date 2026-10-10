@@ -109,6 +109,9 @@ def main():
                 # never complete protocol logs, profiles, sessions or journal data.
                 output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
                 print(f'Disposable {name} process exit: {code}', flush=True)
+                phases = re.findall(r'^HAOS_GUI_FIXTURE_PHASE ([a-z-]{1,64})$', output, re.M)
+                if phases:
+                    print('Disposable GUI last phase: ' + phases[-1], flush=True)
                 for line in output.splitlines():
                     if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
                         print(line[:640], flush=True)

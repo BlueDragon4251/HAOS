@@ -60,7 +60,9 @@ async def main():
         # Actual fragmented stdout from the actual controller process. The old
         # listener tried JSON.parse on this incomplete first line and crashed.
         sys.stdout.write(readiness[:16]); sys.stdout.flush()
-        await asyncio.sleep(0.05)
+        acknowledgement = await asyncio.wait_for(asyncio.to_thread(sys.stdin.buffer.read, 1), 5)
+        if acknowledgement != b'R':
+            raise RuntimeError('incomplete readiness fragment was not acknowledged')
         sys.stdout.write(readiness[16:] + '\n'); sys.stdout.flush()
     else:
         print(readiness, flush=True)
