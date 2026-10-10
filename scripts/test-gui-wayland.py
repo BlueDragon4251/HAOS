@@ -108,8 +108,9 @@ def main():
                 # Only the explicitly disposable probe's own bounded failure label,
                 # never complete protocol logs, profiles, sessions or journal data.
                 output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
+                print(f'Disposable {name} process exit: {code}', flush=True)
                 for line in output.splitlines():
-                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:')):
+                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
                         print(line[:640], flush=True)
                 raise AssertionError('real Wayland GUI probe failed: ' + name)
             stop(client)
