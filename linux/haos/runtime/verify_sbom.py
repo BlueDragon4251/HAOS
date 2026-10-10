@@ -6,12 +6,13 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 SYFT_IMAGE = "ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa"
 SYFT_VERSION = "1.54.1"
 NPM_VERSION = "10.9.4"
-LIMIT = 64 * 1024 * 1024
+LIMIT = 128 * 1024 * 1024
 
 
 def read(path):
@@ -27,7 +28,16 @@ def load(path):
 
 
 def digest(path):
-    return hashlib.sha256(read(path)).hexdigest()
+    # Real image catalogs are large. Hash the unchanged document without a
+    # second whole-file allocation, retaining the same input size boundary.
+    value, length = hashlib.sha256(), 0
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            length += len(chunk)
+            if length > LIMIT:
+                raise ValueError("SBOM input exceeds its bound")
+            value.update(chunk)
+    return value.hexdigest()
 
 
 def normalized(name):
@@ -186,6 +196,7 @@ def verify(directory, commit):
             "npm_generator": {"version": NPM_VERSION, "original_retained": True,
                               "normalized_component_occurrences": len(raw_npm["components"]) - len(npm_document["components"])},
             "document_sha256": {name: digest(directory / name) for name in paths},
+            "document_bytes": {name: (directory / name).stat().st_size for name in paths},
             "coverage": {"python_installed_versions": len(installed), "python_frozen_versions": len(frozen),
                          "rpm_installed_versions_architectures": len(rpm),
                          "image_package_types": dict(sorted(Counter(row[0] for row in packages).items())),
@@ -197,6 +208,14 @@ def verify(directory, commit):
 
 
 def main():
+    if sys.platform.startswith("linux"):
+        import resource
+        # Bound this verifier process independently of the image scanner. Never
+        # raise a smaller enclosing limit; callers importing verify() retain
+        # control of their own process limits.
+        _, hard = resource.getrlimit(resource.RLIMIT_AS)
+        limit = 2 * 1024 ** 3 if hard == resource.RLIM_INFINITY else min(hard, 2 * 1024 ** 3)
+        resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path, nargs="?")
     parser.add_argument("--commit")

@@ -175,12 +175,27 @@ jobs:
             evidence/rpm-with-epochs.txt
             evidence/npm.cdx.json
             evidence/npm.raw.cdx.json
-            evidence/image.cdx.json
-            evidence/image.syft.json
             evidence/sbom-index.json
             evidence/sbom-scanner-status.json
             evidence/sbom-resource-samples.jsonl
             evidence/sbom-host-resources.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain full actual image catalogs separately from bounded metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-image-sbom-${{ github.sha }}
+          path: |
+            evidence/image.cdx.json
+            evidence/image.syft.json
+            evidence/npm.cdx.json
+            evidence/npm.raw.cdx.json
+            evidence/image.json
+            evidence/python-runtime-*.json
+            evidence/python-runtime-*.txt
+            evidence/rpm-with-epochs.txt
+            evidence/sbom-index.json
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4

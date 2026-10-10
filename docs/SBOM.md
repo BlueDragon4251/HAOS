@@ -30,6 +30,14 @@ Evidence includes:
 - `sbom-host-resources.json`: actual host RAM/available RAM, scratch filesystem
   free bytes and scanner limit. Insufficient host memory fails before scanning.
 
+The verifier accepts at most 128 MiB per document and hashes documents in chunks
+without another full-file allocation. Its Linux CLI has a separate 2 GiB address-
+space limit and retains any smaller enclosing limit. This is a build-tool limit,
+not an agent quota. The small `haos-build-metadata-COMMIT` artifact retains the
+index, runtime probes and process/resource receipts; full image catalogs live in
+`haos-image-sbom-COMMIT` and the complete image/ISO evidence artifact. Large catalogs
+must not make bounded metadata inspection download or publish arbitrary image data.
+
 The verifier requires the catalog's source version/image ID to equal this build.
 Every frozen Python version must be actually installed, every installed Python
 version must appear in the image catalog, and every installed RPM must match its
@@ -76,6 +84,23 @@ host memory with additional headroom, lowers Go's soft limit to 1536 MiB and use
 allocation. No input, cataloger, installed package or verification assertion is
 removed. Metrics are recorded before cleanup; successful full-image inventory
 verification remains required. This build-tool limit is not a mission budget.
+
+The actual image at `41e58d3758cc11e82690c2097ab683ef426af4fb`
+([37994395134](https://github.com/BlueDragon4251/HAOS/actions/runs/37994395134))
+completed its scanner with **exit 0, no OOM**, with sampled memory up to 3.645 GiB.
+Its 82,145,743-byte Syft document exceeded the old 64 MiB verifier input limit;
+the image workflow correctly failed before ISO/installation. The actual ZIP
+`11647441671` was downloaded and verified against GitHub SHA256
+`da3ebae698f81d7740c9bad1498568747de39eba71c088412db372f67371cb4a`.
+The corrected verifier then checked these unchanged real catalogs, source and
+image `sha256:9bad188288c408f6ba20ec3ef6f447cc243031578636fcb0ab0acf7660faaec9`:
+all **80 installed/frozen Python versions, 1,210 RPM epoch/version/architecture
+records and 188 npm build identities** passed. The CycloneDX document is
+33,322,515 bytes. Verification also completed in a non-root, offline, read-only
+container limited to 2 GiB; actual maximum resident usage was 564,812 KiB.
+This is real full-image inventory evidence, while the matching corrected CI,
+ISO and installed acceptance remain separate required gates. No installed guest
+success is attributed to the failed `41e58d3` workflow.
 
 Catalogs and inventories improve release evidence; they do not prove exhaustive
 identification of every vendored/embedded C/C++/Rust/Go/WASM component or complete

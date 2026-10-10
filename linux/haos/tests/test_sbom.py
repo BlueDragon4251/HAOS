@@ -1,5 +1,6 @@
 """Negative build-evidence contracts; real image cataloging has a separate gate."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 
@@ -96,3 +97,17 @@ def test_npm_duplicate_occurrences_preserve_locations_and_dependency_edges():
     npm["components"][1]["purl"] = "pkg:npm/example@2"
     with pytest.raises(ValueError, match="conflicting"):
         sbom.normalize_npm(npm)
+
+
+def test_real_file_read_and_streamed_hash_keep_the_same_size_boundary(tmp_path, monkeypatch):
+    monkeypatch.setattr(sbom, "LIMIT", 32)
+    path = tmp_path / "catalog.json"
+    data = b"x" * 32
+    path.write_bytes(data)
+    assert sbom.read(path) == data
+    assert sbom.digest(path) == hashlib.sha256(data).hexdigest()
+    path.write_bytes(data + b"x")
+    with pytest.raises(ValueError, match="exceeds its bound"):
+        sbom.read(path)
+    with pytest.raises(ValueError, match="exceeds its bound"):
+        sbom.digest(path)
