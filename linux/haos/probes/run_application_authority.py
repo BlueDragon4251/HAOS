@@ -19,6 +19,7 @@ def main():
         raise PermissionError('explicit read-only offline disposable root fixture required')
     sys.path.insert(0, '/usr/lib/haos')
     from haos.application_launcher import running_mission
+    from haos.application_protocol import action_digest
     account = pwd.getpwnam('nobody')
     root = Path(tempfile.mkdtemp(prefix='haos-app-ledger-'))
     root.chmod(0o755)
@@ -26,10 +27,11 @@ def main():
     os.chown(ledger, account.pw_uid, account.pw_gid)
     database = ledger / 'missions.db'
     mission = str(uuid.uuid4())
+    request=str(uuid.uuid4());action={'operation':'app.start','program':'approved-terminal'}
     def controller(code):
         def identity():
             os.setgroups([]); os.setgid(account.pw_gid); os.setuid(account.pw_uid)
-        return subprocess.run(['/usr/bin/python3', '-I', '-c', code, str(database), mission],
+        return subprocess.run(['/usr/bin/python3', '-I', '-c', code, str(database), mission,request,action_digest(action)],
             preexec_fn=identity, env={'PATH':'/usr/bin:/bin'}, check=True, timeout=5)
     def denied(path=database):
         try: running_mission(path, mission, account.pw_uid)
@@ -42,6 +44,17 @@ def main():
             "d.execute('INSERT INTO missions VALUES(?,?,?,?,?,?)',(sys.argv[2],'running','dispatching','offline-authority-fixture',0,time.time()+60)); "
             "d.commit();os.chmod(sys.argv[1],0o600)")
         running_mission(database, mission, account.pw_uid)
+        controller("import sqlite3,sys,time;d=sqlite3.connect(sys.argv[1]);"
+            "d.execute('CREATE TABLE gui_actions (id TEXT,mission_id TEXT,request_hash TEXT,operation TEXT,state TEXT,created_at REAL)');"
+            "d.execute('INSERT INTO gui_actions VALUES(?,?,?,?,?,?)',(sys.argv[3],sys.argv[2],sys.argv[4],'app.start','dispatched',time.time()));d.commit()")
+        running_mission(database,mission,account.pw_uid,request=request,action=action)
+        try:running_mission(database,mission,account.pw_uid,request=request,action=dict(action,program='forged-application'))
+        except PermissionError:pass
+        else:raise AssertionError('forged application input does not match durable authority')
+        controller("import sqlite3,sys;d=sqlite3.connect(sys.argv[1]);d.execute(\"UPDATE gui_actions SET state='pending'\");d.commit()")
+        try:running_mission(database,mission,account.pw_uid,request=request,action=action)
+        except PermissionError:pass
+        else:raise AssertionError('uncommitted GUI dispatch accepted')
         controller("import sqlite3,sys; d=sqlite3.connect(sys.argv[1]); d.execute('UPDATE missions SET cancel_requested=1');d.commit()")
         denied()
         controller("import sqlite3,sys; d=sqlite3.connect(sys.argv[1]);d.execute('UPDATE missions SET cancel_requested=0,deadline=1');d.commit()")
@@ -58,6 +71,8 @@ def main():
             'source_commit':os.environ.get('GITHUB_SHA'),
             'launcher_sha256':hashlib.sha256(Path('/usr/lib/haos/haos/application_launcher.py').read_bytes()).hexdigest(),
             'real_fork_uid_wal_admission':True,'cancelled_mission_denied':True,
+            'real_fork_uid_matching_gui_dispatch':True,'forged_application_input_denied':True,
+            'pending_gui_action_denied':True,
             'expired_mission_denied':True,'aliases_and_public_ledger_denied':True,
             'root_private_path_substitution_denied':True,
             'installed_application_unit_verified':False}),flush=True)

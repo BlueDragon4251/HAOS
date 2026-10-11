@@ -59,7 +59,21 @@ def main():
         registry.register(approval)
         launcher=ApplicationLauncher(registry,root/'state',root/'rootfs',source)
         def execute(request,action):
-            return launcher.execute(request,mission,action,ledger=ledger,ledger_uid=account.pw_uid)
+            try:return launcher.execute(request,mission,action,ledger=ledger,ledger_uid=account.pw_uid)
+            except PermissionError:
+                if action['operation']=='capture':
+                    unit=launcher.record(request)['unit']
+                    journal=subprocess.run(['/usr/bin/journalctl','--unit='+unit+'.service','--output=cat','--no-pager','-n','30'],
+                        capture_output=True,text=True,check=True,timeout=3).stdout
+                    values=[]
+                    for line in journal.splitlines():
+                        if len(line)>512:continue
+                        try:value=json.loads(line)
+                        except ValueError:continue
+                        if (isinstance(value,dict) and set(value)=={'event','helper','exitcode'} and value['event']=='application.helper'
+                                and value['helper'] in {'labwc','wtype','wlrctl','grim','wayland-info'} and type(value['exitcode']) is int):values.append(value)
+                    print(json.dumps({'fixed_helper_exit_diagnostics':values}),flush=True)
+                raise
         def denied(call):
             try: call()
             except (PermissionError,ValueError): return

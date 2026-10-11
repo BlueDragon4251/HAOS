@@ -159,7 +159,10 @@ class ApplicationSession:
                         output.extend(data)
                         if len(output) > limit:
                             raise ValueError('application helper output budget exceeded')
-            if process.wait(timeout=max(0.01, deadline - time.monotonic())):
+            code=process.wait(timeout=max(0.01, deadline - time.monotonic()))
+            if code:
+                if arguments[0] in {self.labwc,self.wtype,self.wlrctl,self.grim,self.wayland_info}:
+                    print(json.dumps({'event':'application.helper','helper':Path(arguments[0]).name,'exitcode':code}),flush=True)
                 raise RuntimeError('private application helper failed')
             return bytes(output)
         finally:
@@ -253,8 +256,8 @@ def serve(session):
                     if rest:
                         raise ValueError('multiple application frames denied')
                     result = {'result': session.execute(json.loads(frame))}
-                except (ValueError, PermissionError, RuntimeError, TimeoutError, OSError):
-                    result = {'error': 'application action denied or unavailable'}
+                except (ValueError, PermissionError, RuntimeError, TimeoutError, OSError) as exc:
+                    result = {'error': 'application action denied or unavailable','reason':type(exc).__name__}
                 peer.sendall(json.dumps(result).encode() + b'\n')
         if session.compositor.poll() is not None:
             # Fixed lifecycle diagnostics only; never application stderr, titles

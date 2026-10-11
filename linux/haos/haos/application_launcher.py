@@ -69,7 +69,7 @@ def launch_command(application, mission, request, root, source=SOURCE):
     return command
 
 
-def _read_mission(path, mission, ledger_uid):
+def _read_mission(path, mission, ledger_uid, proof=None):
     info = path.lstat()
     parent = path.parent.lstat()
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != ledger_uid or info.st_nlink != 1
@@ -81,27 +81,39 @@ def _read_mission(path, mission, ledger_uid):
         db.execute('PRAGMA trusted_schema=OFF')
         deadline = time.monotonic() + 1
         db.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
+        db.execute('BEGIN')
         row = db.execute('SELECT state,phase,session_id,cancel_requested,deadline FROM missions WHERE id=?', (mission,)).fetchone()
+        if not row or row[0] != 'running' or row[1] != 'dispatching' or not row[2] or row[3] or row[4] <= time.time():
+            raise PermissionError('application requires an active dispatched mission')
+        if proof is not None:
+            request,digest,operation=proof
+            admitted=db.execute('SELECT mission_id,request_hash,operation,state,created_at FROM gui_actions WHERE id=?',(request,)).fetchone()
+            if (not admitted or admitted[:4]!=(mission,digest,operation,'dispatched')
+                    or type(admitted[4]) not in {int,float} or not 0<=time.time()-admitted[4]<20):
+                raise PermissionError('application action lacks a fresh matching durable GUI dispatch')
     finally:
         db.close()
     after = path.lstat()
     if (info.st_dev, info.st_ino) != (after.st_dev, after.st_ino):
         raise PermissionError('mission ledger changed identity')
-    if not row or row[0] != 'running' or row[1] != 'dispatching' or not row[2] or row[3] or row[4] <= time.time():
-        raise PermissionError('application requires an active dispatched mission')
 
 
-def running_mission(path, mission, ledger_uid):
+def running_mission(path, mission, ledger_uid, *, request=None, action=None):
     """Read the mutable WAL ledger as its UID, never with root filesystem rights.
 
     A substituted SQLite path cannot expose owner/credential data to the broker.
     Only a one-byte allow/deny decision crosses the privilege boundary.
     """
     canonical_id(mission)
+    proof=None
+    if request is not None or action is not None:
+        from .application_protocol import action as validate_action,action_digest
+        canonical_id(request); action=validate_action(action)
+        proof=(request,action_digest(action),action['operation'])
     if type(ledger_uid) is not int or ledger_uid <= 0:
         raise PermissionError('separate controller UID required')
     if os.geteuid() == ledger_uid:
-        return _read_mission(path, mission, ledger_uid)
+        return _read_mission(path, mission, ledger_uid, proof)
     if os.geteuid() != 0:
         raise PermissionError('mission ledger access is not authorized')
     account = pwd.getpwuid(ledger_uid)
@@ -119,7 +131,7 @@ def running_mission(path, mission, ledger_uid):
             libc = ctypes.CDLL(None, use_errno=True)
             if libc.prctl(38, 1, 0, 0, 0) != 0:
                 os._exit(1)
-            _read_mission(path, mission, ledger_uid)
+            _read_mission(path, mission, ledger_uid, proof)
             os.write(writer, b'1')
         except BaseException:
             pass
@@ -314,5 +326,8 @@ class ApplicationLauncher:
         if rest: raise ValueError('multiple application responses denied')
         result=json.loads(frame,object_pairs_hook=unique_object)
         if not isinstance(result,dict) or set(result)!={'result'}:
+            if (isinstance(result,dict) and set(result)=={'error','reason'}
+                    and result['reason'] in {'ValueError','PermissionError','RuntimeError','TimeoutError','OSError'}):
+                raise PermissionError('application action denied or unavailable ('+result['reason']+')')
             raise PermissionError('application action denied or unavailable')
         return result['result']
