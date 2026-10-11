@@ -150,7 +150,11 @@ def test_capture_is_ephemeral_not_ledger_or_audit(live):
 def test_budget_and_oversized_forged_receipts(live):
     store, gui, mid, epoch = live
     for _ in range(120):
+        # Exercise the real native heartbeat, as an attached shell does. Slow
+        # fsync on a runner must not turn this budget test into a stale-peer test.
+        gui.poll(mid, {"epoch": epoch})
         submit(gui, mid, {"operation": "state"})
+    gui.poll(mid, {"epoch": epoch})
     with pytest.raises(Conflict):
         submit(gui, mid)
     with pytest.raises(ValueError):
