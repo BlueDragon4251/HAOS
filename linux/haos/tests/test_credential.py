@@ -7,6 +7,9 @@ from haos.sandbox import command
 
 
 def test_credential_value_never_enters_the_launcher_arguments(monkeypatch):
+    # Credential unit cases isolate the preceding kernel guard; its actual
+    # abstract/named socket behavior is verified in the disposable Fedora VM.
+    monkeypatch.setattr("haos.ipc_scope.restrict_abstract_sockets", lambda: 6)
     token = "fixture-" + "x" * 56
     monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "before")
     monkeypatch.setattr("haos.launch.Path.read_text", lambda self: token)
@@ -20,6 +23,7 @@ def test_credential_value_never_enters_the_launcher_arguments(monkeypatch):
 
 @pytest.mark.parametrize("value", ["", " ", "short", "x" * 43 + "\nsecret", "x" * 129])
 def test_invalid_credentials_cannot_launch_a_backend(monkeypatch, value):
+    monkeypatch.setattr("haos.ipc_scope.restrict_abstract_sockets", lambda: 6)
     monkeypatch.setattr("haos.launch.Path.read_text", lambda self: value)
     monkeypatch.setattr("haos.launch.os.execv", lambda *args: pytest.fail("invalid credential launched backend"))
     with pytest.raises(ValueError, match="credential"):

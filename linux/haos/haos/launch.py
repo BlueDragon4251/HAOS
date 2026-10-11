@@ -7,6 +7,13 @@ from pathlib import Path
 
 
 def main():
+    if __package__:
+        from .ipc_scope import restrict_abstract_sockets
+    else:
+        from ipc_scope import restrict_abstract_sockets
+    abi = restrict_abstract_sockets()
+    print(json.dumps({"event": "isolation.abstract_unix", "active": True,
+                      "landlock_abi": abi}), flush=True)
     token = Path("/run/haos-credentials/backend-token").read_text().strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{43,128}", token):
         raise ValueError("invalid backend credential")

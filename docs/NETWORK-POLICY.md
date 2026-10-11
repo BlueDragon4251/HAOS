@@ -19,4 +19,26 @@ The enrolled owner's restricted sudo grant has no arbitrary `systemctl` permissi
 
 The disposable CI probe uses a new account, private nft table and real IPv4/IPv6 listeners. It checks denied loopback/mapped-address access, pre-existing connections after policy install/reload, actual backend replies, denied unprivileged rule removal and unaffected other-user traffic. Local unit tests validate rule generation, resolver trust, scope and failed validation. The actual kernel gate passed at `2cebd11` and again in [service run 37988845664](https://github.com/BlueDragon4251/HAOS/actions/runs/37988845664) at `aeac4ad`. Installed localhost denial passed in both source-bound `2cebd11` guest receipts ([37915386805](https://github.com/BlueDragon4251/HAOS/actions/runs/37915386805)); it does not accept newer installed images or the complete egress policy. Historical billing failures no longer describe these public runner results.
 
-AF_UNIX abstract sockets, enforcing SELinux coverage, per-mission public egress, DNS-channel exfiltration, remote filesystems, multi-user UID changes and complete owner-only local-service isolation require further implementation and acceptance.
+Installed abstract-socket enforcement, enforcing SELinux coverage, per-mission public egress, DNS-channel exfiltration, remote filesystems, multi-user UID changes and complete owner-only local-service isolation require further acceptance or implementation.
+
+## Abstract Unix sockets
+
+The image-owned agent launcher now enters a Landlock abstract Unix scope before
+reading credentials or starting Hermes. This closes the abstract-socket bypass
+of filesystem mounts while retaining the existing shared TCP network and named
+controller/GUI socket policy. Descendants inherit the scope; they can connect to
+abstract listeners inside their own domain, but cannot connect to earlier host
+listeners. No filesystem or TCP permission is granted by this scope.
+
+Linux Landlock ABI 6 or newer is mandatory. An unsupported kernel or failed
+scope/prctl operation refuses runtime startup, with no unrestricted fallback.
+The independent owner/recovery services do not depend on this agent scope.
+
+The actual Python implementation was tested as UID 1000 in a diskless, offline
+TCG guest using Fedora kernel 7.2.9-200.fc44 (ABI 10): an abstract listener was
+reachable before the scope and denied with EPERM afterwards; named Unix and
+same-domain descendant connections remained usable. The cloud host itself
+reports ENOSYS; unit fixtures are not evidence of enforcement there. This is a
+kernel component proof, not a complete installed HAOS, SELinux, per-mission
+egress or connection-revocation acceptance. Required installed image/guest
+checks must still pass with this stricter launcher.
