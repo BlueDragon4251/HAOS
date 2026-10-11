@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
-      - run: python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3
+      - run: python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3 Pillow==12.3.0
       - run: HAOS_TEST_PYTHON="$(command -v python)" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py
       - name: Root-authority backup and policy-access tests in disposable fixtures
         run: sudo "$(command -v python)" -m pytest -q linux/haos/tests/test_backup.py linux/haos/probes/test_policy_access.py linux/haos/probes/test_gateway_authority.py linux/haos/probes/test_gateway_recovery_authority.py linux/haos/probes/test_owner_recovery.py linux/haos/probes/test_provider_authority.py linux/haos/probes/test_ui_authority.py
@@ -54,6 +54,14 @@ jobs:
             -e HAOS_DISPOSABLE_APPLICATION_TEST=1 -e GITHUB_SHA="$GITHUB_SHA" \
             haos-application-session-fixture > "$RUNNER_TEMP/haos-application-authority.json"
           cat "$RUNNER_TEMP/haos-application-authority.json"
+          docker run --rm --network none --read-only --security-opt no-new-privileges \
+            --cap-drop ALL --cap-add DAC_OVERRIDE --pids-limit 64 --memory 256m --cpus 1 \
+            --tmpfs /run:mode=755,size=64m \
+            -v "$PWD/linux/haos/haos:/usr/lib/haos/haos:ro" \
+            -v "$PWD/linux/haos/probes/run_application_nonces.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_APPLICATION_TEST=1 -e GITHUB_SHA="$GITHUB_SHA" \
+            haos-application-session-fixture > "$RUNNER_TEMP/haos-application-nonces.json"
+          cat "$RUNNER_TEMP/haos-application-nonces.json"
       - uses: actions/upload-artifact@v7
         with:
           name: private-application-components-${{ github.sha }}
@@ -63,7 +71,7 @@ jobs:
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools e2fsprogs xfsprogs btrfs-progs labwc wlrctl wtype grim foot xwayland fonts-dejavu-core wayland-utils
+          sudo apt-get install -y -qq bubblewrap apparmor-profiles qemu-system-x86 restic nftables libpwquality-tools e2fsprogs xfsprogs btrfs-progs labwc wlrctl wtype grim foot xwayland fonts-dejavu-core wayland-utils python3-pil
           # Ubuntu's packaged profile permits the launcher to create its sandbox,
           # then removes capabilities from its children. Keep AppArmor enabled.
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict

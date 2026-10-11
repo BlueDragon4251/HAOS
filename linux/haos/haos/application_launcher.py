@@ -257,7 +257,10 @@ class ApplicationLauncher:
         if os.geteuid() != 0:
             raise PermissionError('application termination requires the independent authority')
         record = self.record(request)
-        subprocess.run(['/usr/bin/systemctl','stop',record['unit'] + '.service'], check=True,
+        # An exited transient unit may already have been unloaded. A failed
+        # stop command never counts as success by itself: confirm empty kernel
+        # process/cgroup state below before changing the durable receipt.
+        subprocess.run(['/usr/bin/systemctl','stop',record['unit'] + '.service'], check=False,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10,
                        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
         process = subprocess.run(['/usr/bin/systemctl','show',record['unit'] + '.service','--property=ActiveState','--property=MainPID'],
@@ -265,6 +268,9 @@ class ApplicationLauncher:
         properties = dict(line.split('=',1) for line in process.stdout.splitlines() if '=' in line)
         if properties.get('ActiveState') not in {'inactive','failed'} or properties.get('MainPID') != '0':
             raise RuntimeError('application cgroup termination is not confirmed')
+        group=Path('/sys/fs/cgroup/system.slice')/(record['unit']+'.service')
+        if group.exists() and 'populated 0' not in (group/'cgroup.events').read_text().splitlines():
+            raise RuntimeError('application cgroup still contains descendants')
         record['state'] = 'stopped'
         atomic_json(self.state / (request + '.json'), record)
         (self.runtime / request / 'launch.json').unlink(missing_ok=True)

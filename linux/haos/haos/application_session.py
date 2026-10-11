@@ -7,6 +7,7 @@ No host Wayland, clipboard, environment, credential or input device is imported.
 import base64
 import ctypes
 import hashlib
+import io
 import json
 import os
 import re
@@ -19,6 +20,25 @@ import struct
 import subprocess
 import sys
 import time
+
+
+def jpeg_capture(encoded):
+    """Bounded trusted PNG→JPEG encoding; grim builds may omit optional JPEG."""
+    if len(encoded)>8*1024*1024 or not encoded.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError('invalid private compositor PNG')
+    from PIL import Image
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        with Image.open(io.BytesIO(encoded)) as frame:
+            if (frame.format!='PNG' or not 0<frame.width<=2048 or not 0<frame.height<=2048
+                    or frame.width*frame.height>4194304 or getattr(frame,'n_frames',1)!=1):
+                raise ValueError('private compositor dimensions exceed their budget')
+            output=io.BytesIO();frame.convert('RGB').save(output,format='JPEG',quality=70)
+    pixels=output.getvalue()
+    if not 100<=len(pixels)<=1024*1024:
+        raise ValueError('private compositor JPEG exceeds its budget')
+    return pixels
 
 KEYS = {'Tab': 'Tab', 'Enter': 'Return', 'Backspace': 'BackSpace', 'Delete': 'Delete',
         'ArrowUp': 'Up', 'ArrowDown': 'Down', 'ArrowLeft': 'Left', 'ArrowRight': 'Right',
@@ -207,7 +227,7 @@ class ApplicationSession:
                 raise PermissionError('application shortcut denied')
             self.helper([self.wtype, '-k', KEYS[action['key']]])
             return {'applied': True}
-        pixels = self.helper([self.grim, '-t', 'jpeg', '-'], limit=1024*1024)
+        pixels = jpeg_capture(self.helper([self.grim, '-t', 'png', '-'], limit=8*1024*1024))
         if not pixels.startswith(b'\xff\xd8') or not pixels.endswith(b'\xff\xd9'):
             raise ValueError('invalid private compositor capture')
         return {'mime': 'image/jpeg', 'sha256': hashlib.sha256(pixels).hexdigest(),
