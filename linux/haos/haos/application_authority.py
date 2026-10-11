@@ -117,6 +117,8 @@ class ApplicationAuthority:
                     running_mission(self.ledger,record['mission'],self.controller_uid)
                     if grant_digest(self.launcher.registry.resolve(record['application']))!=record['grant_sha256']:
                         revoke=True
+                    unit=self.launcher.unit_state(record['request'])
+                    if unit['ActiveState'] in {'inactive','failed'} and unit['MainPID']=='0':revoke=True
                 except (PermissionError,KeyError,ValueError,OSError,sqlite3.Error):revoke=True
             if revoke:
                 self.launcher.stop(record['request']);stopped.append(record['request'])

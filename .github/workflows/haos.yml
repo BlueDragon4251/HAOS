@@ -88,7 +88,28 @@ jobs:
         run: python -m pytest -q -s linux/haos/probes/test_qemu_runtime.py
       - name: Real bounded systemd application units and escaped-child cleanup
         timeout-minutes: 3
-        run: sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 GITHUB_SHA="$GITHUB_SHA" /usr/bin/python3 linux/haos/probes/run_application_unit.py
+        run: |
+          set -euo pipefail
+          sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 GITHUB_SHA="$GITHUB_SHA" /usr/bin/python3 linux/haos/probes/run_application_unit.py | tee "$RUNNER_TEMP/haos-application-unit.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: actual-application-unit-${{ github.sha }}
+          path: ${{ runner.temp }}/haos-application-unit.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Real persistent GUI queue and independently authorized application pipeline
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 GITHUB_SHA="$GITHUB_SHA" /usr/bin/python3 linux/haos/probes/run_application_pipeline.py | tee "$RUNNER_TEMP/haos-application-pipeline.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: actual-application-pipeline-${{ github.sha }}
+          path: ${{ runner.temp }}/haos-application-pipeline.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Actual encrypted retention, corrupt-data denial and damaged fixture restore
         run: |
           restic version

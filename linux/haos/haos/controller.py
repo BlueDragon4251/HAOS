@@ -46,6 +46,32 @@ class Controller:
         self.provider_usage: dict | None = None
         self.gui = GuiBroker(store)
         self.agent_uid = None
+        self.application_request=None
+
+    async def application_worker(self):
+        """Same persistent GUI queue, serviced independently of Herald's lifetime."""
+        while not self.stop.is_set():
+            if self.application_request is None:return
+            try:
+                health=await asyncio.to_thread(self.application_request,{'method':'health'})
+                if health!={'available':True,'isolation':'private-wayland-rootfs-network','external_network':False}:
+                    raise PermissionError('independent application health identity mismatch')
+                self.gui.application_seen_at=time.time()
+            except Exception:
+                self.gui.application_seen_at=0
+            request=self.gui.application_poll(self.current,dispatch=bool(self.gui.application_seen_at))
+            if request:
+                result=None
+                try:
+                    result=await asyncio.to_thread(self.application_request,request)
+                except Exception:
+                    pass  # consumed action may have run; never automatic re-dispatch
+                try:self.gui.application_acknowledge(request['id'],result=result)
+                except (ValueError,PermissionError,Conflict):
+                    try:self.gui.application_acknowledge(request['id'])
+                    except Conflict:pass
+            try:await asyncio.wait_for(self.stop.wait(),0.15 if request else 0.5)
+            except TimeoutError:pass
 
     async def monitor(self):
         from .health import HealthSampler
@@ -290,6 +316,8 @@ async def serve():
     controller.usage_sampler = UsageSampler(model_capability)
     controller.gateway_uids = {pwd.getpwnam("haos-gateway").pw_uid}
     controller.agent_uid = pwd.getpwnam("haos-agent").pw_uid
+    from .application_client import request as application_request
+    controller.application_request=application_request
     if (os.environ.get("LISTEN_PID") != str(os.getpid()) or os.environ.get("LISTEN_FDS") != "1"):
         raise PermissionError("GUI listener must be supplied by its system socket unit")
     gui_socket = socket.socket(fileno=3)
@@ -318,11 +346,13 @@ async def serve():
     try:
         async with server, gateway_server, gui_server:
             monitor = asyncio.create_task(controller.monitor())
+            applications=asyncio.create_task(controller.application_worker())
             try:
                 await controller.worker()
             finally:
                 controller.stop.set()
                 await monitor
+                await applications
     finally:
         server.close()
         await server.wait_closed()

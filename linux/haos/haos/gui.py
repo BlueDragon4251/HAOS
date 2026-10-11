@@ -12,8 +12,9 @@ import time
 import uuid
 
 from .store import Conflict
+from .application_protocol import OPERATIONS as APPLICATION_OPERATIONS,action as application_action,receipt as application_receipt
 
-OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read", "locate", "center", "workspace"}
+OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read", "locate", "center", "workspace"} | APPLICATION_OPERATIONS
 WINDOW_LIMIT = 4
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
@@ -25,6 +26,8 @@ def identifier(value):
 
 
 def action(data):
+    if isinstance(data,dict) and data.get('operation') in APPLICATION_OPERATIONS:
+        return application_action(data)
     if not isinstance(data, dict) or data.get("operation") not in OPERATIONS:
         raise PermissionError("GUI capability denied")
     op = data["operation"]
@@ -66,6 +69,7 @@ def action(data):
 
 def receipt(op, data):
     """Native replies are bounded too; captures never become durable ledger data."""
+    if op in APPLICATION_OPERATIONS:return application_receipt(op,data)
     if not isinstance(data, dict):
         raise ValueError("invalid GUI receipt")
     fields = {"window", "width", "height"}
@@ -138,6 +142,8 @@ class GuiBroker:
         self.store = store
         self.epoch = None
         self.seen_at = 0
+        self.application_seen_at=0
+        self.application_epoch=str(uuid.uuid4())
         self.images = {}  # short-lived replies only, never screenshots in SQLite
         store.db.execute("""CREATE TABLE IF NOT EXISTS gui_actions (
             id TEXT PRIMARY KEY, mission_id TEXT NOT NULL REFERENCES missions(id),
@@ -145,13 +151,17 @@ class GuiBroker:
             state TEXT NOT NULL, created_at REAL NOT NULL, epoch TEXT, result TEXT)""")
         self.invalidate("controller restarted")
 
-    def invalidate(self, reason):
+    def invalidate(self, reason, *, native_only=False):
         with self.store.transaction():
-            for row in self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE state IN ('pending','dispatched')").fetchall():
+            for row in self.store.db.execute("SELECT id,mission_id,operation FROM gui_actions WHERE state IN ('pending','dispatched')").fetchall():
+                if native_only and row['operation'] in APPLICATION_OPERATIONS:continue
                 self.store.db.execute("UPDATE gui_actions SET state='uncertain',arguments=NULL,result=? WHERE id=?",
                                       (json.dumps({"error": reason}), row["id"]))
                 self.store._event(row["mission_id"], "gui.uncertain", {"id": row["id"]})
-        self.images.clear()
+        if native_only:
+            application_ids={row[0] for row in self.store.db.execute("SELECT id FROM gui_actions WHERE operation LIKE 'app.%'")}
+            self.images={k:v for k,v in self.images.items() if k in application_ids}
+        else:self.images.clear()
 
     def authorize(self, current, session):
         if not current:
@@ -175,7 +185,9 @@ class GuiBroker:
                 if old["mission_id"] != row["id"] or old["request_hash"] != digest:
                     raise Conflict("GUI request ID already used")
                 return self.result(current, {"session": params["session"], "id": key})
-            if not self.epoch or time.time() - self.seen_at > 3:
+            if args['operation'] in APPLICATION_OPERATIONS:
+                if time.time()-self.application_seen_at>3:raise Conflict('independent application authority is unavailable')
+            elif not self.epoch or time.time() - self.seen_at > 3:
                 raise Conflict("native GUI broker is unavailable")
             count = self.store.db.execute("SELECT COUNT(*) FROM gui_actions WHERE mission_id=?", (row["id"],)).fetchone()[0]
             recent = self.store.db.execute("SELECT COUNT(*) FROM gui_actions WHERE created_at>?", (time.time() - 60,)).fetchone()[0]
@@ -210,7 +222,7 @@ class GuiBroker:
             raise ValueError("invalid GUI attachment")
         epoch = identifier(params["epoch"])
         if epoch != self.epoch:
-            self.invalidate("native GUI session replaced; inspect before retrying")
+            self.invalidate("native GUI session replaced; inspect before retrying",native_only=True)
         self.epoch, self.seen_at = epoch, time.time()
         return {"attached": True}
 
@@ -225,12 +237,12 @@ class GuiBroker:
             if row["state"] == "running" and not row["cancel_requested"] and row["deadline"] > time.time():
                 active = current
         with self.store.transaction():
-            stale = self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE state IN ('pending','dispatched') AND (mission_id!=? OR created_at<?)",
+            stale = self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE operation NOT LIKE 'app.%' AND state IN ('pending','dispatched') AND (mission_id!=? OR created_at<?)",
                                           (active or "", time.time() - 20)).fetchall()
             for row in stale:
                 self.store.db.execute("UPDATE gui_actions SET state='uncertain',arguments=NULL,result=? WHERE id=?", ('{"error":"GUI action expired or mission ended"}', row["id"]))
                 self.store._event(row["mission_id"], "gui.uncertain", {"id": row["id"]})
-            row = self.store.db.execute("SELECT * FROM gui_actions WHERE state='pending' AND mission_id=? ORDER BY created_at LIMIT 1", (active,)).fetchone()
+            row = self.store.db.execute("SELECT * FROM gui_actions WHERE operation NOT LIKE 'app.%' AND state='pending' AND mission_id=? ORDER BY created_at LIMIT 1", (active,)).fetchone()
             request = None
             if row:
                 request = {"id": row["id"], "mission": active, "action": json.loads(row["arguments"])}
@@ -243,7 +255,7 @@ class GuiBroker:
             raise PermissionError("invalid GUI acknowledgement")
         with self.store.transaction():
             row = self.store.db.execute("SELECT * FROM gui_actions WHERE id=?", (identifier(params["id"]),)).fetchone()
-            if not row or row["state"] != "dispatched" or row["epoch"] != self.epoch:
+            if not row or row["operation"] in APPLICATION_OPERATIONS or row["state"] != "dispatched" or row["epoch"] != self.epoch:
                 raise Conflict("GUI action no longer awaits a receipt")
             data = receipt(row["operation"], params["result"]) if params["ok"] else {"error": "native GUI action failed"}
             if row["operation"] == "capture" and params["ok"]:
@@ -271,3 +283,47 @@ class GuiBroker:
             self.store._event(row["mission_id"], "gui." + state, {"id": row["id"], "operation": row["operation"],
                                                              **({"sha256": data["sha256"], "bytes": data["bytes"]} if "sha256" in data else {})})
         return {"accepted": True}
+
+    def application_poll(self,current,*,dispatch=True):
+        self.prune_images()
+        active=None
+        if current:
+            row=self.store.get(current)
+            try:self.authorize(current,row['session_id']);active=current
+            except PermissionError:pass
+        with self.store.transaction():
+            for row in self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE operation LIKE 'app.%' AND state IN ('pending','dispatched') AND (mission_id!=? OR created_at<?)",
+                    (active or '',time.time()-20)).fetchall():
+                self.store.db.execute("UPDATE gui_actions SET state='uncertain',arguments=NULL,result=? WHERE id=?",('{"error":"application action expired or mission ended"}',row['id']))
+                self.store._event(row['mission_id'],'gui.uncertain',{'id':row['id']})
+            if not dispatch:return None
+            row=self.store.db.execute("SELECT * FROM gui_actions WHERE operation LIKE 'app.%' AND state='pending' AND mission_id=? ORDER BY created_at LIMIT 1",(active,)).fetchone()
+            if not row:return None
+            result={'id':row['id'],'mission':active,'action':json.loads(row['arguments'])}
+            self.store.db.execute("UPDATE gui_actions SET state='dispatched',epoch=?,arguments=NULL WHERE id=?",(self.application_epoch,row['id']))
+            self.store._event(active,'gui.dispatched',{'id':row['id'],'operation':row['operation']})
+            return result
+
+    def application_acknowledge(self,key,*,result=None):
+        """Internal root-worker receipt; never callable through Herald gui.ack."""
+        with self.store.transaction():
+            row=self.store.db.execute('SELECT * FROM gui_actions WHERE id=?',(identifier(key),)).fetchone()
+            if not row or row['operation'] not in APPLICATION_OPERATIONS or row['state']!='dispatched' or row['epoch']!=self.application_epoch:
+                raise Conflict('application no longer awaits an independent receipt')
+            if result is None:
+                # The root authority may have performed input before losing the
+                # response. Keep this action uncertain and permanently consumed.
+                state='uncertain';data={'error':'application receipt unavailable; reconcile before retrying'}
+            else:
+                data=receipt(row['operation'],result);state='succeeded'
+                if row['operation']=='app.start' and data['instance']!=key:
+                    raise PermissionError('application instance does not match the admitted launch')
+                if row['operation']=='app.capture':
+                    self.prune_images();self.images[key]=(time.time(),data)
+                    try:asyncio.get_running_loop().call_later(15,self.images.pop,key,None)
+                    except RuntimeError:pass
+                    data={k:v for k,v in data.items() if k not in {'mime','base64'}} | {'capture_available':False}
+            self.store.db.execute('UPDATE gui_actions SET state=?,result=? WHERE id=?',(state,json.dumps(data),key))
+            self.store._event(row['mission_id'],'gui.'+state,{'id':key,'operation':row['operation'],
+                **({k:data[k] for k in ('sha256','bytes')} if 'sha256' in data else {})})
+        return {'accepted':True}

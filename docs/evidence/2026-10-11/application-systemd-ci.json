@@ -1,0 +1,91 @@
+{
+  "source_commit": "7b801edd193f1c4e269f5d5ffcefc07324360a8f",
+  "services_push": "https://github.com/BlueDragon4251/HAOS/actions/runs/38181446396",
+  "services_pr": "https://github.com/BlueDragon4251/HAOS/actions/runs/38181449539",
+  "ci": "https://github.com/BlueDragon4251/HAOS/actions/runs/38181449532",
+  "arch": "https://github.com/BlueDragon4251/HAOS/actions/runs/38181449536",
+  "all_conclusions": "success",
+  "original_component_zip": {
+    "artifact_id": 11717906222,
+    "sha256": "sha256:940eff13b59db4a8144370f205d632c3454e5a38b1865714937fb95728272704",
+    "downloaded_and_verified": true
+  },
+  "component_receipts": {
+    "haos-application-nonces.json": {
+      "scope": "actual offline independent application nonce persistence",
+      "source_commit": "7b801edd193f1c4e269f5d5ffcefc07324360a8f",
+      "durable_admission_before_dispatch": true,
+      "restart_marks_uncertain_without_replay": true,
+      "changed_payload_replay_denied": true,
+      "completed_nonce_replay_denied": true,
+      "private_root_nonce_permissions": true,
+      "no_arguments_or_pixels_in_nonce_store": true,
+      "aliased_nonce_store_denied": true
+    },
+    "haos-application-authority.json": {
+      "scope": "disposable root/controller authority component",
+      "source_commit": "7b801edd193f1c4e269f5d5ffcefc07324360a8f",
+      "launcher_sha256": "cd3f6e738c50e18b023f8fb3e37a01fc6c142074bbf8725904382de27a866894",
+      "real_fork_uid_wal_admission": true,
+      "cancelled_mission_denied": true,
+      "real_fork_uid_matching_gui_dispatch": true,
+      "forged_application_input_denied": true,
+      "pending_gui_action_denied": true,
+      "expired_mission_denied": true,
+      "aliases_and_public_ledger_denied": true,
+      "root_private_path_substitution_denied": true,
+      "installed_application_unit_verified": false
+    },
+    "haos-application-session.json": {
+      "schema": 1,
+      "scope": "disposable private application session component",
+      "source_commit": "7b801edd193f1c4e269f5d5ffcefc07324360a8f",
+      "source_sha256": "f9d715eb601588fd0c20236360a326e718aaadb1a4be53faea8f6d8f40322185",
+      "real_application_toplevel": true,
+      "real_application_focus": true,
+      "actual_shell_readiness_verified": true,
+      "real_keyboard_result_verified": true,
+      "real_capture_integrity": true,
+      "real_capture_changed": true,
+      "clipboard_and_global_modifiers_denied": true,
+      "paths_and_shell_controls_denied": true,
+      "unprivileged_app_control_peer_denied": true,
+      "root_broker_peer_pid_verified": true,
+      "application_effective_capabilities_zero": true,
+      "application_no_new_privileges": true,
+      "actual_64m_file_limit_and_bounded_terminal_shm": true,
+      "same_uid_control_process_ptrace_denied": true,
+      "installed_systemd_launch_verified": false,
+      "hermes_model_execution_verified": false
+    }
+  },
+  "actual_systemd_receipt_from_immutable_job_log": {
+    "scope": "actual disposable systemd application units; providerless",
+    "source_commit": "7b801edd193f1c4e269f5d5ffcefc07324360a8f",
+    "actual_root_launcher": true,
+    "actual_dynamic_uids_distinct": true,
+    "actual_private_rootfs_and_networks": true,
+    "actual_cgroup_cpu_memory_tasks_limits": true,
+    "actual_window_input_and_capture": true,
+    "foreign_mission_and_clipboard_denied": true,
+    "durable_start_replay_denied": true,
+    "escaped_child_cgroup_cleanup": true,
+    "other_application_survives_cleanup": true,
+    "owner_revoked_application_controls_denied": true,
+    "changed_limits_same_elf_controls_denied": true,
+    "installed_haos_verified": false,
+    "real_hermes_model_verified": false
+  },
+  "test_counts": {
+    "haos": 436,
+    "root_authority": 54,
+    "harness": 82,
+    "actual_restic": 22
+  },
+  "does_not_prove": [
+    "production root application service or GUI queue integration",
+    "installed HAOS application launch",
+    "native application display",
+    "real model execution"
+  ]
+}

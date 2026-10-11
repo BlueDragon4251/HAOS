@@ -222,3 +222,33 @@ ELF/file/UID/lock/update/restart/revocation behavior without executing the fixtu
 The real systemd fixture identified `SIGXFSZ` from foot’s default sparse 512 MiB rendering memfd under the retained 64 MiB file-size limit. The private session supplies `tweak.max-shm-pool-size-mb=32` through its own `XDG_CONFIG_HOME`; no host configuration or resource-limit relaxation is needed. The actual offline Wayland regression now also applies the same kernel file-size limit. See `docs/evidence/2026-10-11/application-shm-regression.json`; the separate root/systemd and installed gates remain necessary.
 
 The Ubuntu `grim` package omits optional JPEG encoding. Capture therefore uses actual PNG output and the distro Pillow codec to produce a checked JPEG. Input, dimensions and output are bounded independently; captures remain ephemeral. The independent root action store records a nonce before execution and preserves uncertainty across restart. It accepts only the matching fresh `gui_actions` dispatch read as the controller UID, never an agent-supplied hash or identity. These components still need the controller/root-service and native presentation gates before general host launch is advertised.
+
+
+## Controller-driven private applications
+
+The existing `haos_gui` tool and WAL queue now also accept `app.start` with an
+owner-registered `program` ID, then `app.state`, `app.focus`, `app.type`, `app.key`,
+`app.capture` and `app.close` with the returned opaque `instance` UUID. No caller
+argv, environment, compositor ID or file/clipboard API is accepted. App text is
+limited to 512 UTF-8 bytes; registered arguments and limits stay owner-controlled.
+
+The unprivileged controller dispatches these operations through the independent
+`haos-applications.socket`/service, without waiting for Herald. Kernel peer UID,
+fresh matching durable GUI dispatch, active mission, full executable/grant hash,
+distinct dynamic UID and the actual control-server PID are independently checked.
+A root nonce is durable before input. Reply loss stays uncertain. Native poll/ack
+cannot consume or forge application actions; native reattachment cannot invalidate
+them. The root monitor stops entire cgroups after cancellation, owner revocation,
+changed grants, controller failure or broker restart. Its private rootfs imports
+only read-only installed code/fonts, bounded temporary files and the application's
+own home; it has a separate network and no host seat, owner files or shared sockets.
+
+The two-application real systemd component gate passed at `7b801ed`, including
+actual terminal results/captures, cgroup limits, escaped-child cleanup, other-app
+survival and revoked/changed grant denial. Original component ZIP and fixed job
+receipt are checked in `evidence/2026-10-11/application-systemd-ci.json`. The new
+persistent-queue/root-client pipeline has a separate actual systemd gate. Production
+broker sandbox, matching installed acceptance and native app presentation still need
+their own receipts. Internet browsing, workspace/volume transfer, pointer control,
+multiple private windows/workspaces and general owner desktop capture remain open.
+No real model execution is claimed without configured provider credentials.

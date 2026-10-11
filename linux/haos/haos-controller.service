@@ -11,7 +11,7 @@ StartLimitBurst=5
 Type=simple
 User=haos-control
 Group=haos-ui
-SupplementaryGroups=haos-gateway
+SupplementaryGroups=haos-gateway haos-control
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=provider-token:/etc/haos/provider-token

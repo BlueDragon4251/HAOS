@@ -1,0 +1,13 @@
+[Unit]
+Description=HAOS independent mission application authority ingress
+
+[Socket]
+ListenStream=/run/haos-applications-control/control.sock
+SocketUser=root
+SocketGroup=haos-control
+SocketMode=0660
+DirectoryMode=0755
+Service=haos-applications.service
+
+[Install]
+WantedBy=sockets.target

@@ -192,6 +192,10 @@ class ApplicationLauncher:
                     raise PermissionError('dynamic application identity already reserved')
         if sum(p['mission'] == mission for p in active) >= 4:
             raise PermissionError('mission application budget exhausted')
+        user='haos-a-'+request.replace('-','')[:24]
+        try:pwd.getpwnam(user)
+        except KeyError:pass
+        else:raise PermissionError('application dynamic identity collides with an existing account')
         # Exclusive, durable admission is never removed after an ambiguous result.
         descriptor = {'version': 1, 'request': request, 'mission': mission, 'application': grant['id'],
                       'sha256': grant['sha256'], 'grant_sha256':grant_digest(grant),
