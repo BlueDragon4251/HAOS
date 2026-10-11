@@ -9,8 +9,22 @@ import { app, BrowserWindow, session } from 'electron'
 
 assert.equal(process.env.HAOS_DISPOSABLE_SCREEN_TEST, '1')
 assert.notEqual(process.getuid(), 0)
-assert.equal(process.env.WAYLAND_DISPLAY, 'haos-disposable-wayland')
 assert.equal(path.basename(path.dirname(process.env.XDG_RUNTIME_DIR || '')).startsWith('haos-wayland-gate-'), true)
+if (process.env.NIRI_SOCKET) {
+  const socket = process.env.NIRI_SOCKET
+  const name = path.basename(socket).match(/^niri\.(wayland-[0-9]+)\.[0-9]+\.sock$/)
+  assert(name, 'only the disposable nested niri socket is allowed')
+  assert.equal(path.dirname(socket), process.env.XDG_RUNTIME_DIR)
+  assert.equal(process.env.WAYLAND_DISPLAY, name[1])
+  assert.equal(fs.lstatSync(socket).isSocket(), true)
+  assert.equal(fs.lstatSync(socket).uid, process.getuid())
+} else assert.equal(process.env.WAYLAND_DISPLAY, 'haos-disposable-wayland')
+const runtimeMetadata = fs.lstatSync(process.env.XDG_RUNTIME_DIR)
+assert.equal(runtimeMetadata.isDirectory(), true)
+assert.equal(runtimeMetadata.uid, process.getuid())
+assert.equal(runtimeMetadata.mode & 0o077, 0)
+assert.equal(fs.realpathSync(process.env.XDG_RUNTIME_DIR), process.env.XDG_RUNTIME_DIR)
+assert.equal(fs.lstatSync(path.join(process.env.XDG_RUNTIME_DIR, process.env.WAYLAND_DISPLAY)).isSocket(), true)
 app.enableSandbox()
 app.on('window-all-closed', () => {})
 let completed = false

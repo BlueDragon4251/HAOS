@@ -75,7 +75,7 @@ def main():
     flags = ["--backend=headless", "--renderer=pixman"] if major >= 14 else ["--backend=headless-backend.so", "--use-pixman"]
     flags += ["--width=1024", "--height=768", "--idle-time=0", "--socket=haos-disposable-wayland", "--no-config",
               "--shell=" + os.environ.get("HAOS_TEST_WESTON_SHELL", "desktop-shell.so")]
-    compositor = client = None
+    compositor = nested = client = None
     identity = source()
     try:
         with (root / "compositor.log").open("wb") as log:
@@ -93,6 +93,30 @@ def main():
             connection.settimeout(2)
             connection.connect(str(display))
         client_env = {**env, "WAYLAND_DISPLAY": display.name, "WAYLAND_DEBUG": "1", "HAOS_DISPOSABLE_SCREEN_TEST": "1"}
+        # Optional real niri integration, nested solely in our private compositor.
+        # No physical seat, installed session or host Wayland socket is used.
+        niri_version = None
+        if os.environ.get("HAOS_TEST_NIRI") == "1":
+            niri_version = subprocess.check_output(["niri", "--version"], env=env, text=True, timeout=5).strip()
+            config = root / "niri.kdl"
+            config.write_text('hotkey-overlay { skip-at-startup; }\nworkspace "haos-one"\nworkspace "haos-two"\nlayout { gaps 0; border { off; }; focus-ring { off; }; }\nbinds {}\n')
+            with (root / "niri.log").open("wb") as log:
+                nested = subprocess.Popen(["niri", "--config", str(config)],
+                    env={**env, "WAYLAND_DISPLAY": display.name, "LIBGL_ALWAYS_SOFTWARE": "1"},
+                    stdout=log, stderr=log, start_new_session=True)
+            deadline = time.monotonic() + 20
+            while True:
+                sockets = list(runtime.glob("niri.*.sock"))
+                displays = [p for p in runtime.glob("wayland-*") if p.is_socket()]
+                if len(sockets) == len(displays) == 1:
+                    client_env.update(WAYLAND_DISPLAY=displays[0].name, NIRI_SOCKET=str(sockets[0]))
+                    break
+                if nested.poll() is not None or time.monotonic() >= deadline:
+                    # Only this credential-free fixed config's startup errors.
+                    errors = (root / "niri.log").read_text(errors="replace")
+                    print("Disposable niri startup: " + errors[-2000:], flush=True)
+                    raise AssertionError("isolated niri failed to start")
+                time.sleep(0.05)
         electron = REPO / "node_modules/electron/dist/electron"
         reports, protocol = {}, {}
         for name, script, prefix, files in (
@@ -104,12 +128,24 @@ def main():
             with log_path.open("wb") as log:
                 client = subprocess.Popen([str(electron), "--ozone-platform=wayland", "--disable-gpu",
                     str(REPO / "apps/desktop/scripts" / script)], cwd=REPO, env=client_env, stdout=log, stderr=log, start_new_session=True)
-            code = client.wait(timeout=75)
+            client_deadline = time.monotonic() + 75
+            shm = os.statvfs('/dev/shm')
+            shm_total = shm.f_blocks * shm.f_frsize
+            shm_free = shm.f_bavail * shm.f_frsize
+            while client.poll() is None:
+                shm = os.statvfs('/dev/shm')
+                shm_free = min(shm_free, shm.f_bavail * shm.f_frsize)
+                if time.monotonic() >= client_deadline:
+                    raise subprocess.TimeoutExpired('disposable GUI gate', 75)
+                time.sleep(0.025)
+            code = client.returncode
             if code != 0:
                 # Only the explicitly disposable probe's own bounded failure label,
                 # never complete protocol logs, profiles, sessions or journal data.
                 output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
                 print(f'Disposable {name} process exit: {code}', flush=True)
+                print(json.dumps({'disposable_shared_memory_total_bytes': shm_total,
+                                  'disposable_shared_memory_lowest_free_bytes': shm_free}), flush=True)
                 print('Disposable compositor exit: ' + str(compositor.poll()), flush=True)
                 server_output = bounded_file(root / 'compositor.log', 8 * 1024 * 1024).decode('utf-8', errors='replace')
                 server_errors = [line for line in server_output.splitlines() if re.search(r'\b(?:error|fatal|invalid|disconnect)\b', line, re.I)]
@@ -134,6 +170,7 @@ def main():
             stop(client)
             client = None
             assert compositor.poll() is None, "compositor exited during GUI work"
+            assert nested is None or nested.poll() is None, "niri exited during GUI work"
             output = bounded_file(log_path, 8 * 1024 * 1024).decode("utf-8", errors="replace")
             receipts = [json.loads(line) for line in output.splitlines() if line.startswith('{"evidence":')]
             assert len(receipts) == 1 and all(receipts[0][key] == value for key, value in identity.items())
@@ -147,6 +184,8 @@ def main():
                 target.write_bytes(payload)
                 target.chmod(0o600)
             reports[name] = {key: receipts[0][key] for key in ("checks", "source_commit")}
+            reports[name]['shared_memory_total_bytes'] = shm_total
+            reports[name]['shared_memory_lowest_free_bytes'] = shm_free
             assert reports[name]["checks"] and all(value is True for value in reports[name]["checks"].values())
             # Chromium/Wayland protocol uses '#' or '@' object IDs across versions.
             title = 'HAOS Theme activation fixture' if name == 'theme' else 'HAOS Mission '
@@ -154,7 +193,8 @@ def main():
             commits = len(re.findall(r'wl_surface[@#]\d+\.commit\(', output))
             assert titles > 0 and commits > 0, "no real mission surface protocol"
             protocol[name] = {"mission_toplevels": titles, "surface_commits": commits}
-        report = {**identity, "weston": version, "compositor_shell": Path(flags[-1].split('=', 1)[1]).name, "actual_virtual_wayland": True,
+        report = {**identity, "weston": version, "niri": niri_version, "actual_virtual_niri": nested is not None,
+                  "compositor_shell": Path(flags[-1].split('=', 1)[1]).name, "actual_virtual_wayland": True,
                   "installed_niri": False, "physical_hardware": False, "real_model_turn": False,
                   "session_is_explicit_fixture": True, "protocol": protocol, "gates": reports}
         (evidence / "virtual-wayland.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -165,6 +205,7 @@ def main():
                 output.write(f"evidence={evidence}\n")
     finally:
         stop(client)
+        stop(nested)
         stop(compositor)
 
 

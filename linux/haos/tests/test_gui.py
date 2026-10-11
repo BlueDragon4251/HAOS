@@ -225,3 +225,36 @@ def test_multiwindow_receipts_are_bounded_unique_and_text_is_utf8_bounded():
     for text in ('x' * 8193, 'é' * 4097):
         with pytest.raises(ValueError):
             receipt('read', {"window": key(), "text": text, "truncated": False})
+
+
+@pytest.mark.parametrize('operation', ['locate', 'center', 'workspace'])
+def test_compositor_actions_use_existing_durable_mission_admission(live, operation):
+    store, gui, mid, epoch = live
+    data = {'operation': operation, 'window': key()}
+    if operation == 'workspace':
+        data['workspace'] = 2
+    admission = submit(gui, mid, data)
+    assert gui.poll(mid, {'epoch': epoch})['request']['action'] == data
+    response = {'window': data['window']}
+    if operation == 'locate':
+        response.update(focused=False, workspace=2, width=800, height=600)
+    gui.acknowledge({'epoch': epoch, 'id': admission['id'], 'ok': True, 'result': response})
+    assert gui.result(mid, {'session': 'runtime-session', 'id': admission['id']})['result'] == response
+    assert submit(gui, mid, data, admission['id'])['state'] == 'succeeded'
+    assert gui.poll(mid, {'epoch': epoch})['request'] is None
+    with pytest.raises(PermissionError):
+        gui.submit(mid, {'session': 'foreign-session', 'id': key(), 'action': data})
+
+
+@pytest.mark.parametrize('number', [0, 9, True, '2', None])
+def test_compositor_workspace_arguments_cannot_select_global_resources(number):
+    with pytest.raises(PermissionError):
+        action({'operation': 'workspace', 'window': key(), 'workspace': number})
+
+
+def test_compositor_receipt_denies_private_titles_and_system_window_identifiers():
+    data = {'window': key(), 'focused': False, 'workspace': 1, 'width': 800, 'height': 600}
+    assert receipt('locate', data) == data
+    for field in ['title', 'pid', 'niri_id', 'socket']:
+        with pytest.raises(ValueError):
+            receipt('locate', data | {field: 'private'})

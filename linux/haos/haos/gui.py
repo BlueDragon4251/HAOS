@@ -13,7 +13,7 @@ import uuid
 
 from .store import Conflict
 
-OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read"}
+OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read", "locate", "center", "workspace"}
 WINDOW_LIMIT = 4
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
@@ -55,6 +55,10 @@ def action(data):
         fields.add("key")
         if data.get("key") not in KEYS:
             raise PermissionError("global shortcuts and clipboard keys are denied")
+    if op == "workspace":
+        fields.add("workspace")
+        if type(data.get("workspace")) is not int or not 1 <= data["workspace"] <= 8:
+            raise PermissionError("mission workspace denied")
     if set(data) != fields:
         raise PermissionError("unexpected GUI capability parameters")
     return dict(data)
@@ -65,6 +69,14 @@ def receipt(op, data):
     if not isinstance(data, dict):
         raise ValueError("invalid GUI receipt")
     fields = {"window", "width", "height"}
+    if op == "locate":
+        if (set(data) != {"window", "width", "height", "focused", "workspace"}
+                or type(data["focused"]) is not bool
+                or data["workspace"] is not None and (type(data["workspace"]) is not int or not 1 <= data["workspace"] <= 255)
+                or any(type(data[k]) is not int or not 1 <= data[k] <= 16384 for k in ("width", "height"))):
+            raise ValueError("invalid mission compositor state")
+        identifier(data["window"])
+        return data
     if op == "read":
         if (set(data) != {"window", "text", "truncated"} or not isinstance(data["text"], str)
                 or len(data["text"].encode()) > 8192 or type(data["truncated"]) is not bool):

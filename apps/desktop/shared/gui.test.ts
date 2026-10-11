@@ -13,7 +13,9 @@ describe('GUI independent native admission boundary', () => {
     { operation: 'scroll', window, x: 30, y: 60, deltaX: 0, deltaY: 553 },
     { operation: 'scroll', window, x: 30, y: 60, deltaX: true, deltaY: 100 },
     { operation: 'scroll', window, x: 30, y: 60, deltaX: 0, deltaY: 0 },
-    { operation: 'read', window, selector: 'owner' }
+    { operation: 'read', window, selector: 'owner' },
+    { operation: 'workspace', window, workspace: 9 }, { operation: 'workspace', window, workspace: true },
+    { operation: 'center', window, id: 12 }, { operation: 'locate', window, pid: 123 }
   ])('denies authority outside the local browser: %j', value => expect(() => validateGuiAction(value)).toThrow())
   it('contains caller markup in an opaque sandbox below the immutable mission banner', () => {
     const html = missionDocument(window, '"></iframe><script>owner()</script>')

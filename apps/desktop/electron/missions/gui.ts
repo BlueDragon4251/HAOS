@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { BrowserWindow, session } from 'electron'
 import { GUI_WINDOW_LIMIT, guiId, missionDocument, validateGuiAction, type GuiRequest, type GuiPoll } from '../../shared/gui.ts'
 import { managedMissions, nativeGuiRequest } from './client.ts'
+import { MissionCompositor } from './niri.ts'
 
 export class MissionBrowser {
   private windows = new Map<string, { mission: string; win: BrowserWindow; documentSession: string }>()
-  constructor(private visible = true) {}
+  constructor(private visible = true, private compositor = new MissionCompositor()) {}
 
   retain(mission: string | null): void {
     for (const [id, entry] of this.windows) {
@@ -32,12 +33,12 @@ export class MissionBrowser {
       isolated.on('will-download', event => event.preventDefault())
       // Only the one broker-generated top document can load. No file/http/WS/extension
       // resources, even when caller HTML adds its own CSP or redirects an iframe.
-      const url = `data:text/html;charset=utf-8,${encodeURIComponent(missionDocument(request.mission, action.html))}`
+      const url = `data:text/html;charset=utf-8,${encodeURIComponent(missionDocument(request.mission, action.html, window))}`
       isolated.webRequest.onBeforeRequest((details, reply) => reply({ cancel: details.url !== url || details.resourceType !== 'mainFrame' }))
       const win = new BrowserWindow({
         width: 800, height: 600, useContentSize: true, show: false, resizable: false, frame: false,
         minimizable: false, maximizable: false, fullscreenable: false, alwaysOnTop: false, focusable: false,
-        title: `HAOS Mission ${request.mission}`, autoHideMenuBar: true,
+        title: `HAOS Mission ${request.mission} Window ${window}`, autoHideMenuBar: true,
         webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false,
           nodeIntegrationInSubFrames: false, webviewTag: false, webSecurity: true, allowRunningInsecureContent: false,
           safeDialogs: true, navigateOnDragDrop: false, devTools: false, spellcheck: false }
@@ -110,7 +111,12 @@ export class MissionBrowser {
     const entry = this.windows.get(action.window)
     if (!entry || entry.mission !== request.mission || entry.win.isDestroyed()) throw new Error('Window capability denied')
     const win = entry.win
+    const title = `HAOS Mission ${request.mission} Window ${action.window}`
+    if (win.getTitle() !== title) throw new Error('Mission window title changed')
     switch (action.operation) {
+      case 'locate': return { window: action.window, ...await this.compositor.locate(title) }
+      case 'center': await this.compositor.center(title); break
+      case 'workspace': await this.compositor.move(title, action.workspace); break
       case 'close': win.destroy(); break
       case 'focus': win.moveTop(); break
       case 'scroll':

@@ -7,6 +7,8 @@ export type GuiAction =
   | { operation: 'scroll'; window: string; x: number; y: number; deltaX: number; deltaY: number }
   | { operation: 'type'; window: string; text: string }
   | { operation: 'key'; window: string; key: string }
+  | { operation: 'locate' | 'center'; window: string }
+  | { operation: 'workspace'; window: string; workspace: number }
 
 export interface GuiRequest { id: string; mission: string; action: GuiAction }
 export interface GuiPoll { mission: string | null; request: GuiRequest | null }
@@ -25,7 +27,7 @@ export function validateGuiAction(value: unknown): GuiAction {
     if (typeof data.html !== 'string' || new TextEncoder().encode(data.html).length > 32768 || !data.html.length) throw new Error('Invalid local document')
     if (/<\s*(?:iframe|frame|frameset|object|embed|applet)\b/i.test(data.html)) throw new Error('Nested application surfaces denied')
   } else if (op !== 'state') {
-    if (!['focus', 'close', 'capture', 'inspect', 'read', 'click', 'scroll', 'type', 'key'].includes(String(op))) throw new Error('GUI capability denied')
+    if (!['focus', 'close', 'capture', 'inspect', 'read', 'click', 'scroll', 'type', 'key', 'locate', 'center', 'workspace'].includes(String(op))) throw new Error('GUI capability denied')
     fields.push('window')
     if (!guiId(data.window)) throw new Error('Invalid window ID')
   }
@@ -45,13 +47,18 @@ export function validateGuiAction(value: unknown): GuiAction {
     fields.push('key')
     if (!GUI_KEYS.has(String(data.key))) throw new Error('Shortcut capability denied')
   }
+  if (op === 'workspace') {
+    fields.push('workspace')
+    if (!Number.isInteger(data.workspace) || Number(data.workspace) < 1 || Number(data.workspace) > 8) throw new Error('Mission workspace denied')
+  }
   if (Object.keys(data).length !== fields.length || fields.some(key => !(key in data))) throw new Error('Unexpected GUI parameters')
   return value as GuiAction
 }
 
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!))
 
-export function missionDocument(mission: string, html: string): string {
+export function missionDocument(mission: string, html: string, window?: string): string {
   if (!guiId(mission)) throw new Error('Invalid mission ID')
-  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-src about:; connect-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>HAOS Mission ${mission}</title><style>html,body{margin:0;width:800px;height:600px;overflow:hidden;background:#122136;color:white;font:14px sans-serif}header{box-sizing:border-box;height:48px;padding:8px;overflow:hidden}iframe{border:0;width:800px;height:552px;background:white}</style></head><body><header>Hermes mission ${mission}<br>Isolated local browser · no owner authority</header><iframe sandbox srcdoc="${escape(html)}"></iframe></body></html>`
+  if (window !== undefined && !guiId(window)) throw new Error('Invalid window ID')
+  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-src about:; connect-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>HAOS Mission ${mission}${window ? ` Window ${window}` : ''}</title><style>html,body{margin:0;width:800px;height:600px;overflow:hidden;background:#122136;color:white;font:14px sans-serif}header{box-sizing:border-box;height:48px;padding:8px;overflow:hidden}iframe{border:0;width:800px;height:552px;background:white}</style></head><body><header>Hermes mission ${mission}<br>Isolated local browser · no owner authority</header><iframe sandbox srcdoc="${escape(html)}"></iframe></body></html>`
 }

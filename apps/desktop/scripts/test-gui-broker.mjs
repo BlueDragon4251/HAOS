@@ -36,6 +36,23 @@ async function main() {
     const window = opened.window
     assert.deepEqual(await execute({ operation: 'state' }), { windows: [opened] })
     const win = BrowserWindow.getAllWindows()[0]
+    const niriChecks = {}
+    if (process.env.NIRI_SOCKET) {
+      const location = await execute({ operation: 'locate', window })
+      assert.equal(location.width, 800); assert.equal(location.height, 600)
+      assert.equal(location.workspace, 1)
+      await execute({ operation: 'center', window })
+      await execute({ operation: 'workspace', window, workspace: 2 })
+      assert.equal((await execute({ operation: 'locate', window })).workspace, 2)
+      await execute({ operation: 'workspace', window, workspace: 1 })
+      assert.equal((await execute({ operation: 'locate', window })).workspace, 1)
+      await assert.rejects(execute({ operation: 'workspace', window, workspace: 9 }))
+      await assert.rejects(execute({ operation: 'center', window: randomUUID() }))
+      niriChecks.actual_niri_pid_title_inventory = true
+      niriChecks.actual_niri_window_center = true
+      niriChecks.actual_niri_workspace_move_verified = true
+      niriChecks.niri_foreign_window_and_workspace_denied = true
+    }
     assert.equal(win.isFocusable(), false)
     const rendererPids = new Set([win.webContents.getOSProcessId(), ...win.webContents.mainFrame.frames.map(frame => frame.osProcessId)])
     assert(rendererPids.size >= 2, 'opaque mission document must use a separate renderer')
@@ -124,7 +141,7 @@ async function main() {
       checks: { typed_actual_fields: true, captured_actual_pixels: true, renderer_sandbox: true, no_caller_scripts: true,
         network_canary_denied: received === 0, chooser_intercepted: choosers > 0, clipboard_shortcut_denied: true,
         mission_and_window_denials: true, closed_window_denied: true, mission_cleanup: true, actual_form_inspection: true, sensitive_fields_masked: true,
-        visible_text_from_actual_layout: true, hidden_and_form_text_excluded: true, actual_scrolling_verified: true, multiple_windows_isolated: true, window_and_scroll_budgets_enforced: true },
+        visible_text_from_actual_layout: true, hidden_and_form_text_excluded: true, actual_scrolling_verified: true, multiple_windows_isolated: true, window_and_scroll_budgets_enforced: true, ...niriChecks },
       capture_sha256: createHash('sha256').update(Buffer.from(typed.jpeg, 'base64')).digest('hex') }
     fs.writeFileSync(path.join(evidence, 'gui-broker.json'), JSON.stringify(report, null, 2), { mode: 0o600, flag: 'wx' })
     fs.writeFileSync(path.join(evidence, 'disposable-form.jpg'), Buffer.from(typed.jpeg, 'base64'), { mode: 0o600, flag: 'wx' })

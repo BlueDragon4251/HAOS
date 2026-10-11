@@ -87,3 +87,34 @@ budgets, GUI owner setup and remote streaming need additional capabilities.
 Credentialed Hermes graphical execution and matching installed Wayland evidence
 remain required. This local browser enables report/form work without exposing the
 host Wayland connection or privileged bridge. No Stable release is approved.
+
+## Targeted niri placement
+
+The same durable GUI action queue now accepts `locate`, `center` and `workspace`.
+Every existing Chromium window has a fixed broker-generated title containing its
+mission and window UUID. The native main process matches exactly one niri window
+with that title **and its own kernel process ID**; a missing/duplicate match,
+foreign PID, stale window, unsafe socket or unsupported compositor fails closed.
+The compositor socket stays in native code, outside agent/renderer namespaces.
+
+`locate` returns only that window's actual dimensions, focus flag and workspace
+index, never other titles or compositor identifiers. `center` specifies its exact
+niri ID. `workspace` selects an existing index 1–8 on that window's current output,
+uses the stable workspace ID with `focus: false`, and rechecks actual placement.
+No focused-window fallback, spawn, global key/pointer injection, portal, clipboard
+or whole-desktop screenshot is exposed. Capture/input retain their renderer scopes.
+
+The optional real niri fixture uses `HAOS_TEST_NIRI=1` with the existing
+`scripts/test-gui-wayland.py`: niri is nested in the fixture's private Weston,
+with two fixed workspaces, software rendering, offline networking and separate
+process groups. Production niri's IPC controls and actual Chromium surfaces,
+workspace moves, inputs/captures, controller restart and theme rollback are tested.
+This remains a disposable component session, not an installed HAOS/model gate.
+
+A Fedora 44 / niri 26.04 / Weston 15 container needs sufficient shared memory.
+Its 64 MiB `/dev/shm` fixture exhausted available pages and Chromium exited with
+SIGTRAP. A bounded 256 MiB fixture passed all 37 checks; its browser high-water
+allocation exceeded 64 MiB. The harness records capacity/minimum free bytes,
+retains original assertions/deadlines and keeps Chromium sandboxing enabled.
+General registered host applications, process isolation/limits, online browsing
+and authenticated remote viewing remain open.
