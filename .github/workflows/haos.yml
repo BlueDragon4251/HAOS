@@ -28,6 +28,38 @@ jobs:
         run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py tests/e2e/test_guest_owner.py tests/e2e/test_evidence_inspection.py tests/e2e/test_image_selection.py
       - name: Verify exact owner-approved application files and persistent revocation
         run: sudo env PYTHONPATH="$PWD/linux/haos" HAOS_DISPOSABLE_APPLICATION_TEST=1 /usr/bin/python3 linux/haos/probes/run_applications.py
+      - name: Real private host application Wayland input and denied peers
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          docker build -f linux/haos/probes/application-session.Containerfile -t haos-application-session-fixture .
+          # Only the disposable supervisor can change UID, traverse the private
+          # mission directory and stop its own children. The actual application
+          # UID has zero capabilities and inherited NoNewPrivileges.
+          docker run --rm --network none --read-only --security-opt no-new-privileges \
+            --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add DAC_OVERRIDE \
+            --pids-limit 64 --memory 1g --cpus 1 \
+            --tmpfs /home/mission:uid=1000,gid=1000,mode=700,size=64m \
+            --tmpfs /tmp:mode=1777,size=64m \
+            -v "$PWD/linux/haos/haos/application_session.py:/usr/lib/haos/haos/application_session.py:ro" \
+            -v "$PWD/linux/haos/probes/run_application_session.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_APPLICATION_TEST=1 -e GITHUB_SHA="$GITHUB_SHA" \
+            haos-application-session-fixture > "$RUNNER_TEMP/haos-application-session.json"
+          cat "$RUNNER_TEMP/haos-application-session.json"
+          docker run --rm --network none --read-only --security-opt no-new-privileges \
+            --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add KILL --cap-add DAC_OVERRIDE --cap-add CHOWN \
+            --pids-limit 64 --memory 1g --cpus 1 --tmpfs /tmp:mode=1777,size=64m \
+            -v "$PWD/linux/haos/haos:/usr/lib/haos/haos:ro" \
+            -v "$PWD/linux/haos/probes/run_application_authority.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_APPLICATION_TEST=1 -e GITHUB_SHA="$GITHUB_SHA" \
+            haos-application-session-fixture > "$RUNNER_TEMP/haos-application-authority.json"
+          cat "$RUNNER_TEMP/haos-application-authority.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: private-application-components-${{ github.sha }}
+          path: ${{ runner.temp }}/haos-application-*.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq

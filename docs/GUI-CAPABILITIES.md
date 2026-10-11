@@ -116,8 +116,8 @@ Its 64 MiB `/dev/shm` fixture exhausted available pages and Chromium exited with
 SIGTRAP. A bounded 256 MiB fixture passed all 37 checks; its browser high-water
 allocation exceeded 64 MiB. The harness records capacity/minimum free bytes,
 retains original assertions/deadlines and keeps Chromium sandboxing enabled.
-General registered host applications, process isolation/limits, online browsing
-and authenticated remote viewing remain open.
+Installed registered host applications, verified systemd process limits, online
+browsing and authenticated remote viewing remain open.
 
 ## Explicit owner application identities
 
@@ -128,6 +128,42 @@ runtime limits. Paths, parent ownership, file modes, set-ID bits, hard/symbolic
 links, content changes, duplicate keys/IDs and policy size are checked. Grants
 serialize under a private nonblocking lock and publish with the existing fsynced
 atomic policy writer. A changed executable after an update requires a new approval.
+
+## Private application execution engine
+
+`application_session.py` adds a real private labwc Wayland session to the existing
+application registry foundation. It runs an approved ELF and fixed owner arguments
+as a separate unprivileged UID. Fixed `wlrctl`, `wtype` and `grim` helpers observe
+actual toplevels, focus one unambiguous private window, enter bounded plain text
+and approved keys, and capture actual JPEG pixels. No host Wayland/DBus socket,
+input device, clipboard, caller command/path/environment, owner session or other
+mission enters this session. Application-owned titles are not durable audit data.
+
+`application_launcher.py` is an independently root-authorized library, with durable
+UUID admission before submission. Its fixed systemd template uses DynamicUser,
+RootDirectory, private network/devices, read-only `/usr`, empty capabilities,
+NoNewPrivileges, bounded tmpfs, CPU/memory/tasks/runtime limits and cgroup-wide
+termination. Mutable mission SQLite is opened in a fork after dropping to the
+controller UID; only allow/deny returns to root. Cancelled, expired, pre-dispatch,
+ambiguous and unsafe ledger identities fail closed. A repeated admitted action
+is inspected rather than re-launched. Admission is not proof of application or
+mission success.
+
+The mandatory services gate runs a real terminal in an offline read-only disposable
+Fedora 44 container with a private headless compositor. It focuses the actual
+window, types a command, verifies the actual file content and changed capture,
+and denies unsupported shortcuts, paths, commands and non-root control peers.
+The application has zero effective capabilities and NoNewPrivileges. A separate
+real root/fork/WAL probe denies cancelled/expired missions and private-path
+substitution. Receipts contain component scope, source identity and checks, never
+private screenshots, application output, profiles or database content.
+
+**Still incomplete:** the root library has no public endpoint yet. The existing
+owner status therefore continues to report launch unavailable. Installed systemd
+execution/cleanup, queued capability proof, independent cancellation/revocation,
+native presentation and credentialed Hermes execution must pass before enabling
+the product path. The disposable container proves the private engine and UID
+ledger boundary; it does not prove the proposed systemd unit or installed HAOS.
 No caller-supplied environment, volume, credential or privilege field is accepted.
 
 ```sh
