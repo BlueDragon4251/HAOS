@@ -104,6 +104,12 @@ def main():
             assert (cgroup/'memory.swap.max').read_text().strip()=='0'
             assert (cgroup/'pids.max').read_text().strip()=='64'
             quota,period=map(int,(cgroup/'cpu.max').read_text().split());assert 0<quota<=period
+            while True:
+                window=execute(request,{'operation':'state'})
+                if window['running'] and window['windows']==1: break
+                assert window['running'] and window['windows']==0 and time.monotonic()<deadline, \
+                    'actual mapped application window: '+json.dumps(window)
+                time.sleep(0.025)
             assert execute(request,{'operation':'state'})['windows']==1
             assert execute(request,{'operation':'focus'})['focused']
             before=execute(request,{'operation':'capture'})
