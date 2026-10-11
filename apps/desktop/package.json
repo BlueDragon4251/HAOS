@@ -24,8 +24,8 @@
     "test:gui-broker": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-broker.mjs",
     "test:gui-integration": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-integration.mjs",
     "test:gui-wayland": "python3 ../../scripts/test-gui-wayland.py",
-    "dist:mac": "npm run build && electron-builder --mac --arm64 -c.npmRebuild=false --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --publish never"
+    "dist:mac": "npm run build && node --import ../../packages/electron-download/register.mjs ../../node_modules/electron-builder/cli.js --mac --arm64 -c.npmRebuild=false --publish never",
+    "dist:linux": "npm run build && node --import ../../packages/electron-download/register.mjs ../../node_modules/electron-builder/cli.js --linux --publish never"
   },
   "dependencies": {
     "@herald-os/client": "*",

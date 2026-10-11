@@ -11,12 +11,12 @@
   was relaxed. Full-session visual health remains open. CI at `041dece`
   passed; exact counts, merge identity, archived component hashes and independent
   image-SBOM reverification are in `evidence/2026-10-11/continuation-receipts.json`.
-  Its dependency audit reports nine affected build packages (one high, eight
-  moderate). Updating only `http-cache-semantics` to 4.3.0 removes the high audit
-  label but the isolated security-zero-TTL/max-stale API probe still accepts the
-  response; that candidate was not committed as a fix. HAOS exposure is not
-  demonstrated. The legacy build downloader's dependency and exposure review
-  remains required; these results do not approve a release.
+  The legacy downloader audit initially reported nine build packages. The new
+  pinned official get-5 compatibility entry point removes that entire chain;
+  current local npm audit reports zero known advisories. Twelve actual transport/
+  deadline/TLS/checksum tests and 795 native tests pass; signed release validation
+  and full ecosystem vulnerability/license review remain open. The earlier cache-
+  only candidate was not treated as remediation or evidence of HAOS exploitation.
 
 HAOS is development, not an accepted production distribution. The master prompt remains the complete target.
 
