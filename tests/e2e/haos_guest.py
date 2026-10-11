@@ -570,9 +570,26 @@ def installed_theme_watchdog_proof(observer, *, first_boot):
     script = r'''
 import json,os,runpy,select,signal,subprocess,sys,time
 assert os.geteuid()!=0
+stage='guard-initialization'
+child_failure=None
+codes={'theme parent did not arm':'child-readiness-deadline',
+       'independent theme watchdog did not become ready':'watchdog-readiness',
+       'theme transaction lock is busy':'transaction-lock',
+       'recover the previous theme transaction before another activation':'prior-transaction',
+       'unsafe theme output directory':'directory-policy',
+       'unsafe theme output file':'file-policy',
+       'unsafe theme transaction lock':'lock-policy',
+       'no matching pending theme activation':'journal-not-pending',
+       'independent watchdog did not restore':'rollback-deadline'}
+def failure(kind,value,traceback):
+    reason=kind.__name__ if kind.__name__ in {'AssertionError','PermissionError','RuntimeError','TimeoutError','OSError','ValueError','FileNotFoundError'} else 'OtherError'
+    detail=child_failure or {'stage':stage,'reason':reason,'code':codes.get(str(value),'condition-failed')}
+    print('HAOS_THEME_DIAGNOSTIC='+json.dumps(detail),flush=True)
+sys.excepthook=failure
 watchdog,engine=sys.argv[1:3]
 guard=runpy.run_path(watchdog)['ThemeGuard']()
 if sys.argv[3]=='reboot':
+    stage='reboot-journal'
     state=guard.load()
     assert state and state['status']=='rolled_back'
     assert guard.recover() is False
@@ -582,9 +599,23 @@ before={target:guard.read(target) for target in guard.targets.values()}
 prefs=guard.preferences()
 child_code=r"""
 import json,os,runpy,sys
+stage='child-initialization'
+def failure(kind,value,traceback):
+    codes={'independent theme watchdog did not become ready':'watchdog-readiness',
+           'theme transaction lock is busy':'transaction-lock',
+           'recover the previous theme transaction before another activation':'prior-transaction',
+           'unsafe theme output directory':'directory-policy',
+           'unsafe theme output file':'file-policy',
+           'unsafe theme transaction lock':'lock-policy',
+           'no matching pending theme activation':'journal-not-pending'}
+    reason=kind.__name__ if kind.__name__ in {'AssertionError','PermissionError','RuntimeError','TimeoutError','OSError','ValueError','FileNotFoundError'} else 'OtherError'
+    print('HAOS_THEME_DIAGNOSTIC='+json.dumps({'stage':stage,'reason':reason,'code':codes.get(str(value),'condition-failed')}),flush=True)
+sys.excepthook=failure
 g=runpy.run_path(sys.argv[1])['ThemeGuard']()
 outputs={target:'intentionally invalid disposable theme '+key for key,target in g.targets.items()}
+stage='child-arming'
 token=g.begin('haos-test-damage','b'*64,os.getpid(),outputs)
+stage='child-writing'
 with g.lock():
     assert not g.expired(g.pending(token))
     for target in list(outputs)[:3]:g.write(target,outputs[target].encode())
@@ -596,19 +627,31 @@ env={key:os.environ[key] for key in ('HOME','HERMES_HOME','PATH','LANG')}
 child=subprocess.Popen([sys.executable,'-I','-c',child_code,watchdog],env=env,
     stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
 try:
+    stage='child-readiness'
     assert select.select([child.stdout],[],[],20)[0],'theme parent did not arm'
     token=child.stdout.readline().strip()
+    if token.startswith('HAOS_THEME_DIAGNOSTIC='):
+        child_failure=json.loads(token.split('=',1)[1])
+        raise RuntimeError('theme child failed before arming')
+    stage='journal-identity'
     state=guard.load()
     assert state and state['token']==token and state['status']=='pending'
+    stage='watcher-identity'
     assert state['watcher'] not in (0,child.pid,os.getpid())
+    stage='damage-count'
     assert sum(guard.read(target)!=original for target,original in before.items())==3
+    stage='parent-sigkill'
     child.send_signal(signal.SIGKILL)
     assert child.wait(timeout=10)==-signal.SIGKILL
     deadline=time.monotonic()+20
+    stage='rollback-wait'
     while guard.load()['status']=='pending' and time.monotonic()<deadline:time.sleep(.1)
     assert guard.load()['status']=='rolled_back','independent watchdog did not restore'
+    stage='output-restoration'
     assert all(guard.read(target)==original for target,original in before.items())
+    stage='preference-restoration'
     assert guard.preferences()==prefs
+    stage='recovery-cli'
     restarted=subprocess.run([sys.executable,'-I',engine,'recover'],env=env,
         capture_output=True,text=True,timeout=10)
     assert restarted.returncode==0 and guard.load()['status']=='rolled_back'
@@ -617,18 +660,52 @@ try:
 finally:
     if child.poll() is None:child.kill();child.wait(timeout=10)
     state=guard.load()
-    if state and state['status']=='pending':guard.recover(state['token'])
+    if (state and state['status']=='pending' and state['parent']==child.pid
+            and state['name']=='haos-test-damage' and state['revision']=='b'*64):
+        guard.recover(state['token'])
 '''
-    response = run("runuser", "-u", observer.pw_name, "--", "env",
-                   f"HOME={observer.pw_dir}", f"HERMES_HOME={observer.pw_dir}/.hermes",
-                   "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "/usr/bin/python3", "-I", "-c", script,
-                   "/usr/bin/herald-os-theme-watchdog", "/usr/bin/herald-os-theme",
-                   "first" if first_boot else "reboot", capture_output=True, timeout=70)
+    try:
+        response = run("runuser", "-u", observer.pw_name, "--", "env",
+                       f"HOME={observer.pw_dir}", f"HERMES_HOME={observer.pw_dir}/.hermes",
+                       "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "/usr/bin/python3", "-I", "-c", script,
+                       "/usr/bin/herald-os-theme-watchdog", "/usr/bin/herald-os-theme",
+                       "first" if first_boot else "reboot", capture_output=True, timeout=70)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        detail = theme_failure_report(error.stdout)
+        print("HAOS_THEME_DIAGNOSTIC=" + json.dumps(detail), flush=True)
+        # Never publish captured stderr, command args, file contents or tokens.
+        raise RuntimeError("installed theme fixture failed at " + detail["stage"] + ": " + detail["code"]) from None
     proof = json.loads(response.stdout)
     expected = {"installed_theme_watchdog_parent_sigkill", "installed_theme_fixed_outputs_restored",
                 "installed_theme_recovery_cli_restart"} if first_boot else {"installed_theme_watchdog_journal_survives_reboot"}
     assert set(proof) == expected and all(value is True for value in proof.values())
     return proof
+
+
+def theme_failure_report(output):
+    """Publish only a fixed assertion phase/error code, never observer output."""
+    fallback = {"stage": "unreported", "reason": "OtherError", "code": "child-failed"}
+    if not isinstance(output, str) or len(output.encode()) > 32768:
+        return fallback
+    stages = {"guard-initialization", "reboot-journal", "child-initialization", "child-arming", "child-writing",
+              "child-readiness", "journal-identity", "watcher-identity", "damage-count", "parent-sigkill",
+              "rollback-wait", "output-restoration", "preference-restoration", "recovery-cli"}
+    reasons = {"AssertionError", "PermissionError", "RuntimeError", "TimeoutError", "OSError", "ValueError", "FileNotFoundError", "OtherError"}
+    codes = {"child-readiness-deadline", "watchdog-readiness", "transaction-lock", "prior-transaction",
+             "directory-policy", "file-policy", "lock-policy", "journal-not-pending", "rollback-deadline", "condition-failed"}
+    for line in reversed(output.splitlines()):
+        if not line.startswith("HAOS_THEME_DIAGNOSTIC="):
+            continue
+        try:
+            detail = json.loads(line.split("=", 1)[1])
+            if (isinstance(detail, dict) and set(detail) == {"stage", "reason", "code"}
+                    and isinstance(detail["stage"], str) and detail["stage"] in stages
+                    and isinstance(detail["reason"], str) and detail["reason"] in reasons
+                    and isinstance(detail["code"], str) and detail["code"] in codes):
+                return detail
+        except (ValueError, TypeError, RecursionError):
+            pass
+    return fallback
 
 
 if __name__ == "__main__":

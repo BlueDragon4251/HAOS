@@ -129,6 +129,35 @@ def test_actual_installed_guest_theme_program_before_and_after_restart(guard):
         assert set(proof) == expected and all(value is True for value in proof.values())
 
 
+@pytest.mark.parametrize('cause', ['unsafe-file', 'existing-transaction'])
+def test_actual_guest_theme_failure_reports_fixed_phase_and_preserves_other_transaction(guard, cause):
+    tree=ast.parse((ROOT/'tests/e2e/haos_guest.py').read_text())
+    function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='installed_theme_watchdog_proof')
+    script=next(ast.literal_eval(n.value) for n in function.body if isinstance(n,ast.Assign)
+                and any(isinstance(t,ast.Name) and t.id=='script' for t in n.targets))
+    prior=None
+    if cause=='existing-transaction':
+        activate(guard)
+        prior=guard.load()
+    else:
+        guard.targets['niri'].chmod(0o666)
+    env={'PATH':'/usr/bin:/bin','HOME':str(guard.home),'HERMES_HOME':str(guard.hermes),'LANG':'C.UTF-8'}
+    try:
+        result=subprocess.run([sys.executable,'-I','-c',script,str(WATCHDOG),str(ENGINE),'first'],
+                              env=env,capture_output=True,text=True,timeout=70)
+        assert result.returncode!=0 and result.stdout.startswith('HAOS_THEME_DIAGNOSTIC=')
+        detail=json.loads(result.stdout.split('=',1)[1])
+        assert detail['reason']=='PermissionError'
+        assert detail['code']==('prior-transaction' if prior else 'file-policy')
+        assert detail['stage']==('child-arming' if prior else 'guard-initialization')
+        assert 'not-in-theme-journal' not in result.stdout+result.stderr
+        if prior:
+            assert guard.load()['token']==prior['token'] and guard.load()['status']=='pending'
+            assert all(target.read_text()=='candidate '+key for key,target in guard.targets.items())
+    finally:
+        if cause=='unsafe-file':guard.targets['niri'].chmod(0o600)
+
+
 @pytest.mark.parametrize("cause", ["deadline", "different-boot", "different-parent-start"])
 def test_actual_independent_watcher_recovers_expiry_and_identity_change(guard, cause):
     activate(guard)

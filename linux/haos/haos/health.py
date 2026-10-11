@@ -9,7 +9,10 @@ import time
 UNITS = ("haos-hermes.service", "haos-controller.service", "haos-policy.service",
          "haos-network.service", "haos-owner-ready.service", "haos-recovery.service",
          "haos-gateway.service", "haos-provider.service", "greetd.service")
-DISKS = {"system": Path("/"), "workspace": Path("/var/lib/haos-workspace"), "missions": Path("/var/lib/haos-control")}
+# bootc's immutable root overlay reports zero free space even when its backing
+# btrfs has ample capacity. Admission needs the writable system state reserve,
+# not spare space in a read-only image. Workspace/ledger checks remain separate.
+DISKS = {"system": Path("/var"), "workspace": Path("/var/lib/haos-workspace"), "missions": Path("/var/lib/haos-control")}
 RESERVE_BYTES = 256 * 1024 * 1024
 RESERVE_MEMORY = 64 * 1024 * 1024
 

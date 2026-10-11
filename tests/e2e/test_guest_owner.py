@@ -34,6 +34,27 @@ def test_installed_theme_program_uses_fixed_unprivileged_observer_launch(monkeyp
     assert set(proof) == flags
 
 
+@pytest.mark.parametrize('output', ['private-chat-and-token', 'HAOS_THEME_DIAGNOSTIC={"stage":"private-token"}',
+                                  'HAOS_THEME_DIAGNOSTIC=' + '[' * 2000, 'x' * 32769, None])
+def test_unknown_theme_failure_never_publishes_captured_output(output):
+    assert guest.theme_failure_report(output) == {'stage':'unreported','reason':'OtherError','code':'child-failed'}
+
+
+def test_theme_subprocess_failure_keeps_known_phase_and_hides_args_stdout_stderr(monkeypatch, capsys):
+    import json
+    detail={'stage':'child-arming','reason':'RuntimeError','code':'watchdog-readiness'}
+    monkeypatch.setattr(guest,'require_disposable_guest',lambda: None)
+    def failed(args,**kwargs):
+        raise subprocess.CalledProcessError(1,['private-command-token'],
+              output='private-stdout\nHAOS_THEME_DIAGNOSTIC='+json.dumps(detail)+'\n',stderr='private-stderr')
+    monkeypatch.setattr(guest.subprocess,'run',failed)
+    with pytest.raises(RuntimeError,match='child-arming: watchdog-readiness'):
+        guest.installed_theme_watchdog_proof(SimpleNamespace(pw_name='hermes',pw_dir='/var/home/hermes'),first_boot=True)
+    text=capsys.readouterr().out
+    assert json.loads(text.split('=',1)[1])==detail
+    assert 'private-' not in text
+
+
 def test_progress_contains_only_fixed_phase_and_elapsed_time(monkeypatch, capsys):
     monkeypatch.setenv("HAOS_PRIVATE_FIXTURE", "never-log-this-credential")
     monkeypatch.setattr(guest.time, "monotonic", lambda: guest.PROBE_STARTED + 123.456)

@@ -47,6 +47,23 @@ def test_unknown_storage_blocks_new_dispatch_without_leaking_exception_text(monk
     assert "sensitive" not in str(snapshot)
 
 
+@pytest.mark.parametrize('free,allowed', [(32648683520, True), (RESERVE_BYTES - 1, False)])
+def test_bootc_immutable_root_does_not_replace_writable_system_reserve(monkeypatch, free, allowed):
+    measured = []
+    def capacity(path):
+        measured.append(path)
+        if path == Path('/'):
+            return SimpleNamespace(total=20840448, free=0)
+        return SimpleNamespace(total=40170946560, free=free)
+    monkeypatch.setattr(health.shutil, 'disk_usage', capacity)
+    snapshot = HealthSampler().sample()
+    assert Path('/') not in measured and Path('/var') in measured
+    assert snapshot['disks']['system']['free'] == free
+    assert snapshot['can_dispatch'] is allowed
+    if not allowed:
+        assert 'disk-reserve:system' in snapshot['alerts']
+
+
 def test_service_probe_is_read_only_fixed_and_hides_unavailable_counters(monkeypatch, tmp_path):
     monkeypatch.setattr(health, "DISKS", {"fixture": tmp_path})
     def show(args, **kwargs):

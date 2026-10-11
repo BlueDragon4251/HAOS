@@ -20,6 +20,12 @@ in required storage/memory measurements also prevent dispatch; UI health failure
 never select an alternate execution path. CPU/service measurement errors are
 reported without inventing values. A service failure is visible as degraded health.
 
+The system reserve measures writable `/var`, with separate workspace and mission
+ledger checks. A bootc image's immutable `/` overlay can report zero free bytes
+while its writable backing filesystem has ample capacity; that image counter is
+not the writable system budget. Missing measurements and low writable capacity
+still deny admission at the same thresholds.
+
 Already running/uncertain jobs retain their existing deadline, interruption and
 reconciliation rules. The sampler never blindly retries external actions or kills
 an action while reporting its outcome as successful. Logs contain only changed
