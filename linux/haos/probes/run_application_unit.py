@@ -72,7 +72,8 @@ def main():
             # isolation/resource properties or production logging defaults.
             diagnostic=dict(approval,id='fixture-error-diagnostic',executable='/usr/bin/bash',
                 sha256=executable_digest('/usr/bin/bash'),argv=['--noprofile','--norc','-c',
-                    'exec '+shlex.join(['/usr/bin/foot',*approval['argv']])+' 2>/home/mission/fixture-foot-errors'])
+                    shlex.join(['/usr/bin/foot',*approval['argv']])+
+                    ' 2>/home/mission/fixture-foot-errors; printf "\\nFOOT_EXIT=%s\\n" "$?" >> /home/mission/fixture-foot-errors; /usr/bin/sleep 2'])
             registry.register(diagnostic)
             request=str(uuid.uuid4());requests.append(request)
             launcher.start(diagnostic['id'],mission,request,ledger=ledger,ledger_uid=account.pw_uid)
@@ -141,7 +142,8 @@ def main():
                 window=execute(request,{'operation':'state'})
                 if window['running'] and window['windows']==1: break
                 if not window['running']:
-                    raise AssertionError('actual application exited before mapping: '+json.dumps(application_failure_diagnostics()))
+                    raise AssertionError('actual application exited before mapping: '+json.dumps({
+                        'application':window,'diagnostics':application_failure_diagnostics()}))
                 assert window['running'] and window['windows']==0 and time.monotonic()<deadline, \
                     'actual mapped application window: '+json.dumps(window)
                 time.sleep(0.025)
