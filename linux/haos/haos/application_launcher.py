@@ -4,16 +4,18 @@ The registered ELF is run as a distinct dynamic UID in a private rootfs/network
 with a bounded cgroup. Admission is durable before systemd receives the start.
 An ambiguous start is inspected or stopped, never dispatched again.
 """
-import base64
 import json
+import hashlib
 import os
 from pathlib import Path
 import pwd
 import re
 import select
 import signal
+import socket
 import sqlite3
 import stat
+import struct
 import subprocess
 import time
 import uuid
@@ -21,8 +23,13 @@ import uuid
 from .applications import ApplicationRegistry, unique_object
 from .enrollment import protected_directory
 from .policy import atomic_json
+from .application_session import session_action
 
 SOURCE = Path('/usr/lib/haos/haos/application_session.py')
+
+
+def grant_digest(grant):
+    return hashlib.sha256(json.dumps(grant,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
 def canonical_id(value):
@@ -37,7 +44,6 @@ def launch_command(application, mission, request, root, source=SOURCE):
     from .applications import validate_application
     application = validate_application(application)
     unit = 'haos-app-' + request.replace('-', '')
-    descriptor = base64.b64encode(json.dumps({'executable': application['executable'], 'argv': application['argv']}).encode()).decode()
     properties = {
         'Type': 'exec', 'DynamicUser': 'yes', 'User': 'haos-a-' + request.replace('-', '')[:24],
         'RootDirectory': str(root), 'BindReadOnlyPaths': f'/usr:/usr /etc/fonts:/etc/fonts {source}:/session.py',
@@ -49,16 +55,17 @@ def launch_command(application, mission, request, root, source=SOURCE):
         'ProtectProc': 'invisible', 'ProcSubset': 'pid', 'RestrictSUIDSGID': 'yes',
         'RestrictAddressFamilies': 'AF_UNIX', 'RestrictNamespaces': 'yes', 'LockPersonality': 'yes',
         'RuntimeDirectory': unit, 'RuntimeDirectoryMode': '0700',
+        'LoadCredential': 'launch:' + str(root / 'launch.json'),
         'BindPaths': f'/run/{unit}:/home/mission', 'WorkingDirectory': '/home/mission',
         'MemoryMax': str(application['memory_mib']) + 'M', 'MemorySwapMax': '0',
         'TasksMax': '64', 'CPUQuota': '100%', 'RuntimeMaxSec': str(application['runtime_seconds']),
         'KillMode': 'control-group', 'ExitType': 'cgroup', 'Delegate': 'no', 'TimeoutStopSec': '5', 'Restart': 'no',
         'UMask': '0077', 'LimitNOFILE': '128', 'LimitFSIZE': '64M',
-        'StandardOutput': 'null', 'StandardError': 'null',
+        'StandardOutput': 'journal', 'StandardError': 'null',
     }
     command = ['/usr/bin/systemd-run', '--quiet', '--no-block', '--unit=' + unit]
     command += ['--property=' + key + '=' + value for key, value in properties.items()]
-    command += ['/usr/bin/python3', '-I', '/session.py', descriptor]
+    command += ['/usr/bin/python3', '-I', '/session.py']
     return command
 
 
@@ -175,7 +182,8 @@ class ApplicationLauncher:
             raise PermissionError('mission application budget exhausted')
         # Exclusive, durable admission is never removed after an ambiguous result.
         descriptor = {'version': 1, 'request': request, 'mission': mission, 'application': grant['id'],
-                      'sha256': grant['sha256'], 'unit': 'haos-app-' + request.replace('-', ''), 'state': 'admitted'}
+                      'sha256': grant['sha256'], 'grant_sha256':grant_digest(grant),
+                      'unit': 'haos-app-' + request.replace('-', ''), 'state': 'admitted'}
         fd = os.open(receipt, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
             os.write(fd, (json.dumps(descriptor) + '\n').encode()); os.fsync(fd)
@@ -194,6 +202,9 @@ class ApplicationLauncher:
         for name in ('bin','sbin','lib','lib64'):
             (root / name).symlink_to('usr/' + name)
         (root / 'session.py').touch(mode=0o444)
+        # Do not put fixed owner arguments (which may contain private URLs or
+        # paths) in world-readable transient-unit metadata or the process argv.
+        atomic_json(root / 'launch.json',{'executable':grant['executable'],'argv':grant['argv']})
         # Revalidate the policy immediately before submitting a fixed unit. The
         # immutable /usr bind pins the running image's executable/library view.
         if self.registry.resolve(application) != grant:
@@ -220,12 +231,12 @@ class ApplicationLauncher:
         finally:
             if fd >= 0: os.close(fd)
         if (not isinstance(record, dict)
-                or set(record) != {'version','request','mission','application','sha256','unit','state'}
+                or set(record) != {'version','request','mission','application','sha256','grant_sha256','unit','state'}
                 or record['request'] != request or record['unit'] != 'haos-app-' + request.replace('-', '')
                 or type(record['version']) is not int or record['version'] != 1
                 or record['state'] not in {'admitted','submitted','stopped'}
                 or not isinstance(record['application'],str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,47}',record['application'])
-                or not isinstance(record['sha256'],str) or not re.fullmatch(r'[a-f0-9]{64}',record['sha256'])):
+                or any(not isinstance(record[k],str) or not re.fullmatch(r'[a-f0-9]{64}',record[k]) for k in ('sha256','grant_sha256'))):
             raise PermissionError('application record identity mismatch')
         canonical_id(record['mission'])
         return record
@@ -244,4 +255,64 @@ class ApplicationLauncher:
             raise RuntimeError('application cgroup termination is not confirmed')
         record['state'] = 'stopped'
         atomic_json(self.state / (request + '.json'), record)
+        (self.runtime / request / 'launch.json').unlink(missing_ok=True)
         return {'request':request,'state':'stopped'}
+
+    def unit_state(self, request):
+        record=self.record(request)
+        process=subprocess.run(['/usr/bin/systemctl','show',record['unit']+'.service',
+            '--property=ActiveState','--property=MainPID','--property=ControlGroup','--property=ExecMainStatus'],
+            capture_output=True,text=True,check=True,timeout=3,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
+        if len(process.stdout.encode())>8192:
+            raise PermissionError('invalid application unit response')
+        properties=dict(line.split('=',1) for line in process.stdout.splitlines() if '=' in line)
+        if (set(properties)!={'ActiveState','MainPID','ControlGroup','ExecMainStatus'}
+                or not properties['MainPID'].isdecimal() or not properties['ExecMainStatus'].isdecimal()
+                or properties['ActiveState'] not in {'active','activating','inactive','failed','deactivating'}):
+            raise PermissionError('invalid application unit identity')
+        return properties
+
+    def execute(self, request, mission, action, *, ledger=Path('/var/lib/haos-control/missions.db'), ledger_uid):
+        if os.geteuid()!=0:
+            raise PermissionError('application controls require the independent authority')
+        action=session_action(action)
+        record=self.record(request)
+        if record['mission']!=canonical_id(mission) or record['state']!='submitted':
+            raise PermissionError('application belongs to another mission or is not running')
+        running_mission(Path(ledger),mission,ledger_uid)
+        if grant_digest(self.registry.resolve(record['application']))!=record['grant_sha256']:
+            raise PermissionError('application authority changed')
+        unit=self.unit_state(request)
+        pid=int(unit['MainPID'])
+        if unit['ActiveState']!='active' or pid<=1:
+            raise RuntimeError('application unit is not ready or has stopped')
+        status=dict(line.split(':',1) for line in Path(f'/proc/{pid}/status').read_text().splitlines() if ':' in line)
+        identities=[int(value) for value in status['Uid'].split()]
+        if len(identities)!=4 or len(set(identities))!=1 or not 61184<=identities[0]<=65519:
+            raise PermissionError('a separate systemd dynamic application identity is required')
+        path=Path('/run')/record['unit']/'control.sock'
+        info=path.lstat();parent=path.parent.lstat()
+        if (not stat.S_ISSOCK(info.st_mode) or info.st_uid!=identities[0] or stat.S_IMODE(info.st_mode)!=0o600
+                or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=identities[0]
+                or stat.S_IMODE(parent.st_mode)!=0o700 or path.resolve()!=path):
+            raise PermissionError('untrusted application control socket')
+        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
+            peer.settimeout(4);peer.connect(str(path))
+            actual_pid,actual_uid,_=struct.unpack('3i',peer.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+            if actual_pid!=pid or actual_uid!=identities[0]:
+                raise PermissionError('application server kernel identity changed')
+            running_mission(Path(ledger),mission,ledger_uid)
+            if grant_digest(self.registry.resolve(record['application']))!=record['grant_sha256']:
+                raise PermissionError('application authority changed before input')
+            peer.sendall(json.dumps(action).encode()+b'\n');data=bytearray()
+            while b'\n' not in data:
+                block=peer.recv(65536)
+                if not block or len(data)+len(block)>1500000:
+                    raise ValueError('invalid application control response')
+                data.extend(block)
+        frame,rest=data.split(b'\n',1)
+        if rest: raise ValueError('multiple application responses denied')
+        result=json.loads(frame,object_pairs_hook=unique_object)
+        if not isinstance(result,dict) or set(result)!={'result'}:
+            raise PermissionError('application action denied or unavailable')
+        return result['result']

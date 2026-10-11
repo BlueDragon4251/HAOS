@@ -164,6 +164,41 @@ execution/cleanup, queued capability proof, independent cancellation/revocation,
 native presentation and credentialed Hermes execution must pass before enabling
 the product path. The disposable container proves the private engine and UID
 ledger boundary; it does not prove the proposed systemd unit or installed HAOS.
+
+The root launch library now verifies the running unit's actual dynamic UID and
+kernel socket server PID before sending bounded private-session controls. A
+replaced pathname cannot impersonate that control process. The session disables
+dumpability independently of inherited NoNewPrivileges, preventing same-UID
+applications from injecting its control process. Text is limited to 512 UTF-8
+bytes per action to fit wtype's real per-key roundtrips within the existing
+three-second helper deadline; the original Chromium tool retains its 4096-byte
+limit. Multiple private windows deny implicit focus rather than choosing a dialog.
+
+`run_application_unit.py` is a separate mandatory disposable systemd gate for
+two real dynamic-UID terminal sessions, live input/capture, actual kernel cgroup
+limits and cleanup of a `setsid` descendant. It requires a marked GitHub runner
+with systemd PID 1 and never runs against the cloud host or a production policy.
+An added gate is **not** evidence that it passed: its exact CI result must be
+checked before claiming systemd execution or cleanup. Installed HAOS, queued
+authorization, native presentation and independent revocation remain required.
+
+Actual systemd launches deliver the fixed owner descriptor with LoadCredential,
+not a base64 payload in world-readable unit metadata. Known credential patterns
+and credential flags are rejected by the application registry; argv is never a
+supported credential provisioner. Unknown secrets and all process/remote privacy
+remain separate open requirements. Private launch descriptors are removed after
+confirmed termination; bounded identity receipts remain for replay protection.
+
+The headless seat keeps a fixed idle virtual keyboard and verifies its actual
+Wayland keyboard capability before starting the app. This prevents first-key
+loss while clients bind `wl_keyboard`; it sends no prepared input. The control
+receipt binds the complete approved manifest, including argv, class and limits,
+so re-registering the same ELF with changed rights invalidates old controls.
+
+The trusted session journals only fixed startup phases/error classes. Child
+applications, compositors and input/capture helpers have disconnected stdout and
+stderr. The disposable unit test reads only these validated codes on a startup
+failure, preserving diagnosis without copying command arguments, content or keys.
 No caller-supplied environment, volume, credential or privilege field is accepted.
 
 ```sh

@@ -102,6 +102,12 @@ assert reply==b''
 '''
         subprocess.run(['/usr/bin/python3','-I','-c',peer_probe,str(control)],preexec_fn=identity,
                        env={'PATH':'/usr/bin:/bin'},check=True,timeout=5)
+        ptrace_probe='''import ctypes,errno,sys
+libc=ctypes.CDLL(None,use_errno=True)
+assert libc.ptrace(16,int(sys.argv[1]),None,None)==-1 and ctypes.get_errno()==errno.EPERM
+'''
+        subprocess.run(['/usr/bin/python3','-I','-c',ptrace_probe,str(worker.pid)],preexec_fn=identity,
+                       env={'PATH':'/usr/bin:/bin'},check=True,timeout=5)
         print(json.dumps({'schema':1,'scope':'disposable private application session component',
             'source_commit':os.environ.get('GITHUB_SHA'),
             'source_sha256':hashlib.sha256(session_source.read_bytes()).hexdigest(),
@@ -111,6 +117,7 @@ assert reply==b''
             'clipboard_and_global_modifiers_denied':True,'paths_and_shell_controls_denied':True,
             'unprivileged_app_control_peer_denied':True,'root_broker_peer_pid_verified':True,
             'application_effective_capabilities_zero':True,'application_no_new_privileges':True,
+            'same_uid_control_process_ptrace_denied':True,
             'installed_systemd_launch_verified':False,'hermes_model_execution_verified':False}),flush=True)
     finally:
         try:

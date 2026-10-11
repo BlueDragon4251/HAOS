@@ -14,6 +14,7 @@ import stat
 
 from .enrollment import protected_directory
 from .policy import atomic_json
+from .redaction import Redactor
 
 POLICY = Path('/etc/haos/applications.json')
 CLASSES = {'browser', 'editor', 'terminal', 'utility'}
@@ -37,6 +38,13 @@ def validate_application(value):
             or any(not isinstance(a, str) or len(a.encode()) > 1024 or any(ord(c) < 32 or ord(c) == 127 for c in a) for a in arguments)
             or sum(len(a.encode()) for a in arguments) > 8192):
         raise ValueError('application arguments must be bounded fixed strings')
+    # Application argv is visible to the application and may be visible through
+    # host process metadata. Never use this registry as a credential setup flow.
+    redactor=Redactor()
+    if any(redactor.text(a)!=a or re.search(
+            r'(?:^|[-_])(?:password|passwd|secret|token|api[-_]?key|authorization|cookie|credential)(?:$|[=:_-])',
+            a,re.I) for a in arguments):
+        raise PermissionError('credentials require a separate application setup flow, never argv')
     if (type(value['memory_mib']) is not int or not 128 <= value['memory_mib'] <= 4096
             or type(value['runtime_seconds']) is not int or not 1 <= value['runtime_seconds'] <= 3600):
         raise ValueError('bounded application memory and runtime required')

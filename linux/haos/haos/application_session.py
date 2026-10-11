@@ -5,9 +5,11 @@ The control socket accepts kernel-authenticated root broker peers, never an app.
 No host Wayland, clipboard, environment, credential or input device is imported.
 """
 import base64
+import ctypes
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import selectors
 import signal
@@ -22,6 +24,37 @@ KEYS = {'Tab': 'Tab', 'Enter': 'Return', 'Backspace': 'BackSpace', 'Delete': 'De
         'ArrowUp': 'Up', 'ArrowDown': 'Down', 'ArrowLeft': 'Left', 'ArrowRight': 'Right',
         'Home': 'Home', 'End': 'End', 'Escape': 'Escape'}
 FRAME_LIMIT = 8192
+
+
+def diagnostic(stage, error=None):
+    if stage not in {'credential','hardening','identity','compositor','keyboard','application','control','failed'}:
+        raise ValueError('invalid private session diagnostic')
+    value={'event':'application.session','stage':stage}
+    if error is not None:
+        known={'ValueError','KeyError','PermissionError','RuntimeError','TimeoutError','OSError',
+               'JSONDecodeError','FileNotFoundError','TypeError'}
+        value['error']=error if error in known else 'unexpected-error'
+    # Only these fixed lifecycle codes reach the journal. Every application and
+    # compositor/helper child's stdout/stderr is separately disconnected.
+    print(json.dumps(value),flush=True)
+
+
+def session_action(action):
+    if not isinstance(action, dict):
+        raise ValueError('application action must be an object')
+    op=action.get('operation')
+    fields={'operation'} | ({'text'} if op=='type' else {'key'} if op=='key' else set())
+    if set(action)!=fields or op not in {'state','focus','type','key','capture'}:
+        raise PermissionError('application capability denied')
+    if op=='type' and (not isinstance(action['text'],str) or not 1<=len(action['text'].encode())<=512
+                      or any(ord(c)<32 or ord(c)==127 for c in action['text'])):
+        # wtype has a real per-key protocol roundtrip/delay. Bound each action
+        # to the existing three-second helper deadline, rather than admitting
+        # 4096 characters that inevitably produce partial input on that budget.
+        raise ValueError('bounded plain application text required')
+    if op=='key' and action['key'] not in KEYS:
+        raise PermissionError('application shortcut denied')
+    return dict(action)
 
 
 def root_program(path):
@@ -53,15 +86,17 @@ class ApplicationSession:
                 or any(not isinstance(v, str) or len(v.encode()) > 1024 or any(ord(c) < 32 for c in v) for v in arguments)):
             raise ValueError('bounded owner arguments required')
         self.arguments = list(arguments)
-        self.labwc, self.wtype, self.wlrctl, self.grim = [root_program('/usr/bin/' + name) for name in ('labwc','wtype','wlrctl','grim')]
+        self.labwc, self.wtype, self.wlrctl, self.grim, self.wayland_info = [root_program('/usr/bin/' + name)
+            for name in ('labwc','wtype','wlrctl','grim','wayland-info')]
         self.runtime = self.home / 'runtime'
         self.runtime.mkdir(mode=0o700)
         self.env = {'HOME': str(self.home), 'XDG_RUNTIME_DIR': str(self.runtime), 'PATH': '/usr/bin:/bin',
                     'LANG': 'C.UTF-8', 'WLR_BACKENDS': 'headless', 'WLR_RENDERER': 'pixman',
                     'WLR_LIBINPUT_NO_DEVICES': '1', 'WLR_HEADLESS_OUTPUTS': '1'}
-        self.compositor = self.application = None
+        self.compositor = self.application = self.keyboard = None
 
     def start(self):
+        diagnostic('compositor')
         config = self.home / 'config'
         config.mkdir(mode=0o700)
         (config / 'rc.xml').write_text('<labwc_config><keyboard><default/></keyboard><mouse><default/></mouse></labwc_config>')
@@ -79,8 +114,23 @@ class ApplicationSession:
             if self.compositor.poll() is not None or time.monotonic() >= deadline:
                 raise RuntimeError('private application compositor unavailable')
             time.sleep(0.025)
+        # A headless seat initially has no wl_keyboard capability. A short-lived
+        # injector can send keys before the application has bound wl_keyboard.
+        # Keep one idle private virtual device alive; verify the actual seat
+        # capability before allowing any application to connect. No key is sent
+        # by this fixed helper. The enclosing cgroup bounds its lifetime.
+        self.keyboard=subprocess.Popen([self.wtype,'-s','3600000'],env=self.env,cwd=self.home,
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        while True:
+            listing=self.helper([self.wayland_info]).decode('utf-8',errors='replace')
+            if re.search(r'(?m)^\s*capabilities:.*\bkeyboard\b',listing): break
+            if self.keyboard.poll() is not None or time.monotonic()>=deadline:
+                raise RuntimeError('private application keyboard seat unavailable')
+            time.sleep(0.025)
+        diagnostic('keyboard')
         self.application = subprocess.Popen([self.executable, *self.arguments], cwd=self.home,
                                            env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        diagnostic('application')
 
     def helper(self, arguments, limit=65536):
         process = subprocess.Popen(arguments, env=self.env, cwd=self.home, stdout=subprocess.PIPE,
@@ -112,12 +162,8 @@ class ApplicationSession:
             process.wait(timeout=3)
 
     def execute(self, action):
-        if not isinstance(action, dict):
-            raise ValueError('application action must be an object')
-        op = action.get('operation')
-        fields = {'operation'} | ({'text'} if op == 'type' else {'key'} if op == 'key' else set())
-        if set(action) != fields or op not in {'state','focus','type','key','capture'}:
-            raise PermissionError('application capability denied')
+        action=session_action(action)
+        op=action['operation']
         if not self.compositor or self.compositor.poll() is not None:
             raise RuntimeError('application compositor stopped')
         if op in {'state', 'focus'}:
@@ -138,12 +184,13 @@ class ApplicationSession:
             return {'running': self.application.poll() is None, 'windows': len(lines),
                     'window_state_sha256': hashlib.sha256(listing).hexdigest()}
         if op == 'type':
-            text = action.get('text')
-            if not isinstance(text, str) or not 1 <= len(text.encode()) <= 4096 or any(ord(c) < 32 or ord(c) == 127 for c in text):
-                raise ValueError('bounded plain application text required')
-            self.helper([self.wtype, '--', text])
+            if self.keyboard.poll() is not None:
+                raise RuntimeError('private application keyboard stopped')
+            self.helper([self.wtype, '--', action['text']])
             return {'applied': True}
         if op == 'key':
+            if self.keyboard.poll() is not None:
+                raise RuntimeError('private application keyboard stopped')
             if action.get('key') not in KEYS:
                 raise PermissionError('application shortcut denied')
             self.helper([self.wtype, '-k', KEYS[action['key']]])
@@ -155,7 +202,7 @@ class ApplicationSession:
                 'bytes': len(pixels), 'base64': base64.b64encode(pixels).decode('ascii')}
 
     def close(self):
-        for process in (self.application, self.compositor):
+        for process in (self.application, self.keyboard, self.compositor):
             if process is not None and process.poll() is None:
                 process.terminate()
                 try:
@@ -209,20 +256,47 @@ def serve(session):
 
 
 def main():
-    if len(sys.argv) != 2:
+    diagnostic('credential')
+    if len(sys.argv)==1:
+        directory=Path(os.environ['CREDENTIALS_DIRECTORY'])
+        path=directory/'launch'
+        if not directory.is_absolute() or not str(directory).startswith('/run/credentials/') or path.resolve()!=path:
+            raise PermissionError('system-owned application launch credential required')
+        info=path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022 or info.st_size>16384:
+            raise PermissionError('invalid application launch credential')
+        manifest=json.loads(path.read_bytes())
+    elif len(sys.argv)==2:
+        # The offline component fixture uses only fixed nonsensitive arguments.
+        # Actual systemd launches always use the private credential above.
+        manifest=json.loads(base64.b64decode(sys.argv[1],validate=True))
+    else:
         raise ValueError('owner-approved application launch descriptor required')
-    manifest = json.loads(base64.b64decode(sys.argv[1], validate=True))
+    if not isinstance(manifest,dict) or set(manifest)!={'executable','argv'}:
+        raise ValueError('invalid application launch descriptor')
+    diagnostic('hardening')
+    # Same-UID applications must not ptrace/inject the trusted control process.
+    # This also protects its descriptors after an application replaces a socket
+    # pathname. Root still verifies the kernel server PID, not the path alone.
+    libc=ctypes.CDLL(None,use_errno=True)
+    if libc.prctl(38,1,0,0,0)!=0 or libc.prctl(4,0,0,0,0)!=0 or libc.prctl(3,0,0,0,0)!=0:
+        raise PermissionError('application control process hardening unavailable')
     # This descriptor is provided only by the independently authorizing launcher.
+    diagnostic('identity')
     session = ApplicationSession(manifest['executable'], manifest['argv'])
     def finish(_signum, _frame):
         raise SystemExit(0)
     signal.signal(signal.SIGTERM, finish)
     try:
         session.start()
+        diagnostic('control')
         serve(session)
     finally:
         session.close()
 
 
 if __name__ == '__main__':
-    main()
+    try: main()
+    except Exception as exc:
+        diagnostic('failed',type(exc).__name__)
+        raise

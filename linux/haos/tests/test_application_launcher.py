@@ -1,5 +1,3 @@
-import base64
-import json
 import os
 from pathlib import Path
 import time
@@ -7,8 +5,9 @@ import uuid
 
 import pytest
 
-from haos.application_launcher import ApplicationLauncher, canonical_id, launch_command, running_mission
-from haos.application_session import ApplicationSession
+from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission
+from haos.application_session import ApplicationSession,session_action
+from haos.applications import validate_application
 from haos.store import MissionStore
 
 
@@ -31,10 +30,11 @@ def test_application_runs_as_a_bounded_distinct_uid_without_host_home_network_or
     assert properties['MemoryMax']=='512M' and properties['MemorySwapMax']=='0'
     assert properties['TasksMax']=='64' and properties['RuntimeMaxSec']=='60'
     assert properties['KillMode']=='control-group' and properties['ExitType']=='cgroup' and properties['Delegate']=='no'
-    assert properties['Restart']=='no' and properties['StandardOutput']==properties['StandardError']=='null'
+    assert properties['Restart']=='no' and properties['StandardOutput']=='journal' and properties['StandardError']=='null'
     assert not any(a.startswith('--setenv') for a in command)
-    assert command[-4:-1]==['/usr/bin/python3','-I','/session.py']
-    assert json.loads(base64.b64decode(command[-1]))=={'executable':'/usr/bin/foot','argv':grant()['argv']}
+    assert command[-3:]==['/usr/bin/python3','-I','/session.py']
+    assert properties['LoadCredential']==f'launch:/run/haos-applications/{request}/launch.json'
+    assert all(value not in command for value in grant()['argv'])
 
 
 @pytest.mark.parametrize('bad',['../owner','ROOT','',True,'00000000000000000000000000000000'])
@@ -48,9 +48,10 @@ def test_unprivileged_application_cannot_use_launch_inspection_or_termination(tm
     with pytest.raises(PermissionError):
         ApplicationLauncher(state=tmp_path/'state',runtime=tmp_path/'run')
     launcher=object.__new__(ApplicationLauncher)
-    for method,args in [(launcher.start,('terminal',str(uuid.uuid4()),str(uuid.uuid4()))),(launcher.record,(str(uuid.uuid4()),)),(launcher.stop,(str(uuid.uuid4()),))]:
+    for method,args in [(launcher.start,('terminal',str(uuid.uuid4()),str(uuid.uuid4()))),(launcher.record,(str(uuid.uuid4()),)),(launcher.stop,(str(uuid.uuid4()),)),
+                        (launcher.unit_state,(str(uuid.uuid4()),)),(launcher.execute,(str(uuid.uuid4()),str(uuid.uuid4()),{'operation':'state'}))]:
         with pytest.raises(PermissionError):
-            method(*args,**({'ledger_uid':os.geteuid()} if method==launcher.start else {}))
+            method(*args,**({'ledger_uid':os.geteuid()} if method in {launcher.start,launcher.execute} else {}))
     assert not list(tmp_path.iterdir())
 
 
@@ -94,3 +95,35 @@ def test_session_denies_commands_global_shortcuts_clipboard_files_and_unbounded_
     session.compositor=Live()
     with pytest.raises((ValueError,PermissionError)):
         session.execute(action)
+
+
+def test_real_keyboard_protocol_budget_is_checked_before_partial_input():
+    assert session_action({'operation':'type','text':'a'*512})['text']=='a'*512
+    for text in ('a'*513,'é'*257,'x\x7f'):
+        with pytest.raises(ValueError): session_action({'operation':'type','text':text})
+
+
+def test_multiple_private_windows_cannot_authorize_implicit_dialog_focus():
+    session=object.__new__(ApplicationSession)
+    class Live:
+        def poll(self): return None
+    session.compositor=Live();session.wlrctl='/usr/bin/wlrctl'
+    calls=[]
+    def helper(argv):
+        calls.append(argv);return b'editor: document\neditor: dialog\n'
+    session.helper=helper
+    with pytest.raises(PermissionError):session.execute({'operation':'focus'})
+    assert calls==[['/usr/bin/wlrctl','toplevel','list']]
+
+
+@pytest.mark.parametrize('argument',['--password','--api-key=value','--access-token',
+    'https://user:pass@example.invalid/', 'Bearer '+'A'*32, 'sk-'+'A'*32])
+def test_application_manifest_cannot_be_used_as_a_credential_argv_channel(argument):
+    with pytest.raises(PermissionError):validate_application(dict(grant(),argv=[argument]))
+
+
+def test_application_authority_identity_includes_limits_and_fixed_arguments():
+    approval=grant();digest=grant_digest(approval)
+    assert grant_digest(dict(reversed(list(approval.items()))))==digest
+    for delta in ({'memory_mib':128},{'runtime_seconds':1},{'argv':['--different-private-context']},{'class':'utility'}):
+        assert grant_digest(dict(approval,**delta))!=digest

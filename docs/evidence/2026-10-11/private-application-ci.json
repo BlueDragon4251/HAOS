@@ -1,0 +1,42 @@
+{
+  "scope": "matching-source real disposable component CI; not installed systemd or model",
+  "source_commit": "1a8f8eee905a065c41a19515091039a32afd88f6",
+  "workflow": "https://github.com/BlueDragon4251/HAOS/actions/runs/38176477630",
+  "workflow_conclusion": "success",
+  "artifact": 11716003094,
+  "artifact_sha256": "7bc1b0f274bebf1f1ea9acaa68f2aba3a20670d02ca20f99a5d18e60dded95a1",
+  "original_zip_verified": true,
+  "receipts": {
+    "haos-application-authority.json": {
+      "scope": "disposable root/controller authority component",
+      "source_commit": "1a8f8eee905a065c41a19515091039a32afd88f6",
+      "launcher_sha256": "b60793f2a04fdb4ccf5654adbd21155f72793b730b96e56eda0ddd417987d606",
+      "real_fork_uid_wal_admission": true,
+      "cancelled_mission_denied": true,
+      "expired_mission_denied": true,
+      "aliases_and_public_ledger_denied": true,
+      "root_private_path_substitution_denied": true,
+      "installed_application_unit_verified": false
+    },
+    "haos-application-session.json": {
+      "schema": 1,
+      "scope": "disposable private application session component",
+      "source_commit": "1a8f8eee905a065c41a19515091039a32afd88f6",
+      "source_sha256": "c37096ec30f48cf7dbf63116a39554d76654113e43562cb4f0a2d2c28e33f9ee",
+      "real_application_toplevel": true,
+      "real_application_focus": true,
+      "actual_shell_readiness_verified": true,
+      "real_keyboard_result_verified": true,
+      "real_capture_integrity": true,
+      "real_capture_changed": true,
+      "clipboard_and_global_modifiers_denied": true,
+      "paths_and_shell_controls_denied": true,
+      "unprivileged_app_control_peer_denied": true,
+      "root_broker_peer_pid_verified": true,
+      "application_effective_capabilities_zero": true,
+      "application_no_new_privileges": true,
+      "installed_systemd_launch_verified": false,
+      "hermes_model_execution_verified": false
+    }
+  }
+}
