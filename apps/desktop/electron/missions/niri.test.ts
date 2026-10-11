@@ -10,7 +10,9 @@ const cleanup: (() => void)[] = []
 afterEach(() => { for (const close of cleanup.splice(0)) close() })
 
 async function fixture(alter?: (request: unknown, reply: unknown) => unknown) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'haos-niri-ipc-'))
+  // macOS exposes /var through /private/var. The positive fixture must use
+  // the canonical socket directory required by production, not relax its guard.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'haos-niri-ipc-')))
   fs.chmodSync(root, 0o700)
   const endpoint = path.join(root, 'niri.sock'), requests: unknown[] = []
   let workspace = 10
@@ -76,6 +78,13 @@ describe('mission-only niri IPC', () => {
     fs.chmodSync(root, 0o700)
     const link = path.join(root, 'redirect.sock'); fs.symlinkSync(endpoint, link)
     await expect(new MissionCompositor({ XDG_RUNTIME_DIR: root, NIRI_SOCKET: link }).locate(title)).rejects.toThrow('Untrusted')
+  })
+  it('denies an alias in a runtime ancestor even when the final directory is private', async () => {
+    const { root } = await fixture()
+    const alias = root + '-alias'
+    fs.symlinkSync(root, alias)
+    cleanup.push(() => fs.unlinkSync(alias))
+    await expect(new MissionCompositor({ XDG_RUNTIME_DIR: alias, NIRI_SOCKET: path.join(alias, 'niri.sock') }).locate(title)).rejects.toThrow('Untrusted')
   })
   it('does not leak compositor errors or accept unverified action results', async () => {
     const { broker } = await fixture((request, reply) => typeof request === 'object' ? { Err: 'private compositor content' } : reply)
