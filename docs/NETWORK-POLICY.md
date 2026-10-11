@@ -42,3 +42,17 @@ reports ENOSYS; unit fixtures are not evidence of enforcement there. This is a
 kernel component proof, not a complete installed HAOS, SELinux, per-mission
 egress or connection-revocation acceptance. Required installed image/guest
 checks must still pass with this stricter launcher.
+
+The reproducible probe sources are `linux/haos/probes/ipc_scope_vm_init.c` and
+`run_ipc_scope_vm.py`. Compile the init statically with `gcc -static -O2 -Wall
+-Wextra -Werror`. Its newc initramfs contains the public Python 3.11 runtime at
+`/python`, the exact `ipc_scope.py` at `/modules`, the probe at `/probe.py`, and
+the root-owned mode-0400 marker `/haos-disposable-ipc-marker` with contents
+`haos-scope-disposable-vm-v1\n`. Use cpio `--owner=0:0`; public runtime directories
+must be traversable by the UID-1000 child. The marker/PID-1 guards run before any
+mount/socket mutation. Launch only a new disposable diskless QEMU guest with
+the verified Fedora kernel, `-machine q35,accel=tcg -cpu max -smp 2 -m 512M
+-kernel ... -initrd ... -append 'console=ttyS0 rdinit=/init panic=-1' -nographic
+-no-reboot -nic none`. Require exit 0, `HAOS_SCOPE_FINISHED=0`, and the exact
+product-module digest in `HAOS_SCOPE_PYTHON_RECEIPT`. Private raw logs/runtime
+archives are not release artifacts.

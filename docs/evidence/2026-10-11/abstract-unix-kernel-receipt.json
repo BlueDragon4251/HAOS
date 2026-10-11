@@ -29,5 +29,28 @@
     "Exact Python module bytes tested in the kernel VM; initial code validation preceded the implementation commit.",
     "No physical disks, external network, installed HAOS, model, gateway or release acceptance inferred.",
     "Current installed image must still pass startup and both guest receipts with this mandatory scope."
-  ]
+  ],
+  "guarded_repeat": {
+    "actual_product_module": true,
+    "module_sha256": "e087970c82865f7488b7b1d7b333e3dd97e0bd622fa7b4a15c9f9d418503ea55",
+    "abi": 10,
+    "uid": 1000,
+    "host_abstract_allowed_before_scope": true,
+    "host_abstract_denied_after_scope": true,
+    "filesystem_controller_socket_allowed": true,
+    "descendant_same_domain_abstract_allowed": true,
+    "kernel": "7.2.9-200.fc44.x86_64",
+    "kernel_sha256": "5806981b246bfd6e0b9f8dd0ee5e5d2e35561aca66bdf8377f190c8abcc4b2cc",
+    "init_sha256": "c95d0e0bacd71edb9747810352ad30bf8723d72242603fe046f15a5cde72e418",
+    "boot_log_sha256": "653fc0ea93816933cc12fba36509b56e7e4a7f0b21d6c31cfab09b6c4397d1dc",
+    "accelerator": "tcg",
+    "disks_attached": false,
+    "network_attached": false,
+    "installed_haos": false,
+    "production_acceptance": false,
+    "product_module_commit": "a71b04148ffb9ab6bbbb8d3cd8fb0b0c195d6c9b",
+    "init_source_sha256": "02a2156457a7eacf89cb8d855a5d35bfe4e3616871111f64883b5ba156210599",
+    "probe_source_sha256": "18415b4c4a5329b1412cc2bdc5bc5846ab3f8a0bcae3102ef9cf9255ea7aa277",
+    "root_marker_and_pid1_required": true
+  }
 }
