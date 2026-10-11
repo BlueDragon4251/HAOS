@@ -10,7 +10,9 @@ import os
 from pathlib import Path
 import pwd
 import shutil
+import shlex
 import subprocess
+import stat
 import sys
 import tempfile
 import time
@@ -62,6 +64,33 @@ def main():
             try: call()
             except (PermissionError,ValueError): return
             raise AssertionError('unauthorized application action accepted')
+        def application_failure_diagnostics():
+            # Only this fixed credentialless disposable fixture. Keep the
+            # original approved foot launch and its assertion unchanged. A
+            # separately approved exact bash ELF execs the identical foot argv
+            # with stderr into its private home, without changing any systemd
+            # isolation/resource properties or production logging defaults.
+            diagnostic=dict(approval,id='fixture-error-diagnostic',executable='/usr/bin/bash',
+                sha256=executable_digest('/usr/bin/bash'),argv=['--noprofile','--norc','-c',
+                    'exec '+shlex.join(['/usr/bin/foot',*approval['argv']])+' 2>/home/mission/fixture-foot-errors'])
+            registry.register(diagnostic)
+            request=str(uuid.uuid4());requests.append(request)
+            launcher.start(diagnostic['id'],mission,request,ledger=ledger,ledger_uid=account.pw_uid)
+            home=Path('/run')/launcher.record(request)['unit']
+            text='';deadline=time.monotonic()+3
+            while time.monotonic()<deadline:
+                path=home/'fixture-foot-errors'
+                if path.exists():
+                    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                    try:
+                        info=os.fstat(fd)
+                        assert stat.S_ISREG(info.st_mode) and info.st_nlink==1 and 61184<=info.st_uid<=65519
+                        assert not info.st_mode&0o077
+                        text=os.read(fd,4096).decode(errors='replace')
+                    finally: os.close(fd)
+                    if text: break
+                time.sleep(0.025)
+            return {'scope':'fixed credentialless disposable foot stderr only','diagnostic':text}
         homes=[];units=[]
         for index in range(2):
             request=str(uuid.uuid4());requests.append(request)
@@ -107,6 +136,8 @@ def main():
             while True:
                 window=execute(request,{'operation':'state'})
                 if window['running'] and window['windows']==1: break
+                if not window['running']:
+                    raise AssertionError('actual application exited before mapping: '+json.dumps(application_failure_diagnostics()))
                 assert window['running'] and window['windows']==0 and time.monotonic()<deadline, \
                     'actual mapped application window: '+json.dumps(window)
                 time.sleep(0.025)
