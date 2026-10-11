@@ -27,7 +27,7 @@ jobs:
       - name: QEMU runtime selection and privileged guest fixture regression tests
         run: python -m pytest -q tests/e2e/test_qemu_runtime.py tests/e2e/test_guest_diagnostics.py tests/e2e/test_guest_owner.py tests/e2e/test_evidence_inspection.py tests/e2e/test_image_selection.py
       - name: Verify exact owner-approved application files and persistent revocation
-        run: sudo env PYTHONPATH="$PWD/linux/haos" HAOS_DISPOSABLE_APPLICATION_TEST=1 /usr/bin/python3 linux/haos/probes/test_applications.py
+        run: sudo env PYTHONPATH="$PWD/linux/haos" HAOS_DISPOSABLE_APPLICATION_TEST=1 /usr/bin/python3 linux/haos/probes/run_applications.py
       - name: Real local socket and kernel filesystem probes
         run: |
           sudo apt-get update -qq
