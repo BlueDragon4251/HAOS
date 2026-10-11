@@ -200,6 +200,10 @@ def serve(session):
                 except (ValueError, PermissionError, RuntimeError, TimeoutError, OSError):
                     result = {'error': 'application action denied or unavailable'}
                 peer.sendall(json.dumps(result).encode() + b'\n')
+        if session.compositor.poll() is not None:
+            # Fixed lifecycle diagnostics only; never application stderr, titles
+            # or caller text. A compositor exit is not a successful app receipt.
+            raise RuntimeError('private application compositor stopped')
     finally:
         listener.close()
 

@@ -30,9 +30,15 @@ def main():
     if not os.statvfs('/').f_flag & os.ST_RDONLY or set(p.name for p in Path('/sys/class/net').iterdir()) != {'lo'}:
         raise PermissionError('read-only offline disposable rootfs required')
     session_source = Path('/usr/lib/haos/haos/application_session.py')
+    # A mapped terminal surface precedes its interactive shell. This fixed
+    # startup marker is written by the real shell, not the test supervisor; it
+    # certifies readiness only, never the result of the typed command below.
+    shell_init=home/'fixture.bashrc'
+    shell_init.write_text("printf HAOS_SHELL_READY > .fixture-shell-ready\n")
+    shell_init.chmod(0o644)
     descriptor = base64.b64encode(json.dumps({'executable':'/usr/bin/foot',
         'argv':['--font','monospace:size=16','--app-id','haos-approved-terminal','--title','HAOS Disposable Mission',
-                '/usr/bin/bash','--noprofile','--norc']}).encode()).decode()
+                '/usr/bin/bash','--noprofile','--rcfile',str(shell_init),'-i']}).encode()).decode()
     def identity():
         os.setgroups([]); os.setgid(1000); os.setuid(1000)
     diagnostics = tempfile.TemporaryFile()
@@ -61,6 +67,9 @@ def main():
             if state['running'] and state['windows']>0: break
             assert time.monotonic()<deadline, 'actual application toplevel startup'; time.sleep(0.05)
         assert request({'operation':'focus'})['result']['focused'], 'actual application keyboard focus'
+        while not (home/'.fixture-shell-ready').exists() or (home/'.fixture-shell-ready').read_text()!='HAOS_SHELL_READY':
+            assert worker.poll() is None and time.monotonic()<deadline, 'actual interactive shell readiness'
+            time.sleep(0.025)
         before=request({'operation':'capture'})['result']
         request({'operation':'type','text':'printf HAOS_REAL_APPLICATION > result.txt'})
         request({'operation':'key','key':'Enter'})
@@ -96,7 +105,8 @@ assert reply==b''
         print(json.dumps({'schema':1,'scope':'disposable private application session component',
             'source_commit':os.environ.get('GITHUB_SHA'),
             'source_sha256':hashlib.sha256(session_source.read_bytes()).hexdigest(),
-            'real_application_toplevel':True,'real_application_focus':True,'real_keyboard_result_verified':True,
+            'real_application_toplevel':True,'real_application_focus':True,'actual_shell_readiness_verified':True,
+            'real_keyboard_result_verified':True,
             'real_capture_integrity':True,'real_capture_changed':True,
             'clipboard_and_global_modifiers_denied':True,'paths_and_shell_controls_denied':True,
             'unprivileged_app_control_peer_denied':True,'root_broker_peer_pid_verified':True,
