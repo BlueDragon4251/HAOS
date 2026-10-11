@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "run_id": 38123702298,
+  "build_job_id": 114423530236,
+  "build_conclusion": "success",
+  "image_source_commit": "28dd93a3519db4b5702ca5e88321b870994ad159",
+  "matching_frozen_guest_commit": "28dd93a3519db4b5702ca5e88321b870994ad159",
+  "metadata_artifact_id": 11696534217,
+  "metadata_archive_digest": "sha256:fb912a2f554e328436a329dc0a6ff05ccb6d2e5e1d8112917519479a710efacc",
+  "image_id": "sha256:344521d1c3068d0a3524989a9bcb6ba9011a8ea9d9c4ac53484793e0034978dd",
+  "checksums": "cce42d7a01f255d6bf1b3fca4371ab277c9a80f510fab7f22850cd1a18b3f7f8  haos-x86_64-development.iso\n",
+  "full_iso_downloaded_for_local_reverification": false,
+  "full_iso_artifact_id": 11696599041,
+  "github_full_iso_archive_digest": "sha256:7d71309f1b0dedacb4e7f74391656a12ca85386888cc2943aea4002d10a9c6d8",
+  "sbom_artifact_id": 11696638848,
+  "github_sbom_archive_digest": "sha256:48913c004a09edf2d05ab3929fd4d05123d77f38e6674bb94f2dc87c6779a3c8",
+  "installed_acceptance_job_id": 114427691370,
+  "installed_acceptance_pending_at_recording": true,
+  "installed_theme_crash_rollback_passed": false,
+  "both_guest_receipts_verified": false,
+  "production_acceptance": false
+}
