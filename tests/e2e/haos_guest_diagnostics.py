@@ -24,7 +24,14 @@ def collect():
     # Fixed commands only. Never dump process environments, credentials or config.
     commands = [("resolver path metadata", ["namei", "--long", "/etc/resolv.conf"]),
         ("unit states", ["systemctl", "show", *UNITS,
-        "--property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ConditionResult"]),
+        "--property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ConditionResult,MainPID,CPUUsageNSec,MemoryCurrent,TasksCurrent"]),
+        # A combined journal can hide the backend's earlier startup behind the
+        # owner's expected negative authentication tests. Keep its own bounded
+        # journal and filesystem measurements distinct, without argv or env.
+        ("backend startup journal", ["journalctl", "--boot", "--no-pager", "--output=short-monotonic", "--lines=120",
+                                     "--unit", "haos-hermes.service"]),
+        ("fixed filesystem capacity", ["df", "--block-size=1", "--output=target,fstype,size,avail", "/", "/var", "/sysroot"]),
+        ("backend listener", ["ss", "--listening", "--tcp", "--numeric", "sport", "=", ":9119"]),
         ("service journal", ["journalctl", "--boot", "--no-pager", "--output=short-monotonic", "--lines=120",
                              *[argument for unit in UNITS for argument in ("--unit", unit)]])]
     # Also redact the per-machine backend credential if a dependency logs it.

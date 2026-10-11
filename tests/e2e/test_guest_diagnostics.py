@@ -39,6 +39,23 @@ def test_backend_credential_is_redacted_and_logs_are_bounded(monkeypatch):
     assert all("[REDACTED]" in report["output"] and report["returncode"] == 1 for report in reports)
 
 
+def test_startup_failure_keeps_backend_journal_capacity_and_listener_separate(monkeypatch):
+    monkeypatch.setattr(Path, "is_file", lambda self: False)
+    commands = []
+    def run(args, **kwargs):
+        commands.append(args)
+        assert kwargs == {"capture_output": True, "text": True, "timeout": 20, "check": False}
+        return subprocess.CompletedProcess(args, 0, "fixed metadata", "")
+    monkeypatch.setattr(diagnostics.subprocess, "run", run)
+    reports = diagnostics.collect()
+    assert len(reports) == 6
+    assert commands[2][-2:] == ["--unit", "haos-hermes.service"]
+    assert commands[3][-3:] == ["/", "/var", "/sysroot"]
+    assert commands[4][-3:] == ["sport", "=", ":9119"]
+    assert "MainPID" in commands[1][-1] and "CPUUsageNSec" in commands[1][-1]
+    assert not any("--all" in args or "--processes" in args for args in commands)
+
+
 @pytest.mark.parametrize("error", [OSError("fixture"), subprocess.TimeoutExpired("journalctl", 20)])
 def test_unavailable_diagnostics_still_report_original_failure_and_power_off(monkeypatch, capsys, error):
     monkeypatch.setattr(diagnostics, "require_disposable_guest", lambda: None)

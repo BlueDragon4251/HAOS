@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "failed_run_id": 38092528231,
+  "image_guest_source_commit": "699bc82b76c927aced09784c6442d2b97713753c",
+  "guest_artifact_id": 11686296831,
+  "guest_archive_digest": "sha256:f115d7351bbb12409e3a43333de200698379ad4573c48204dac7d1fbaa5927fa",
+  "build": {
+    "artifact_id": 11684554918,
+    "archive_digest": "sha256:863be69dd00e3e10a37340acfb56733c635fe2a727a7b6713267d322771c8ebf",
+    "source_commit": "699bc82b76c927aced09784c6442d2b97713753c",
+    "checksums": "f16ce8a4388bd7eaf584e35169b381a4063f90def3469007e07bfebf8af37d02  haos-x86_64-development.iso\n"
+  },
+  "boot_1_log_sha256": "d97005ca6ffdb967500119929dae3cbb78767e995f39d0c62cff79065adaf677",
+  "failure": {
+    "phase": "runtime-readiness",
+    "function": "wait_for(health)",
+    "line": 343,
+    "error": "TimeoutError: acceptance condition was not met",
+    "backend_readiness_seconds": 180,
+    "theme_probe_reached": false,
+    "guest_receipts": 0,
+    "installed_theme_acceptance": false
+  },
+  "source_checkout_verified_jobs": [
+    114331723447,
+    114335793539
+  ],
+  "iso_bytes_verified_in_guest_job": true,
+  "root_cause_not_yet_proven": true
+}
