@@ -602,3 +602,17 @@ passes with real local parent/watchdog processes; launch/guard/compilation tests
 also pass. **74 harness cases** and **335 Linux bridge/CLI cases with one existing
 skip** pass. These new installed assertions remain pending their own image run;
 they do not prove an autonomous model-generated theme or full visual session health.
+
+
+On October 11, source `28dd93a3519db4b5702ca5e88321b870994ad159` completed
+[the exact new installed gate](https://github.com/BlueDragon4251/HAOS/actions/runs/38123702298).
+Installation and both TCG boots exited successfully. The original guest ZIP
+`11698822773` matches GitHub SHA-256 `f9a0a90fd0fbe9697be963b0f4bdfb0ddb03192a6fb0c21e7b140a4302aabb62`.
+Both saved receipts match the actual serial JSON. All installed parent-SIGKILL,
+fixed-output restoration, restarted recovery CLI and reboot-journal conditions
+passed, alongside encrypted scheduled/live-SQLite backup and preserved service
+PIDs. The exact ISO checksum is `cce42d7a01f255d6bf1b3fca4371ab277c9a80f510fab7f22850cd1a18b3f7f8`.
+[The bounded receipt](evidence/2026-10-11/installed-theme-and-live-backup.json)
+retains source identities and individual conditions. The historical hidden
+`699bc82` assertion remains unidentified; this new success does not accept
+autonomous theme generation, complete graphical session health or a Stable release.

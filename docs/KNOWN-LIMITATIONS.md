@@ -3,8 +3,12 @@
 - October 11 continuation: the exact `699bc82` diagnostic replay reached the
   installed theme gate but its observer subprocess exited 1; the old wrapper
   concealed the assertion. New fixed, private-safe diagnostic phases preserve
-  every assertion and timeout. Installed theme rollback and the writable `/var`
-  reserve correction still need matching new guest receipts. CI at `041dece`
+  every assertion and timeout. The matching `28dd93a` image now passes both
+  installed boots, all four new theme conditions and the live-ledger backup
+  conditions in run `38123702298`; original ZIP digest, serial-matching receipts
+  and ISO identity are verified in `evidence/2026-10-11/installed-theme-and-live-backup.json`.
+  The old hidden assertion remains unidentified; no watchdog timeout or algorithm
+  was relaxed. Full-session visual health remains open. CI at `041dece`
   passed; exact counts, merge identity, archived component hashes and independent
   image-SBOM reverification are in `evidence/2026-10-11/continuation-receipts.json`.
   Its dependency audit reports nine affected build packages (one high, eight
@@ -53,7 +57,6 @@ watchdog has real component/Wayland CI proof; installed full-session proof is st
 
 The installed guest matrix now additionally exercises actual observer-UID theme
 watchdog parent-SIGKILL, fixed-output/preference restoration, restarted recovery
-CLI and durable journal after reboot. Its embedded program passes locally with
-real processes, but source-bound installed receipts for these new flags remain
-required. This is a bounded file/watchdog gate; it cannot accept whole-session
+CLI and durable journal after reboot. Matching source `28dd93a` now has
+verified installed receipts for every one of these conditions in run `38123702298`. This is a bounded file/watchdog gate; it cannot accept whole-session
 visual health, autonomous theme generation or general host GUI access.
