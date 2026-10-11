@@ -99,10 +99,18 @@ class ApplicationSession:
         diagnostic('compositor')
         config = self.home / 'config'
         config.mkdir(mode=0o700)
+        self.env['XDG_CONFIG_HOME']=str(config)
         (config / 'rc.xml').write_text('<labwc_config><keyboard><default/></keyboard><mouse><default/></mouse></labwc_config>')
         # An empty explicit autostart prevents installed desktop launchers from
         # creating unrelated applications even in this private compositor.
         (config / 'autostart').write_text('')
+        if self.executable=='/usr/bin/foot':
+            # foot's default sparse 512 MiB memfd is subject to RLIMIT_FSIZE
+            # despite not consuming that much physical memory. Retain the
+            # launcher's 64 MiB file bound and give this supported application
+            # a private 32 MiB rendering pool, rather than loosening the unit.
+            terminal=config/'foot';terminal.mkdir(mode=0o700)
+            (terminal/'foot.ini').write_text('[tweak]\nmax-shm-pool-size-mb=32\n')
         self.compositor = subprocess.Popen([self.labwc, '--config-dir', str(config)], env=self.env,
                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         deadline = time.monotonic() + 10

@@ -218,3 +218,5 @@ launch unavailable. Mission process isolation, private Wayland/clipboard context
 resource enforcement and cancellation cleanup must be integrated before these
 grants can authorize native execution. The real disposable root probe checks actual
 ELF/file/UID/lock/update/restart/revocation behavior without executing the fixture ELF.
+
+The real systemd fixture identified `SIGXFSZ` from foot’s default sparse 512 MiB rendering memfd under the retained 64 MiB file-size limit. The private session supplies `tweak.max-shm-pool-size-mb=32` through its own `XDG_CONFIG_HOME`; no host configuration or resource-limit relaxation is needed. The actual offline Wayland regression now also applies the same kernel file-size limit. See `docs/evidence/2026-10-11/application-shm-regression.json`; the separate root/systemd and installed gates remain necessary.

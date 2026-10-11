@@ -40,6 +40,8 @@ def main():
         'argv':['--font','monospace:size=16','--app-id','haos-approved-terminal','--title','HAOS Disposable Mission',
                 '/usr/bin/bash','--noprofile','--rcfile',str(shell_init),'-i']}).encode()).decode()
     def identity():
+        import resource
+        resource.setrlimit(resource.RLIMIT_FSIZE,(64*1024*1024,64*1024*1024))
         os.setgroups([]); os.setgid(1000); os.setuid(1000)
     diagnostics = tempfile.TemporaryFile()
     worker = subprocess.Popen(['/usr/bin/python3','-I',str(session_source),descriptor],
@@ -62,6 +64,8 @@ def main():
             time.sleep(0.05)
         status = dict(line.split(':',1) for line in Path(f'/proc/{worker.pid}/status').read_text().splitlines() if ':' in line)
         assert int(status['CapEff'].strip(),16)==0 and status['NoNewPrivs'].strip()=='1'
+        limits=Path(f'/proc/{worker.pid}/limits').read_text()
+        assert 'Max file size' in limits and '67108864' in next(line for line in limits.splitlines() if line.startswith('Max file size'))
         while True:
             state=request({'operation':'state'})['result']
             if state['running'] and state['windows']>0: break
@@ -117,6 +121,7 @@ assert libc.ptrace(16,int(sys.argv[1]),None,None)==-1 and ctypes.get_errno()==er
             'clipboard_and_global_modifiers_denied':True,'paths_and_shell_controls_denied':True,
             'unprivileged_app_control_peer_denied':True,'root_broker_peer_pid_verified':True,
             'application_effective_capabilities_zero':True,'application_no_new_privileges':True,
+            'actual_64m_file_limit_and_bounded_terminal_shm':True,
             'same_uid_control_process_ptrace_denied':True,
             'installed_systemd_launch_verified':False,'hermes_model_execution_verified':False}),flush=True)
     finally:
