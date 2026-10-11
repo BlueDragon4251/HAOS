@@ -1,5 +1,19 @@
 # Known limitations
 
+- October 11 continuation: the exact `699bc82` diagnostic replay reached the
+  installed theme gate but its observer subprocess exited 1; the old wrapper
+  concealed the assertion. New fixed, private-safe diagnostic phases preserve
+  every assertion and timeout. Installed theme rollback and the writable `/var`
+  reserve correction still need matching new guest receipts. CI at `041dece`
+  passed; exact counts, merge identity, archived component hashes and independent
+  image-SBOM reverification are in `evidence/2026-10-11/continuation-receipts.json`.
+  Its dependency audit reports nine affected build packages (one high, eight
+  moderate). Updating only `http-cache-semantics` to 4.3.0 removes the high audit
+  label but the isolated security-zero-TTL/max-stale API probe still accepts the
+  response; that candidate was not committed as a fix. HAOS exposure is not
+  demonstrated. The legacy build downloader's dependency and exposure review
+  remains required; these results do not approve a release.
+
 HAOS is development, not an accepted production distribution. The master prompt remains the complete target.
 
 - The bounded installed foundation gate passed at `2cebd11`: exact ISO bytes verified, actual UEFI/TCG installation and both guest receipts completed, covering Hermes health, fixture volume boundaries, observer/local-network denial, staged local recovery, UI/backend restart separation and offline queue persistence. Earlier policy-umask, DNS and systemd/procfs startup failures are corrected and evidenced. This does not accept the complete distribution, graphical owner onboarding or physical hardware. Historical billing failures are distinct from current public runs. Builds remain unsigned. An actual offline image [SBOM gate](SBOM.md) now checks installed Python/RPM coverage and preserves the npm graph; matching HAOS-image results, embedded-component/license/vulnerability review, provenance, reproducible pins, Secure Boot and update trust remain unfinished.

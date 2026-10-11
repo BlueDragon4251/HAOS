@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "tested_branch_commit": "041decef89200daa38b9dd79528bf4b5b16d57ea",
+  "ci_merge_commit": "f57cd4db2dfd370838db52f1dc381c683a9d7f19",
+  "workflows": {
+    "ci": 38123736809,
+    "services_push": 38123734009,
+    "services_pr": 38123736805,
+    "arch": 38123736757
+  },
+  "workflow_conclusions": {
+    "ci": "success",
+    "services_push": "success",
+    "services_pr": "success",
+    "arch": "success"
+  },
+  "counts": {
+    "haos": 380,
+    "native_linux": 795,
+    "native_macos": 795,
+    "native_files_each": 109,
+    "linux_bridge_passed": 337,
+    "linux_bridge_skipped": 1,
+    "macos_bridge_passed": 314,
+    "macos_bridge_skipped": 24,
+    "root_authority_backup_policy": 54,
+    "qemu_guest_harness": 82,
+    "root_encrypted_restic_lifecycle": 22,
+    "local_watchdog_real_process_cases": 24
+  },
+  "ci_virtual_wayland": {
+    "artifact_id": 11696207491,
+    "archive_digest": "sha256:b133e1831e0107c065c4065bc851f718d6fca7f2ee856f3448b35908ce1d83fc",
+    "weston": "weston 13.0.0",
+    "checks": 33,
+    "all_checks_passed": true,
+    "real_niri": false,
+    "installed_haos": false,
+    "real_model_turn": false,
+    "source_commit": "f57cd4db2dfd370838db52f1dc381c683a9d7f19",
+    "receipt_sha256": "75ce40783eb5a11232cdf4100d83cfb9edc13b7106d1d9451ad270a66f37b015"
+  },
+  "log_sha256": {
+    "ci": "3ed84f317037410e6d504d94316e27077d5ac88ff88f5c763d9bc3ecd33a9048",
+    "services": "f68ff8c8f250bf31d9d5a02b62623dea8e441f9ad9f9c0ec630948842d585cbf"
+  },
+  "image_inventory_reverification": {
+    "run_id": 38122080018,
+    "source_commit": "a71b04148ffb9ab6bbbb8d3cd8fb0b0c195d6c9b",
+    "image_id": "sha256:176a9697cfdaa814dec3616dae71ff55579fab5ea2d56993c459f2dbe40baf0d",
+    "iso_sha256": "8286ba1b0497b3ccfc4e5edb901bbc25a911ffb1a7b50628ff400ca908d03285",
+    "metadata_artifact_id": 11696017961,
+    "metadata_archive_digest": "sha256:b83e536084429046608dc7c222f35b6224afafeb69eb58d76aa95beedbda76e5",
+    "sbom_artifact_id": 11696267230,
+    "sbom_archive_digest": "sha256:2b3d5be817892bae1c6ee9298550caaadaa494c1fc0fd4e9b2aa563bf756f27a",
+    "all_document_digests_verified": true,
+    "actual_verifier_repeated": true,
+    "verifier_index_byte_identical": true,
+    "coverage": {
+      "python_installed_versions": 80,
+      "python_frozen_versions": 80,
+      "rpm_installed_versions_architectures": 1210,
+      "image_package_types": {
+        "generic": 376,
+        "golang": 435,
+        "maven": 1,
+        "npm": 12,
+        "pypi": 104,
+        "rpm": 1210
+      },
+      "npm_build_packages": 188
+    },
+    "installed_acceptance": false,
+    "full_iso_downloaded_for_local_verification": false
+  },
+  "dependency_audit": {
+    "source_lock_commit": "041decef89200daa38b9dd79528bf4b5b16d57ea",
+    "npm_audit_exit_status": 1,
+    "reported_counts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 8,
+      "high": 1,
+      "critical": 0,
+      "total": 9
+    },
+    "affected_dependencies_are_build_only": true,
+    "primary_advisories": [
+      "GHSA-ch52-4w7c-c8xp",
+      "GHSA-hp3w-g68c-fv3c"
+    ],
+    "candidate_http_cache_version": "4.3.0",
+    "candidate_removed_high_audit_label": true,
+    "candidate_functional_probe_still_accepts_security_zero_ttl_max_stale": true,
+    "candidate_update_not_committed": true,
+    "haos_exploitation_or_exposure_not_demonstrated": true,
+    "remediation_and_exposure_review_open": true
+  },
+  "installed_theme_crash_rollback_passed": false,
+  "host_application_launch_available": false,
+  "remote_viewer_available": false,
+  "production_acceptance": false
+}
