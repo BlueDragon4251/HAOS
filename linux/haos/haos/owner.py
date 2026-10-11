@@ -44,6 +44,17 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    applications = sub.add_parser("application", help="owner-approved exact host executable identities; no direct execution")
+    applications_sub = applications.add_subparsers(dest="application_action", required=True)
+    applications_sub.add_parser("status")
+    register = applications_sub.add_parser("register")
+    register.add_argument("id")
+    register.add_argument("executable")
+    register.add_argument("--class", dest="application_class", choices=["browser", "editor", "terminal", "utility"], required=True)
+    register.add_argument("--arg", action="append", default=[])
+    register.add_argument("--memory-mib", type=int, default=512)
+    register.add_argument("--runtime-seconds", type=int, default=300)
+    applications_sub.add_parser("revoke").add_argument("id")
     gateway = sub.add_parser("gateway", help="owner-authenticated transport credentials and exact sender pairing")
     gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
     for action in ("status", "start", "stop"):
@@ -122,7 +133,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "provider":
+    if args.action == "application":
+        from .applications import owner_application
+        print(json.dumps(owner_application(args), indent=2))
+    elif args.action == "provider":
         from .provider_setup import owner_provider
         print(json.dumps(owner_provider(args), indent=2))
     elif args.action == "recovery-codes":

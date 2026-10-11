@@ -118,3 +118,32 @@ allocation exceeded 64 MiB. The harness records capacity/minimum free bytes,
 retains original assertions/deadlines and keeps Chromium sandboxing enabled.
 General registered host applications, process isolation/limits, online browsing
 and authenticated remote viewing remain open.
+
+## Explicit owner application identities
+
+`haos-owner application` now maintains a private root-owned registry for the next
+host-application integration. A grant records an application ID/class, exact ELF
+path under immutable `/usr`, SHA-256, fixed bounded arguments and intended memory/
+runtime limits. Paths, parent ownership, file modes, set-ID bits, hard/symbolic
+links, content changes, duplicate keys/IDs and policy size are checked. Grants
+serialize under a private nonblocking lock and publish with the existing fsynced
+atomic policy writer. A changed executable after an update requires a new approval.
+No caller-supplied environment, volume, credential or privilege field is accepted.
+
+```sh
+sudo haos-owner stop
+sudo haos-owner application register mission-editor /usr/bin/APP --class editor
+sudo haos-owner application status
+sudo haos-owner application revoke mission-editor
+```
+
+`APP` must be an actual installed ELF application selected by the owner. There are
+no default grants. Mutations require authenticated owner authority and fully stopped
+execution. Re-registering an existing identity requires explicit revocation first;
+audit records only ID/class/digest, not arguments. Class labels grant no system rights.
+
+**This registry does not start applications.** Status explicitly reports host
+launch unavailable. Mission process isolation, private Wayland/clipboard context,
+resource enforcement and cancellation cleanup must be integrated before these
+grants can authorize native execution. The real disposable root probe checks actual
+ELF/file/UID/lock/update/restart/revocation behavior without executing the fixture ELF.
