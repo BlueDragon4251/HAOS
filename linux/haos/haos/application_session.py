@@ -182,6 +182,7 @@ class ApplicationSession:
                 self.helper([self.wlrctl, 'toplevel', 'find', 'state:focused'])
                 return {'focused': True}
             return {'running': self.application.poll() is None, 'windows': len(lines),
+                    'application_exitcode':self.application.returncode,
                     'window_state_sha256': hashlib.sha256(listing).hexdigest()}
         if op == 'type':
             if self.keyboard.poll() is not None:

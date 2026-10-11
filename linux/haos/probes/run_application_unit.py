@@ -88,7 +88,11 @@ def main():
                         assert not info.st_mode&0o077
                         text=os.read(fd,4096).decode(errors='replace')
                     finally: os.close(fd)
-                    if text: break
+                    # Keep polling through the real application's exit; its
+                    # first warning precedes the useful failure/footer. A vanished
+                    # runtime directory retains only the last bounded snapshot.
+                elif text:
+                    break
                 time.sleep(0.025)
             return {'scope':'fixed credentialless disposable foot stderr only','diagnostic':text}
         homes=[];units=[]
