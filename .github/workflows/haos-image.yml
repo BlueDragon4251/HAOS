@@ -5,7 +5,24 @@ on:
     branches: ['agent/haos-*']
     # Harness/diagnostics-only edits retest an existing ISO; they do not need
     # another multi-gigabyte image build. Keep actual image and guest inputs here.
-    paths: ['linux/**', 'apps/**', 'packages/**', 'plugins/**', 'scripts/sync-upstream.sh', 'tests/e2e/haos_guest.py', 'package*.json', 'upstream/*.lock', '.containerignore', '.github/workflows/haos-image.yml']
+    paths:
+      - 'linux/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'plugins/**'
+      - 'scripts/sync-upstream.sh'
+      - 'tests/e2e/haos_guest.py'
+      - 'package*.json'
+      - 'upstream/*.lock'
+      - '.containerignore'
+      - '.github/workflows/haos-image.yml'
+      # These are exercised by the required CI/service jobs, and are never
+      # installed or bundled into the shipped runtime. Do not rebuild an ISO
+      # merely to repair a test fixture. Production inputs above still trigger.
+      - '!linux/haos/tests/**'
+      - '!linux/haos/probes/**'
+      - '!apps/**/*.test.ts'
+      - '!apps/**/*.test.tsx'
   workflow_dispatch:
 
 permissions:
@@ -211,6 +228,11 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 210
+    concurrency:
+      # Share the execution slot with existing-ISO acceptance. A new source
+      # must not interrupt an installed guest or start another costly TCG VM.
+      group: haos-installed-qemu-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
       - name: Reclaim unused SDKs on the disposable VM runner

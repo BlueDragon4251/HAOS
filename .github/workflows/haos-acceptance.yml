@@ -25,6 +25,9 @@ jobs:
   install:
     runs-on: ubuntu-24.04
     timeout-minutes: 210
+    concurrency:
+      group: haos-installed-qemu-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
         with:

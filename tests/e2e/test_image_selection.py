@@ -104,3 +104,13 @@ def test_failed_build_cannot_be_reused(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="No completed"):
         select(monkeypatch, tmp_path, requested="10", build="failure")
     assert not (tmp_path / "output").exists()
+
+
+def test_new_and_reused_iso_installations_share_a_non_cancelling_slot():
+    root = Path(__file__).resolve().parents[2]
+    workflows = [yaml.safe_load((root / ".github/workflows" / name).read_text())
+                 for name in ("haos-image.yml", "haos-acceptance.yml")]
+    slots = [workflow["jobs"]["install"]["concurrency"] for workflow in workflows]
+    assert slots[0] == slots[1]
+    assert slots[0]["cancel-in-progress"] is False
+    assert "github.ref" in slots[0]["group"] and "github.sha" not in slots[0]["group"]
