@@ -12,6 +12,7 @@ import { $pendingMissionMessages, recoverMissionMessages } from '../../store/mis
 import { MissionMessageComposer } from './MissionMessageComposer.tsx'
 import { SystemHealth } from './SystemHealth.tsx'
 import { ProviderUsage } from './ProviderUsage.tsx'
+import { PrivateApplications } from './PrivateApplications.tsx'
 
 const STATE_COLOR: Record<DurableMissionState, string> = {
   queued: 'text-fg-3', running: 'text-progress', waiting: 'text-warn', blocked: 'text-warn',
@@ -159,6 +160,7 @@ export function DurableMissionsPage({ conversation = false }: { conversation?: b
                   {isPausedDurableMission(selected) && <p className="text-xs text-fg-3">Paused before dispatch. Resume returns this mission to the queue; its original deadline and retry budget still apply.</p>}
                   {selected.state === 'blocked' && !isPausedDurableMission(selected) && <p className="text-xs text-warn">Execution may have changed files or external services. Owner recovery must inspect and reconcile it before another mission uses this workspace.</p>}
                   {questions.map(q => <PendingQuestion key={String(q.id)} question={q} />)}
+                  <PrivateApplications mission={selected.id} />
                   {selected.result && <section className="flex flex-col gap-2"><h3 className="text-sm font-semibold text-fg">Hermes result</h3><p className="text-xs text-fg-4">Recorded upstream turn receipt. Review its evidence and remaining work.</p><pre className="whitespace-pre-wrap break-words text-xs text-fg-2">{selected.result}</pre></section>}
                   <section className="flex flex-col gap-3" aria-label="Recorded mission events">
                     <h3 className="text-sm font-semibold text-fg">Recorded activity</h3>

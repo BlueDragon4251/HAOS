@@ -100,3 +100,29 @@ def test_controller_lost_root_receipt_is_uncertain_and_dispatches_only_once(live
     asyncio.run(controller.application_worker())
     assert len(calls)==1 and calls[0]['id']==admitted['id']
     assert controller.gui.result(mission,{'session':'offline-session','id':admitted['id']})['state']=='uncertain'
+
+
+def test_observer_snapshot_has_actual_scoped_receipts_and_purges_cancelled_images(live):
+    store,gui,mission,_=live;gui.application_seen_at=time.time()
+    start=submit(gui,mission,{'operation':'app.start','program':'approved-terminal'});gui.application_poll(mission)
+    gui.application_acknowledge(start['id'],result={'instance':start['id'],'program':'approved-terminal','state':'submitted'})
+    captured=submit(gui,mission,{'operation':'app.capture','instance':start['id']});gui.application_poll(mission)
+    output=io.BytesIO();Image.new('RGB',(80,60),(15,30,70)).save(output,format='PNG');pixels=jpeg_capture(output.getvalue())
+    data={'instance':start['id'],'mime':'image/jpeg','bytes':len(pixels),'sha256':hashlib.sha256(pixels).hexdigest(),'base64':base64.b64encode(pixels).decode()}
+    gui.application_acknowledge(captured['id'],result=data)
+    snapshot=gui.application_snapshot(mission);app=snapshot['applications'][0]
+    assert snapshot['mission']==mission and snapshot['mission_active'] and app['jpeg']==data['base64']
+    assert app['running'] is None and app['observed_at'] is None  # a screenshot does not certify process state
+    foreign=store.create('owner-fixture','foreign','separate application visibility')
+    assert gui.application_snapshot(foreign['id'])['applications']==[]
+    store.request_cancel(mission,'owner-fixture')
+    assert gui.application_snapshot(mission)['applications'][0]['jpeg'] is None
+    assert not gui.application_snapshot(mission)['mission_active']
+
+
+def test_application_authority_outage_expires_pending_requests_without_dispatch(live):
+    store,gui,mission,_=live;gui.application_seen_at=time.time()
+    admitted=submit(gui,mission,{'operation':'app.start','program':'approved-terminal'})
+    store.db.execute('UPDATE gui_actions SET created_at=? WHERE id=?',(time.time()-21,admitted['id']))
+    assert gui.application_poll(mission,dispatch=False) is None
+    assert store.db.execute('SELECT state,arguments FROM gui_actions WHERE id=?',(admitted['id'],)).fetchone()[0]=='uncertain'

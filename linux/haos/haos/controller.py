@@ -172,6 +172,9 @@ class Controller:
             if type(after) is not int or after < 0:
                 raise ValueError("after must be a nonnegative event cursor")
             return self.store.events(params["id"], after)
+        if method=='applications.snapshot':
+            if set(params)!={'id'}:raise PermissionError('closed application observation request required')
+            return self.gui.application_snapshot(params['id'])
         if method == "missions.cancel":
             return self.store.request_cancel(params["id"], actor)
         if method == "missions.pause":

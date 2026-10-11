@@ -327,3 +327,34 @@ class GuiBroker:
             self.store._event(row['mission_id'],'gui.'+state,{'id':key,'operation':row['operation'],
                 **({k:data[k] for k in ('sha256','bytes')} if 'sha256' in data else {})})
         return {'accepted':True}
+
+    def application_snapshot(self,mission):
+        """Read-only actual receipts/ephemeral frames, no commands or new captures."""
+        identifier(mission);current=self.store.get(mission);self.prune_images()
+        now=time.time()
+        active=(current['state']=='running' and current['phase']=='dispatching'
+                and not current['cancel_requested'] and current['deadline']>now)
+        rows=self.store.db.execute("SELECT id,operation,result,created_at FROM gui_actions WHERE mission_id=? AND state='succeeded' AND operation LIKE 'app.%' ORDER BY created_at,id",(mission,)).fetchall()
+        applications={}
+        for row in rows:
+            data=json.loads(row['result'])
+            if row['operation']=='app.start':
+                receipt(row['operation'],data)
+                if data['instance']!=row['id']:raise PermissionError('application inventory launch identity mismatch')
+                applications[data['instance']]={'instance':data['instance'],'program':data['program'],
+                    'admitted_at':row['created_at'],'observed_at':None,'running':None,'windows':None,
+                    'capture_at':None,'capture_sha256':None,'jpeg':None}
+            elif data.get('instance') in applications:
+                item=applications[data['instance']]
+                if row['operation']=='app.state':
+                    receipt(row['operation'],data)
+                    item.update(observed_at=row['created_at'],running=data['running'],windows=data['windows'])
+                elif row['operation']=='app.close':
+                    receipt(row['operation'],data);applications.pop(data['instance'])
+                elif row['operation']=='app.capture' and active and row['id'] in self.images:
+                    at,frame=self.images[row['id']];receipt('app.capture',frame)
+                    if frame['instance']!=data['instance']:raise PermissionError('application capture identity mismatch')
+                    item.update(capture_at=at,capture_sha256=frame['sha256'],jpeg=frame['base64'])
+        return {'mission':mission,'snapshot_at':now,'mission_active':bool(active),
+                'authority_available':0<=now-self.application_seen_at<3,
+                'applications':list(applications.values())[-4:]}

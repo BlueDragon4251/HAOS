@@ -90,6 +90,27 @@ export interface MissionMethods {
   'missions.pause': { params: { id: string }; result: DurableMission }
   'missions.resume': { params: { id: string }; result: DurableMission }
   'missions.answer': { params: { request_id: string; choice?: 'once' | 'deny'; answer?: string }; result: { accepted: boolean } }
+  'applications.snapshot': { params: { id: string }; result: PrivateApplicationSnapshot }
 }
 
-export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.lookup', 'missions.get', 'missions.events', 'missions.cancel', 'missions.pause', 'missions.resume', 'missions.answer'])
+export interface PrivateApplicationObservation {
+  instance: string
+  program: string
+  admitted_at: number
+  observed_at: number | null
+  running: boolean | null
+  windows: number | null
+  capture_at: number | null
+  capture_sha256: string | null
+  jpeg: string | null
+}
+
+export interface PrivateApplicationSnapshot {
+  mission: string
+  snapshot_at: number
+  mission_active: boolean
+  authority_available: boolean
+  applications: PrivateApplicationObservation[]
+}
+
+export const MISSION_METHODS: ReadonlySet<string> = new Set(['health', 'missions.list', 'missions.create', 'missions.lookup', 'missions.get', 'missions.events', 'missions.cancel', 'missions.pause', 'missions.resume', 'missions.answer', 'applications.snapshot'])
