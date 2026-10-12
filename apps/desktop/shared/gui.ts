@@ -1,3 +1,4 @@
+import { validateMissionThemeAction, type MissionThemeAction } from './mission-theme.ts'
 /** Fixed capability for mission-owned local Chromium windows. No host/window/URL/eval API. */
 export type GuiAction =
   | { operation: 'open'; html: string }
@@ -9,6 +10,7 @@ export type GuiAction =
   | { operation: 'key'; window: string; key: string }
   | { operation: 'locate' | 'center'; window: string }
   | { operation: 'workspace'; window: string; workspace: number }
+  | MissionThemeAction
 
 export interface GuiRequest { id: string; mission: string; action: GuiAction }
 export interface GuiPoll { mission: string | null; request: GuiRequest | null }
@@ -22,6 +24,7 @@ export function validateGuiAction(value: unknown): GuiAction {
   const fields = ['operation']
   const op = data.operation
   if (typeof op !== 'string') throw new Error('Invalid GUI operation')
+  if (op.startsWith('theme.')) return validateMissionThemeAction(value)
   if (op === 'open') {
     fields.push('html')
     if (typeof data.html !== 'string' || new TextEncoder().encode(data.html).length > 32768 || !data.html.length) throw new Error('Invalid local document')

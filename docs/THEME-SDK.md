@@ -131,3 +131,9 @@ No physical display, provider, model response or installed niri result is invent
 Restricted agent theme generation/activation, widgets, capability-managed plugins,
 complete resource/visual regressions and installed whole-session acceptance remain
 required. This guard does not grant Hermes access to the observer's theme store.
+
+## Mission data authoring
+
+The existing `haos_gui` tool now exposes `theme.sdk` and `theme.stage` through the same durable, authenticated mission queue and native broker. The SDK returns the maintained palette keys and installed shell presets. Stage accepts only a complete hex palette, bounded label/description and those presets. The broker derives `haos-t-<full mission UUID without dashes>` itself, fixes the drawn wallpaper, and publishes a complete checksum-addressed revision through the existing ThemeRevisions engine. Caller theme names, image/file/import paths, GTK commands, code and plugin manifests are denied. There are at most 16 saved valid revisions per mission. The receipt is checked against the actual mission before acknowledgement. Neither manifest contents nor pixels are persisted in action audit.
+
+Real filesystem tests cover new/repeated publication, independent mission namespaces, old-byte preservation, no activation, unsafe fields and version limits; controller tests cover scope/receipt rejection. These are providerless data-authoring checks. Agent-accessible isolated preview and guarded activation, full desktop health/rollback, model-generated widgets/skills and credentialed natural-language execution still need integration and acceptance. Saving a revision is not an activated or visually verified theme.

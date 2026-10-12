@@ -4,6 +4,7 @@ import { BrowserWindow, session } from 'electron'
 import { GUI_WINDOW_LIMIT, guiId, missionDocument, validateGuiAction, type GuiRequest, type GuiPoll } from '../../shared/gui.ts'
 import { managedMissions, nativeGuiRequest } from './client.ts'
 import { MissionCompositor } from './niri.ts'
+import { missionTheme } from './themes.ts'
 
 export class MissionBrowser {
   private windows = new Map<string, { mission: string; win: BrowserWindow; documentSession: string }>()
@@ -21,6 +22,7 @@ export class MissionBrowser {
   async execute(request: GuiRequest): Promise<Record<string, unknown>> {
     if (!guiId(request.id) || !guiId(request.mission)) throw new Error('Invalid GUI scope')
     const action = validateGuiAction(request.action)
+    if (action.operation === 'theme.sdk' || action.operation === 'theme.stage') return missionTheme(request)
     if (action.operation === 'state') {
       return { windows: [...this.windows].filter(([, e]) => e.mission === request.mission && !e.win.isDestroyed()).map(([window]) => ({ window, width: 800, height: 600 })) }
     }

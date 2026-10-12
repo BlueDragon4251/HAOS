@@ -1,0 +1,38 @@
+{
+  "artifact": {
+    "id": 11727002449,
+    "digest": "sha256:bdf1c7fbddf8d0d1bc6585a4f3e83355db46a0f34d89be4a777893ad9ba1193c",
+    "original_zip_digest_verified": true
+  },
+  "receipt": {
+    "scope": "actual production root-service hardening in a disposable socket-activated CI fixture",
+    "source_commit": "90964a384eafbddeea4dc673e7d7c04b1f6f5c9b",
+    "root_service_source_sha256": "90fd7d1bbfc8fc182beb47a498189848885063de7425571d51051772c8b7f209",
+    "actual_root_capabilities_exactly_four": true,
+    "actual_root_no_new_privileges_and_private_network": true,
+    "all_production_service_hardening_properties_preserved": true,
+    "actual_root_and_controller_kernel_socket_roles": true,
+    "actual_uid_dropped_wal_authorization_under_strict_filesystem": true,
+    "actual_owner_catalog_and_nonce_replay_denial": true,
+    "actual_real_terminal_input_result_and_capture": true,
+    "actual_pid1_broker_sigkill_application_cleanup": true,
+    "installed_haos_verified": false,
+    "hermes_model_verified": false
+  },
+  "run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38204954191",
+  "conclusion": "success",
+  "historical_failures": [
+    {
+      "source": "215027f",
+      "run": 38203118313,
+      "reason": "effective/permitted CAP_SETUID missing; bounding set unchanged"
+    },
+    {
+      "source": "be7e3cf",
+      "run": 38204113911,
+      "reason": "200/CHDIR before private session; UMask=0077 directories not traversable"
+    }
+  ],
+  "local_haos_tests_at_fix": 494,
+  "scope_limit": "actual production hardening properties/authority on disposable systemd; no installed/model acceptance"
+}

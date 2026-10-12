@@ -13,8 +13,9 @@ import uuid
 
 from .store import Conflict
 from .application_protocol import OPERATIONS as APPLICATION_OPERATIONS,action as application_action,receipt as application_receipt
+from .theme_protocol import OPERATIONS as THEME_OPERATIONS,action as theme_action,receipt as theme_receipt
 
-OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read", "locate", "center", "workspace"} | APPLICATION_OPERATIONS
+OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key", "capture", "inspect", "read", "locate", "center", "workspace"} | APPLICATION_OPERATIONS | THEME_OPERATIONS
 WINDOW_LIMIT = 4
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
@@ -26,6 +27,7 @@ def identifier(value):
 
 
 def action(data):
+    if isinstance(data,dict) and data.get('operation') in THEME_OPERATIONS:return theme_action(data)
     if isinstance(data,dict) and data.get('operation') in APPLICATION_OPERATIONS:
         return application_action(data)
     if not isinstance(data, dict) or data.get("operation") not in OPERATIONS:
@@ -70,6 +72,7 @@ def action(data):
 def receipt(op, data):
     """Native replies are bounded too; captures never become durable ledger data."""
     if op in APPLICATION_OPERATIONS:return application_receipt(op,data)
+    if op in THEME_OPERATIONS:return theme_receipt(op,data)
     if not isinstance(data, dict):
         raise ValueError("invalid GUI receipt")
     fields = {"window", "width", "height"}
@@ -258,6 +261,8 @@ class GuiBroker:
             if not row or row["operation"] in APPLICATION_OPERATIONS or row["state"] != "dispatched" or row["epoch"] != self.epoch:
                 raise Conflict("GUI action no longer awaits a receipt")
             data = receipt(row["operation"], params["result"]) if params["ok"] else {"error": "native GUI action failed"}
+            if row['operation']=='theme.stage' and params['ok'] and data['name']!='haos-t-'+row['mission_id'].replace('-',''):
+                raise PermissionError('theme revision belongs to another mission')
             if row["operation"] == "capture" and params["ok"]:
                 self.prune_images()
                 self.images[row["id"]] = (time.time(), data)
