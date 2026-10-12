@@ -1,10 +1,10 @@
-// Herald OS boot splash. Deep-blue field, the Herald mark fading in, a progress bar on a faint track
+// HAOS boot splash. Deep-blue field, the HAOS wordmark fading in, a progress bar on a faint track
 // for the boot sequence, and plain password prompts for encrypted disks.
 
 Window.SetBackgroundTopColor(0.016, 0.067, 0.247);
 Window.SetBackgroundBottomColor(0.008, 0.035, 0.150);
 
-logo.image = Image("logo.png");
+logo.image = Image.Text("HAOS", 0.79, 0.93, 1, 1, "Sans Bold 48");
 logo.sprite = Sprite(logo.image);
 logo.x = Window.GetWidth() / 2 - logo.image.GetWidth() / 2;
 logo.y = Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 40;
