@@ -68,6 +68,62 @@ def test_progress_contains_only_fixed_phase_and_elapsed_time(monkeypatch, capsys
     assert not capsys.readouterr().out
 
 
+def test_agent_loopback_probe_accepts_slow_tcg_child_exit(monkeypatch):
+    """The old 5s outer timeout rejected slow TCG children even if they finished."""
+    original_run = subprocess.run
+
+    def slow_child(args, **kwargs):
+        assert args[:1] == ["setpriv"]
+        assert args[1:3] == ["--reuid=12345", "--regid=12346"]
+        assert args[3:5] == ["--clear-groups", "--no-new-privs"]
+        assert args[5:8] == ["python3", "-I", "-c"]
+        assert "timeout=2" in args[8]
+        compile(args[8], "agent-loopback-guest", "exec")
+        assert args[9] == "19001"
+        assert kwargs == {"timeout": 30}
+        # Real bounded child process, deliberately slower than the former 5s
+        # startup/exit budget; never touches the host network or identities.
+        return original_run([sys.executable, "-I", "-c", "import time; time.sleep(5.2)"],
+                            **kwargs)
+
+    monkeypatch.setattr(guest.subprocess, "run", slow_child)
+    guest.verify_agent_local_network_guard(SimpleNamespace(pw_uid=12345, pw_gid=12346), 19001)
+
+
+def test_agent_loopback_probe_rejects_a_successful_unauthorized_connect(monkeypatch):
+    """A reachable listener must fail the guard, not become an accepted result."""
+    import socket
+
+    original_run = subprocess.run
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        port = listener.getsockname()[1]
+
+        def without_uid_isolation(args, **kwargs):
+            assert args[:1] == ["setpriv"]
+            assert kwargs == {"timeout": 30}
+            assert "timeout=2" in args[-2]
+            # Test the *actual embedded socket program* against our disposable
+            # allowed listener, without changing any system identity/firewall.
+            return original_run([sys.executable, "-I", "-c", args[-2], args[-1]],
+                                **kwargs)
+
+        monkeypatch.setattr(guest.subprocess, "run", without_uid_isolation)
+        with pytest.raises(AssertionError, match="agent reached a privileged localhost listener"):
+            guest.verify_agent_local_network_guard(SimpleNamespace(pw_uid=12345, pw_gid=12346), port)
+
+
+def test_agent_loopback_probe_fails_closed_on_outer_timeout(monkeypatch):
+    def too_slow(args, **kwargs):
+        assert kwargs == {"timeout": 30}
+        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+
+    monkeypatch.setattr(guest.subprocess, "run", too_slow)
+    with pytest.raises(AssertionError, match="did not finish within 30 seconds"):
+        guest.verify_agent_local_network_guard(SimpleNamespace(pw_uid=12345, pw_gid=12346), 19001)
+
+
 def test_guest_budget_leaves_time_for_boot_diagnostics_and_shutdown():
     # An expanded guest matrix must fit inside the outer QEMU phase; otherwise
     # SIGTERM kills diagnostics and hides the original failure.
