@@ -90,6 +90,10 @@ def main():
             transport(queued['dispatch'],denied=True)
             assert control({'method':'ack','id':key,'result':result})['accepted']
             return result
+        catalog=action({'operation':'app.catalog'})
+        assert catalog=={'programs':[{'program':'fixture-terminal','class':'terminal','approved_sha256':executable_digest('/usr/bin/foot'),
+            'memory_mib':512,'runtime_seconds':60}]}
+        assert str(initialization) not in json.dumps(catalog) and '--rcfile' not in json.dumps(catalog)
         result=action({'operation':'app.start','program':'fixture-terminal'},reattach=True)
         instance=result['instance'];instances.append(instance)
         home=Path('/run')/launcher.record(instance)['unit'];deadline=time.monotonic()+15
@@ -113,7 +117,8 @@ def main():
         assert action({'operation':'app.state','instance':instance})['running']
         audit=control({'method':'audit'})
         assert 'HAOS_REAL_QUEUE' not in json.dumps(audit) and after['base64'] not in json.dumps(audit)
-        assert audit['action_count']==7 and sum(e['kind']=='gui.succeeded' for e in audit['events'])==7
+        assert audit['action_count']==8 and sum(e['kind']=='gui.succeeded' for e in audit['events'])==8
+        assert sum(e['kind']=='gui.succeeded' and e['payload']['operation']!='app.catalog' for e in audit['events'])==7
         assert control({'method':'cancel'})['cancel_requested']
         assert authority.reconcile()==[instance]
         assert launcher.record(instance)['state']=='stopped'
@@ -121,6 +126,7 @@ def main():
             'source_commit':os.environ.get('GITHUB_SHA'),'actual_unprivileged_persistent_gui_queue':True,
             'actual_root_server_and_client_kernel_identity':True,'non_controller_root_peer_denied':True,
             'actual_matching_wal_dispatch_authority':True,'root_action_replays_denied':True,
+            'actual_owner_program_discovery_without_arguments':True,
             'actual_terminal_input_result_and_capture':True,'native_reattach_preserves_application':True,
             'audit_has_no_typed_contents_or_pixels':True,'cancel_reconciles_entire_application':True,
             'production_broker_service_verified':False,'installed_haos_verified':False,'hermes_model_verified':False}),flush=True)

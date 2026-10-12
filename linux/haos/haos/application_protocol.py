@@ -11,7 +11,7 @@ import uuid
 
 from .application_session import session_action
 
-OPERATIONS = {'app.start','app.state','app.focus','app.type','app.key','app.capture','app.close'}
+OPERATIONS = {'app.catalog','app.start','app.state','app.focus','app.type','app.key','app.capture','app.close'}
 
 
 def identifier(value):
@@ -24,7 +24,9 @@ def action(value):
     if not isinstance(value,dict) or value.get('operation') not in OPERATIONS:
         raise PermissionError('application capability denied')
     op=value['operation']
-    if op=='app.start':
+    if op=='app.catalog':
+        if set(value)!={'operation'}:raise PermissionError('closed approved-program discovery required')
+    elif op=='app.start':
         if set(value)!={'operation','program'} or not isinstance(value['program'],str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,47}',value['program']):
             raise PermissionError('only an exact owner-registered application is allowed')
     else:
@@ -46,6 +48,20 @@ def action_digest(value):
 def receipt(op,value):
     if op not in OPERATIONS or not isinstance(value,dict):
         raise ValueError('invalid application receipt')
+    if op=='app.catalog':
+        if set(value)!={'programs'} or not isinstance(value['programs'],list) or len(value['programs'])>32:
+            raise ValueError('bounded owner-approved program catalog required')
+        seen=set()
+        for item in value['programs']:
+            if (not isinstance(item,dict) or set(item)!={'program','class','approved_sha256','memory_mib','runtime_seconds'}
+                    or not isinstance(item['program'],str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,47}',item['program'])
+                    or item['program'] in seen or item['class'] not in {'browser','editor','terminal','utility'}
+                    or not isinstance(item['approved_sha256'],str) or not re.fullmatch(r'[a-f0-9]{64}',item['approved_sha256'])
+                    or type(item['memory_mib']) is not int or not 128<=item['memory_mib']<=4096
+                    or type(item['runtime_seconds']) is not int or not 1<=item['runtime_seconds']<=3600):
+                raise ValueError('closed approved program metadata required')
+            seen.add(item['program'])
+        return value
     identifier(value.get('instance'))
     fields={'instance'}
     if op=='app.start':

@@ -14,6 +14,7 @@ from haos.store import MissionStore
 
 def test_owner_registered_id_and_opaque_instances_are_the_only_application_targets():
     instance=str(uuid.uuid4())
+    assert action({'operation':'app.catalog'})=={'operation':'app.catalog'}
     assert action({'operation':'app.start','program':'approved-terminal'})['program']=='approved-terminal'
     for op in ('state','focus','capture','close'):
         assert action({'operation':'app.'+op,'instance':instance})['instance']==instance
@@ -30,6 +31,7 @@ def test_owner_registered_id_and_opaque_instances_are_the_only_application_targe
     {'operation':'app.type','instance':str(uuid.uuid4()),'text':'a'*513},
     {'operation':'app.type','instance':str(uuid.uuid4()),'text':'a\n'},
     {'operation':'app.shell','command':'id'},
+    {'operation':'app.catalog','owner':True},
 ])
 def test_application_targets_cannot_import_owner_windows_files_commands_or_credentials(value):
     with pytest.raises((ValueError,PermissionError)):action(value)
@@ -42,6 +44,15 @@ def test_actual_capture_receipt_checks_pixels_hash_size_and_closed_fields():
     assert receipt('app.capture',value)==value
     for delta in ({'bytes':True},{'sha256':'a'*64},{'base64':'not base64'},{'owner_window':True}):
         with pytest.raises(ValueError):receipt('app.capture',dict(value,**delta))
+
+
+def test_catalog_exposes_only_bounded_owner_approval_metadata():
+    item={'program':'approved-editor','class':'editor','approved_sha256':'a'*64,'memory_mib':512,'runtime_seconds':60}
+    assert receipt('app.catalog',{'programs':[item]})=={'programs':[item]}
+    assert receipt('app.catalog',{'programs':[]})=={'programs':[]}
+    for delta in ({'argv':['private-owner-args']},{'executable':'/etc/haos/secret'},{'memory_mib':True},{'runtime_seconds':0},{'class':'owner'},{'program':'/usr/bin/bash'}):
+        with pytest.raises(ValueError):receipt('app.catalog',{'programs':[dict(item,**delta)]})
+    with pytest.raises(ValueError):receipt('app.catalog',{'programs':[item,item]})
 
 
 @pytest.fixture

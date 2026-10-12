@@ -81,14 +81,22 @@ class ApplicationAuthority:
         # Validate instance ownership *before* admitting a side effect. The
         # root nonce and recheck both precede the actual compositor input.
         op=action['operation']
-        if op!='app.start':
+        if op not in {'app.start','app.catalog'}:
             record=self.launcher.record(action['instance'])
             if record['mission']!=mission or record['state']!='submitted':
                 raise PermissionError('application instance belongs to another mission or has stopped')
         self.nonces.admit(key,mission,action)
         try:
             running_mission(self.ledger,mission,self.controller_uid,request=key,action=action)
-            if op=='app.start':
+            if op=='app.catalog':
+                # Owner-approved metadata only, never fixed arguments, paths,
+                # environment or credentials. Launch separately verifies actual
+                # executable bytes; listing an approval is not runtime evidence.
+                result={'programs':[{'program':grant['id'],'class':grant['class'],
+                    'approved_sha256':grant['sha256'],'memory_mib':grant['memory_mib'],
+                    'runtime_seconds':grant['runtime_seconds']}
+                    for grant in self.launcher.registry.read()['applications']]}
+            elif op=='app.start':
                 result=self.launcher.start(action['program'],mission,key,ledger=self.ledger,ledger_uid=self.controller_uid)
                 result={'instance':result['request'],'program':result['application'],'state':result['state']}
             elif op=='app.close':
