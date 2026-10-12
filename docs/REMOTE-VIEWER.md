@@ -60,3 +60,15 @@ separate installed service UIDs, real browser/device rendering and real applicat
 capture delivery need their own gates. Existing application captures are produced
 by the separate real Wayland/systemd pipeline. No installed remote acceptance or
 complete privacy/release approval is claimed by a local TLS test.
+
+The additional mandatory `run_remote_application.py` gate uses actual PID 1,
+separate disposable controller/viewer UIDs, the production viewer service's
+hardening properties and real systemd credential delivery. It drives an actual
+private Wayland terminal through the persistent GUI queue, verifies the typed
+task's file, then compares two real changed captures byte-for-byte over verified
+TLS 1.3. Wrong Unix peer UIDs, unpaired/missing certificates, foreign missions,
+withdrawn screenshot/content consent, expiry, revocation and cancellation are
+denied independently. Application cancellation must stop its entire cgroup;
+observation audit must exclude typed contents and pixels. No host desktop,
+production credentials or physical device is used. This new mandatory gate
+requires its own successful CI receipt before those service/frame claims hold.
