@@ -23,6 +23,9 @@ on:
       - '!linux/haos/probes/**'
       - '!apps/**/*.test.ts'
       - '!apps/**/*.test.tsx'
+      # electron-builder includes dist/** and package.json, never these
+      # disposable renderer probes. Required CI still executes every probe.
+      - '!apps/desktop/scripts/test-*.mjs'
   workflow_dispatch:
 
 permissions:
