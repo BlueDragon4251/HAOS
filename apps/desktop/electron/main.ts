@@ -55,7 +55,7 @@ import { registerServiceIpc } from './shell/services.ts'
 import { WallpaperService } from './shell/wallpaper.ts'
 import { appIconPath, createMainWindow } from './window.ts'
 
-app.setName('Herald OS')
+app.setName('HAOS')
 // Chromium turns WebGL off where it does not accelerate the graphics (virtual machines, drivers it
 // blocklists), and Herald Canvas draws with WebGL: there it falls back to SwiftShader, Chromium's
 // software renderer, rather than to nothing. Machines it accelerates are not affected.
@@ -366,7 +366,7 @@ app.whenReady().then(async () => {
     const recovered = await run('herald-os-theme', ['recover'], 8_000)
     if (recovered.code !== 0 && recovered.code !== 127) log('theme', 'theme recovery needs inspection of the private activation journal')
   }
-  log('main', `Herald OS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
+  log('main', `HAOS ${app.getVersion()} starting (dev=${isDev}, mode=${mode}, HERMES_HOME=${hermesHome()})`)
   // A packaged app carries its icon in the bundle; `electron .` would show Electron's.
   const icon = isDev ? appIconPath() : undefined
 
