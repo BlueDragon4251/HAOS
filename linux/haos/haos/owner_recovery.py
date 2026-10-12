@@ -144,7 +144,20 @@ def main():
     print("HAOS owner onboarding and recovery. No agent or desktop is required.")
     if not owners():
         print("No owner is enrolled. Set up the owner from this local console.")
-        username = input("New owner account: ").strip()
+        # Reject invalid or existing identities before asking for a password.
+        # The raw exception is deliberately not printed: it could disclose
+        # private account names or data when other checks are added.
+        config = trusted_json(Path("/etc/haos/controller.json"))
+        observers = config.get("control_users")
+        if not isinstance(observers, list) or len(observers) != 1 or not isinstance(observers[0], str):
+            raise PermissionError("invalid HAOS observer configuration")
+        while True:
+            username = input("New owner account (lowercase letters, digits, _ or -): ").strip()
+            try:
+                enrollment.validate_name(username, observers[0])
+                break
+            except (ValueError, PermissionError):
+                print("Choose a new lowercase account name (a-z, 0-9, _ or -); do not use an existing, observer or service account.")
         # Another console may have enrolled the owner while this prompt was open.
         if owners():
             raise PermissionError("initial onboarding has already completed; authenticate with recovery instead")
