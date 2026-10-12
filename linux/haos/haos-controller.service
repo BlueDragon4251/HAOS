@@ -11,7 +11,7 @@ StartLimitBurst=5
 Type=simple
 User=haos-control
 Group=haos-ui
-SupplementaryGroups=haos-gateway haos-control
+SupplementaryGroups=haos-gateway haos-control haos-viewer
 WorkingDirectory=/usr/lib/haos
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=provider-token:/etc/haos/provider-token
@@ -22,7 +22,7 @@ RestartSec=3
 TimeoutStopSec=35
 StateDirectory=haos-control
 StateDirectoryMode=0700
-RuntimeDirectory=haos-control haos-gateway-control
+RuntimeDirectory=haos-control haos-gateway-control haos-viewer-control
 RuntimeDirectoryMode=0750
 UMask=0077
 NoNewPrivileges=yes

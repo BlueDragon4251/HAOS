@@ -60,3 +60,5 @@ watchdog parent-SIGKILL, fixed-output/preference restoration, restarted recovery
 CLI and durable journal after reboot. Matching source `28dd93a` now has
 verified installed receipts for every one of these conditions in run `38123702298`. This is a bounded file/watchdog gate; it cannot accept whole-session
 visual health, autonomous theme generation or general host GUI access.
+
+The optional TLS remote viewer now implements owner-paired, expiring read-only mission/event observation and explicitly shared recent private app captures, with separate kernel socket, bandwidth/rate limits and revocation. Real local TLS/Unix/MissionStore tests pass. Installed distinct-UID service acceptance, browser/device rendering, continuous video, automatic certificate setup/rotation, remote commands and complete sensitive-content/privacy handling remain open; see [remote scope](REMOTE-VIEWER.md). New image `7678f59` failed before theme acceptance at backend health readiness; its digest-verified failure and bounded diagnosis are retained in `evidence/2026-10-12/backend-startup-failure.json`. No timeout or assertion was weakened.

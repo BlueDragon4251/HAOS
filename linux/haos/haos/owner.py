@@ -44,6 +44,24 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    remote=sub.add_parser('remote',help='owner-paired TLS observation; disabled until explicitly started')
+    remote_sub=remote.add_subparsers(dest='remote_action',required=True)
+    for action in ('start','stop','status'):remote_sub.add_parser(action)
+    configure_remote=remote_sub.add_parser('configure')
+    configure_remote.add_argument('--server-cert',required=True)
+    configure_remote.add_argument('--server-key',required=True)
+    configure_remote.add_argument('--client-ca',required=True)
+    configure_remote.add_argument('--bind',default='127.0.0.1')
+    configure_remote.add_argument('--port',type=int,default=8443)
+    configure_remote.add_argument('--requests-per-minute',type=int,default=60)
+    configure_remote.add_argument('--bytes-per-minute',type=int,default=16*1024*1024)
+    pair_remote=remote_sub.add_parser('pair')
+    pair_remote.add_argument('id');pair_remote.add_argument('certificate')
+    pair_remote.add_argument('--mission',action='append',required=True)
+    pair_remote.add_argument('--hours',type=int,default=1)
+    pair_remote.add_argument('--share-content',action='store_true')
+    pair_remote.add_argument('--share-screenshots',action='store_true')
+    remote_sub.add_parser('revoke').add_argument('id')
     applications = sub.add_parser("application", help="owner-approved exact host executable identities; no direct execution")
     applications_sub = applications.add_subparsers(dest="application_action", required=True)
     applications_sub.add_parser("status")
@@ -133,7 +151,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "application":
+    if args.action=='remote':
+        from .remote_setup import owner_remote
+        print(json.dumps(owner_remote(args),indent=2))
+    elif args.action == "application":
         from .applications import owner_application
         print(json.dumps(owner_application(args), indent=2))
     elif args.action == "provider":

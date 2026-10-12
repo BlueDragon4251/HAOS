@@ -1,0 +1,38 @@
+[Unit]
+Description=HAOS paired TLS remote mission observation
+After=haos-controller.service
+ConditionPathExists=/etc/haos/remote-viewer.json
+
+[Service]
+Type=simple
+User=haos-viewer
+Group=haos-viewer
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=server-cert:/etc/haos/remote-private/server.pem
+LoadCredential=server-key:/etc/haos/remote-private/server-key.pem
+LoadCredential=client-ca:/etc/haos/remote-private/clients-ca.pem
+ExecStart=/usr/bin/python3 -m haos.remote_server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=5
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryMax=128M
+TasksMax=16
+CPUQuota=25%
+LimitNOFILE=128

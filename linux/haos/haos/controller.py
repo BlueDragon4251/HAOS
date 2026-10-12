@@ -47,6 +47,10 @@ class Controller:
         self.gui = GuiBroker(store)
         self.agent_uid = None
         self.application_request=None
+        from .remote_policy import load as remote_policy
+        self.remote_policy=remote_policy
+        self.remote_observed={}
+        self.viewer_uid=None
 
     async def application_worker(self):
         """Same persistent GUI queue, serviced independently of Herald's lifetime."""
@@ -346,8 +350,19 @@ async def serve():
     gateway_server = await asyncio.start_unix_server(gateway_client, path=gateway_path, limit=MAX_FRAME)
     os.chown(gateway_path, -1, gateway_gid)
     os.chmod(gateway_path, 0o660)
+    from .remote_control import client as viewer_client,SOCKET as viewer_path
+    viewer=pwd.getpwnam('haos-viewer')
+    controller.viewer_uid=viewer.pw_uid
+    viewer_dir=Path(viewer_path).parent
+    os.chown(viewer_dir,-1,grp.getgrnam('haos-viewer').gr_gid)
+    Path(viewer_path).unlink(missing_ok=True)
+    async def observe_client(reader,writer):
+        await viewer_client(controller,reader,writer)
+    viewer_server=await asyncio.start_unix_server(observe_client,path=viewer_path,limit=8192)
+    os.chown(viewer_path,-1,grp.getgrnam('haos-viewer').gr_gid)
+    os.chmod(viewer_path,0o660)
     try:
-        async with server, gateway_server, gui_server:
+        async with server, gateway_server, gui_server,viewer_server:
             monitor = asyncio.create_task(controller.monitor())
             applications=asyncio.create_task(controller.application_worker())
             try:
@@ -363,6 +378,8 @@ async def serve():
         await gateway_server.wait_closed()
         gui_server.close()
         await gui_server.wait_closed()
+        viewer_server.close()
+        await viewer_server.wait_closed()
         store.close()
         lock.close()
 

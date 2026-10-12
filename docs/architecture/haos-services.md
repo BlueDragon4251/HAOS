@@ -16,6 +16,7 @@ fallback child. Quitting or restarting Electron does not stop that service.
 | `haos-control` | Queue, dispatch receipts, local API authenticated with Linux `SO_PEERCRED`; cannot grant volumes or run privileged commands | `/var/lib/haos-control/missions.db` |
 | `haos-gateway` | Pinned messaging adapters, exact owner-paired senders and scoped mission ingress/outbox; no general control/owner API | Private transport inbox and credentials delivered by systemd |
 | `haos-provider` | Fixed model API routes under owner allowlists; real provider/OAuth credentials kept outside agent/gateway namespaces | Private OAuth and bounded usage metadata; root-private API key store |
+| `haos-viewer` | Optional owner-paired TLS observation through a separate kernel-authenticated read-only controller socket; explicit mission/content/capture scopes | Root-owned device grants; TLS keys only via systemd credentials |
 | Root owner broker | Stable-volume resolution, mount preparation and offline recovery; no arbitrary command/path/options endpoint | `/etc/haos/volumes.json`, `/var/lib/haos-owner/audit.jsonl` |
 
 The UI's existing bridge permissions are not this authority. The isolated agent is deliberately
@@ -112,3 +113,5 @@ passes 20 HAOS tests, 729 desktop tests, typecheck and build. The existing CI (L
 bridge, script parsing and secret scan) passed at `f6127a5`. The first kernel probe failed because
 Bubblewrap requires explicit `--unshare-user` with `--disable-userns`; this has been corrected and
 must pass the next CI run. The actual Unix-socket roundtrip already passed in that run.
+
+The optional [remote observation service](../REMOTE-VIEWER.md) is never enabled by the image. Owner-paired certificate expiry, mission scope and consent are independently enforced by the viewer and controller; no general controller or owner actions are available through it.
