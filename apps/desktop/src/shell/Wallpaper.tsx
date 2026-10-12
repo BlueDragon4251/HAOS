@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { HeraldOSPrefs } from '../../shared/ipc.ts'
 import { wallpaperTint, type WallpaperTint } from '../../shared/theme.ts'
 import { $prefs, $windowState } from '../store/backend.ts'
+import { $managedMissions } from '../store/mission-mode.ts'
 
 /**
  * Procedural "flowing silk" wallpaper: layered, slowly drifting ribbons on a deep-blue field.
@@ -147,6 +148,7 @@ function useWallpaperSource(custom: string | undefined): string | undefined {
 }
 
 export function Wallpaper() {
+  const managed = useStore($managedMissions)
   const prefs = useStore($prefs)
   const win = useStore($windowState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -162,7 +164,7 @@ export function Wallpaper() {
   }, [win.focused])
 
   useEffect(() => {
-    if (custom) {
+    if (custom || managed) {
       return
     }
 
@@ -232,10 +234,28 @@ export function Wallpaper() {
       window.removeEventListener('resize', onResize)
       cancelAnimationFrame(raf)
     }
-  }, [custom, prefs.reduceMotion, tint])
+  }, [custom, managed, prefs.reduceMotion, tint])
 
   if (custom) {
     return <div className="absolute inset-0 z-(--z-wallpaper) bg-cover bg-center" style={{ backgroundImage: source ? `url(${JSON.stringify(source)})` : undefined }} />
+  }
+
+  if (managed === true) {
+    // HAOS must not boot into the inherited Herald flowing-silk wallpaper.
+    // Lightweight CSS field: no timers, external assets or privileged access.
+    return (
+      <div className="absolute inset-0 z-(--z-wallpaper) overflow-hidden" style={{
+        backgroundColor: '#071221',
+        backgroundImage: 'radial-gradient(ellipse at 84% 12%, rgba(36,167,211,.29), transparent 48%), radial-gradient(ellipse at 18% 83%, rgba(85,70,192,.29), transparent 52%), linear-gradient(145deg,#071221,#0b2340 60%,#071121)'
+      }} aria-hidden="true">
+        <div className="absolute inset-0 opacity-30" style={{
+          backgroundImage: 'linear-gradient(rgba(89,200,242,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(89,200,242,.10) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+          maskImage: 'radial-gradient(ellipse at 55% 50%, black, transparent 82%)'
+        }} />
+        <div className="absolute right-10 bottom-8 select-none text-[13px] font-semibold tracking-[0.5em] text-cyan-200/20">HAOS</div>
+      </div>
+    )
   }
 
   return <canvas ref={canvasRef} className="absolute inset-0 z-(--z-wallpaper) h-full w-full" style={{ filter: 'blur(1.5px)' }} aria-hidden="true" />
