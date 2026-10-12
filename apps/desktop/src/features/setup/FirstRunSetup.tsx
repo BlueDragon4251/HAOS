@@ -17,6 +17,7 @@ type Step = 'welcome' | 'account' | 'wifi' | 'hermes' | 'done'
  */
 export function FirstRunSetup() {
   const [due, setDue] = useState(false)
+  const [haosManaged, setHaosManaged] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const auth = useStore($hermesAuth)
@@ -24,7 +25,7 @@ export function FirstRunSetup() {
   useEffect(() => {
     void window.heraldOS.setup
       ?.state()
-      .then(state => setDue(state.needed))
+      .then(state => { setDue(state.needed); setHaosManaged(Boolean(state.haosManaged)) })
       .catch(() => undefined)
   }, [])
 
@@ -42,11 +43,11 @@ export function FirstRunSetup() {
     setDue(false)
   }
 
-  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
+  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : haosManaged ? ['welcome', 'account', 'wifi', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
   const next = () => setStep(steps[Math.min(steps.length - 1, steps.indexOf(step) + 1)] ?? 'done')
 
   return (
-    <div className="absolute inset-0 z-(--z-boot) flex items-center justify-center bg-bg/85 backdrop-blur-md animate-fade-in" role="dialog" aria-label="Set up Herald OS">
+    <div className="absolute inset-0 z-(--z-boot) flex items-center justify-center bg-bg/85 backdrop-blur-md animate-fade-in" role="dialog" aria-label="Set up HAOS">
       <div className="float flex w-[min(560px,92vw)] flex-col gap-5 rounded-2xl p-7">
         <div className="flex items-center gap-3">
           <HeraldLogo height={22} />
@@ -66,7 +67,7 @@ export function FirstRunSetup() {
             }}
           />
         )}
-        {step === 'account' && <Account onDone={next} />}
+        {step === 'account' && <Account onDone={next} haosManaged={haosManaged} />}
         {step === 'wifi' && (
           <div className="flex flex-col gap-4">
             <Heading icon={<IconWifi size={18} />} title="Get online" text="Pick a network; you can also plug in a cable. Skip it to stay offline for now." />
@@ -81,10 +82,10 @@ export function FirstRunSetup() {
           <div className="flex flex-col gap-4">
             <Heading
               icon={forSomeoneElse ? <IconGift size={18} /> : <IconCheck size={18} />}
-              title={forSomeoneElse ? 'Ready to hand over' : 'You are all set'}
-              text={forSomeoneElse ? 'The next time it starts, it asks its new owner for a name, a password and their Hermes sign-in.' : 'Press Super+Space to ask Hermes about anything on screen, or Super+M for the Herald OS menu.'}
+              title={forSomeoneElse ? 'Ready to hand over' : 'HAOS is ready'}
+              text={forSomeoneElse ? 'The next person can finish personal setup later. HAOS owner authority remains separate from the desktop.' : haosManaged ? 'Open Hermes or Missions to view durable work. An authenticated owner configures model providers using haos-owner.' : 'Press Super+Space to ask Hermes about anything on screen, or Super+M for the menu.'}
             />
-            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using Herald OS'} />
+            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using HAOS'} />
           </div>
         )}
       </div>
@@ -117,11 +118,11 @@ function Footer({ onNext, label, busy, disabled }: { onNext: () => void; label: 
 function Welcome({ onChoose }: { onChoose: (someoneElse: boolean) => void }) {
   return (
     <div className="flex flex-col gap-4">
-      <Heading icon={<IconUser size={18} />} title="Welcome to Herald OS" text="A computer you can talk to. A few questions and it is yours." />
+      <Heading icon={<IconUser size={18} />} title="Welcome to HAOS" text="A computer you can talk to. A few questions and it is yours." />
       <div className="grid grid-cols-2 gap-3">
         <button type="button" onClick={() => onChoose(false)} className="glass-input flex flex-col items-start gap-1 rounded-xl p-4 text-left hover:border-line-strong">
           <span className="text-[14px] font-medium text-fg">It is for me</span>
-          <span className="text-[12px] text-fg-3">Choose your name, a password and sign in to Hermes.</span>
+          <span className="text-[12px] text-fg-3">Choose your display name and complete the guided setup.</span>
         </button>
         <button type="button" onClick={() => onChoose(true)} className="glass-input flex flex-col items-start gap-1 rounded-xl p-4 text-left hover:border-line-strong">
           <span className="text-[14px] font-medium text-fg">For someone else</span>
@@ -132,7 +133,7 @@ function Welcome({ onChoose }: { onChoose: (someoneElse: boolean) => void }) {
   )
 }
 
-function Account({ onDone }: { onDone: () => void }) {
+function Account({ onDone, haosManaged }: { onDone: () => void; haosManaged: boolean }) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [again, setAgain] = useState('')
@@ -145,13 +146,18 @@ function Account({ onDone }: { onDone: () => void }) {
     setError(null)
 
     try {
-      await window.heraldOS.setup.name(name)
-      const result = await window.heraldOS.setup.password(password)
+      const result = await window.heraldOS.setup.name(name)
+      if (haosManaged) {
+        if (result.ok) onDone()
+        else setError(result.error ?? 'Could not save your display name.')
+        return
+      }
+      const passwordResult = await window.heraldOS.setup.password(password)
 
-      if (result.ok) {
+      if (passwordResult.ok) {
         onDone()
       } else {
-        setError(result.error ?? 'The password was not set.')
+        setError(passwordResult.error ?? 'The password was not set.')
       }
     } finally {
       setBusy(false)
@@ -166,21 +172,21 @@ function Account({ onDone }: { onDone: () => void }) {
         void save()
       }}
     >
-      <Heading icon={<IconLock size={18} />} title="Your name and password" text="Herald OS greets you by name. The password unlocks the screen and approves changes to the system." />
+      <Heading icon={<IconLock size={18} />} title={haosManaged ? 'Your name and owner security' : 'Your name and password'} text={haosManaged ? 'HAOS uses a locked observer desktop. The independent owner account is enrolled from Ctrl+Alt+F2 (tty2), not by changing this account password.' : 'Your desktop greets you by name. Your password unlocks the screen.'} />
       <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Name
         <input value={name} onChange={event => setName(event.target.value)} autoFocus autoComplete="name" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
       </label>
-      <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
+      {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Password (at least 8 characters)
         <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
       </label>
-      <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
+      {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         The same password again
         <input type="password" value={again} onChange={event => setAgain(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
       </label>
-      {(error || mismatch) && <p className="text-[12.5px] text-danger">{mismatch ? 'The passwords do not match.' : error}</p>}
-      <Footer onNext={() => void save()} label="Next" busy={busy} disabled={!name.trim() || password.length < 8 || password !== again} />
+      {(error || (!haosManaged && mismatch)) && <p className="text-[12.5px] text-danger">{mismatch ? 'The passwords do not match.' : error}</p>}
+      <Footer onNext={() => void save()} label="Next" busy={busy} disabled={!name.trim() || (!haosManaged && (password.length < 8 || password !== again))} />
     </form>
   )
 }
