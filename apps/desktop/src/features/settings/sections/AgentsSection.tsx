@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { IconBolt, IconCloud, IconCpu, IconFileText, IconHistory, IconKey, IconLock, IconMessage, IconRefresh, IconScale, IconSearch, IconUsers } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AuditEntry } from '../../../../shared/ipc.ts'
 import { HermesAvatar } from '../../../components/app-icon.tsx'
 import { Dropdown, GlassButton, GlassCard, LinkAction, Pill, type PillTone, StatusDot, Toggle } from '../../../components/ui/glass.tsx'
@@ -9,6 +9,8 @@ import { formatRelative } from '../../../lib/format.ts'
 import { rest } from '../../../lib/rest.ts'
 import { useBackendData, useLocalData } from '../../../lib/use-async.ts'
 import { $activeChat } from '../../../store/chat.ts'
+import { $managedMissions, resolveMissionMode } from '../../../store/mission-mode.ts'
+import { showPage } from '../../../store/windows.ts'
 import { $connection, gatewayRequest } from '../../../store/gateway.ts'
 import { $hermesAuth, loginTarget, refreshHermesAuth, requestHermesLogin } from '../../../store/hermes-auth.ts'
 import { notify } from '../../../store/notifications.ts'
@@ -29,7 +31,31 @@ import { ToolSearchRow } from './ToolSearchRow.tsx'
 
 export function AgentsSection() {
   const connection = useStore($connection)
+  const managed = useStore($managedMissions)
   const ready = connection === 'open'
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
+
+  // A managed HAOS installation has deliberately revoked legacy config/model
+  // RPC authority. Rendering the inherited controls would try config.get,
+  // config.set and others, disconnecting the read-only observer WebSocket.
+  if (managed === true) {
+    return (
+      <>
+        <SectionTitle title="Hermes & agents" subtitle="Supervised execution through the HAOS mission controller." />
+        <SettingsBlock label="Hermes" description="HAOS managed runtime" keywords="controller owner missions">
+          <GlassCard className="flex flex-col gap-3 px-4 py-4">
+            <div className="text-sm font-semibold text-fg">HAOS managed Hermes</div>
+            <div className="text-xs text-fg-2">The desktop can view work, but cannot directly change runtime approvals, models, credentials or other owner-controlled settings. This is intentional, not a missing WebSocket connection.</div>
+            <div className="text-xs text-fg-3">Create and inspect work under Missions. Use the trusted owner terminal to run haos-owner provider status, configure a model and restart execution services.</div>
+            <GlassButton size="sm" onClick={() => showPage('missions')}>Open Missions</GlassButton>
+          </GlassCard>
+        </SettingsBlock>
+      </>
+    )
+  }
+  if (managed === null) {
+    return <SectionTitle title="Hermes & agents" subtitle="Checking HAOS controller mode…" />
+  }
 
   return (
     <>
