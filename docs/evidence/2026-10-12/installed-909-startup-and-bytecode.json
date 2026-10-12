@@ -1,0 +1,231 @@
+{
+  "scope": "original failed installed 909 acceptance and independently tested build-time bytecode correction; new installed result pending",
+  "failed_source_commit": "90964a384eafbddeea4dc673e7d7c04b1f6f5c9b",
+  "run_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/38204954188",
+  "original_guest_artifact": 11729882373,
+  "verified_original_zip_digest": "sha256:d20d7c9ba634f7461bab7dfbc8b4d4f631b9d5e8609b567b423c2d281a6d1259",
+  "installer_exitcode": null,
+  "guest_failure": "haos_guest.py line 343 wait_for(health), unchanged 180-second condition; no successful theme receipt or second boot",
+  "bounded_actual_startup_reports": [
+    {
+      "event": "isolation.abstract_unix",
+      "active": true,
+      "landlock_abi": 10
+    },
+    {
+      "event": "backend.startup",
+      "stage": "web-import"
+    },
+    {
+      "event": "backend.startup-stack",
+      "elapsed_seconds": 30,
+      "frames": [
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/typing_extensions.py",
+          "function": "<module>",
+          "line": 1419
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/pydantic_core/__init__.py",
+          "function": "<module>",
+          "line": 6
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/pydantic/version.py",
+          "function": "<module>",
+          "line": 7
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/pydantic/warnings.py",
+          "function": "<module>",
+          "line": 5
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/pydantic/_migration.py",
+          "function": "<module>",
+          "line": 4
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/pydantic/__init__.py",
+          "function": "<module>",
+          "line": 5
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/fastapi/exceptions.py",
+          "function": "<module>",
+          "line": 5
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/fastapi/params.py",
+          "function": "<module>",
+          "line": 7
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/fastapi/routing.py",
+          "function": "<module>",
+          "line": 31
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/fastapi/applications.py",
+          "function": "<module>",
+          "line": 10
+        },
+        {
+          "module": "hermes/.venv/lib64/python3.11/site-packages/fastapi/__init__.py",
+          "function": "<module>",
+          "line": 7
+        },
+        {
+          "module": "hermes/hermes_cli/web_server.py",
+          "function": "<module>",
+          "line": 40
+        }
+      ]
+    },
+    {
+      "event": "backend.startup-stack",
+      "elapsed_seconds": 90,
+      "frames": [
+        {
+          "module": "hermes/agent/conversation_compression.py",
+          "function": "<module>",
+          "line": 33
+        },
+        {
+          "module": "hermes/agent/turn_context.py",
+          "function": "<module>",
+          "line": 20
+        },
+        {
+          "module": "hermes/agent/context_compressor.py",
+          "function": "<module>",
+          "line": 37
+        },
+        {
+          "module": "hermes/hermes_state_common.py",
+          "function": "<module>",
+          "line": 14
+        },
+        {
+          "module": "hermes/hermes_cli/web_server_sessions.py",
+          "function": "<module>",
+          "line": 12
+        },
+        {
+          "module": "hermes/hermes_cli/web_server.py",
+          "function": "<module>",
+          "line": 791
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "canonical_run",
+          "line": 30
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "run",
+          "line": 25
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "main",
+          "line": 53
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "<module>",
+          "line": 57
+        }
+      ]
+    },
+    {
+      "event": "backend.startup",
+      "stage": "gui-registration"
+    },
+    {
+      "event": "backend.startup",
+      "stage": "cli-import"
+    },
+    {
+      "event": "backend.startup-stack",
+      "elapsed_seconds": 150,
+      "frames": [
+        {
+          "module": "hermes/hermes_cli/main.py",
+          "function": "<module>",
+          "line": 16
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "canonical_run",
+          "line": 42
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "run",
+          "line": 25
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "main",
+          "line": 53
+        },
+        {
+          "module": "haos/serve.py",
+          "function": "<module>",
+          "line": 57
+        }
+      ]
+    },
+    {
+      "event": "backend.startup",
+      "stage": "canonical-cli"
+    }
+  ],
+  "observed_startup_work": "web server import remained active at 30 and 90 seconds; completed at about 150 seconds, then CLI import and canonical dispatch before the health timeout",
+  "correction": "compile actual immutable upstream/dependencies/HAOS before image probes using Python 3.11 CHECKED_HASH caches; preserve CLI/middleware and all timeouts",
+  "local_haos_tests_passed": 523,
+  "actual_runtime_compile": {
+    "scope": "actual pinned Python runtime source compilation in development, not QEMU startup",
+    "trees": {
+      "dependencies": {
+        "modules": 3794,
+        "bytecode_bytes": 42242542,
+        "input_and_bytecode_sha256": "e7cb7b6aeb7b3bec85ca42468cf55e48518ac7bb22158a47e9c7d91aae1c5a1e",
+        "invalidation": "checked-hash",
+        "host_elapsed_seconds": 3.806
+      },
+      "upstream": {
+        "modules": 2164,
+        "bytecode_bytes": 54944922,
+        "input_and_bytecode_sha256": "9277f688036376987ecd025069357e523feb4ad6dca49c10df0cf0ec944dcaa7",
+        "invalidation": "checked-hash",
+        "host_elapsed_seconds": 4.568
+      },
+      "haos": {
+        "modules": 54,
+        "bytecode_bytes": 671387,
+        "input_and_bytecode_sha256": "0cca68482e23f75ef9a77292e2fc7845504138f9772624622c8f0b9a60791150",
+        "invalidation": "checked-hash",
+        "host_elapsed_seconds": 0.066
+      }
+    }
+  },
+  "actual_pinned_backend_access_probe": {
+    "actual_pinned_backend": true,
+    "observer_identity_matches_child": true,
+    "observer_read_rpc_works": true,
+    "observer_config_credentials_terminal_denied": true,
+    "observer_direct_turn_and_session_mutations_denied": true,
+    "wrong_or_missing_identity_denied": true,
+    "controller_session_creation_preserved": true,
+    "dashboard_credentials_absent_from_process_log": true,
+    "runtime_session_created": true,
+    "durable_session_created": true,
+    "real_model_turn": false,
+    "installed_owner_ui_acceptance": false
+  },
+  "new_installed_acceptance": false,
+  "real_model_turn": false,
+  "remaining_limit": "The observed pre-bind work is real; cache effectiveness on installed TCG must still pass the exact new image. No old failure is relabelled successful."
+}

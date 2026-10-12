@@ -16,6 +16,10 @@ uv pip check --python .venv/bin/python
 mkdir -p /usr/lib/haos/runtime-provenance
 cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" /usr/lib/haos/runtime-provenance/
 uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/installed.txt
+# Installed /usr is immutable and runtime bytecode writes are disabled. Compile
+# actual trusted sources here instead of parsing the entire cold import graph
+# under QEMU TCG at first boot. Keep the canonical CLI and health deadline intact.
+.venv/bin/python -I "$HAOS_RUNTIME_OVERLAY/compile_runtime.py"
 test -x .venv/bin/hermes
 .venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3, 11)'
 .venv/bin/python -I -c 'import importlib.metadata,json;from pathlib import Path;s=json.loads(Path("/usr/lib/haos/runtime-provenance/source.json").read_text());assert all(importlib.metadata.version(n)==v for n,v in s["security_versions"].items())'
