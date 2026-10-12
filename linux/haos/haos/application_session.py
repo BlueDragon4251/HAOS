@@ -63,8 +63,8 @@ def session_action(action):
     if not isinstance(action, dict):
         raise ValueError('application action must be an object')
     op=action.get('operation')
-    fields={'operation'} | ({'text'} if op=='type' else {'key'} if op=='key' else set())
-    if set(action)!=fields or op not in {'state','focus','type','key','capture'}:
+    fields={'operation'} | ({'text'} if op=='type' else {'key'} if op=='key' else {'file'} if op=='export' else set())
+    if set(action)!=fields or op not in {'state','focus','type','key','capture','export'}:
         raise PermissionError('application capability denied')
     if op=='type' and (not isinstance(action['text'],str) or not 1<=len(action['text'].encode())<=512
                       or any(ord(c)<32 or ord(c)==127 for c in action['text'])):
@@ -74,7 +74,38 @@ def session_action(action):
         raise ValueError('bounded plain application text required')
     if op=='key' and action['key'] not in KEYS:
         raise PermissionError('application shortcut denied')
+    if op=='export' and (not isinstance(action['file'],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}',action['file'])):
+        raise PermissionError('only a bounded export basename is allowed')
     return dict(action)
+
+
+def read_export(home,name):
+    """Read only a private app's designated output file, never arbitrary paths."""
+    session_action({'operation':'export','file':name})
+    directory=os.open(Path(home)/'exports',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    fd=None
+    try:
+        info=os.fstat(directory)
+        if info.st_uid!=os.geteuid() or info.st_mode&0o077:
+            raise PermissionError('private application output directory required')
+        fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=directory)
+        before=os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid!=os.geteuid() or before.st_nlink!=1
+                or before.st_mode&0o077 or not 0<=before.st_size<=1048576):
+            raise PermissionError('bounded private regular output required')
+        data=bytearray()
+        while block:=os.read(fd,65536):
+            data.extend(block)
+            if len(data)>1048576:raise ValueError('application output budget exceeded')
+        after=os.fstat(fd)
+        if (before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)!=(
+                after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns) or len(data)!=before.st_size:
+            raise PermissionError('application output changed while exporting')
+        return {'file':name,'mime':'application/octet-stream','sha256':hashlib.sha256(data).hexdigest(),
+            'bytes':len(data),'base64':base64.b64encode(data).decode('ascii')}
+    finally:
+        if fd is not None:os.close(fd)
+        os.close(directory)
 
 
 def root_program(path):
@@ -110,6 +141,7 @@ class ApplicationSession:
             for name in ('labwc','wtype','wlrctl','grim','wayland-info')]
         self.runtime = self.home / 'runtime'
         self.runtime.mkdir(mode=0o700)
+        (self.home/'exports').mkdir(mode=0o700)
         self.env = {'HOME': str(self.home), 'XDG_RUNTIME_DIR': str(self.runtime), 'PATH': '/usr/bin:/bin',
                     'LANG': 'C.UTF-8', 'WLR_BACKENDS': 'headless', 'WLR_RENDERER': 'pixman',
                     'WLR_LIBINPUT_NO_DEVICES': '1', 'WLR_HEADLESS_OUTPUTS': '1'}
@@ -227,6 +259,7 @@ class ApplicationSession:
                 raise PermissionError('application shortcut denied')
             self.helper([self.wtype, '-k', KEYS[action['key']]])
             return {'applied': True}
+        if op=='export':return read_export(self.home,action['file'])
         pixels = jpeg_capture(self.helper([self.grim, '-t', 'png', '-'], limit=8*1024*1024))
         if not pixels.startswith(b'\xff\xd8') or not pixels.endswith(b'\xff\xd9'):
             raise ValueError('invalid private compositor capture')
@@ -288,6 +321,9 @@ def serve(session):
 
 
 def main():
+    # Keep output private even when an isolated component runner did not inherit
+    # the production unit's UMask. Never relax an existing file's permissions.
+    os.umask(0o077)
     diagnostic('credential')
     if len(sys.argv)==1:
         directory=Path(os.environ['CREDENTIALS_DIRECTORY'])

@@ -113,12 +113,22 @@ def main():
             data=base64.b64decode(image['base64'],validate=True)
             assert len(data)==image['bytes'] and hashlib.sha256(data).hexdigest()==image['sha256']
         assert before['sha256']!=after['sha256']
+        assert action({'operation':'app.type','instance':instance,'text':'cp queue-result.txt exports/queue-result.txt'})['applied']
+        assert action({'operation':'app.key','instance':instance,'key':'Enter'})['applied']
+        deadline=time.monotonic()+5
+        while not (home/'exports/queue-result.txt').exists() or (home/'exports/queue-result.txt').read_text()!='HAOS_REAL_QUEUE':
+            assert time.monotonic()<deadline,'real queued output export completion';time.sleep(0.025)
+        exported=action({'operation':'app.export','instance':instance,'file':'queue-result.txt'})
+        assert base64.b64decode(exported['base64'],validate=True)==b'HAOS_REAL_QUEUE'
+        assert exported['bytes']==len(b'HAOS_REAL_QUEUE') and exported['sha256']==hashlib.sha256(b'HAOS_REAL_QUEUE').hexdigest()
         assert control({'method':'reattach'})['attached']
         assert action({'operation':'app.state','instance':instance})['running']
         audit=control({'method':'audit'})
-        assert 'HAOS_REAL_QUEUE' not in json.dumps(audit) and after['base64'] not in json.dumps(audit)
-        assert audit['action_count']==8 and sum(e['kind']=='gui.succeeded' for e in audit['events'])==8
-        assert sum(e['kind']=='gui.succeeded' and e['payload']['operation']!='app.catalog' for e in audit['events'])==7
+        assert 'HAOS_REAL_QUEUE' not in json.dumps(audit) and after['base64'] not in json.dumps(audit) and exported['base64'] not in json.dumps(audit)
+        assert audit['action_count']==11 and sum(e['kind']=='gui.succeeded' for e in audit['events'])==11
+        assert sum(e['kind']=='gui.succeeded' and e['payload']['operation'] not in {'app.catalog','app.export'} for e in audit['events'])==9
+        assert {e['payload']['operation'] for e in audit['events'] if e['kind']=='gui.succeeded'}=={
+            'app.catalog','app.start','app.focus','app.capture','app.type','app.key','app.export','app.state'}
         assert control({'method':'cancel'})['cancel_requested']
         assert authority.reconcile()==[instance]
         assert launcher.record(instance)['state']=='stopped'
@@ -128,6 +138,7 @@ def main():
             'actual_matching_wal_dispatch_authority':True,'root_action_replays_denied':True,
             'actual_owner_program_discovery_without_arguments':True,
             'actual_terminal_input_result_and_capture':True,'native_reattach_preserves_application':True,
+            'actual_private_output_export_bytes_and_hash':True,'export_bytes_absent_from_persistent_audit':True,
             'audit_has_no_typed_contents_or_pixels':True,'cancel_reconciles_entire_application':True,
             'production_broker_service_verified':False,'installed_haos_verified':False,'hermes_model_verified':False}),flush=True)
     finally:

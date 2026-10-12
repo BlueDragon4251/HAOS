@@ -88,15 +88,30 @@ def main():
                 raise AssertionError('real terminal input completion: '+repr(value[:256]))
             time.sleep(0.025)
         assert (home/'result.txt').read_text()=='HAOS_REAL_APPLICATION'
+        assert stat.S_IMODE((home/'result.txt').stat().st_mode)==0o600
         after=request({'operation':'capture'})['result']
         for pixels in (before,after):
             data=base64.b64decode(pixels['base64'],validate=True)
             assert data.startswith(b'\xff\xd8') and data.endswith(b'\xff\xd9') and len(data)==pixels['bytes']
             assert hashlib.sha256(data).hexdigest()==pixels['sha256']
         assert before['sha256']!=after['sha256']
+        request({'operation':'type','text':'cp result.txt exports/result.txt'})
+        request({'operation':'key','key':'Enter'})
+        deadline=time.monotonic()+5
+        while not (home/'exports/result.txt').exists() or (home/'exports/result.txt').read_text()!='HAOS_REAL_APPLICATION':
+            assert time.monotonic()<deadline,'actual private application export completion';time.sleep(0.025)
+        exported=request({'operation':'export','file':'result.txt'})['result']
+        assert base64.b64decode(exported['base64'],validate=True)==b'HAOS_REAL_APPLICATION'
+        assert exported['bytes']==len(b'HAOS_REAL_APPLICATION') and exported['sha256']==hashlib.sha256(b'HAOS_REAL_APPLICATION').hexdigest()
+        (home/'exports/alias.txt').symlink_to(home/'result.txt')
+        assert 'error' in request({'operation':'export','file':'alias.txt'})
+        os.link(home/'exports/result.txt',home/'exports/linked.txt')
+        assert 'error' in request({'operation':'export','file':'linked.txt'})
+        (home/'exports/linked.txt').unlink()
         for action in ({'operation':'key','key':'Control+V'},{'operation':'key','key':'Super'},
                        {'operation':'type','text':'\n'},{'operation':'capture','path':'/etc/haos'},
-                       {'operation':'shell','command':'id'}):
+                       {'operation':'shell','command':'id'},{'operation':'export','file':'../result.txt'},
+                       {'operation':'export','file':'.fixture-shell-ready'}):
             assert 'error' in request(action), 'unauthorized private application action'
         peer_probe='''import socket,sys
 s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(2);s.connect(sys.argv[1]);s.sendall(b'{"operation":"state"}\\n')
@@ -118,6 +133,8 @@ assert libc.ptrace(16,int(sys.argv[1]),None,None)==-1 and ctypes.get_errno()==er
             'real_application_toplevel':True,'real_application_focus':True,'actual_shell_readiness_verified':True,
             'real_keyboard_result_verified':True,
             'real_capture_integrity':True,'real_capture_changed':True,
+            'real_keyboard_output_export_hash_and_bytes_verified':True,
+            'export_paths_symlinks_hardlinks_and_hidden_profiles_denied':True,
             'clipboard_and_global_modifiers_denied':True,'paths_and_shell_controls_denied':True,
             'unprivileged_app_control_peer_denied':True,'root_broker_peer_pid_verified':True,
             'application_effective_capabilities_zero':True,'application_no_new_privileges':True,

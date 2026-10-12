@@ -105,6 +105,8 @@ class ApplicationAuthority:
                 args={'operation':op.removeprefix('app.'),**{k:v for k,v in action.items() if k not in {'operation','instance'}}}
                 result=self.launcher.execute(action['instance'],mission,args,ledger=self.ledger,ledger_uid=self.controller_uid)
                 result={'instance':action['instance'],**result}
+                if op=='app.export' and result.get('file')!=action['file']:
+                    raise PermissionError('application output identity differs')
             result=receipt(op,result)
             self.nonces.settle(key,'succeeded')
             return result

@@ -125,6 +125,14 @@ def main():
         after=action({'operation':'app.capture','instance':instance})
         assert before['sha256']!=after['sha256']
         for frame in (before,after):assert hashlib.sha256(base64.b64decode(frame['base64'],validate=True)).hexdigest()==frame['sha256']
+        assert action({'operation':'app.type','instance':instance,'text':'cp hardened-result.txt exports/hardened-result.txt'})['applied']
+        assert action({'operation':'app.key','instance':instance,'key':'Enter'})['applied']
+        deadline=time.monotonic()+5
+        while not (home/'exports/hardened-result.txt').exists() or (home/'exports/hardened-result.txt').read_text()!='HAOS_ROOT_SERVICE_RESULT':
+            assert time.monotonic()<deadline,'actual hardened output export completion';time.sleep(0.025)
+        exported=action({'operation':'app.export','instance':instance,'file':'hardened-result.txt'})
+        assert base64.b64decode(exported['base64'],validate=True)==b'HAOS_ROOT_SERVICE_RESULT'
+        assert exported['bytes']==len(b'HAOS_ROOT_SERVICE_RESULT') and exported['sha256']==hashlib.sha256(b'HAOS_ROOT_SERVICE_RESULT').hexdigest()
         subprocess.run(['/usr/bin/systemctl','kill','--signal=SIGKILL',unit],check=True,timeout=5)
         deadline=time.monotonic()+5
         while home.exists():assert time.monotonic()<deadline,'actual PID1 hardened broker-loss app cleanup';time.sleep(0.025)
@@ -134,6 +142,7 @@ def main():
             'all_production_service_hardening_properties_preserved':True,'actual_root_and_controller_kernel_socket_roles':True,
             'actual_uid_dropped_wal_authorization_under_strict_filesystem':True,'actual_owner_catalog_and_nonce_replay_denial':True,
             'actual_real_terminal_input_result_and_capture':True,'actual_pid1_broker_sigkill_application_cleanup':True,
+            'actual_private_output_export_under_production_hardening':True,
             'installed_haos_verified':False,'hermes_model_verified':False}),flush=True)
     finally:
         if started:

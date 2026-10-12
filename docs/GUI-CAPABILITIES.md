@@ -264,3 +264,29 @@ The actual production-hardening gate first exposed a missing effective `CAP_SETU
 The subsequent full-hardening run returned actual systemd `200/CHDIR` before the session code ran. Broker `UMask=0077` had reduced newly created rootfs/home traversal directories to 0700. The allocator now explicitly publishes 0755 only for empty directories inside each private chroot; the enclosing broker runtime stays 0700 and receipts/launch credentials stay 0600. A real filesystem regression uses the production umask, retains the private enclosing directory and denies allocator reuse. Existing tempfs bounds/modes, process capabilities and all positive/negative gates are unchanged. The new full-hardening run must independently pass.
 
 Native actions can now recheck `gui.lease` against their existing dispatched UUID/epoch and active mission, without consuming another pending action. Cancellation, completion, stale/foreign epochs and the existing 20-second queue age deny the lease. It grants no new operation or owner rights and is absent from the agent/renderer method sets. This supports upcoming cancellable theme work; existing browser/application timeouts are unchanged.
+
+## Private application output transfer
+
+`app.export` uses the existing controller/root queue and opaque application UUID.
+It accepts one bounded basename from that application's private `exports/`
+directory. Both directory and file must belong to the actual dynamic UID and
+deny group/other access. The file must be regular, single-link and at most 1 MiB;
+symlinks, hidden names, paths, changing files and other mission identities fail
+closed. The session also sets its own private umask, retaining the production
+unit's existing file-size, memory and process limits.
+
+Actual bytes and SHA-256 return through the independently nonce-protected root
+receipt. They live for at most 15 seconds in controller memory; only integrity
+metadata enters the persistent GUI ledger/audit. The image-owned Hermes tool
+verifies those bytes and writes a random 0600 `.bin` file through a checked private
+directory descriptor under `/workspace/.haos-artifacts`. Model/tool history receives
+that path and metadata, never the base64 body. Remote snapshots do not expose
+these artifacts. Mission files remain subject to the separate workspace retention
+and encryption requirements.
+
+The disposable real Wayland regression types the actual command, verifies its
+actual private output, exports those exact bytes and denies symlink/hardlink/path
+attacks. The mandatory persistent-queue and full production-hardening systemd
+gates now also require real output export; their results must be checked on the
+new commit before claiming that transport passed. This adds bounded output
+transfer, not arbitrary host-file access, volume imports or online browsing.

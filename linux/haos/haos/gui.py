@@ -349,11 +349,12 @@ class GuiBroker:
                 data=receipt(row['operation'],result);state='succeeded'
                 if row['operation']=='app.start' and data['instance']!=key:
                     raise PermissionError('application instance does not match the admitted launch')
-                if row['operation']=='app.capture':
+                if row['operation'] in {'app.capture','app.export'}:
                     self.prune_images();self.images[key]=(time.time(),data)
                     try:asyncio.get_running_loop().call_later(15,self.images.pop,key,None)
                     except RuntimeError:pass
-                    data={k:v for k,v in data.items() if k not in {'mime','base64'}} | {'capture_available':False}
+                    data={k:v for k,v in data.items() if k not in {'mime','base64'}} | {
+                        'capture_available' if row['operation']=='app.capture' else 'artifact_available':False}
             self.store.db.execute('UPDATE gui_actions SET state=?,result=? WHERE id=?',(state,json.dumps(data),key))
             self.store._event(row['mission_id'],'gui.'+state,{'id':key,'operation':row['operation'],
                 **({k:data[k] for k in ('sha256','bytes')} if 'sha256' in data else {})})

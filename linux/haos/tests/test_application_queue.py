@@ -88,6 +88,22 @@ def test_controller_restart_and_mission_cancellation_never_re_dispatch_an_applic
     assert store.db.execute('SELECT state FROM gui_actions WHERE id=?',(next_action['id'],)).fetchone()[0]=='uncertain'
 
 
+def test_export_bytes_expire_and_do_not_enter_mission_ledger_or_observer_snapshot(live):
+    store,gui,mission,_=live;gui.application_seen_at=time.time();instance=str(uuid.uuid4())
+    admitted=submit(gui,mission,{'operation':'app.export','instance':instance,'file':'result.txt'});gui.application_poll(mission)
+    contents=b'private application artifact fixture'
+    data={'instance':instance,'file':'result.txt','mime':'application/octet-stream','bytes':len(contents),
+        'sha256':hashlib.sha256(contents).hexdigest(),'base64':base64.b64encode(contents).decode()}
+    gui.application_acknowledge(admitted['id'],result=data)
+    assert gui.result(mission,{'session':'offline-stored','id':admitted['id']})['result']==data
+    durable='\n'.join(str(tuple(row)) for row in store.db.execute('SELECT * FROM gui_actions'))+json.dumps(store.events(mission))
+    assert data['base64'] not in durable and contents.decode() not in durable
+    assert data['base64'] not in json.dumps(gui.application_snapshot(mission))
+    gui.images[admitted['id']]=(time.time()-16,data)
+    result=gui.result(mission,{'session':'offline-session','id':admitted['id']})['result']
+    assert 'base64' not in result and result['artifact_available'] is False
+
+
 def test_controller_lost_root_receipt_is_uncertain_and_dispatches_only_once(live):
     store,_,mission,_=live
     controller=Controller(store,'ws://offline.invalid',set());controller.current=mission

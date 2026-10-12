@@ -11,7 +11,7 @@ import uuid
 
 from .application_session import session_action
 
-OPERATIONS = {'app.catalog','app.start','app.state','app.focus','app.type','app.key','app.capture','app.close'}
+OPERATIONS = {'app.catalog','app.start','app.state','app.focus','app.type','app.key','app.capture','app.close','app.export'}
 
 
 def identifier(value):
@@ -31,7 +31,7 @@ def action(value):
             raise PermissionError('only an exact owner-registered application is allowed')
     else:
         identifier(value.get('instance'))
-        expected={'operation','instance'} | ({'text'} if op=='app.type' else {'key'} if op=='app.key' else set())
+        expected={'operation','instance'} | ({'text'} if op=='app.type' else {'key'} if op=='app.key' else {'file'} if op=='app.export' else set())
         if set(value)!=expected:
             raise PermissionError('unexpected application capability parameters')
         if op!='app.close':
@@ -80,6 +80,14 @@ def receipt(op,value):
     elif op=='app.close':
         fields.add('state')
         if value.get('state')!='stopped':raise ValueError('unconfirmed application termination')
+    elif op=='app.export':
+        fields|={'file','mime','sha256','bytes','base64'}
+        session_action({'operation':'export','file':value.get('file')})
+        if value.get('mime')!='application/octet-stream' or not isinstance(value.get('base64'),str) or len(value['base64'])>1398104:
+            raise ValueError('bounded private application artifact required')
+        data=base64.b64decode(value['base64'],validate=True)
+        if type(value.get('bytes')) is not int or not 0<=len(data)<=1048576 or len(data)!=value['bytes'] or hashlib.sha256(data).hexdigest()!=value.get('sha256'):
+            raise ValueError('actual application artifact bytes/hash differ')
     else:
         fields|={'mime','sha256','bytes','base64'}
         if value.get('mime')!='image/jpeg' or not isinstance(value.get('base64'),str) or len(value['base64'])>1398104:
