@@ -1,9 +1,9 @@
 {
   "name": "@herald-os/desktop",
-  "productName": "Herald OS",
+  "productName": "HAOS",
   "version": "0.1.0-alpha.2",
   "private": true,
-  "description": "The Herald OS shell: menu bar, dock, windows and apps for an agent-native operating system.",
+  "description": "HAOS - Hermes Autonomous OS visual shell",
   "author": "Luke The Dev",
   "license": "MIT",
   "type": "module",
@@ -65,9 +65,9 @@
   },
   "build": {
     "appId": "dev.iamluke.heraldos",
-    "productName": "Herald OS",
+    "productName": "HAOS",
     "executableName": "Herald OS",
-    "artifactName": "HeraldOS-${version}-${os}-${arch}.${ext}",
+    "artifactName": "HAOS-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
