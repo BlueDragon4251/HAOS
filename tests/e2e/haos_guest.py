@@ -319,6 +319,26 @@ print(json.dumps({'installed_disconnected_volume_namespace_denied': True,
             "installed_disconnected_volume_compiled_bind_absent": True}
 
 
+def verify_agent_local_network_guard(agent, port):
+    """Require a real denied localhost connection from the agent UID.
+
+    In TCG guests, Python interpreter startup and setpriv scheduling can take
+    longer than the socket's own two-second connect deadline. Keep the inner
+    deadline and denial requirement unchanged; bound the entire subprocess
+    separately and fail closed if it never returns.
+    """
+    code = "import socket,sys;\ntry:\n socket.create_connection(('127.0.0.1',int(sys.argv[1])),timeout=2)\nexcept OSError:\n sys.exit(0)\nsys.exit(1)"
+    try:
+        result = subprocess.run(
+            ["setpriv", f"--reuid={agent.pw_uid}", f"--regid={agent.pw_gid}",
+             "--clear-groups", "--no-new-privs", "python3", "-I", "-c", code, str(port)],
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise AssertionError("agent localhost isolation probe did not finish within 30 seconds") from None
+    assert result.returncode == 0, "agent reached a privileged localhost listener"
+
+
 def main():
     require_disposable_guest()
     progress("device-identity")
@@ -393,10 +413,7 @@ def main():
         port = listener.getsockname()[1]
         with socket.create_connection(("127.0.0.1", port), timeout=2):
             pass
-        code = "import socket,sys;\ntry:\n socket.create_connection(('127.0.0.1',int(sys.argv[1])),timeout=2)\nexcept OSError:\n sys.exit(0)\nsys.exit(1)"
-        result = subprocess.run(["setpriv", f"--reuid={agent.pw_uid}", f"--regid={agent.pw_gid}",
-            "--clear-groups", "--no-new-privs", "python3", "-I", "-c", code, str(port)], timeout=5)
-        assert result.returncode == 0, "agent reached a privileged localhost listener"
+        verify_agent_local_network_guard(agent, port)
     observer_proof["installed_agent_local_network_guard"] = True
     progress("theme-watchdog-rollback")
     theme_proof = installed_theme_watchdog_proof(observer, first_boot=not stamp.exists())
