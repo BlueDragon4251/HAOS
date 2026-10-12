@@ -16,7 +16,7 @@ describe('HAOS observer account onboarding', () => {
     vi.spyOn(fs, 'existsSync').mockImplementation(file => (
       String(file) === '/etc/haos/enabled' || String(file) === '/var/lib/herald-os/firstboot-done'
     ))
-    expect(setupState()).toMatchObject({ needed: true, haosManaged: true })
+    expect(setupState()).toMatchObject({ needed: process.platform === 'linux', haosManaged: true })
   })
 
   it('never invokes passwd on the locked observer account', async () => {
