@@ -77,7 +77,7 @@ def main():
             temp=root/'policy.next';temp.write_text(json.dumps(value));os.chown(temp,0,viewer.pw_gid);temp.chmod(0o640)
             os.replace(temp,policy)
         publish()
-        parsed=configparser.ConfigParser(interpolation=None);parsed.optionxform=str;parsed.read(source/'haos-remote-viewer.service')
+        parsed=configparser.ConfigParser(interpolation=None, strict=False);parsed.optionxform=str;parsed.read(source/'haos-remote-viewer.service')
         original=dict(parsed['Service']);properties={key:val for key,val in original.items()
             if key not in {'ExecStart','User','Group','WorkingDirectory','Environment','LoadCredential'}}
         properties.update({'User':viewer_name,'Group':viewer_name,'WorkingDirectory':str(code),'RuntimeMaxSec':'180'})
