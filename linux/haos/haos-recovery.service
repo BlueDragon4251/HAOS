@@ -24,7 +24,11 @@ StateDirectory=haos-owner
 StateDirectoryMode=0700
 NoNewPrivileges=yes
 CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE
-PrivateDevices=yes
+PrivateDevices=no
+# The recovery console owns a real VT. A private /dev makes StandardInput=tty fail
+# at exec time (systemd 208/STDIN); keep all other device access blocked.
+DevicePolicy=closed
+DeviceAllow=/dev/tty2 rw
 ProtectSystem=strict
 ReadWritePaths=/etc /home /var/lib/haos-owner /run
 ProtectKernelTunables=yes
