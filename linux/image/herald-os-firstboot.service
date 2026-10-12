@@ -1,6 +1,7 @@
 [Unit]
-Description=Herald OS: first-boot setup (the session user, the home folder, Hermes Agent)
-# Once per machine; `herald-os reset` removes the stamp to run it again.
+Description=HAOS: initialize locked desktop observer and isolated Hermes runtime
+# Once per machine. HAOS owner enrollment runs separately on tty2;
+# this service never grants the graphical observer administrator authority.
 ConditionPathExists=!/var/lib/herald-os/firstboot-done
 Wants=network-online.target
 After=network-online.target
