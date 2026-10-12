@@ -93,9 +93,26 @@ def main():
         assert action({'operation':'app.catalog'})['programs'][0]['program']=='fixture-terminal'
         launch=action({'operation':'app.start','program':'fixture-terminal'});instance=launch['instance'];instances.append(instance)
         record=json.loads((state/'instances'/(instance+'.json')).read_text());home=Path('/run')/record['unit']
+        def startup_diagnostics():
+            app_unit=record['unit']+'.service'
+            status=subprocess.run(['/usr/bin/systemctl','show',app_unit,'--property=LoadState,ActiveState,MainPID,Result,ExecMainStatus'],
+                capture_output=True,text=True,check=True,timeout=3).stdout
+            journal=subprocess.run(['/usr/bin/journalctl','--unit='+app_unit,'--output=cat','--no-pager','-n','30'],
+                capture_output=True,text=True,check=True,timeout=3).stdout
+            phases=[]
+            for line in journal.splitlines():
+                if len(line)>512:continue
+                try:item=json.loads(line)
+                except ValueError:continue
+                if (isinstance(item,dict) and set(item)<={'event','stage','error'} and item.get('event')=='application.session'
+                        and item.get('stage') in {'credential','hardening','identity','compositor','keyboard','application','control','failed'}
+                        and item.get('error') in {None,'ValueError','KeyError','PermissionError','RuntimeError','TimeoutError','OSError',
+                            'JSONDecodeError','FileNotFoundError','TypeError','unexpected-error'}):phases.append(item)
+            return {'fixed_unit_status':dict(line.split('=',1) for line in status.splitlines() if '=' in line),'fixed_session_phases':phases}
         deadline=time.monotonic()+15
         while not (home/'.fixture-ready').exists() or not (home/'control.sock').exists():
-            assert time.monotonic()<deadline,'actual hardened broker application readiness';time.sleep(0.025)
+            assert time.monotonic()<deadline,'actual hardened broker application readiness: '+json.dumps(startup_diagnostics())
+            time.sleep(0.025)
         while action({'operation':'app.state','instance':instance})['windows']!=1:
             assert time.monotonic()<deadline,'actual hardened broker mapped window';time.sleep(0.05)
         assert action({'operation':'app.focus','instance':instance})['focused']
