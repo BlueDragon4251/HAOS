@@ -154,6 +154,8 @@ class Controller:
             return self.gui.attach(params)
         if method == "gui.poll":
             return self.gui.poll(self.current, params)
+        if method=='gui.lease':
+            return self.gui.lease(self.current,params)
         if method == "gui.ack":
             return self.gui.acknowledge(params)
         if method == "health":

@@ -31,9 +31,26 @@ def test_theme_revision_acknowledgement_cannot_claim_another_mission(tmp_path):
     epoch=str(uuid.uuid4());gui.attach({'epoch':epoch});key=str(uuid.uuid4())
     gui.submit(row['id'],{'session':'session','id':key,'action':{'operation':'theme.stage','theme':spec()}})
     assert gui.poll(row['id'],{'epoch':epoch})['request']['id']==key
+    assert gui.lease(row['id'],{'epoch':epoch,'id':key})=={'authorized':True}
     reply={'name':'haos-t-'+uuid.uuid4().hex,'revision':'a'*64,'scope':'mission-data-theme'}
     with pytest.raises(PermissionError):gui.acknowledge({'epoch':epoch,'id':key,'ok':True,'result':reply})
     reply['name']='haos-t-'+row['id'].replace('-','')
     assert gui.acknowledge({'epoch':epoch,'id':key,'ok':True,'result':reply})['accepted']
     assert gui.result(row['id'],{'session':'session','id':key})['result']==reply
+    assert gui.lease(row['id'],{'epoch':epoch,'id':key})=={'authorized':False}
+    store.close()
+
+
+def test_native_lease_revocation_does_not_dispatch_other_queued_work(tmp_path):
+    store=MissionStore(tmp_path/'missions.db');gui=GuiBroker(store)
+    row=store.create('fixture','lease','Providerless native lease fixture');store.claim()
+    store.session(row['id'],'session','stored');store.dispatching(row['id'])
+    epoch=str(uuid.uuid4());gui.attach({'epoch':epoch});ids=[str(uuid.uuid4()),str(uuid.uuid4())]
+    for key in ids:gui.submit(row['id'],{'session':'session','id':key,'action':{'operation':'theme.sdk'}})
+    assert gui.poll(row['id'],{'epoch':epoch})['request']['id']==ids[0]
+    assert gui.lease(row['id'],{'epoch':epoch,'id':ids[0]})['authorized']
+    assert gui.result(row['id'],{'session':'session','id':ids[1]})['state']=='pending'
+    store.request_cancel(row['id'],'fixture')
+    assert not gui.lease(row['id'],{'epoch':epoch,'id':ids[0]})['authorized']
+    with pytest.raises(PermissionError):gui.lease(row['id'],{'epoch':str(uuid.uuid4()),'id':ids[0]})
     store.close()

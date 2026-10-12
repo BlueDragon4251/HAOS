@@ -21,8 +21,8 @@ export function controllerRequest<M extends keyof MissionMethods>(method: M, par
 }
 
 /** Main-process broker only: never exposed through renderer IPC/preload. */
-export function nativeGuiRequest(method: 'gui.attach' | 'gui.poll' | 'gui.ack', params: Record<string, unknown>): Promise<GuiPoll | { attached: boolean } | { accepted: boolean }> {
-  if (!['gui.attach', 'gui.poll', 'gui.ack'].includes(method)) return Promise.reject(new Error('Unknown native GUI method'))
+export function nativeGuiRequest(method: 'gui.attach' | 'gui.poll' | 'gui.ack' | 'gui.lease', params: Record<string, unknown>): Promise<GuiPoll | { attached: boolean } | { accepted: boolean } | { authorized: boolean }> {
+  if (!['gui.attach', 'gui.poll', 'gui.ack','gui.lease'].includes(method)) return Promise.reject(new Error('Unknown native GUI method'))
   return localRequest(method, params)
 }
 

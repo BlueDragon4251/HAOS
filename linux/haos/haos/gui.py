@@ -229,6 +229,21 @@ class GuiBroker:
         self.epoch, self.seen_at = epoch, time.time()
         return {"attached": True}
 
+    def lease(self,current,params):
+        """Recheck a dispatched native action without consuming another one."""
+        if set(params)!={'epoch','id'} or params['epoch']!=self.epoch:
+            raise PermissionError('closed native lease required')
+        key=identifier(params['id']);row=self.store.db.execute('SELECT * FROM gui_actions WHERE id=?',(key,)).fetchone()
+        valid=bool(row and row['epoch']==self.epoch and row['state']=='dispatched'
+            and row['operation'] not in APPLICATION_OPERATIONS and row['mission_id']==current)
+        if valid:
+            try:
+                self.authorize(current,self.store.get(current)['session_id'])
+                valid=0<=time.time()-row['created_at']<20
+            except PermissionError:valid=False
+        if valid:self.seen_at=time.time()
+        return {'authorized':valid}
+
     def poll(self, current, params):
         if set(params) != {"epoch"} or params["epoch"] != self.epoch:
             raise PermissionError("stale GUI session")
