@@ -78,7 +78,8 @@ def main():
         pid=int(broker.strip().split('=',1)[1]);assert pid>1
         fields=dict(line.split(':',1) for line in Path(f'/proc/{pid}/status').read_text().splitlines() if ':' in line)
         assert fields['Uid'].split()==['0']*4 and fields['NoNewPrivs'].strip()=='1'
-        assert int(fields['CapEff'].strip(),16)==sum(1<<bit for bit in (1,5,6,7))
+        assert int(fields['CapEff'].strip(),16)==sum(1<<bit for bit in (1,5,6,7)), json.dumps({
+            'fixed_root_capability_diagnostics':{key:fields[key].strip() for key in ('CapEff','CapPrm','CapBnd','CapAmb')}})
         assert os.readlink(f'/proc/{pid}/ns/net')!=os.readlink('/proc/self/ns/net')
         for key,value in original.items():
             if key not in {'ExecStart','WorkingDirectory','Environment','StateDirectory','RuntimeDirectory'}:assert properties[key]==value
