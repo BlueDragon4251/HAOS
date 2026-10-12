@@ -13,6 +13,7 @@ import { loadPty } from './terminal.ts'
  * a new account), and the name Herald greets with lives in ~/.config/herald-os/name.
  */
 
+const HAOS_ENABLED = '/etc/haos/enabled'
 const FIRSTBOOT_DONE = '/var/lib/herald-os/firstboot-done'
 const configDir = () => path.join(os.homedir(), '.config', 'herald-os')
 const doneFile = () => path.join(configDir(), 'setup-done')
@@ -28,7 +29,7 @@ export function setupState(): SetupState {
     // Not named yet.
   }
 
-  return { needed: process.platform === 'linux' && image && !fs.existsSync(doneFile()), user: os.userInfo().username, name }
+  return { needed: process.platform === 'linux' && image && !fs.existsSync(doneFile()), haosManaged: fs.existsSync(HAOS_ENABLED), user: os.userInfo().username, name }
 }
 
 /** What `passwd` asks (LANG=C), most specific first: "Retype new password:" also ends in "new password:". */
@@ -110,6 +111,9 @@ export function registerSetupIpc(): void {
     return { ok: true } satisfies SetupResult
   })
   ipcMain.handle(IPC.setupPassword, (_event, password: string) => {
+    if (fs.existsSync(HAOS_ENABLED)) {
+      return { ok: false, error: 'HAOS owner credentials are created on the trusted tty2 console. The observer account must remain locked.' } satisfies SetupResult
+    }
     const value = String(password ?? '')
 
     if (value.length < 8 || /[\r\n]/.test(value)) {
