@@ -20,6 +20,13 @@ const STATE_COLOR: Record<DurableMissionState, string> = {
 }
 const ACTIVE = new Set<DurableMissionState>(['queued', 'running', 'waiting'])
 
+function controllerMessage(error: string): string {
+  if (error.includes('ENOENT') && error.includes('/run/haos-control/control.sock')) {
+    return 'HAOS mission controller is stopped or its socket is missing. An authenticated owner can run haos-owner start on tty3 and inspect haos-controller.service. No saved work is resent automatically.'
+  }
+  return error
+}
+
 async function command(id: string, args: Record<string, unknown>): Promise<void> {
   const result = await runCommand(id, args, { source: 'ui' })
   if (!result.ok) notify({ title: 'Mission action failed', body: result.error || result.summary, level: 'error' })
@@ -117,7 +124,7 @@ export function DurableMissionsPage({ conversation = false }: { conversation?: b
         actions={<GlassButton onClick={() => void command('mission.compose', {})}><IconPlus />New mission</GlassButton>} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
         <p role="status" className={`text-xs ${error ? 'text-danger' : 'text-fg-3'}`}>
-          {error ? `Controller unavailable: ${error}. Stored work is not resubmitted by the UI.` : health ? 'Mission controller connected' : 'Connecting to the mission controller…'}
+          {error ? `Controller unavailable: ${controllerMessage(error)}. Stored work is not resubmitted by the UI.` : health ? 'Mission controller connected' : 'Connecting to the mission controller…'}
         </p>
         {admissionError && <p role="alert" className="text-xs text-danger">Could not check pending messages: {admissionError}</p>}
         {pending.length > 0 && <p role="status" className="text-xs text-warn">{pending.length} submission receipt(s) pending. Hermes checks saved admissions without resending. To retry, enter the exact original message.</p>}
