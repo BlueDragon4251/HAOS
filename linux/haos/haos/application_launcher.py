@@ -29,6 +29,19 @@ SOURCE = Path('/usr/lib/haos/haos/application_session.py')
 GUARDIAN='haos-applications.service'
 
 
+def create_rootfs(root):
+    """Traverse the private chroot after UID drop, even with broker UMask=0077.
+
+    The enclosing broker runtime remains root-private. Only empty directories
+    inside this one application's rootfs get explicit traversal permissions.
+    """
+    root.mkdir(mode=0o755);root.chmod(0o755)
+    for name in ('usr','run','tmp','var','var/tmp','home','home/mission','etc','dev','proc','etc/fonts'):
+        path=root/name;path.mkdir(mode=0o755,exist_ok=True);path.chmod(0o755)
+    for name in ('bin','sbin','lib','lib64'):(root/name).symlink_to('usr/'+name)
+    (root/'session.py').touch(mode=0o444)
+
+
 def guardian_unit(value):
     if value!=GUARDIAN and not (os.geteuid()==0 and os.environ.get('GITHUB_ACTIONS')=='true'
             and os.environ.get('HAOS_DISPOSABLE_CI')=='1' and isinstance(value,str)
@@ -241,13 +254,7 @@ class ApplicationLauncher:
         finally:
             os.close(directory)
         root = self.runtime / request
-        root.mkdir(mode=0o755)
-        for path in ('usr','run','tmp','var','var/tmp','home','home/mission','etc','dev','proc'):
-            (root / path).mkdir(mode=0o755, exist_ok=True)
-        (root / 'etc/fonts').mkdir(mode=0o755)
-        for name in ('bin','sbin','lib','lib64'):
-            (root / name).symlink_to('usr/' + name)
-        (root / 'session.py').touch(mode=0o444)
+        create_rootfs(root)
         # Do not put fixed owner arguments (which may contain private URLs or
         # paths) in world-readable transient-unit metadata or the process argv.
         atomic_json(root / 'launch.json',{'executable':grant['executable'],'argv':grant['argv']})

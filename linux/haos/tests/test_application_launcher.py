@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission,guardian_unit,drop_ledger_identity
+from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission,guardian_unit,drop_ledger_identity,create_rootfs
 from haos.application_session import ApplicationSession,session_action
 from haos.applications import validate_application
 from haos.store import MissionStore
@@ -138,3 +138,15 @@ def test_an_agent_cannot_choose_a_different_or_fake_application_guardian(value):
 @pytest.mark.parametrize('uid,gid',[(0,1000),(1000,0),(-1,1000),(True,1000),(1000,True)])
 def test_ledger_identity_may_never_retain_root_or_ambiguous_ids(uid,gid):
     with pytest.raises(PermissionError):drop_ledger_identity(uid,gid)
+
+
+def test_real_rootfs_directory_traversal_survives_private_production_umask(tmp_path):
+    parent=tmp_path/'private-broker';parent.mkdir(mode=0o700)
+    root=parent/'instance';original=os.umask(0o077)
+    try:create_rootfs(root)
+    finally:os.umask(original)
+    assert parent.stat().st_mode&0o777==0o700
+    for path in (root,root/'home',root/'home/mission',root/'usr',root/'etc/fonts',root/'run',root/'proc'):
+        assert path.is_dir() and path.stat().st_mode&0o777==0o755
+    assert not (root/'etc/passwd').exists() and not (root/'etc/haos').exists()
+    with pytest.raises(FileExistsError):create_rootfs(root)
