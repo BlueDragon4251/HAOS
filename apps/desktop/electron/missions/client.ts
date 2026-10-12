@@ -40,7 +40,7 @@ function localRequest<T>(method: string, params: unknown): Promise<T> {
       if (error) reject(error)
       else resolve(value as T)
     }
-    socket.setTimeout(15_000, () => finish(new Error('The HAOS controller did not respond')))
+    socket.setTimeout(method === 'gui.lease' ? 2000 : 15_000, () => finish(new Error('The HAOS controller did not respond')))
     socket.once('error', error => finish(error))
     socket.once('end', () => finish(new Error('The HAOS controller closed without a complete reply')))
     socket.once('connect', () => socket.write(`${JSON.stringify({ method, params })}\n`))

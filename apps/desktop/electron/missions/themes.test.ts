@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { getAppPath: () => path.resolve(__dirname, '../..') } }))
-import { missionTheme } from './themes.ts'
+import { missionTheme, executeMissionTheme } from './themes.ts'
 import { findTheme } from '../theme/themes.ts'
 import { MISSION_THEME_SDK, missionThemeName } from '../../shared/mission-theme.ts'
 
@@ -39,5 +39,13 @@ describe('mission-scoped existing theme publisher', () => {
     expect(() => missionTheme({ mission: '../../owner', action: { operation: 'theme.sdk' } })).toThrow()
     for (let i = 0; i < 16; i++) missionTheme({ mission, action: { operation: 'theme.stage', theme: { ...theme(), description: String(i) } } })
     expect(() => missionTheme({ mission, action: { operation: 'theme.stage', theme: theme() } })).toThrow(/budget/)
+  })
+  it('denies a lost mission lease before any publication and never selects another mission', async () => {
+    await expect(executeMissionTheme({ mission, action: { operation: 'theme.stage', theme: theme() } }, async () => false)).rejects.toThrow(/authority/)
+    expect(fs.readdirSync(home)).toEqual([])
+    const revision = missionTheme({ mission, action: { operation: 'theme.stage', theme: theme() } })
+    await expect(executeMissionTheme({ mission: '42514251-0000-4000-8000-000000000004', action: { operation: 'theme.apply', revision: revision.revision } }, async () => true)).rejects.toThrow()
+    await expect(executeMissionTheme({ mission, action: { operation: 'theme.apply', revision: revision.revision } }, async () => true)).rejects.toThrow(/guarded HAOS shell/)
+    expect(fs.existsSync(path.join(home, '.config/herald-os/theme-activation'))).toBe(false)
   })
 })

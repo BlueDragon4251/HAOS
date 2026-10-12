@@ -19,6 +19,12 @@ OPERATIONS = {"open", "state", "focus", "close", "click", "scroll", "type", "key
 WINDOW_LIMIT = 4
 KEYS = {"Tab", "Enter", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Escape"}
 
+def action_age_limit(operation):
+    # New guarded theme application includes the unchanged isolated preview,
+    # CLI, actual-shell verification and confirmation deadlines. All existing
+    # window/app queue limits remain exactly twenty seconds.
+    return 45 if operation=='theme.apply' else 20
+
 
 def identifier(value):
     if not isinstance(value, str) or str(uuid.UUID(value)) != value:
@@ -239,7 +245,7 @@ class GuiBroker:
         if valid:
             try:
                 self.authorize(current,self.store.get(current)['session_id'])
-                valid=0<=time.time()-row['created_at']<20
+                valid=0<=time.time()-row['created_at']<action_age_limit(row['operation'])
             except PermissionError:valid=False
         if valid:self.seen_at=time.time()
         return {'authorized':valid}
@@ -255,8 +261,8 @@ class GuiBroker:
             if row["state"] == "running" and not row["cancel_requested"] and row["deadline"] > time.time():
                 active = current
         with self.store.transaction():
-            stale = self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE operation NOT LIKE 'app.%' AND state IN ('pending','dispatched') AND (mission_id!=? OR created_at<?)",
-                                          (active or "", time.time() - 20)).fetchall()
+            stale = self.store.db.execute("SELECT id,mission_id FROM gui_actions WHERE operation NOT LIKE 'app.%' AND state IN ('pending','dispatched') AND (mission_id!=? OR created_at+CASE WHEN operation='theme.apply' THEN 45 ELSE 20 END<?)",
+                                          (active or "", time.time())).fetchall()
             for row in stale:
                 self.store.db.execute("UPDATE gui_actions SET state='uncertain',arguments=NULL,result=? WHERE id=?", ('{"error":"GUI action expired or mission ended"}', row["id"]))
                 self.store._event(row["mission_id"], "gui.uncertain", {"id": row["id"]})
@@ -276,8 +282,13 @@ class GuiBroker:
             if not row or row["operation"] in APPLICATION_OPERATIONS or row["state"] != "dispatched" or row["epoch"] != self.epoch:
                 raise Conflict("GUI action no longer awaits a receipt")
             data = receipt(row["operation"], params["result"]) if params["ok"] else {"error": "native GUI action failed"}
-            if row['operation']=='theme.stage' and params['ok'] and data['name']!='haos-t-'+row['mission_id'].replace('-',''):
+            if row['operation'] in {'theme.stage','theme.preview','theme.apply'} and params['ok'] and data['name']!='haos-t-'+row['mission_id'].replace('-',''):
                 raise PermissionError('theme revision belongs to another mission')
+            if row['operation']=='theme.preview' and params['ok']:
+                self.prune_images();self.images[row['id']]=(time.time(),data)
+                try:asyncio.get_running_loop().call_later(15,self.images.pop,row['id'],None)
+                except RuntimeError:pass
+                data={k:v for k,v in data.items() if k not in {'base64','mime'}}|{'preview_available':False}
             if row["operation"] == "capture" and params["ok"]:
                 self.prune_images()
                 self.images[row["id"]] = (time.time(), data)

@@ -2,7 +2,7 @@
 import re
 
 COLORS=['bg','bg2','surface','fg','fg_dim','accent','accent_strong','border_active','border_inactive','urgent','ok','warn']
-OPERATIONS={'theme.sdk','theme.stage'}
+OPERATIONS={'theme.sdk','theme.stage','theme.preview','theme.apply'}
 SDK={'colors':COLORS,'shell_themes':['ocean','graphite'],'accents':['blue','ice','violet'],
      'schemes':['dark','light'],'wallpaper':'drawn','executable_extensions':False}
 
@@ -12,6 +12,10 @@ def action(value):
         raise PermissionError('mission data theme capability denied')
     if value['operation']=='theme.sdk':
         if set(value)!={'operation'}:raise PermissionError('closed theme schema request required')
+        return value
+    if value['operation'] in {'theme.preview','theme.apply'}:
+        if set(value)!={'operation','revision'} or not isinstance(value['revision'],str) or not re.fullmatch(r'[a-f0-9]{64}',value['revision']):
+            raise PermissionError('only an exact saved mission revision is allowed')
         return value
     if set(value)!={'operation','theme'} or not isinstance(value['theme'],dict):
         raise PermissionError('closed theme data required')
@@ -36,9 +40,26 @@ def receipt(op,value):
     if op=='theme.sdk':
         if value!=SDK or type(value['executable_extensions']) is not bool:raise ValueError('installed theme schema identity differs')
         return value
-    if (op!='theme.stage' or not isinstance(value,dict) or set(value)!={'name','revision','scope'}
-            or value['scope']!='mission-data-theme' or not isinstance(value['name'],str)
+    if (op not in OPERATIONS or not isinstance(value,dict) or not isinstance(value.get('name'),str)
             or not re.fullmatch(r'haos-t-[a-f0-9]{32}',value['name']) or not isinstance(value['revision'],str)
             or not re.fullmatch(r'[a-f0-9]{64}',value['revision'])):
         raise ValueError('verified mission theme revision required')
+    if op=='theme.stage':
+        if set(value)!={'name','revision','scope'} or value['scope']!='mission-data-theme':raise ValueError('closed staged theme receipt required')
+    elif op=='theme.apply':
+        if set(value)!={'name','revision','applied','verified'} or value['applied'] is not True or value['verified'] is not True:
+            raise ValueError('confirmed actual shell activation required')
+    else:
+        import base64,hashlib
+        checks={'sandbox','rendered','controlsVisible','textContrast','secondaryContrast','controlContrast','rasterDecoded'}
+        if (set(value)!={'name','revision','passed','checks','stylesheet_sha256','png_sha256','mime','bytes','sha256','base64'}
+                or type(value['passed']) is not bool or not isinstance(value['checks'],dict) or set(value['checks'])!=checks
+                or any(type(v) is not bool for v in value['checks'].values()) or value['passed']!=all(value['checks'].values())
+                or any(not isinstance(value[k],str) or not re.fullmatch(r'[a-f0-9]{64}',value[k]) for k in ('stylesheet_sha256','png_sha256'))
+                or value['mime']!='image/jpeg' or not isinstance(value['base64'],str) or len(value['base64'])>1398104):
+            raise ValueError('actual isolated theme preview required')
+        pixels=base64.b64decode(value['base64'],validate=True)
+        if (type(value['bytes']) is not int or not 100<=len(pixels)<=1048576 or value['bytes']!=len(pixels)
+                or hashlib.sha256(pixels).hexdigest()!=value['sha256'] or not pixels.startswith(b'\xff\xd8') or not pixels.endswith(b'\xff\xd9')):
+            raise ValueError('bounded actual preview pixels required')
     return value

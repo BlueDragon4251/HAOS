@@ -292,12 +292,14 @@ function registerCoreIpc(): void {
     () => BrowserWindow.getAllWindows(),
     back => events.emit('returned', { reason: back.reason, away_minutes: Math.round(back.awayMs / 60_000) })
   )
-  registerThemeIpc({ panels: Boolean(panels), broadcast: broadcastPrefs, backend,
+  const themeDependencies: Parameters<typeof registerThemeIpc>[0] = { panels: Boolean(panels), broadcast: broadcastPrefs, backend,
     verify: next => {
       const windows = BrowserWindow.getAllWindows().filter(win => !win.isDestroyed() && win.isVisible() && isShellPage(win.webContents.getURL()))
       return verifyThemeShell(windows, next)
     }
-  })
+  }
+  registerThemeIpc(themeDependencies)
+  nativeGui.configureThemes(themeDependencies)
   registerCaptureIpc(state => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.captureRecordChanged, state)

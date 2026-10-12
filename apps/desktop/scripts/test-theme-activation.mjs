@@ -6,6 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, session } from 'electron'
+import { randomUUID, createHash } from 'node:crypto'
 
 assert.equal(process.env.HAOS_DISPOSABLE_SCREEN_TEST, '1')
 assert.notEqual(process.getuid(), 0)
@@ -116,6 +117,41 @@ async function main() {
     checks.missing_or_wrong_shell_denied = true
     assert.equal(await win.webContents.executeJavaScript('typeof process'), 'undefined')
     checks.renderer_remains_sandboxed = true
+    // Drive the production mission capability router with real publication,
+    // renderer pixels, guarded CLI and shell verification. The callback here
+    // is explicitly a component lease; real queue/socket authorization has a
+    // separate controller gate, and no provider/model is represented.
+    const { MissionBrowser } = await import('../dist/electron/gui-broker.mjs')
+    const capabilities = new MissionBrowser(false), mission = randomUUID()
+    let lease = true
+    const context = { authorize: async () => lease, deps }
+    const execute = action => capabilities.execute({ id: randomUUID(), mission, action }, context)
+    const sdk = await execute({ operation: 'theme.sdk' })
+    assert.equal(sdk.executable_extensions, false)
+    const candidate = await execute({ operation: 'theme.stage', theme: { colors: base.colors, label: 'Actual mission data theme' } })
+    assert.equal(candidate.name, 'haos-t-' + mission.replaceAll('-', ''))
+    const visual = await execute({ operation: 'theme.preview', revision: candidate.revision })
+    assert.equal(visual.passed, true)
+    const jpeg = Buffer.from(visual.base64, 'base64')
+    assert.equal(createHash('sha256').update(jpeg).digest('hex'), visual.sha256)
+    assert.equal(jpeg.length, visual.bytes)
+    const activated = await execute({ operation: 'theme.apply', revision: candidate.revision })
+    assert.equal(activated.applied, true); assert.equal(activated.verified, true)
+    assert.equal(JSON.parse(fs.readFileSync(preferences, 'utf8')).themeRevision, candidate.revision)
+    checks.actual_mission_data_stage_preview_and_guarded_apply = true
+    const changed = await execute({ operation: 'theme.stage', theme: { colors: { ...base.colors, accent: '#a7bfff' }, label: 'Actual broken renderer update' } })
+    hiddenRevision = changed.revision
+    await assert.rejects(execute({ operation: 'theme.apply', revision: changed.revision }), /actual shell did not verify/)
+    assert.equal(JSON.parse(fs.readFileSync(journal, 'utf8')).status, 'rolled_back')
+    assert.equal(JSON.parse(fs.readFileSync(preferences, 'utf8')).themeRevision, candidate.revision)
+    checks.mission_capability_broken_renderer_rolls_back = true
+    lease = false
+    await assert.rejects(execute({ operation: 'theme.apply', revision: candidate.revision }), /authority expired/)
+    assert.equal(JSON.parse(fs.readFileSync(preferences, 'utf8')).themeRevision, candidate.revision)
+    checks.expired_component_lease_cannot_activate = true
+    lease = true
+    await assert.rejects(capabilities.execute({ id: randomUUID(), mission: randomUUID(), action: { operation: 'theme.apply', revision: candidate.revision } }, context))
+    checks.other_mission_revision_cannot_activate = true
     const report = { source_commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
       work_tree_dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }).trim()),
       actual_renderer: true, actual_theme_engine: true, independent_watchdog: true,

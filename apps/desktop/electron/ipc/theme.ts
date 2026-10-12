@@ -17,6 +17,8 @@ export interface ThemeIpcDeps {
   backend: BackendManager
   /** Verify the actual connected shell after applying preferences, before confirmation. */
   verify?: (prefs: HeraldOSPrefs) => Promise<boolean>
+  /** Optional independently rechecked mission lease; ordinary UI calls omit it. */
+  authorize?: () => Promise<boolean>
 }
 
 /**
@@ -44,6 +46,7 @@ export function syncHermesSkin(spec: ThemeSpec, backend: BackendManager): void {
 
 /** Apply an installed theme everywhere it reaches. */
 export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: string): Promise<HeraldOSPrefs> {
+  if (deps.authorize && !(await deps.authorize())) throw new Error('Theme mission ended before activation')
   const found = findTheme(name, revision)
 
   if (!found) {
@@ -55,6 +58,7 @@ export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: st
   if (found.revision && !(await previewTheme(found, deps.panels)).passed) {
     throw new Error('Theme preview failed its readability, raster or isolation checks; the previous theme remains in use')
   }
+  if (deps.authorize && !(await deps.authorize())) throw new Error('Theme mission ended during preview')
 
   let guard: string | undefined
   // Saved Linux session themes use an independent, unprivileged rollback process.
@@ -77,10 +81,12 @@ export async function applyTheme(name: string, deps: ThemeIpcDeps, revision?: st
   }
 
   try {
+    if (deps.authorize && !(await deps.authorize())) throw new Error('Theme mission ended before preference publication')
     const next = writePrefs({ ...prefsForTheme(found.spec, found.dir), themeRevision: found.revision })
     deps.broadcast(next)
     if (guard) {
       if (!(await deps.verify!(next))) throw new Error('The actual shell did not verify the tested theme')
+      if (deps.authorize && !(await deps.authorize())) throw new Error('Theme mission ended before confirmation')
       const result = await run('herald-os-theme', ['confirm', guard], 8_000)
       if (result.code !== 0) throw new Error('Theme activation could not be confirmed')
     }

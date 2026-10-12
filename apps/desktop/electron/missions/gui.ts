@@ -4,7 +4,8 @@ import { BrowserWindow, session } from 'electron'
 import { GUI_WINDOW_LIMIT, guiId, missionDocument, validateGuiAction, type GuiRequest, type GuiPoll } from '../../shared/gui.ts'
 import { managedMissions, nativeGuiRequest } from './client.ts'
 import { MissionCompositor } from './niri.ts'
-import { missionTheme } from './themes.ts'
+import { missionTheme, executeMissionTheme } from './themes.ts'
+import type { ThemeIpcDeps } from '../ipc/theme.ts'
 
 export class MissionBrowser {
   private windows = new Map<string, { mission: string; win: BrowserWindow; documentSession: string }>()
@@ -19,10 +20,14 @@ export class MissionBrowser {
     }
   }
 
-  async execute(request: GuiRequest): Promise<Record<string, unknown>> {
+  async execute(request: GuiRequest, themeContext?: { authorize: () => Promise<boolean>; deps?: ThemeIpcDeps }): Promise<Record<string, unknown>> {
     if (!guiId(request.id) || !guiId(request.mission)) throw new Error('Invalid GUI scope')
     const action = validateGuiAction(request.action)
-    if (action.operation === 'theme.sdk' || action.operation === 'theme.stage') return missionTheme(request)
+    if (action.operation === 'theme.sdk' || action.operation === 'theme.stage' || action.operation === 'theme.preview' || action.operation === 'theme.apply') {
+      if (themeContext) return executeMissionTheme(request, themeContext.authorize, themeContext.deps)
+      if (action.operation === 'theme.preview' || action.operation === 'theme.apply') throw new Error('Independent theme mission lease unavailable')
+      return missionTheme(request)
+    }
     if (action.operation === 'state') {
       return { windows: [...this.windows].filter(([, e]) => e.mission === request.mission && !e.win.isDestroyed()).map(([window]) => ({ window, width: 800, height: 600 })) }
     }
@@ -222,7 +227,9 @@ export class NativeGuiBroker {
   private stopped = true
   private browser = new MissionBrowser()
   private epoch = randomUUID()
+  private themeDeps?: ThemeIpcDeps
   constructor(private transport: typeof nativeGuiRequest = nativeGuiRequest) {}
+  configureThemes(deps: ThemeIpcDeps): void { this.themeDeps = deps }
   start(): void {
     if (!managedMissions() || !this.stopped) return
     this.stopped = false
@@ -244,12 +251,28 @@ export class NativeGuiBroker {
           let ok = true
           let result: Record<string, unknown>
           let timer: ReturnType<typeof setTimeout> | undefined
+          let heartbeat: ReturnType<typeof setInterval> | undefined
+          let alive = true
+          const authorize = async (): Promise<boolean> => {
+            if (!alive || this.stopped) return false
+            try {
+              const result = await this.transport('gui.lease', { epoch: this.epoch, id: poll.request!.id })
+              if (!alive || this.stopped || !('authorized' in result) || result.authorized !== true) { alive = false; return false }
+              return true
+            } catch { alive = false; return false }
+          }
           try {
-            result = await Promise.race([this.browser.execute(poll.request), new Promise<never>((_resolve, reject) => {
-              timer = setTimeout(() => { this.browser.retain(null); reject(new Error('GUI deadline exceeded')) }, 5000)
+            const theme = poll.request.action.operation.startsWith('theme.')
+            if (theme) heartbeat = setInterval(() => { void authorize() }, 1000)
+            // Only new preview/guarded-apply operations compose the maintained
+            // 15s preview and fixed CLI/verification/confirmation deadlines.
+            // Every existing browser operation keeps its original five seconds.
+            const deadline = poll.request.action.operation === 'theme.apply' ? 45000 : poll.request.action.operation === 'theme.preview' ? 20000 : 5000
+            result = await Promise.race([this.browser.execute(poll.request, theme ? { authorize, deps: this.themeDeps } : undefined), new Promise<never>((_resolve, reject) => {
+              timer = setTimeout(() => { alive = false; this.browser.retain(null); reject(new Error('GUI deadline exceeded')) }, deadline)
             })])
           } catch { ok = false; result = {} }
-          finally { if (timer) clearTimeout(timer) }
+          finally { alive = false; if (timer) clearTimeout(timer); if (heartbeat) clearInterval(heartbeat) }
           // Lost acknowledgements are not retried as executions; the durable action
           // remains uncertain and the agent must inspect it using its original UUID.
           await this.transport('gui.ack', { epoch: this.epoch, id: poll.request.id, ok, result })
