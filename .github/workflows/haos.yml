@@ -110,6 +110,18 @@ jobs:
           path: ${{ runner.temp }}/haos-application-pipeline.json
           if-no-files-found: ignore
           retention-days: 7
+      - name: Actual production root application hardening and independent broker loss
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          sudo env GITHUB_ACTIONS=true HAOS_DISPOSABLE_CI=1 GITHUB_SHA="$GITHUB_SHA" /usr/bin/python3 linux/haos/probes/run_application_root_service.py | tee "$RUNNER_TEMP/haos-application-root-service.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: actual-application-root-service-${{ github.sha }}
+          path: ${{ runner.temp }}/haos-application-root-service.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Actual encrypted retention, corrupt-data denial and damaged fixture restore
         run: |
           restic version
