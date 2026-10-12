@@ -176,7 +176,7 @@ function Account({ onDone, haosManaged }: { onDone: () => void; haosManaged: boo
       <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Name
         <input value={name} onChange={event => setName(event.target.value)} autoFocus autoComplete="name" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
-      </label>
+      </label>}
       {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Password (at least 8 characters)
         <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
@@ -184,7 +184,7 @@ function Account({ onDone, haosManaged }: { onDone: () => void; haosManaged: boo
       {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         The same password again
         <input type="password" value={again} onChange={event => setAgain(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
-      </label>
+      </label>}
       {(error || (!haosManaged && mismatch)) && <p className="text-[12.5px] text-danger">{mismatch ? 'The passwords do not match.' : error}</p>}
       <Footer onNext={() => void save()} label="Next" busy={busy} disabled={!name.trim() || (!haosManaged && (password.length < 8 || password !== again))} />
     </form>
