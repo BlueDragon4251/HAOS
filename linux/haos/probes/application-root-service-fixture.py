@@ -8,6 +8,10 @@ import socket
 import sys
 
 sys.path.insert(0,str(Path(__file__).parent))
+if os.geteuid()==0:
+    fields=dict(line.split(':',1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
+    print(json.dumps({'event':'root-fixture.entry-capabilities',
+        'masks':{key:fields[key].strip() for key in ('CapEff','CapPrm','CapBnd','CapAmb')}}),flush=True)
 from haos.application_authority import ApplicationAuthority,ActionNonces
 from haos.application_launcher import ApplicationLauncher
 from haos.application_server import handle

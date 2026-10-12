@@ -20,7 +20,9 @@ RuntimeDirectoryMode=0700
 UMask=0077
 NoNewPrivileges=yes
 CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_KILL CAP_DAC_OVERRIDE
-AmbientCapabilities=
+# Retain only these independently required broker capabilities across exec
+# under NoNewPrivileges. The mutable-ledger reader explicitly clears them all.
+AmbientCapabilities=CAP_SETUID CAP_SETGID CAP_KILL CAP_DAC_OVERRIDE
 PrivateDevices=yes
 PrivateTmp=yes
 PrivateNetwork=yes

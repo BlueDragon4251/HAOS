@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission,guardian_unit
+from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission,guardian_unit,drop_ledger_identity
 from haos.application_session import ApplicationSession,session_action
 from haos.applications import validate_application
 from haos.store import MissionStore
@@ -133,3 +133,8 @@ def test_application_authority_identity_includes_limits_and_fixed_arguments():
 @pytest.mark.parametrize('value',['herald-os.service','haos-hermes.service','../../owner','',None,'haos-app-fixture-'+'a'*32+'.service'])
 def test_an_agent_cannot_choose_a_different_or_fake_application_guardian(value):
     with pytest.raises(PermissionError):guardian_unit(value)
+
+
+@pytest.mark.parametrize('uid,gid',[(0,1000),(1000,0),(-1,1000),(True,1000),(1000,True)])
+def test_ledger_identity_may_never_retain_root_or_ambiguous_ids(uid,gid):
+    with pytest.raises(PermissionError):drop_ledger_identity(uid,gid)

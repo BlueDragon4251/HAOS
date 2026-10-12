@@ -108,6 +108,29 @@ def _read_mission(path, mission, ledger_uid, proof=None):
         raise PermissionError('mission ledger changed identity')
 
 
+def drop_ledger_identity(uid,gid):
+    """Never inherit broker permitted/ambient capabilities into mutable SQLite."""
+    import ctypes
+    if os.geteuid()!=0 or type(uid) is not int or uid<=0 or type(gid) is not int or gid<=0:
+        raise PermissionError('separate unprivileged ledger reader required')
+    libc=ctypes.CDLL(None,use_errno=True)
+    # systemd may enable keep-caps to deliver the broker's ambient set. Undo
+    # that policy before the UID transition, then explicitly clear all sets.
+    if libc.prctl(8,0,0,0,0)!=0:raise PermissionError('ledger keep-caps reset failed')
+    os.setgroups([]);os.setgid(gid);os.setuid(uid)
+    class Header(ctypes.Structure):_fields_=[('version',ctypes.c_uint32),('pid',ctypes.c_int)]
+    class Data(ctypes.Structure):_fields_=[('effective',ctypes.c_uint32),('permitted',ctypes.c_uint32),('inheritable',ctypes.c_uint32)]
+    header=Header(0x20080522,0);data=(Data*2)()
+    if (libc.capset(ctypes.byref(header),data)!=0 or libc.prctl(47,4,0,0,0)!=0
+            or libc.prctl(38,1,0,0,0)!=0 or libc.prctl(4,0,0,0,0)!=0):
+        raise PermissionError('ledger capabilities or privilege hardening failed')
+    fields=dict(line.split(':',1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
+    if (fields['Uid'].split()!=[str(uid)]*4 or fields['Gid'].split()!=[str(gid)]*4
+            or any(int(fields[key].strip(),16)!=0 for key in ('CapEff','CapPrm','CapInh','CapAmb'))
+            or fields['NoNewPrivs'].strip()!='1' or fields['Groups'].strip()):
+        raise PermissionError('actual ledger identity or capabilities not cleared')
+
+
 def running_mission(path, mission, ledger_uid, *, request=None, action=None):
     """Read the mutable WAL ledger as its UID, never with root filesystem rights.
 
@@ -136,11 +159,7 @@ def running_mission(path, mission, ledger_uid, *, request=None, action=None):
             # descriptor from the authorizing process.
             os.closerange(0, writer)
             os.closerange(writer + 1, 1048576)
-            os.setgroups([]); os.setgid(account.pw_gid); os.setuid(ledger_uid)
-            import ctypes
-            libc = ctypes.CDLL(None, use_errno=True)
-            if libc.prctl(38, 1, 0, 0, 0) != 0:
-                os._exit(1)
+            drop_ledger_identity(ledger_uid,account.pw_gid)
             _read_mission(path, mission, ledger_uid, proof)
             os.write(writer, b'1')
         except BaseException:
