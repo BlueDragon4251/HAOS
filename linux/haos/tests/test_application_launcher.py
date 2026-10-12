@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission
+from haos.application_launcher import ApplicationLauncher, canonical_id, grant_digest, launch_command, running_mission,guardian_unit
 from haos.application_session import ApplicationSession,session_action
 from haos.applications import validate_application
 from haos.store import MissionStore
@@ -21,6 +21,7 @@ def test_application_runs_as_a_bounded_distinct_uid_without_host_home_network_or
     command = launch_command(grant(), mission, request, Path('/run/haos-applications')/request)
     properties = dict(a.removeprefix('--property=').split('=',1) for a in command if a.startswith('--property='))
     assert properties['DynamicUser']=='yes' and properties['User'] not in {'root','hermes','haos-agent','haos-control'}
+    assert properties['BindsTo']==properties['After']=='haos-applications.service'
     assert properties['RootDirectory']==str(Path('/run/haos-applications')/request)
     assert properties['BindReadOnlyPaths'].startswith('/usr:/usr /etc/fonts:/etc/fonts ')
     assert properties['BindPaths']==f'/run/haos-app-{request.replace("-", "")}:/home/mission'
@@ -127,3 +128,8 @@ def test_application_authority_identity_includes_limits_and_fixed_arguments():
     assert grant_digest(dict(reversed(list(approval.items()))))==digest
     for delta in ({'memory_mib':128},{'runtime_seconds':1},{'argv':['--different-private-context']},{'class':'utility'}):
         assert grant_digest(dict(approval,**delta))!=digest
+
+
+@pytest.mark.parametrize('value',['herald-os.service','haos-hermes.service','../../owner','',None,'haos-app-fixture-'+'a'*32+'.service'])
+def test_an_agent_cannot_choose_a_different_or_fake_application_guardian(value):
+    with pytest.raises(PermissionError):guardian_unit(value)

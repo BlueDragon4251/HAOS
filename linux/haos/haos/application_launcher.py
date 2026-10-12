@@ -26,6 +26,15 @@ from .policy import atomic_json
 from .application_session import session_action
 
 SOURCE = Path('/usr/lib/haos/haos/application_session.py')
+GUARDIAN='haos-applications.service'
+
+
+def guardian_unit(value):
+    if value!=GUARDIAN and not (os.geteuid()==0 and os.environ.get('GITHUB_ACTIONS')=='true'
+            and os.environ.get('HAOS_DISPOSABLE_CI')=='1' and isinstance(value,str)
+            and re.fullmatch(r'haos-app-fixture-[a-f0-9]{32}\.service',value)):
+        raise PermissionError('fixed independent application guardian required')
+    return value
 
 
 def grant_digest(grant):
@@ -38,13 +47,14 @@ def canonical_id(value):
     return value
 
 
-def launch_command(application, mission, request, root, source=SOURCE):
+def launch_command(application, mission, request, root, source=SOURCE, *, guardian=GUARDIAN):
     """Only RootDirectory/runtime names and owner-registered fixed argv vary."""
     canonical_id(mission); canonical_id(request)
     from .applications import validate_application
     application = validate_application(application)
     unit = 'haos-app-' + request.replace('-', '')
     properties = {
+        'BindsTo':guardian_unit(guardian),'After':guardian_unit(guardian),
         'Type': 'exec', 'DynamicUser': 'yes', 'User': 'haos-a-' + request.replace('-', '')[:24],
         'RootDirectory': str(root), 'BindReadOnlyPaths': f'/usr:/usr /etc/fonts:/etc/fonts {source}:/session.py',
         'MountAPIVFS': 'yes', 'PrivateDevices': 'yes', 'PrivateNetwork': 'yes',
@@ -153,10 +163,11 @@ def running_mission(path, mission, ledger_uid, *, request=None, action=None):
 
 
 class ApplicationLauncher:
-    def __init__(self, registry=None, state=Path('/var/lib/haos-applications'), runtime=Path('/run/haos-applications'), source=SOURCE):
+    def __init__(self, registry=None, state=Path('/var/lib/haos-applications'), runtime=Path('/run/haos-applications'), source=SOURCE, *, guardian=GUARDIAN):
         if os.geteuid() != 0:
             raise PermissionError('the independent application authority is required')
         self.registry = registry or ApplicationRegistry()
+        self.guardian=guardian_unit(guardian)
         self.state, self.runtime, self.source = map(Path, (state, runtime, source))
         for path in (self.state, self.runtime):
             protected_directory(path.parent)
@@ -225,7 +236,7 @@ class ApplicationLauncher:
         # immutable /usr bind pins the running image's executable/library view.
         if self.registry.resolve(application) != grant:
             raise PermissionError('owner application authority changed before launch')
-        subprocess.run(launch_command(grant, mission, request, root, self.source), check=True,
+        subprocess.run(launch_command(grant, mission, request, root, self.source,guardian=self.guardian), check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10,
                        env={'PATH':'/usr/bin:/bin', 'LANG':'C.UTF-8'})
         descriptor['state'] = 'submitted'

@@ -32,6 +32,7 @@ def main():
     root=Path(tempfile.mkdtemp(prefix='haos-app-pipeline-',dir='/run'));root.chmod(0o755)
     code=Path(tempfile.mkdtemp(prefix='haos-app-pipeline-',dir='/usr/lib'));code.chmod(0o755)
     controller=None;launcher=None;nonces=None;listener=None;instances=[]
+    guardian='haos-app-fixture-'+uuid.uuid4().hex+'.service'
     def identity():os.setgroups([]);os.setgid(account.pw_gid);os.setuid(account.pw_uid)
     try:
         module=code/'haos';module.mkdir(mode=0o755)
@@ -55,7 +56,10 @@ def main():
         registry.register({'id':'fixture-terminal','class':'terminal','executable':'/usr/bin/foot','sha256':executable_digest('/usr/bin/foot'),
             'argv':['--font','monospace:size=16','/usr/bin/bash','--noprofile','--rcfile',str(initialization),'-i'],
             'memory_mib':512,'runtime_seconds':60})
-        launcher=ApplicationLauncher(registry,root/'instances',root/'rootfs',module/'application_session.py')
+        subprocess.run(['/usr/bin/systemd-run','--quiet','--unit='+guardian,'--property=Type=exec',
+            '--property=User='+account.pw_name,'--property=NoNewPrivileges=yes','--property=CapabilityBoundingSet=',
+            '--property=RuntimeMaxSec=180','--property=MemoryMax=16M','--property=TasksMax=1','/usr/bin/sleep','180'],check=True,timeout=5)
+        launcher=ApplicationLauncher(registry,root/'instances',root/'rootfs',module/'application_session.py',guardian=guardian)
         nonces=ActionNonces(root/'actions.db');authority=ApplicationAuthority(launcher,nonces,ledger,account.pw_uid)
         listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);listener.settimeout(5)
         path=root/'control.sock';listener.bind(str(path));os.chown(path,0,account.pw_gid);os.chmod(path,0o660);listener.listen(4)
@@ -131,6 +135,7 @@ def main():
         if nonces:nonces.close()
         if listener:listener.close()
         shutil.rmtree(root);shutil.rmtree(code)
+        subprocess.run(['/usr/bin/systemctl','stop',guardian],check=False,timeout=5,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
 
 if __name__=='__main__':main()

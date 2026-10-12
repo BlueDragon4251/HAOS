@@ -32,6 +32,7 @@ def main():
     root=Path(tempfile.mkdtemp(prefix='haos-app-unit-',dir='/run'));root.chmod(0o755)
     code=Path(tempfile.mkdtemp(prefix='haos-app-unit-',dir='/usr/lib'));code.chmod(0o755)
     launcher=None;requests=[];pids=[]
+    guardian='haos-app-fixture-'+uuid.uuid4().hex+'.service'
     try:
         module=code/'haos';module.mkdir(mode=0o755)
         for source in (Path(__file__).resolve().parents[1]/'haos').glob('*.py'):
@@ -57,7 +58,10 @@ def main():
                 '--font','monospace:size=16','/usr/bin/bash','--noprofile','--rcfile',str(initialization),'-i'],
             'memory_mib':512,'runtime_seconds':60}
         registry.register(approval)
-        launcher=ApplicationLauncher(registry,root/'state',root/'rootfs',source)
+        subprocess.run(['/usr/bin/systemd-run','--quiet','--unit='+guardian,'--property=Type=exec',
+            '--property=User='+account.pw_name,'--property=NoNewPrivileges=yes','--property=CapabilityBoundingSet=',
+            '--property=RuntimeMaxSec=180','--property=MemoryMax=16M','--property=TasksMax=1','/usr/bin/sleep','180'],check=True,timeout=5)
+        launcher=ApplicationLauncher(registry,root/'state',root/'rootfs',source,guardian=guardian)
         def execute(request,action):
             try:return launcher.execute(request,mission,action,ledger=ledger,ledger_uid=account.pw_uid)
             except PermissionError:
@@ -198,6 +202,21 @@ def main():
         registry.register(dict(approval,memory_mib=128))
         denied(lambda:execute(requests[1],{'operation':'state'}))
         launcher.stop(requests[1])
+        registry.revoke('fixture-terminal');registry.register(approval)
+        guarded=str(uuid.uuid4());requests.append(guarded)
+        launcher.start('fixture-terminal',mission,guarded,ledger=ledger,ledger_uid=account.pw_uid)
+        deadline=time.monotonic()+15
+        while launcher.unit_state(guarded)['ActiveState']!='active':
+            assert time.monotonic()<deadline,'guardian-bound real application start';time.sleep(0.025)
+        guarded_state=launcher.unit_state(guarded);guarded_pid=int(guarded_state['MainPID'])
+        assert guarded_pid>1,'actual guardian-bound application PID'
+        guarded_group=Path('/sys/fs/cgroup')/guarded_state['ControlGroup'].lstrip('/')
+        # PID 1 must terminate the app even if the authorizing process disappears.
+        subprocess.run(['/usr/bin/systemctl','kill','--signal=SIGKILL',guardian],check=True,timeout=5)
+        deadline=time.monotonic()+5
+        while Path(f'/proc/{guarded_pid}').exists() or guarded_group.exists() and 'populated 0' not in (guarded_group/'cgroup.events').read_text().splitlines():
+            assert time.monotonic()<deadline,'PID1 guardian-loss cgroup termination';time.sleep(0.025)
+        launcher.stop(guarded)
         print(json.dumps({'scope':'actual disposable systemd application units; providerless',
             'source_commit':os.environ.get('GITHUB_SHA'),'actual_root_launcher':True,
             'actual_dynamic_uids_distinct':True,'actual_private_rootfs_and_networks':True,
@@ -206,6 +225,7 @@ def main():
             'escaped_child_cgroup_cleanup':True,'other_application_survives_cleanup':True,
             'owner_revoked_application_controls_denied':True,
             'changed_limits_same_elf_controls_denied':True,
+            'guardian_sigkill_stops_application_without_broker':True,
             'installed_haos_verified':False,'real_hermes_model_verified':False}),flush=True)
     finally:
         if launcher:
@@ -216,6 +236,7 @@ def main():
                     record=launcher.record(request)
                     subprocess.run(['/usr/bin/systemctl','stop',record['unit']+'.service'],timeout=10,check=False)
         shutil.rmtree(root);shutil.rmtree(code)
+        subprocess.run(['/usr/bin/systemctl','stop',guardian],check=False,timeout=5,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
 
 if __name__=='__main__': main()
