@@ -89,8 +89,9 @@ def test_slow_watchdog_startup_does_not_disable_expiry(guard, monkeypatch):
     assert state["token"] == token and state["status"] == "pending"
     assert state["watcher"] not in (0, os.getpid())
     assert time.monotonic_ns() - started_ns >= 4_000_000_000
-    assert state["deadline_ns"] - started_ns <= 30_000_000_000
-    assert state["deadline_ns"] > time.monotonic_ns()
+    # The 30s journal expiry is measured from the begin() transaction, not
+    # from this test's earlier process-start timestamp.
+    assert 0 < state["deadline_ns"] - time.monotonic_ns() < 30_000_000_000
     guard.recover(token)
     assert guard.load()["status"] == "rolled_back"
 
