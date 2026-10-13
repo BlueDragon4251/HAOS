@@ -38,6 +38,11 @@ concurrency:
 
 jobs:
   build:
+    # Prevent multiple expensive image builds for rapid commits. The QEMU
+    # install job uses a separate non-cancelling shared concurrency group.
+    concurrency:
+      group: haos-image-build-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:

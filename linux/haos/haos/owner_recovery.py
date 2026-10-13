@@ -136,6 +136,16 @@ def print_codes(username):
     print("All previously issued codes for this owner have been revoked.")
     for code in codes:
         print(code)
+    # The tty2 systemd service restarts after main() exits. Keep the only
+    # plaintext recovery-code display visible until its owner confirms storage.
+    while True:
+        try:
+            confirmation = input("Save ALL recovery codes offline, then type SAVED to continue: ").strip()
+        except EOFError as exc:
+            raise PermissionError("recovery codes were not acknowledged") from exc
+        if confirmation == "SAVED":
+            break
+        print("Codes remain visible. Type SAVED only after saving them securely.")
 
 
 def main():
