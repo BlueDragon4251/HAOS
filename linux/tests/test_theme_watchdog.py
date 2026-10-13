@@ -66,6 +66,51 @@ def activate(guard, parent=None):
     return token
 
 
+def test_slow_watchdog_startup_does_not_disable_expiry(guard, monkeypatch):
+    """A real watcher delayed past the old 3s deadline must still arm in TCG."""
+    real_popen = subprocess.Popen
+    module = guard.begin.__globals__
+
+    def delayed_watcher(args, **kwargs):
+        assert args[1:3] == [str(WATCHDOG), "watch"]
+        # Delay the very same real watchdog process, rather than mocking the
+        # journal acknowledgement or the kernel identity check.
+        script = ("import runpy,sys,time;"
+                  "time.sleep(4.2);"
+                  "path=sys.argv[1];token=sys.argv[2];"
+                  "sys.argv=[path,'watch',token];"
+                  "runpy.run_path(path,run_name='__main__')")
+        return real_popen([args[0], "-I", "-c", script, args[1], args[3]], **kwargs)
+
+    monkeypatch.setattr(module["subprocess"], "Popen", delayed_watcher)
+    started_ns = time.monotonic_ns()
+    token = guard.begin("candidate", "b" * 64, os.getpid(), outputs(guard))
+    state = guard.load()
+    assert state["token"] == token and state["status"] == "pending"
+    assert state["watcher"] not in (0, os.getpid())
+    assert time.monotonic_ns() - started_ns >= 4_000_000_000
+    assert state["deadline_ns"] - started_ns <= 30_000_000_000
+    assert state["deadline_ns"] > time.monotonic_ns()
+    guard.recover(token)
+    assert guard.load()["status"] == "rolled_back"
+
+
+def test_exited_watchdog_denies_activation_and_restores_its_journal(guard, monkeypatch):
+    """A crash is not treated as readiness; never publish an unguarded theme."""
+    real_popen = subprocess.Popen
+    module = guard.begin.__globals__
+
+    def exited_watcher(args, **kwargs):
+        assert args[1:3] == [str(WATCHDOG), "watch"]
+        return real_popen([args[0], "-I", "-c", "raise SystemExit(17)"], **kwargs)
+
+    monkeypatch.setattr(module["subprocess"], "Popen", exited_watcher)
+    with pytest.raises(RuntimeError, match="watchdog exited before readiness"):
+        guard.begin("candidate", "b" * 64, os.getpid(), outputs(guard))
+    assert guard.load()["status"] == "rolled_back"
+    assert all(guard.read(target) is not None for target in guard.targets.values())
+
+
 def test_actual_watcher_confirms_only_exact_outputs_and_keeps_private_unrelated_preferences(guard):
     token = activate(guard)
     assert guard.load()["watcher"] != os.getpid()
