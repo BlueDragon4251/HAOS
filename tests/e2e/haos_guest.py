@@ -591,6 +591,7 @@ stage='guard-initialization'
 child_failure=None
 codes={'theme parent did not arm':'child-readiness-deadline',
        'independent theme watchdog did not become ready':'watchdog-readiness',
+        'independent theme watchdog exited before readiness':'watchdog-exited',
        'theme transaction lock is busy':'transaction-lock',
        'recover the previous theme transaction before another activation':'prior-transaction',
        'unsafe theme output directory':'directory-policy',
@@ -619,6 +620,7 @@ import json,os,runpy,sys
 stage='child-initialization'
 def failure(kind,value,traceback):
     codes={'independent theme watchdog did not become ready':'watchdog-readiness',
+        'independent theme watchdog exited before readiness':'watchdog-exited',
            'theme transaction lock is busy':'transaction-lock',
            'recover the previous theme transaction before another activation':'prior-transaction',
            'unsafe theme output directory':'directory-policy',
@@ -708,7 +710,7 @@ def theme_failure_report(output):
               "child-readiness", "journal-identity", "watcher-identity", "damage-count", "parent-sigkill",
               "rollback-wait", "output-restoration", "preference-restoration", "recovery-cli"}
     reasons = {"AssertionError", "PermissionError", "RuntimeError", "TimeoutError", "OSError", "ValueError", "FileNotFoundError", "OtherError"}
-    codes = {"child-readiness-deadline", "watchdog-readiness", "transaction-lock", "prior-transaction",
+    codes = {"child-readiness-deadline", "watchdog-readiness", "watchdog-exited", "transaction-lock", "prior-transaction",
              "directory-policy", "file-policy", "lock-policy", "journal-not-pending", "rollback-deadline", "condition-failed"}
     for line in reversed(output.splitlines()):
         if not line.startswith("HAOS_THEME_DIAGNOSTIC="):
