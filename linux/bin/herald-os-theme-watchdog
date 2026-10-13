@@ -220,14 +220,21 @@ class ThemeGuard:
         child = subprocess.Popen([sys.executable, str(executable), "watch", state["token"]], env=env,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True, close_fds=True)
-        deadline = time.monotonic() + 3
+        # A bootc guest running in QEMU/TCG can take more than three seconds
+        # to start the independent Python watcher. Bound readiness separately
+        # from the original 30-second activation expiry: a slow child must
+        # never create extra time in which an unconfirmed theme stays active.
+        deadline = min(time.monotonic() + 15, state["deadline_ns"] / 1_000_000_000 - 5)
         while child.poll() is None and time.monotonic() < deadline:
             with self.lock():
                 current = self.load()
                 if current["token"] == state["token"] and current["watcher"] == child.pid:
                     return state["token"]
             time.sleep(0.025)
+        exited = child.poll() is not None
         self.recover(state["token"])
+        if exited:
+            raise RuntimeError("independent theme watchdog exited before readiness")
         raise RuntimeError("independent theme watchdog did not become ready")
 
     def pending(self, token):
