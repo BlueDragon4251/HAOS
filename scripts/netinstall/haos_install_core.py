@@ -138,6 +138,8 @@ def stream_execute(args, *, timeout, cancel_event=None, progress=None):
             except ProcessLookupError:
                 pass
             proc.communicate()
+        if proc is not None and proc.stdout is not None:
+            proc.stdout.close()
 
 def check_network():
     """DNS alone is insufficient: verify actual TLS route to GHCR on TCP 443."""

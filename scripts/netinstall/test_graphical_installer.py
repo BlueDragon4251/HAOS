@@ -124,7 +124,9 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
         ]
         import json
         with mock.patch.object(core, "execute", return_value=json.dumps(releases)) as run:
-            sess = core.RegistrySession()
+            # Avoid real /run writes when running unprivileged in CI.
+            sess = object.__new__(core.RegistrySession)
+            sess.cancel_event = None
             try:
                 sess.api_token = "github_pat_TEST123"
                 with mock.patch.object(sess, "tags", return_value=[
@@ -140,7 +142,7 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
                 self.assertIn(b"Authorization: Bearer github_pat_TEST123",
                               run.call_args.kwargs["input_data"])
             finally:
-                sess.close()
+                sess.api_token = None
 
     def test_image_pull_progress_reports_real_lines(self):
         observed = []
