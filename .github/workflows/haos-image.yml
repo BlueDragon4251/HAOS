@@ -155,7 +155,8 @@ jobs:
           set -euo pipefail
           sudo podman run --rm localhost/haos:ci bash -euo pipefail -c '
             rpm -q iwlwifi-mvm-firmware iwlwifi-mld-firmware iwlbluetooth-firmware alsa-sof-firmware
-            rpm -ql iwlwifi-mvm-firmware | grep -Eq "/iwlwifi-so-a0-gf-a0-89\\.ucode(\\.xz)?$"
+            firmware_files="$(rpm -ql iwlwifi-mvm-firmware)"
+            grep -E "/iwlwifi-so-a0-gf-a0-89\\.ucode(\\.xz)?$" <<< "$firmware_files"
           '
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |

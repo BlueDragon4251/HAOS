@@ -27,3 +27,15 @@ def test_immutable_image_uses_the_checked_firmware_manifest():
     installer = IMAGE_DIR.joinpath("packages.sh").read_text()
     assert 'list "$LINUX/image/packages.txt"' in installer
     assert 'dnf -y install --setopt=install_weak_deps=False "${PACKAGES[@]}"' in installer
+
+
+def test_firmware_image_gate_avoids_grep_quiet_sigpipe_under_pipefail():
+    # "rpm -ql ... | grep -q" can return 141 (SIGPIPE from rpm) when the
+    # match is found early. Image verification must inspect the whole RPM
+    # listing without a short-circuiting producer/consumer pipe.
+    workflow = (IMAGE_DIR.parent.parent / ".github" / "workflows" / "haos-image.yml").read_text()
+    gate = workflow.split("- name: Verify Intel wireless, Bluetooth and audio firmware in the built image", 1)[1]
+    gate = gate.split("\n      - name:", 1)[0]
+    assert 'firmware_files="$(rpm -ql iwlwifi-mvm-firmware)"' in gate
+    assert '<<< "$firmware_files"' in gate
+    assert "| grep -q" not in gate
