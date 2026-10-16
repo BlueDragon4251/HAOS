@@ -38,7 +38,7 @@ jobs:
             bash -euo pipefail -c '
               dnf install -y livecd-tools python3-kickstart xorriso qemu-img
               python3 scripts/netinstall/build-live-ks.py output/haos-live.ks
-              ksvalidator -v F44 output/haos-live.ks
+              python3 -c "from pykickstart.parser import KickstartParser; from pykickstart.version import makeVersion; KickstartParser(makeVersion('F44')).readKickstart('output/haos-live.ks')"
               livecd-creator --verbose --config=output/haos-live.ks \
                 --fslabel=HAOS-DUAL-44 --releasever=44 --cache=/var/cache/haos-live
               cp HAOS-DUAL-44.iso output/haos-dual-channel-x86_64.iso
@@ -48,6 +48,9 @@ jobs:
           ls -lh output/haos-dual-channel-x86_64.iso
       - name: Inspect ISO filesystem
         run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y xorriso
           xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -print
           xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain
       - uses: actions/upload-artifact@v4
