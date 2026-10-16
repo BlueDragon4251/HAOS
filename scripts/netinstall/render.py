@@ -11,9 +11,9 @@ from pathlib import Path
 import re
 
 SOURCE_RE = re.compile(
-    r"(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\\.)+[a-z][a-z0-9-]*"
+    r"(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\.)+[a-z][a-z0-9-]*"
     r"(?::[0-9]{1,5})?/[a-z0-9_]+(?:[./_-][a-z0-9_]+)*"
-    r"@sha256:[0-9a-f]{64}\\Z"
+    r"@sha256:[0-9a-f]{64}\Z"
 )
 
 
@@ -30,7 +30,7 @@ def render_kickstart(image_ref: str, template: Path) -> str:
     assert text.count("__HAOS_DEFAULT_IMAGE__") == 1, "invalid Netinstall template"
     text = text.replace("__HAOS_DEFAULT_IMAGE__", source)
     assert "%include /tmp/haos-netinstall-source.ks" in text
-    assert "clearpart" not in "\\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert "clearpart" not in "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
     return text
 
 
