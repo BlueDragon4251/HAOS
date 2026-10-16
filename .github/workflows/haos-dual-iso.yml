@@ -1,0 +1,64 @@
+name: HAOS Dual-Channel Live ISO (experimental)
+on:
+  push:
+    branches: ['agent/haos-foundation']
+    paths:
+      - '.github/workflows/haos-dual-iso.yml'
+      - 'scripts/netinstall/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: haos-dual-iso-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live-iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts
+        run: |
+          set -euo pipefail
+          bash -n scripts/netinstall/private-install.sh scripts/netinstall/haos-install.sh
+          python3 -m py_compile scripts/netinstall/build-live-ks.py
+      - name: Prepare host for filesystem image
+        run: |
+          set -euo pipefail
+          sudo modprobe loop
+          sudo losetup --find
+          sudo mkdir -p /dev/mapper
+          df -h /
+      - name: Compose independent Fedora 44 live ISO
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          sudo podman run --rm --privileged --security-opt label=disable \
+            -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
+            bash -euo pipefail -c '
+              dnf install -y livecd-tools fedora-kickstarts python3-kickstart xorriso qemu-img
+              find /usr/share -name "fedora-live-base.ks" -o -name "fedora-live-mini.ks"
+              BASE="$(find /usr/share -name fedora-live-mini.ks -print -quit)"
+              [[ -n "$BASE" ]] || BASE="$(find /usr/share -name fedora-live-base.ks -print -quit)"
+              [[ -n "$BASE" ]] || exit 2
+              python3 scripts/netinstall/build-live-ks.py "$BASE" output/haos-live.ks
+              livecd-creator --verbose --config=output/haos-live.ks \
+                --fslabel=HAOS-DUAL-44 --releasever=44 --cache=/var/cache/haos-live
+              cp HAOS-DUAL-44.iso output/haos-dual-channel-x86_64.iso
+            '
+          sudo chown -R "$(id -u):$(id -g)" output
+          (cd output && sha256sum haos-dual-channel-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
+          ls -lh output/haos-dual-channel-x86_64.iso
+      - name: Inspect ISO filesystem
+        run: |
+          xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -print
+          xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: haos-dual-channel-iso-${{ github.sha }}
+          path: |
+            output/haos-dual-channel-x86_64.iso
+            output/SHA256SUMS
+            output/haos-live.ks
+          retention-days: 14
