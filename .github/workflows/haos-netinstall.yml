@@ -107,9 +107,15 @@ jobs:
           # Fedora 44 lorax/mkksiso retains Fedora's UEFI boot loader and
           # inserts the source-selected Anaconda kickstart. Do not put the
           # bootc image into the ISO.
-          sudo podman run --rm --security-opt label=disable \
+          # mkksiso/mkefiboot creates an EFI FAT image using losetup.
+          # Rootful Podman alone does NOT give its container loop-device access.
+          sudo modprobe loop
+          sudo losetup --find >/dev/null
+          sudo podman run --rm --privileged --security-opt label=disable \
             -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
             bash -euo pipefail -c '
+              test -e /dev/loop-control
+              losetup --find >/dev/null
               dnf install -y lorax xorriso isomd5sum
               mkksiso -V HAOS_NETINSTALL \
                 output/haos-netinstall.ks \
