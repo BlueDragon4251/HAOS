@@ -323,8 +323,13 @@ class Wizard(tk.Tk):
         self.session.cancel_event = self.cancel_event
         self.stop_button = self.button("Vorgang abbrechen", self.cancel_operation)
         def run():
-            try: self.messages.put((True, operation(), callback, retry))
-            except Exception as exc: self.messages.put((False, exc, callback, retry))
+            try:
+                result = operation()
+                if self.cancel_event.is_set():
+                    raise core.InstallerError("Vorgang vom Benutzer abgebrochen.")
+                self.messages.put((True, result, callback, retry))
+            except Exception as exc:
+                self.messages.put((False, exc, callback, retry))
         threading.Thread(target=run, daemon=True).start()
 
     def poll(self):
