@@ -46,3 +46,30 @@ If the URL does not work, the live OS cannot boot in this mode. This is an
 **untested real-hardware fallback** rather than confirmed PXE installation.
 Standard USB boot remains unchanged. Never host GHCR tokens via this HTTP
 service; token transport still requires USB, trusted HTTPS, or manual input.
+
+## On-device installer input and screen recovery
+
+The new GUI sizes itself from the actual X11 screen mode, starts Openbox
+before Tkinter, and attempts to take keyboard focus. It supports a physical
+mouse/touchpad and also provides a keyboard-only operation path:
+
+- `1`: open the public stable installer. Public stable still fails safely
+  when no official stable image manifest has been published.
+- `2` or `F3`: open NetworkManager text interface in an on-screen terminal.
+- `Tab` / `Shift+Tab`, then `Enter`: navigate and activate controls.
+- `Ctrl+Shift+D` or `F12`: authenticated private GHCR image chooser.
+- `F2` or `Ctrl+Alt+F2`: use the independent HAOS text installer on TTY2.
+- `Ctrl+Alt+F1`: return to the graphical installer.
+- `Esc`: show the on-screen keyboard shortcuts.
+
+If the pointer/keyboard is completely absent on the HP laptop, try a wired
+USB keyboard and mouse and inspect device enumeration. On the live filesystem,
+`/run/haos-kiosk/hardware.log` records xrandr display modes, libinput devices,
+and the kernel's input device inventory (no GitHub credentials are recorded).
+The X11 session logs Openbox startup to `/run/haos-kiosk/openbox.log`.
+
+CI checks screen edge coverage in QEMU, emulates pressing the numeric `2`
+key, and requires a material on-screen change after the network-settings
+window opens. Those checks cannot conclusively verify an HP-specific I2C
+touchpad. Test both direct USB boot and iVentoy HTTP PXE boot before declaring
+the installer release-ready.
