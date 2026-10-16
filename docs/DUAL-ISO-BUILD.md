@@ -164,3 +164,8 @@ version \`created_at\` via an authenticated, secret-stdin GitHub API request.
 If the token cannot read package version metadata, the fallback uses OCI
 \`Created\` timestamps from Skopeo and clearly labels that these are *image
 creation times*, not GHCR publication times. Both dates display in UTC.
+
+
+### Fedora bootc root filesystem must be configured
+
+A real HP PXE installation failed with `error: Installing to disk: No root filesystem specified` after confirming `WIPE`. The HAOS live installer now passes `bootc install to-disk --filesystem ext4` explicitly, and first checks for the bootc CLI option and `mkfs.ext4` in the already downloaded image, without changing the disk. Future HAOS bootc images also ship `/usr/lib/bootc/install/50-haos-root.toml` with `[install.filesystem.root]\ntype = "ext4"`. The live ISO change supports already-published dev OCI images without re-pushing them. Do not conflate the Live ISO Kickstart `part /` filesystem with this bootc target rootfs requirement. Retest on a disposable VM disk before asserting end-to-end install success.

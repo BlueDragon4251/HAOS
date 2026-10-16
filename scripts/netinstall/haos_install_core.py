@@ -495,6 +495,17 @@ class RegistrySession:
         nodes = set(execute(["lsblk", "-nrpo", "NAME", disk], timeout=10).splitlines())
         if nodes.intersection(swap.stdout.splitlines()):
             raise InstallerError("Auf dem Datenträger ist Swap aktiv.")
+        # Non-destructive capability check before invoking bootc with a
+        # writable target disk. The current HAOS dev image lacks a default
+        # install.filesystem.root configuration, so --filesystem is mandatory.
+        # Check that its bootc build supports the flag and ext4 tools are there.
+        execute(
+            ["podman", "run", "--rm", "--entrypoint", "/usr/bin/bash",
+             image, "-c",
+             "command -v mkfs.ext4 >/dev/null && "
+             "bootc install to-disk --help | grep -q -- '--filesystem'"],
+            timeout=45, cancel_event=self.cancel_event,
+        )
         # Ensure the pre-pulled image is available locally before erasing.
         execute(["podman", "image", "exists", image], timeout=15,
                 cancel_event=self.cancel_event)
@@ -510,6 +521,7 @@ class RegistrySession:
                  "-v", "/var/lib/containers:/var/lib/containers",
                  "-v", "/dev:/dev", "-v", "/run:/run",
                  image, "bootc", "install", "to-disk", "--wipe",
+                 "--filesystem", "ext4",
                  "--skip-fetch-check",
                  "--source-imgref", "containers-storage:" + image,
                  "--target-imgref", image, disk],

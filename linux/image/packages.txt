@@ -25,6 +25,8 @@ wireplumber
 alsa-utils
 # Cloud images ship kernel-core only; the sound drivers (snd-hda-intel for the VM's audio) live here.
 kernel-modules
+# mkfs.ext4 is required by bootc install to-disk --filesystem ext4.
+e2fsprogs
 NetworkManager
 NetworkManager-wifi
 # Intel AX211 Wi-Fi 6E, Intel Bluetooth and Intel Sound Open Firmware.

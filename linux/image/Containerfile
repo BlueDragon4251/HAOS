@@ -22,4 +22,10 @@ LABEL org.opencontainers.image.title="HAOS" \
       org.opencontainers.image.licenses="MIT" \
       containers.bootc="1"
 
+# bootc >= 1.11 has no implicit root filesystem if the image lacks
+# /usr/lib/bootc/install/*.toml. Supply the default for all HAOS installers.
+# The Live ISO also passes --filesystem ext4 explicitly for older dev images.
+RUN install -d /usr/lib/bootc/install \
+ && printf '[install.filesystem.root]\\ntype = "ext4"\\n' > /usr/lib/bootc/install/50-haos-root.toml
+
 RUN bootc container lint

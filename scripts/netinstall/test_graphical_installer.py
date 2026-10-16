@@ -165,6 +165,43 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
         self.assertIn("--source-imgref", src)
         self.assertIn("--target-imgref", src)
         self.assertIn("stream_execute", src)
+        self.assertIn('"--filesystem", "ext4"', src)
+        self.assertIn("command -v mkfs.ext4", src)
+        self.assertIn("bootc install to-disk --help", src)
+
+    def test_install_command_passes_explicit_ext4_and_preflights_image(self):
+        # Simulate a valid target but never touch or erase any real disk.
+        # We intentionally mock all host/storage subprocesses.
+        from unittest.mock import patch
+        import json
+        session = object.__new__(core.RegistrySession)
+        session.authfile = "/run/haos-test/auth.json"
+        session.cancel_event = None
+        image = "ghcr.io/bluedragon4251/haos@sha256:" + "a" * 64
+        disk = "/dev/nvme0n1"
+        executed = []
+        def fake_execute(args, **kwargs):
+            executed.append(args)
+            if args[:3] == ["lsblk", "-nrpo", "NAME"]:
+                return disk + "\\n"
+            return ""
+        def fake_stream(args, **kwargs):
+            executed.append(args)
+            return "ok"
+        with patch.object(core, "internal_disks", return_value=[{"path": disk}]), \\
+             patch.object(core, "execute", side_effect=fake_execute), \\
+             patch.object(core, "stream_execute", side_effect=fake_stream), \\
+             patch.object(core.subprocess, "run",
+                          return_value=core.subprocess.CompletedProcess([], 1, "")):
+            session.install(image, disk)
+        command = next(args for args in executed if args[:2] == ["podman", "run"]
+                       and "bootc" in args)
+        self.assertEqual(command[command.index("--filesystem") + 1], "ext4")
+        self.assertEqual(command[-1], disk)
+        self.assertIn("--wipe", command)
+        preflight = next(args for args in executed if args[:3] == ["podman", "run", "--rm"]
+                         and "bootc" not in args)
+        self.assertIn("mkfs.ext4", " ".join(preflight))
 
     def test_disk_selection_uses_existing_validator(self):
         with mock.patch.object(core, "ROOT", core.ROOT):
