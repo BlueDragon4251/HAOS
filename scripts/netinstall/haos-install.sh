@@ -13,7 +13,7 @@ echo
 echo "1) Install verified public stable release"
 echo "2) Exit"
 echo
-echo "Developer access: type :dev (not advertised on the normal screen)."
+
 read -r -p 'Selection [1]: ' selection
 case "${selection:-1}" in
   1)
