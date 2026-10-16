@@ -122,6 +122,17 @@ jobs:
               printf 'screendump output/uefi-after-key.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
               python3 scripts/netinstall/check-gui-keyboard.py \
                 output/uefi-welcome.ppm output/uefi-after-key.ppm
+              # Close network window; verify F12+Enter opens native graphical
+              # developer wizard instead of the previous XTerm console.
+              printf 'sendkey alt-f4\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 2
+              printf 'sendkey f12\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 2
+              printf 'sendkey ret\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 6
+              printf 'screendump output/uefi-wizard.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              python3 scripts/netinstall/check-gui-keyboard.py \
+                output/uefi-welcome.ppm output/uefi-wizard.ppm
               exit 0
             fi
             echo "Graphical boot not visible yet (poll $i/10)"
@@ -136,6 +147,7 @@ jobs:
             output/uefi-boot.ppm
             output/uefi-welcome.ppm
             output/uefi-after-key.ppm
+            output/uefi-wizard.ppm
             output/uefi-serial.log
             output/boot-report.txt
             output/uefi-grub.cfg
