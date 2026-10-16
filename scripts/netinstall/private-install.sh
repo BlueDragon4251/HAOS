@@ -32,14 +32,53 @@ read -r -p "Type exact disk path to confirm: " CONFIRM
 AUTHDIR="$(mktemp -d /run/haos-ghcr-auth.XXXXXXXX)"
 chmod 700 "$AUTHDIR"
 printf '%s\n' '{}' > "$AUTHDIR/auth.json"
-cleanup() { rm -rf -- "$AUTHDIR"; }
+cleanup() { if [[ -n "${USB_MOUNT:-}" ]] && mountpoint -q "$USB_MOUNT"; then umount "$USB_MOUNT" || true; fi; rm -rf -- "$AUTHDIR"; }
 trap cleanup EXIT
 if [[ "$PUBLIC" == 0 ]]; then
 read -r -p 'GitHub username: ' GHUSER
 [[ "$GHUSER" =~ ^[A-Za-z0-9-]+$ ]] || die "Invalid GitHub username"
-read -r -s -p 'Fine-grained/classic GHCR read token: ' GHTOKEN
-printf '\n'
-[[ -n "$GHTOKEN" ]] || die "Empty token"
+printf '\nDeveloper authentication:\n'
+printf '1) USB token file (HAOS-DEV/token.txt)\n'
+printf '2) HTTPS credential endpoint (also when booted via iVentoy PXE)\n'
+printf '3) Paste token manually\n'
+read -r -p 'Method [1]: ' AUTH_METHOD
+case "${AUTH_METHOD:-1}" in
+  1)
+    command -v mount >/dev/null && command -v blkid >/dev/null || die "USB mount support missing"
+    printf 'USB partitions:\n'
+    lsblk -rpo NAME,TRAN,TYPE,SIZE | awk '$2 == "usb" || ($3 == "part" && $2 == "usb") {print}'
+    read -r -p 'USB partition (e.g. /dev/sdb1): ' USB_PART
+    USB_PART="$(readlink -f -- "$USB_PART")"
+    [[ -b "$USB_PART" && "$(lsblk -dnro TYPE "$USB_PART")" == "part" ]] || die "Select a USB partition"
+    USB_PARENT="$(lsblk -s -nro TRAN "$USB_PART" | grep -m1 -F usb || true)"
+    [[ "$USB_PARENT" == usb ]] || die "Partition is not on a USB drive"
+    USB_MOUNT="$AUTHDIR/usb"
+    mkdir -m 700 "$USB_MOUNT"
+    mount -o ro,nosuid,nodev,noexec "$USB_PART" "$USB_MOUNT" || die "Cannot mount USB read-only"
+    USB_FILE="$USB_MOUNT/HAOS-DEV/token.txt"
+    [[ -f "$USB_FILE" && ! -L "$USB_FILE" ]] || die "USB file HAOS-DEV/token.txt not found"
+    IFS= read -r GHTOKEN < "$USB_FILE" || [[ -n "${GHTOKEN:-}" ]]
+    umount "$USB_MOUNT"
+    ;;
+  2)
+    command -v curl >/dev/null || die "Missing curl"
+    echo 'Use a trusted HTTPS endpoint. iVentoy HTTP port 16000 must NOT host your token.'
+    read -r -p 'HTTPS token URL: ' TOKEN_URL
+    [[ "$TOKEN_URL" == https://* && "$TOKEN_URL" != *'@'* ]] || die "Only HTTPS URLs without embedded credentials are accepted"
+    TOKEN_FILE="$AUTHDIR/token"
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      --connect-timeout 10 --max-time 30 --max-filesize 8192 "$TOKEN_URL" -o "$TOKEN_FILE" || die "Token download failed"
+    IFS= read -r GHTOKEN < "$TOKEN_FILE" || [[ -n "${GHTOKEN:-}" ]]
+    rm -f -- "$TOKEN_FILE"
+    unset TOKEN_URL
+    ;;
+  3)
+    read -r -s -p 'Fine-grained/classic GHCR read token: ' GHTOKEN
+    printf '\n'
+    ;;
+  *) die "Unsupported authentication method" ;;
+esac
+[[ -n "${GHTOKEN:-}" && "$GHTOKEN" != *[[:space:]]* && ${#GHTOKEN} -le 8192 ]] || die "Invalid or empty token"
 printf '%s' "$GHTOKEN" | podman login --authfile "$AUTHDIR/auth.json" ghcr.io -u "$GHUSER" --password-stdin
 unset GHTOKEN
 fi
