@@ -47,6 +47,16 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn('TTYPath=/dev/tty2', self.ks)
         self.assertIn('systemctl enable haos-installer-console.service', self.ks)
 
+    def test_keyboard_layout_selector(self):
+        self.assertIn('self.bind("<F4>", self.cycle_keyboard)', self.gui)
+        self.assertIn('("Deutsch (AT)", "at")', self.gui)
+        self.assertIn('setxkbmap', self.gui)
+        self.assertIn("keyboard --vckeymap=de --xlayouts=at", self.ks)
+        self.assertIn("setxkbmap -layout at", self.session)
+
+    def test_nmtui_is_not_executed_through_bash(self):
+        self.assertIn('else [path, *args]', self.gui)
+
     def test_input_stack(self):
         for package in ('openbox', 'xorg-x11-drv-evdev', 'xorg-x11-drv-libinput', 'xrandr'):
             self.assertIn(package, self.ks)

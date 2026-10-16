@@ -15,6 +15,8 @@ mkdir -p /run/haos-kiosk
   if command -v libinput >/dev/null; then libinput list-devices || true; fi
 } > /run/haos-kiosk/hardware.log 2>&1
 if command -v xrandr >/dev/null; then xrandr --auto || true; fi
+if command -v setxkbmap >/dev/null; then setxkbmap -layout at || true; fi
+if command -v loadkeys >/dev/null; then loadkeys de || true; fi
 if command -v openbox >/dev/null; then
   openbox --sm-disable >/run/haos-kiosk/openbox.log 2>&1 &
   WM_PID=$!

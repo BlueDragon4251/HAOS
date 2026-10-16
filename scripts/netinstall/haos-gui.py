@@ -40,11 +40,14 @@ class Welcome(tk.Tk):
         self.bind("<F12>", self.open_dev)
         self.bind("<F2>", self.open_text_console)
         self.bind("<F3>", self.open_network)
+        self.bind("<F4>", self.cycle_keyboard)
         self.bind("<KeyPress-1>", self.open_stable)
         self.bind("<KeyPress-2>", self.open_network)
         self.bind("<Escape>", self.show_help)
         self.bind_all("<Key>", self.key_sequence, add="+")
         self.sequence = ""
+        self.keyboards = [("Deutsch (AT)", "at"), ("Deutsch (DE)", "de"), ("English (US)", "us")]
+        self.keyboard_index = 0
         self.build()
         self.after(200, self.acquire_focus)
         self.after(1500, self.refresh_network)
@@ -124,12 +127,32 @@ class Welcome(tk.Tk):
         )
         self.network_button.pack(side="right")
         self.network_button.bind("<Return>", lambda e: (self.network_button.invoke(), "break")[1])
+        keyrow = tk.Frame(main, bg=BG)
+        keyrow.pack(fill="x", pady=(cfg["gap"], 2))
+        self.keyboard_button = tk.Button(
+            keyrow, text="F4  Keyboard: Deutsch (AT)", command=self.cycle_keyboard,
+            bg=EDGE, fg=FG, font=("DejaVu Sans", cfg["body"]),
+            relief="flat", padx=10, pady=5, takefocus=True
+        )
+        self.keyboard_button.pack(anchor="w")
         help_text = ("TAB / ENTER navigate   ·   F2 text installer   ·   F3 network settings"
                      if cfg["compact"] else
                      "TAB / ENTER: navigate   |   F2: text installer   |   F3: network settings   |   ESC: help")
         self.label(main, help_text, 9 if cfg["compact"] else 11, MUTED)
         self.label(main, "No disk changes until you explicitly confirm installation.",
                    9 if cfg["compact"] else 10, MUTED)
+
+    def cycle_keyboard(self, event=None):
+        self.keyboard_index = (self.keyboard_index + 1) % len(self.keyboards)
+        name, layout = self.keyboards[self.keyboard_index]
+        try:
+            subprocess.run(["/usr/bin/setxkbmap", "-layout", layout],
+                           check=True, capture_output=True, timeout=4)
+            subprocess.run(["/usr/bin/loadkeys", "us" if layout == "us" else "de"],
+                           check=False, capture_output=True, timeout=4)
+            self.keyboard_button.configure(text=f"F4  Keyboard: {name}")
+        except Exception as exc:
+            messagebox.showerror("Keyboard layout failed", str(exc))
 
     def open_stable(self, event=None):
         self.open_terminal("HAOS Stable Installation", "/usr/local/sbin/haos-install.sh", "--stable")
@@ -143,6 +166,7 @@ class Welcome(tk.Tk):
             "1: Stable installer\n2 or F3: Network settings\n"
             "Tab / Shift+Tab: change button\nEnter: activate button\n"
             "F2: switch to text installer on TTY2\n"
+            "F4: change keyboard layout (AT / DE / US)\n"
             "Ctrl+Alt+F2: direct text installer\n"
             "Esc: show this help"
         )
@@ -176,7 +200,10 @@ class Welcome(tk.Tk):
                 "-fa", "DejaVu Sans Mono", "-fs", size,
                 "-bg", BG, "-fg", FG,
                 "-geometry", f"{cols}x{rows}+5+5",
-                "-e", "/usr/bin/bash", path, *args
+                "-e", *(
+                    ["/usr/bin/bash", path, *args] if path.endswith(".sh")
+                    else [path, *args]
+                )
             ])
         except OSError as exc:
             messagebox.showerror("Unable to open installer", str(exc))
