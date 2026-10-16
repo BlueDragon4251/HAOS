@@ -46,6 +46,16 @@ jobs:
               python3 scripts/netinstall/fix_livecd_grub.py --verbose --config=output/haos-live.ks \
                 --fslabel=HAOS-DUAL-44 --releasever=44 --cache=/var/cache/haos-live
               cp HAOS-DUAL-44.iso output/haos-dual-channel-x86_64.iso
+              # HTTP network root requires dracut livenet in the live kernel initrd.
+              xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+                -extract /isolinux/initrd0.img output/haos-live-initrd.img
+              lsinitrd -m output/haos-live-initrd.img > output/dracut-modules.txt
+              grep -Eq "(^|[[:space:]])livenet([[:space:]]|$)" output/dracut-modules.txt || {
+                cat output/dracut-modules.txt
+                echo "ERROR: dracut livenet module missing; HTTP PXE cannot work."
+                exit 1
+              }
+              rm -f output/haos-live-initrd.img
             '
           sudo chown -R "$(id -u):$(id -g)" output
           (cd output && sha256sum haos-dual-channel-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
@@ -71,6 +81,10 @@ jobs:
           mtype -i output/efiboot.img ::/EFI/BOOT/grub.cfg > output/grub-efiboot.cfg
           python3 scripts/netinstall/verify_live_grub.py \
             output/uefi-grub.cfg output/grub-efiboot.cfg
+          # PXE boot must not depend on the old virtual block device root.
+          grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/uefi-grub.cfg
+          grep -Fq "root=live:http://${haos_server}:16000/eiso/id/${haos_image_id}/LiveOS/squashfs.img" output/uefi-grub.cfg
+          grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/grub-efiboot.cfg
           # Never store the temporary EFI image inside the uploaded artifact.
           rm -f output/efiboot.img
           xorriso -indev output/haos-dual-channel-x86_64.iso -ls /EFI/BOOT /images || true
@@ -125,4 +139,5 @@ jobs:
             output/SHA256SUMS
             output/haos-live.ks
             output/boot-report.txt
+            output/dracut-modules.txt
           retention-days: 14

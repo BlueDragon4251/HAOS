@@ -23,3 +23,26 @@ Every HAOS live installer has the same hidden `:dev` access regardless of whethe
 **Safety:** No credentials are included in the ISO, GitHub Actions artifacts, or the installed system. The installer clears its temporary authfile on exit. For private subsequent updates, a separate credentials mechanism will be required.
 
 This integration has not yet passed a real PXE boot or GHCR private-install acceptance test.
+
+## HTTP-root fallback for iVentoy PXE
+
+When booted over iVentoy, a VM or physical PC may have the HAOS GRUB menu
+and kernel but lose access to the virtual ISO drive at dracut startup.
+The symptom is waiting indefinitely for
+`/dev/disk/by-label/HAOS-DUAL-44`.
+
+Use the optional UEFI GRUB entry **Start HAOS via iVentoy HTTP (network root)**.
+It asks for the iVentoy **server IP** and **image ID**, both short values
+available from iVentoy ISO Management (web UI often port 26000).
+
+The live system is downloaded directly from the ISO already on your
+iVentoy server, via its documented HTTP ISO-internal-file endpoint:
+`http://SERVER:16000/eiso/id/IMAGE_ID/LiveOS/squashfs.img`.
+No duplicate storage of the ~1.5 GB ISO is needed. Check the URL is
+reachable before booting. iVentoy must serve the ISO internal files and
+the client must have working wired DHCP.
+
+If the URL does not work, the live OS cannot boot in this mode. This is an
+**untested real-hardware fallback** rather than confirmed PXE installation.
+Standard USB boot remains unchanged. Never host GHCR tokens via this HTTP
+service; token transport still requires USB, trusted HTTPS, or manual input.

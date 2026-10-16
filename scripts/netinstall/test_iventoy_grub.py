@@ -1,6 +1,6 @@
 """Regression tests for iVentoy-compatible GRUB menu generation."""
 import unittest
-from fix_livecd_grub import fix_grub_text
+from fix_livecd_grub import fix_grub_text, add_iventoy_network_boot
 from verify_live_grub import verify
 
 
@@ -37,6 +37,21 @@ class IventoyGrubTest(unittest.TestCase):
         result = fix_grub_text(menu)
         self.assertIn("# text linuxefi /initrdefi", result)
         verify(result)
+
+
+    def test_iventoy_http_path_does_not_require_virtual_disk(self):
+        cfg = add_iventoy_network_boot(self.NATIVE)
+        verify(cfg)
+        self.assertIn("Start HAOS via iVentoy HTTP (network root)", cfg)
+        self.assertIn("read haos_server", cfg)
+        self.assertIn("read haos_image_id", cfg)
+        self.assertIn("root=live:http://${haos_server}:16000/eiso/id/${haos_image_id}/LiveOS/squashfs.img", cfg)
+        self.assertIn("ip=dhcp rd.neednet=1", cfg)
+        self.assertIn("linux /isolinux/vmlinuz0 root=live:LABEL=", cfg)
+
+    def test_no_duplicate_pxe_entry(self):
+        with self.assertRaises(ValueError):
+            add_iventoy_network_boot(add_iventoy_network_boot(self.NATIVE))
 
     def test_reject_incompatible_generated_menu(self):
         with self.assertRaises(ValueError):

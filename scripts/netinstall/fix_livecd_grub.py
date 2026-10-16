@@ -26,6 +26,34 @@ def fix_grub_text(menu: str) -> str:
     return updated
 
 
+
+# iVentoy's virtual ISO block device can vanish in dracut. Fetch live SquashFS
+# over the iVentoy HTTP service rather than requiring this block device.
+PXE_HTTP_STANZA = """
+menuentry 'Start HAOS via iVentoy HTTP (network root)' --class gnu-linux --class os {
+    echo 'iVentoy server IP (e.g. 192.168.50.1):'
+    read haos_server
+    echo 'iVentoy image ID (from iVentoy ISO Management):'
+    read haos_image_id
+    if [ -z "$haos_server" -o -z "$haos_image_id" ]; then
+        echo 'Missing server IP or image ID; returning to menu.'
+        sleep 4
+    else
+        linux /isolinux/vmlinuz0 root=live:http://__SERVER__:16000/eiso/id/__ID__/LiveOS/squashfs.img ip=dhcp rd.neednet=1 rd.live.image ro
+        initrd /isolinux/initrd0.img
+    fi
+}
+""".replace("__SERVER__", "${haos_server}").replace("__ID__", "${haos_image_id}")
+
+
+def add_iventoy_network_boot(menu: str) -> str:
+    """Extra opt-in PXE boot, without altering conventional USB ISO entry."""
+    if "Start HAOS via iVentoy HTTP (network root)" in menu:
+        raise ValueError("Duplicate iVentoy HTTP menu entry")
+    if not LINUX_LINE.search(menu) or not INITRD_LINE.search(menu):
+        raise ValueError("Cannot add HTTP boot to invalid EFI GRUB menu")
+    return menu.rstrip() + "\n" + PXE_HTTP_STANZA
+
 def install_runtime_shim() -> dict:
     from imgcreate.live import x86LiveImageCreator
 
@@ -39,7 +67,7 @@ def install_runtime_shim() -> dict:
         raw = original(self, *args, **kwargs)
         if not isinstance(raw, str):
             raise TypeError("Fedora EFI menu generator returned non-text output")
-        corrected = fix_grub_text(raw)
+        corrected = add_iventoy_network_boot(fix_grub_text(raw))
         calls["count"] += 1
         if corrected != raw:
             calls["rewrites"] += 1
