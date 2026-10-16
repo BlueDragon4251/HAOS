@@ -51,7 +51,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y xorriso
-          xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -print
+          xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -exec report_lba --
           xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain
       - uses: actions/upload-artifact@v4
         if: success()
