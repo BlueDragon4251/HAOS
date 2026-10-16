@@ -19,7 +19,7 @@ class KioskLayoutTests(unittest.TestCase):
         program = ast.Module(body=[method], type_ignores=[])
         ns = {}
         exec(compile(program, str(HERE / "haos-gui.py"), "exec"), ns)
-        cls.layout = ns["layout_for_screen"]
+        cls.layout = staticmethod(ns["layout_for_screen"])
 
     def test_small_uefi_resolution(self):
         c = self.layout(640, 480)
