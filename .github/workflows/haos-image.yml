@@ -150,6 +150,13 @@ jobs:
             'import json,sys; s=json.load(sys.stdin); r={"event":"haos.sbom.scanner", "status":s["Status"], "exit_code":s["ExitCode"], "oom_killed":s["OOMKilled"]}; print(json.dumps(r)); open("evidence/sbom-scanner-status.json","x").write(json.dumps(r)+"\n"); sys.exit(0 if s["Status"]=="exited" and s["ExitCode"]==0 and not s["OOMKilled"] else 1)'
           if [[ "$HAOS_SBOM_STATUS" -ne 0 ]]; then exit "$HAOS_SBOM_STATUS"; fi
           python3 linux/haos/runtime/verify_sbom.py evidence --commit "$GITHUB_SHA"
+      - name: Verify Intel wireless, Bluetooth and audio firmware in the built image
+        run: |
+          set -euo pipefail
+          sudo podman run --rm localhost/haos:ci bash -euo pipefail -c '
+            rpm -q iwlwifi-mvm-firmware iwlwifi-mld-firmware iwlbluetooth-firmware alsa-sof-firmware
+            rpm -ql iwlwifi-mvm-firmware | grep -Eq "/iwlwifi-so-a0-gf-a0-89\\.ucode(\\.xz)?$"
+          '
       - name: Build the UEFI x86_64 installer ISO from the local image
         run: |
           set -euo pipefail

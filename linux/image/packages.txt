@@ -27,6 +27,12 @@ alsa-utils
 kernel-modules
 NetworkManager
 NetworkManager-wifi
+# Intel AX211 Wi-Fi 6E, Intel Bluetooth and Intel Sound Open Firmware.
+# Must ship inside the immutable bootc image; dnf in a transient /usr overlay is lost on reboot.
+iwlwifi-mvm-firmware
+iwlwifi-mld-firmware
+iwlbluetooth-firmware
+alsa-sof-firmware
 bluez
 upower
 # Electron runtime libraries and fonts.
