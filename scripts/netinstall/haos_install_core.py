@@ -5,6 +5,7 @@ Token bytes are used only for stdin of podman login, never CLI arguments,
 environment variables, image metadata or logs.
 """
 import importlib.util
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -88,6 +89,137 @@ def check_network():
             "Gateway, Internetfreigabe, DNS und Firewall überprüfen."
         ) from exc
 
+
+
+def _routes(*args):
+    """Read the kernel's current IPv4 routes as JSON; no network changes."""
+    raw = execute(["ip", "-j", "-4", "route", *args], timeout=8, output_limit=None)
+    return json.loads(raw)
+
+
+def _wifi_devices():
+    """Connected WLAN interfaces only, obtained from NetworkManager."""
+    lines = execute(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device", "status"], timeout=8)
+    choices = []
+    for line in lines.splitlines():
+        bits = line.split(":", 2)
+        if len(bits) == 3 and bits[1] == "wifi" and bits[2].startswith("connected"):
+            if re.fullmatch(r"[a-zA-Z0-9_.-]{1,32}", bits[0]):
+                choices.append(bits[0])
+    return choices
+
+
+def _pxe_root_host():
+    """The HTTP-root location must stay reachable after any route change."""
+    from urllib.parse import urlsplit
+    try:
+        cmdline = Path("/proc/cmdline").read_text(encoding="utf-8")
+        match = re.search(r"(?:^|\s)root=live:(http://[^\s]+)", cmdline)
+        if not match:
+            return None
+        host = urlsplit(match.group(1)).hostname
+        return str(ipaddress.IPv4Address(host)) if host else None
+    except (OSError, ValueError):
+        return None
+
+
+def _route_device(host):
+    routes = _routes("get", host)
+    return routes[0].get("dev") if routes else None
+
+
+def network_diagnostics():
+    """Safe, read-only network overview for the graphical installer."""
+    output = []
+    for label, args in [
+        ("Aktive Netzwerkgeräte", ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device", "status"]),
+        ("IPv4-Adressen", ["ip", "-br", "-4", "address", "show"]),
+        ("Standardrouten", ["ip", "-4", "route", "show", "default"]),
+        ("DNS-Server", ["nmcli", "-t", "-f", "IP4.DNS", "device", "show"]),
+    ]:
+        try:
+            value = execute(args, timeout=8)
+            output.append(f"{label}:\n{value or '(keine)'}")
+        except InstallerError as exc:
+            output.append(f"{label}: {exc}")
+    root = _pxe_root_host()
+    if root:
+        try:
+            output.append(f"iVentoy HTTP root: {root} über {_route_device(root)}")
+        except InstallerError as exc:
+            output.append(f"iVentoy HTTP root: {exc}")
+    try:
+        output.append("WLAN mit Verbindung: " + (", ".join(_wifi_devices()) or "(keines)"))
+    except InstallerError as exc:
+        output.append(f"WLAN-Status: {exc}")
+    return "\n\n".join(output)
+
+
+def prefer_wifi_internet():
+    """User-invoked temporary route preference; never disconnect PXE Ethernet.
+
+    Only add a temporary lower-metric WLAN default route. Preserve the route
+    that serves dracut's HTTP SquashFS; roll back on failure.
+    """
+    wifi = _wifi_devices()
+    if not wifi:
+        raise InstallerError("Kein verbundenes WLAN erkannt. Erst WLAN in F3 verbinden.")
+    defaults = _routes("show", "default")
+    metrics = [int(route.get("metric", 0)) for route in defaults]
+    if not metrics:
+        raise InstallerError("Kein IPv4-Gateway vorhanden. Bitte DHCP/WLAN prüfen.")
+    best_metric = min(metrics)
+    if best_metric < 2:
+        raise InstallerError("Eine Standardroute hat Metrik 0 oder 1. Keine sichere automatische Änderung möglich.")
+    metric = max(1, min(50, best_metric - 1))
+    root_host = _pxe_root_host()
+    root_device = _route_device(root_host) if root_host else None
+    failures = []
+    for iface in wifi:
+        wifi_defaults = [r for r in defaults if r.get("dev") == iface and r.get("gateway")]
+        if not wifi_defaults:
+            failures.append(f"{iface}: WLAN ohne IPv4-Gateway.")
+            continue
+        gateway = wifi_defaults[0]["gateway"]
+        try:
+            ipaddress.IPv4Address(gateway)
+            # Avoid installing a route unless this specific WLAN can reach GHCR.
+            probe = execute(
+                ["curl", "-4", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                 "--interface", iface, "--connect-timeout", "6", "--max-time", "10",
+                 "https://ghcr.io/v2/"], timeout=13,
+            )
+            if probe not in ("200", "401", "403"):
+                failures.append(f"{iface}: HTTPS über WLAN lieferte {probe}.")
+                continue
+        except (InstallerError, ValueError) as exc:
+            failures.append(f"{iface}: HTTPS nicht erreichbar ({exc}).")
+            continue
+        route_args = ["default", "via", gateway, "dev", iface, "metric", str(metric)]
+        try:
+            execute(["ip", "-4", "route", "add", *route_args], timeout=8)
+        except InstallerError as exc:
+            failures.append(f"{iface}: Route nicht hinzugefügt: {exc}")
+            continue
+        try:
+            if root_host and _route_device(root_host) != root_device:
+                raise InstallerError("iVentoy-Verbindung würde den Netzwerkweg wechseln.")
+            check_network()
+            return (
+                f"Internet bevorzugt über WLAN {iface} ({gateway}, Metrik {metric}). "
+                f"iVentoy bleibt über {root_device or 'die bestehende lokale Route'} erreichbar."
+            )
+        except InstallerError as exc:
+            try:
+                execute(["ip", "-4", "route", "del", *route_args], timeout=8)
+            except InstallerError:
+                pass
+            failures.append(f"{iface}: Prüfung nach Änderung fehlgeschlagen: {exc}")
+    raise InstallerError(
+        "WLAN konnte nicht als Internetverbindung eingerichtet werden.\n"
+        + "\n".join(failures)
+        + "\nPrüfe Internetzugang des WLAN-Routers, Gateway und Firewall in F3."
+    )
 
 def _lsblk():
     data = execute(["lsblk", "--json", "--bytes", "--paths",
