@@ -45,6 +45,33 @@ def readable_frame(text):
         return False
 
 
+def declined_capability_probe_id(text):
+    """Identify the pinned UI client's automatic announcement, not an owner grant.
+
+    On gateway.ready upstream's TypeScript client unconditionally sends
+    client.capabilities(server_requests=true). The observer must NOT register
+    server-request authority; closing the entire socket on this harmless
+    announcement created an infinite 4403/reconnect loop instead. Return a
+    strict JSON-RPC id solely so we can reply -32601 locally.
+    """
+    if not isinstance(text, str) or len(text.encode()) > MAX_FRAME:
+        return None
+    try:
+        frame = json.loads(text, object_pairs_hook=unique_object,
+                           parse_constant=lambda _: (_ for _ in ()).throw(ValueError("invalid constant")))
+        if (not isinstance(frame, dict) or set(frame) != {"jsonrpc", "id", "method", "params"}
+                or frame.get("jsonrpc") != "2.0" or frame.get("method") != "client.capabilities"
+                or frame.get("params") != {"server_requests": True}):
+            return None
+        identifier = frame.get("id")
+        if ((isinstance(identifier, str) and 0 < len(identifier) <= 128)
+                or (type(identifier) is int and -(2 ** 63) <= identifier < 2 ** 63)):
+            return identifier
+    except (ValueError, TypeError, RecursionError, UnicodeError):
+        pass
+    return None
+
+
 class DashboardAccess:
     def __init__(self, app, *, backend_token, observer_token, redact_tokens=()):
         if (not TOKEN.fullmatch(backend_token) or not TOKEN.fullmatch(observer_token)
@@ -125,14 +152,26 @@ class DashboardAccess:
         closed = False
         async def observer_receive():
             nonlocal closed
-            if closed:
-                return {"type": "websocket.disconnect", "code": 4403}
-            message = await receive()
-            if message["type"] == "websocket.receive" and not readable_frame(message.get("text")):
+            while True:
+                if closed:
+                    return {"type": "websocket.disconnect", "code": 4403}
+                message = await receive()
+                if message["type"] != "websocket.receive":
+                    return message
+                if readable_frame(message.get("text")):
+                    return message
+                probe_id = declined_capability_probe_id(message.get("text"))
+                if probe_id is not None:
+                    # Refuse upstream client-side request handling without granting
+                    # the observer its advertised authority or killing its read feed.
+                    await send({"type": "websocket.send", "text": json.dumps({
+                        "jsonrpc": "2.0", "id": probe_id,
+                        "error": {"code": -32601, "message": "client capabilities unavailable to HAOS observer"}
+                    })})
+                    continue
                 closed = True
                 await self.deny(scope, send)
                 return {"type": "websocket.disconnect", "code": 4403}
-            return message
         # Observer HTTP responses are bounded and buffered before publication so
         # a credential split across ASGI chunks cannot escape redaction.
         start, chunks, size = None, [], 0

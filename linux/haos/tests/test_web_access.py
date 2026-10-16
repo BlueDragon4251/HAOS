@@ -86,6 +86,42 @@ def test_rpc_mutations_answers_ambiguous_batches_and_oversize_close_before_dispa
     assert sent[-1]["code"] == 4403 and "unsafe" not in str(sent)
 
 
+def test_pinned_client_capability_advertisement_no_longer_disconnects_observer():
+    # JsonRpcGatewayClient advertises this automatically after gateway.ready.
+    # An observer must decline it, NOT forward it to the backend, and keep
+    # its allowed read-only WebSocket alive for gateway.ping and session reads.
+    probe = json.dumps({"jsonrpc": "2.0", "id": "os1",
+                        "method": "client.capabilities", "params": {"server_requests": True}})
+    ping = json.dumps({"jsonrpc": "2.0", "id": "heartbeat-1",
+                       "method": "gateway.ping", "params": {}})
+    calls, sent = invoke("/api/ws", websocket=True, frames=[
+        {"type": "websocket.receive", "text": probe},
+        {"type": "websocket.receive", "text": ping},
+    ])
+    assert sent[0]["type"] == "websocket.accept"
+    refusal = json.loads(sent[1]["text"])
+    assert refusal == {"jsonrpc": "2.0", "id": "os1",
+                       "error": {"code": -32601,
+                                 "message": "client capabilities unavailable to HAOS observer"}}
+    assert not any(msg["type"] == "websocket.close" for msg in sent)
+    assert not any(call.get("text") == probe for call in calls)
+    assert calls[-1]["text"] == ping
+    assert not readable_frame(probe)
+
+
+@pytest.mark.parametrize("bad", [
+    '{"jsonrpc":"2.0","id":"os1","method":"client.capabilities","params":{"server_requests":false}}',
+    '{"jsonrpc":"2.0","id":"os1","method":"client.capabilities","params":{"server_requests":true,"owner":true}}',
+    '{"jsonrpc":"2.0","id":"os1","method":"client.capabilities","params":{"server_requests":true},"result":{}}',
+    '{"jsonrpc":"2.0","id":true,"method":"client.capabilities","params":{"server_requests":true}}',
+    '{"jsonrpc":"2.0","id":"os1","method":"client.capabilities","method":"gateway.ping","params":{"server_requests":true}}',
+])
+def test_mutated_capability_announcement_still_closes_fail_closed(bad):
+    calls, sent = invoke("/api/ws", websocket=True, frames=[{"type": "websocket.receive", "text": bad}])
+    assert not any(call.get("text") == bad for call in calls)
+    assert sent[-1]["type"] == "websocket.close" and sent[-1]["code"] == 4403
+
+
 def test_valid_read_rpc_and_controller_mutation_are_not_changed():
     frame = json.dumps({"jsonrpc": "2.0", "id": "fixture", "method": "session.list", "params": {}})
     assert readable_frame(frame)

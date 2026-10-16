@@ -183,13 +183,17 @@ function UsageMeter() {
 export function BackendBadge() {
   const backend = useStore($backend)
   const connection = useStore($connection)
-  const online = backend.phase === 'ready' && connection === 'open'
-
-  if (online) {
+  // The HTTP backend can be healthy while the read-only gateway socket is
+  // reconnecting. Do not mislabel a live Hermes backend as "Starting Hermes".
+  if (backend.phase === 'ready' && connection === 'open') {
     return null
   }
 
-  return <span className="ml-2 rounded-full bg-warn/20 px-2 py-0.5 text-[11px] text-warn">{backend.phase === 'failed' ? 'Hermes offline' : 'Starting Hermes'}</span>
+  const label = backend.phase === 'ready'
+    ? (connection === 'connecting' ? 'Gateway connecting' : 'Gateway unavailable')
+    : (backend.phase === 'failed' ? 'Hermes offline' : 'Starting Hermes')
+
+  return <span className="ml-2 rounded-full bg-warn/20 px-2 py-0.5 text-[11px] text-warn">{label}</span>
 }
 
 export function MenuBar() {
