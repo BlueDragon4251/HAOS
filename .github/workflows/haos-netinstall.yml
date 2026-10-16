@@ -48,6 +48,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/netinstall/private-install.sh
           bash -n scripts/netinstall/haos-install.sh
+          python3 -m pip install --user pytest
           python3 -m pytest -q linux/haos/tests/test_private_netinstall.py linux/haos/tests/test_dual_channel_install.py
       - name: Build the pinned HAOS shell
         run: |
