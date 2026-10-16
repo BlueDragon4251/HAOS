@@ -7,6 +7,8 @@ die() { printf 'HAOS: %s\n' "$*" >&2; exit 1; }
 [[ ${EUID} == 0 ]] || die "Run as root"
 for tool in podman lsblk findmnt readlink; do command -v "$tool" >/dev/null || die "Missing $tool"; done
 
+PUBLIC=0
+if [[ "${1:-}" == "--public" ]]; then PUBLIC=1; shift; fi
 IMAGE="${1:-}"
 [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9_-]+(/[a-z0-9_.-]+)+@sha256:[0-9a-f]{64}$ ]] ||
   die "Usage: sudo bash private-install.sh ghcr.io/owner/haos@sha256:<64 lowercase hex>"
@@ -31,6 +33,7 @@ AUTHDIR="$(mktemp -d /run/haos-ghcr-auth.XXXXXXXX)"
 chmod 700 "$AUTHDIR"
 cleanup() { podman logout --authfile "$AUTHDIR/auth.json" ghcr.io >/dev/null 2>&1 || :; rm -rf -- "$AUTHDIR"; }
 trap cleanup EXIT
+if [[ "$PUBLIC" == 0 ]]; then
 read -r -p 'GitHub username: ' GHUSER
 [[ "$GHUSER" =~ ^[A-Za-z0-9-]+$ ]] || die "Invalid GitHub username"
 read -r -s -p 'Fine-grained/classic GHCR read token: ' GHTOKEN
@@ -38,6 +41,7 @@ printf '\n'
 [[ -n "$GHTOKEN" ]] || die "Empty token"
 printf '%s' "$GHTOKEN" | podman login --authfile "$AUTHDIR/auth.json" ghcr.io -u "$GHUSER" --password-stdin
 unset GHTOKEN
+fi
 export REGISTRY_AUTH_FILE="$AUTHDIR/auth.json"
 printf 'Fetching exact signed-by-digest (not cryptographically publisher-signed) image...\n'
 podman pull --authfile "$REGISTRY_AUTH_FILE" "$IMAGE"
@@ -50,7 +54,6 @@ podman run --rm --privileged --pid=host --ipc=host \
   --security-opt label=disable \
   -v /var/lib/containers:/var/lib/containers \
   -v /dev:/dev \
-  --authfile "$REGISTRY_AUTH_FILE" \
   "$IMAGE" bootc install to-disk --wipe --skip-fetch-check "$DISK"
 printf '\nHAOS installed to %s. Remove live media before reboot.\n' "$DISK"
 printf 'IMPORTANT: private registry updates require separately configured read-only auth.\n'
