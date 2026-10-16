@@ -5,6 +5,9 @@ Token bytes are used only for stdin of podman login, never CLI arguments,
 environment variables, image metadata or logs.
 """
 import importlib.util
+import datetime
+import selectors
+import shutil
 import ipaddress
 import json
 import os
@@ -295,10 +298,12 @@ class RegistrySession:
         self.folder = tempfile.TemporaryDirectory(prefix="haos-ghcr-", dir="/run")
         self.authfile = str(Path(self.folder.name, "auth.json"))
         self.cancel_event = None
+        self.api_token = None
         Path(self.authfile).write_text("{}\n", encoding="utf-8")
         os.chmod(self.authfile, 0o600)
 
     def close(self):
+        self.api_token = None
         self.folder.cleanup()
 
     def login(self, username, token):
@@ -310,6 +315,7 @@ class RegistrySession:
                      "ghcr.io", "-u", username, "--password-stdin"],
                     input_data=check_token(token).encode("utf-8"), timeout=35,
                     cancel_event=self.cancel_event)
+            self.api_token = check_token(token)
         except InstallerError as exc:
             raise InstallerError(f"GHCR-Anmeldung fehlgeschlagen: {exc}") from exc
 
@@ -319,6 +325,64 @@ class RegistrySession:
                        output_limit=None)
         return sorted({t for t in json.loads(raw).get("Tags", [])
                        if TAG_PATTERN.fullmatch(t)}, reverse=True)
+
+    def versions(self):
+        """Return dev releases newest first with GHCR package publication timestamps.
+
+        GitHub REST package versions' created_at reflects publication, unlike
+        OCI image Created (build time). Use the latter only as a labeled fallback.
+        """
+        tags = self.tags()
+        if not tags:
+            return []
+        timestamps = {}
+        source = "GitHub-Paket erstellt"
+        try:
+            if not self.api_token:
+                raise InstallerError("No token available for package metadata")
+            token = check_token(self.api_token)
+            # The -K - config flows over stdin, not visible in process argv or env.
+            # Escape config-string syntax; ensure no CR or LF can be injected.
+            safe_token = token.replace("\\", "\\\\").replace('"', '\\"')
+            options = (
+                'header = "Accept: application/vnd.github+json"\n'
+                + 'header = "Authorization: Bearer ' + safe_token + '"\n'
+            ).encode("utf-8")
+            response = execute([
+                "curl", "-fsSL", "--connect-timeout", "7", "--max-time", "20",
+                "-K", "-", "--proto", "=https",
+                "https://api.github.com/user/packages/container/haos/versions?per_page=100"
+            ], input_data=options, timeout=25, cancel_event=self.cancel_event, output_limit=None)
+            versions = json.loads(response)
+            if not isinstance(versions, list):
+                raise ValueError("API returned no version list")
+            for version in versions:
+                when = version.get("created_at", "")
+                for tag in (version.get("metadata") or {}).get("container", {}).get("tags", []):
+                    if TAG_PATTERN.fullmatch(tag) and when:
+                        timestamps[tag] = when
+        except (InstallerError, ValueError, KeyError, TypeError):
+            pass
+        finally:
+            # No need to keep the token plaintext once Podman authfile exists.
+            self.api_token = None
+
+        if not timestamps:
+            # Last resort: OCI creation date (not necessarily GHCR publication).
+            source = "Image erstellt (UTC)"
+            for tag in tags[:30]:
+                try:
+                    raw = execute([
+                        "skopeo", "inspect", "--no-tags",
+                        "--authfile", self.authfile, "docker://" + REPO + ":" + tag
+                    ], timeout=12, cancel_event=self.cancel_event, output_limit=None)
+                    timestamps[tag] = json.loads(raw).get("Created", "")
+                except (InstallerError, ValueError, KeyError, TypeError):
+                    continue
+        entries = [{"tag": tag, "published": timestamps.get(tag, ""), "source": source}
+                   for tag in tags]
+        # ISO 8601 UTC is lexicographically chronological; unknown dates last.
+        return sorted(entries, key=lambda item: item["published"], reverse=True)
 
     def pin(self, tag):
         if not TAG_PATTERN.fullmatch(tag):
