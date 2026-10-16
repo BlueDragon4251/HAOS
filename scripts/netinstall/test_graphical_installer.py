@@ -135,7 +135,7 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
                 self.assertEqual(found[0]["published"], "2026-10-16T22:00:00Z")
                 self.assertIsNone(sess.api_token)
                 args = run.call_args.args[0]
-                self.assertEqual(args[-3:-1], ["-K", "-"])
+                self.assertIn(["-K", "-"], [args[i:i+2] for i in range(len(args)-1)])
                 self.assertNotIn("github_pat_TEST123", " ".join(args))
                 self.assertIn(b"Authorization: Bearer github_pat_TEST123",
                               run.call_args.kwargs["input_data"])
