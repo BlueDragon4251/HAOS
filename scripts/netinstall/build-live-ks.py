@@ -41,6 +41,10 @@ xorg-x11-xinit
 xterm
 python3-tkinter
 xorg-x11-drv-libinput
+xorg-x11-drv-evdev
+openbox
+xrandr
+libinput-utils
 mesa-dri-drivers
 dejavu-sans-mono-fonts
 podman
