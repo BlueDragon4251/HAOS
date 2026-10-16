@@ -23,9 +23,10 @@ jobs:
           bash -n scripts/netinstall/private-install.sh scripts/netinstall/haos-install.sh
           python3 -m py_compile scripts/netinstall/build-live-ks.py scripts/netinstall/haos-gui.py
           bash -n scripts/netinstall/haos-start-gui.sh
-          python3 -m py_compile scripts/netinstall/check-boot-screen.py scripts/netinstall/verify_uefi.py
+          python3 -m py_compile scripts/netinstall/check-boot-screen.py scripts/netinstall/verify_uefi.py scripts/netinstall/check-gui-keyboard.py
           python3 -m unittest discover -s scripts/netinstall -p 'test_uefi_report.py' -v
           python3 -m unittest discover -s scripts/netinstall -p 'test_iventoy_grub.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_gui_layout.py' -v
       - name: Prepare host for filesystem image
         run: |
           set -euo pipefail
@@ -112,6 +113,13 @@ jobs:
             printf 'screendump output/uefi-boot.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock || true
             if python3 scripts/netinstall/check-boot-screen.py output/uefi-boot.ppm; then
               echo "UEFI graphical HAOS welcome verified after ${i}x30s"
+              cp output/uefi-boot.ppm output/uefi-welcome.ppm
+              # Prove that X11 actually accepts a key and opens the network UI.
+              printf 'sendkey 2\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 8
+              printf 'screendump output/uefi-after-key.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              python3 scripts/netinstall/check-gui-keyboard.py \
+                output/uefi-welcome.ppm output/uefi-after-key.ppm
               exit 0
             fi
             echo "Graphical boot not visible yet (poll $i/10)"
@@ -124,6 +132,8 @@ jobs:
           name: haos-uefi-boot-debug-${{ github.sha }}
           path: |
             output/uefi-boot.ppm
+            output/uefi-welcome.ppm
+            output/uefi-after-key.ppm
             output/uefi-serial.log
             output/boot-report.txt
             output/uefi-grub.cfg

@@ -172,7 +172,7 @@ class Welcome(tk.Tk):
         size = "10" if self.cfg["compact"] else "13"
         try:
             subprocess.Popen([
-                "/usr/bin/xterm", "-T", title,
+                "/usr/bin/xterm", "-hold", "-T", title,
                 "-fa", "DejaVu Sans Mono", "-fs", size,
                 "-bg", BG, "-fg", FG,
                 "-geometry", f"{cols}x{rows}+5+5",
