@@ -25,6 +25,7 @@ jobs:
           bash -n scripts/netinstall/haos-start-gui.sh
           python3 -m py_compile scripts/netinstall/check-boot-screen.py scripts/netinstall/verify_uefi.py
           python3 -m unittest discover -s scripts/netinstall -p 'test_uefi_report.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_iventoy_grub.py' -v
       - name: Prepare host for filesystem image
         run: |
           set -euo pipefail
@@ -40,6 +41,7 @@ jobs:
             -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
             bash -euo pipefail -c '
               dnf install -y livecd-tools python3-kickstart xorriso qemu-img
+              python3 scripts/netinstall/fix_livecd_grub.py
               python3 scripts/netinstall/build-live-ks.py output/haos-live.ks
               python3 -c "from pykickstart.parser import KickstartParser; from pykickstart.version import makeVersion; KickstartParser(makeVersion(\"F44\")).readKickstart(\"output/haos-live.ks\")"
               livecd-creator --verbose --config=output/haos-live.ks \
@@ -53,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y xorriso
+          sudo apt-get install -y xorriso mtools
           xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -exec report_lba --
           xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain | tee output/boot-report.txt
           # Fail closed: require a real UEFI El Torito entry, not merely GPT.
@@ -61,6 +63,17 @@ jobs:
             echo "::error::UEFI boot image missing; refusing to publish BIOS-only ISO."
             exit 1
           }
+          # Inspect the UEFI GRUB menu embedded in both ISO and EFI FAT boot image.
+          # Testing QEMU alone is insufficient: iVentoy chainloads a different GRUB.
+          xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+            -extract /EFI/BOOT/grub.cfg output/uefi-grub.cfg
+          xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+            -extract /isolinux/efiboot.img output/efiboot.img
+          mtype -i output/efiboot.img ::/EFI/BOOT/grub.cfg > output/grub-efiboot.cfg
+          python3 scripts/netinstall/verify_live_grub.py \
+            output/uefi-grub.cfg output/grub-efiboot.cfg
+          # Never store the temporary EFI image inside the uploaded artifact.
+          rm -f output/efiboot.img
           xorriso -indev output/haos-dual-channel-x86_64.iso -ls /EFI/BOOT /images || true
       - name: UEFI graphical QEMU smoke test
         timeout-minutes: 12
@@ -100,6 +113,8 @@ jobs:
             output/uefi-boot.ppm
             output/uefi-serial.log
             output/boot-report.txt
+            output/uefi-grub.cfg
+            output/grub-efiboot.cfg
           retention-days: 7
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
