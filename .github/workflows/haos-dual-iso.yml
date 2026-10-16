@@ -41,10 +41,9 @@ jobs:
             -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
             bash -euo pipefail -c '
               dnf install -y livecd-tools python3-kickstart xorriso qemu-img
-              python3 scripts/netinstall/fix_livecd_grub.py
               python3 scripts/netinstall/build-live-ks.py output/haos-live.ks
               python3 -c "from pykickstart.parser import KickstartParser; from pykickstart.version import makeVersion; KickstartParser(makeVersion(\"F44\")).readKickstart(\"output/haos-live.ks\")"
-              livecd-creator --verbose --config=output/haos-live.ks \
+              python3 scripts/netinstall/fix_livecd_grub.py --verbose --config=output/haos-live.ks \
                 --fslabel=HAOS-DUAL-44 --releasever=44 --cache=/var/cache/haos-live
               cp HAOS-DUAL-44.iso output/haos-dual-channel-x86_64.iso
             '
