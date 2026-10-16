@@ -6,7 +6,7 @@ def test_private_bootstrap_invariants():
     assert 'set -Eeuo pipefail' in s
     assert 'read -r -s -p' in s
     assert 'REGISTRY_AUTH_FILE=' in s
-    assert 'read -r -p "Type WIPE' in s
+    assert "read -r -p 'Type WIPE" in s
     assert 'bootc install to-disk --wipe --skip-fetch-check' in s
     assert 'rm -rf -- "$AUTHDIR"' in s
     assert '--password-stdin' in s
