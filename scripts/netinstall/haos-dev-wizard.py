@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import haos_install_core as core
 
 BG, CARD, EDGE = "#070D1C", "#101D33", "#28415D"
@@ -219,7 +219,7 @@ class Wizard(tk.Tk):
             elif kind == "https": token = core.https_token(source)
             else: token = core.check_token(source)
             self.session.login(username, token)
-            return self.session.tags()
+            return self.session.versions()
 
         def done(tags):
             if not tags:
@@ -229,17 +229,32 @@ class Wizard(tk.Tk):
         self.async_action("Anmeldung und Versionsliste laden", connect, done,
                           retry=self.page_auth)
 
-    def page_tags(self, tags):
+    def page_tags(self, versions):
         self.reset("Entwicklungsimage auswählen",
-                   "Eintrag auswählen: Der feste SHA256-Digest wird automatisch ermittelt.")
-        self.tags = list(tags)
-        self.tag_list = tk.Listbox(self.content, bg=CARD, fg=FG, selectbackground=EDGE,
-                                   font=("DejaVu Sans Mono", 12), height=8,
-                                   exportselection=False, relief="flat")
-        self.tag_list.pack(anchor="w", fill="x")
-        for tag in tags: self.tag_list.insert("end", tag)
-        self.label(self.content, "Die Sortierung nach Tag ist keine bestätigte Veröffentlichungsreihenfolge.", 10, MUTED)
-        self.button("Image prüfen →", self.select_tag, True)
+                   "Neueste GHCR-Veröffentlichungen zuerst. Zeitangaben in UTC.")
+        self.versions = list(versions)
+        entries = max(5, min(23, int((self.winfo_screenheight() - 300) / (18 if self.compact else 24))))
+        holder = tk.Frame(self.content, bg=BG)
+        holder.pack(fill="both", expand=True, pady=(6, 4))
+        self.tag_list = tk.Listbox(
+            holder, bg=CARD, fg=FG, selectbackground=EDGE, selectforeground=CYAN,
+            font=("DejaVu Sans Mono", 10 if self.compact else 12),
+            height=entries, exportselection=False, relief="flat",
+            activestyle="dotbox", takefocus=True
+        )
+        self.tag_list.pack(side="left", fill="both", expand=True)
+        scrollbar = tk.Scrollbar(holder, command=self.tag_list.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.tag_list.config(yscrollcommand=scrollbar.set)
+        for item in self.versions:
+            when = item.get("published", "")[:19].replace("T", " ")
+            self.tag_list.insert("end", f'{when or "Zeit unbekannt":19} UTC    {item["tag"]}')
+        if self.versions:
+            self.tag_list.selection_set(0)
+            self.tag_list.activate(0)
+        source = self.versions[0].get("source", "") if self.versions else ""
+        self.label(self.content, f"Zeitquelle: {source or 'unbekannt'} · Alle verfügbaren Einträge: {len(self.versions)}", 10, MUTED)
+        self.button("Ausgewähltes Image prüfen →", self.select_tag, True)
         self.button("← Anmeldung", self.page_auth)
 
     def select_tag(self):
@@ -247,12 +262,12 @@ class Wizard(tk.Tk):
         if not sel:
             messagebox.showwarning("Image", "Bitte erst einen Container auswählen.", parent=self)
             return
-        tag = self.tags[sel[0]]
+        tag = self.versions[sel[0]]["tag"]
         def done(image):
             self.image = image
             self.page_disks()
         self.async_action("SHA256-Digest von GHCR abrufen", lambda: self.session.pin(tag),
-                          done, retry=lambda: self.page_tags(self.tags))
+                          done, retry=lambda: self.page_tags(self.versions))
 
     def fetch_stable(self):
         def done(image):
@@ -281,7 +296,7 @@ class Wizard(tk.Tk):
             self.label(self.content, "Keine geeignete interne SSD erkannt. F5 Diagnose im Hauptmenü.", 12, ERROR)
         self.label(self.content, "WARNUNG: Auf dem ausgewählten Datenträger werden ALLE Partitionen gelöscht.", 12, ERROR)
         self.button("Image herunterladen →", self.choose_disk, True)
-        self.button("← Image-Auswahl", lambda: self.page_tags(self.tags) if self.channel == "dev" else self.page_network)
+        self.button("← Image-Auswahl", lambda: self.page_tags(self.versions) if self.channel == "dev" else self.page_network)
 
     def choose_disk(self):
         selected = self.disk_list.curselection()
