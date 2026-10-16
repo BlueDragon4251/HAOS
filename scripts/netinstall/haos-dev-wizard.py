@@ -24,6 +24,9 @@ class Wizard(tk.Tk):
         self.attributes("-fullscreen", True)
         self.session = core.RegistrySession()
         self.messages = queue.Queue()
+        self.progress_events = queue.Queue()
+        self.progress_bar = None
+        self.progress_label = None
         self.waiting = False
         self.started_install = False
         self.cancel_event = None
@@ -306,7 +309,7 @@ class Wizard(tk.Tk):
         self.disk = self.disks[selected[0]]["path"]
         def download():
             core.check_network()
-            self.session.pull(self.image)
+            self.session.pull(self.image, progress=self.report_progress)
             return True
         self.async_action("HAOS-Container herunterladen (bis 30 Minuten)", download,
                           lambda _result: self.page_confirm(), retry=self.page_disks)
@@ -332,7 +335,7 @@ class Wizard(tk.Tk):
             return
         self.started_install = True
         self.async_action("HAOS auf die SSD installieren (bis 60 Minuten)",
-                          lambda: self.session.install(self.image, self.disk),
+                          lambda: self.session.install(self.image, self.disk, progress=self.report_progress),
                           lambda _: self.done(), retry=None)
 
     def done(self):
@@ -357,11 +360,43 @@ class Wizard(tk.Tk):
             self.button("WLAN für Internet bevorzugen", self.prefer_wifi_route, True)
         self.status.set("Fehler – du kannst zurück, erneut versuchen oder abbrechen.")
 
+    def report_progress(self, line):
+        # Called by backend worker thread. Never touch Tk from that thread.
+        self.progress_events.put(str(line)[-250:])
+
     def async_action(self, description, operation, callback, retry=None):
         if self.waiting: return
         self.waiting = True
         self.timer = time.monotonic()
+        while not self.progress_events.empty():
+            try:
+                self.progress_events.get_nowait()
+            except queue.Empty:
+                break
         self.status.set(description + " …")
+        # Pulse means 'working', never an invented percentage. The message
+        # below reports actual Podman/bootc status as each line arrives.
+        if self.progress_bar is not None:
+            try:
+                self.progress_bar.stop()
+            except tk.TclError:
+                pass
+        self.progress_bar = None
+        self.progress_label = None
+        if "herunterladen" in description.lower() or "installieren" in description.lower():
+            area = tk.Frame(self.content, bg=BG)
+            area.pack(fill="x", pady=(14, 4))
+            self.label(area, "Live-Status des Container-Vorgangs", 11, CYAN)
+            self.progress_bar = ttk.Progressbar(area, orient="horizontal",
+                                                mode="indeterminate")
+            self.progress_bar.pack(fill="x", pady=6)
+            self.progress_bar.start(16)
+            self.progress_label = tk.Label(
+                area, text="Warte auf Ausgabe des Container-Programms...",
+                anchor="w", justify="left", bg=BG, fg=MUTED,
+                font=("DejaVu Sans Mono", 10), wraplength=max(280, self.winfo_screenwidth()-150),
+            )
+            self.progress_label.pack(fill="x", anchor="w")
         for widget in self.actions.winfo_children():
             widget.configure(state="disabled")
         self.cancel_event = threading.Event()
@@ -378,10 +413,24 @@ class Wizard(tk.Tk):
         threading.Thread(target=run, daemon=True).start()
 
     def poll(self):
+        # Drain actual streamed Podman/bootc output. The progress bar stays
+        # indeterminate unless the engine reports a reliable percentage.
+        try:
+            while True:
+                line = self.progress_events.get_nowait()
+                if self.progress_label is not None and self.progress_label.winfo_exists():
+                    self.progress_label.configure(text=line)
+        except queue.Empty:
+            pass
         try:
             while True:
                 success, value, callback, retry = self.messages.get_nowait()
                 self.waiting = False
+                if self.progress_bar is not None:
+                    try:
+                        self.progress_bar.stop()
+                    except tk.TclError:
+                        pass
                 if hasattr(self, "stop_button") and self.stop_button.winfo_exists():
                     self.stop_button.destroy()
                 for widget in self.actions.winfo_children():
