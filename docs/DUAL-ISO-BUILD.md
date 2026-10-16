@@ -73,3 +73,55 @@ key, and requires a material on-screen change after the network-settings
 window opens. Those checks cannot conclusively verify an HP-specific I2C
 touchpad. Test both direct USB boot and iVentoy HTTP PXE boot before declaring
 the installer release-ready.
+
+
+## Graphical developer and stable installer (2026-10-16)
+
+The HAOS welcome screen launches the native **Tk graphical installation wizard**
+for both public stable and private dev channels; no xterm is required for the
+actual installation workflow. The text console on TTY2 remains a fallback.
+
+Wizard sequence:
+1. **Internet check:** verify DNS and a real HTTPS response from
+   `https://ghcr.io/v2/` on TCP 443. An HTTP 401 response here is expected.
+   An iVentoy HTTP PXE root at `192.168.50.1:16000` does NOT imply Internet.
+   A DNS resolution by itself is not enough, as shown by previous
+   `ghcr.io:443 i/o timeout` failures.
+2. **Credentials:** choose the USB filesystem partition (e.g. `/dev/sda1`,
+   not whole `/dev/sda`), HTTPS credential endpoint, or manual secure entry.
+   Tokens are never embedded in ISO files and are passed to Podman over stdin.
+   Credentials are held in a temporary, restrictive `/run` directory.
+3. **Private versions:** choose an authenticated `dev-<12hex>` GHCR tag.
+   The wizard resolves and pins its exact SHA256 digest via `skopeo`.
+4. **Target disk:** show only nonremovable internal candidates of at least 16
+   GiB, with strict allowed kernel device names; exclude loop, device-mapper,
+   network block, zero-capacity, USB and RAM devices. On the tested HP the
+   expected candidate is `/dev/nvme0n1` (~477 GiB), not the 121 MiB
+   USB credential disk `/dev/sda`.
+5. **Download:** time-limited image pull with visible elapsed time, cancellation
+   and recoverable errors.
+6. **Erase confirmation:** the user must type the complete selected device
+   path and `WIPE`, and separately approve the destructive action.
+7. **bootc install:** the same guarded bootc install backend is invoked.
+   A failure at this stage may leave the drive partially modified; there is
+   intentionally no automatic destructive retry.
+
+The wizard is designed to stay responsive while network calls run on worker
+threads. Bounded subprocesses are killed as a process group on timeouts or
+cancellation. A dedicated error screen explains what failed and how to retry.
+Openbox, keyboard support and the separate TTY2 fallback remain available.
+
+### GHCR I/O timeouts after iVentoy PXE boot
+
+When `ghcr.io` resolves but its IPv4 TCP port 443 times out, credentials are
+not yet the cause: examine the actual WAN connectivity of the PXE client.
+Check routing, NetworkManager DHCP lease, DNS and the upstream Windows
+internet-sharing / gateway firewall. Select *Network settings* (F3)
+from the HAOS installer; it starts NetworkManager TUI as an executable.
+Re-run the HTTPS preflight test after fixing the route. iVentoy's network
+boot and ISO file server do not forward Docker/GHCR traffic by themselves.
+Do not place GHCR tokens on iVentoy's unencrypted port 16000.
+
+Validation: Python syntax, headless backend tests, virtual-disk safety,
+and QEMU UEFI GUI opening are CI gates. A green build confirms those
+checks, **not** a complete destructive bootc install on the physical HP.
