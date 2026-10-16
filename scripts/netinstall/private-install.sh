@@ -5,7 +5,7 @@ umask 077
 
 die() { printf 'HAOS: %s\n' "$*" >&2; exit 1; }
 [[ ${EUID} == 0 ]] || die "Run as root"
-for tool in podman lsblk findmnt readlink; do command -v "$tool" >/dev/null || die "Missing $tool"; done
+for tool in podman lsblk findmnt readlink python3; do command -v "$tool" >/dev/null || die "Missing $tool"; done
 
 PUBLIC=0
 SELECT_DEV=0
@@ -20,20 +20,11 @@ fi
 
 printf '\nHAOS NETWORK INSTALLER\n\n'
 [[ "$SELECT_DEV" == 1 ]] || printf 'Image: %s\n' "$IMAGE"
-printf 'Physical block devices:\n'
-lsblk -dpno NAME,SIZE,MODEL,TYPE,TRAN | awk '$4 == "disk" {print}'
-read -r -p 'Target entire disk (e.g. /dev/nvme0n1): ' DISK
-[[ "$DISK" == /dev/* && ! "$DISK" =~ [[:space:]] ]] || die "Invalid device"
-DISK="$(readlink -f -- "$DISK")"
-[[ -b "$DISK" && "$(lsblk -dnro TYPE "$DISK")" == disk ]] || die "Not a physical whole disk"
-# Refuse any disk with mounted partitions, including the live media.
-while IFS= read -r node; do
-  if findmnt -rn -S "$node" >/dev/null; then die "Mounted device $node belongs to target disk"; fi
-done < <(lsblk -nrpo NAME "$DISK")
-printf '\nDANGER: ALL DATA ON %s WILL BE PERMANENTLY DESTROYED.\n' "$DISK"
-read -r -p "Type exact disk path to confirm: " CONFIRM
-[[ "$CONFIRM" == "$DISK" ]] || die "Confirmation failed"
-
+if ! getent ahostsv4 ghcr.io >/dev/null 2>&1; then
+  printf 'GHCR DNS resolution unavailable. Configure networking (F3 or TTY2) before installing.\n' >&2
+  command -v nmcli >/dev/null && nmcli device status >&2 || true
+  die "Network preflight failed"
+fi
 AUTHDIR="$(mktemp -d /run/haos-ghcr-auth.XXXXXXXX)"
 chmod 700 "$AUTHDIR"
 printf '%s\n' '{}' > "$AUTHDIR/auth.json"
@@ -50,17 +41,21 @@ read -r -p 'Method [1]: ' AUTH_METHOD
 case "${AUTH_METHOD:-1}" in
   1)
     command -v mount >/dev/null && command -v blkid >/dev/null || die "USB mount support missing"
-    printf 'USB partitions:\n'
-    lsblk -rpo NAME,TRAN,TYPE,SIZE | awk '$2 == "usb" || ($3 == "part" && $2 == "usb") {print}'
-    read -r -p 'USB partition (e.g. /dev/sdb1): ' USB_PART
+    printf 'USB devices (whole drives and partitions):\n'
+    lsblk -rpo NAME,TYPE,SIZE,TRAN
+    read -r -p 'Token USB device (/dev/sda or /dev/sda1): ' USB_PART
+    [[ "$USB_PART" == /dev/* && ! "$USB_PART" =~ [[:space:]] ]] || die "Invalid USB path"
     USB_PART="$(readlink -f -- "$USB_PART")"
-    [[ -b "$USB_PART" && "$(lsblk -dnro TYPE "$USB_PART")" == "part" ]] || die "Select a USB partition"
-    USB_PARENT="$(lsblk -s -nro TRAN "$USB_PART" | grep -m1 -F usb || true)"
-    [[ "$USB_PARENT" == usb ]] || die "Partition is not on a USB drive"
+    [[ -b "$USB_PART" ]] || die "Token device is not a block device"
+    USB_TYPE="$(lsblk -dnro TYPE "$USB_PART")"
+    [[ "$USB_TYPE" == "disk" || "$USB_TYPE" == "part" ]] || die "Expected USB disk or partition"
+    USB_PARENT="$(lsblk -s -nro TRAN "$USB_PART" | grep -m1 -x usb || true)"
+    [[ "$USB_PARENT" == usb ]] || die "Selected token medium is not a USB drive"
     USB_MOUNT="$AUTHDIR/usb"
     mkdir -m 700 "$USB_MOUNT"
     mount -o ro,nosuid,nodev,noexec "$USB_PART" "$USB_MOUNT" || die "Cannot mount USB read-only"
     USB_FILE="$USB_MOUNT/HAOS-DEV/token.txt"
+    if [[ ! -f "$USB_FILE" ]]; then USB_FILE="$USB_MOUNT/token.txt"; fi
     [[ -f "$USB_FILE" && ! -L "$USB_FILE" ]] || die "USB file HAOS-DEV/token.txt not found"
     IFS= read -r GHTOKEN < "$USB_FILE" || [[ -n "${GHTOKEN:-}" ]]
     umount "$USB_MOUNT"
@@ -127,6 +122,29 @@ fi
 export REGISTRY_AUTH_FILE="$AUTHDIR/auth.json"
 printf 'Fetching digest-pinned (not publisher-signed) image...\n'
 podman pull --authfile "$REGISTRY_AUTH_FILE" "$IMAGE"
+# The USB token stick must never be treated as the installation target.
+printf '\nDetecting internal storage (NVMe / VMD)...\n'
+modprobe nvme 2>/dev/null || true
+modprobe vmd 2>/dev/null || true
+udevadm settle --timeout=15 2>/dev/null || true
+lsblk -dpno NAME,SIZE,MODEL,TYPE,TRAN,RM,RO || true
+printf '\nEligible INTERNAL non-removable disks (min 16GiB, excluding USB):\n'
+python3 /usr/local/sbin/haos-disk-safety.py list ||
+  die "No safe internal drive found. The USB token stick must not be used."
+read -r -p 'Target internal disk (/dev/nvme0n1), blank to cancel: ' DISK
+[[ "$DISK" == /dev/* && ! "$DISK" =~ [[:space:]] ]] || die "No safe disk chosen"
+DISK="$(readlink -f -- "$DISK")"
+python3 /usr/local/sbin/haos-disk-safety.py check "$DISK" ||
+  die "Disk is not eligible (USB, removable, too small, read-only or absent)"
+while IFS= read -r node; do
+  if findmnt -rn -S "$node" >/dev/null; then die "Device $node is mounted"; fi
+  if swapon --noheadings --raw --show=NAME 2>/dev/null | grep -Fxq "$node"; then
+    die "Active swap on target disk: $node"
+  fi
+done < <(lsblk -nrpo NAME "$DISK")
+printf '\nDANGER: ALL DATA ON %s WILL BE ERASED.\n' "$DISK"
+read -r -p 'Type the FULL target disk path: ' CONFIRM
+[[ "$CONFIRM" == "$DISK" ]] || die "Disk confirmation failed"
 read -r -p 'Type WIPE to begin permanent installation: ' CONFIRM_WIPE
 [[ "$CONFIRM_WIPE" == WIPE ]] || die "Cancelled"
 # bootc runs from the TARGET image, with the host disk exposed.
