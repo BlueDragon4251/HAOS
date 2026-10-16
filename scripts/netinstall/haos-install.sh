@@ -29,9 +29,7 @@ case "${selection:-1}" in
     echo
     echo "Developer mode — private GitHub Container Registry"
     echo "A GitHub token with package read permission will be requested securely."
-    read -r -p 'Private image digest (ghcr.io/...@sha256:...): ' image
-    validate_image "$image" || { echo "Invalid image digest" >&2; exit 1; }
-    exec bash "$DIR/private-install.sh" "$image"
+    exec bash "$DIR/private-install.sh" --select-dev
     ;;
   2) exit 0 ;;
   *) echo "Invalid selection" >&2; exit 1 ;;
