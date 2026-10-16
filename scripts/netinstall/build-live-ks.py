@@ -60,7 +60,7 @@ parted
 %end
 """
 payload=""
-for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh"):
+for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh","haos-xsession.sh","haos-console.sh"):
     data=(root/"scripts/netinstall"/filename).read_bytes()
     encoded=base64.b64encode(data).decode()
     payload+=f"echo '{encoded}' | base64 -d > /usr/local/sbin/{filename}\nchmod 755 /usr/local/sbin/{filename}\n"
@@ -88,6 +88,27 @@ WantedBy=multi-user.target
 UNIT
 systemctl enable NetworkManager.service
 systemctl enable haos-installer.service
+cat > /etc/systemd/system/haos-installer-console.service <<'UNIT'
+[Unit]
+Description=HAOS physical keyboard text fallback on TTY2
+After=systemd-logind.service
+Conflicts=getty@tty2.service
+[Service]
+Type=simple
+ExecStart=/usr/bin/bash /usr/local/sbin/haos-console.sh
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+Restart=always
+RestartSec=2
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl mask getty@tty2.service
+systemctl enable haos-installer-console.service
 %end
 """
 # Fedora kickstart base usually already includes %post blocks;
