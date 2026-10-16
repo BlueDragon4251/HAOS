@@ -92,6 +92,8 @@ class Wizard(tk.Tk):
                    "GHCR benötigt Internet über HTTPS (Port 443). Der PXE-Start über LAN reicht dafür nicht aus.")
         self.label(self.content, "Die Prüfung testet DNS UND die echte TLS-Verbindung zu ghcr.io.", 12)
         self.button("Verbindung prüfen", self.verify_network, True)
+        self.button("Netzwerkdetails anzeigen", self.show_network_details)
+        self.button("WLAN als Internetzugang prüfen", self.prefer_wifi_route)
         self.button("Netzwerk einrichten (F3)", self.open_network_settings)
         self.verify_network()
 
@@ -101,6 +103,31 @@ class Wizard(tk.Tk):
             self.button("Weiter →", self.page_auth if self.channel == "dev" else self.fetch_stable, True)
         self.async_action("Verbinde mit ghcr.io:443", core.check_network, done,
                           retry=self.page_network)
+
+    def show_network_details(self):
+        def done(info):
+            self.reset("Netzwerkdiagnose", "Lesende Diagnose: aktive Geräte, Standardrouten, DNS und iVentoy-Netzwerkweg.")
+            view = tk.Text(
+                self.content, bg=CARD, fg=FG, insertbackground=CYAN,
+                font=("DejaVu Sans Mono", 10 if self.compact else 12),
+                relief="flat", wrap="word", height=14, padx=14, pady=12,
+            )
+            view.pack(fill="both", expand=True)
+            view.insert("1.0", info)
+            view.configure(state="disabled")
+            self.button("← Netzwerkprüfung", self.page_network)
+            self.button("WLAN für Internet bevorzugen", self.prefer_wifi_route, True)
+        self.async_action("Netzwerkwege und DNS auslesen",
+                          core.network_diagnostics, done, retry=self.page_network)
+
+    def prefer_wifi_route(self):
+        def done(result):
+            messagebox.showinfo("Netzwerkrouten aktualisiert", result, parent=self)
+            self.page_network()
+        self.async_action(
+            "WLAN-HTTPS prüfen und iVentoy-Route absichern",
+            core.prefer_wifi_internet, done, retry=self.page_network,
+        )
 
     def open_network_settings(self):
         import subprocess
@@ -310,6 +337,9 @@ class Wizard(tk.Tk):
         elif retry:
             self.button("Erneut versuchen / zurück", retry, True)
         self.button("Netzwerk einrichten", self.open_network_settings)
+        if "GHCR" in detail or "443" in detail or "Gateway" in detail:
+            self.button("Netzwerkdiagnose anzeigen", self.show_network_details)
+            self.button("WLAN für Internet bevorzugen", self.prefer_wifi_route, True)
         self.status.set("Fehler – du kannst zurück, erneut versuchen oder abbrechen.")
 
     def async_action(self, description, operation, callback, retry=None):
