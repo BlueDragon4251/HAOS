@@ -26,7 +26,7 @@ class InstallerError(Exception):
     pass
 
 
-def execute(args, *, timeout=35, input_data=None, cancel_event=None):
+def execute(args, *, timeout=35, input_data=None, cancel_event=None, output_limit=5000):
     """Run commands with a real deadline and optional user cancellation."""
     proc = None
     output = b""
@@ -52,7 +52,9 @@ def execute(args, *, timeout=35, input_data=None, cancel_event=None):
                 break
             except subprocess.TimeoutExpired:
                 first = False
-        result = output.decode("utf-8", errors="replace")[-5000:]
+        result = output.decode("utf-8", errors="replace")
+        if output_limit is not None:
+            result = result[-output_limit:]
         if proc.returncode:
             raise InstallerError(f"{args[0]} schlug fehl (Code {proc.returncode}).\n{result.strip()}")
         return result.strip()
@@ -90,7 +92,7 @@ def check_network():
 def _lsblk():
     data = execute(["lsblk", "--json", "--bytes", "--paths",
                     "--output", "PATH,NAME,TYPE,SIZE,TRAN,RM,RO,FSTYPE,MODEL,PKNAME"],
-                   timeout=12)
+                   timeout=12, output_limit=None)
     return json.loads(data).get("blockdevices", [])
 
 
@@ -181,7 +183,8 @@ class RegistrySession:
 
     def tags(self):
         raw = execute(["skopeo", "list-tags", "--authfile", self.authfile,
-                       "docker://" + REPO], timeout=45, cancel_event=self.cancel_event)
+                       "docker://" + REPO], timeout=45, cancel_event=self.cancel_event,
+                       output_limit=None)
         return sorted({t for t in json.loads(raw).get("Tags", [])
                        if TAG_PATTERN.fullmatch(t)}, reverse=True)
 
@@ -189,7 +192,8 @@ class RegistrySession:
         if not TAG_PATTERN.fullmatch(tag):
             raise InstallerError("Ungültiger Entwicklungstag.")
         raw = execute(["skopeo", "inspect", "--authfile", self.authfile,
-                       "docker://" + REPO + ":" + tag], timeout=45, cancel_event=self.cancel_event)
+                       "docker://" + REPO + ":" + tag], timeout=45, cancel_event=self.cancel_event,
+                       output_limit=None)
         digest = json.loads(raw).get("Digest", "")
         if not DIGEST_PATTERN.fullmatch(digest):
             raise InstallerError("GHCR lieferte keinen gültigen SHA256-Digest.")
