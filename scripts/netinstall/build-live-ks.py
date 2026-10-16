@@ -18,7 +18,9 @@ rootpw --lock
 bootloader --location=mbr
 zerombr
 clearpart --all --initlabel
-part / --fstype=ext4 --size=4096
+# The prior 4 GiB live root filesystem was too small for large image layers.
+# The sparse filesystem compresses into squashfs; ISO size does not grow 4x.
+part / --fstype=ext4 --size=16384
 shutdown
 repo --name=fedora --mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64
 repo --name=updates --mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=x86_64
