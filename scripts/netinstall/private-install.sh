@@ -8,13 +8,18 @@ die() { printf 'HAOS: %s\n' "$*" >&2; exit 1; }
 for tool in podman lsblk findmnt readlink; do command -v "$tool" >/dev/null || die "Missing $tool"; done
 
 PUBLIC=0
+SELECT_DEV=0
 if [[ "${1:-}" == "--public" ]]; then PUBLIC=1; shift; fi
+if [[ "${1:-}" == "--select-dev" ]]; then SELECT_DEV=1; shift; fi
 IMAGE="${1:-}"
-[[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9_-]+(/[a-z0-9_.-]+)+@sha256:[0-9a-f]{64}$ ]] ||
-  die "Usage: sudo bash private-install.sh ghcr.io/owner/haos@sha256:<64 lowercase hex>"
-[[ "$IMAGE" != *..* ]] || die "Invalid image reference"
+if [[ "$SELECT_DEV" == 0 ]]; then
+  [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9_-]+(/[a-z0-9_.-]+)+@sha256:[0-9a-f]{64}$ ]] ||
+    die "Expected a GHCR digest-pinned image reference"
+  [[ "$IMAGE" != *..* ]] || die "Invalid image reference"
+fi
 
-printf '\nHAOS PRIVATE REGISTRY INSTALLER\nImage: %s\n\n' "$IMAGE"
+printf '\nHAOS NETWORK INSTALLER\n\n'
+[[ "$SELECT_DEV" == 1 ]] || printf 'Image: %s\n' "$IMAGE"
 printf 'Physical block devices:\n'
 lsblk -dpno NAME,SIZE,MODEL,TYPE,TRAN | awk '$4 == "disk" {print}'
 read -r -p 'Target entire disk (e.g. /dev/nvme0n1): ' DISK
@@ -81,6 +86,43 @@ esac
 [[ -n "${GHTOKEN:-}" && "$GHTOKEN" != *[[:space:]]* && ${#GHTOKEN} -le 8192 ]] || die "Invalid or empty token"
 printf '%s' "$GHTOKEN" | podman login --authfile "$AUTHDIR/auth.json" ghcr.io -u "$GHUSER" --password-stdin
 unset GHTOKEN
+fi
+if [[ "$SELECT_DEV" == 1 ]]; then
+  for tool in skopeo python3; do command -v "$tool" >/dev/null || die "Missing $tool for image picker"; done
+  REPO="ghcr.io/bluedragon4251/haos"
+  TAGS_FILE="$AUTHDIR/tags.json"
+  skopeo list-tags --authfile "$AUTHDIR/auth.json" "docker://$REPO" > "$TAGS_FILE" ||
+    die "Could not list private HAOS images; check package permission"
+  mapfile -t DEV_TAGS < <(python3 - "$TAGS_FILE" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    tags = json.load(source).get("Tags", [])
+for tag in sorted(set(tags), reverse=True):
+    if re.fullmatch(r"dev-[0-9a-f]{12}", tag):
+        print(tag)
+PY
+)
+  (( ${#DEV_TAGS[@]} > 0 )) || die "No dev images available"
+  echo
+  echo "Available HAOS development images:"
+  for i in "${!DEV_TAGS[@]}"; do printf '%2d) %s\n' "$((i+1))" "${DEV_TAGS[i]}"; done
+  read -r -p "Select image number [1]: " CHOICE
+  CHOICE="${CHOICE:-1}"
+  [[ "$CHOICE" =~ ^[0-9]+$ ]] && (( CHOICE >= 1 && CHOICE <= ${#DEV_TAGS[@]} )) ||
+    die "Invalid image number"
+  TAG="${DEV_TAGS[CHOICE-1]}"
+  INSPECT_FILE="$AUTHDIR/inspect.json"
+  skopeo inspect --authfile "$AUTHDIR/auth.json" "docker://$REPO:$TAG" > "$INSPECT_FILE" ||
+    die "Could not inspect selected image"
+  DIGEST="$(python3 - "$INSPECT_FILE" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    print(json.load(source).get("Digest", ""))
+PY
+)"
+  [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || die "Registry returned invalid image digest"
+  IMAGE="$REPO@$DIGEST"
+  printf '\nSelected: %s\nPinned image: %s\n' "$TAG" "$IMAGE"
 fi
 export REGISTRY_AUTH_FILE="$AUTHDIR/auth.json"
 printf 'Fetching digest-pinned (not publisher-signed) image...\n'
