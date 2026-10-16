@@ -43,6 +43,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Verify private bootstrap shell syntax
+        run: |
+          set -euo pipefail
+          bash -n scripts/netinstall/private-install.sh
+          python3 -m pytest -q linux/haos/tests/test_private_netinstall.py
       - name: Build the pinned HAOS shell
         run: |
           set -euo pipefail
