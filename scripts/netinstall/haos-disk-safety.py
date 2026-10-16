@@ -22,7 +22,16 @@ def is_eligible(device):
     except (ValueError, TypeError):
         return False
     transport = str(device.get("tran") or "").lower()
-    return size >= MIN_INSTALL_BYTES and removable == 0 and read_only == 0 and transport != "usb"
+    # Positive allowlist: reject nbd*, loop*, zram*, dm*, md*, sr*, ram*
+    # even if their reported size is large enough.
+    import re
+    path = str(device.get("path") or "")
+    internal_name = re.fullmatch(
+        r"/dev/(?:nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|xvd[a-z]+|mmcblk[0-9]+)",
+        path
+    )
+    return (bool(internal_name) and size >= MIN_INSTALL_BYTES
+            and removable == 0 and read_only == 0 and transport != "usb")
 
 def inspect():
     cp = subprocess.run(

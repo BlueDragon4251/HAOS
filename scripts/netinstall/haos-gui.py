@@ -160,7 +160,7 @@ class Welcome(tk.Tk):
                            "/usr/local/sbin/haos-storage-diagnostics.sh")
 
     def open_stable(self, event=None):
-        self.open_terminal("HAOS Stable Installation", "/usr/local/sbin/haos-install.sh", "--stable")
+        self.open_wizard("--stable")
 
     def open_network(self, event=None):
         self.open_terminal("Network Settings", "/usr/bin/nmtui")
@@ -190,10 +190,16 @@ class Welcome(tk.Tk):
             "No disk will be erased without confirmation.",
             parent=self
         ):
-            self.open_terminal(
-                "HAOS Developer Installation", "/usr/local/sbin/private-install.sh",
-                "--select-dev"
-            )
+            self.open_wizard("--dev")
+
+    def open_wizard(self, mode):
+        """Native Tk graphical installer, not an xterm subprocess."""
+        try:
+            subprocess.Popen([
+                "/usr/bin/python3", "/usr/local/sbin/haos-dev-wizard.py", mode
+            ], close_fds=True)
+        except OSError as exc:
+            messagebox.showerror("Installer", str(exc), parent=self)
 
     def open_terminal(self, title, path, *args):
         # xterm was previously hardcoded to 106x31 and exceeded 640x480 displays.
