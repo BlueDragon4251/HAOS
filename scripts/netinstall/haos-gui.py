@@ -41,6 +41,7 @@ class Welcome(tk.Tk):
         self.bind("<F2>", self.open_text_console)
         self.bind("<F3>", self.open_network)
         self.bind("<F4>", self.cycle_keyboard)
+        self.bind("<F5>", self.open_storage_diagnostics)
         self.bind("<KeyPress-1>", self.open_stable)
         self.bind("<KeyPress-2>", self.open_network)
         self.bind("<Escape>", self.show_help)
@@ -135,9 +136,9 @@ class Welcome(tk.Tk):
             relief="flat", padx=10, pady=5, takefocus=True
         )
         self.keyboard_button.pack(anchor="w")
-        help_text = ("TAB / ENTER navigate   ·   F2 text installer   ·   F3 network settings"
+        help_text = ("TAB / ENTER navigate   ·   F2 text   ·   F3 network   ·   F4 keys   ·   F5 storage"
                      if cfg["compact"] else
-                     "TAB / ENTER: navigate   |   F2: text installer   |   F3: network settings   |   ESC: help")
+                     "TAB / ENTER: navigate   |   F2: text installer   |   F3: network   |   F4: keyboard   |   F5: storage   |   ESC: help")
         self.label(main, help_text, 9 if cfg["compact"] else 11, MUTED)
         self.label(main, "No disk changes until you explicitly confirm installation.",
                    9 if cfg["compact"] else 10, MUTED)
@@ -154,6 +155,10 @@ class Welcome(tk.Tk):
         except Exception as exc:
             messagebox.showerror("Keyboard layout failed", str(exc))
 
+    def open_storage_diagnostics(self, event=None):
+        self.open_terminal("HAOS Storage Diagnostics",
+                           "/usr/local/sbin/haos-storage-diagnostics.sh")
+
     def open_stable(self, event=None):
         self.open_terminal("HAOS Stable Installation", "/usr/local/sbin/haos-install.sh", "--stable")
 
@@ -167,6 +172,7 @@ class Welcome(tk.Tk):
             "Tab / Shift+Tab: change button\nEnter: activate button\n"
             "F2: switch to text installer on TTY2\n"
             "F4: change keyboard layout (AT / DE / US)\n"
+            "F5: inspect internal SSD / NVMe / Intel VMD\n"
             "Ctrl+Alt+F2: direct text installer\n"
             "Esc: show this help"
         )

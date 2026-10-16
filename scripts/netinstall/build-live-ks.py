@@ -68,7 +68,7 @@ nvme-cli
 %end
 """
 payload=""
-for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh","haos-xsession.sh","haos-console.sh","haos-disk-safety.py"):
+for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh","haos-xsession.sh","haos-console.sh","haos-disk-safety.py","haos-storage-diagnostics.sh"):
     data=(root/"scripts/netinstall"/filename).read_bytes()
     encoded=base64.b64encode(data).decode()
     payload+=f"echo '{encoded}' | base64 -d > /usr/local/sbin/{filename}\nchmod 755 /usr/local/sbin/{filename}\n"

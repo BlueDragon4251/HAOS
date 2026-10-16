@@ -54,6 +54,11 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn("keyboard --vckeymap=de --xlayouts=at", self.ks)
         self.assertIn("setxkbmap -layout at", self.session)
 
+    def test_read_only_storage_diagnostics(self):
+        self.assertIn('self.bind("<F5>", self.open_storage_diagnostics)', self.gui)
+        self.assertIn("haos-storage-diagnostics.sh", self.gui)
+        self.assertIn("haos-storage-diagnostics.sh", self.ks)
+
     def test_dns_health_probe_visible(self):
         self.assertIn('"/usr/bin/getent", "ahostsv4", "ghcr.io"', self.gui)
         self.assertIn('DNS not ready - F3', self.gui)
