@@ -83,7 +83,7 @@ jobs:
             output/uefi-grub.cfg output/grub-efiboot.cfg
           # PXE boot must not depend on the old virtual block device root.
           grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/uefi-grub.cfg
-          grep -Fq "root=live:http://${haos_server}:16000/eiso/id/${haos_image_id}/LiveOS/squashfs.img" output/uefi-grub.cfg
+          grep -Fq 'root=live:http://${haos_server}:16000/eiso/id/${haos_image_id}/LiveOS/squashfs.img' output/uefi-grub.cfg
           grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/grub-efiboot.cfg
           # Never store the temporary EFI image inside the uploaded artifact.
           rm -f output/efiboot.img
