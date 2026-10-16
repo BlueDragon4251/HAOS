@@ -5,10 +5,34 @@ import base64
 import sys
 
 root=Path(__file__).resolve().parents[2]
-base=Path(sys.argv[1]).read_text()
-out=Path(sys.argv[2])
+out=Path(sys.argv[1])
+base="""# Standalone Fedora 44 live image installer composition (not target disk instructions)
+lang en_US.UTF-8
+keyboard us
+timezone UTC --utc
+selinux --enforcing
+firewall --enabled
+services --enabled=NetworkManager,sshd
+network --bootproto=dhcp --device=link --activate
+rootpw --lock
+bootloader --location=mbr
+zerombr
+clearpart --all --initlabel
+part / --fstype=ext4 --size=4096
+shutdown
+repo --name=fedora --mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64
+repo --name=updates --mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=x86_64
+"""
 # Package customization supplements, rather than replaces, Fedora's live core.
 packages="""\n%packages
+@core
+kernel
+kernel-modules
+kernel-modules-extra
+dracut-live
+livecd-tools
+bash
+NetworkManager
 podman
 bootc
 NetworkManager-wifi
