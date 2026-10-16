@@ -47,7 +47,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/netinstall/private-install.sh
-          python3 -m pytest -q linux/haos/tests/test_private_netinstall.py
+          bash -n scripts/netinstall/haos-install.sh
+          python3 -m pytest -q linux/haos/tests/test_private_netinstall.py linux/haos/tests/test_dual_channel_install.py
       - name: Build the pinned HAOS shell
         run: |
           set -euo pipefail
@@ -143,9 +144,9 @@ jobs:
             echo "Source commit: `$GITHUB_SHA`"
             echo "Registry image: `${{ steps.image.outputs.image_ref }}`"
             echo
-            echo 'Download the **haos-netinstall-x86_64** GitHub Actions artifact.'
+            echo 'Download the **haos-netinstall-x86_64** GitHub Actions artifact (legacy Anaconda prototype only).'
             echo 'This ISO is based on Fedora 44 Everything Netinstall and does not contain the HAOS OCI layers.'
-            echo '**Required:** Set the GHCR package visibility to Public in GitHub Packages before installing, or Anaconda will fail to pull it anonymously.'
+            echo '**Warning:** This is the legacy Anaconda ISO. The dual-channel launcher is NOT integrated. Keep GHCR private; this ISO cannot install it.'
             echo 'To override the image, edit the GRUB boot command (press e) and append `haos.image=registry.example/repo@sha256:<digest>`.'
             echo 'This is not an accepted production release; signed-image, installer/UEFI boot, network and installed-guest verification remain separate.'
           } >>"$GITHUB_STEP_SUMMARY"
