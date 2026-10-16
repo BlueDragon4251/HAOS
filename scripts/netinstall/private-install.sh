@@ -31,8 +31,8 @@ read -r -p "Type exact disk path to confirm: " CONFIRM
 
 AUTHDIR="$(mktemp -d /run/haos-ghcr-auth.XXXXXXXX)"
 chmod 700 "$AUTHDIR"
-printf '{}\\n' > "$AUTHDIR/auth.json"
-cleanup() { podman logout --authfile "$AUTHDIR/auth.json" ghcr.io >/dev/null 2>&1 || :; rm -rf -- "$AUTHDIR"; }
+printf '%s\n' '{}' > "$AUTHDIR/auth.json"
+cleanup() { rm -rf -- "$AUTHDIR"; }
 trap cleanup EXIT
 if [[ "$PUBLIC" == 0 ]]; then
 read -r -p 'GitHub username: ' GHUSER
@@ -44,7 +44,7 @@ printf '%s' "$GHTOKEN" | podman login --authfile "$AUTHDIR/auth.json" ghcr.io -u
 unset GHTOKEN
 fi
 export REGISTRY_AUTH_FILE="$AUTHDIR/auth.json"
-printf 'Fetching exact signed-by-digest (not cryptographically publisher-signed) image...\n'
+printf 'Fetching digest-pinned (not publisher-signed) image...\n'
 podman pull --authfile "$REGISTRY_AUTH_FILE" "$IMAGE"
 read -r -p 'Type WIPE to begin permanent installation: ' CONFIRM_WIPE
 [[ "$CONFIRM_WIPE" == WIPE ]] || die "Cancelled"
@@ -55,6 +55,7 @@ podman run --rm --privileged --pid=host --ipc=host \
   --security-opt label=disable \
   -v /var/lib/containers:/var/lib/containers \
   -v /dev:/dev \
+  -v /run:/run \
   "$IMAGE" bootc install to-disk --wipe --skip-fetch-check "$DISK"
 printf '\nHAOS installed to %s. Remove live media before reboot.\n' "$DISK"
 printf 'IMPORTANT: private registry updates require separately configured read-only auth.\n'
