@@ -47,6 +47,7 @@ podman
 skopeo
 bootc
 NetworkManager-wifi
+NetworkManager-tui
 iwlwifi-mvm-firmware
 iwlwifi-mld-firmware
 iwlbluetooth-firmware
