@@ -47,6 +47,73 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
         with self.assertRaisesRegex(core.InstallerError, "Zeitüberschreitung"):
             core.execute(["/usr/bin/sleep", "5"], timeout=0.15)
 
+
+    def test_connected_wifi_filter(self):
+        devices = ("eno1:ethernet:connected:Wired\n"
+                   "wlp0s20f3:wifi:connected:Blue\n"
+                   "wlan9:wifi:disconnected:--\n")
+        with mock.patch.object(core, "execute", return_value=devices):
+            self.assertEqual(core._wifi_devices(), ["wlp0s20f3"])
+
+    def test_ghcr_wifi_route_does_not_break_iventoy(self):
+        defaults = [
+            {"dev": "eno1", "gateway": "192.168.50.1", "metric": 100},
+            {"dev": "wlp0s20f3", "gateway": "192.168.0.1", "metric": 600},
+        ]
+        seen = []
+        def execute(args, **kwargs):
+            seen.append(args)
+            if args[0] == "curl":
+                self.assertIn("--interface", args)
+                self.assertIn("wlp0s20f3", args)
+                return "401"
+            return ""
+        with mock.patch.object(core, "_wifi_devices", return_value=["wlp0s20f3"]), \
+             mock.patch.object(core, "_routes", return_value=defaults), \
+             mock.patch.object(core, "_pxe_root_host", return_value="192.168.50.1"), \
+             mock.patch.object(core, "_route_device", return_value="eno1"), \
+             mock.patch.object(core, "check_network", return_value="GHCR HTTPS erreichbar"), \
+             mock.patch.object(core, "execute", side_effect=execute):
+            result = core.prefer_wifi_internet()
+        self.assertIn("wlp0s20f3", result)
+        self.assertTrue(any(cmd[:4] == ["ip", "-4", "route", "add"] for cmd in seen))
+        self.assertFalse(any(cmd[:4] == ["ip", "-4", "route", "del"] for cmd in seen))
+        self.assertFalse(any(cmd[:3] == ["nmcli", "device", "disconnect"] for cmd in seen))
+
+    def test_wifi_repair_rollback_when_ghcr_still_fails(self):
+        defaults = [
+            {"dev": "eno1", "gateway": "192.168.50.1", "metric": 100},
+            {"dev": "wlp0s20f3", "gateway": "192.168.0.1", "metric": 600},
+        ]
+        seen = []
+        def execute(args, **kwargs):
+            seen.append(args)
+            if args[0] == "curl":
+                return "401"
+            return ""
+        with mock.patch.object(core, "_wifi_devices", return_value=["wlp0s20f3"]), \
+             mock.patch.object(core, "_routes", return_value=defaults), \
+             mock.patch.object(core, "_pxe_root_host", return_value="192.168.50.1"), \
+             mock.patch.object(core, "_route_device", return_value="eno1"), \
+             mock.patch.object(core, "check_network", side_effect=core.InstallerError("Cannot reach GHCR")), \
+             mock.patch.object(core, "execute", side_effect=execute):
+            with self.assertRaisesRegex(core.InstallerError, "nicht"):
+                core.prefer_wifi_internet()
+        self.assertTrue(any(cmd[:4] == ["ip", "-4", "route", "add"] for cmd in seen))
+        self.assertTrue(any(cmd[:4] == ["ip", "-4", "route", "del"] for cmd in seen))
+
+    def test_no_wifi_refuses_route_change(self):
+        with mock.patch.object(core, "_wifi_devices", return_value=[]), \
+             mock.patch.object(core, "execute") as run:
+            with self.assertRaisesRegex(core.InstallerError, "WLAN"):
+                core.prefer_wifi_internet()
+            run.assert_not_called()
+
+    def test_http_root_host_is_discovered_dynamically(self):
+        with mock.patch.object(core.Path, "read_text",
+                               return_value="root=live:http://192.168.50.1:16000/eiso/id/1/LiveOS/squashfs.img ip=dhcp"):
+            self.assertEqual(core._pxe_root_host(), "192.168.50.1")
+
     def test_disk_selection_uses_existing_validator(self):
         with mock.patch.object(core, "ROOT", core.ROOT):
             # Real safety module (mock only the lsblk subprocess).

@@ -59,6 +59,13 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn("haos-storage-diagnostics.sh", self.gui)
         self.assertIn("haos-storage-diagnostics.sh", self.ks)
 
+    def test_wizard_has_route_diagnostics_and_safe_wifi_repair(self):
+        wizard = (HERE / "haos-dev-wizard.py").read_text()
+        self.assertIn("def show_network_details(self):", wizard)
+        self.assertIn("def prefer_wifi_route(self):", wizard)
+        self.assertIn("core.prefer_wifi_internet", wizard)
+        self.assertIn("Netzwerkdiagnose anzeigen", wizard)
+
     def test_dns_health_probe_visible(self):
         self.assertIn('"/usr/bin/getent", "ahostsv4", "ghcr.io"', self.gui)
         self.assertIn('DNS not ready - F3', self.gui)
