@@ -8,7 +8,7 @@ root=Path(__file__).resolve().parents[2]
 out=Path(sys.argv[1])
 base="""# Standalone Fedora 44 live image installer composition (not target disk instructions)
 lang en_US.UTF-8
-keyboard us
+keyboard --vckeymap=de --xlayouts=at
 timezone UTC --utc
 selinux --enforcing
 firewall --enabled
@@ -44,6 +44,8 @@ xorg-x11-drv-libinput
 xorg-x11-drv-evdev
 openbox
 xrandr
+setxkbmap
+kbd
 libinput-utils
 mesa-dri-drivers
 dejavu-sans-mono-fonts
@@ -64,7 +66,7 @@ parted
 %end
 """
 payload=""
-for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh","haos-xsession.sh","haos-console.sh"):
+for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh","haos-xsession.sh","haos-console.sh","haos-disk-safety.py"):
     data=(root/"scripts/netinstall"/filename).read_bytes()
     encoded=base64.b64encode(data).decode()
     payload+=f"echo '{encoded}' | base64 -d > /usr/local/sbin/{filename}\nchmod 755 /usr/local/sbin/{filename}\n"
