@@ -215,9 +215,16 @@ class Welcome(tk.Tk):
                 capture_output=True, text=True, timeout=3
             )
             ok = status.returncode == 0 and "connected" in status.stdout
+            dns = subprocess.run(
+                ["/usr/bin/getent", "ahostsv4", "ghcr.io"],
+                capture_output=True, text=True, timeout=4
+            )
+            resolved = ok and dns.returncode == 0
             self.network.configure(
-                text="● Network connected" if ok else "● Network not connected",
-                fg=CYAN if ok else "#FFA75E"
+                text=("● Network + GHCR DNS ready" if resolved else
+                      "● Network connected, DNS not ready - F3" if ok else
+                      "● Network disconnected - F3"),
+                fg=CYAN if resolved else "#FFA75E"
             )
         except Exception:
             self.network.configure(text="● Network status unavailable", fg=MUTED)

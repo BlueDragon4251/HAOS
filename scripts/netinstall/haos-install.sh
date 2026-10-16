@@ -20,6 +20,10 @@ fi
 case "${selection:-1}" in
   1)
     command -v curl >/dev/null || { echo "Missing curl" >&2; exit 1; }
+    if ! getent ahostsv4 raw.githubusercontent.com >/dev/null 2>&1; then
+      echo "No GitHub DNS resolution. Use F3 Network Settings; check DHCP/gateway/DNS." >&2
+      exit 1
+    fi
     # A stable reference must be published explicitly; never fall back to a private dev image.
     image="$(curl -fsSL --connect-timeout 15 --max-time 30 "$RELEASE_MANIFEST")"
     image="${image%$'\n'}"

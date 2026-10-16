@@ -54,6 +54,10 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn("keyboard --vckeymap=de --xlayouts=at", self.ks)
         self.assertIn("setxkbmap -layout at", self.session)
 
+    def test_dns_health_probe_visible(self):
+        self.assertIn('"/usr/bin/getent", "ahostsv4", "ghcr.io"', self.gui)
+        self.assertIn('DNS not ready - F3', self.gui)
+
     def test_nmtui_is_not_executed_through_bash(self):
         self.assertIn('else [path, *args]', self.gui)
 
