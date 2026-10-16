@@ -63,6 +63,12 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn('"/usr/bin/getent", "ahostsv4", "ghcr.io"', self.gui)
         self.assertIn('DNS not ready - F3', self.gui)
 
+    def test_graphical_installer_both_channels(self):
+        self.assertIn('self.open_wizard("--dev")', self.gui)
+        self.assertIn('self.open_wizard("--stable")', self.gui)
+        for filename in ("haos-dev-wizard.py", "haos_install_core.py"):
+            self.assertIn(filename, self.ks)
+
     def test_nmtui_is_not_executed_through_bash(self):
         self.assertIn('else [path, *args]', self.gui)
 

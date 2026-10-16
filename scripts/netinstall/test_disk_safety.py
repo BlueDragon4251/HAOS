@@ -36,6 +36,19 @@ class DiskSafetyTest(unittest.TestCase):
     def test_partition_rejected(self):
         self.assertFalse(eligible(self.drive(type="part", path="/dev/nvme0n1p1")))
 
+    def test_large_virtual_nbd_drive_rejected(self):
+        self.assertFalse(eligible(self.drive(path="/dev/nbd0", tran=None)))
+
+    def test_large_loop_drive_rejected(self):
+        self.assertFalse(eligible(self.drive(path="/dev/loop0", tran=None)))
+
+    def test_large_device_mapper_drive_rejected(self):
+        self.assertFalse(eligible(self.drive(path="/dev/dm-0", tran=None)))
+
+    def test_ram_and_zram_rejected(self):
+        self.assertFalse(eligible(self.drive(path="/dev/zram0", tran=None)))
+        self.assertFalse(eligible(self.drive(path="/dev/ram0", tran=None)))
+
     def test_internal_sata_allowed(self):
         self.assertTrue(eligible(self.drive(path="/dev/sda", tran="sata")))
 
