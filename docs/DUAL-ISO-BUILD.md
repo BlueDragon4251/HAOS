@@ -125,3 +125,42 @@ Do not place GHCR tokens on iVentoy's unencrypted port 16000.
 Validation: Python syntax, headless backend tests, virtual-disk safety,
 and QEMU UEFI GUI opening are CI gates. A green build confirms those
 checks, **not** a complete destructive bootc install on the physical HP.
+
+
+### Large HAOS images, scratch capacity and real progress
+
+The Live ISO root filesystem was expanded from 4 GiB to 16 GiB
+(Kickstart root partition size, sparse/compressible). This is NOT a promise
+that arbitrary bootc image sizes will fit in RAM or scratch.
+
+The GUI now displays an indeterminate progress bar and streaming Podman and
+bootc output with cancellation and finite deadlines. It intentionally does
+not display synthetic download percentages.
+
+The bootc command explicitly uses its already-pulled local container via
+\`--source-imgref containers-storage:<registry>@sha256:<digest>\`, while
+\`--target-imgref\` retains the digest-pinned public/privileged GHCR reference
+for the installed machine. This avoids bootc performing a redundant registry
+pull during the installation pass. Podman storage is mounted into the install
+container per bootc's documented usage.
+
+When any installation fails with \`no space left on device\`, the wizard reports
+the disk and available local filesystem usage after failure, and does NOT
+automatically retry the destructive installation. The reported \`/sysroot\`
+path during an ostree import may refer to installation work on the target
+filesystem and should be investigated rather than assumed to be a full
+RAM-backed live root. A second scratch disk or sufficient RAM may be
+necessary for large images (in particular when unpacking into tmpfs); the
+121 MiB credentials stick is not suitable scratch storage.
+
+Before attempting another destructive installation, verify the newly built
+ISO boots and the GUI can select a GHCR image. Back up target data and
+test bootc installation against a dedicated blank VM disk whenever possible.
+
+### Ordering GHCR development images
+
+The private list now orders images newest-first by GitHub Packages'
+version \`created_at\` via an authenticated, secret-stdin GitHub API request.
+If the token cannot read package version metadata, the fallback uses OCI
+\`Created\` timestamps from Skopeo and clearly labels that these are *image
+creation times*, not GHCR publication times. Both dates display in UTC.

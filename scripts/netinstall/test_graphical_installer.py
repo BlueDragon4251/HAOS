@@ -114,6 +114,56 @@ class GraphicalInstallerCoreTests(unittest.TestCase):
                                return_value="root=live:http://192.168.50.1:16000/eiso/id/1/LiveOS/squashfs.img ip=dhcp"):
             self.assertEqual(core._pxe_root_host(), "192.168.50.1")
 
+
+    def test_published_dev_versions_sort_and_hide_token(self):
+        releases = [
+            {"created_at": "2026-10-15T01:00:00Z",
+             "metadata": {"container": {"tags": ["dev-111111111111"]}}},
+            {"created_at": "2026-10-16T22:00:00Z",
+             "metadata": {"container": {"tags": ["dev-222222222222"]}}},
+        ]
+        import json
+        with mock.patch.object(core, "execute", return_value=json.dumps(releases)) as run:
+            sess = core.RegistrySession()
+            try:
+                sess.api_token = "github_pat_TEST123"
+                with mock.patch.object(sess, "tags", return_value=[
+                        "dev-111111111111", "dev-222222222222"]):
+                    found = sess.versions()
+                self.assertEqual([x["tag"] for x in found],
+                                 ["dev-222222222222", "dev-111111111111"])
+                self.assertEqual(found[0]["published"], "2026-10-16T22:00:00Z")
+                self.assertIsNone(sess.api_token)
+                args = run.call_args.args[0]
+                self.assertEqual(args[-3:-1], ["-K", "-"])
+                self.assertNotIn("github_pat_TEST123", " ".join(args))
+                self.assertIn(b"Authorization: Bearer github_pat_TEST123",
+                              run.call_args.kwargs["input_data"])
+            finally:
+                sess.close()
+
+    def test_image_pull_progress_reports_real_lines(self):
+        observed = []
+        output = core.stream_execute(
+            ["/usr/bin/python3", "-c",
+             "import sys; print('Copying blob A', flush=True);"
+             " print('Writing manifest', flush=True)"],
+            timeout=10, progress=observed.append)
+        self.assertIn("Writing manifest", output)
+        self.assertTrue(any("Copying blob" in line for line in observed))
+
+    def test_stream_timeout_is_bounded(self):
+        with self.assertRaisesRegex(core.InstallerError, "Zeitüberschreitung"):
+            core.stream_execute(["/usr/bin/sleep", "5"], timeout=0.2)
+
+    def test_bootc_uses_local_storage_to_avoid_second_network_fetch(self):
+        import inspect
+        src = inspect.getsource(core.RegistrySession.install)
+        self.assertIn("containers-storage:", src)
+        self.assertIn("--source-imgref", src)
+        self.assertIn("--target-imgref", src)
+        self.assertIn("stream_execute", src)
+
     def test_disk_selection_uses_existing_validator(self):
         with mock.patch.object(core, "ROOT", core.ROOT):
             # Real safety module (mock only the lsblk subprocess).

@@ -54,6 +54,15 @@ class KioskLayoutTests(unittest.TestCase):
         self.assertIn("keyboard --vckeymap=de --xlayouts=at", self.ks)
         self.assertIn("setxkbmap -layout at", self.session)
 
+    def test_large_live_root_image_and_download_progress(self):
+        self.assertIn("part / --fstype=ext4 --size=16384", self.ks)
+        wizard = (HERE / "haos-dev-wizard.py").read_text()
+        self.assertIn("ttk.Progressbar", wizard)
+        self.assertIn("progress=self.report_progress", wizard)
+        self.assertIn("class Wizard", wizard)
+        self.assertIn("self.versions[sel[0]]", wizard)
+        self.assertIn('height=entries', wizard)
+
     def test_read_only_storage_diagnostics(self):
         self.assertIn('self.bind("<F5>", self.open_storage_diagnostics)', self.gui)
         self.assertIn("haos-storage-diagnostics.sh", self.gui)
