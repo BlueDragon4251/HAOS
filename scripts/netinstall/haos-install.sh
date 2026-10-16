@@ -14,7 +14,9 @@ echo "1) Install verified public stable release"
 echo "2) Exit"
 echo
 
-read -r -p 'Selection [1]: ' selection
+if [[ "${1:-}" == "--stable" ]]; then selection=1
+else read -r -p 'Selection [1]: ' selection
+fi
 case "${selection:-1}" in
   1)
     command -v curl >/dev/null || { echo "Missing curl" >&2; exit 1; }

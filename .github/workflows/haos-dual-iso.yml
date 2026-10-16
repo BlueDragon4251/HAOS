@@ -21,7 +21,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/netinstall/private-install.sh scripts/netinstall/haos-install.sh
-          python3 -m py_compile scripts/netinstall/build-live-ks.py
+          python3 -m py_compile scripts/netinstall/build-live-ks.py scripts/netinstall/haos-gui.py
+          bash -n scripts/netinstall/haos-start-gui.sh
       - name: Prepare host for filesystem image
         run: |
           set -euo pipefail
@@ -52,7 +53,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y xorriso
           xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -exec report_lba --
-          xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain
+          xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain | tee output/boot-report.txt
+          # Fail closed: a BIOS-only ISO is not acceptable on modern HP UEFI systems.
+          grep -Eq 'El Torito img.*UEFI|El Torito img.*0xef' output/boot-report.txt || {
+            echo "::error::UEFI boot image is missing; do not publish this BIOS-only ISO."
+            exit 1
+          }
+          xorriso -indev output/haos-dual-channel-x86_64.iso -ls /EFI/BOOT /images || true
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -61,4 +68,5 @@ jobs:
             output/haos-dual-channel-x86_64.iso
             output/SHA256SUMS
             output/haos-live.ks
+            output/boot-report.txt
           retention-days: 14

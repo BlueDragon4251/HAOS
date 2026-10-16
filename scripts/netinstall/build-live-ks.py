@@ -30,9 +30,19 @@ kernel
 kernel-modules
 kernel-modules-extra
 dracut-live
+shim-x64
+grub2-efi-x64
+grub2-efi-x64-cdboot
 livecd-tools
 bash
 NetworkManager
+xorg-x11-server-Xorg
+xorg-x11-xinit
+xterm
+python3-tkinter
+xorg-x11-drv-libinput
+mesa-dri-drivers
+dejavu-sans-mono-fonts
 podman
 skopeo
 bootc
@@ -49,10 +59,10 @@ parted
 %end
 """
 payload=""
-for filename in ("haos-install.sh","private-install.sh"):
+for filename in ("haos-install.sh","private-install.sh","haos-gui.py","haos-start-gui.sh"):
     data=(root/"scripts/netinstall"/filename).read_bytes()
     encoded=base64.b64encode(data).decode()
-    payload+=f"echo '{encoded}' | base64 -d > /usr/local/sbin/{filename}\nchmod 700 /usr/local/sbin/{filename}\n"
+    payload+=f"echo '{encoded}' | base64 -d > /usr/local/sbin/{filename}\nchmod 755 /usr/local/sbin/{filename}\n"
 post="""\n%post --log=/root/haos-live-post.log
 set -eu
 mkdir -p /etc/systemd/system /usr/local/sbin
@@ -60,11 +70,11 @@ mkdir -p /etc/systemd/system /usr/local/sbin
 cat > /etc/systemd/system/haos-installer.service <<'UNIT'
 [Unit]
 Description=HAOS Dual Channel Installer
-After=network.target getty@tty1.service
+After=systemd-logind.service NetworkManager.service
 Conflicts=getty@tty1.service
 [Service]
-Type=idle
-ExecStart=/usr/bin/bash /usr/local/sbin/haos-install.sh
+Type=simple
+ExecStart=/usr/local/sbin/haos-start-gui.sh
 StandardInput=tty-force
 StandardOutput=tty
 StandardError=tty
