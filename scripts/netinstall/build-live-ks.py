@@ -34,6 +34,7 @@ livecd-tools
 bash
 NetworkManager
 podman
+skopeo
 bootc
 NetworkManager-wifi
 iwlwifi-mvm-firmware
