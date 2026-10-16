@@ -26,26 +26,45 @@ class InstallerError(Exception):
     pass
 
 
-def execute(args, *, timeout=35, input_data=None, status=None):
-    """Run finite external command, capturing bounded output and killing process group."""
+def execute(args, *, timeout=35, input_data=None, cancel_event=None):
+    """Run commands with a real deadline and optional user cancellation."""
     proc = None
+    output = b""
     try:
         proc = subprocess.Popen(
             args, stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
         )
-        output, _ = proc.communicate(input=input_data, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        if proc is not None:
-            os.killpg(proc.pid, signal.SIGKILL)
-            proc.communicate()
-        raise InstallerError(f"Zeitüberschreitung ({timeout}s): {args[0]}. Netzwerk und DNS prüfen.")
+        first = True
+        deadline = time.monotonic() + timeout
+        while True:
+            if cancel_event is not None and cancel_event.is_set():
+                raise InstallerError("Vorgang vom Benutzer abgebrochen.")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise InstallerError(f"Zeitüberschreitung ({timeout}s): {args[0]}. Verbindung prüfen.")
+            try:
+                chunk, _ = proc.communicate(
+                    input=input_data if first else None,
+                    timeout=min(1.0, remaining),
+                )
+                output = chunk
+                break
+            except subprocess.TimeoutExpired:
+                first = False
+        result = output.decode("utf-8", errors="replace")[-5000:]
+        if proc.returncode:
+            raise InstallerError(f"{args[0]} schlug fehl (Code {proc.returncode}).\n{result.strip()}")
+        return result.strip()
     except OSError as exc:
         raise InstallerError(f"Programm {args[0]} konnte nicht gestartet werden: {exc}") from exc
-    result = output.decode("utf-8", errors="replace")[-5000:]
-    if proc.returncode:
-        raise InstallerError(f"{args[0]} schlug fehl (Code {proc.returncode}).\n{result.strip()}")
-    return result.strip()
+    finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.communicate()
 
 
 def check_network():
@@ -111,7 +130,8 @@ def read_usb_token(device):
                 if path.is_file() and not path.is_symlink():
                     if path.stat().st_size > 8192:
                         raise InstallerError("Token-Datei ist ungewöhnlich groß.")
-                    return check_token(path.read_text(encoding="utf-8").splitlines()[0])
+                    lines = path.read_text(encoding="utf-8").splitlines()
+                    return check_token(lines[0] if lines else "")
             raise InstallerError("HAOS-DEV/token.txt oder token.txt auf dem USB-Stick fehlt.")
         finally:
             execute(["umount", folder], timeout=12)
@@ -132,13 +152,15 @@ def https_token(url):
         execute(["curl", "-fsS", "-L", "--proto", "=https", "--proto-redir", "=https",
                  "--connect-timeout", "8", "--max-time", "25", "--max-filesize", "8192",
                  "-o", path, url], timeout=30)
-        return check_token(Path(path).read_text(encoding="utf-8").splitlines()[0])
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+        return check_token(lines[0] if lines else "")
 
 
 class RegistrySession:
     def __init__(self):
         self.folder = tempfile.TemporaryDirectory(prefix="haos-ghcr-", dir="/run")
         self.authfile = str(Path(self.folder.name, "auth.json"))
+        self.cancel_event = None
         Path(self.authfile).write_text("{}\n", encoding="utf-8")
         os.chmod(self.authfile, 0o600)
 
@@ -152,13 +174,14 @@ class RegistrySession:
         try:
             execute(["podman", "login", "--authfile", self.authfile,
                      "ghcr.io", "-u", username, "--password-stdin"],
-                    input_data=check_token(token).encode("utf-8"), timeout=35)
+                    input_data=check_token(token).encode("utf-8"), timeout=35,
+                    cancel_event=self.cancel_event)
         except InstallerError as exc:
             raise InstallerError(f"GHCR-Anmeldung fehlgeschlagen: {exc}") from exc
 
     def tags(self):
         raw = execute(["skopeo", "list-tags", "--authfile", self.authfile,
-                       "docker://" + REPO], timeout=45)
+                       "docker://" + REPO], timeout=45, cancel_event=self.cancel_event)
         return sorted({t for t in json.loads(raw).get("Tags", [])
                        if TAG_PATTERN.fullmatch(t)}, reverse=True)
 
@@ -166,7 +189,7 @@ class RegistrySession:
         if not TAG_PATTERN.fullmatch(tag):
             raise InstallerError("Ungültiger Entwicklungstag.")
         raw = execute(["skopeo", "inspect", "--authfile", self.authfile,
-                       "docker://" + REPO + ":" + tag], timeout=45)
+                       "docker://" + REPO + ":" + tag], timeout=45, cancel_event=self.cancel_event)
         digest = json.loads(raw).get("Digest", "")
         if not DIGEST_PATTERN.fullmatch(digest):
             raise InstallerError("GHCR lieferte keinen gültigen SHA256-Digest.")
@@ -174,7 +197,7 @@ class RegistrySession:
 
     def public_image(self):
         raw = execute(["curl", "-fsSL", "--connect-timeout", "8", "--max-time", "20",
-                       "--proto", "=https", RELEASE], timeout=25).strip()
+                       "--proto", "=https", RELEASE], timeout=25, cancel_event=self.cancel_event).strip()
         if not IMAGE_PATTERN.fullmatch(raw) or ".." in raw:
             raise InstallerError("Es ist noch kein gültiges öffentliches Stable-Image veröffentlicht.")
         return raw
@@ -182,7 +205,8 @@ class RegistrySession:
     def pull(self, image):
         if not IMAGE_PATTERN.fullmatch(image):
             raise InstallerError("Das Container-Image hat keinen festen SHA256-Digest.")
-        execute(["podman", "pull", "--authfile", self.authfile, image], timeout=1800)
+        execute(["podman", "pull", "--authfile", self.authfile, image], timeout=1800,
+                cancel_event=self.cancel_event)
 
     def install(self, image, disk):
         # Re-validate target right before the destructive operation.
@@ -190,7 +214,6 @@ class RegistrySession:
         if disk not in safe:
             raise InstallerError("Zielfestplatte ist nicht mehr verfügbar oder nicht sicher.")
         for node in execute(["lsblk", "-nrpo", "NAME", disk], timeout=10).splitlines():
-            mounts = execute(["findmnt", "-rn", "-S", node, "-o", "TARGET"], timeout=8) if False else ""
             check = subprocess.run(["findmnt", "-rn", "-S", node], capture_output=True, timeout=8)
             if check.returncode == 0:
                 raise InstallerError(f"Abbruch: {node} ist eingebunden.")
@@ -205,5 +228,5 @@ class RegistrySession:
              "-v", "/var/lib/containers:/var/lib/containers",
              "-v", "/dev:/dev", "-v", "/run:/run",
              image, "bootc", "install", "to-disk", "--wipe", "--skip-fetch-check", disk],
-            timeout=3600,
+            timeout=3600, cancel_event=self.cancel_event,
         )
