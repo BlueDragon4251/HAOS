@@ -26,6 +26,7 @@ class Wizard(tk.Tk):
         self.messages = queue.Queue()
         self.waiting = False
         self.started_install = False
+        self.cancel_event = None
         self.timer = 0.0
         self.image = None
         self.disk = None
@@ -318,6 +319,9 @@ class Wizard(tk.Tk):
         self.status.set(description + " …")
         for widget in self.actions.winfo_children():
             widget.configure(state="disabled")
+        self.cancel_event = threading.Event()
+        self.session.cancel_event = self.cancel_event
+        self.stop_button = self.button("Vorgang abbrechen", self.cancel_operation)
         def run():
             try: self.messages.put((True, operation(), callback, retry))
             except Exception as exc: self.messages.put((False, exc, callback, retry))
@@ -328,6 +332,10 @@ class Wizard(tk.Tk):
             while True:
                 success, value, callback, retry = self.messages.get_nowait()
                 self.waiting = False
+                if hasattr(self, "stop_button") and self.stop_button.winfo_exists():
+                    self.stop_button.destroy()
+                for widget in self.actions.winfo_children():
+                    widget.configure(state="normal")
                 if success: callback(value)
                 else: self.error(value, retry)
         except queue.Empty:
@@ -337,11 +345,18 @@ class Wizard(tk.Tk):
             self.status.set(f"Bitte warten: Vorgang läuft seit {seconds} Sekunden (mit Zeitlimit).")
         self.after(300, self.poll)
 
+    def cancel_operation(self):
+        if self.cancel_event is not None:
+            self.cancel_event.set()
+            if hasattr(self, "stop_button") and self.stop_button.winfo_exists():
+                self.stop_button.configure(state="disabled")
+            self.status.set("Vorgang wird abgebrochen … bitte kurz warten.")
+
     def exit(self):
         if self.waiting:
             messagebox.showwarning("Vorgang läuft",
-                                   "Bitte bis zum Abschluss oder Timeout warten. "
-                                   "Die Oberfläche bleibt bedienbar.", parent=self)
+                                   "Du kannst den laufenden Vorgang über 'Vorgang abbrechen' beenden. "
+                                   "Eine begonnene Installation kann dadurch unvollständig bleiben.", parent=self)
             return
         self.session.close()
         self.destroy()
