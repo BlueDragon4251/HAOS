@@ -62,6 +62,8 @@ curl
 util-linux
 systemd-udev
 parted
+pciutils
+nvme-cli
 -gnome-shell
 %end
 """

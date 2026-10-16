@@ -20,6 +20,16 @@ fi
 
 printf '\nHAOS NETWORK INSTALLER\n\n'
 [[ "$SELECT_DEV" == 1 ]] || printf 'Image: %s\n' "$IMAGE"
+printf 'Checking internal storage before GHCR authentication...\n'
+modprobe nvme 2>/dev/null || true
+modprobe vmd 2>/dev/null || true
+udevadm settle --timeout=15 2>/dev/null || true
+if ! python3 /usr/local/sbin/haos-disk-safety.py list; then
+  printf 'Storage inventory:\n' >&2
+  lsblk -dpno NAME,SIZE,MODEL,TYPE,TRAN,RM,RO >&2 || true
+  command -v lspci >/dev/null && lspci -nn | grep -Ei 'vmd|nvme|storage|sata|raid' >&2 || true
+  die "No eligible INTERNAL drive. Detected USB is only your credentials stick."
+fi
 if ! getent ahostsv4 ghcr.io >/dev/null 2>&1; then
   printf 'GHCR DNS resolution unavailable. Configure networking (F3 or TTY2) before installing.\n' >&2
   command -v nmcli >/dev/null && nmcli device status >&2 || true

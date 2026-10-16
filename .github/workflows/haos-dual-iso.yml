@@ -21,12 +21,13 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/netinstall/private-install.sh scripts/netinstall/haos-install.sh
-          python3 -m py_compile scripts/netinstall/build-live-ks.py scripts/netinstall/haos-gui.py
+          python3 -m py_compile scripts/netinstall/build-live-ks.py scripts/netinstall/haos-gui.py scripts/netinstall/haos-disk-safety.py
           bash -n scripts/netinstall/haos-start-gui.sh scripts/netinstall/haos-xsession.sh scripts/netinstall/haos-console.sh
           python3 -m py_compile scripts/netinstall/check-boot-screen.py scripts/netinstall/verify_uefi.py scripts/netinstall/check-gui-keyboard.py
           python3 -m unittest discover -s scripts/netinstall -p 'test_uefi_report.py' -v
           python3 -m unittest discover -s scripts/netinstall -p 'test_iventoy_grub.py' -v
           python3 -m unittest discover -s scripts/netinstall -p 'test_gui_layout.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_disk_safety.py' -v
       - name: Prepare host for filesystem image
         run: |
           set -euo pipefail
