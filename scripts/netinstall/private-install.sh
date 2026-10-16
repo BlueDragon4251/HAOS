@@ -31,6 +31,7 @@ read -r -p "Type exact disk path to confirm: " CONFIRM
 
 AUTHDIR="$(mktemp -d /run/haos-ghcr-auth.XXXXXXXX)"
 chmod 700 "$AUTHDIR"
+printf '{}\\n' > "$AUTHDIR/auth.json"
 cleanup() { podman logout --authfile "$AUTHDIR/auth.json" ghcr.io >/dev/null 2>&1 || :; rm -rf -- "$AUTHDIR"; }
 trap cleanup EXIT
 if [[ "$PUBLIC" == 0 ]]; then
