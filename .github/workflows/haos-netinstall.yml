@@ -1,0 +1,151 @@
+name: HAOS Netinstall (GHCR + small online installer)
+
+# Develop on the agent branch without merging into main or publishing a stable
+# release. This is a distinct, one-commit pipeline and does not run the old
+# multi-gigabyte offline-ISO builder.
+on:
+  push:
+    branches: ['agent/haos-foundation']
+    paths:
+      - '.github/workflows/haos-netinstall.yml'
+      - 'scripts/netinstall/**'
+      - 'linux/image/Containerfile'
+      - 'linux/image/packages.txt'
+      - 'linux/image/packages.sh'
+      - 'linux/haos/**'
+      - 'apps/desktop/src/**'
+      - 'upstream/*.lock'
+      - 'package*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: haos-netinstall-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  netinstall:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - name: Free disk space on the disposable GitHub runner
+        run: |
+          set -euo pipefail
+          for path in /usr/share/dotnet /usr/local/lib/android /opt/ghc; do
+            if [[ -d "$path" ]]; then sudo rm -rf -- "$path"; fi
+          done
+          df -h /
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the pinned HAOS shell
+        run: |
+          set -euo pipefail
+          npm run sync-upstream
+          npm ci
+          npm run dist:linux --workspace apps/desktop -- --x64
+          cp apps/desktop/release/herald-os-*-linux-x64.tar.gz herald-os-linux.tar.gz
+      - name: Build the Fedora 44 bootc runtime
+        run: |
+          set -euo pipefail
+          sudo podman build -f linux/image/Containerfile \
+            --build-arg SHELL_TARBALL=herald-os-linux.tar.gz -t localhost/haos:netinstall .
+          sudo podman run --rm localhost/haos:netinstall bash -euo pipefail -c '
+            rpm -q iwlwifi-mvm-firmware iwlwifi-mld-firmware iwlbluetooth-firmware alsa-sof-firmware
+            files="$(rpm -ql iwlwifi-mvm-firmware)"
+            grep -E "/iwlwifi-so-a0-gf-a0-89\\.ucode(\\.xz)?$" <<< "$files"
+            bootc container lint
+          '
+      - name: Publish digest-pinned DEVELOPMENT image to GitHub Container Registry
+        id: image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/haos"
+          TAG="dev-${GITHUB_SHA:0:12}"
+          echo "$GHCR_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          sudo podman push --digestfile /tmp/haos-netinstall-digest \
+            localhost/haos:netinstall "docker://$IMAGE:$TAG"
+          DIGEST="$(cat /tmp/haos-netinstall-digest)"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::No valid remote manifest digest"; exit 1; }
+          echo "image_ref=$IMAGE@$DIGEST" >>"$GITHUB_OUTPUT"
+          echo "source_commit=$GITHUB_SHA" > output/IMAGE.txt
+          echo "oci_source=$IMAGE@$DIGEST" >> output/IMAGE.txt
+          echo "development=true" >> output/IMAGE.txt
+          echo "signed=false" >> output/IMAGE.txt
+          sudo podman logout ghcr.io
+          # Keep the netinstaller small and make room to transform the ISO.
+          sudo podman system prune -af --volumes
+          df -h /
+      - name: Render safe Anaconda bootc Kickstart
+        run: |
+          set -euo pipefail
+          python3 scripts/netinstall/render.py --image-ref "${{ steps.image.outputs.image_ref }}" \
+            --output output/haos-netinstall.ks
+          python3 -m py_compile scripts/netinstall/render.py
+          grep -F -- 'bootc --source-imgref=registry:' output/haos-netinstall.ks
+      - name: Download checksum-pinned Fedora 44 Everything Netinstall ISO
+        run: |
+          set -euo pipefail
+          cd output
+          # Official Fedora 44 Everything 1.7 media, SHA256 from Fedora's PGP-signed CHECKSUM.
+          # Bump together, only after verifying an official release checksum.
+          FILE=Fedora-Everything-netinst-x86_64-44-1.7.iso
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 \
+            "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/$FILE" -o "$FILE"
+          echo "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e  $FILE" | sha256sum -c -
+      - name: Build the bootable HAOS online installer without embedded HAOS layers
+        run: |
+          set -euo pipefail
+          # Fedora 44 lorax/mkksiso retains Fedora's UEFI boot loader and
+          # inserts the source-selected Anaconda kickstart. Do not put the
+          # bootc image into the ISO.
+          sudo podman run --rm --security-opt label=disable \
+            -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
+            bash -euo pipefail -c '
+              dnf install -y lorax xorriso isomd5sum
+              mkksiso -V HAOS_NETINSTALL \
+                output/haos-netinstall.ks \
+                output/Fedora-Everything-netinst-x86_64-44-1.7.iso \
+                output/haos-netinstall-x86_64.iso
+            '
+          sudo chown -R "$(id -u):$(id -g)" output
+          rm -f output/Fedora-Everything-netinst-x86_64-44-1.7.iso
+          (cd output && sha256sum haos-netinstall-x86_64.iso > SHA256SUMS)
+          (cd output && sha256sum -c SHA256SUMS)
+          test "$(stat -c %s output/haos-netinstall-x86_64.iso)" -lt 2147483648
+          ls -lh output/haos-netinstall-x86_64.iso
+          cat output/IMAGE.txt output/SHA256SUMS
+      - name: Record installation instructions and evidence
+        if: success()
+        run: |
+          {
+            echo '### HAOS network installer built (development, unsigned)'
+            echo
+            echo "Source commit: `$GITHUB_SHA`"
+            echo "Registry image: `${{ steps.image.outputs.image_ref }}`"
+            echo
+            echo 'Download the **haos-netinstall-x86_64** GitHub Actions artifact.'
+            echo 'This ISO is based on Fedora 44 Everything Netinstall and does not contain the HAOS OCI layers.'
+            echo '**Required:** Set the GHCR package visibility to Public in GitHub Packages before installing, or Anaconda will fail to pull it anonymously.'
+            echo 'To override the image, edit the GRUB boot command (press e) and append `haos.image=registry.example/repo@sha256:<digest>`.'
+            echo 'This is not an accepted production release; signed-image, installer/UEFI boot, network and installed-guest verification remain separate.'
+          } >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-netinstall-x86_64-${{ github.sha }}
+          path: |
+            output/haos-netinstall-x86_64.iso
+            output/SHA256SUMS
+            output/IMAGE.txt
+            output/haos-netinstall.ks
+          if-no-files-found: warn
+          retention-days: 14
