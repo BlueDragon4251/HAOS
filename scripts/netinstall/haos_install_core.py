@@ -73,6 +73,72 @@ def execute(args, *, timeout=35, input_data=None, cancel_event=None, output_limi
             proc.communicate()
 
 
+
+def stream_execute(args, *, timeout, cancel_event=None, progress=None):
+    """Stream actual Podman/bootc output rather than faking percentage values.
+
+    Output parsing is independent of a pseudo-TTY and handles carriage returns
+    emitted by the container engine. Captured diagnostics are bounded.
+    """
+    import collections
+    proc = None
+    tail = collections.deque(maxlen=60)
+    partial = b""
+    try:
+        proc = subprocess.Popen(
+            args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, start_new_session=True,
+        )
+        with selectors.DefaultSelector() as selected:
+            selected.register(proc.stdout, selectors.EVENT_READ)
+            deadline = time.monotonic() + timeout
+            last_emit = 0.0
+            while selected.get_map() or proc.poll() is None:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise InstallerError("Vorgang vom Benutzer abgebrochen.")
+                if time.monotonic() >= deadline:
+                    raise InstallerError(f"Zeitüberschreitung ({timeout}s): {args[0]}.")
+                for key, _ in selected.select(timeout=0.4):
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                    if not chunk:
+                        selected.unregister(key.fileobj)
+                        continue
+                    partial += chunk
+                    # Handle both textual CR-updated and LF-delimited progress.
+                    parts = re.split(rb"[\r\n]+", partial)
+                    partial = parts.pop()[-8192:]
+                    for part in parts:
+                        line = part.decode("utf-8", errors="replace").strip()
+                        if not line:
+                            continue
+                        tail.append(line[:1200])
+                        if progress is not None and (
+                            time.monotonic() - last_emit > 0.2
+                            or "error" in line.lower()
+                        ):
+                            progress(line[:300])
+                            last_emit = time.monotonic()
+            if partial.strip():
+                tail.append(partial.decode("utf-8", errors="replace")[:1200])
+            code = proc.wait(timeout=5)
+            if code:
+                raise InstallerError(
+                    f"{args[0]} fehlgeschlagen (Exit {code}).\n"
+                    + "\n".join(tail)[-4500:]
+                )
+            if progress:
+                progress("Vorgang erfolgreich abgeschlossen.")
+            return "\n".join(tail)
+    except OSError as exc:
+        raise InstallerError(f"{args[0]} konnte nicht ausgeführt werden: {exc}") from exc
+    finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.communicate()
+
 def check_network():
     """DNS alone is insufficient: verify actual TLS route to GHCR on TCP 443."""
     try:
@@ -402,13 +468,18 @@ class RegistrySession:
             raise InstallerError("Es ist noch kein gültiges öffentliches Stable-Image veröffentlicht.")
         return raw
 
-    def pull(self, image):
+    def pull(self, image, progress=None):
         if not IMAGE_PATTERN.fullmatch(image):
             raise InstallerError("Das Container-Image hat keinen festen SHA256-Digest.")
-        execute(["podman", "pull", "--authfile", self.authfile, image], timeout=1800,
-                cancel_event=self.cancel_event)
+        stream_execute(
+            ["podman", "pull", "--retry=2", "--retry-delay=3s",
+             "--authfile", self.authfile, image],
+            timeout=1800, cancel_event=self.cancel_event, progress=progress,
+        )
 
-    def install(self, image, disk):
+    def install(self, image, disk, progress=None):
+        if not IMAGE_PATTERN.fullmatch(image):
+            raise InstallerError("Image reference does not have a pinned digest.")
         # Re-validate target right before the destructive operation.
         safe = {v["path"] for v in internal_disks()}
         if disk not in safe:
@@ -422,11 +493,39 @@ class RegistrySession:
         nodes = set(execute(["lsblk", "-nrpo", "NAME", disk], timeout=10).splitlines())
         if nodes.intersection(swap.stdout.splitlines()):
             raise InstallerError("Auf dem Datenträger ist Swap aktiv.")
-        execute(
-            ["podman", "run", "--rm", "--privileged", "--pid=host", "--ipc=host",
-             "--security-opt", "label=disable",
-             "-v", "/var/lib/containers:/var/lib/containers",
-             "-v", "/dev:/dev", "-v", "/run:/run",
-             image, "bootc", "install", "to-disk", "--wipe", "--skip-fetch-check", disk],
-            timeout=3600, cancel_event=self.cancel_event,
-        )
+        # Ensure the pre-pulled image is available locally before erasing.
+        execute(["podman", "image", "exists", image], timeout=15,
+                cancel_event=self.cancel_event)
+        # bootc normally may copy from docker:// even when a local image was
+        # downloaded. Point it explicitly to containers-storage to reuse the
+        # existing local OCI layer store and avoid redundant network fetches.
+        # Keep target-imgref at the signed-by-digest registry reference so
+        # future updates do not use the temporary live session's storage.
+        try:
+            stream_execute(
+                ["podman", "run", "--rm", "--privileged", "--pid=host", "--ipc=host",
+                 "--security-opt", "label=disable",
+                 "-v", "/var/lib/containers:/var/lib/containers",
+                 "-v", "/dev:/dev", "-v", "/run:/run",
+                 image, "bootc", "install", "to-disk", "--wipe",
+                 "--skip-fetch-check",
+                 "--source-imgref", "containers-storage:" + image,
+                 "--target-imgref", image, disk],
+                timeout=3600, cancel_event=self.cancel_event, progress=progress,
+            )
+        except InstallerError as exc:
+            try:
+                diagnosis = execute(
+                    ["df", "-h", "/", "/var/lib/containers", "/sysroot"],
+                    timeout=8,
+                )
+            except InstallerError:
+                diagnosis = "Partition usage not available after failure."
+            raise InstallerError(
+                f"bootc-Installation fehlgeschlagen auf {disk}.\n"
+                + str(exc)
+                + "\nSpeicherbelegung nach Fehler:\n" + diagnosis
+                + "\n'no space left on device' kann unzureichenden Platz im "
+                  "Live-Zwischenspeicher ODER auf der neu angelegten Zielpartition bedeuten. "
+                  "Nicht automatisch wiederholen."
+            ) from exc
