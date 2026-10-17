@@ -18,6 +18,28 @@ from .provider_policy import ProviderPolicy, ENDPOINTS
 # Never store a plaintext password, recovery code, provider key or GHCR token
 # in setup state, IPC, temporary files, shell argv, or the audit log.
 RUNNING = ("haos-gateway.service", "haos-controller.service", "haos-hermes.service")
+PENDING = Path("/var/lib/haos-owner/setup-recovery-pending.json")
+COMPLETE = Path("/var/lib/haos-owner/graphical-setup.json")
+
+
+def recovery_pending():
+    if PENDING.is_symlink():
+        raise PermissionError("untrusted recovery pending marker")
+    if not PENDING.exists():
+        return False
+    info = PENDING.stat()
+    import stat
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        raise PermissionError("owner recovery marker must be private")
+    return True
+
+
+def mark_pending():
+    from .policy import atomic_json
+    if recovery_pending():
+        raise PermissionError("a prior recovery setup must be resolved first")
+    atomic_json(PENDING, {"version": 1, "unconfirmed_recovery": True}, mode=0o600)
+
 
 
 def require_root():
@@ -32,11 +54,11 @@ def account_status():
         # Multiple owners require explicit migration; never guess whose rights to change.
         raise PermissionError("multiple enrolled owners need a separate migration review")
     if not entries:
-        return {"owner": False, "recovery": False, "complete": False}
+        return {"owner": False, "recovery": False, "complete": False, "pending": recovery_pending()}
     owner = enrolled_owner(entries[0]["username"])
     recovery = RecoveryCodes()._load()
     has_codes = bool(recovery["owners"].get(str(owner.pw_uid), {}).get("hashes"))
-    return {"owner": True, "recovery": has_codes, "complete": has_codes}
+    return {"owner": True, "recovery": has_codes, "complete": has_codes and not recovery_pending(), "pending": recovery_pending()}
 
 
 def create_initial_owner(username: str, password: str, repeated: str) -> tuple[str, list[str]]:
@@ -55,7 +77,7 @@ def create_initial_owner(username: str, password: str, repeated: str) -> tuple[s
                    check=True, timeout=45, capture_output=True)
     from .owner import stopped, audit
     stopped()
-    created = enroll(username, password, initial_only=True)
+    mark_pending()  # Durable before password creation/recovery issuance. A crash can be resumed.\n    created = enroll(username, password, initial_only=True)
     identity = enrolled_owner(created["username"])
     codes = RecoveryCodes().issue(identity.pw_uid)
     audit("setup.initial-owner", {"uid": identity.pw_uid, "recovery_count": len(codes)})
@@ -65,6 +87,8 @@ def create_initial_owner(username: str, password: str, repeated: str) -> tuple[s
 def rotate_unconfirmed_codes(username: str) -> list[str]:
     """Used only on the physical trusted root display after an interrupted setup."""
     require_root()
+    if not recovery_pending():
+        raise PermissionError("recovery rotation requires pending local setup")
     entry = enrolled_owner(username)
     codes = RecoveryCodes().issue(entry.pw_uid)
     from .owner import audit
@@ -179,3 +203,38 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     persist(policy, credentials)
     audit("setup.gateway-pair", {"binding": binding_id, "connector": connector})
     return {"paired": True, "binding": binding_id}
+
+
+def acknowledge_recovery(username: str):
+    """Only the trusted root window after *displaying* all recovery codes."""
+    require_root()
+    if not recovery_pending():
+        raise PermissionError("no pending recovery code display to confirm")
+    entry = enrolled_owner(username)
+    record = RecoveryCodes()._load()["owners"].get(str(entry.pw_uid), {})
+    if len(record.get("hashes", [])) != 10:
+        raise PermissionError("ten active codes required at first setup")
+    PENDING.unlink()
+    from .owner import audit
+    audit("setup.recovery-confirmed", {"uid": entry.pw_uid})
+    return {"acknowledged": True}
+
+
+def finalize():
+    """Never complete if account/recovery safety gates have not passed."""
+    require_root()
+    state = account_status()
+    if not state["complete"]:
+        raise PermissionError("initial owner recovery must be acknowledged before first-use")
+    from .owner_ready import main as readiness_check
+    from .owner import audit
+    from .policy import atomic_json
+    readiness_check()
+    # Root-only evidence marker, never a plaintext secret or model-created flag.
+    if COMPLETE.is_symlink():
+        raise PermissionError("untrusted setup completion marker")
+    atomic_json(COMPLETE, {"version": 1, "completed": True}, mode=0o600)
+    subprocess.run(["/usr/bin/systemctl", "restart", "haos-owner-ready.service"],
+                   check=True, timeout=35, capture_output=True)
+    audit("setup.graphical-complete", {"owner_confirmed": True})
+    return {"completed": True, "reboot_required": True}
