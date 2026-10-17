@@ -24,6 +24,7 @@ PY
 chmod 0644 /usr/lib/haos/passwd /usr/lib/haos/group
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-owner" /usr/bin/haos-owner
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-setup-desktop" /usr/bin/haos-setup-desktop
+install -Dm0755 "$HAOS_SOURCE/../bin/haos-setup-gate" /usr/bin/haos-setup-gate
 install -Dm0755 "$HAOS_SOURCE/setup-display.sh" /usr/lib/haos/setup-display.sh
 install -Dm0755 "$HAOS_SOURCE/setup-gui-session.sh" /usr/lib/haos/setup-gui-session.sh
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-recovery" /usr/bin/haos-recovery
@@ -33,6 +34,9 @@ cat >/etc/systemd/system/greetd.service.d/haos-observer.conf <<'UNIT'
 [Unit]
 Requires=herald-os-firstboot.service haos-observer-security.service haos-dashboard-policy.service
 After=herald-os-firstboot.service haos-observer-security.service haos-dashboard-policy.service
+[Service]
+ExecCondition=/usr/bin/haos-setup-gate desktop
 UNIT
+systemctl enable haos-setup-desktop.service
 systemctl enable haos-update.timer
 systemctl enable haos-controller.service haos-hermes.service haos-policy.service haos-network.service haos-observer-security.service haos-dashboard-policy.service haos-gateway.service haos-recovery.service haos-provider.socket haos-applications.socket

@@ -9,6 +9,9 @@ on:
       - 'linux/haos/tests/test_initial_setup*.py'
       - 'linux/haos/setup-display.sh'
       - 'linux/haos/haos-setup-desktop.service'
+      - 'linux/haos/haos/setup_gate.py'
+      - 'linux/haos/tests/test_setup_gate.py'
+      - 'linux/bin/haos-setup-gate'
       - 'linux/haos/install.sh'
       - 'linux/bin/haos-setup-desktop'
       - '.github/workflows/haos-initial-setup.yml'
@@ -26,13 +29,13 @@ jobs:
       - name: Verify immutable launcher shell and Python syntax
         run: |
           bash -n linux/haos/setup-display.sh linux/haos/setup-gui-session.sh linux/haos/install.sh
-          python -m compileall -q linux/haos/haos/initial_setup.py linux/haos/haos/initial_setup_gui.py
+          python -m compileall -q linux/haos/haos/initial_setup.py linux/haos/haos/initial_setup_gui.py linux/haos/haos/setup_gate.py
       - name: Verify owner and physical session boundaries
         env:
           PYTHONPATH: linux/haos
         run: |
           python -m pip install pytest
-          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py
+          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py linux/haos/tests/test_setup_gate.py
       - name: Render native setup under virtual X display (nonprivileged fixture)
         run: |
           sudo apt-get update -qq
@@ -62,9 +65,11 @@ jobs:
           wizard.root.destroy()
           print("All six native HAOS setup pages and live operation state rendered under Xvfb")
           PY
-      - name: Assert native setup stays disabled pending QEMU acceptance
+      - name: Assert firstboot and migration gate wiring
         run: |
-          ! grep -E 'systemctl enable .*haos-setup-desktop' linux/haos/install.sh
+          grep -F 'systemctl enable haos-setup-desktop.service' linux/haos/install.sh
+          grep -F 'ExecCondition=/usr/bin/haos-setup-gate prompt' linux/haos/haos-setup-desktop.service
+          grep -F 'ExecCondition=/usr/bin/haos-setup-gate desktop' linux/haos/install.sh
           grep -F 'HAOS_TRUSTED_SETUP=1' linux/haos/setup-display.sh
           grep -F -- '-nolisten tcp' linux/haos/setup-display.sh
           grep -F 'XAUTHORITY=' linux/haos/setup-display.sh
