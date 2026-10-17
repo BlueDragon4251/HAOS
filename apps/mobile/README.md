@@ -45,3 +45,13 @@ Fernsteuerung. Für den Fernzugriff über Mobilfunk muss außerdem ein
 wirklich erreichbarer eigener TLS-Host existieren, was Drei/CGNAT
 nicht automatisch bereitstellt. Der Betreiber kann die Freigabe jederzeit
 serverseitig widerrufen.
+
+## Missionsereignisse
+
+Die Hermes-Ansicht ruft über die authentifizierte, lesende
+`GET /api/events/<mission-uuid>?after=<cursor>`-Schnittstelle ausschließlich
+freigegebene echte Missionsereignisse ab. Der Client begrenzt die sichtbare
+Liste auf 24 Einträge und setzt sie beim Missions- oder Gerätewechsel zurück.
+Er sendet keine Schreiboperationen, erfundenen KI-Ergebnisse oder
+unbestätigten Statuswerte. Das Backend kann Ereignisfelder abhängig von
+der erteilten `content`-Freigabe weiter einschränken.

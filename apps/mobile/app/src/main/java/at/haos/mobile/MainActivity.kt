@@ -65,6 +65,11 @@ private fun MobileApp() {
     var waking by remember { mutableStateOf(false) }
     var wakeFeedback by remember { mutableStateOf("") }
     var selectedMission by remember { mutableStateOf("") }
+    var selectedHermesMission by remember { mutableStateOf("") }
+    var hermesMenuOpen by remember { mutableStateOf(false) }
+    var missionEvents by remember { mutableStateOf<List<MissionEvent>>(emptyList()) }
+    var eventStatus by remember { mutableStateOf("Keine Ereignisse geladen") }
+
     var missionMenuOpen by remember { mutableStateOf(false) }
     var remoteCaptures by remember { mutableStateOf<List<RemoteCapture>>(emptyList()) }
     var remoteStatus by remember { mutableStateOf("Kein freigegebenes Anwendungsfenster.") }
@@ -118,6 +123,34 @@ private fun MobileApp() {
             remoteCaptures = emptyList()
         }
     }
+    LaunchedEffect(missions) {
+        if (missions.none { it.id == selectedHermesMission }) {
+            selectedHermesMission = missions.firstOrNull()?.id ?: ""
+            missionEvents = emptyList()
+        }
+    }
+    LaunchedEffect(session, tab, selectedHermesMission) {
+        missionEvents = emptyList()
+        if (session == null || tab != Tab.Hermes || selectedHermesMission.isBlank()) return@LaunchedEffect
+        var cursor = 0L
+        while (true) {
+            runCatching { session!!.missionEvents(selectedHermesMission, cursor) }
+                .onSuccess { incoming ->
+                    if (incoming.isNotEmpty()) {
+                        cursor = maxOf(cursor, incoming.maxOf { it.sequence })
+                        missionEvents = (missionEvents + incoming).distinctBy { it.sequence }
+                            .sortedBy { it.sequence }.takeLast(24)
+                    }
+                    eventStatus = "Echte Missionsereignisse · Nur Lesezugriff"
+                }
+                .onFailure {
+                    missionEvents = emptyList()
+                    eventStatus = "Ereignisse nicht verfügbar oder Freigabe widerrufen."
+                }
+            delay(4000)
+        }
+    }
+
     MaterialTheme(colorScheme = darkColorScheme(primary = cyan, onPrimary = navy,
         background = navy, onBackground = text, surface = surface, onSurface = text)) {
         Scaffold(containerColor = navy, bottomBar = {
@@ -177,9 +210,50 @@ private fun MobileApp() {
                         MissionList(missions)
                     }
                     Tab.Hermes -> {
-                        Heading("Hermes", "Missionen unterwegs verfolgen")
+                        Heading("Hermes", "Echte Missionsereignisse unterwegs verfolgen")
                         MissionList(missions)
-                        Info("Aufträge", "Neue Aufgaben über die App sind noch gesperrt. Dafür muss HAOS zuerst eine eigene gerätegebundene Schreibberechtigung bereitstellen.")
+                        Panel {
+                            Text("Missionsverlauf", color = cyan,
+                                fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Box {
+                                OutlinedButton(
+                                    onClick = { hermesMenuOpen = true },
+                                    enabled = session != null && missions.isNotEmpty(),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(missions.firstOrNull { it.id == selectedHermesMission }?.let {
+                                        "${it.state} · ${it.id.take(16)}…"
+                                    } ?: "Keine Mission")
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Rounded.ArrowDropDown, null)
+                                }
+                                DropdownMenu(expanded = hermesMenuOpen,
+                                    onDismissRequest = { hermesMenuOpen = false }) {
+                                    missions.forEach { mission ->
+                                        DropdownMenuItem(
+                                            text = { Text("${mission.state} · ${mission.id.take(16)}…") },
+                                            onClick = {
+                                                selectedHermesMission = mission.id
+                                                hermesMenuOpen = false
+                                            })
+                                    }
+                                }
+                            }
+                            Text(eventStatus, color = muted, fontSize = 12.sp)
+                            if (missionEvents.isEmpty()) {
+                                Text("Noch keine freigegebenen Ereignisse.", color = muted,
+                                    fontSize = 12.sp)
+                            } else {
+                                missionEvents.takeLast(12).forEach { event ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                                        Text("#${event.sequence}", color = muted,
+                                            fontSize = 11.sp, modifier = Modifier.width(70.dp))
+                                        Text(event.kind, color = text, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                        Info("Aufträge", "Der mobile Client besitzt absichtlich keine Schreibberechtigung. Neue Aufgaben, Pause/Fortsetzung und Genehmigungen benötigen getrennte, vom Eigentümer freigegebene Rechte.")
                     }
                     Tab.Desktop -> {
                         Heading("Remote-Ansicht", "Explizit freigegebene Anwendungsausschnitte")
