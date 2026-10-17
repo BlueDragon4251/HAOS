@@ -77,7 +77,8 @@ def create_initial_owner(username: str, password: str, repeated: str) -> tuple[s
                    check=True, timeout=45, capture_output=True)
     from .owner import stopped, audit
     stopped()
-    mark_pending()  # Durable before password creation/recovery issuance. A crash can be resumed.\n    created = enroll(username, password, initial_only=True)
+    mark_pending()  # Durable before password creation/recovery issuance. A crash can be resumed.
+    created = enroll(username, password, initial_only=True)
     identity = enrolled_owner(created["username"])
     codes = RecoveryCodes().issue(identity.pw_uid)
     audit("setup.initial-owner", {"uid": identity.pw_uid, "recovery_count": len(codes)})
