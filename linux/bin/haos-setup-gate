@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+"""Immutable privileged firstboot gate; no caller-supplied modules."""
+import sys
+sys.path.insert(0, "/usr/lib/haos")
+from haos.setup_gate import main
+main()
