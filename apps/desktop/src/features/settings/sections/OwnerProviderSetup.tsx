@@ -1,55 +1,38 @@
-import { useState } from 'react'
-import { GlassButton } from '../../../components/ui/glass.tsx'
+import { IconCpu, IconLock, IconShieldCheck } from '@tabler/icons-react'
 
-type Kind = 'openai-codex' | 'openai' | 'openrouter' | 'local'
-const OPTIONS: { id: Kind; label: string }[] = [
-  { id: 'openai-codex', label: 'OpenAI Codex (account login)' },
-  { id: 'openai', label: 'OpenAI API key' },
-  { id: 'openrouter', label: 'OpenRouter API key' },
-  { id: 'local', label: 'Local OpenAI-compatible server' }
-]
-
-/** Builds instructions only. The HAOS observer cannot write owner credentials. */
+/** The unprivileged observer must never generate shell scripts to acquire
+ * owner secrets. Those operations move to a separate native root-only graphical
+ * setup seat; keep its stage clear while that seat is not boot-qualified.
+ */
 export function OwnerProviderSetup() {
-  const [kind, setKind] = useState<Kind>('openai-codex')
-  const [model, setModel] = useState('')
-  const [endpoint, setEndpoint] = useState('http://127.0.0.1:11434/v1')
-  const validModel = /^[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}$/.test(model)
-  const validEndpoint = /^http:\/\/127\.0\.0\.1:(?:[0-9]{4,5})\/v1$/.test(endpoint)
-  const ready = validModel && (kind !== 'local' || validEndpoint)
-  const args = kind === 'local' ? ` --endpoint ${endpoint}` : ''
-  const instructions = [
-    'su - YOUR_OWNER',
-    'sudo haos-owner stop',
-    ...(kind === 'openai-codex' ? ['sudo haos-owner provider login-codex'] : []),
-    ...(ready ? [`sudo haos-owner provider configure ${kind} --model ${model}${args}`] : []),
-    'sudo haos-owner start'
-  ].join('\n')
-
   return (
-    <div className="space-y-3 rounded-xl border border-line p-3 text-[12px]">
-      <div className="font-semibold text-fg">Hermes model provider (owner-controlled)</div>
-      <label className="flex flex-col gap-1 text-fg-2">
-        Provider
-        <select className="glass-input rounded-lg p-2 text-fg" value={kind} onChange={event => setKind(event.target.value as Kind)}>
-          {OPTIONS.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-fg-2">
-        Model ID (must be supported by your provider)
-        <input className="glass-input rounded-lg p-2 text-fg" value={model} onChange={event => setModel(event.target.value)} placeholder="e.g. gpt-5.4" />
-      </label>
-      {kind === 'local' && <label className="flex flex-col gap-1 text-fg-2">
-        Local API endpoint
-        <input className="glass-input rounded-lg p-2 text-fg" value={endpoint} onChange={event => setEndpoint(event.target.value)} />
-      </label>}
-      <p className="text-fg-3">The configuration is applied only after owner authentication. A GitHub update token is not a Hermes model/API token.</p>
-      {ready ? (
-        <>
-          <pre className="selectable whitespace-pre-wrap rounded-lg bg-black/20 p-2 text-[11px]">{instructions}</pre>
-          <GlassButton size="sm" variant="ghost" onClick={() => void navigator.clipboard.writeText(instructions)}>Copy owner commands</GlassButton>
-        </>
-      ) : <p className="text-fg-3">Enter a valid model ID to generate the owner commands.</p>}
+    <div className="space-y-3 rounded-xl border border-line bg-white/3 p-4 text-[12px]">
+      <div className="flex items-center gap-2 font-semibold text-fg">
+        <IconCpu size={17} className="text-accent" />
+        Hermes · Provider und Modelle
+      </div>
+      <div className="text-fg-2 leading-relaxed">
+        HAOS unterstützt bereits einen geschützten einzelnen Modellprovider.
+        Die Auswahl mehrerer Provider und die automatische Modellauswahl
+        werden mit dem separaten Administrator-Setup integriert. Das bisherige
+        Kopieren von Root-Befehlen ist kein Bestandteil des neuen grafischen Setups.
+      </div>
+      <div className="flex items-start gap-2 rounded-lg border border-line px-3 py-3">
+        <IconLock size={17} className="mt-0.5 shrink-0 text-fg-2" />
+        <div className="space-y-1">
+          <div className="font-semibold text-fg">Administratorfreigabe erforderlich</div>
+          <p className="text-fg-3">
+            Zugangsdaten werden ausschließlich in der eigenen geschützten
+            lokalen Administrator-Oberfläche eingegeben. Solange deren echter
+            Erststart noch nicht getestet wurde, kann dieser normale Desktop
+            keine geheimen Provider-Schlüssel ändern.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-fg-3">
+        <IconShieldCheck size={15} />
+        Kein API-Schlüssel im Desktop, Browser oder Hermes-Protokoll
+      </div>
     </div>
   )
 }
