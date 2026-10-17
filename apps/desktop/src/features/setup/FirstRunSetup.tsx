@@ -20,6 +20,8 @@ type Step = 'welcome' | 'region' | 'account' | 'wifi' | 'provider' | 'hermes' | 
 export function FirstRunSetup() {
   const [due, setDue] = useState(false)
   const [haosManaged, setHaosManaged] = useState(false)
+  const [ownerReady, setOwnerReady] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('welcome')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const auth = useStore($hermesAuth)
@@ -27,7 +29,7 @@ export function FirstRunSetup() {
   useEffect(() => {
     void window.heraldOS.setup
       ?.state()
-      .then(state => { setDue(state.needed); setHaosManaged(Boolean(state.haosManaged)) })
+      .then(state => { setDue(state.needed); setHaosManaged(Boolean(state.haosManaged)); setOwnerReady(Boolean(state.ownerReady)) })
       .catch(() => undefined)
   }, [])
 
@@ -41,7 +43,8 @@ export function FirstRunSetup() {
   }
 
   const finish = async () => {
-    await window.heraldOS.setup.finish({ later: forSomeoneElse })
+    const result = await window.heraldOS.setup.finish({ later: forSomeoneElse })
+    if (!result.ok) { setFinishError(result.error ?? 'Einrichtung noch nicht vollständig.'); return }
     setDue(false)
   }
 
@@ -50,7 +53,7 @@ export function FirstRunSetup() {
 
   return (
     <div className="absolute inset-0 z-(--z-boot) flex items-center justify-center bg-bg/85 backdrop-blur-md animate-fade-in" role="dialog" aria-label="Set up HAOS">
-      <div className="float flex w-[min(560px,92vw)] flex-col gap-5 rounded-2xl p-7">
+      <div className="float flex max-h-[95vh] w-[min(680px,94vw)] flex-col gap-5 overflow-y-auto rounded-2xl p-7">
         <div className="flex items-center gap-3">
           <HeraldLogo height={22} />
           <span className="flex-1" />
@@ -103,7 +106,9 @@ export function FirstRunSetup() {
               title={forSomeoneElse ? 'Ready to hand over' : 'HAOS is ready'}
               text={forSomeoneElse ? 'The next person can finish personal setup later. HAOS owner authority remains separate from the desktop.' : haosManaged ? 'Open Hermes or Missions to view durable work. An authenticated owner configures model providers using haos-owner.' : 'Press Super+Space to ask Hermes about anything on screen, or Super+M for the menu.'}
             />
-            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using HAOS'} />
+            {haosManaged && !ownerReady && <p role="alert" className="rounded-xl border border-line p-3 text-[12px] text-fg-2">Sicherheits-Setup ausstehend: Der Administrator und die zehn Wiederherstellungscodes müssen durch die geschützte lokale Einrichtung bestätigt werden. Der normale Hermes-Desktop bekommt dafür keine Root-Rechte.</p>}
+            {finishError && <p role="alert" className="text-[12px] text-danger">{finishError}</p>}
+            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using HAOS'} disabled={haosManaged && !ownerReady} />
           </div>
         )}
       </div>

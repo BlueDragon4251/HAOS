@@ -404,6 +404,8 @@ export interface CatalogGroupView {
 export interface SetupState {
   /** HAOS uses a locked observer desktop and separate tty2 owner authentication. */
   haosManaged?: boolean
+  /** Root-owned readiness service has validated owner and offline recovery. Status only. */
+  ownerReady?: boolean
   /** The Herald OS image has not been set up by its owner yet. */
   needed: boolean
   user: string

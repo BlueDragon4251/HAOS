@@ -29,3 +29,17 @@ describe('HAOS observer account onboarding', () => {
     expect(answer.error).toMatch(/trusted tty2 console/i)
   })
 })
+
+
+describe('managed HAOS completion cannot bypass root owner recovery readiness', () => {
+  it('refuses to persist the done marker while service is not ready', async () => {
+    vi.spyOn(fs, 'existsSync').mockImplementation(file => String(file) === '/etc/haos/enabled')
+    const write = vi.spyOn(fs, 'writeFileSync')
+    registerSetupIpc()
+    const callback = vi.mocked(ipcMain.handle).mock.calls.find(call => call[0] === IPC.setupFinish)?.[1]
+    expect(callback).toBeDefined()
+    const result = await callback!(null as never, {})
+    expect(result).toMatchObject({ ok: false })
+    expect(write).not.toHaveBeenCalled()
+  })
+})

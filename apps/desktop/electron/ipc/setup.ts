@@ -71,6 +71,20 @@ export function saveRegion(value: unknown): SetupResult {
   }
 }
 
+/** In a managed image the one-shot root service must have validated a separate
+ * administrator plus recovery before the observer may dismiss first-run.
+ * This is status-only: no renderer IPC ever receives root/owner privileges.
+ */
+function ownerReady(): boolean {
+  try {
+    execFileSync('/usr/bin/systemctl', ['is-active', '--quiet', 'haos-owner-ready.service'],
+      { timeout: 3000, stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function setupState(): SetupState {
   const image = fs.existsSync(FIRSTBOOT_DONE) || process.env.HERALD_OS_FORCE_SETUP === '1'
   let name = ''
@@ -81,7 +95,10 @@ export function setupState(): SetupState {
     // Not named yet.
   }
 
-  return { needed: process.platform === 'linux' && image && !fs.existsSync(doneFile()), haosManaged: fs.existsSync(HAOS_ENABLED), user: os.userInfo().username, name }
+  const managed = fs.existsSync(HAOS_ENABLED)
+  const ready = managed ? ownerReady() : true
+  return { needed: process.platform === 'linux' && image && (!fs.existsSync(doneFile()) || !ready),
+    haosManaged: managed, ownerReady: ready, user: os.userInfo().username, name }
 }
 
 /** What `passwd` asks (LANG=C), most specific first: "Retype new password:" also ends in "new password:". */
@@ -178,6 +195,9 @@ export function registerSetupIpc(): void {
   })
   // `later`: set up for someone else; setup shows again for them at the next start.
   ipcMain.handle(IPC.setupFinish, (_event, options: { later?: boolean } = {}) => {
+    if (fs.existsSync(HAOS_ENABLED) && !ownerReady()) {
+      return { ok: false, error: 'Administrator und Wiederherstellungscodes sind noch nicht geprüft. HAOS bleibt im Einrichtungsmodus.' } satisfies SetupResult
+    }
     if (!options.later) {
       fs.mkdirSync(configDir(), { recursive: true })
       fs.writeFileSync(doneFile(), `${new Date().toISOString()}\n`)
