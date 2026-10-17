@@ -8,6 +8,9 @@ from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 def main():
     if os.geteuid() != 0:
         raise PermissionError("owner readiness is checked only by the privileged service boundary")
+    from .initial_setup import recovery_pending
+    if recovery_pending():
+        raise PermissionError("graphical recovery codes have not yet been confirmed offline")
     records = owners()
     if not records:
         raise PermissionError("complete initial owner onboarding at the recovery console before enabling Hermes")
