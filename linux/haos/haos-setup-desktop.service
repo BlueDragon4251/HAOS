@@ -1,8 +1,8 @@
 [Unit]
-Description=HAOS graphical administrator setup (isolated local VT8; experimental)
+Description=HAOS graphical administrator setup (isolated local VT1; experimental)
 After=systemd-user-sessions.service herald-os-firstboot.service
 Requires=herald-os-firstboot.service
-Conflicts=getty@tty8.service
+Conflicts=getty@tty1.service
 Before=greetd.service
 ConditionPathExists=/etc/haos/enabled
 
@@ -14,7 +14,7 @@ Restart=no
 StandardInput=tty-force
 StandardOutput=journal
 StandardError=journal
-TTYPath=/dev/tty8
+TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 UMask=0077
