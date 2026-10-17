@@ -19,7 +19,9 @@ def decision(state: dict, in_progress: bool) -> str:
     if (set(state) != {"owner", "recovery", "complete", "pending"}
             or any(type(v) is not bool for v in state.values())):
         raise ValueError("unsafe onboarding state")
-    if in_progress or not state["complete"]:
+    # All independent enrollment indicators must agree. A corrupted or
+    # partially committed state must never open the normal desktop.
+    if in_progress or state["pending"] or not (state["owner"] and state["recovery"] and state["complete"]):
         return "setup"
     return "desktop"
 

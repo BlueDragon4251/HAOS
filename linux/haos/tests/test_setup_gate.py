@@ -12,6 +12,11 @@ def state(owner=False, recovery=False, complete=False, pending=False):
     (state(pending=True), True, "setup"),
     (state(owner=True, recovery=True, complete=True), True, "setup"),
     (state(owner=True, recovery=True, complete=True), False, "desktop"),
+    # A forged completion bit or unacknowledged recovery is never sufficient.
+    (state(complete=True), False, "setup"),
+    (state(owner=True, complete=True), False, "setup"),
+    (state(recovery=True, complete=True), False, "setup"),
+    (state(owner=True, recovery=True, complete=True, pending=True), False, "setup"),
     (state(owner=True, recovery=False), False, "setup"),
     (state(owner=True, recovery=True, complete=False, pending=True), False, "setup"),
 ])
