@@ -4,6 +4,7 @@ on:
     branches: [agent/haos-foundation]
     paths:
       - 'linux/haos/haos/initial_setup.py'
+      - 'linux/haos/haos/owner_ready.py'
       - 'linux/haos/haos/initial_setup_gui.py'
       - 'linux/haos/tests/test_initial_setup*.py'
       - 'linux/haos/setup-display.sh'

@@ -85,3 +85,11 @@ def test_recovery_pending_prevents_success_without_loading_raw_codes(monkeypatch
     assert initial_setup.account_status()["complete"] is False
     with pytest.raises(PermissionError):
         initial_setup.finalize()
+
+
+def test_root_service_cannot_start_while_new_recovery_codes_unconfirmed(monkeypatch):
+    from haos import owner_ready
+    monkeypatch.setattr(owner_ready.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(initial_setup, "recovery_pending", lambda: True)
+    with pytest.raises(PermissionError, match="not yet been confirmed"):
+        owner_ready.main()
