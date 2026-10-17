@@ -130,3 +130,52 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
                    check=True, timeout=30, capture_output=True)
     audit("setup.provider", {"provider": provider, "models": [model]})
     return {"configured": True, "provider": provider, "model_turn_tested": False}
+
+
+def configure_gateway(connector: str, platform: str, token: str):
+    """Graphical root-seat setup for HAOS's TWO authorized message adapters.
+
+    Upstream Hermes lists more platform plugins, but HAOS's ingress authorization
+    currently supports only these two. Never auto-authorize upstream modules.
+    """
+    require_root()
+    if platform not in {"telegram", "discord"}:
+        raise ValueError("HAOS has not approved this platform for gateway execution")
+    if (not isinstance(token, str) or not 16 <= len(token) <= 4096
+            or any(c.isspace() or ord(c) < 32 for c in token)):
+        raise ValueError("invalid protected gateway credential")
+    from .gateway_setup import load, persist, stopped_gateway
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy, credentials = load()
+    stopped_gateway()
+    if any(c["id"] != connector and c["platform"] == platform for c in policy["connectors"]):
+        raise ValueError("one isolated adapter per platform is currently supported")
+    policy["connectors"] = [c for c in policy["connectors"] if c["id"] != connector] + [
+        {"id": connector, "platform": platform}]
+    GatewayPolicy(policy)
+    credentials["connectors"][connector] = {"token": token}
+    persist(policy, credentials)
+    audit("setup.gateway", {"connector": connector, "platform": platform})
+    return {"configured": True, "platform": platform, "restart_required": True}
+
+
+def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
+                        identity: str, capabilities: tuple[str, ...] = ("create", "read")):
+    """Grant one exact sender+chat on an already provisioned platform."""
+    require_root()
+    if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
+        raise ValueError("unsupported gateway permissions")
+    from .gateway_setup import load, persist, stopped_gateway
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy, credentials = load()
+    stopped_gateway()
+    item = {"id": binding_id, "connector": connector, "sender": sender, "chat": chat,
+            "scope": "", "thread": "", "identity": identity,
+            "capabilities": list(capabilities)}
+    policy["bindings"] = [b for b in policy["bindings"] if b["id"] != binding_id] + [item]
+    GatewayPolicy(policy)
+    persist(policy, credentials)
+    audit("setup.gateway-pair", {"binding": binding_id, "connector": connector})
+    return {"paired": True, "binding": binding_id}
