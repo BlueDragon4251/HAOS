@@ -14,7 +14,8 @@ COOKIE="$(/usr/bin/mcookie)"
 /usr/bin/xauth -f "$AUTH" add :8 MIT-MAGIC-COOKIE-1 "$COOKIE"
 unset COOKIE
 export XAUTHORITY="$AUTH" HOME=/root HAOS_TRUSTED_SETUP=1
-# Xorg only on vt8, never the observer's Wayland display.
+# Xorg uses physical VT1 only while the setup gate blocks the normal observer.
+# DISPLAY :8 is an isolated X server number; it is independent of the VT index.
 # On completion xinit stops the private server; service stays disabled until
 # this setup mode is QEMU and hardware tested.
-exec /usr/bin/xinit /usr/lib/haos/setup-gui-session.sh -- /usr/bin/Xorg :8 vt8 -auth "$AUTH" -nolisten tcp -noreset
+exec /usr/bin/xinit /usr/lib/haos/setup-gui-session.sh -- /usr/bin/Xorg :8 vt1 -auth "$AUTH" -nolisten tcp -noreset
