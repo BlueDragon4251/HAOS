@@ -48,8 +48,18 @@ jobs:
               wizard.show(page)
               wizard.root.update_idletasks()
               assert wizard.content.winfo_children(), page
+          import time
+          wizard._run_async(lambda: time.sleep(0.05), success="Async operation complete")
+          assert wizard.running
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running, "Setup must not freeze during slow operations"
+          assert "Async operation complete" in wizard.status.cget("text")
           wizard.root.destroy()
-          print("All six native HAOS setup pages rendered under Xvfb")
+          print("All six native HAOS setup pages and live operation state rendered under Xvfb")
           PY
       - name: Assert native setup stays disabled pending QEMU acceptance
         run: |
