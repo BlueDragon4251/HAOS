@@ -178,6 +178,18 @@ class Wizard:
             if status is None:
                 return
             if not status["owner"]:
+                if status.get("pending", False) or initial_setup.setup_in_progress():
+                    self._label(self.content,
+                        "Ein früherer Einrichtungsversuch wurde unterbrochen, bevor ein Administratorkonto entstand.",
+                        size=11, color="#ffafba").pack(anchor="w", pady=5)
+                    def clear_interrupted():
+                        result = self._run(initial_setup.retry_failed_new_enrollment,
+                                           success="Unterbrochenen Versuch sicher zurückgesetzt.")
+                        if result is not None:
+                            self.show("security")
+                    self._button(self.content, "Unterbrochenen Versuch sicher zurücksetzen",
+                                 clear_interrupted).pack(anchor="w", pady=8)
+                    return
                 username = self._field(self.content, "Administrator-Benutzername (klein geschrieben)")
                 password = self._field(self.content, "Passwort · mindestens 20 Zeichen", secret=True)
                 repeated = self._field(self.content, "Passwort wiederholen", secret=True)
@@ -238,6 +250,18 @@ class Wizard:
                     color=self.MUTED).pack(anchor="w")
                 if status["owner"] and not status["recovery"]:
                     self._label(self.content, "Für diesen Administrator fehlen Recovery-Codes.", color="#ffafba").pack(anchor="w")
+                    def migrate_recovery():
+                        from .owner_recovery import owners
+                        username = owners()[0]["username"]
+                        codes = self._run(lambda: initial_setup.issue_missing_recovery(username),
+                                          success="Zehn sichere Recovery-Codes erzeugt.")
+                        if codes is not None:
+                            self.owner_username = username
+                            self.codes = codes
+                            self.codes_confirmed = False
+                            self.show("security")
+                    self._button(self.content, "Bestehendes Konto behalten und Recovery-Codes erstellen",
+                                 migrate_recovery, primary=True).pack(anchor="w", pady=18)
         elif name == "region":
             self._head("Sprache & Tastatur",
                        "System- und Konsolensprache werden mit localectl gesetzt. Änderungen gelten nach neuer Anmeldung.")
