@@ -17,6 +17,7 @@ import { notify } from '../../../store/notifications.ts'
 import { readTier, withTier } from './policy.ts'
 import { errorText, InlineNote, markSaved, MenuDropdown, RadioCard, SectionTitle, SettingsBlock, SettingsGroup, SettingsRow, Stepper, useDismiss } from './shared.tsx'
 import { ToolSearchRow } from './ToolSearchRow.tsx'
+import { OwnerProviderSetup } from './OwnerProviderSetup.tsx'
 
 /*
  * Hermes & agents: the default Settings section. Every control here binds to real Hermes state:
@@ -46,7 +47,8 @@ export function AgentsSection() {
           <GlassCard className="flex flex-col gap-3 px-4 py-4">
             <div className="text-sm font-semibold text-fg">HAOS managed Hermes</div>
             <div className="text-xs text-fg-2">The desktop can view work, but cannot directly change runtime approvals, models, credentials or other owner-controlled settings. This is intentional, not a missing WebSocket connection.</div>
-            <div className="text-xs text-fg-3">Create and inspect work under Missions. Use the trusted owner terminal to run haos-owner provider status, configure a model and restart execution services.</div>
+            <div className="text-xs text-fg-3">Model provider configuration is separate from MCP Connections. Choose your provider and supported model below, then apply the generated commands from an authenticated owner terminal.</div>
+            <OwnerProviderSetup />
             <GlassButton size="sm" onClick={() => showPage('missions')}>Open Missions</GlassButton>
           </GlassCard>
         </SettingsBlock>

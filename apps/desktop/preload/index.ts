@@ -31,6 +31,7 @@ import {
   type EnvInfo,
   type FilePreview,
   type HeraldOSPrefs,
+  type HaosUpdateStatus,
   type ImageInfo,
   type InstalledApp,
   IPC,
@@ -102,6 +103,7 @@ const api = {
   },
   system: {
     info: (): Promise<SystemInfo> => ipcRenderer.invoke(IPC.systemInfo),
+    haosUpdate: (): Promise<HaosUpdateStatus | null> => ipcRenderer.invoke(IPC.systemHaosUpdate),
     stats: (): Promise<SystemStats> => ipcRenderer.invoke(IPC.systemStats),
     processes: (sort: 'cpu' | 'memory', limit: number): Promise<ProcessInfo[]> => ipcRenderer.invoke(IPC.systemProcesses, sort, limit),
     network: (): Promise<NetworkStatus> => ipcRenderer.invoke(IPC.systemNetwork),

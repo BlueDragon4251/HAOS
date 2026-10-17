@@ -710,6 +710,17 @@ export interface EnvInfo {
   shellMode: ShellMode
 }
 
+/** Read-only status published by the root-owned HAOS update timer. No credentials. */
+export interface HaosUpdateStatus {
+  version: 1
+  channel: 'dev' | 'stable' | 'unconfigured'
+  auto_stage: boolean
+  state: 'not-checked' | 'unconfigured' | 'configured' | 'checking' | 'checked' | 'up-to-date' | 'update-available' | 'staged' | 'offline-or-error'
+  reboot_required: boolean
+  checked_at: string | null
+  message: string | null
+}
+
 /** Channel names, table-driven so preload and main cannot drift. */
 export const IPC = {
   missionServiceInfo: 'haos:missions:service-info',
@@ -721,6 +732,7 @@ export const IPC = {
   backendLogTail: 'herald-os:backend:log-tail',
 
   systemInfo: 'herald-os:system:info',
+  systemHaosUpdate: 'haos:system:update-status',
   systemStats: 'herald-os:system:stats',
   systemStatsPush: 'herald-os:system:stats-push',
   systemStatsSubscribe: 'herald-os:system:stats-subscribe',

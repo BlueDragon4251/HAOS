@@ -68,7 +68,7 @@ def publish(state, *, channel, auto_stage, error=None, reboot_required=False, pa
     if channel not in {*CHANNELS, "unconfigured"}:
         raise ValueError("unsupported channel")
     if state not in {"unconfigured", "configured", "checking", "up-to-date", "update-available",
-                     "staged", "offline-or-error"}:
+                     "staged", "offline-or-error", "checked"}:
         raise ValueError("unsupported update state")
     data = {"version": 1, "channel": channel, "auto_stage": bool(auto_stage),
             "state": state, "reboot_required": bool(reboot_required),
@@ -163,11 +163,11 @@ def watch(*, stage=False):
     try:
         stdout = command("/usr/bin/bootc", "upgrade", "--check", timeout=300)
         # Do not translate an unknown CLI message into a claim of new updates.
-        available = bool(re.search(r"update available|upgrade available", stdout, re.I))
+        available = bool(re.search(r"(?m)^(?:.{0,40})?(?<!no )(?<!no new )(?:update|upgrade) available\\b", stdout, re.I)) and not bool(re.search(r"\\bno (?:new )?(?:update|upgrade) available\\b", stdout, re.I))
         if available and stage and cfg["auto_stage"]:
             command("/usr/bin/bootc", "upgrade", timeout=1800)
             return publish("staged", **cfg, reboot_required=True)
-        return publish("update-available" if available else "up-to-date", **cfg)
+        return publish("update-available" if available else "checked", **cfg)
     except (RuntimeError, OSError, subprocess.TimeoutExpired):
         return publish("offline-or-error", **cfg, error="bootc check failed")
 

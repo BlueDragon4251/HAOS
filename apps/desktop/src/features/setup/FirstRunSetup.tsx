@@ -7,8 +7,9 @@ import { Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { $hermesAuth, refreshHermesAuth, requestHermesLogin } from '../../store/hermes-auth.ts'
 import { StatusPanel } from '../status/StatusPanel.tsx'
+import { OwnerProviderSetup } from '../settings/sections/OwnerProviderSetup.tsx'
 
-type Step = 'welcome' | 'account' | 'wifi' | 'hermes' | 'done'
+type Step = 'welcome' | 'account' | 'wifi' | 'provider' | 'hermes' | 'done'
 
 /**
  * First-boot setup on the Herald OS image: who the computer is for, their name and password,
@@ -43,7 +44,7 @@ export function FirstRunSetup() {
     setDue(false)
   }
 
-  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : haosManaged ? ['welcome', 'account', 'wifi', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
+  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : haosManaged ? ['welcome', 'account', 'wifi', 'provider', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
   const next = () => setStep(steps[Math.min(steps.length - 1, steps.indexOf(step) + 1)] ?? 'done')
 
   return (
@@ -78,6 +79,13 @@ export function FirstRunSetup() {
               <GlassButton variant="ghost" onClick={next}>Skip Wi-Fi for now</GlassButton>
               <Footer onNext={next} label="Next" />
             </div>
+          </div>
+        )}
+        {step === 'provider' && (
+          <div className="flex flex-col gap-4">
+            <Heading icon={<IconUser size={18} />} title="Choose Hermes's model" text="Your model provider requires separate owner authorization; this desktop does not store API keys." />
+            <OwnerProviderSetup />
+            <Footer onNext={next} label="Continue without activating a provider" />
           </div>
         )}
         {step === 'hermes' && <HermesStep onDone={next} />}
