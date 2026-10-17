@@ -11,5 +11,5 @@ set -euo pipefail
 }
 # Switch the physical console to the isolated graphical administrator seat
 # after X is ready. Never expose a root Wayland/Electron session.
-(/usr/bin/chvt 8 || echo "HAOS setup: VT8 activation requires physical console selection" >&2)
+(/usr/bin/chvt 1 || echo "HAOS setup: VT1 activation requires physical console selection" >&2)
 exec /usr/bin/haos-setup-desktop
