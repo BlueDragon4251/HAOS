@@ -72,3 +72,17 @@ Ende-zu-Ende-WAN-Fernsteuerungs-/Fernstartmechanismus.
 - Zertifikatsschlüssel bleiben auf dem eigenen PC; ohne dessen Zugriff
   oder ein sicher übertragenes Paket kann das Handy sich nicht anmelden.
 - Das Serverzertifikat ist standardmäßig 90 Tage gültig.
+
+## Vorhandenen Grant gezielt erneuern
+
+Die lokale Identität der App bleibt gleich; der Eigentümer darf eine
+bestehende Freigabe **ohne weitere Berechtigungen** für maximal 24 Stunden
+verlängern. Das erstellt keine neuen Schlüssel und wirkt nicht über das
+Ablaufdatum des X.509-Zertifikats hinaus:
+
+```sh
+sudo /usr/bin/haos-owner remote renew mein-handy --hours 12
+```
+
+Der Vorgang wird im root-eigenen Audit protokolliert. Die konkrete
+Missionsliste und Screenshot-Freigabe bleiben unverändert.

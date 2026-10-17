@@ -61,6 +61,10 @@ def main():
     pair_remote.add_argument('--hours',type=int,default=1)
     pair_remote.add_argument('--share-content',action='store_true')
     pair_remote.add_argument('--share-screenshots',action='store_true')
+    renew_remote=remote_sub.add_parser('renew',
+        help='owner-only reauthorization of an existing fingerprint; grant at most 24h')
+    renew_remote.add_argument('id')
+    renew_remote.add_argument('--hours',type=int,default=12)
     remote_sub.add_parser('revoke').add_argument('id')
     bootstrap_remote=remote_sub.add_parser('bootstrap',
         help='one-time local CA/server/device certificate generation on authenticated owner console')

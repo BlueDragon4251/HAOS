@@ -186,6 +186,19 @@ def owner_remote_locked(args):
         audit('remote.paired',{'device':args.id,'missions':args.mission,'expires_at':device['expires_at'],
             'content':args.share_content,'screenshots':args.share_screenshots})
         return {'paired':args.id,'expires_at':device['expires_at'],'rights':'observation only'}
+    if action=='renew':
+        if type(args.hours) is not int or not 1<=args.hours<=24:
+            raise ValueError('device renewal is bounded to 1-24 hours')
+        matches=[d for d in value['devices'] if d['id']==args.id]
+        if len(matches)!=1:raise KeyError('unknown paired device')
+        # Renewal does not alter the pinned certificate, mission grants,
+        # content/screenshot rights or network listener configuration.
+        updated=dict(matches[0],expires_at=time.time()+args.hours*3600)
+        value['devices']=[updated if d['id']==args.id else d for d in value['devices']]
+        persist(value)
+        audit('remote.renewed',{'device':args.id,'expires_at':updated['expires_at']})
+        return {'renewed':args.id,'expires_at':updated['expires_at'],
+                'rights':'same limited observation capabilities'}
     if action=='revoke':
         if not any(d['id']==args.id for d in value['devices']):raise KeyError('unknown paired device')
         value['devices']=[d for d in value['devices'] if d['id']!=args.id];persist(value)

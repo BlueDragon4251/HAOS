@@ -60,3 +60,46 @@ def test_private_scratch_and_passphrase_are_mandatory(tmp_path):
         generate(tmp_path / "bad", "127.0.0.1", "phone", "test-long-local-password")
     with pytest.raises(ValueError):
         generate(tmp_path, "127.0.0.1", "phone", "short")
+
+def test_owner_renew_does_not_change_identity_mission_or_permissions():
+    import time
+    from types import SimpleNamespace
+    from unittest import mock
+    from haos.remote_policy import RemotePolicy
+    from haos.remote_setup import owner_remote_locked
+    mid = "de305d54-75b4-431b-adb2-eb6b9e546014"
+    initial = {
+        "version": 1, "bind": "127.0.0.1", "port": 8443,
+        "requests_per_minute": 60, "bytes_per_minute": 65536,
+        "devices": [{
+            "id": "my-phone", "certificate_sha256": "a"*64,
+            "expires_at": time.time()-10, "missions": [mid],
+            "content": False, "screenshots": False
+        }]
+    }
+    original = dict(initial["devices"][0])
+    with mock.patch("haos.remote_setup.load", return_value=RemotePolicy(initial)), \
+         mock.patch("haos.remote_setup.persist") as persist, \
+         mock.patch("haos.owner.audit") as audit:
+        result = owner_remote_locked(SimpleNamespace(remote_action="renew",
+                                                     id="my-phone", hours=12))
+    assert result["renewed"] == "my-phone"
+    new = persist.call_args.args[0]["devices"][0]
+    assert {k:v for k,v in new.items() if k!="expires_at"} == {
+        k:v for k,v in original.items() if k!="expires_at"
+    }
+    assert new["expires_at"] > time.time()+11*3600
+    assert audit.call_args.args[0] == "remote.renewed"
+
+
+@pytest.mark.parametrize("hours", [0, 25, -1, True])
+def test_owner_renew_rejects_out_of_range_time_without_writing(hours):
+    from types import SimpleNamespace
+    from unittest import mock
+    from haos.remote_setup import owner_remote_locked
+    with mock.patch("haos.remote_setup.persist") as persist, \
+         mock.patch("haos.owner.audit"):
+        with pytest.raises(ValueError):
+            owner_remote_locked(SimpleNamespace(remote_action="renew",
+                                                id="my-phone", hours=hours))
+        persist.assert_not_called()

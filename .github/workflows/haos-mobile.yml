@@ -2,7 +2,12 @@ name: HAOS Native Android Mobile
 on:
   push:
     branches: [agent/haos-foundation]
-    paths: ['apps/mobile/**', '.github/workflows/haos-mobile.yml']
+    paths:
+      - 'apps/mobile/**'
+      - 'linux/haos/haos/remote_*.py'
+      - '.github/workflows/haos-mobile.yml'
+      - '.github/workflows/haos-dual-iso.yml'
+      - '.github/workflows/haos-netinstall.yml'
   workflow_dispatch:
 permissions:
   contents: read

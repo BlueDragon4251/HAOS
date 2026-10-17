@@ -13,6 +13,8 @@ on:
       - 'linux/image/packages.txt'
       - 'linux/image/packages.sh'
       - 'linux/haos/**'
+      - '.github/workflows/haos-dual-iso.yml'
+      - '.github/workflows/haos-mobile.yml'
       - 'apps/desktop/src/**'
       - 'upstream/*.lock'
       - 'package*.json'

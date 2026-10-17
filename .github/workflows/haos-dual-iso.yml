@@ -5,6 +5,12 @@ on:
     paths:
       - '.github/workflows/haos-dual-iso.yml'
       - 'scripts/netinstall/**'
+      # Source-aligned candidate ISO when mobile and installed remote
+      # components evolve together; always retain the UEFI GUI acceptance.
+      - 'apps/mobile/**'
+      - 'linux/haos/haos/remote_*.py'
+      - 'linux/haos/haos/owner.py'
+      - 'linux/haos/tests/test_remote_bootstrap.py'
   workflow_dispatch:
 permissions:
   contents: read
