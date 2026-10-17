@@ -29,6 +29,10 @@ kernel-modules
 e2fsprogs
 NetworkManager
 NetworkManager-wifi
+# The regional setup supports these locales offline, even on minimal bootc builds.
+glibc-langpack-de
+glibc-langpack-en
+glibc-langpack-fr
 # Intel AX211 Wi-Fi 6E, Intel Bluetooth and Intel Sound Open Firmware.
 # Must ship inside the immutable bootc image; dnf in a transient /usr overlay is lost on reboot.
 iwlwifi-mvm-firmware

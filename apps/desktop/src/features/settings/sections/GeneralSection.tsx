@@ -11,6 +11,7 @@ import { openEmojiPicker } from '../../../store/emoji.ts'
 import { notify } from '../../../store/notifications.ts'
 import { $spaces } from '../../../store/spaces.ts'
 import { $switches, setSwitch, SWITCH_LABELS } from '../../../store/switches.ts'
+import { RegionSettings } from '../../setup/RegionPicker.tsx'
 import { errorText, markSaved, MenuDropdown, SectionTitle, SettingsGroup, SettingsRow, Stepper } from './shared.tsx'
 
 export function GeneralSection() {
@@ -81,6 +82,7 @@ export function GeneralSection() {
         </SettingsRow>
       </SettingsGroup>
 
+      {hostPlatform() === 'linux' && <RegionSettings />}
       <SwitchesGroup />
       {hostPlatform() === 'linux' && <IdleGroup />}
       <TypingGroup />

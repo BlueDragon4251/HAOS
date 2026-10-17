@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconArrowRight, IconCheck, IconGift, IconLock, IconUser, IconWifi } from '@tabler/icons-react'
+import { IconArrowRight, IconCheck, IconGift, IconKeyboard, IconLock, IconUser, IconWifi } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { HeraldLogo } from '../../components/herald-logo.tsx'
 import { GlassButton } from '../../components/ui/glass.tsx'
@@ -8,8 +8,9 @@ import { cn } from '../../lib/cn.ts'
 import { $hermesAuth, refreshHermesAuth, requestHermesLogin } from '../../store/hermes-auth.ts'
 import { StatusPanel } from '../status/StatusPanel.tsx'
 import { OwnerProviderSetup } from '../settings/sections/OwnerProviderSetup.tsx'
+import { RegionPicker } from './RegionPicker.tsx'
 
-type Step = 'welcome' | 'account' | 'wifi' | 'provider' | 'hermes' | 'done'
+type Step = 'welcome' | 'region' | 'account' | 'wifi' | 'provider' | 'hermes' | 'done'
 
 /**
  * First-boot setup on the Herald OS image: who the computer is for, their name and password,
@@ -44,7 +45,7 @@ export function FirstRunSetup() {
     setDue(false)
   }
 
-  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : haosManaged ? ['welcome', 'account', 'wifi', 'provider', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
+  const steps: Step[] = forSomeoneElse ? ['welcome', 'region', 'wifi', 'done'] : haosManaged ? ['welcome', 'region', 'account', 'wifi', 'provider', 'done'] : ['welcome', 'region', 'account', 'wifi', 'hermes', 'done']
   const next = () => setStep(steps[Math.min(steps.length - 1, steps.indexOf(step) + 1)] ?? 'done')
 
   return (
@@ -64,9 +65,15 @@ export function FirstRunSetup() {
           <Welcome
             onChoose={someoneElse => {
               setForSomeoneElse(someoneElse)
-              setStep(someoneElse ? 'wifi' : 'account')
+              setStep('region')
             }}
           />
+        )}
+        {step === 'region' && (
+          <div className="flex flex-col gap-4">
+            <Heading icon={<IconKeyboard size={18} />} title="Sprache und Tastatur / Language & keyboard" text="Wähle die Sprache deiner Sitzung und dein Tastaturlayout. Du kannst beides später unter Einstellungen ändern." />
+            <RegionPicker onSaved={next} />
+          </div>
         )}
         {step === 'account' && <Account onDone={next} haosManaged={haosManaged} />}
         {step === 'wifi' && (

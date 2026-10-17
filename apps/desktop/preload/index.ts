@@ -66,6 +66,7 @@ import {
   type WmAction,
   type WmState
 } from '../shared/ipc.ts'
+import type { HaosRegion } from '../shared/region.ts'
 import type { BrandingPatch, BrandingView } from '../shared/branding.ts'
 import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/models.ts'
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
@@ -277,6 +278,8 @@ const api = {
   setup: {
     /** First-boot setup on the Herald OS image: due or not, the account, the name so far. */
     state: (): Promise<SetupState> => ipcRenderer.invoke(IPC.setupState),
+    region: (): Promise<HaosRegion> => ipcRenderer.invoke(IPC.setupRegionGet),
+    setRegion: (region: HaosRegion): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupRegionSet, region),
     name: (name: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupName, name),
     password: (password: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupPassword, password),
     /** `later`: setting it up for someone else, who finishes setup at the next start. */

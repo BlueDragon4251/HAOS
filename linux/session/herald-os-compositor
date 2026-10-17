@@ -27,6 +27,20 @@ for legacy in "${!HERMES_OS_@}"; do
   [[ -n "${!current:-}" ]] || export "$current=${!legacy}"
 done
 
+# The session chooses its own allowlisted locale. This does not give the
+# unprivileged observer authority over root, greetd or the owner console.
+REGION_LOCALE="$HOME/.config/herald-os/locale"
+if [[ -f "$REGION_LOCALE" && ! -L "$REGION_LOCALE" ]]; then
+  IFS= read -r requested_locale <"$REGION_LOCALE" || true
+  case "${requested_locale:-}" in
+    de_AT.UTF-8 | de_DE.UTF-8 | en_US.UTF-8 | en_GB.UTF-8 | fr_FR.UTF-8)
+      export LANG="$requested_locale"
+      export LANGUAGE="${requested_locale%%_*}"
+      unset LC_ALL
+      ;;
+  esac
+fi
+
 COMPOSITOR="${HERALD_OS_COMPOSITOR:-niri}"
 
 # The compositor's own output is the only record of DRM/GPU/seat problems; keep the last run.

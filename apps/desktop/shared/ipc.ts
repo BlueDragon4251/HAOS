@@ -834,6 +834,8 @@ export const IPC = {
 
   /** First-boot setup on the Herald OS image: whether it is due, the name, the password, done. */
   setupState: 'herald-os:setup:state',
+  setupRegionGet: 'herald-os:setup:region-get',
+  setupRegionSet: 'herald-os:setup:region-set',
   setupName: 'herald-os:setup:name',
   setupPassword: 'herald-os:setup:password',
   setupFinish: 'herald-os:setup:finish',

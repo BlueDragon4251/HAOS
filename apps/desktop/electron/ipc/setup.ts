@@ -2,6 +2,9 @@ import { ipcMain } from 'electron'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { type HaosRegion, DEFAULT_HAOS_REGION, validHaosRegion } from '../../shared/region.ts'
 import { IPC, type SetupResult, type SetupState } from '../../shared/ipc.ts'
 import { log } from '../log.ts'
 import { loadPty } from './terminal.ts'
@@ -18,6 +21,55 @@ const FIRSTBOOT_DONE = '/var/lib/herald-os/firstboot-done'
 const configDir = () => path.join(os.homedir(), '.config', 'herald-os')
 const doneFile = () => path.join(configDir(), 'setup-done')
 export const nameFile = (): string => path.join(configDir(), 'name')
+
+const REGION_FILE = () => path.join(configDir(), 'region.json')
+const LOCALE_FILE = () => path.join(configDir(), 'locale')
+
+// Unlike application preferences, the keyboard compositor renderer depends on
+// this exact protected shape. There are no caller-selected paths or commands.
+export function readRegion(): HaosRegion {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(REGION_FILE(), 'utf8'))
+    return validHaosRegion(parsed) ? parsed : DEFAULT_HAOS_REGION
+  } catch {
+    return DEFAULT_HAOS_REGION
+  }
+}
+
+function writeRegionFile(file: string, data: string): void {
+  const dir = path.dirname(file)
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+  if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink()) throw new Error('Refusing a symbolic-link region setting')
+  const temporary = path.join(dir, `.haos-region-${randomBytes(8).toString('hex')}`)
+  try {
+    fs.writeFileSync(temporary, data, { mode: 0o600, flag: 'wx' })
+    fs.renameSync(temporary, file)
+  } finally {
+    try { fs.unlinkSync(temporary) } catch { /* already renamed */ }
+  }
+}
+
+export function saveRegion(value: unknown): SetupResult {
+  if (process.platform !== 'linux') return { ok: false, error: 'Regional configuration is supported only on Linux.' }
+  if (!validHaosRegion(value)) return { ok: false, error: 'Unsupported language or keyboard layout.' }
+  const region = value
+  try {
+    writeRegionFile(REGION_FILE(), JSON.stringify(region) + '\n')
+    // The session launcher reads this allowlisted locale, so applications and
+    // desktop services use it on the next session. Never modify root/owner files.
+    writeRegionFile(LOCALE_FILE(), region.language + '\n')
+    // User systemd services use the same locale on their next activation.
+    writeRegionFile(path.join(os.homedir(), '.config', 'environment.d', '90-haos-locale.conf'),
+                    `LANG=${region.language}\nLANGUAGE=${region.language.split('_')[0]}\n`)
+    // The real niri renderer consumes region.json; it atomically reloads when
+    // this config changes, applying the keyboard immediately without root.
+    execFileSync('herald-os', ['keymap', 'apply'], { timeout: 8000, stdio: 'pipe' })
+    return { ok: true }
+  } catch (error) {
+    log('setup', `regional configuration could not be applied: ${error instanceof Error ? error.message : String(error)}`)
+    return { ok: false, error: 'Cannot activate keyboard layout. Please try again or use the terminal.' }
+  }
+}
 
 export function setupState(): SetupState {
   const image = fs.existsSync(FIRSTBOOT_DONE) || process.env.HERALD_OS_FORCE_SETUP === '1'
@@ -103,6 +155,8 @@ export function changePassword(password: string, current = ''): Promise<SetupRes
 
 export function registerSetupIpc(): void {
   ipcMain.handle(IPC.setupState, () => setupState())
+  ipcMain.handle(IPC.setupRegionGet, () => readRegion())
+  ipcMain.handle(IPC.setupRegionSet, (_event, region: unknown) => saveRegion(region))
   ipcMain.handle(IPC.setupName, (_event, name: string) => {
     const clean = String(name ?? '').replace(/[\r\n:]/g, ' ').trim().slice(0, 64)
     fs.mkdirSync(configDir(), { recursive: true })
