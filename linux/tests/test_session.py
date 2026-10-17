@@ -121,3 +121,19 @@ def test_the_migration_leaves_a_personal_config_alone(tmp_path):
     subprocess.run(["bash", str(MIGRATION)], env=env, check=True, timeout=60)
     assert (niri / "config.kdl").read_text() == PERSONAL
     assert (niri / "herald-os.kdl").read_text() == TEMPLATE
+
+
+
+def test_haos_surfaces_match_floating_niri_title_rules():
+    """Rebranding must not turn the menubar and dock into central niri tiles."""
+    titles = (ROOT / "apps/desktop/electron/shell/mode.ts").read_text()
+    for surface, title in (
+        ("menubar", "Menu Bar"), ("dock", "Dock"), ("command", "Command"),
+        ("panel", "Panel"), ("screensaver", "Screensaver"), ("wallpaper", "Wallpaper")
+    ):
+        assert f"{surface}: 'HAOS · {title}'" in titles
+        assert f'title="^(HAOS|Herald OS) · {title}$"' in TEMPLATE
+    assert 'title="^(HAOS|Herald OS)$"' in TEMPLATE
+    assert 'app-id=r#"^(herald-os|Herald OS|haos|HAOS)$"#' in TEMPLATE
+    assert 'default-floating-position x=0 y=0 relative-to="top"' in TEMPLATE
+    assert 'default-floating-position x=0 y=0 relative-to="bottom"' in TEMPLATE

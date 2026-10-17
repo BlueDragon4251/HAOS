@@ -10,6 +10,8 @@ import {
 } from '@herald-os/client'
 import { atom } from 'nanostores'
 import { $backend } from './backend.ts'
+import { observerRpcAllowed } from './haos-observer-rpc.ts'
+import { resolveMissionMode } from './mission-mode.ts'
 
 export const $connection = atom<ConnectionState>('idle')
 export const $gatewayReady = atom<GatewayReadyPayload | null>(null)
@@ -103,7 +105,15 @@ export function gatewayRequest<M extends keyof RpcMethods>(
   params: RpcMethods[M]['params'],
   timeoutMs?: number
 ): Promise<RpcMethods[M]['result']> {
-  return client.request<RpcMethods[M]['result']>(method, params as Record<string, unknown>, timeoutMs)
+  // The installed HAOS observer has only read-only Hermes WebSocket authority.
+  // Do not send old Herald RPCs that the hardened backend would reject by closing
+  // the whole connection (4403). Durable work uses the controller's mission IPC.
+  return resolveMissionMode().then(managed => {
+    if (!observerRpcAllowed(managed, String(method))) {
+      throw new Error('HAOS manages this action through Missions or the authenticated owner console; the legacy Hermes RPC is unavailable.')
+    }
+    return client.request<RpcMethods[M]['result']>(method, params as Record<string, unknown>, timeoutMs)
+  })
 }
 
 export function onGatewayEvent<K extends GatewayEventName>(type: K, handler: (event: GatewayEvent<K>) => void): () => void {

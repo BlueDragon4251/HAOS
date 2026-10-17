@@ -1,0 +1,4 @@
+# HAOS foundation copied with complete upstream Git history.
+# Update this pin only after inspecting and testing a deliberate upstream merge.
+repo=iamlukethedev/Herald-OS
+sha=3c891adcd1f5c3b6eeadf4d20472d10d9516a999

@@ -1,9 +1,9 @@
 {
   "name": "@herald-os/desktop",
-  "productName": "Herald OS",
+  "productName": "HAOS",
   "version": "0.1.0-alpha.2",
   "private": true,
-  "description": "The Herald OS shell: menu bar, dock, windows and apps for an agent-native operating system.",
+  "description": "HAOS - Hermes Autonomous OS visual shell",
   "author": "Luke The Dev",
   "license": "MIT",
   "type": "module",
@@ -19,8 +19,13 @@
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
-    "dist:mac": "npm run build && electron-builder --mac --arm64 -c.npmRebuild=false --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --publish never"
+    "test:theme-preview": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-theme-preview.mjs",
+    "test:theme-activation": "electron --ozone-platform=wayland --disable-gpu scripts/test-theme-activation.mjs",
+    "test:gui-broker": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-broker.mjs",
+    "test:gui-integration": "electron --ozone-platform=headless --ozone-override-screen-size=1024,768 --disable-gpu scripts/test-gui-integration.mjs",
+    "test:gui-wayland": "python3 ../../scripts/test-gui-wayland.py",
+    "dist:mac": "npm run build && node --import ../../packages/electron-download/register.mjs ../../node_modules/electron-builder/cli.js --mac --arm64 -c.npmRebuild=false --publish never",
+    "dist:linux": "npm run build && node --import ../../packages/electron-download/register.mjs ../../node_modules/electron-builder/cli.js --linux --publish never"
   },
   "dependencies": {
     "@herald-os/client": "*",
@@ -60,9 +65,9 @@
   },
   "build": {
     "appId": "dev.iamluke.heraldos",
-    "productName": "Herald OS",
+    "productName": "HAOS",
     "executableName": "Herald OS",
-    "artifactName": "HeraldOS-${version}-${os}-${arch}.${ext}",
+    "artifactName": "HAOS-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },

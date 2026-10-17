@@ -1,0 +1,184 @@
+name: HAOS Dual-Channel Live ISO (release candidate tests)
+on:
+  push:
+    branches: ['agent/haos-foundation']
+    paths:
+      - '.github/workflows/haos-dual-iso.yml'
+      - 'scripts/netinstall/**'
+      # Source-aligned candidate ISO when mobile and installed remote
+      # components evolve together; always retain the UEFI GUI acceptance.
+      - 'apps/mobile/**'
+      - 'linux/haos/haos/remote_*.py'
+      - 'linux/haos/haos/owner.py'
+      - 'linux/haos/tests/test_remote_bootstrap.py'
+      # Rebuild the developer installation vehicle when the installed OS
+      # firstboot gate changes. Live-ISO GUI smoke alone is not owner GUI proof.
+      - 'linux/image/firstboot.sh'
+      - 'linux/haos/haos-setup-desktop.service'
+      - 'linux/haos/haos/setup_gate.py'
+      - '.github/workflows/haos-mobile.yml'
+      - '.github/workflows/haos-image.yml'
+      - '.github/workflows/haos-netinstall.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: haos-dual-iso-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live-iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts
+        run: |
+          set -euo pipefail
+          bash -n scripts/netinstall/private-install.sh scripts/netinstall/haos-install.sh
+          python3 -m py_compile scripts/netinstall/build-live-ks.py scripts/netinstall/haos-gui.py scripts/netinstall/haos-disk-safety.py scripts/netinstall/haos-dev-wizard.py scripts/netinstall/haos_install_core.py
+          bash -n scripts/netinstall/haos-start-gui.sh scripts/netinstall/haos-xsession.sh scripts/netinstall/haos-console.sh scripts/netinstall/haos-storage-diagnostics.sh
+          python3 -m py_compile scripts/netinstall/check-boot-screen.py scripts/netinstall/verify_uefi.py scripts/netinstall/check-gui-keyboard.py
+          python3 -m unittest discover -s scripts/netinstall -p 'test_uefi_report.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_iventoy_grub.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_gui_layout.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_disk_safety.py' -v
+          python3 -m unittest discover -s scripts/netinstall -p 'test_graphical_installer.py' -v
+      - name: Prepare host for filesystem image
+        run: |
+          set -euo pipefail
+          sudo modprobe loop
+          sudo losetup --find
+          sudo mkdir -p /dev/mapper
+          df -h /
+      - name: Compose independent Fedora 44 live ISO
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          sudo podman run --rm --privileged --security-opt label=disable \
+            -v "$PWD:/work:rw" -w /work registry.fedoraproject.org/fedora:44 \
+            bash -euo pipefail -c '
+              dnf install -y livecd-tools python3-kickstart xorriso qemu-img
+              python3 scripts/netinstall/build-live-ks.py output/haos-live.ks
+              python3 -c "from pykickstart.parser import KickstartParser; from pykickstart.version import makeVersion; KickstartParser(makeVersion(\"F44\")).readKickstart(\"output/haos-live.ks\")"
+              python3 scripts/netinstall/fix_livecd_grub.py --verbose --config=output/haos-live.ks \
+                --fslabel=HAOS-DUAL-44 --releasever=44 --cache=/var/cache/haos-live
+              cp HAOS-DUAL-44.iso output/haos-dual-channel-x86_64.iso
+              # HTTP network root requires dracut livenet in the live kernel initrd.
+              xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+                -extract /isolinux/initrd0.img output/haos-live-initrd.img
+              lsinitrd -m output/haos-live-initrd.img > output/dracut-modules.txt
+              grep -Eq "(^|[[:space:]])livenet([[:space:]]|$)" output/dracut-modules.txt || {
+                cat output/dracut-modules.txt
+                echo "ERROR: dracut livenet module missing; HTTP PXE cannot work."
+                exit 1
+              }
+              rm -f output/haos-live-initrd.img
+            '
+          sudo chown -R "$(id -u):$(id -g)" output
+          (cd output && sha256sum haos-dual-channel-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
+          ls -lh output/haos-dual-channel-x86_64.iso
+          printf 'source_commit=%s\nartifact_kind=dual-channel-iso\nproduction_release=false\n' \
+            "$GITHUB_SHA" > output/BUILD-IDENTITY.txt
+      - name: Inspect ISO filesystem
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y xorriso mtools
+          xorriso -indev output/haos-dual-channel-x86_64.iso -find / -name '*vmlinuz*' -exec report_lba --
+          xorriso -indev output/haos-dual-channel-x86_64.iso -report_el_torito plain | tee output/boot-report.txt
+          # Fail closed: require a real UEFI El Torito entry, not merely GPT.
+          python3 scripts/netinstall/verify_uefi.py output/boot-report.txt || {
+            echo "::error::UEFI boot image missing; refusing to publish BIOS-only ISO."
+            exit 1
+          }
+          # Inspect the UEFI GRUB menu embedded in both ISO and EFI FAT boot image.
+          # Testing QEMU alone is insufficient: iVentoy chainloads a different GRUB.
+          xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+            -extract /EFI/BOOT/grub.cfg output/uefi-grub.cfg
+          xorriso -osirrox on -indev output/haos-dual-channel-x86_64.iso \
+            -extract /isolinux/efiboot.img output/efiboot.img
+          mtype -i output/efiboot.img ::/EFI/BOOT/grub.cfg > output/grub-efiboot.cfg
+          python3 scripts/netinstall/verify_live_grub.py \
+            output/uefi-grub.cfg output/grub-efiboot.cfg
+          # PXE boot must not depend on the old virtual block device root.
+          grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/uefi-grub.cfg
+          grep -Fq 'root=live:http://${haos_server}:16000/eiso/id/${haos_image_id}/LiveOS/squashfs.img' output/uefi-grub.cfg
+          grep -Fq "Start HAOS via iVentoy HTTP (network root)" output/grub-efiboot.cfg
+          # Never store the temporary EFI image inside the uploaded artifact.
+          rm -f output/efiboot.img
+          xorriso -indev output/haos-dual-channel-x86_64.iso -ls /EFI/BOOT /images || true
+      - name: UEFI graphical QEMU smoke test
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq qemu-system-x86 ovmf socat python3-pil
+          test -f /usr/share/OVMF/OVMF_CODE_4M.fd
+          test -f /usr/share/OVMF/OVMF_VARS_4M.fd
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd /tmp/haos-uefi-vars.fd
+          qemu-system-x86_64 \
+            -machine q35,accel=tcg -cpu max -m 4096 -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive if=pflash,format=raw,file=/tmp/haos-uefi-vars.fd \
+            -cdrom output/haos-dual-channel-x86_64.iso -boot order=d \
+            -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+            -vga std -display none -serial file:output/uefi-serial.log \
+            -monitor unix:/tmp/haos-qemu.sock,server,nowait -no-reboot &
+          QEMU_PID=$!
+          trap 'kill "$QEMU_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 10); do
+            sleep 30
+            kill -0 "$QEMU_PID" || { echo "::error::QEMU terminated during boot"; exit 1; }
+            printf 'screendump output/uefi-boot.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock || true
+            if python3 scripts/netinstall/check-boot-screen.py output/uefi-boot.ppm; then
+              echo "UEFI graphical HAOS welcome verified after ${i}x30s"
+              cp output/uefi-boot.ppm output/uefi-welcome.ppm
+              # Prove that X11 actually accepts a key and opens the network UI.
+              printf 'sendkey 2\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 8
+              printf 'screendump output/uefi-after-key.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              python3 scripts/netinstall/check-gui-keyboard.py \
+                output/uefi-welcome.ppm output/uefi-after-key.ppm
+              # Close network window; verify F12+Enter opens native graphical
+              # developer wizard instead of the previous XTerm console.
+              printf 'sendkey alt-f4\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 2
+              printf 'sendkey f12\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 2
+              printf 'sendkey ret\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              sleep 6
+              printf 'screendump output/uefi-wizard.ppm\n' | socat - UNIX-CONNECT:/tmp/haos-qemu.sock
+              python3 scripts/netinstall/check-gui-keyboard.py \
+                output/uefi-welcome.ppm output/uefi-wizard.ppm
+              exit 0
+            fi
+            echo "Graphical boot not visible yet (poll $i/10)"
+          done
+          echo "::error::QEMU did not display HAOS GUI; see screenshot debug artifact"
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: haos-uefi-boot-debug-${{ github.sha }}
+          path: |
+            output/uefi-boot.ppm
+            output/uefi-welcome.ppm
+            output/uefi-after-key.ppm
+            output/uefi-wizard.ppm
+            output/uefi-serial.log
+            output/boot-report.txt
+            output/uefi-grub.cfg
+            output/grub-efiboot.cfg
+          retention-days: 7
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: haos-dual-channel-iso-${{ github.sha }}
+          path: |
+            output/haos-dual-channel-x86_64.iso
+            output/SHA256SUMS
+            output/haos-live.ks
+            output/boot-report.txt
+            output/dracut-modules.txt
+            output/BUILD-IDENTITY.txt
+          retention-days: 14

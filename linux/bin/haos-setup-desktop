@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+"""Root-only entry to the immutable graphical HAOS setup source."""
+import sys
+sys.path.insert(0, "/usr/lib/haos")
+from haos.initial_setup_gui import main
+main()

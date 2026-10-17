@@ -1,0 +1,19 @@
+{
+  "source_commit": "2aacca886b933672374fc232fd54cbf84857162a",
+  "work_tree_dirty": false,
+  "actual_renderer": true,
+  "actual_theme_engine": true,
+  "independent_watchdog": true,
+  "installed_niri": false,
+  "full_desktop_acceptance": false,
+  "real_model_turn": false,
+  "checks": {
+    "actual_preview_and_renderer_confirmed": true,
+    "actual_fixed_linux_outputs": true,
+    "actual_unusable_renderer_rolls_back": true,
+    "prior_renderer_restored": true,
+    "unreadable_draft_never_activates": true,
+    "missing_or_wrong_shell_denied": true,
+    "renderer_remains_sandboxed": true
+  }
+}

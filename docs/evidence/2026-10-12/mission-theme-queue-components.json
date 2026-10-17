@@ -1,0 +1,105 @@
+{
+  "scope": "actual persistent controller Unix/native queue plus real virtual Wayland theme stages; explicit offline session, no model",
+  "source_base_commit": "7c83b7d6b547f1624bdaace78148e329778e754b",
+  "work_tree_dirty": true,
+  "actual_controller_queue_theme_apply_and_rollback": true,
+  "original_assertions_and_deadlines_preserved": true,
+  "checks": 42,
+  "report": {
+    "evidence": "/tmp/haos-wayland-gate-j0t_dysh/evidence",
+    "source_commit": "7c83b7d6b547f1624bdaace78148e329778e754b",
+    "work_tree_dirty": true,
+    "weston": "weston 13.0.0",
+    "niri": null,
+    "actual_virtual_niri": false,
+    "compositor_shell": "desktop-shell.so",
+    "actual_virtual_wayland": true,
+    "installed_niri": false,
+    "physical_hardware": false,
+    "real_model_turn": false,
+    "session_is_explicit_fixture": true,
+    "protocol": {
+      "browser": {
+        "mission_toplevels": 7,
+        "surface_commits": 34
+      },
+      "integration": {
+        "mission_toplevels": 1,
+        "surface_commits": 19
+      },
+      "theme": {
+        "mission_toplevels": 1,
+        "surface_commits": 7
+      }
+    },
+    "gates": {
+      "browser": {
+        "checks": {
+          "typed_actual_fields": true,
+          "captured_actual_pixels": true,
+          "renderer_sandbox": true,
+          "no_caller_scripts": true,
+          "network_canary_denied": true,
+          "chooser_intercepted": true,
+          "clipboard_shortcut_denied": true,
+          "mission_and_window_denials": true,
+          "closed_window_denied": true,
+          "mission_cleanup": true,
+          "actual_form_inspection": true,
+          "sensitive_fields_masked": true,
+          "visible_text_from_actual_layout": true,
+          "hidden_and_form_text_excluded": true,
+          "actual_scrolling_verified": true,
+          "multiple_windows_isolated": true,
+          "window_and_scroll_budgets_enforced": true
+        },
+        "source_commit": "7c83b7d6b547f1624bdaace78148e329778e754b",
+        "shared_memory_total_bytes": 268435456,
+        "shared_memory_lowest_free_bytes": 206327808
+      },
+      "integration": {
+        "checks": {
+          "actual_input_and_inspection": true,
+          "actual_capture": true,
+          "actual_read_without_body_persistence": true,
+          "private_bodies_absent_from_audit": true,
+          "unauthorized_methods_denied": true,
+          "lost_ack_not_reexecuted": true,
+          "controller_restart_blocks_mission": true,
+          "durable_audit_survives": true,
+          "actual_fragmented_readiness_framed": true,
+          "real_queue_mission_theme_schema_and_revision": true,
+          "real_queue_theme_preview_and_private_pixels": true,
+          "agent_native_lease_and_unsupported_activation_denied": true,
+          "real_queue_guarded_theme_activation_and_shell_verified": true,
+          "real_queue_broken_renderer_update_rolls_back": true
+        },
+        "source_commit": "7c83b7d6b547f1624bdaace78148e329778e754b",
+        "shared_memory_total_bytes": 268435456,
+        "shared_memory_lowest_free_bytes": 220237824
+      },
+      "theme": {
+        "checks": {
+          "actual_preview_and_renderer_confirmed": true,
+          "actual_fixed_linux_outputs": true,
+          "actual_unusable_renderer_rolls_back": true,
+          "prior_renderer_restored": true,
+          "unreadable_draft_never_activates": true,
+          "missing_or_wrong_shell_denied": true,
+          "renderer_remains_sandboxed": true,
+          "actual_mission_data_stage_preview_and_guarded_apply": true,
+          "mission_capability_broken_renderer_rolls_back": true,
+          "expired_component_lease_cannot_activate": true,
+          "other_mission_revision_cannot_activate": true
+        },
+        "source_commit": "7c83b7d6b547f1624bdaace78148e329778e754b",
+        "shared_memory_total_bytes": 268435456,
+        "shared_memory_lowest_free_bytes": 225587200
+      }
+    }
+  },
+  "installed_acceptance": false,
+  "physical_hardware": false,
+  "real_model_turn": false,
+  "historical_local_fixture_failure": "TypeError from imported electron session shadowed by fixture session ID; renamed module import, all original checks retained"
+}

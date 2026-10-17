@@ -23,7 +23,8 @@ else
 fi
 
 echo "==> every commit"
-gitleaks_run git --redact --no-banner .
+# If the gate fails, show rule/file/commit for diagnosis while hiding values.
+gitleaks_run git --redact --verbose --no-banner .
 echo "==> staged changes"
 gitleaks_run git --pre-commit --staged --redact --no-banner .
 echo "==> unstaged changes"

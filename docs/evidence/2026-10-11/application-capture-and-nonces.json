@@ -1,0 +1,71 @@
+{
+  "baseline_commit": "9582df330942a35729ca2f2b61c7884d65e658f3",
+  "failed_gate": "https://github.com/BlueDragon4251/HAOS/actions/runs/38180906902",
+  "cause": "Ubuntu grim 1.4.0 compiled without optional JPEG support; reproduced directly in pinned Ubuntu 24.04 container",
+  "fixed_encoding": "actual grim PNG converted to bounded JPEG through distro Pillow; PNG <=8 MiB, dimensions <=2048 each, JPEG <=1 MiB",
+  "actual_private_sessions": {
+    "fedora": {
+      "schema": 1,
+      "scope": "disposable private application session component",
+      "source_commit": null,
+      "source_sha256": "f9d715eb601588fd0c20236360a326e718aaadb1a4be53faea8f6d8f40322185",
+      "real_application_toplevel": true,
+      "real_application_focus": true,
+      "actual_shell_readiness_verified": true,
+      "real_keyboard_result_verified": true,
+      "real_capture_integrity": true,
+      "real_capture_changed": true,
+      "clipboard_and_global_modifiers_denied": true,
+      "paths_and_shell_controls_denied": true,
+      "unprivileged_app_control_peer_denied": true,
+      "root_broker_peer_pid_verified": true,
+      "application_effective_capabilities_zero": true,
+      "application_no_new_privileges": true,
+      "actual_64m_file_limit_and_bounded_terminal_shm": true,
+      "same_uid_control_process_ptrace_denied": true,
+      "installed_systemd_launch_verified": false,
+      "hermes_model_execution_verified": false
+    },
+    "ubuntu": {
+      "schema": 1,
+      "scope": "disposable private application session component",
+      "source_commit": null,
+      "source_sha256": "f9d715eb601588fd0c20236360a326e718aaadb1a4be53faea8f6d8f40322185",
+      "real_application_toplevel": true,
+      "real_application_focus": true,
+      "actual_shell_readiness_verified": true,
+      "real_keyboard_result_verified": true,
+      "real_capture_integrity": true,
+      "real_capture_changed": true,
+      "clipboard_and_global_modifiers_denied": true,
+      "paths_and_shell_controls_denied": true,
+      "unprivileged_app_control_peer_denied": true,
+      "root_broker_peer_pid_verified": true,
+      "application_effective_capabilities_zero": true,
+      "application_no_new_privileges": true,
+      "actual_64m_file_limit_and_bounded_terminal_shm": true,
+      "same_uid_control_process_ptrace_denied": true,
+      "installed_systemd_launch_verified": false,
+      "hermes_model_execution_verified": false
+    }
+  },
+  "root_nonce_fixture": {
+    "scope": "actual offline independent application nonce persistence",
+    "source_commit": null,
+    "durable_admission_before_dispatch": true,
+    "restart_marks_uncertain_without_replay": true,
+    "changed_payload_replay_denied": true,
+    "completed_nonce_replay_denied": true,
+    "private_root_nonce_permissions": true,
+    "no_arguments_or_pixels_in_nonce_store": true,
+    "aliased_nonce_store_denied": true
+  },
+  "does_not_prove": [
+    "installed application integration",
+    "model execution",
+    "native application presentation"
+  ],
+  "application_session.py_sha256": "f9d715eb601588fd0c20236360a326e718aaadb1a4be53faea8f6d8f40322185",
+  "application_authority.py_sha256": "4fac96a7cc15028ae5c5f8380169a3d843363496eefa29f7093a38bdb5d70581",
+  "application_protocol.py_sha256": "b3d683802af50043c4f881f1f83e629719cf016a7ccc72408a9f6c3e50728e13"
+}

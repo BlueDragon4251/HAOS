@@ -1,0 +1,26 @@
+[Unit]
+Description=HAOS agent local network authority boundary
+After=herald-os-firstboot.service
+Before=haos-hermes.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.network
+RemainAfterExit=yes
+# Keep the guard installed when execution is stopped, including recovery work.
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN
+RestrictAddressFamilies=AF_NETLINK
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

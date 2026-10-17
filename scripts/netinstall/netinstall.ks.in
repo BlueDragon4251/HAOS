@@ -1,0 +1,35 @@
+# HAOS Fedora 44 Netinstall (generated from the selected image digest).
+# The installer cannot install from a normal HTTPS download; the source is an OCI registry image.
+# No clearpart/autopart: the owner chooses the target disk in Anaconda.
+graphical
+lang en_US.UTF-8
+keyboard us
+timezone UTC --utc
+rootpw --lock
+xconfig --startxonboot
+
+# Anaconda runs %pre before expanding the generated %include below.
+# A custom OCI image is selected at GRUB boot by pressing e and adding:
+# haos.image=ghcr.io/owner/image@sha256:<64 lowercase hex digits>
+# Require a digest: accidentally reusing a mutable :latest image is not safe.
+%pre --interpreter=/usr/bin/python3 --erroronfail --log=/tmp/haos-netinstall-pre.log
+from pathlib import Path
+import re
+import shlex
+
+default = "__HAOS_DEFAULT_IMAGE__"
+pattern = re.compile(r"(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\.)+[a-z][a-z0-9-]*(?::[0-9]{1,5})?/[a-z0-9_]+(?:[./_-][a-z0-9_]+)*@sha256:[0-9a-f]{64}\Z")
+options = [arg.partition("=")[2] for arg in shlex.split(Path("/proc/cmdline").read_text())
+           if arg.startswith("haos.image=")]
+if len(options) > 1:
+    raise ValueError("HAOS: only one haos.image argument is allowed")
+source = options[0] if options else default
+if not pattern.fullmatch(source) or any(c in source for c in ("..", "//")):
+    raise ValueError("HAOS: invalid OCI image digest; use registry.example/image@sha256:...")
+Path("/tmp/haos-netinstall-source.ks").write_text(
+    "bootc --source-imgref=registry:" + source + "\n", encoding="utf-8")
+Path("/tmp/haos-netinstall-source-ref").write_text(source + "\n", encoding="utf-8")
+print("HAOS Netinstall source: " + source, flush=True)
+%end
+
+%include /tmp/haos-netinstall-source.ks

@@ -6,6 +6,7 @@ import { useBackendData } from '../../lib/use-async.ts'
 import { sendPrompt } from '../../store/chat.ts'
 import { $connectionsTick, setConnectionEnabled } from '../../store/connections-actions.ts'
 import { $activity } from '../../store/missions.ts'
+import { $managedMissions, resolveMissionMode } from '../../store/mission-mode.ts'
 import { notify } from '../../store/notifications.ts'
 import { showPage } from '../../store/windows.ts'
 import { AddConnection } from './AddConnection.tsx'
@@ -20,6 +21,8 @@ const probeCache = new Map<string, McpProbeResult>()
 
 export function ConnectionsPage() {
   const activity = useStore($activity)
+  const managed = useStore($managedMissions)
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
   // Reload when a command (voice, agent) changed a connection outside this page.
   const connectionsTick = useStore($connectionsTick)
   const { data, error, loading, reload } = useBackendData(loadConnections, [connectionsTick])
@@ -303,6 +306,20 @@ export function ConnectionsPage() {
   const openBrowse = () => {
     setTab('browse')
     setFocusSearch(n => n + 1)
+  }
+
+  if (managed === true) {
+    return (
+      <div className="page-enter flex h-full flex-col">
+        <PageHeader icon="connections" title="Connections" subtitle="External tools and provider integrations." />
+        <div className="m-6 max-w-2xl space-y-3 rounded-2xl border border-line p-6 text-[13px]">
+          <h2 className="text-[16px] font-semibold text-fg">Managed HAOS connections</h2>
+          <p className="text-fg-2">This HAOS installation intentionally blocks the classic Hermes dashboard APIs for MCP, OAuth providers and messaging tools from the locked desktop account. An empty list does not mean everything is connected, and is not proof of an internet outage.</p>
+          <p className="text-fg-3">Model providers are configured separately by the authenticated HAOS owner. Open Settings → Hermes & agents for the provider/model chooser and owner-only instructions. MCP and other integrations need a dedicated authorized HAOS integration broker; they cannot safely be connected through the old unrestricted dashboard routes.</p>
+          <GlassButton size="sm" onClick={() => showPage('settings')}>Open Settings</GlassButton>
+        </div>
+      </div>
+    )
   }
 
   return (

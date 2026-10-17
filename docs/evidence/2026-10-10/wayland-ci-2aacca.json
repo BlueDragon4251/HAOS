@@ -1,0 +1,75 @@
+{
+  "source_commit": "2aacca886b933672374fc232fd54cbf84857162a",
+  "work_tree_dirty": false,
+  "weston": "weston 13.0.0",
+  "compositor_shell": "desktop-shell.so",
+  "actual_virtual_wayland": true,
+  "installed_niri": false,
+  "physical_hardware": false,
+  "real_model_turn": false,
+  "session_is_explicit_fixture": true,
+  "protocol": {
+    "browser": {
+      "mission_toplevels": 7,
+      "surface_commits": 30
+    },
+    "integration": {
+      "mission_toplevels": 1,
+      "surface_commits": 7
+    },
+    "theme": {
+      "mission_toplevels": 1,
+      "surface_commits": 6
+    }
+  },
+  "gates": {
+    "browser": {
+      "checks": {
+        "typed_actual_fields": true,
+        "captured_actual_pixels": true,
+        "renderer_sandbox": true,
+        "no_caller_scripts": true,
+        "network_canary_denied": true,
+        "chooser_intercepted": true,
+        "clipboard_shortcut_denied": true,
+        "mission_and_window_denials": true,
+        "closed_window_denied": true,
+        "mission_cleanup": true,
+        "actual_form_inspection": true,
+        "sensitive_fields_masked": true,
+        "visible_text_from_actual_layout": true,
+        "hidden_and_form_text_excluded": true,
+        "actual_scrolling_verified": true,
+        "multiple_windows_isolated": true,
+        "window_and_scroll_budgets_enforced": true
+      },
+      "source_commit": "2aacca886b933672374fc232fd54cbf84857162a"
+    },
+    "integration": {
+      "checks": {
+        "actual_input_and_inspection": true,
+        "actual_capture": true,
+        "actual_read_without_body_persistence": true,
+        "private_bodies_absent_from_audit": true,
+        "unauthorized_methods_denied": true,
+        "lost_ack_not_reexecuted": true,
+        "controller_restart_blocks_mission": true,
+        "durable_audit_survives": true,
+        "actual_fragmented_readiness_framed": true
+      },
+      "source_commit": "2aacca886b933672374fc232fd54cbf84857162a"
+    },
+    "theme": {
+      "checks": {
+        "actual_preview_and_renderer_confirmed": true,
+        "actual_fixed_linux_outputs": true,
+        "actual_unusable_renderer_rolls_back": true,
+        "prior_renderer_restored": true,
+        "unreadable_draft_never_activates": true,
+        "missing_or_wrong_shell_denied": true,
+        "renderer_remains_sandboxed": true
+      },
+      "source_commit": "2aacca886b933672374fc232fd54cbf84857162a"
+    }
+  }
+}

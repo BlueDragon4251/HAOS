@@ -37,12 +37,12 @@ export function AboutIdentity() {
   const branding = useStore($branding)
 
   return (
-    <SettingsBlock label="Herald OS" description={branding.name ?? undefined} keywords="about logo branding version">
+    <SettingsBlock label="HAOS" description={branding.name ?? undefined} keywords="about logo branding version">
       <GlassCard className="flex items-center gap-4 p-5">
         {branding.logo ? <img src={branding.logo} alt={branding.name ? `${branding.name} logo` : 'Logo'} className="h-12 max-w-[180px] object-contain" /> : <HeraldLogo height={28} />}
         <div className="min-w-0">
           {branding.name && <div className="truncate text-[15px] font-semibold text-fg">{branding.name}</div>}
-          <div className={branding.name ? 'text-[12.5px] text-fg-3' : 'text-[15px] font-semibold text-fg'}>Herald OS {env?.version ?? ''}</div>
+          <div className={branding.name ? 'text-[12.5px] text-fg-3' : 'text-[15px] font-semibold text-fg'}>HAOS {env?.version ?? ''}</div>
         </div>
       </GlassCard>
     </SettingsBlock>

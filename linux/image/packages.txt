@@ -25,8 +25,20 @@ wireplumber
 alsa-utils
 # Cloud images ship kernel-core only; the sound drivers (snd-hda-intel for the VM's audio) live here.
 kernel-modules
+# mkfs.ext4 is required by bootc install to-disk --filesystem ext4.
+e2fsprogs
 NetworkManager
 NetworkManager-wifi
+# The regional setup supports these locales offline, even on minimal bootc builds.
+glibc-langpack-de
+glibc-langpack-en
+glibc-langpack-fr
+# Intel AX211 Wi-Fi 6E, Intel Bluetooth and Intel Sound Open Firmware.
+# Must ship inside the immutable bootc image; dnf in a transient /usr overlay is lost on reboot.
+iwlwifi-mvm-firmware
+iwlwifi-mld-firmware
+iwlbluetooth-firmware
+alsa-sof-firmware
 bluez
 upower
 # Electron runtime libraries and fonts.
@@ -53,7 +65,11 @@ dejavu-sans-fonts
 liberation-fonts
 # What the CLIs and the shell shell out to.
 python3
+python3.11
+python3.11-devel
 python3-pyyaml
+python3-pillow
+openssl
 git
 tar
 xdg-utils
@@ -66,6 +82,10 @@ iproute
 procps-ng
 util-linux
 grim
+labwc
+wlrctl
+wayland-utils
+xorg-x11-server-Xwayland
 socat
 curl
 # Herald Canvas converts HEIF and AVIF stills (libheif; HEVC-compressed HEIC photos also need RPM Fusion's
@@ -99,3 +119,21 @@ foot
 firefox
 nautilus
 gnome-text-editor
+# HAOS independent controller and mandatory rootless filesystem sandbox.
+bubblewrap
+nftables
+python3-websockets
+sudo
+shadow-utils
+libpwquality
+uv
+restic
+
+# Dedicated graphical administrator first-boot seat (not normal Electron/root).
+python3-tkinter
+xorg-x11-server-Xorg
+xorg-x11-xinit
+xorg-x11-xauth
+xorg-x11-drv-libinput
+setxkbmap
+kbd

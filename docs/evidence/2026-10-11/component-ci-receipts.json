@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "tested_commit": "b008c2f454badf5c14e7c2625b84478756626748",
+  "ci_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38119914910",
+  "services_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38119910629",
+  "services_pr_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38119914913",
+  "arch_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38119914945",
+  "counts": {
+    "haos": 366,
+    "native_linux": 795,
+    "native_macos": 795,
+    "linux_bridge_passed": 335,
+    "linux_bridge_skipped": 1,
+    "macos_bridge_passed": 314,
+    "macos_bridge_skipped": 22,
+    "root_authority_backup_policy": 54,
+    "qemu_guest_harness": 75,
+    "root_encrypted_restic_lifecycle": 22
+  },
+  "root_application_probe": {
+    "actual_root_elf_grant_resolve_restart": true,
+    "explicit_revocation_survives_restart": true,
+    "changed_executable_denied": true,
+    "unsafe_executable_owner_mode_links_script_denied": true,
+    "unsafe_policy_mode_links_duplicate_keys_denied": true,
+    "concurrent_mutations_denied": true,
+    "actual_unprivileged_grant_denied": true,
+    "host_application_executed": false
+  },
+  "root_application_probe_ci_required": true,
+  "log_sha256": {
+    "ci": "8a9f907c27b26b31960933cf8aff3a83cbfd5386f427b7b3f9534c4657a3261f",
+    "services": "2e66bf3a96f04f6cdeb907ec76c102894a6ee656b97269da149b9bef974c0a31"
+  },
+  "virtual_niri": {
+    "tested_commit": "bbcfe77e15a0ae93a95bf6b12c799cee30ef5ffa",
+    "checks": 37,
+    "fixture_image": "sha256:75a6f4d498f9e6e7037923fac17166a2ff0f877af0221acd231e63595ab26896",
+    "network": "none",
+    "readonly_source": true,
+    "renderer_sandbox_required": true,
+    "disposable_outer_fixture_seccomp_apparmor_unconfined": true,
+    "receipt_sha256": "2c90dded733156e69e70d6bf05673681e98dee2e222803a3e0a6e8afbd6763ee",
+    "private_raw_log_sha256": "6d79c754788a3ff540e4274ad857f7b7bdf69caff23f66ea6bad5328f12b3cb1"
+  },
+  "production_acceptance": false,
+  "installed_theme_crash_rollback_passed": false,
+  "host_application_launch_implemented": false,
+  "limitations": [
+    "Virtual niri component tests do not prove installed HAOS or real model execution.",
+    "Application approvals and revocation are implemented; isolated host application launch remains unavailable.",
+    "The original 699bc82 installed gate failed before the theme test, at backend readiness. Its exact diagnostic replay remains active.",
+    "Raw logs and profiles remain private; only bounded receipts are checked in."
+  ]
+}

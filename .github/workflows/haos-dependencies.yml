@@ -1,0 +1,104 @@
+name: HAOS frozen runtime dependency verification
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    paths: ['.github/workflows/haos-dependencies.yml', 'linux/haos/runtime/**', 'upstream/UPSTREAM.lock']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install audit tools and fetch the pinned source
+        run: |
+          python -m pip install uv==0.12.19 pip-audit==2.10.1
+          npm run sync-upstream
+          mkdir -p evidence
+          python -m pip freeze > evidence/audit-tools.txt
+      - name: Audit the exact committed image dependencies
+        run: |
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime --check
+          python -m pip_audit --no-deps --disable-pip -r linux/haos/runtime/requirements.txt --format json --output evidence/audit-committed.json
+          python -m pip_audit --no-deps --disable-pip -r linux/haos/runtime/requirements.txt --format cyclonedx-json --output evidence/python-runtime.cdx.json
+          cp linux/haos/runtime/source.json evidence/committed-runtime-source.json
+          cp linux/haos/runtime/requirements.txt evidence/committed-runtime-requirements.txt
+      - name: Resolve scoped security fixes with package hashes
+        run: |
+          uv export --project upstream/hermes-agent --frozen --no-dev --no-emit-project --extra web --extra messaging --no-hashes --format requirements-txt --output-file evidence/runtime-input.txt
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          root = Path('upstream/hermes-agent')
+          inputs = {'upstream_commit': (root / '.herald-os-upstream-sha').read_text().strip(),
+                    'pyproject_sha256': hashlib.sha256((root / 'pyproject.toml').read_bytes()).hexdigest(),
+                    'uv_lock_sha256': hashlib.sha256((root / 'uv.lock').read_bytes()).hexdigest(),
+                    'extras': ['web', 'messaging'], 'python': '3.11', 'platform': 'x86_64-unknown-linux-gnu',
+                    'security_versions': {'anyio': '4.14.2', 'multidict': '6.9.1', 'pyjwt': '2.15.1', 'tornado': '6.5.9', 'urllib3': '2.8.0'}}
+          assert re.fullmatch(r'[0-9a-f]{40}', inputs['upstream_commit'])
+          path = Path('evidence/runtime-input.txt')
+          requirements = path.read_text()
+          for name, version in inputs['security_versions'].items():
+              requirements, count = re.subn(rf'^{name}==[^\s;]+', f'{name}=={version}', requirements, flags=re.M)
+              assert count == 1, (name, count)
+          path.write_text(requirements)
+          Path('evidence/runtime-source.json').write_text(json.dumps(inputs, indent=2) + '\n')
+          PY
+          uv pip compile evidence/runtime-input.txt --python-version 3.11 --python-platform x86_64-unknown-linux-gnu --generate-hashes --output-file evidence/runtime.requirements.txt
+          python -m pip_audit --no-deps --disable-pip -r evidence/runtime.requirements.txt --format json --output evidence/audit-fixed.json
+      - name: Install and exercise the actual pinned Hermes with these dependencies
+        run: |
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python "$(command -v python)" --no-dev --extra web --extra messaging
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+          uv pip freeze --python upstream/hermes-agent/.venv/bin/python > evidence/installed-runtime.txt
+          HERMES_HOME="$(mktemp -d)" upstream/hermes-agent/.venv/bin/hermes --help > evidence/hermes-help.txt
+          upstream/hermes-agent/.venv/bin/python - <<'PY'
+          import importlib.metadata, secrets, time
+          import jwt
+          expected = {'anyio': '4.14.2', 'multidict': '6.9.1', 'pyjwt': '2.15.1', 'tornado': '6.5.9', 'urllib3': '2.8.0'}
+          for name, version in expected.items():
+              assert importlib.metadata.version(name) == version
+          # Real local JWT regression: parsing an unverified fixture must not mutate
+          # the caller's options and disable expiry checks on its next verified use.
+          key = secrets.token_bytes(48)
+          token = jwt.encode({'exp': int(time.time()) - 3600}, key, algorithm='HS256')
+          options = {'verify_signature': False}
+          jwt.decode(token, options=options)
+          assert options == {'verify_signature': False}
+          options['verify_signature'] = True
+          try:
+              jwt.decode(token, key, algorithms=['HS256'], options=options)
+          except jwt.ExpiredSignatureError:
+              pass
+          else:
+              raise AssertionError('expired JWT accepted after options reuse')
+          print('Patched package versions, Hermes CLI and JWT claim regression passed')
+          PY
+      - name: Start the real backend and verify authenticated durable sessions
+        run: upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_backend.py upstream/hermes-agent/.venv/bin/hermes evidence/real-backend.json
+      - name: Record the reproducible dependency artifact
+        run: |
+          sha256sum evidence/runtime.requirements.txt > evidence/runtime.requirements.sha256
+          echo HAOS_RUNTIME_REQUIREMENTS_BEGIN
+          cat evidence/runtime.requirements.txt
+          echo HAOS_RUNTIME_REQUIREMENTS_END
+          echo HAOS_RUNTIME_SOURCE_BEGIN
+          cat evidence/runtime-source.json
+          echo HAOS_RUNTIME_SOURCE_END
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-runtime-dependencies-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 7

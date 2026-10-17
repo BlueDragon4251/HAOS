@@ -1,3 +1,7 @@
 # Findings checked by hand and known not to be credentials.
 # A keyboard shortcut in a Herald Slides menu item.
 cf060c446d79180f748b8aac563b463f54edbcf9:apps/desktop/src/features/office/slides/SlidesWindow.tsx:generic-api-key:177
+
+# Reviewed 2026-10-17: prose about private GHCR/bot credential handling,
+# not an embedded API key. Exact commit/path/rule/line only.
+c06c495e42b111c6067f3eca4082f96fe26a31a5:docs/GRAPHICAL-OWNER-SETUP.md:generic-api-key:24

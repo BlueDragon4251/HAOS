@@ -1,0 +1,63 @@
+{
+  "source_commit": "2fb65dcc3368dbc73064d04f8556a71e0cb39932",
+  "services_push": "https://github.com/BlueDragon4251/HAOS/actions/runs/38182711252",
+  "services_pr": "https://github.com/BlueDragon4251/HAOS/actions/runs/38182713887",
+  "ci": "https://github.com/BlueDragon4251/HAOS/actions/runs/38182713883",
+  "arch": "https://github.com/BlueDragon4251/HAOS/actions/runs/38182713862",
+  "all_conclusions": "success",
+  "original_archives": {
+    "pipeline": {
+      "zip_digest": "sha256:89e70184d48f60f5e19ac035185f06ac0c8e6c44754e9c14443f81e443322ad5",
+      "downloaded_and_verified": true,
+      "receipt": {
+        "scope": "actual disposable persistent GUI queue and root/kernel application pipeline; providerless",
+        "source_commit": "2fb65dcc3368dbc73064d04f8556a71e0cb39932",
+        "actual_unprivileged_persistent_gui_queue": true,
+        "actual_root_server_and_client_kernel_identity": true,
+        "non_controller_root_peer_denied": true,
+        "actual_matching_wal_dispatch_authority": true,
+        "root_action_replays_denied": true,
+        "actual_terminal_input_result_and_capture": true,
+        "native_reattach_preserves_application": true,
+        "audit_has_no_typed_contents_or_pixels": true,
+        "cancel_reconciles_entire_application": true,
+        "production_broker_service_verified": false,
+        "installed_haos_verified": false,
+        "hermes_model_verified": false
+      }
+    },
+    "unit": {
+      "zip_digest": "sha256:620059dff2874de5e47bb277e7e20d699e8065a3701e72346c427f1126441dd9",
+      "downloaded_and_verified": true,
+      "receipt": {
+        "scope": "actual disposable systemd application units; providerless",
+        "source_commit": "2fb65dcc3368dbc73064d04f8556a71e0cb39932",
+        "actual_root_launcher": true,
+        "actual_dynamic_uids_distinct": true,
+        "actual_private_rootfs_and_networks": true,
+        "actual_cgroup_cpu_memory_tasks_limits": true,
+        "actual_window_input_and_capture": true,
+        "foreign_mission_and_clipboard_denied": true,
+        "durable_start_replay_denied": true,
+        "escaped_child_cgroup_cleanup": true,
+        "other_application_survives_cleanup": true,
+        "owner_revoked_application_controls_denied": true,
+        "changed_limits_same_elf_controls_denied": true,
+        "installed_haos_verified": false,
+        "real_hermes_model_verified": false
+      }
+    }
+  },
+  "test_counts": {
+    "haos": 445,
+    "root_authority": 54,
+    "harness": 82,
+    "actual_restic": 22
+  },
+  "does_not_prove": [
+    "production root service sandbox",
+    "installed application pipeline",
+    "native application view",
+    "real model turn"
+  ]
+}

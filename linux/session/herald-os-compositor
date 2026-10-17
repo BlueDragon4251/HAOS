@@ -27,6 +27,20 @@ for legacy in "${!HERMES_OS_@}"; do
   [[ -n "${!current:-}" ]] || export "$current=${!legacy}"
 done
 
+# The session chooses its own allowlisted locale. This does not give the
+# unprivileged observer authority over root, greetd or the owner console.
+REGION_LOCALE="$HOME/.config/herald-os/locale"
+if [[ -f "$REGION_LOCALE" && ! -L "$REGION_LOCALE" ]]; then
+  IFS= read -r requested_locale <"$REGION_LOCALE" || true
+  case "${requested_locale:-}" in
+    de_AT.UTF-8 | de_DE.UTF-8 | en_US.UTF-8 | en_GB.UTF-8 | fr_FR.UTF-8)
+      export LANG="$requested_locale"
+      export LANGUAGE="${requested_locale%%_*}"
+      unset LC_ALL
+      ;;
+  esac
+fi
+
 COMPOSITOR="${HERALD_OS_COMPOSITOR:-niri}"
 
 # The compositor's own output is the only record of DRM/GPU/seat problems; keep the last run.
@@ -34,6 +48,13 @@ LOG_DIR="$HOME/.local/state/herald-os"
 mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/compositor.log" 2>&1
 echo "$(date -Is) starting $COMPOSITOR (renderer=${WLR_RENDERER:-gpu})"
+
+# Recover an interrupted saved-theme activation before niri reads its includes.
+# This runs as the observer, touches only the fixed private theme outputs and
+# preserves conflicts for inspection. Hermes services are independent of it.
+if command -v herald-os-theme >/dev/null 2>&1; then
+  herald-os-theme recover >/dev/null 2>&1 || echo "theme recovery needs inspection of the private activation journal"
+fi
 
 # Herald's own niri config, rendered at every start from the installed template and the person's
 # keymap (and written only when that changed, as after an update). niri is given it by path, so a
@@ -72,7 +93,10 @@ fi
 
 # theme.kdl is included by the managed config; make sure the active theme has written it.
 if [[ ! -f "$HOME/.config/niri/theme.kdl" ]] && command -v herald-os-theme >/dev/null; then
-  herald-os-theme set "$(herald-os-theme current)" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
+  theme_args=(set "$(herald-os-theme current)")
+  theme_revision="$(herald-os-theme current-revision 2>/dev/null || true)"
+  [[ "$theme_revision" =~ ^[a-f0-9]{64}$ ]] && theme_args+=(--revision "$theme_revision")
+  herald-os-theme "${theme_args[@]}" >/dev/null 2>&1 || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
 fi
 [[ -f "$HOME/.config/niri/theme.kdl" ]] || echo "// theme pending" >"$HOME/.config/niri/theme.kdl"
 # The Display panel writes outputs.kdl; the managed config includes it, so it must exist.

@@ -14,6 +14,7 @@ export function AboutSection() {
   const backend = useStore($backend)
   const status = useBackendData(() => rest.get<HermesStatusPayload>('/api/status'))
   const [showLog, setShowLog] = useState(false)
+  const updates = useLocalData(() => window.heraldOS.system.haosUpdate(), [])
   const log = useLocalData(() => (showLog ? window.heraldOS.backend.logTail(300) : Promise.resolve<string[]>([])), [showLog, backend.phase])
 
   return (
@@ -23,7 +24,7 @@ export function AboutSection() {
       <AboutIdentity />
 
       <SettingsGroup title="Versions">
-        <SettingsRow icon={<IconInfoCircle />} label="Herald OS" description={env?.isDev ? 'Development build.' : 'Agent-native operating system.'} keywords="version build shell">
+        <SettingsRow icon={<IconInfoCircle />} label="HAOS" description={env?.isDev ? 'Development build.' : 'Agent-native operating system.'} keywords="version build shell">
           <Pill tone="accent">{env?.version ?? '—'}</Pill>
         </SettingsRow>
         <SettingsRow icon={<IconServer />} label="Hermes runtime" description={<span className="selectable">{backend.runtime?.label ?? 'Not resolved yet.'}</span>} keywords="hermes agent version runtime">
@@ -35,7 +36,20 @@ export function AboutSection() {
       <BrandingSettings />
 
       <SettingsGroup title="Maintenance">
-        <SettingsRow icon={<IconDownload />} label="Check for updates" description="Herald OS runs whatever Hermes is installed. Run “hermes update” in Terminal, then restart Hermes from Network." keywords="upgrade update hermes update terminal">
+        <SettingsRow icon={<IconDownload />} label="HAOS system updates"
+          description={updates.data ? `Channel: ${updates.data.channel} · ${updates.data.state}${updates.data.reboot_required ? ' · Restart to activate' : ''}` : 'Immutable bootc image updates'}
+          keywords="upgrade update bootc ghcr token dev stable reboot"
+          below={updates.data ? (
+            <div className="mt-2 space-y-2 text-[12px] text-fg-3">
+              <p>{updates.data.reboot_required ? 'A new OS image was staged. Restart when ready; the previous deployment remains available for rollback.' : updates.data.auto_stage ? 'Checks every six hours and stages newer images; never restarts without you.' : 'Automatic staging is disabled until an authenticated owner enables it.'}</p>
+              {updates.data.message && <p className="text-warn">{updates.data.message}</p>}
+              {updates.data.checked_at && <p>Last checked: {new Date(updates.data.checked_at).toLocaleString()}</p>}
+              <p>Private Dev images require GHCR read:packages credentials in the root-owned store. Use an authenticated owner terminal; do not paste the token into this unprivileged desktop or Hermes.</p>
+              <pre className="selectable whitespace-pre-wrap rounded-lg bg-black/20 p-3 text-[11px]">su - YOUR_OWNER{ '\n' }sudo haos-owner update login{ '\n' }sudo haos-owner update channel dev --auto-stage</pre>
+              <p>Stable channel: <code>sudo haos-owner update channel stable</code> (available only after an official stable image is published).</p>
+            </div>
+          ) : undefined}>
+          <GlassButton size="sm" variant="ghost" onClick={updates.reload}>Refresh status</GlassButton>
           <GlassButton size="sm" onClick={() => openApp('terminal')} aria-label="Open Terminal">
             Open Terminal
           </GlassButton>

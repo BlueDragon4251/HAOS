@@ -1,0 +1,11 @@
+[Unit]
+Description=HAOS periodic bootc update discovery
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=HAOS observer authority separation
+After=herald-os-firstboot.service
+Before=greetd.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.observer
+RemainAfterExit=yes
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

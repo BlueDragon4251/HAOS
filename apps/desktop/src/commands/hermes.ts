@@ -2,6 +2,7 @@ import { pauseAllAgents } from '../store/agents-control.ts'
 import { $activeChat, createChat, interruptChat, openStoredSession, sendPrompt } from '../store/chat.ts'
 import { $activeMissions, $completedMissions, $missions, $reviewMissions, focusMissions, markReviewed, type Mission } from '../store/missions.ts'
 import { startMission } from '../store/missions-actions.ts'
+import { $durableMissions, $missionServiceError, answerMissionRequest, cancelDurableMission, pauseDurableMission, resumeDurableMission, refreshDurableMissions } from '../store/durable-missions.ts'
 import { fail, ok, type OsCommand } from '../store/os-commands.ts'
 import { $sessions, refreshSessions } from '../store/sessions.ts'
 import { readToolSearch, setToolSearch } from '../store/tool-search.ts'
@@ -141,9 +142,9 @@ export const hermesCommands: readonly OsCommand[] = [
     args: [{ name: 'goal', type: 'string', description: 'What the mission should achieve', required: true }],
     phrases: ['start a mission to {goal}', 'new mission {goal}', 'create a mission to {goal}', 'start a mission: {goal}'],
     run: async ({ goal }) => {
-      const { sessionId, title } = await startMission(String(goal))
+      const { sessionId, missionId, title, queued } = await startMission(String(goal))
 
-      return ok(`Started mission "${title}"`, { spoken: 'Mission started.', page: 'hermes', data: { sessionId } })
+      return ok(`${queued ? 'Queued' : 'Started'} mission "${title}"`, { spoken: queued ? 'Mission queued.' : 'Mission started.', page: queued ? 'missions' : 'hermes', data: { sessionId, missionId } })
     }
   },
   {
@@ -168,7 +169,16 @@ export const hermesCommands: readonly OsCommand[] = [
     tier: 'read',
     args: [{ name: 'name', type: 'string', description: 'Part of the mission title', required: true }],
     phrases: ['open the {name} mission', 'show the mission {name}', 'open mission {name}'],
-    run: ({ name }) => {
+    run: async ({ name }) => {
+      if ((await window.heraldOS.missions.serviceInfo()).managed) {
+        await refreshDurableMissions()
+        if ($missionServiceError.get()) return fail($missionServiceError.get()!)
+        const needle = String(name).toLowerCase()
+        const matches = $durableMissions.get().filter(row => row.id === String(name) || row.goal.toLowerCase().includes(needle))
+        if (matches.length !== 1) return fail(matches.length ? 'Several stored missions match; use a mission ID.' : 'No stored mission matches.')
+        showPage('missions'); focusMissions({ missionId: matches[0].id })
+        return ok('Showing stored mission', { page: 'missions', data: { missionId: matches[0].id, state: matches[0].state } })
+      }
       const { mission, candidates } = findMission(String(name))
 
       if (!mission) {
@@ -188,7 +198,14 @@ export const hermesCommands: readonly OsCommand[] = [
     tier: 'read',
     args: [],
     phrases: ['what missions are running', 'list my missions', 'show my missions', 'how are my missions going'],
-    run: () => {
+    run: async () => {
+      if ((await window.heraldOS.missions.serviceInfo()).managed) {
+        await refreshDurableMissions()
+        if ($missionServiceError.get()) return fail($missionServiceError.get()!)
+        showPage('missions')
+        const rows = $durableMissions.get()
+        return ok(`${rows.length} stored missions`, { page: 'missions', items: rows.map(row => ({ id: row.id, goal: row.goal, state: row.state })) })
+      }
       const active = $activeMissions.get()
       const review = $reviewMissions.get()
       const completed = $completedMissions.get()
@@ -203,13 +220,41 @@ export const hermesCommands: readonly OsCommand[] = [
     }
   },
   {
+    id: 'mission.openDurable', title: 'Open a stored mission', description: 'Show a controller mission by its stable ID.', tier: 'read',
+    args: [{ name: 'id', type: 'string', description: 'Mission ID', required: true }], hidden: true,
+    run: ({ id }) => { showPage('missions'); focusMissions({ missionId: String(id) }); return ok('Opened stored mission', { page: 'missions' }) }
+  },
+  {
+    id: 'mission.cancel', title: 'Stop a stored mission', description: 'Request interruption and retain uncertain work for owner recovery.', tier: 'act',
+    args: [{ name: 'id', type: 'string', description: 'Stable mission ID', required: true }],
+    run: async ({ id }) => { await cancelDurableMission(String(id)); return ok('Stop requested', { page: 'missions' }) }
+  },
+  {
+    id: 'mission.answer', title: 'Answer a mission request', description: 'Give a clarification or one-time tool approval; grants no owner authority.', tier: 'mutate', hidden: true,
+    args: [{ name: 'requestId', type: 'string', description: 'Pending request ID', required: true }, { name: 'choice', type: 'string', description: 'Explicit once or deny' }, { name: 'answer', type: 'string', description: 'Clarification answer' }],
+    run: async ({ requestId, choice, answer }) => {
+      if (choice !== undefined && choice !== 'once' && choice !== 'deny') return fail('Choose once or deny.')
+      await answerMissionRequest(String(requestId), choice, typeof answer === 'string' ? answer : undefined)
+      return ok('Answer sent', { page: 'missions' })
+    }
+  },
+  {
     id: 'mission.pause',
     title: 'Pause a mission',
-    description: 'Interrupt a running mission.',
+    description: 'In HAOS, hold queued work before dispatch. Running work cannot safely be paused.',
     tier: 'act',
     args: [{ name: 'name', type: 'string', description: 'Part of the mission title', required: true }],
-    phrases: ['pause the {name} mission', 'stop the {name} mission'],
+    phrases: ['pause the {name} mission'],
     run: async ({ name }) => {
+      if ((await window.heraldOS.missions.serviceInfo()).managed) {
+        await refreshDurableMissions()
+        if ($missionServiceError.get()) return fail($missionServiceError.get()!)
+        const matches = $durableMissions.get().filter(row => row.id === String(name) || row.goal.toLowerCase().includes(String(name).toLowerCase()))
+        if (matches.length !== 1) return fail('Choose one stored mission by its stable ID.')
+        await pauseDurableMission(matches[0].id)
+        showPage('missions'); focusMissions({ missionId: matches[0].id })
+        return ok('Paused before dispatch. The existing deadline still applies.', { page: 'missions' })
+      }
       const { mission, candidates } = findMission(String(name))
 
       if (!mission) {
@@ -225,6 +270,16 @@ export const hermesCommands: readonly OsCommand[] = [
       focusMissions({ missionId: mission.id })
 
       return ok(`Paused "${mission.title}"`, { page: 'missions', highlight: { kind: 'mission', id: mission.id } })
+    }
+  },
+  {
+    id: 'mission.resume', title: 'Resume a queued mission', description: 'Return work paused before dispatch to the durable queue.', tier: 'act',
+    args: [{ name: 'id', type: 'string', description: 'Stable mission ID', required: true }],
+    run: async ({ id }) => {
+      if (!(await window.heraldOS.missions.serviceInfo()).managed) return fail('Durable resume requires the HAOS controller.')
+      const mission = await resumeDurableMission(String(id))
+      showPage('missions'); focusMissions({ missionId: mission.id })
+      return mission.state === 'queued' ? ok('Returned to the queue.', { page: 'missions' }) : fail('The paused mission deadline expired; the controller marked it failed.')
     }
   },
   {

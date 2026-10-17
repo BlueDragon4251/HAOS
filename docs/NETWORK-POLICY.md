@@ -1,0 +1,58 @@
+# Agent local-network boundary
+
+`haos-network.service` is a root oneshot with only `CAP_NET_ADMIN`; it installs the dedicated `inet haos_agent` nftables table before Hermes starts. Hermes binds its lifecycle to this required service. Missing nftables, an invalid identity/resolver configuration or a rejected transaction prevents startup. Stopping the helper does not remove the guard. Other host firewall tables are not flushed.
+
+Rules apply only to the kernel socket UID of `haos-agent`, including sockets opened outside its user namespace. They reject the host's own addresses and private, loopback, link-local, shared-address, multicast and reserved destinations. Public Internet access is retained for providers; this is not a mission-specific destination allowlist or complete exfiltration policy.
+
+Narrow exceptions permit TCP to the literal backend `127.0.0.1:9119`, the separately authorized provider broker at `127.0.0.1:9120` when configured by the owner, DNS to the system stub and exact configured resolver addresses, and established **reply-direction** traffic from a server operated by the agent. Established original-direction connections do not bypass a new policy. DNS input must come from a root-owned, non-writable resolver file with protected original and resolved parent paths; addresses are numeric, validated and bounded. Arbitrary other ports on a DNS resolver are not permitted.
+
+The nft transaction is checked before application and atomically reloads only the dedicated table. Resolver changes require an authenticated administrator to stop execution and reload the guard:
+
+```sh
+sudo haos-owner stop
+# From a separately authenticated administrator/recovery console:
+systemctl restart haos-network.service
+sudo haos-owner start
+```
+
+The enrolled owner's restricted sudo grant has no arbitrary `systemctl` permission. An unattended NetworkManager/resolver reload broker remains missing. Changes to blocking lists similarly require rebuilding/reviewing image-owned code.
+
+The disposable CI probe uses a new account, private nft table and real IPv4/IPv6 listeners. It checks denied loopback/mapped-address access, pre-existing connections after policy install/reload, actual backend replies, denied unprivileged rule removal and unaffected other-user traffic. Local unit tests validate rule generation, resolver trust, scope and failed validation. The actual kernel gate passed at `2cebd11` and again in [service run 37988845664](https://github.com/BlueDragon4251/HAOS/actions/runs/37988845664) at `aeac4ad`. Installed localhost denial passed in both source-bound `2cebd11` guest receipts ([37915386805](https://github.com/BlueDragon4251/HAOS/actions/runs/37915386805)); it does not accept newer installed images or the complete egress policy. Historical billing failures no longer describe these public runner results.
+
+Installed abstract-socket enforcement, enforcing SELinux coverage, per-mission public egress, DNS-channel exfiltration, remote filesystems, multi-user UID changes and complete owner-only local-service isolation require further acceptance or implementation.
+
+## Abstract Unix sockets
+
+The image-owned agent launcher now enters a Landlock abstract Unix scope before
+reading credentials or starting Hermes. This closes the abstract-socket bypass
+of filesystem mounts while retaining the existing shared TCP network and named
+controller/GUI socket policy. Descendants inherit the scope; they can connect to
+abstract listeners inside their own domain, but cannot connect to earlier host
+listeners. No filesystem or TCP permission is granted by this scope.
+
+Linux Landlock ABI 6 or newer is mandatory. An unsupported kernel or failed
+scope/prctl operation refuses runtime startup, with no unrestricted fallback.
+The independent owner/recovery services do not depend on this agent scope.
+
+The actual Python implementation was tested as UID 1000 in a diskless, offline
+TCG guest using Fedora kernel 7.2.9-200.fc44 (ABI 10): an abstract listener was
+reachable before the scope and denied with EPERM afterwards; named Unix and
+same-domain descendant connections remained usable. The cloud host itself
+reports ENOSYS; unit fixtures are not evidence of enforcement there. This is a
+kernel component proof, not a complete installed HAOS, SELinux, per-mission
+egress or connection-revocation acceptance. Required installed image/guest
+checks must still pass with this stricter launcher.
+
+The reproducible probe sources are `linux/haos/probes/ipc_scope_vm_init.c` and
+`run_ipc_scope_vm.py`. Compile the init statically with `gcc -static -O2 -Wall
+-Wextra -Werror`. Its newc initramfs contains the public Python 3.11 runtime at
+`/python`, the exact `ipc_scope.py` at `/modules`, the probe at `/probe.py`, and
+the root-owned mode-0400 marker `/haos-disposable-ipc-marker` with contents
+`haos-scope-disposable-vm-v1\n`. Use cpio `--owner=0:0`; public runtime directories
+must be traversable by the UID-1000 child. The marker/PID-1 guards run before any
+mount/socket mutation. Launch only a new disposable diskless QEMU guest with
+the verified Fedora kernel, `-machine q35,accel=tcg -cpu max -smp 2 -m 512M
+-kernel ... -initrd ... -append 'console=ttyS0 rdinit=/init panic=-1' -nographic
+-no-reboot -nic none`. Require exit 0, `HAOS_SCOPE_FINISHED=0`, and the exact
+product-module digest in `HAOS_SCOPE_PYTHON_RECEIPT`. Private raw logs/runtime
+archives are not release artifacts.
