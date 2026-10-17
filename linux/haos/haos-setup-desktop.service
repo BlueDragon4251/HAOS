@@ -1,0 +1,37 @@
+[Unit]
+Description=HAOS graphical administrator setup (isolated local VT8; experimental)
+After=systemd-user-sessions.service herald-os-firstboot.service
+Requires=herald-os-firstboot.service
+Conflicts=getty@tty8.service
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bash /usr/lib/haos/setup-display.sh
+Restart=no
+StandardInput=tty-force
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty8
+TTYReset=yes
+TTYVHangup=yes
+UMask=0077
+RuntimeDirectory=haos-setup-display
+RuntimeDirectoryMode=0700
+Environment=HOME=/root
+Environment=LANG=C.UTF-8
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
+# Only one local native UI with a private cookie, no shared normal desktop.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TasksMax=96
+MemoryMax=2G
+
+# Deliberately disabled by default until physical GUI/keyboard tests pass.
+# Do not auto-start this root graphical server alongside normal greetd.

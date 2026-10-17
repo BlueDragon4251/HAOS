@@ -16,7 +16,7 @@ def session_allowed(env=None, uid=None):
     env = os.environ if env is None else env
     uid = os.geteuid() if uid is None else uid
     return (uid == 0 and env.get("HAOS_TRUSTED_SETUP") == "1"
-            and env.get("DISPLAY") in {":1", ":2"}
+            and env.get("DISPLAY") == ":8"
             and not any(env.get(k) for k in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"))
             and not env.get("WAYLAND_DISPLAY"))
 
@@ -156,14 +156,6 @@ class Wizard:
                 box.insert("1.0", "\n".join(self.codes))
                 box.configure(state="disabled")
                 box.pack(fill="x", pady=12)
-                def confirm():
-                    if not tk.messagebox.askyesno("Recovery", "Alle zehn Codes wirklich außerhalb des PCs gespeichert?"):
-                        return
-                    self.codes.clear()
-                    self.codes_confirmed = True
-                    self.show("region")
-                # messagebox is a tkinter submodule and cannot be assumed
-                # from the package shortcut in every Python runtime.
                 from tkinter import messagebox
                 def accept():
                     if messagebox.askyesno("Recovery", "Sind alle zehn Codes sicher außerhalb des PCs gespeichert?"):
