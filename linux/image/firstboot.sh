@@ -59,7 +59,11 @@ system_phase() {
 
   step "Home folder"
   as_user mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.local/share" "$HOME_DIR/.local/state" "$HOME_DIR/.config/herald-os" "$HOME_DIR/.config/niri" "$HOME_DIR/.config/swaylock" "$HOME_DIR/.config/systemd/user"
-  as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
+  # HAOS managed images run their own root-controlled update timer. The legacy
+  # per-user update tool invokes sudo -n, which the locked observer cannot do.
+  if [[ ! -d /usr/lib/haos/haos ]]; then
+    as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
+  fi
   as_user herald-os-theme set "$(as_user herald-os-theme current)" || true
   # Herald's niri config, rendered with the person's keymap (managed; local.kdl is theirs).
   as_user herald-os keymap apply || install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/niri/config.kdl" "$HOME_DIR/.config/niri/herald-os.kdl"

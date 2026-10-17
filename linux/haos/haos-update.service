@@ -1,0 +1,18 @@
+[Unit]
+Description=HAOS image update check (opt-in staging, no automatic reboot)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/haos/enabled
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.update watch
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes

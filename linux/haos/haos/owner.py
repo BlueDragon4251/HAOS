@@ -118,6 +118,14 @@ def main():
     configure.add_argument("--endpoint", help="local loopback /v1 endpoint; remote endpoints are fixed")
     configure.add_argument("--requests-per-day", type=int, default=200)
     configure.add_argument("--requests-per-minute", type=int, default=30)
+    updater = sub.add_parser("update", help="owner-approved bootc image channel and private GHCR credentials")
+    updater_sub = updater.add_subparsers(dest="update_action", required=True)
+    for action in ("status", "login", "check", "stage", "logout"):
+        updater_sub.add_parser(action)
+    change_channel = updater_sub.add_parser("channel")
+    change_channel.add_argument("channel", choices=["stable", "dev"])
+    change_channel.add_argument("--auto-stage", action="store_true",
+                                help="download and stage new images automatically; reboot remains manual")
     backup = sub.add_parser("backup")
     backup_sub = backup.add_subparsers(dest="backup_action", required=True)
     for action in ("init", "create", "check", "snapshots"):
@@ -157,6 +165,9 @@ def main():
     elif args.action == "application":
         from .applications import owner_application
         print(json.dumps(owner_application(args), indent=2))
+    elif args.action == "update":
+        from .update import owner_update
+        print(json.dumps(owner_update(args), indent=2))
     elif args.action == "provider":
         from .provider_setup import owner_provider
         print(json.dumps(owner_provider(args), indent=2))

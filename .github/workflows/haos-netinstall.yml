@@ -82,6 +82,10 @@ jobs:
           echo "$GHCR_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           sudo podman push --digestfile /tmp/haos-netinstall-digest \
             localhost/haos:netinstall "docker://$IMAGE:$TAG"
+          # Moving DEV channel ref: upgraded installations track this tag with
+          # bootc upgrade. Keep the immutable dev-SHA tag for acceptance/rollback.
+          # This never publishes a stable channel or changes package visibility.
+          sudo podman push localhost/haos:netinstall "docker://$IMAGE:dev-current"
           DIGEST="$(cat /tmp/haos-netinstall-digest)"
           [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::No valid remote manifest digest"; exit 1; }
           echo "image_ref=$IMAGE@$DIGEST" >>"$GITHUB_OUTPUT"
