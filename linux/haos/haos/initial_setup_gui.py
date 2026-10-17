@@ -216,12 +216,28 @@ class Wizard:
                          primary=True).pack(anchor="w", pady=13)
         elif name == "gateways":
             self._head("Hermes · Gateways",
-                       "Sichere Adapterfreigaben sind getrennt von Provider-API-Keys und Mobile-Kopplungen.")
-            self._label(self.content,
-                "Telegram und Discord besitzen bereits eine HAOS-Autorisierung. "
-                "Weitere Hermes-Adapter sind im aktuellen HAOS noch nicht freigeschaltet. "
-                "Das grafische Pairing pro Sender wird in der nächsten Phase integriert.",
-                size=12, color=self.MUTED, wrap=740).pack(anchor="w")
+                       "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
+            connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord"], "telegram")
+            token = self._field(self.content, "Bot-Token (wird niemals im GUI gespeichert)", secret=True)
+            def configure():
+                secret = token.get()
+                token.delete(0, tk.END)
+                self._run(lambda: initial_setup.configure_gateway(
+                    connector.get(), platform.get(), secret),
+                    success="Gateway gespeichert. Neustart des Gateway-Dienstes erforderlich.")
+            self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
+            self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
+                        size=13, bold=True).pack(anchor="w", pady=(14, 0))
+            binding = self._field(self.content, "Freigabe-ID (z. B. mein-handy)", "my-device")
+            sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
+            chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
+            identity = self._field(self.content, "HAOS-Identität", "personal")
+            self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
+                         lambda: self._run(lambda: initial_setup.pair_gateway_sender(
+                             binding.get(), connector.get(), sender.get(), chat.get(), identity.get()),
+                             success="Absender explizit freigegeben. Gateway-Neustart erforderlich."),
+                         primary=True).pack(anchor="w", pady=(10, 0))
         elif name == "finish":
             self._head("Einrichtung abschließen",
                        "Erst nach Administrator + Recovery kann die normale HAOS-Sitzung sicher starten.")
