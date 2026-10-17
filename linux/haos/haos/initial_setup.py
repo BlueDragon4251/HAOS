@@ -128,7 +128,24 @@ def configure_region(language: str, keyboard: str):
                        timeout=8, capture_output=True,
                        env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
                             "PATH": "/usr/bin:/bin"})
+    from .normal_profile import configure_region as observer_region
+    observer_region(language, keyboard)
     return result
+
+
+def configure_normal_user(display_name: str):
+    require_root()
+    from .normal_profile import configure_name
+    from .owner import audit
+    result = configure_name(display_name)
+    audit("setup.normal-user-named", {"configured": True})
+    return result
+
+
+def normal_user_ready() -> bool:
+    require_root()
+    from .normal_profile import name_exists
+    return name_exists()
 
 
 def configure_ghcr(username: str, token: str):
@@ -285,6 +302,11 @@ def finalize():
     from .owner import audit
     from .policy import atomic_json
     readiness_check()
+    if setup_in_progress():
+        # On freshly enrolled installations, finish the NORMAL observer's
+        # profile before disabling the root setup boot gate.
+        from .normal_profile import mark_ready
+        mark_ready()
     # Root-only evidence marker, never a plaintext secret or model-created flag.
     if COMPLETE.is_symlink():
         raise PermissionError("untrusted setup completion marker")
