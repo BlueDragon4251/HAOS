@@ -14,6 +14,8 @@ class UpdatePolicyTest(unittest.TestCase):
     def test_fixed_registry_and_public_non_secret_receipt(self):
         self.assertEqual(update.CHANNELS["dev"], "ghcr.io/bluedragon4251/haos:dev-current")
         self.assertEqual(update.CHANNELS["stable"], "ghcr.io/bluedragon4251/haos:stable")
+        if os.geteuid() != 0:
+            self.skipTest("the root-controlled status publisher requires root")
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "status.json"
             receipt = update.publish("staged", channel="dev", auto_stage=True,
