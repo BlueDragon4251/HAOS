@@ -106,6 +106,14 @@ def main():
     enroll.add_argument("username")
     recovery = sub.add_parser("recovery-codes", help="issue ten single-use codes at an authenticated owner console")
     recovery.add_argument("username")
+    region = sub.add_parser("region", help="owner-approved system locale and physical keyboard layout")
+    region_sub = region.add_subparsers(dest="region_action", required=True)
+    region_sub.add_parser("status")
+    region_apply = region_sub.add_parser("apply")
+    region_apply.add_argument("--language", required=True,
+                              choices=["de_AT.UTF-8", "de_DE.UTF-8", "en_US.UTF-8", "en_GB.UTF-8", "fr_FR.UTF-8"])
+    region_apply.add_argument("--keyboard", required=True,
+                              choices=["at", "de", "us", "gb", "fr", "ch"])
     provider = sub.add_parser("provider", help="owner-only credential-isolated model configuration")
     provider_sub = provider.add_subparsers(dest="provider_action", required=True)
     for action in ("status", "stop", "disable", "login-codex", "logout-codex"):
@@ -168,6 +176,9 @@ def main():
     elif args.action == "update":
         from .update import owner_update
         print(json.dumps(owner_update(args), indent=2))
+    elif args.action == "region":
+        from .region import owner_region
+        print(json.dumps(owner_region(args), indent=2))
     elif args.action == "provider":
         from .provider_setup import owner_provider
         print(json.dumps(owner_provider(args), indent=2))
