@@ -41,7 +41,7 @@ jobs:
           sys.path.insert(0, "linux/haos")
           import tkinter
           from haos import initial_setup
-          initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True}
+          initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True, "pending": False}
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
           for page in ("security", "region", "provider", "updates", "gateways", "finish"):

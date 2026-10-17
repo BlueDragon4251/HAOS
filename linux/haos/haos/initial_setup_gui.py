@@ -167,7 +167,7 @@ class Wizard:
                             self.codes_confirmed = True
                             self.show("region")
                 self._button(self.content, "Alle Codes sicher gespeichert", accept, primary=True).pack(anchor="w")
-            elif status["pending"]:
+            elif status.get("pending", False):
                 self._label(self.content,
                     "Unvollständige Wiederherstellung nach Unterbrechung.",
                     size=14, color="#ffafba", bold=True).pack(anchor="w", pady=12)
