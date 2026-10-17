@@ -1,0 +1,132 @@
+"""Root-only initial HAOS setup authority for a dedicated *local* graphical seat.
+
+The normal Hermes renderer and agent must never call this module. The graphical
+launcher is not enabled at boot until actual installed-OS GUI acceptance passes.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import pwd
+import subprocess
+
+from .enrollment import enroll, validate_name
+from .owner_recovery import RecoveryCodes, enrolled_owner, owners
+from .region import CONSOLE_MAP, LOCALES
+from .provider_policy import ProviderPolicy, ENDPOINTS
+
+# Never store a plaintext password, recovery code, provider key or GHCR token
+# in setup state, IPC, temporary files, shell argv, or the audit log.
+RUNNING = ("haos-gateway.service", "haos-controller.service", "haos-hermes.service")
+
+
+def require_root():
+    if os.geteuid() != 0:
+        raise PermissionError("initial setup is reserved for the trusted local root seat")
+
+
+def account_status():
+    require_root()
+    entries = owners()
+    if len(entries) > 1:
+        # Multiple owners require explicit migration; never guess whose rights to change.
+        raise PermissionError("multiple enrolled owners need a separate migration review")
+    if not entries:
+        return {"owner": False, "recovery": False, "complete": False}
+    owner = enrolled_owner(entries[0]["username"])
+    recovery = RecoveryCodes()._load()
+    has_codes = bool(recovery["owners"].get(str(owner.pw_uid), {}).get("hashes"))
+    return {"owner": True, "recovery": has_codes, "complete": has_codes}
+
+
+def create_initial_owner(username: str, password: str, repeated: str) -> tuple[str, list[str]]:
+    """Creates an independent password owner and returns one-time recovery codes.
+
+    Recovery codes are returned only to this local root process; a crash before
+    the operator saves them means the trusted local setup must *rotate* them.
+    """
+    require_root()
+    if password != repeated:
+        raise ValueError("Administrator passwords do not match")
+    if owners():
+        raise PermissionError("existing owners must never be overwritten during migration")
+    # Stop all autonomous execution before granting another principal.
+    subprocess.run(["/usr/bin/systemctl", "stop", *RUNNING],
+                   check=True, timeout=45, capture_output=True)
+    from .owner import stopped, audit
+    stopped()
+    created = enroll(username, password, initial_only=True)
+    identity = enrolled_owner(created["username"])
+    codes = RecoveryCodes().issue(identity.pw_uid)
+    audit("setup.initial-owner", {"uid": identity.pw_uid, "recovery_count": len(codes)})
+    return identity.pw_name, codes
+
+
+def rotate_unconfirmed_codes(username: str) -> list[str]:
+    """Used only on the physical trusted root display after an interrupted setup."""
+    require_root()
+    entry = enrolled_owner(username)
+    codes = RecoveryCodes().issue(entry.pw_uid)
+    from .owner import audit
+    audit("setup.recovery-rotated", {"uid": entry.pw_uid})
+    return codes
+
+
+def configure_region(language: str, keyboard: str):
+    require_root()
+    if language not in LOCALES or keyboard not in CONSOLE_MAP:
+        raise ValueError("unsupported language or keyboard")
+    from .region import owner_region
+    from types import SimpleNamespace
+    return owner_region(SimpleNamespace(region_action="apply", language=language, keyboard=keyboard))
+
+
+def configure_ghcr(username: str, token: str):
+    require_root()
+    from .update import login_credentials
+    from .owner import audit
+    result = login_credentials(username, token)
+    audit("setup.ghcr-login", {"ghcr": True})
+    return result
+
+
+def configure_update(channel: str, automatic: bool):
+    require_root()
+    if channel not in {"stable", "dev"} or type(automatic) is not bool:
+        raise ValueError("unsupported update configuration")
+    from .update import switch_channel
+    from .owner import audit
+    result = switch_channel(channel, automatic)
+    audit("setup.update-channel", {"channel": channel, "auto_stage": automatic})
+    return result
+
+
+def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = ""):
+    """Cloud API or local model; OAuth flow is not yet supported in this GUI."""
+    require_root()
+    if provider not in {"openai", "openrouter", "local"}:
+        raise ValueError("use a provider with an implemented graphical credential flow")
+    from .provider_setup import publish, stopped_provider
+    from .gateway_setup import stopped_gateway
+    from .network import install
+    from .owner import stopped, audit
+    data = {"version": 1, "provider": provider,
+            "endpoint": endpoint if provider == "local" else ENDPOINTS[provider],
+            "models": [model], "default_model": model,
+            "api_mode": "chat_completions" if provider in {"openrouter", "local"} else "codex_responses",
+            "requests_per_day": 200, "requests_per_minute": 30}
+    policy = ProviderPolicy(data)
+    if provider == "local" and api_key:
+        raise ValueError("a local endpoint does not use a cloud credential")
+    if provider != "local" and not api_key:
+        raise ValueError("cloud API key required")
+    stopped()
+    stopped_gateway()
+    stopped_provider()
+    # Only now does the vetted owner credential publisher replace trusted files.
+    publish(policy.data, api_key if provider != "local" else None)
+    install(pwd.getpwnam("haos-agent").pw_uid)
+    subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"],
+                   check=True, timeout=30, capture_output=True)
+    audit("setup.provider", {"provider": provider, "models": [model]})
+    return {"configured": True, "provider": provider, "model_turn_tested": False}
