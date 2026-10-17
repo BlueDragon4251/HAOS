@@ -67,6 +67,21 @@ jobs:
               time.sleep(0.02)
           assert not wizard.running, "Setup must not freeze during slow operations"
           assert "Async operation complete" in wizard.status.cget("text")
+          # Every asynchronous exception must unblock the wizard. Never leak
+          # a credential-bearing exception message back into the screen.
+          from tkinter import messagebox
+          import subprocess
+          messagebox.showerror = lambda *args: None
+          def fail():
+              raise subprocess.CalledProcessError(12, "private-ghcr-command")
+          wizard._run_async(fail, success="MUST NOT SUCCEED")
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running, "An unhandled OS error must never freeze setup"
+          assert "fehlgeschlagen" in wizard.status.cget("text")
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY
