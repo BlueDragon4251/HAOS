@@ -20,6 +20,21 @@ from .provider_policy import ProviderPolicy, ENDPOINTS
 RUNNING = ("haos-gateway.service", "haos-controller.service", "haos-hermes.service")
 PENDING = Path("/var/lib/haos-owner/setup-recovery-pending.json")
 COMPLETE = Path("/var/lib/haos-owner/graphical-setup.json")
+IN_PROGRESS = Path("/var/lib/haos-owner/graphical-setup-in-progress.json")
+
+
+def setup_in_progress():
+    """Durable wizard fence. Survives recovery-code acknowledgement and reboot."""
+    if IN_PROGRESS.is_symlink():
+        raise PermissionError("untrusted initial setup marker")
+    if not IN_PROGRESS.exists():
+        return False
+    import stat
+    info = IN_PROGRESS.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        raise PermissionError("initial setup marker must be root-private")
+    return True
+
 
 
 def recovery_pending():
@@ -36,8 +51,10 @@ def recovery_pending():
 
 def mark_pending():
     from .policy import atomic_json
-    if recovery_pending():
-        raise PermissionError("a prior recovery setup must be resolved first")
+    if recovery_pending() or setup_in_progress():
+        raise PermissionError("a prior graphical setup must be resolved first")
+    # Fence the normal desktop BEFORE enrolling another privileged principal.
+    atomic_json(IN_PROGRESS, {"version": 1, "setup_in_progress": True}, mode=0o600)
     atomic_json(PENDING, {"version": 1, "unconfirmed_recovery": True}, mode=0o600)
 
 
@@ -229,6 +246,35 @@ def acknowledge_recovery(username: str):
     return {"acknowledged": True}
 
 
+def retry_failed_new_enrollment():
+    """Allow a physical operator to retry an interrupted pre-account enrollment.
+
+    Never delete or repurpose any existing user or their home folder.
+    """
+    require_root()
+    if owners():
+        raise PermissionError("an enrolled owner requires authenticated recovery")
+    if recovery_pending():
+        PENDING.unlink()
+    if setup_in_progress():
+        IN_PROGRESS.unlink()
+    return {"may_retry_enrollment": True}
+
+
+def issue_missing_recovery(username: str):
+    """Migrate a pre-existing owner missing recovery without replacing their account."""
+    require_root()
+    status = account_status()
+    if not status["owner"] or status["recovery"] or status["pending"]:
+        raise PermissionError("recovery migration is unavailable")
+    entry = enrolled_owner(username)
+    from .policy import atomic_json
+    if not setup_in_progress():
+        atomic_json(IN_PROGRESS, {"version": 1, "setup_in_progress": True}, mode=0o600)
+    atomic_json(PENDING, {"version": 1, "unconfirmed_recovery": True}, mode=0o600)
+    return RecoveryCodes().issue(entry.pw_uid)
+
+
 def finalize():
     """Never complete if account/recovery safety gates have not passed."""
     require_root()
@@ -246,4 +292,6 @@ def finalize():
     subprocess.run(["/usr/bin/systemctl", "restart", "haos-owner-ready.service"],
                    check=True, timeout=35, capture_output=True)
     audit("setup.graphical-complete", {"owner_confirmed": True})
+    if setup_in_progress():
+        IN_PROGRESS.unlink()
     return {"completed": True, "reboot_required": True}
