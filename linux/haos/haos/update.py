@@ -78,6 +78,12 @@ def publish(state, *, channel, auto_stage, error=None, reboot_required=False, pa
     path.parent.mkdir(parents=True, mode=0o755, exist_ok=True)
     if path.parent.is_symlink():
         raise PermissionError("update status directory may not be a symlink")
+    directory = path.parent.stat()
+    if directory.st_uid != 0 or not stat.S_ISDIR(directory.st_mode) or directory.st_mode & 0o022:
+        raise PermissionError("update status directory is not root-controlled")
+    # The root service uses UMask=0077; explicitly permit the observer to read
+    # the non-secret receipt, never the separate credential/config directory.
+    os.chmod(path.parent, 0o755)
     fd, tmp = tempfile.mkstemp(prefix=".status-", dir=path.parent)
     try:
         with os.fdopen(fd, "w") as f:

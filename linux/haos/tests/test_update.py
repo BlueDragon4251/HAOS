@@ -55,6 +55,19 @@ class UpdatePolicyTest(unittest.TestCase):
             os.chmod(f, 0o600)
             self.assertEqual(update.has_auth(f), os.getuid() == 0)
 
+    def test_public_status_directory_under_restrictive_umask(self):
+        if os.geteuid() != 0:
+            self.skipTest("public status directory owner must be root")
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "status" / "status.json"
+            original = os.umask(0o077)
+            try:
+                update.publish("configured", channel="dev", auto_stage=False, path=dest)
+            finally:
+                os.umask(original)
+            self.assertEqual(dest.parent.stat().st_mode & 0o777, 0o755)
+            self.assertEqual(dest.stat().st_mode & 0o777, 0o644)
+
     def test_unconfigured_watch_never_connects(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(update, "root"), patch.object(update, "load_config", return_value={"channel": "unconfigured", "auto_stage": False}), \
