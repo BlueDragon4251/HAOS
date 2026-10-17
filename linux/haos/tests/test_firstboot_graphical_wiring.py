@@ -1,7 +1,7 @@
 """Regression: fresh Anaconda first boot must open native owner GUI automatically.
 
 This is a static integration contract for target wiring. The separate real
-installed-guest / VT8 graphics acceptance remains mandatory before stable.
+installed-guest / VT1 graphics acceptance remains mandatory before stable.
 """
 from pathlib import Path
 
@@ -39,7 +39,13 @@ def test_wizard_is_behind_gate_and_separate_recovery_stays_available():
     setup = SETUP.read_text(encoding="utf-8")
     assert "ExecStart=/usr/bin/bash /usr/lib/haos/setup-display.sh" in setup
     assert "StandardInput=tty-force" in setup
-    assert "TTYPath=/dev/tty8" in setup
+    assert "TTYPath=/dev/tty1" in setup
+    assert "Conflicts=getty@tty1.service" in setup
+    assert "TTYPath=/dev/tty8" not in setup
+    assert "chvt 1" in (ROOT / "linux/haos/setup-gui-session.sh").read_text(encoding="utf-8")
+    display = (ROOT / "linux/haos/setup-display.sh").read_text(encoding="utf-8")
+    assert "Xorg :8 vt1" in display
+    assert "Xorg :8 vt8" not in display
     installed = INSTALL.read_text(encoding="utf-8")
     assert "systemctl enable haos-setup-desktop.service" in installed
     assert "haos-recovery.service" in installed
