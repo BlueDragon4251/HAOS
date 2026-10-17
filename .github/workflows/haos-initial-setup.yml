@@ -24,7 +24,7 @@ jobs:
         with: { python-version: '3.11' }
       - name: Verify immutable launcher shell and Python syntax
         run: |
-          bash -n linux/haos/setup-display.sh linux/haos/install.sh
+          bash -n linux/haos/setup-display.sh linux/haos/setup-gui-session.sh linux/haos/install.sh
           python -m compileall -q linux/haos/haos/initial_setup.py linux/haos/haos/initial_setup_gui.py
       - name: Verify owner and physical session boundaries
         env:

@@ -103,7 +103,15 @@ def configure_region(language: str, keyboard: str):
         raise ValueError("unsupported language or keyboard")
     from .region import owner_region
     from types import SimpleNamespace
-    return owner_region(SimpleNamespace(region_action="apply", language=language, keyboard=keyboard))
+    result = owner_region(SimpleNamespace(region_action="apply", language=language, keyboard=keyboard))
+    # The private VT8 X keyboard must change immediately too; other callers
+    # cannot ask the owner broker to modify the normal observer's X display.
+    if os.getenv("HAOS_TRUSTED_SETUP") == "1" and os.getenv("DISPLAY") == ":8":
+        subprocess.run(["/usr/bin/setxkbmap", "-layout", keyboard], check=True,
+                       timeout=8, capture_output=True,
+                       env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
+                            "PATH": "/usr/bin:/bin"})
+    return result
 
 
 def configure_ghcr(username: str, token: str):

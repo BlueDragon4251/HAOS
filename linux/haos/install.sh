@@ -25,6 +25,7 @@ chmod 0644 /usr/lib/haos/passwd /usr/lib/haos/group
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-owner" /usr/bin/haos-owner
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-setup-desktop" /usr/bin/haos-setup-desktop
 install -Dm0755 "$HAOS_SOURCE/setup-display.sh" /usr/lib/haos/setup-display.sh
+install -Dm0755 "$HAOS_SOURCE/setup-gui-session.sh" /usr/lib/haos/setup-gui-session.sh
 install -Dm0755 "$HAOS_SOURCE/../bin/haos-recovery" /usr/bin/haos-recovery
 install -Dm0644 "$HAOS_SOURCE/../bin/haos-recovery" /usr/lib/haos/recovery-console.py
 install -d /etc/systemd/system/greetd.service.d
