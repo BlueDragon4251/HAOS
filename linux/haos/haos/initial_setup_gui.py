@@ -36,7 +36,12 @@ class Wizard:
         self.root.title("HAOS — Administrator Setup")
         self.root.configure(bg=self.BG)
         self.root.attributes("-fullscreen", True)
-        self.root.minsize(750, 500)
+        # Firmware GOP and old laptop panels may start at 640x480. Never
+        # force the window larger than the available physical screen.
+        screen_w, screen_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.compact = screen_w < 900 or screen_h < 600
+        self.label_wrap = max(220, min(780, screen_w - (225 if self.compact else 390)))
+        self.root.minsize(min(560, screen_w), min(380, screen_h))
         self.root.bind("<Control-Alt-F12>", lambda _event: self.root.destroy())
         self.page = "security"
         self.codes = []
@@ -49,7 +54,7 @@ class Wizard:
     def _label(self, parent, text, *, size=12, color=None, bold=False, wrap=800):
         return self.tk.Label(parent, text=text, font=("DejaVu Sans", size, "bold" if bold else "normal"),
                              fg=color or self.TEXT, bg=parent.cget("bg"),
-                             anchor="w", justify="left", wraplength=wrap)
+                             anchor="w", justify="left", wraplength=min(wrap, self.label_wrap))
 
     def _button(self, parent, text, action, *, primary=False):
         return self.tk.Button(parent, text=text, command=action, relief="flat", bd=0, padx=17, pady=11,
@@ -77,9 +82,10 @@ class Wizard:
     def _build(self):
         tk = self.tk
         layout = tk.Frame(self.root, bg=self.BG)
-        layout.pack(fill="both", expand=True, padx=45, pady=32)
-        sidebar = tk.Frame(layout, bg=self.BG, width=225)
-        sidebar.pack(side="left", fill="y", padx=(0, 28))
+        layout.pack(fill="both", expand=True, padx=13 if self.compact else 45,
+                    pady=12 if self.compact else 32)
+        sidebar = tk.Frame(layout, bg=self.BG, width=155 if self.compact else 225)
+        sidebar.pack(side="left", fill="y", padx=(0, 10 if self.compact else 28))
         sidebar.pack_propagate(False)
         self._label(sidebar, "◇ HAOS", size=27, color=self.CYAN, bold=True).pack(anchor="w", pady=(0, 8))
         self._label(sidebar, "ADMINISTRATOR SETUP", size=9, color=self.MUTED).pack(anchor="w", pady=(0, 28))
@@ -93,13 +99,35 @@ class Wizard:
             self._button(sidebar, title, lambda p=name: self.show(p)).pack(fill="x", pady=5)
         self._label(sidebar, "LOCAL ROOT SETUP\nKein Fernzugriff und keine Agent-Rechte.",
                     size=9, color=self.MUTED, wrap=190).pack(side="bottom", anchor="w", pady=10)
-        self.card = tk.Frame(layout, bg=self.PANEL, padx=34, pady=28,
+        self.card = tk.Frame(layout, bg=self.PANEL,
+                             padx=12 if self.compact else 34,
+                             pady=12 if self.compact else 28,
                              highlightthickness=1, highlightbackground=self.BORDER)
         self.card.pack(side="left", fill="both", expand=True)
         self.status = self._label(self.card, "", size=10, color=self.MUTED)
         self.status.pack(side="bottom", fill="x", pady=(15, 0))
-        self.content = tk.Frame(self.card, bg=self.PANEL)
-        self.content.pack(side="top", fill="both", expand=True)
+        # Scroll the card, not the desktop: keyboard-only users and small
+        # firmware framebuffers must still reach every credential field.
+        self.viewport = tk.Canvas(self.card, bg=self.PANEL, bd=0,
+                                  highlightthickness=0)
+        scrollbar = tk.Scrollbar(self.card, orient="vertical",
+                                 command=self.viewport.yview)
+        self.viewport.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.viewport.pack(side="left", fill="both", expand=True)
+        self.content = tk.Frame(self.viewport, bg=self.PANEL)
+        self.content_window = self.viewport.create_window(
+            (0, 0), window=self.content, anchor="nw")
+        self.content.bind("<Configure>", lambda _e: self.viewport.configure(
+            scrollregion=self.viewport.bbox("all")))
+        self.viewport.bind("<Configure>", lambda e: self.viewport.itemconfigure(
+            self.content_window, width=e.width))
+        self.root.bind_all("<MouseWheel>", lambda e: self.viewport.yview_scroll(
+            -1 if e.delta > 0 else 1, "units"))
+        self.root.bind_all("<Button-4>", lambda _e: self.viewport.yview_scroll(-1, "units"))
+        self.root.bind_all("<Button-5>", lambda _e: self.viewport.yview_scroll(1, "units"))
+        self.root.bind_all("<Next>", lambda _e: self.viewport.yview_scroll(1, "pages"))
+        self.root.bind_all("<Prior>", lambda _e: self.viewport.yview_scroll(-1, "pages"))
         self.show("security")
 
     def _head(self, title, subtitle):
@@ -168,6 +196,7 @@ class Wizard:
     def show(self, name):
         tk = self.tk
         self.page = name
+        self.viewport.yview_moveto(0)
         for child in self.content.winfo_children():
             child.destroy()
         self.status.config(text="", fg=self.MUTED)
@@ -208,7 +237,8 @@ class Wizard:
             elif self.codes and not self.codes_confirmed:
                 self._label(self.content, "Einmalige Wiederherstellungscodes — JETZT sichern!",
                             size=14, color=self.CYAN, bold=True).pack(anchor="w")
-                box = tk.Text(self.content, height=11, width=60, font=("DejaVu Sans Mono", 10),
+                box = tk.Text(self.content, height=11, width=46,
+                              font=("DejaVu Sans Mono", 9 if self.compact else 10),
                               bg=self.BG, fg=self.TEXT, bd=0, padx=12, pady=8)
                 box.insert("1.0", "\n".join(self.codes))
                 box.configure(state="disabled")
