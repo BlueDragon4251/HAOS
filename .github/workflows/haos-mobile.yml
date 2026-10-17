@@ -16,8 +16,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
+      # Ubuntu hosted runners already provide the Android SDK; avoid obsolete\n      # sdkmanager 'tools' package requested by older setup-android actions.\n      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
       - name: Install platform
