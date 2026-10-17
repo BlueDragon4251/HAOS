@@ -16,7 +16,7 @@ Do not release this branch as production-ready on the basis of those tests.
 
 ## Implemented pieces
 
-- Private root-owned Xorg display `:8` on VT8, non-TCP, random protected
+- Private root-owned Xorg display `:8` on VT1 (F1), non-TCP, random protected
   Xauthority cookie, explicit Austrian keyboard before password entry,
   physical VT activation, no privileged Electron/Hermes browser.
 - Seven responsive, vertically scrollable graphical pages:
@@ -40,7 +40,7 @@ Do not release this branch as production-ready on the basis of those tests.
 
 ## Important current limitations
 
-- **Root window/VT8 real boot must still be tested.** If it fails, the
+- **Root window/VT1 real boot must still be tested.** If it fails, the
   independent physical tty2 recovery console remains the supported fallback.
   No automatic fail-open root shell or unrestricted desktop is provided.
 - The normal desktop remains the existing locked non-administrator observer
@@ -63,7 +63,7 @@ Do not release this branch as production-ready on the basis of those tests.
 
 ## Required acceptance before stable or a real daily-driver update
 
-1. Actual Fedora 44 image and ISO build, installation and reboot into VT8 on
+1. Actual Fedora 44 image and ISO build, installation and reboot into VT1 on
    disposable UEFI and BIOS QEMU, with video/keyboard/mouse interaction.
 2. Physical keyboard mapping, mouse, UI scaling and root-secret isolation on HP.
 3. New owner account and offline recovery codes fully exercised with PAM/sudo,
@@ -77,7 +77,7 @@ Do not release this branch as production-ready on the basis of those tests.
 `haos-recovery.service` on tty2 is not removed. Avoid a production release or
 an unattended upgrade of the daily-driver HP until actual boot acceptance.
 
-## Recovered owner on tty2 but no GUI on VT8
+## Recovered owner on tty2 but no GUI on VT1
 
 A real HP installation exposed a boot arbitration defect: tty2 owner
 enrollment + recovery-code generation previously satisfied the general
@@ -92,7 +92,7 @@ The receipt is only published after the normal observer display-name
 profile and owner service checks succeed. Failed or malformed receipts
 never unlock the desktop.
 
-**Physical fallback if Xorg VT8 cannot display the wizard:** On the
+**Physical fallback if Xorg VT1 cannot display the wizard:** On the
 machine's physical tty3, log in with the *existing owner account* and
 run (sudo prompts for the owner password, never the locked root password):
 
@@ -104,7 +104,10 @@ systemctl reboot
 ```
 
 This fixed-action fallback is local-console only; the command rejects
-SSH and other pseudo-terminals. It never edits administrator identities,
+SSH and other pseudo-terminals. The owner CLI checks the invoking kernel VT
+reported by authenticated sudo as `SUDO_TTY`, because Fedora sudo `use_pty`
+may give the child `/dev/pts/N` even if the owner really logged into tty3.
+It also validates the enrolled owner UID and rejects arbitrary or symlinked TTY paths. It never edits administrator identities,
 reissues recovery codes, opens a remote surface or exposes a root shell.
 The initial owner and ten recovery codes MUST already exist and be saved.
 On installations from **older ISO revisions**, the fallback subcommands
@@ -116,7 +119,7 @@ to re-evaluate the systemd startup conditions. If graphics are still black,
 collect `systemctl status` of the two gated units and GUI journal
 evidence; never bypass the gate or wipe the disk as a first step.
 
-## Automatic graphical admin wizard on the very first installed boot (HP bugfix)
+## Automatic graphical admin wizard on F1 during the first installed boot (HP bugfix)
 
 An HP first-boot report identified a separate **activation-order** defect.
 The previous native wizard was `WantedBy=graphical.target` alone, while
@@ -125,17 +128,17 @@ firstboot script could queue `graphical.target` from within its **incomplete**
 firstboot service before `haos.initialize` had produced the credentials
 and root state required by the two boot gates.
 
-Fix: the dedicated VT8 native wizard is now `WantedBy=multi-user.target`,
+Fix: the dedicated VT1 native wizard is now `WantedBy=multi-user.target`,
 `After=` and `Requires=herald-os-firstboot.service`. The initialization
 script still installs `graphical.target` as the **next** boot default, but
 does **not** activate it early during initialization. The first boot therefore
-starts the root-only wizard on VT8 **automatically**, even when the first
+starts the root-only wizard on VT1 **automatically**, even when the first
 Anaconda target is text-only. `greetd` remains blocked until the separate,
 protected wizard completion receipt exists.
 
 The existing owner console on tty2 is a recovery fallback, NOT a mandatory
 firstboot step. A new user should be asked to create their administrator,
-password and recovery codes directly within the automatically launched VT8
+password and recovery codes directly within the automatically launched VT1
 wizard. Unit tests assert the firstboot target ordering and prohibit starting
 graphical.target prematurely. **The real installed HP/UEFI GPU + keyboard
 acceptance is not complete merely because those tests pass.**
@@ -143,3 +146,14 @@ acceptance is not complete merely because those tests pass.**
 An older installed image does **not** gain this fix until a newer bootc
 deployment is installed. Existing owner accounts/recovery codes are retained.
 Never erase the disk just to re-run initial setup.
+
+## Local VT mapping (pending physical HP acceptance)
+
+- **Ctrl+Alt+F1**: native firstboot administrator wizard until the trusted setup receipt is published; normal HAOS desktop after completion/reboot.
+- **Ctrl+Alt+F2**: independent owner enrollment and recovery console (never an automatic root shell).
+- **Ctrl+Alt+F3**: physical user console and fixed `sudo /usr/bin/haos-owner setup` fallback.
+
+The Xorg display identifier stays `:8` for isolation although the physical
+virtual terminal is now VT1. A currently installed older bootc image still
+uses its existing code; rebuild, install/stage, reboot, and inspect HP logs
+before claiming this mapping is working on the real machine.
