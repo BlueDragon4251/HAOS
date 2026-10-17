@@ -89,12 +89,13 @@ class Wizard:
         sidebar.pack_propagate(False)
         self._label(sidebar, "◇ HAOS", size=27, color=self.CYAN, bold=True).pack(anchor="w", pady=(0, 8))
         self._label(sidebar, "ADMINISTRATOR SETUP", size=9, color=self.MUTED).pack(anchor="w", pady=(0, 28))
-        items = [("security", "01  Sicherheit / Security"),
-                 ("region", "02  Sprache / Keyboard"),
-                 ("provider", "03  Hermes / Models"),
-                 ("updates", "04  Updates / GHCR"),
-                 ("gateways", "05  Gateways"),
-                 ("finish", "06  Abschluss / Finish")]
+        items = [("security", "01  Administrator"),
+                 ("user", "02  Normaler Benutzer"),
+                 ("region", "03  Sprache / Tastatur"),
+                 ("provider", "04  Hermes / Models"),
+                 ("updates", "05  Updates / GHCR"),
+                 ("gateways", "06  Gateways"),
+                 ("finish", "07  Abschluss")]
         for name, title in items:
             self._button(sidebar, title, lambda p=name: self.show(p)).pack(fill="x", pady=5)
         self._label(sidebar, "LOCAL ROOT SETUP\nKein Fernzugriff und keine Agent-Rechte.",
@@ -292,6 +293,19 @@ class Wizard:
                             self.show("security")
                     self._button(self.content, "Bestehendes Konto behalten und Recovery-Codes erstellen",
                                  migrate_recovery, primary=True).pack(anchor="w", pady=18)
+        elif name == "user":
+            self._head("Normalen Benutzer einrichten",
+                       "Separat vom Administrator. Das sichere HAOS-Observerkonto bleibt ohne Root- und sudo-Zugriff.")
+            self._label(self.content,
+                "HAOS verwendet intern den gesperrten technischen Sitzungskontonamen 'hermes'. "
+                "Dein persönlicher Anzeigename erscheint im Desktop; persönliche Dateien "
+                "werden bei bestehenden Installationen nicht gelöscht.",
+                size=11, color=self.MUTED).pack(anchor="w", pady=10)
+            name = self._field(self.content, "Dein Anzeigename (1–64 Zeichen)")
+            self._button(self.content, "Benutzerprofil sicher übernehmen",
+                         lambda: self._run(lambda: initial_setup.configure_normal_user(name.get()),
+                                           success="Anzeigename für die normale HAOS-Sitzung gespeichert."),
+                         primary=True).pack(anchor="w", pady=20)
         elif name == "region":
             self._head("Sprache & Tastatur",
                        "System- und Konsolensprache werden mit localectl gesetzt. Änderungen gelten nach neuer Anmeldung.")
@@ -366,10 +380,11 @@ class Wizard:
             status = self._run(initial_setup.account_status, success="")
             if status is None:
                 return
-            ready = status["complete"] and not (self.codes and not self.codes_confirmed)
+            profile = self._run(initial_setup.normal_user_ready, success="")
+            ready = status["complete"] and profile is True and not (self.codes and not self.codes_confirmed)
             self._label(self.content,
-                "✓ Administratorkonto und Recovery vorhanden" if ready
-                else "Administrator und Wiederherstellungscodes müssen zuerst eingerichtet werden.",
+                "✓ Administrator, Recovery und normaler Benutzer eingerichtet" if ready
+                else "Administrator, Wiederherstellungscodes und Anzeigename des normalen Benutzers sind erforderlich.",
                 size=14, color=self.CYAN if ready else "#ffafba").pack(anchor="w", pady=12)
             self._label(self.content,
                 "Für bestehende HAOS-Installationen ist die Datenmigration getrennt zu testen. "
