@@ -32,7 +32,12 @@ class UpdatePolicyTest(unittest.TestCase):
                 update.persist_config({"channel": "host", "auto_stage": True}, path)
             self.assertEqual(update.load_config(path)["channel"], "unconfigured")
             update.persist_config({"channel": "dev", "auto_stage": False}, path)
-            self.assertEqual(update.load_config(path)["channel"], "dev")
+            if os.geteuid() == 0:
+                self.assertEqual(update.load_config(path)["channel"], "dev")
+            else:
+                # The real protected config is only readable by root.
+                with self.assertRaises(PermissionError):
+                    update.load_config(path)
             path.unlink()
             path.symlink_to(Path(tmp) / "elsewhere")
             with self.assertRaises(PermissionError):
@@ -57,6 +62,16 @@ class UpdatePolicyTest(unittest.TestCase):
                 self.assertEqual(update.watch(), {"state": "unconfigured"})
                 command.assert_not_called()
                 publish.assert_called_once()
+
+    def test_no_update_is_not_optimistically_staged(self):
+        with patch.object(update, "root"), patch.object(update, "load_config",
+              return_value={"channel": "dev", "auto_stage": True}), \
+             patch.object(update, "has_auth", return_value=True), \
+             patch.object(update, "command", return_value="No update available") as command, \
+             patch.object(update, "publish", return_value={"state": "checked"}) as publish:
+            update.watch(stage=True)
+            command.assert_called_once()
+            self.assertEqual(publish.call_args.args[0], "checked")
 
     def test_dev_stage_does_not_reboot(self):
         with patch.object(update, "root"), patch.object(update, "load_config", return_value={"channel": "dev", "auto_stage": True}), \

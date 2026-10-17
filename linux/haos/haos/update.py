@@ -163,7 +163,7 @@ def watch(*, stage=False):
     try:
         stdout = command("/usr/bin/bootc", "upgrade", "--check", timeout=300)
         # Do not translate an unknown CLI message into a claim of new updates.
-        available = bool(re.search(r"(?m)^(?:.{0,40})?(?<!no )(?<!no new )(?:update|upgrade) available\\b", stdout, re.I)) and not bool(re.search(r"\\bno (?:new )?(?:update|upgrade) available\\b", stdout, re.I))
+        available = bool(re.search(r"(?m)^(?:.{0,40})?(?<!no )(?<!no new )(?:update|upgrade) available\b", stdout, re.I)) and not bool(re.search(r"\bno (?:new )?(?:update|upgrade) available\b", stdout, re.I))
         if available and stage and cfg["auto_stage"]:
             command("/usr/bin/bootc", "upgrade", timeout=1800)
             return publish("staged", **cfg, reboot_required=True)
