@@ -115,15 +115,17 @@ def has_auth(path=AUTH):
             and not info.st_mode & 0o077 and info.st_size <= 32768)
 
 
-def login():
+def login_credentials(username: str, token: str):
+    """Protected root-only GHCR writer shared by owner CLI and trusted setup seat.
+
+    Never store token in argv, environment, /tmp, rootless user profiles, or
+    display/error/log output. Keep previous auth valid if verification fails.
+    """
     root()
-    if not all(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr)):
-        raise PermissionError("enter GHCR credentials only in an authenticated owner terminal")
-    username = input("GitHub username (GHCR read:packages): ").strip()
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}", username):
+    if not isinstance(username, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}", username):
         raise ValueError("invalid GitHub username")
-    token = getpass.getpass("Read-only GHCR token (hidden): ")
-    if not 16 <= len(token) <= 512 or any(ord(c) < 33 or ord(c) > 126 for c in token):
+    if (not isinstance(token, str) or not 16 <= len(token) <= 512
+            or any(ord(c) < 33 or ord(c) > 126 for c in token)):
         raise ValueError("invalid GHCR token")
     AUTH.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
     if AUTH.is_symlink():
@@ -133,7 +135,6 @@ def login():
         with os.fdopen(fd, "w") as f:
             os.fchmod(f.fileno(), 0o600)
             f.write("{}\n")
-        # Temporary credentials are published only after GHCR verifies them.
         command("/usr/bin/podman", "login", "--authfile", tmp, "--username", username,
                 "--password-stdin", "ghcr.io", input_text=token + "\n", timeout=90)
         os.chmod(tmp, 0o600)
@@ -141,6 +142,15 @@ def login():
     finally:
         Path(tmp).unlink(missing_ok=True)
     return {"ghcr_auth_configured": True, "token_disclosed": False}
+
+
+def login():
+    root()
+    if not all(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr)):
+        raise PermissionError("enter GHCR credentials only in an authenticated owner terminal")
+    username = input("GitHub username (GHCR read:packages): ").strip()
+    token = getpass.getpass("Read-only GHCR token (hidden): ")
+    return login_credentials(username, token)
 
 
 def switch_channel(channel, auto_stage):
