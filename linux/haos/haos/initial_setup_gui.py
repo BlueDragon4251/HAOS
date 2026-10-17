@@ -145,7 +145,7 @@ class Wizard:
         self.root.update_idletasks()
         try:
             result = action()
-        except (RuntimeError, ValueError, PermissionError, OSError) as exc:
+        except Exception:
             # Credential material never belongs in UI exception text: existing
             # privileged helpers intentionally suppress stdout/stderr.
             self.status.config(text="Vorgang fehlgeschlagen; Änderungen wurden nicht bestätigt.", fg="#ffafba")
@@ -175,7 +175,7 @@ class Wizard:
             try:
                 action()
                 results.put(True)
-            except (RuntimeError, ValueError, PermissionError, OSError, TimeoutError):
+            except Exception:
                 results.put(False)
 
         threading.Thread(target=worker, daemon=True, name="haos-setup-action").start()
@@ -325,8 +325,9 @@ class Wizard:
             def apply():
                 key=secret.get()
                 secret.delete(0, tk.END)
+                selected_provider, selected_model, selected_endpoint = provider.get(), model.get(), endpoint.get()
                 self._run_async(lambda: initial_setup.configure_provider(
-                    provider.get(), model.get(), key, endpoint.get()))
+                    selected_provider, selected_model, key, selected_endpoint))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
             self._label(self.content, "Codex-Kontologin und Multi-Provider-Auswahl sind in dieser Stufe noch nicht verfügbar.",
                         color=self.MUTED).pack(anchor="w")
@@ -338,7 +339,8 @@ class Wizard:
             def save_token():
                 secret = token.get()
                 token.delete(0, tk.END)
-                self._run_async(lambda: initial_setup.configure_ghcr(username.get(), secret),
+                selected_username = username.get()
+                self._run_async(lambda: initial_setup.configure_ghcr(selected_username, secret),
                           success="Privates GHCR-Login geprüft und geschützt gespeichert.")
             self._button(self.content, "Dev-Token sicher hinterlegen", save_token).pack(anchor="w", pady=14)
             channel = self._choice(self.content, "Update-Kanal", ["stable", "dev"], "stable")
@@ -346,10 +348,12 @@ class Wizard:
             tk.Checkbutton(self.content, text="Updates automatisch herunterladen (Neustart manuell)",
                            variable=automatic, bg=self.PANEL, fg=self.TEXT,
                            selectcolor=self.BG, activebackground=self.PANEL).pack(anchor="w", pady=9)
+            def apply_channel():
+                selected_channel, selected_automatic = channel.get(), automatic.get()
+                self._run_async(lambda: initial_setup.configure_update(selected_channel, selected_automatic),
+                                success="Bootc-Update vorbereitet. Neustart nach eigener Freigabe.")
             self._button(self.content, "Kanal wählen und bootc-Image prüfen",
-                         lambda: self._run_async(lambda: initial_setup.configure_update(channel.get(), automatic.get()),
-                                           success="Bootc-Update vorbereitet. Neustart nach eigener Freigabe."),
-                         primary=True).pack(anchor="w", pady=13)
+                         apply_channel, primary=True).pack(anchor="w", pady=13)
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
@@ -359,8 +363,9 @@ class Wizard:
             def configure():
                 secret = token.get()
                 token.delete(0, tk.END)
+                selected_connector, selected_platform = connector.get(), platform.get()
                 self._run_async(lambda: initial_setup.configure_gateway(
-                    connector.get(), platform.get(), secret),
+                    selected_connector, selected_platform, secret),
                     success="Gateway gespeichert. Neustart des Gateway-Dienstes erforderlich.")
             self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
@@ -369,11 +374,12 @@ class Wizard:
             sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
             identity = self._field(self.content, "HAOS-Identität", "personal")
+            def pair_sender():
+                selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get())
+                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected),
+                                success="Absender explizit freigegeben. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
-                         lambda: self._run_async(lambda: initial_setup.pair_gateway_sender(
-                             binding.get(), connector.get(), sender.get(), chat.get(), identity.get()),
-                             success="Absender explizit freigegeben. Gateway-Neustart erforderlich."),
-                         primary=True).pack(anchor="w", pady=(10, 0))
+                         pair_sender, primary=True).pack(anchor="w", pady=(10, 0))
         elif name == "finish":
             self._head("Einrichtung abschließen",
                        "Erst nach Administrator + Recovery kann die normale HAOS-Sitzung sicher starten.")
