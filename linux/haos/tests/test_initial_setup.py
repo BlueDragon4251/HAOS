@@ -112,8 +112,20 @@ def test_initial_setup_requires_valid_private_completion_receipt(tmp_path, monke
     with pytest.raises(PermissionError):
         initial_setup.setup_finished()
     receipt.chmod(0o600)
-    # CI may not run as uid 0: mock the strict parser, but never bypass
-    # the preceding path stat/mode checks or schema validation.
+    # CI is unprivileged: model a real root-owned inode without relaxing
+    # production validation of file type, mode, link count or symlinks.
+    import stat
+    from types import SimpleNamespace
+    real_lstat = Path.lstat
+    def fake_root_owned_lstat(self, *args, **kwargs):
+        info = real_lstat(self, *args, **kwargs)
+        if self == receipt:
+            return SimpleNamespace(st_uid=0, st_mode=info.st_mode,
+                                   st_nlink=info.st_nlink)
+        return info
+    monkeypatch.setattr(Path, "lstat", fake_root_owned_lstat)
+    # Mock only the trusted JSON parser after verifying the inode; CI's
+    # parent directory is not root-owned like a real /var/lib/haos-owner.
     monkeypatch.setattr(
         __import__("haos.sandbox", fromlist=["trusted_json"]), "trusted_json",
         lambda path: json.loads(Path(path).read_text()))
