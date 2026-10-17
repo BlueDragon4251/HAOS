@@ -97,7 +97,8 @@ def test_owner_renew_rejects_out_of_range_time_without_writing(hours):
     from types import SimpleNamespace
     from unittest import mock
     from haos.remote_setup import owner_remote_locked
-    with mock.patch("haos.remote_setup.persist") as persist, \
+    with mock.patch("haos.remote_setup.load", return_value=mock.Mock(value={"devices": []})), \
+         mock.patch("haos.remote_setup.persist") as persist, \
          mock.patch("haos.owner.audit"):
         with pytest.raises(ValueError):
             owner_remote_locked(SimpleNamespace(remote_action="renew",
