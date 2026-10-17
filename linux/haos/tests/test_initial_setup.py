@@ -56,3 +56,18 @@ def test_physical_owner_status_is_not_a_permission(monkeypatch):
     monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
     monkeypatch.setattr(initial_setup, "owners", lambda: [])
     assert initial_setup.account_status() == {"owner": False, "recovery": False, "complete": False}
+
+
+def test_gateway_owner_and_platform_validation(monkeypatch):
+    monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 1000)
+    with pytest.raises(PermissionError):
+        initial_setup.configure_gateway("id", "telegram", "x" * 24)
+    with pytest.raises(PermissionError):
+        initial_setup.pair_gateway_sender("id", "bot", "sender", "chat", "personal")
+    monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
+    with pytest.raises(ValueError):
+        initial_setup.configure_gateway("id", "whatsapp", "x" * 24)
+    with pytest.raises(ValueError):
+        initial_setup.configure_gateway("id", "telegram", "short")
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender("id", "bot", "sender", "chat", "personal", ("root",))
