@@ -62,6 +62,19 @@ def main():
     pair_remote.add_argument('--share-content',action='store_true')
     pair_remote.add_argument('--share-screenshots',action='store_true')
     remote_sub.add_parser('revoke').add_argument('id')
+    bootstrap_remote=remote_sub.add_parser('bootstrap',
+        help='one-time local CA/server/device certificate generation on authenticated owner console')
+    bootstrap_remote.add_argument('--hostname',required=True,
+        help='exact server DNS name or literal IP included in TLS SAN')
+    bootstrap_remote.add_argument('--bind',default='127.0.0.1',
+        help='IP address on which to listen; stays local until explicitly configured')
+    bootstrap_remote.add_argument('--port',type=int,default=8443)
+    bootstrap_remote.add_argument('--device-id',required=True)
+    bootstrap_remote.add_argument('--mission',action='append',required=True)
+    bootstrap_remote.add_argument('--hours',type=int,default=1)
+    bootstrap_remote.add_argument('--share-content',action='store_true')
+    bootstrap_remote.add_argument('--share-screenshots',action='store_true')
+
     applications = sub.add_parser("application", help="owner-approved exact host executable identities; no direct execution")
     applications_sub = applications.add_subparsers(dest="application_action", required=True)
     applications_sub.add_parser("status")

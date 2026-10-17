@@ -76,6 +76,78 @@ def owner_remote(args):
 def owner_remote_locked(args):
     from .owner import audit
     action=args.remote_action
+    if action == 'bootstrap':
+        # A physical owner console, not any observer/agent socket, performs
+        # certificate creation. Never rekey an existing active installation.
+        from .remote_pki import generate
+        import getpass
+        import tempfile
+        if POLICY.exists() or POLICY.is_symlink() or PRIVATE.exists() or PRIVATE.is_symlink():
+            raise PermissionError('TLS owner bootstrap is one-time; existing identities require reviewed migration')
+        require_stopped()
+        if type(args.hours) is not int or not 1 <= args.hours <= 24:
+            raise ValueError('device grant must last 1-24 hours')
+        requested={'version':1,'bind':args.bind,'port':args.port,
+                   'requests_per_minute':60,'bytes_per_minute':16*1024*1024,
+                   'devices':[]}
+        RemotePolicy(requested)
+        if len(set(args.mission)) != len(args.mission):
+            raise ValueError('duplicate mission grants refused')
+        # Validating mission IDs and owner-facing ID before asking for a secret
+        # prevents accidental collection of sensitive data for invalid input.
+        from .remote_policy import mission_id
+        for mid in args.mission: mission_id(mid)
+        import re
+        if not re.fullmatch(r'[a-z][a-z0-9-]{0,47}', args.device_id):
+            raise ValueError('invalid device name')
+        password=getpass.getpass('Mobile PKCS#12 export password (16-128 chars): ')
+        repeated=getpass.getpass('Repeat mobile PKCS#12 password: ')
+        if password != repeated:
+            raise PermissionError('password confirmation differs')
+        from .remote_pki import validate_hostname
+        validate_hostname(args.hostname)
+        export=Path('/var/lib/haos-owner/remote-export')
+        protected_directory(export.parent)
+        # Existing mobile exports must never be overwritten by new onboarding.
+        if export.exists() and (export.is_symlink() or
+                               (export / (args.device_id+'.p12')).exists()):
+            raise PermissionError('mobile identity already staged; manual removal required')
+        with tempfile.TemporaryDirectory(prefix='.remote-pki-',dir=export.parent) as temporary:
+            generated=generate(temporary,args.hostname,args.device_id,password)
+            del password, repeated
+            requested['devices']=[{'id':args.device_id,
+                'certificate_sha256':generated['fingerprint'],
+                'expires_at':time.time()+args.hours*3600,
+                'missions':args.mission,'content':args.share_content,
+                'screenshots':args.share_screenshots}]
+            RemotePolicy(requested)
+            # A malformed server SAN/key is rejected before any permanent
+            # key, policy or mobile identity is published.
+            tls_context(str(generated['server']),str(generated['server_key']),str(generated['ca']))
+            PRIVATE.mkdir(mode=0o700,exist_ok=False)
+            protected_directory(PRIVATE)
+            export.mkdir(mode=0o700,exist_ok=True)
+            protected_directory(export)
+            if export.stat().st_mode&0o077:
+                raise PermissionError('mobile export staging must be private')
+            # Authenticated viewer receives server cert/key and public client CA;
+            # the CA signing key remains root-only, never a systemd credential.
+            for name,asset in (
+                ('server.pem','server'),('server-key.pem','server_key'),
+                ('clients-ca.pem','ca'),('clients-ca-key.pem','ca_key')):
+                write_private(PRIVATE/name,generated[asset].read_bytes())
+            write_private(export/(args.device_id+'.p12'),generated['mobile_p12'].read_bytes())
+            write_private(export/(args.device_id+'-ca.pem'),generated['ca'].read_bytes())
+            persist(requested)
+        audit('remote.bootstrapped',{'device':args.device_id,'missions':args.mission,
+            'expires_at':requested['devices'][0]['expires_at'],
+            'content':args.share_content,'screenshots':args.share_screenshots})
+        return {'configured':True,'started':False,'paired':args.device_id,
+                'rights':'observation only',
+                'mobile_pkcs12':str(export/(args.device_id+'.p12')),
+                'mobile_ca':str(export/(args.device_id+'-ca.pem')),
+                'expires_at':requested['devices'][0]['expires_at'],
+                'next':'Copy the two files to the trusted phone in person, import in HAOS Mobile, then explicitly run remote start'}
     if action in {'start','stop'}:
         if action=='start':load()
         subprocess.run(['/usr/bin/systemctl',action,UNIT],check=True,timeout=15)
