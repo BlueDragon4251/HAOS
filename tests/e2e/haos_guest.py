@@ -26,7 +26,7 @@ A = "42514251-0000-4000-8000-000000000001"
 B = "42514251-0000-4000-8000-000000000002"
 C = "42514251-0000-4000-8000-000000000003"
 PROBE_STARTED = time.monotonic()
-PHASES = frozenset({"device-identity", "owner-authentication", "runtime-readiness",
+PHASES = frozenset({"device-identity", "firstboot-gate", "owner-authentication", "runtime-readiness",
     "observer-boundaries", "theme-watchdog-rollback", "encrypted-backup-restore", "scheduled-backup-restore",
     "live-ledger-backup-restore", "foreign-owner-volume-setup", "volume-read-write",
     "volume-read-only", "ui-restart-and-journal", "reboot-persistence", "complete"})
@@ -208,6 +208,14 @@ def active(unit):
     return subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0
 
 
+def assert_installed_setup_gate(expected):
+    """Check the *installed* root gate, never infer desktop rights from GUI fixtures."""
+    require_disposable_guest()
+    outcome = run("/usr/bin/haos-setup-gate", "state", capture_output=True, timeout=15)
+    if outcome.stdout.strip() != expected:
+        raise AssertionError("installed firstboot gate did not enforce the expected state")
+
+
 def namespace_probe(grants, script, arguments, label):
     require_disposable_guest()
     credential = ROOT / "probe-credential"
@@ -350,6 +358,12 @@ def main():
         assert any(d.get("uuid") == C and d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
     else:
         assert not any(d.get("uuid") == C or d.get("serial") == "HAOS-CI-DATA-C" for d in devices)
+    if not stamp.exists():
+        # Before any owner is enrolled, the real installed gate must deny
+        # greetd. An intentionally headless fixture does NOT prove VT8 GUI.
+        progress("firstboot-gate")
+        assert_installed_setup_gate("setup")
+        assert not active("greetd.service"), "greetd opened before owner enrollment"
     progress("owner-authentication")
     if not stamp.exists():
         # Fresh production systems hold execution until the owner is enrolled.
@@ -358,6 +372,17 @@ def main():
         run("haos-owner", "start")
     else:
         installed_owner_proof = owner_authentication_proof(first_boot=False)
+    # The acceptance fixture provisions its owner through the independent
+    # physical console, not the new GUI. Verify the transition explicitly.
+    assert_installed_setup_gate("desktop")
+    installed_owner_proof["installed_firstboot_gate_desktop_after_enrollment"] = True
+    if not stamp.exists():
+        installed_owner_proof["installed_firstboot_gate_denied_before_enrollment"] = True
+        # Production GUI calls for a reboot. This disposable console-auth
+        # fixture instead restarts greetd after the enrollment gate passes.
+        # It must never be called while the root setup window still runs.
+        run("systemctl", "stop", "haos-setup-desktop.service")
+        run("systemctl", "restart", "greetd.service")
     progress("runtime-readiness")
     wait_for(lambda: active("haos-controller.service"))
     wait_for(health)

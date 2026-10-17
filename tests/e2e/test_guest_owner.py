@@ -124,6 +124,26 @@ def test_agent_loopback_probe_fails_closed_on_outer_timeout(monkeypatch):
         guest.verify_agent_local_network_guard(SimpleNamespace(pw_uid=12345, pw_gid=12346), 19001)
 
 
+@pytest.mark.parametrize("installed,expected,valid", [
+    ("setup", "setup", True),
+    ("desktop", "desktop", True),
+    ("setup", "desktop", False),
+    ("desktop", "setup", False),
+])
+def test_installed_setup_gate_checks_real_cli_and_denies_mismatch(monkeypatch, installed, expected, valid):
+    monkeypatch.setattr(guest, "require_disposable_guest", lambda: None)
+    def execute(*args, **kwargs):
+        assert args == ("/usr/bin/haos-setup-gate", "state")
+        assert kwargs == {"capture_output": True, "timeout": 15}
+        return subprocess.CompletedProcess(args, 0, installed)
+    monkeypatch.setattr(guest, "run", execute)
+    if valid:
+        guest.assert_installed_setup_gate(expected)
+    else:
+        with pytest.raises(AssertionError, match="firstboot gate"):
+            guest.assert_installed_setup_gate(expected)
+
+
 def test_guest_budget_leaves_time_for_boot_diagnostics_and_shutdown():
     # An expanded guest matrix must fit inside the outer QEMU phase; otherwise
     # SIGTERM kills diagnostics and hides the original failure.
