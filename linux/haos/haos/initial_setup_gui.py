@@ -41,6 +41,7 @@ class Wizard:
         self.page = "security"
         self.codes = []
         self.codes_confirmed = False
+        self.owner_username = ""
         self.variables = {}
         self._build()
 
@@ -144,7 +145,7 @@ class Wizard:
                     result = self._run(lambda: initial_setup.create_initial_owner(name, secret, confirm),
                                        success="Administrator erstellt. Wiederherstellungscodes unbedingt sichern.")
                     if result is not None:
-                        self.codes = result[1]
+                        self.owner_username, self.codes = result
                         self.codes_confirmed = False
                         self.show("security")
                 self._button(self.content, "Administrator sicher erstellen", create, primary=True).pack(anchor="w", pady=22)
@@ -159,10 +160,33 @@ class Wizard:
                 from tkinter import messagebox
                 def accept():
                     if messagebox.askyesno("Recovery", "Sind alle zehn Codes sicher außerhalb des PCs gespeichert?"):
-                        self.codes.clear()
-                        self.codes_confirmed = True
-                        self.show("region")
+                        result = self._run(lambda: initial_setup.acknowledge_recovery(self.owner_username),
+                                           success="Alle Wiederherstellungscodes bestätigt.")
+                        if result is not None:
+                            self.codes.clear()
+                            self.codes_confirmed = True
+                            self.show("region")
                 self._button(self.content, "Alle Codes sicher gespeichert", accept, primary=True).pack(anchor="w")
+            elif status["pending"]:
+                self._label(self.content,
+                    "Unvollständige Wiederherstellung nach Unterbrechung.",
+                    size=14, color="#ffafba", bold=True).pack(anchor="w", pady=12)
+                self._label(self.content,
+                    "Alte Codes können aus Sicherheitsgründen nicht erneut angezeigt werden. "
+                    "Du kannst jetzt alle zehn Codes lokal neu erstellen; alte Codes werden ungültig.",
+                    size=11, color=self.MUTED).pack(anchor="w")
+                def recover():
+                    from .owner_recovery import owners
+                    username = owners()[0]["username"]
+                    codes = self._run(lambda: initial_setup.rotate_unconfirmed_codes(username),
+                                      success="Neue Recovery-Codes erzeugt. Jetzt sicher speichern.")
+                    if codes is not None:
+                        self.owner_username = username
+                        self.codes = codes
+                        self.codes_confirmed = False
+                        self.show("security")
+                self._button(self.content, "Wiederherstellungscodes neu ausgeben",
+                             recover, primary=True).pack(anchor="w", pady=18)
             else:
                 self._label(self.content, "Administrator bereits angelegt.", size=14, color=self.CYAN).pack(anchor="w", pady=7)
                 self._label(self.content,
@@ -254,7 +278,17 @@ class Wizard:
                 "Diese Oberfläche löscht keine Laufwerke und startet keine Fernzugriffs-Dienste.",
                 color=self.MUTED).pack(anchor="w")
             if ready:
-                self._button(self.content, "Sicheres Setup verlassen", self.root.destroy, primary=True).pack(anchor="w", pady=25)
+                def finish():
+                    result = self._run(initial_setup.finalize,
+                                       success="Einrichtung verifiziert. System wird neu gestartet.")
+                    if result is not None:
+                        # Explicit user action; no reboot after failed validation.
+                        import subprocess
+                        self.root.destroy()
+                        subprocess.run(["/usr/bin/systemctl", "--no-block", "reboot"],
+                                       check=True, timeout=15)
+                self._button(self.content, "Einrichtung abschließen und neustarten", finish,
+                             primary=True).pack(anchor="w", pady=25)
 
     def run(self):
         self.root.mainloop()

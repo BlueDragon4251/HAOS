@@ -55,7 +55,8 @@ def test_update_allowlist_is_applied_before_any_command(monkeypatch):
 def test_physical_owner_status_is_not_a_permission(monkeypatch):
     monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
     monkeypatch.setattr(initial_setup, "owners", lambda: [])
-    assert initial_setup.account_status() == {"owner": False, "recovery": False, "complete": False}
+    monkeypatch.setattr(initial_setup, "recovery_pending", lambda: False)
+    assert initial_setup.account_status() == {"owner": False, "recovery": False, "complete": False, "pending": False}
 
 
 def test_gateway_owner_and_platform_validation(monkeypatch):
@@ -71,3 +72,16 @@ def test_gateway_owner_and_platform_validation(monkeypatch):
         initial_setup.configure_gateway("id", "telegram", "short")
     with pytest.raises(ValueError):
         initial_setup.pair_gateway_sender("id", "bot", "sender", "chat", "personal", ("root",))
+
+
+def test_recovery_pending_prevents_success_without_loading_raw_codes(monkeypatch):
+    monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(initial_setup, "owners", lambda: [{"username": "owner", "uid": 1001}])
+    monkeypatch.setattr(initial_setup, "enrolled_owner", lambda name: SimpleNamespace(pw_uid=1001))
+    monkeypatch.setattr(initial_setup, "recovery_pending", lambda: True)
+    from haos import owner_recovery
+    monkeypatch.setattr(owner_recovery.RecoveryCodes, "__init__", lambda self: None)
+    monkeypatch.setattr(owner_recovery.RecoveryCodes, "_load", lambda self: {"owners": {"1001": {"hashes": ["dummy"] * 10}}})
+    assert initial_setup.account_status()["complete"] is False
+    with pytest.raises(PermissionError):
+        initial_setup.finalize()
