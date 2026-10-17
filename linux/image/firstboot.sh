@@ -50,11 +50,16 @@ system_phase() {
   sed -i "s/^user = .*/user = \"$HERMES_USER\"/" /etc/greetd/config.toml
 
   step "The login screen"
-  # Anaconda picks multi-user.target unless its kickstart says otherwise, because greetd provides
-  # no service(graphical-login); only graphical.target starts greetd and so the session.
+  # Preserve the graphical default for every future boot, but DO NOT start
+  # graphical.target from inside the still-running firstboot service.
+  # HAOS isn't initialized yet: controller.json, the root setup gate and its
+  # marker are created only at the very end of this system phase. A premature
+  # graphical.target activation can evaluate both ExecConditions against
+  # partial state and leave BOTH normal greetd and the owner wizard skipped.
+  # The owner wizard is WantedBy=multi-user.target and After=this firstboot
+  # service, so it runs automatically even if Anaconda boots multi-user first.
   if [[ "$(systemctl get-default)" != "graphical.target" ]]; then
     systemctl set-default graphical.target
-    systemctl --no-block start graphical.target
   fi
 
   step "Home folder"

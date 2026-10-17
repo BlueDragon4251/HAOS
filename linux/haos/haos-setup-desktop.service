@@ -35,7 +35,11 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 TasksMax=96
 MemoryMax=2G
 
-# With incomplete owner/recovery, normal greetd is suppressed and this
-# isolated local setup starts instead; already enrolled systems bypass it.
+# The FIRST Anaconda/bootc boot may reach only multi-user.target.
+# This root-only wizard MUST be activated at that target, AFTER firstboot has
+# finished initializing /etc/haos and the protected observer. Graphical.target
+# normally pulls in multi-user.target too. The ExecCondition still rejects
+# normal-boot systems with a verified completed setup receipt.
+# An independent tty2 recovery console remains available on display failure.
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target

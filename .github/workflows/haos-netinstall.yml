@@ -12,6 +12,8 @@ on:
       - 'linux/image/Containerfile'
       - 'linux/image/packages.txt'
       - 'linux/image/packages.sh'
+      - 'linux/image/firstboot.sh'
+      - 'linux/image/herald-os-firstboot.service'
       - 'linux/haos/**'
       - '.github/workflows/haos-dual-iso.yml'
       - '.github/workflows/haos-mobile.yml'

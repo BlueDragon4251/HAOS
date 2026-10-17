@@ -11,6 +11,11 @@ on:
       - 'linux/haos/haos/remote_*.py'
       - 'linux/haos/haos/owner.py'
       - 'linux/haos/tests/test_remote_bootstrap.py'
+      # Rebuild the developer installation vehicle when the installed OS
+      # firstboot gate changes. Live-ISO GUI smoke alone is not owner GUI proof.
+      - 'linux/image/firstboot.sh'
+      - 'linux/haos/haos-setup-desktop.service'
+      - 'linux/haos/haos/setup_gate.py'
       - '.github/workflows/haos-mobile.yml'
       - '.github/workflows/haos-image.yml'
       - '.github/workflows/haos-netinstall.yml'

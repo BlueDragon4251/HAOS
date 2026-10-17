@@ -115,3 +115,31 @@ For *current* older installs lacking the fix, reboot after tty2 enrollment
 to re-evaluate the systemd startup conditions. If graphics are still black,
 collect `systemctl status` of the two gated units and GUI journal
 evidence; never bypass the gate or wipe the disk as a first step.
+
+## Automatic graphical admin wizard on the very first installed boot (HP bugfix)
+
+An HP first-boot report identified a separate **activation-order** defect.
+The previous native wizard was `WantedBy=graphical.target` alone, while
+Anaconda can initially boot into `multi-user.target`. In addition, the
+firstboot script could queue `graphical.target` from within its **incomplete**
+firstboot service before `haos.initialize` had produced the credentials
+and root state required by the two boot gates.
+
+Fix: the dedicated VT8 native wizard is now `WantedBy=multi-user.target`,
+`After=` and `Requires=herald-os-firstboot.service`. The initialization
+script still installs `graphical.target` as the **next** boot default, but
+does **not** activate it early during initialization. The first boot therefore
+starts the root-only wizard on VT8 **automatically**, even when the first
+Anaconda target is text-only. `greetd` remains blocked until the separate,
+protected wizard completion receipt exists.
+
+The existing owner console on tty2 is a recovery fallback, NOT a mandatory
+firstboot step. A new user should be asked to create their administrator,
+password and recovery codes directly within the automatically launched VT8
+wizard. Unit tests assert the firstboot target ordering and prohibit starting
+graphical.target prematurely. **The real installed HP/UEFI GPU + keyboard
+acceptance is not complete merely because those tests pass.**
+
+An older installed image does **not** gain this fix until a newer bootc
+deployment is installed. Existing owner accounts/recovery codes are retained.
+Never erase the disk just to re-run initial setup.
