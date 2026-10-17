@@ -30,3 +30,18 @@ oder aus dem Mobilfunknetz allein **nicht**. Es verwendet weder einen
 Drittanbieter-Relay noch Router-Fernwartung oder automatisch konfigurierte Ports.
 Zertifikate, MAC-Adresse und Broadcast-Adresse werden von der App nicht
 dauerhaft gespeichert.
+
+## Authentifizierte Beobachtung von Missions-Anwendungen
+
+Im Desktop-Tab werden jetzt **nur** die vom Eigentümer einer expliziten
+Mission zugeordneten, kurzlebigen Anwendungscaptures über
+`GET /api/applications/<mission-id>` abgefragt. Die bereits bestehende
+mTLS-Gerätefreigabe benötigt zusätzlich `screenshots=true` für **diese**
+Mission. Bilder werden nach 15 Sekunden verworfen, sobald die Mission oder
+Aufnahmeautorität nicht mehr aktiv ist, bei Berechtigungsfehlern sowie beim
+Wechsel der Mission/des Tabs; sie werden nicht auf dem Telefon gespeichert.
+Es gibt keine Bildschirmspiegelung aller Fenster, kein Streaming und keine
+Fernsteuerung. Für den Fernzugriff über Mobilfunk muss außerdem ein
+wirklich erreichbarer eigener TLS-Host existieren, was Drei/CGNAT
+nicht automatisch bereitstellt. Der Betreiber kann die Freigabe jederzeit
+serverseitig widerrufen.

@@ -1,6 +1,11 @@
 package at.haos.mobile
 
 import android.os.Bundle
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.delay
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -59,6 +64,11 @@ private fun MobileApp() {
     var wakeBroadcast by remember { mutableStateOf("192.168.1.255") }
     var waking by remember { mutableStateOf(false) }
     var wakeFeedback by remember { mutableStateOf("") }
+    var selectedMission by remember { mutableStateOf("") }
+    var missionMenuOpen by remember { mutableStateOf(false) }
+    var remoteCaptures by remember { mutableStateOf<List<RemoteCapture>>(emptyList()) }
+    var remoteStatus by remember { mutableStateOf("Kein freigegebenes Anwendungsfenster.") }
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val clientPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -77,6 +87,35 @@ private fun MobileApp() {
                 .onSuccess { missions = it; status = "Sicher verbunden · Nur Lesezugriff" }
                 .onFailure { missions = emptyList(); status = it.message ?: "Verbindungsfehler" }
             busy = false
+        }
+    }
+    // Changing the selected mission or client identity invalidates prior screenshots.
+    // Only the existing owner-granted, mTLS read-only snapshot endpoint is called.
+    LaunchedEffect(session, tab, selectedMission) {
+        remoteCaptures = emptyList()
+        if (session == null || tab != Tab.Desktop || selectedMission.isBlank()) return@LaunchedEffect
+        while (true) {
+            val result = runCatching { session!!.applicationSnapshot(selectedMission) }
+            result.onSuccess { snapshot ->
+                remoteCaptures = snapshot.captures
+                remoteStatus = if (!snapshot.active) {
+                    "Diese Mission führt derzeit keine freigegebene Anwendung aus."
+                } else if (snapshot.captures.isEmpty()) {
+                    "Keine aktuelle, freigegebene Aufnahme (maximal 15 Sekunden gültig)."
+                } else {
+                    "Nur Beobachtung · ${snapshot.captures.size} freigegebene Aufnahme(n)"
+                }
+            }.onFailure {
+                remoteCaptures = emptyList()
+                remoteStatus = "Aufnahmen nicht freigegeben oder Verbindung unterbrochen."
+            }
+            delay(2500)
+        }
+    }
+    LaunchedEffect(missions) {
+        if (missions.none { it.id == selectedMission }) {
+            selectedMission = missions.firstOrNull()?.id ?: ""
+            remoteCaptures = emptyList()
         }
     }
     MaterialTheme(colorScheme = darkColorScheme(primary = cyan, onPrimary = navy,
@@ -143,16 +182,65 @@ private fun MobileApp() {
                         Info("Aufträge", "Neue Aufgaben über die App sind noch gesperrt. Dafür muss HAOS zuerst eine eigene gerätegebundene Schreibberechtigung bereitstellen.")
                     }
                     Tab.Desktop -> {
-                        Heading("Remote Desktop", "Präzise Steuerung auf deinem Handy")
-                        Box(Modifier.fillMaxWidth().height(220.dp)
-                            .clip(RoundedCornerShape(23.dp)).background(Color(0xFF08162C))
-                            .border(1.dp, outline, RoundedCornerShape(23.dp)),
-                            contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Rounded.DesktopWindows, null, Modifier.size(42.dp), tint = cyan)
-                                Text("Bildschirm nicht freigegeben", color = text)
-                                Text("Sicheres Streaming noch nicht eingerichtet", color = muted, fontSize = 12.sp)
+                        Heading("Remote-Ansicht", "Explizit freigegebene Anwendungsausschnitte")
+                        Panel {
+                            Text("Freigegebene Mission auswählen", color = cyan, fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold)
+                            Box {
+                                OutlinedButton(
+                                    onClick = { missionMenuOpen = true },
+                                    enabled = session != null && missions.isNotEmpty(),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(missions.firstOrNull { it.id == selectedMission }?.let {
+                                        "${it.state} · ${it.id.take(13)}…"
+                                    } ?: "Keine Mission freigegeben")
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Rounded.ArrowDropDown, null)
+                                }
+                                DropdownMenu(expanded = missionMenuOpen,
+                                    onDismissRequest = { missionMenuOpen = false }) {
+                                    missions.forEach { mission ->
+                                        DropdownMenuItem(
+                                            text = { Text("${mission.state} · ${mission.id.take(16)}…") },
+                                            onClick = {
+                                                selectedMission = mission.id
+                                                missionMenuOpen = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(remoteStatus, color = muted, fontSize = 12.sp)
+                            Text("Nur laufende, ausdrücklich geteilte Missions-Anwendungen. " +
+                                "Keine vollständige Desktopfreigabe, keine Eingaberechte.",
+                                color = muted, fontSize = 11.sp)
+                        }
+                        if (remoteCaptures.isEmpty()) {
+                            Box(Modifier.fillMaxWidth().height(160.dp)
+                                .clip(RoundedCornerShape(23.dp))
+                                .background(Color(0xFF08162C))
+                                .border(1.dp, outline, RoundedCornerShape(23.dp)),
+                                contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.DesktopWindows, null, Modifier.size(42.dp), tint = muted)
+                            }
+                        } else {
+                            remoteCaptures.forEach { capture ->
+                                Panel {
+                                    Text(capture.program, color = cyan, fontWeight = FontWeight.Bold)
+                                    val image = remember(capture.image) {
+                                        BitmapFactory.decodeByteArray(
+                                            capture.image, 0, capture.image.size
+                                        )?.asImageBitmap()
+                                    }
+                                    if (image != null) {
+                                        Image(bitmap = image,
+                                            contentDescription = "Freigegebene Anwendung: ${capture.program}",
+                                            modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                                            contentScale = ContentScale.Fit)
+                                    }
+                                }
                             }
                         }
                         Panel {
