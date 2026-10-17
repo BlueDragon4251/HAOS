@@ -148,7 +148,7 @@ jobs:
           fi
           sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_observer_authority.py
       - name: Validate service unit syntax
-        run: systemd-analyze verify linux/haos/*.service linux/haos/*.socket linux/haos/*.timer
+        run: SYSTEMD_UNIT_PATH="$PWD/linux/haos:$PWD/linux/image:" systemd-analyze verify linux/haos/*.service linux/haos/*.socket linux/haos/*.timer
       - name: Enforce the actual agent socket UID boundary with nftables
         run: sudo "$(command -v python)" -m pytest -q -s linux/haos/probes/test_network_boundary.py
       - name: Verify real owner password authentication and fixed CLI authority
