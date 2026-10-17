@@ -58,6 +58,30 @@ def setup_in_progress():
 
 
 
+def setup_finished():
+    """Require a verified, durable root-owned wizard completion receipt.
+
+    Owner enrollment on tty2 is deliberately not equivalent to completing
+    the normal user profile, localization, and graphical wizard.
+    """
+    require_root()
+    if COMPLETE.is_symlink():
+        raise PermissionError("untrusted graphical setup completion marker")
+    if not COMPLETE.exists():
+        return False
+    from .sandbox import trusted_json
+    import stat
+    info = COMPLETE.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+            or info.st_mode & 0o077 or info.st_nlink != 1):
+        raise PermissionError("graphical setup receipt must be root-private")
+    value = trusted_json(COMPLETE)
+    if (set(value) != {"version", "completed"} or type(value["version"]) is not int
+            or value["version"] != 1 or value["completed"] is not True):
+        raise PermissionError("invalid graphical setup completion receipt")
+    return True
+
+
 def recovery_pending():
     if PENDING.is_symlink():
         raise PermissionError("untrusted recovery pending marker")
@@ -324,17 +348,18 @@ def finalize():
     from .owner import audit
     from .policy import atomic_json
     readiness_check()
-    if setup_in_progress():
-        # On freshly enrolled installations, finish the NORMAL observer's
-        # profile before disabling the root setup boot gate.
-        from .normal_profile import mark_ready
-        mark_ready()
-    # Root-only evidence marker, never a plaintext secret or model-created flag.
+    # tty2 may have enrolled the owner without creating IN_PROGRESS. Never
+    # finalize such a path without a normal observer display name and profile.
+    # mark_ready preserves pre-existing user data and validates its ownership.
+    from .normal_profile import mark_ready
+    mark_ready()
     if COMPLETE.is_symlink():
         raise PermissionError("untrusted setup completion marker")
-    atomic_json(COMPLETE, {"version": 1, "completed": True}, mode=0o600)
     subprocess.run(["/usr/bin/systemctl", "restart", "haos-owner-ready.service"],
                    check=True, timeout=35, capture_output=True)
+    # Publish a validated receipt only after all mandatory owner/profile
+    # readiness operations succeeded; the gate rejects any partial state.
+    atomic_json(COMPLETE, {"version": 1, "completed": True}, mode=0o600)
     audit("setup.graphical-complete", {"owner_confirmed": True})
     if setup_in_progress():
         IN_PROGRESS.unlink()

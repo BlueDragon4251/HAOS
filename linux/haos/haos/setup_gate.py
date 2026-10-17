@@ -3,7 +3,8 @@
 New installations with missing owner/recovery are directed to a *physical*
 administrator wizard. Existing owners with validated recovery are migrated
 without automatically exposing a root X11 session after an image update.
-The graphical setup stays explicitly opt-in until installed-OS boot acceptance.
+The graphical setup remains mandatory until its separate validated
+completion receipt exists; tty2 owner recovery cannot substitute for it.
 """
 from __future__ import annotations
 
@@ -31,7 +32,12 @@ def boot_destination() -> str:
     # 'emergency' Electron root session.
     if os.geteuid() != 0:
         raise PermissionError("boot decision requires root-owned host state")
-    return decision(initial_setup.account_status(), initial_setup.setup_in_progress())
+    destination = decision(initial_setup.account_status(), initial_setup.setup_in_progress())
+    if destination == "desktop" and not initial_setup.setup_finished():
+        # Root-owned recovery codes are not proof the graphical / normal-user
+        # setup is finished. This matters when tty2 recovery enrolled first.
+        return "setup"
+    return destination
 
 
 def main() -> None:

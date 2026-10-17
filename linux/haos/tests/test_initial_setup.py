@@ -93,3 +93,50 @@ def test_root_service_cannot_start_while_new_recovery_codes_unconfirmed(monkeypa
     monkeypatch.setattr(initial_setup, "recovery_pending", lambda: True)
     with pytest.raises(PermissionError, match="not yet been confirmed"):
         owner_ready.main()
+
+
+
+def test_initial_setup_requires_valid_private_completion_receipt(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    from haos import initial_setup
+    monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
+    root = tmp_path / "haos-owner"
+    root.mkdir(mode=0o700)
+    receipt = root / "graphical-setup.json"
+    monkeypatch.setattr(initial_setup, "COMPLETE", receipt)
+    assert initial_setup.setup_finished() is False
+    # A forged or loose-mode receipt may never substitute for the owner flow.
+    receipt.write_text(json.dumps({"version": 1, "completed": True}))
+    receipt.chmod(0o644)
+    with pytest.raises(PermissionError):
+        initial_setup.setup_finished()
+    receipt.chmod(0o600)
+    # CI may not run as uid 0: mock the strict parser, but never bypass
+    # the preceding path stat/mode checks or schema validation.
+    monkeypatch.setattr(
+        __import__("haos.sandbox", fromlist=["trusted_json"]), "trusted_json",
+        lambda path: json.loads(Path(path).read_text()))
+    with pytest.raises(PermissionError):
+        receipt.write_text(json.dumps({"version": 1, "completed": False}))
+        initial_setup.setup_finished()
+    receipt.write_text(json.dumps({"version": 1, "completed": True}))
+    assert initial_setup.setup_finished() is True
+    receipt.unlink()
+    receipt.symlink_to(root / "missing")
+    with pytest.raises(PermissionError):
+        initial_setup.setup_finished()
+
+
+def test_finalize_requires_observer_name_even_after_tty2_enrollment(monkeypatch):
+    from haos import initial_setup
+    monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(initial_setup, "account_status", lambda: {
+        "owner": True, "recovery": True, "complete": True, "pending": False})
+    monkeypatch.setattr(initial_setup, "setup_in_progress", lambda: False)
+    from haos import owner_ready, normal_profile
+    monkeypatch.setattr(owner_ready, "main", lambda: None)
+    monkeypatch.setattr(normal_profile, "mark_ready",
+                        lambda: (_ for _ in ()).throw(PermissionError("missing display name")))
+    with pytest.raises(PermissionError, match="missing display name"):
+        initial_setup.finalize()

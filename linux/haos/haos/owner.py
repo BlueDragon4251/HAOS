@@ -44,6 +44,15 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    onboard = sub.add_parser("setup",
+        help="local owner fallback for completing setup if the graphical VT8 fails")
+    onboard_actions = onboard.add_subparsers(dest="setup_action", required=True)
+    onboard_actions.add_parser("status")
+    onboard_name = onboard_actions.add_parser("name",
+        help="configure the bounded observer display name, not a Unix username")
+    onboard_name.add_argument("display_name")
+    onboard_actions.add_parser("finish",
+        help="complete setup only after owner, recovery and normal profile are ready")
     remote=sub.add_parser('remote',help='owner-paired TLS observation; disabled until explicitly started')
     remote_sub=remote.add_subparsers(dest='remote_action',required=True)
     for action in ('start','stop','status'):remote_sub.add_parser(action)
@@ -184,7 +193,28 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action=='remote':
+    if args.action == "setup":
+        # Only the authenticated, physically present owner may finish setup
+        # without the graphical wizard. No agent, gateway or SSH session.
+        from .owner_recovery import require_console
+        require_console()
+        if any(os.environ.get(key) for key in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY")):
+            raise PermissionError("initial setup requires a local physical console")
+        device = os.ttyname(0)
+        if not device.startswith("/dev/tty") or not device[8:].isdigit():
+            raise PermissionError("initial setup requires a local Linux virtual terminal")
+        from . import initial_setup
+        if args.setup_action == "status":
+            print(json.dumps({"owner_recovery": initial_setup.account_status(),
+                              "normal_profile_ready": initial_setup.normal_user_ready(),
+                              "wizard_receipt": initial_setup.setup_finished()}, indent=2))
+        elif args.setup_action == "name":
+            print(json.dumps(initial_setup.configure_normal_user(args.display_name), indent=2))
+        elif args.setup_action == "finish":
+            print(json.dumps(initial_setup.finalize(), indent=2))
+        else:
+            raise PermissionError("unknown local setup operation")
+    elif args.action=='remote':
         from .remote_setup import owner_remote
         print(json.dumps(owner_remote(args),indent=2))
     elif args.action == "application":

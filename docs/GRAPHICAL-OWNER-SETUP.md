@@ -76,3 +76,42 @@ Do not release this branch as production-ready on the basis of those tests.
 
 `haos-recovery.service` on tty2 is not removed. Avoid a production release or
 an unattended upgrade of the daily-driver HP until actual boot acceptance.
+
+## Recovered owner on tty2 but no GUI on VT8
+
+A real HP installation exposed a boot arbitration defect: tty2 owner
+enrollment + recovery-code generation previously satisfied the general
+`account_status.complete` flag without completing the separate graphical
+normal-user profile. The desktop could be treated as eligible before the
+mandatory profile; both systemd ExecConditions may still show old results
+from the pre-enrollment boot.
+
+The fixed boot gate now requires the dedicated root-owned 0600
+`graphical-setup.json` receipt **as well as** owner/recovery readiness.
+The receipt is only published after the normal observer display-name
+profile and owner service checks succeed. Failed or malformed receipts
+never unlock the desktop.
+
+**Physical fallback if Xorg VT8 cannot display the wizard:** On the
+machine's physical tty3, log in with the *existing owner account* and
+run (sudo prompts for the owner password, never the locked root password):
+
+```sh
+sudo /usr/bin/haos-owner setup status
+sudo /usr/bin/haos-owner setup name "Mein Anzeigename"
+sudo /usr/bin/haos-owner setup finish
+systemctl reboot
+```
+
+This fixed-action fallback is local-console only; the command rejects
+SSH and other pseudo-terminals. It never edits administrator identities,
+reissues recovery codes, opens a remote surface or exposes a root shell.
+The initial owner and ten recovery codes MUST already exist and be saved.
+On installations from **older ISO revisions**, the fallback subcommands
+will not be present until that OS image is upgraded; do not instruct
+users to run them on unchanged old bootc images.
+
+For *current* older installs lacking the fix, reboot after tty2 enrollment
+to re-evaluate the systemd startup conditions. If graphics are still black,
+collect `systemctl status` of the two gated units and GUI journal
+evidence; never bypass the gate or wipe the disk as a first step.
