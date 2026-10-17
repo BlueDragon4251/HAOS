@@ -1,0 +1,45 @@
+name: HAOS immutable tri-artifact qualification
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source commit to qualify
+        required: true
+        type: string
+  push:
+    branches: [agent/haos-foundation]
+    paths:
+      - '.github/workflows/haos-qualification.yml'
+      - 'scripts/release/**'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  test-policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test release policy (fail closed)
+        run: python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
+  qualify:
+    needs: test-policy
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read authenticated source-matched workflow and artifact evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python3 scripts/release/qualify.py --sha "$SOURCE_SHA" --repo "$GITHUB_REPOSITORY" \
+            --output evidence/qualification.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: haos-qualification-${{ inputs.source_sha }}
+          path: evidence/qualification.json
+          retention-days: 30
+          if-no-files-found: warn
