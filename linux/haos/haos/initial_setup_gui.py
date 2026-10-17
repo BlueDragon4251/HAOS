@@ -43,6 +43,7 @@ class Wizard:
         self.codes_confirmed = False
         self.owner_username = ""
         self.variables = {}
+        self.running = False
         self._build()
 
     def _label(self, parent, text, *, size=12, color=None, bold=False, wrap=800):
@@ -108,6 +109,9 @@ class Wizard:
 
     def _run(self, action, *, success="Gespeichert."):
         from tkinter import messagebox
+        if self.running:
+            self.status.config(text="Warte, bis die laufende Systemaktion beendet ist.", fg=self.MUTED)
+            return None
         self.status.config(text="Wird sicher angewendet …", fg=self.MUTED)
         self.root.update_idletasks()
         try:
@@ -120,6 +124,46 @@ class Wizard:
             return None
         self.status.config(text=success, fg=self.CYAN)
         return result
+
+    def _run_async(self, action, *, success="Gespeichert."):
+        """Keep Tk's event loop responsive during authenticated slow system actions.
+
+        Exactly one privileged mutation can be underway. No worker thread
+        touches Tk; it reports only sanitized success/failure through a queue.
+        """
+        import queue
+        import threading
+        from tkinter import messagebox
+        if self.running:
+            self.status.config(text="Bitte warte, bis die aktuelle Systemaktion abgeschlossen ist.")
+            return
+        self.running = True
+        self.status.config(text="Aktion läuft … Netzwerk und Datenträger können Zeit benötigen.",
+                           fg=self.CYAN)
+        results = queue.Queue(maxsize=1)
+
+        def worker():
+            try:
+                action()
+                results.put(True)
+            except (RuntimeError, ValueError, PermissionError, OSError, TimeoutError):
+                results.put(False)
+
+        threading.Thread(target=worker, daemon=True, name="haos-setup-action").start()
+
+        def poll():
+            try:
+                ok = results.get_nowait()
+            except queue.Empty:
+                self.root.after(150, poll)
+                return
+            self.running = False
+            if ok:
+                self.status.config(text=success, fg=self.CYAN)
+            else:
+                self.status.config(text="Aktion fehlgeschlagen; keine Bestätigung.", fg="#ffafba")
+                messagebox.showerror("HAOS", "Aktion nicht abgeschlossen. Prüfe Internet, Credentials und Systemstatus.")
+        self.root.after(150, poll)
 
     def show(self, name):
         tk = self.tk
@@ -213,7 +257,7 @@ class Wizard:
             def apply():
                 key=secret.get()
                 secret.delete(0, tk.END)
-                self._run(lambda: initial_setup.configure_provider(
+                self._run_async(lambda: initial_setup.configure_provider(
                     provider.get(), model.get(), key, endpoint.get()))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
             self._label(self.content, "Codex-Kontologin und Multi-Provider-Auswahl sind in dieser Stufe noch nicht verfügbar.",
@@ -226,7 +270,7 @@ class Wizard:
             def save_token():
                 secret = token.get()
                 token.delete(0, tk.END)
-                self._run(lambda: initial_setup.configure_ghcr(username.get(), secret),
+                self._run_async(lambda: initial_setup.configure_ghcr(username.get(), secret),
                           success="Privates GHCR-Login geprüft und geschützt gespeichert.")
             self._button(self.content, "Dev-Token sicher hinterlegen", save_token).pack(anchor="w", pady=14)
             channel = self._choice(self.content, "Update-Kanal", ["stable", "dev"], "stable")
@@ -235,7 +279,7 @@ class Wizard:
                            variable=automatic, bg=self.PANEL, fg=self.TEXT,
                            selectcolor=self.BG, activebackground=self.PANEL).pack(anchor="w", pady=9)
             self._button(self.content, "Kanal wählen und bootc-Image prüfen",
-                         lambda: self._run(lambda: initial_setup.configure_update(channel.get(), automatic.get()),
+                         lambda: self._run_async(lambda: initial_setup.configure_update(channel.get(), automatic.get()),
                                            success="Bootc-Update vorbereitet. Neustart nach eigener Freigabe."),
                          primary=True).pack(anchor="w", pady=13)
         elif name == "gateways":
@@ -247,7 +291,7 @@ class Wizard:
             def configure():
                 secret = token.get()
                 token.delete(0, tk.END)
-                self._run(lambda: initial_setup.configure_gateway(
+                self._run_async(lambda: initial_setup.configure_gateway(
                     connector.get(), platform.get(), secret),
                     success="Gateway gespeichert. Neustart des Gateway-Dienstes erforderlich.")
             self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
@@ -258,7 +302,7 @@ class Wizard:
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
             identity = self._field(self.content, "HAOS-Identität", "personal")
             self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
-                         lambda: self._run(lambda: initial_setup.pair_gateway_sender(
+                         lambda: self._run_async(lambda: initial_setup.pair_gateway_sender(
                              binding.get(), connector.get(), sender.get(), chat.get(), identity.get()),
                              success="Absender explizit freigegeben. Gateway-Neustart erforderlich."),
                          primary=True).pack(anchor="w", pady=(10, 0))
