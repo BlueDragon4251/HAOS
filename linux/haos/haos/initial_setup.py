@@ -18,6 +18,27 @@ from .provider_policy import ProviderPolicy, ENDPOINTS
 # Never store a plaintext password, recovery code, provider key or GHCR token
 # in setup state, IPC, temporary files, shell argv, or the audit log.
 RUNNING = ("haos-gateway.service", "haos-controller.service", "haos-hermes.service")
+PROVIDER_UNITS = ("haos-provider.socket", "haos-provider.service")
+
+
+def quiesce_for_setup(*, gateway_only=False):
+    """Root-only predictable service interruption before changing live secrets.
+
+    Unlike the legacy owner CLI (which requires a manual stop), the graphical
+    flow stops its own services and verifies quiescence, never invokes a shell.
+    """
+    require_root()
+    units = ("haos-gateway.service",) if gateway_only else (*RUNNING, *PROVIDER_UNITS)
+    subprocess.run(["/usr/bin/systemctl", "stop", *units], check=True,
+                   timeout=75, capture_output=True)
+    from .gateway_setup import stopped_gateway
+    stopped_gateway()
+    if not gateway_only:
+        from .owner import stopped
+        from .provider_setup import stopped_provider
+        stopped()
+        stopped_provider()
+
 PENDING = Path("/var/lib/haos-owner/setup-recovery-pending.json")
 COMPLETE = Path("/var/lib/haos-owner/graphical-setup.json")
 IN_PROGRESS = Path("/var/lib/haos-owner/graphical-setup-in-progress.json")
@@ -187,9 +208,10 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
         raise ValueError("a local endpoint does not use a cloud credential")
     if provider != "local" and not api_key:
         raise ValueError("cloud API key required")
-    stopped()
-    stopped_gateway()
-    stopped_provider()
+    if provider != "local" and (not 16 <= len(api_key) <= 16384 or
+                                   any(ord(c) < 33 or ord(c) > 126 for c in api_key)):
+        raise ValueError("invalid provider credential")
+    quiesce_for_setup()
     # Only now does the vetted owner credential publisher replace trusted files.
     publish(policy.data, api_key if provider != "local" else None)
     install(pwd.getpwnam("haos-agent").pw_uid)
@@ -215,7 +237,7 @@ def configure_gateway(connector: str, platform: str, token: str):
     from .gateway import GatewayPolicy
     from .owner import audit
     policy, credentials = load()
-    stopped_gateway()
+    quiesce_for_setup(gateway_only=True)
     if any(c["id"] != connector and c["platform"] == platform for c in policy["connectors"]):
         raise ValueError("one isolated adapter per platform is currently supported")
     policy["connectors"] = [c for c in policy["connectors"] if c["id"] != connector] + [
@@ -237,7 +259,7 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     from .gateway import GatewayPolicy
     from .owner import audit
     policy, credentials = load()
-    stopped_gateway()
+    quiesce_for_setup(gateway_only=True)
     item = {"id": binding_id, "connector": connector, "sender": sender, "chat": chat,
             "scope": "", "thread": "", "identity": identity,
             "capabilities": list(capabilities)}
