@@ -10,6 +10,9 @@ on:
       - 'linux/haos/setup-display.sh'
       - 'linux/haos/haos-setup-desktop.service'
       - 'linux/haos/haos/setup_gate.py'
+      - 'linux/haos/haos/normal_profile.py'
+      - 'linux/haos/tests/test_normal_profile.py'
+      - 'linux/image/packages.txt'
       - 'linux/haos/tests/test_setup_gate.py'
       - 'linux/bin/haos-setup-gate'
       - 'linux/haos/install.sh'
@@ -35,7 +38,7 @@ jobs:
           PYTHONPATH: linux/haos
         run: |
           python -m pip install pytest
-          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py linux/haos/tests/test_setup_gate.py
+          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py linux/haos/tests/test_setup_gate.py linux/haos/tests/test_normal_profile.py
       - name: Render native setup under virtual X display (nonprivileged fixture)
         run: |
           sudo apt-get update -qq
@@ -46,9 +49,11 @@ jobs:
           import tkinter
           from haos import initial_setup
           initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True, "pending": False}
+          initial_setup.normal_user_ready=lambda: True
+          initial_setup.setup_in_progress=lambda: False
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
-          for page in ("security", "region", "provider", "updates", "gateways", "finish"):
+          for page in ("security", "user", "region", "provider", "updates", "gateways", "finish"):
               wizard.show(page)
               wizard.root.update_idletasks()
               assert wizard.content.winfo_children(), page
@@ -63,7 +68,30 @@ jobs:
           assert not wizard.running, "Setup must not freeze during slow operations"
           assert "Async operation complete" in wizard.status.cget("text")
           wizard.root.destroy()
-          print("All six native HAOS setup pages and live operation state rendered under Xvfb")
+          print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
+          PY
+      - name: Verify 640x480 graphical setup with a scrolling small-screen layout
+        run: |
+          xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 - <<'PY'
+          import sys
+          sys.path.insert(0, 'linux/haos')
+          import tkinter
+          from haos import initial_setup
+          from haos.initial_setup_gui import Wizard
+          initial_setup.account_status = lambda: {'owner': True, 'recovery': True, 'complete': True, 'pending': False}
+          initial_setup.normal_user_ready = lambda: True
+          initial_setup.setup_in_progress = lambda: False
+          wizard = Wizard(tkinter)
+          assert wizard.compact
+          assert wizard.root.winfo_screenwidth() == 640
+          for page in ('security', 'user', 'region', 'provider', 'updates', 'gateways', 'finish'):
+              wizard.show(page)
+              wizard.root.update()
+              assert wizard.content.winfo_children(), page
+          assert wizard.viewport.winfo_width() > 100
+          assert wizard.root.winfo_reqwidth() <= 640
+          wizard.root.destroy()
+          print('All seven setup pages render within a 640x480 X screen')
           PY
       - name: Assert firstboot and migration gate wiring
         run: |
