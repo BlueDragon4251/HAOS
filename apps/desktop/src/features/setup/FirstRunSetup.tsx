@@ -74,7 +74,10 @@ export function FirstRunSetup() {
             <div className="max-h-[320px] overflow-y-auto rounded-xl">
               <StatusPanel panel="wifi" />
             </div>
-            <Footer onNext={next} label="Next" />
+            <div className="flex items-center justify-between gap-3">
+              <GlassButton variant="ghost" onClick={next}>Skip Wi-Fi for now</GlassButton>
+              <Footer onNext={next} label="Next" />
+            </div>
           </div>
         )}
         {step === 'hermes' && <HermesStep onDone={next} />}

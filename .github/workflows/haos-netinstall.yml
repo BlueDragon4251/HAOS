@@ -51,6 +51,7 @@ jobs:
           python3 -m venv /tmp/haos-ci-venv
           /tmp/haos-ci-venv/bin/python -m pip install pytest
           /tmp/haos-ci-venv/bin/python -m pytest -q linux/haos/tests/test_private_netinstall.py linux/haos/tests/test_dual_channel_install.py
+          node linux/haos/tests/desktop-network-policy.test.cjs
       - name: Build the pinned HAOS shell
         run: |
           set -euo pipefail
