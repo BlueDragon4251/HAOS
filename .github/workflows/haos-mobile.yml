@@ -5,6 +5,8 @@ on:
     paths:
       - 'apps/mobile/**'
       - 'linux/haos/haos/remote_*.py'
+      - 'linux/haos/haos/owner.py'
+      - 'linux/haos/tests/test_remote_bootstrap.py'
       - '.github/workflows/haos-mobile.yml'
       - '.github/workflows/haos-dual-iso.yml'
       - '.github/workflows/haos-netinstall.yml'

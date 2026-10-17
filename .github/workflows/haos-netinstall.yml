@@ -15,6 +15,7 @@ on:
       - 'linux/haos/**'
       - '.github/workflows/haos-dual-iso.yml'
       - '.github/workflows/haos-mobile.yml'
+      - '.github/workflows/haos-image.yml'
       - 'apps/desktop/src/**'
       - 'upstream/*.lock'
       - 'package*.json'

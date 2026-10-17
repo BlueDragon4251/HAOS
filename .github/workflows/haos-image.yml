@@ -16,6 +16,10 @@ on:
       - 'upstream/*.lock'
       - '.containerignore'
       - '.github/workflows/haos-image.yml'
+      # Source-matched Android and dual-ISO candidate changes must also
+      # produce an independently installed/offline-booted guest receipt.
+      - '.github/workflows/haos-mobile.yml'
+      - '.github/workflows/haos-dual-iso.yml'
       # These are exercised by the required CI/service jobs, and are never
       # installed or bundled into the shipped runtime. Do not rebuild an ISO
       # merely to repair a test fixture. Production inputs above still trigger.

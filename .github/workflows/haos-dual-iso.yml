@@ -11,6 +11,9 @@ on:
       - 'linux/haos/haos/remote_*.py'
       - 'linux/haos/haos/owner.py'
       - 'linux/haos/tests/test_remote_bootstrap.py'
+      - '.github/workflows/haos-mobile.yml'
+      - '.github/workflows/haos-image.yml'
+      - '.github/workflows/haos-netinstall.yml'
   workflow_dispatch:
 permissions:
   contents: read
