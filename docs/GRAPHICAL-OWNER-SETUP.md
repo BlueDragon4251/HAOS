@@ -1,41 +1,78 @@
-# HAOS initial graphical administrator setup — development
+# HAOS graphical administrator first boot — development acceptance
 
-**Status:** native graphical setup source and hardened root-seat launcher are
-in the development image, but the dedicated X11 VT8 seat is **disabled by
-default** until its UEFI/BIOS input/graphics and firstboot/upgrade integration
-are verified in QEMU and on hardware. This must not be reported as a finished
-first-boot desktop. The existing tty2 owner recovery remains the fallback.
+**Experimental on `agent/haos-foundation`.** The current development image now
+**enables** a dedicated graphical setup service. On a fresh HAOS install,
+`haos-setup-gate` suppresses the normal greetd desktop until a separate
+owner, recovery codes and the normal observer profile have completed setup.
+An already enrolled owner with recovery and no interrupted wizard **skips** the
+new privileged setup screen (migration; existing files and users are kept).
+The decision runs as root, not through an agent or remotely supplied message.
 
-## Implemented, not yet hardware-verified
-- A separate initial-setup authority in `haos.initial_setup`, callable only
-  from root. There is **no Electron or Hermes direct RPC** into it.
-- A native Tkinter UI (`haos.initial_setup_gui`) with German labels, a
-  dark HAOS visual design, password-based separate owner enrollment and ten
-  single-use recovery codes, system locale/keymap, single-provider configuration,
-  GHCR read-only token entry and stable/dev bootc channel switching.
-- One-time recovery codes remain visible until the operator confirms they
-  have been saved off-device; if the setup crashes before acknowledgement,
-  physical trusted setup must rotate them, invalidating previous codes.
-- A private Xorg display only on VT8 (no TCP connections; random Xauthority
-  cookie under /run); root X11 process launches no Electron and accepts no
-  remote or observer connection.
-- Existing installed owner accounts are never overwritten by this setup.
-  The current provider UI supports **one active provider**. Multi-provider
-  routing was separately implemented as a tested pure policy, not yet wired
-  to the live model proxy; no false 'automatic' readiness.
-- Gateways, remote desktop and Mobile device pairing require further work.
+There is **no complete installed UEFI/BIOS VM or physical HP acceptance yet**.
+The native window passed Xvfb seven-screen rendering at normal and 640×480
+resolutions, syntax and permissions unit tests. A successful test or container
+build does not prove real graphics, Wi-Fi, input or completed reboot on hardware.
+Do not release this branch as production-ready on the basis of those tests.
 
-## Safety constraints and acceptance before enabling
-- Graphical root enrollment and recovery are highly privileged. They must be
-  isolated from ordinary observer/agent sessions and invoked only by the
-  root-owned systemd service and physically trusted local display.
-- Prove graphics and input on the target HP and disposable UEFI/BIOS QEMU.
-- Prove the 20+ character password and offline recovery-code flow with PAM.
-- Prove that root secret entry is not available to the observer, remote users,
-  clipboard, Hermes, socket, logs, screenshots, or persistent home storage.
-- Restore normal user session on completion with no root session remaining.
-- Test migration (already-enrolled owners) without data/account deletion.
-- Only then enable `haos-setup-desktop.service` for initial boot, and
-  move the remaining owner CLI actions behind this trusted graphical UI.
+## Implemented pieces
 
-Production installer must NOT silently switch to root if GUI setup fails.
+- Private root-owned Xorg display `:8` on VT8, non-TCP, random protected
+  Xauthority cookie, explicit Austrian keyboard before password entry,
+  physical VT activation, no privileged Electron/Hermes browser.
+- Seven responsive, vertically scrollable graphical pages:
+  administrator and recovery, normal user, language and keyboard, Hermes
+  provider/model, stable/dev image updates with private GHCR credentials,
+  Telegram/Discord bot credentials and sender bindings, and finish/reboot.
+- Separate 20+-character owner password validation through HAOS enrollment;
+  ten one-time offline recovery codes must be displayed and acknowledged.
+  Interrupted attempts and pre-existing owner accounts missing recovery can
+  continue in the physical wizard without wiping an account or personal data.
+- A **durable wizard-in-progress marker** prevents a crash after saving recovery
+  codes from opening the normal desktop before the wizard has finished.
+- Observer name and per-user locale/keymap are transferred through a bounded
+  fixed-account writer; no arbitrary paths/usernames, secret-bearing command
+  lines or untrusted symlinks. Existing session setup receipts are preserved.
+- Owned gateway/provider changes stop and check relevant services before
+  changing live secrets, without asking the operator to paste commands.
+- Protected owner-only stable/dev bootc and GHCR credentials reuse the
+  existing root authority implementation. The prior bootc deployment remains
+  subject to tested rollback behavior.
+
+## Important current limitations
+
+- **Root window/VT8 real boot must still be tested.** If it fails, the
+  independent physical tty2 recovery console remains the supported fallback.
+  No automatic fail-open root shell or unrestricted desktop is provided.
+- The normal desktop remains the existing locked non-administrator observer
+  Unix account, with a user-chosen **display name**, not a new full interactive
+  Linux login account. Distinct personal interactive Unix accounts still need
+  integration work.
+- Provider GUI configures **one active provider**. The separate pure automatic
+  multi-model routing policy is not wired into the live Hermes broker; multiple
+  simultaneous providers and per-task model choice are not delivered yet.
+- Only Telegram and Discord have HAOS gateway authorization. The wider Hermes
+  plugin catalogue is not equivalent to HAOS runtime support.
+- Mobile is an Android APK with read-only owner-granted mission inspection;
+  actual remote desktop capture, low-latency touch, secure QR pairing, revocation,
+  worldwide connectivity and remote wake remain to implement and physically test.
+- Current Zwei-route firstboot language choices include `de_AT.UTF-8`,
+  `de_DE.UTF-8`, English and French, but **full interface translations** have
+  not been completed.
+- Public reachable Drei WAN connectivity is **still pending**. Do not enable
+  router DMZ, UPnP or unauthenticated WAN admin.
+
+## Required acceptance before stable or a real daily-driver update
+
+1. Actual Fedora 44 image and ISO build, installation and reboot into VT8 on
+   disposable UEFI and BIOS QEMU, with video/keyboard/mouse interaction.
+2. Physical keyboard mapping, mouse, UI scaling and root-secret isolation on HP.
+3. New owner account and offline recovery codes fully exercised with PAM/sudo,
+   crash-and-retry at every enrollment stage, then normal user login on reboot.
+4. Already enrolled installation migration and user-file preservation.
+5. End-to-end firstboot stable/dev updates, live provider tokens and model
+   calls, gateway delivery and revocation.
+6. Full translations, integration of multiple models/providers and gateway
+   platforms, then Android paired streaming/input/wake acceptance.
+
+`haos-recovery.service` on tty2 is not removed. Avoid a production release or
+an unattended upgrade of the daily-driver HP until actual boot acceptance.
