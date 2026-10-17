@@ -55,6 +55,10 @@ private fun MobileApp() {
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var status by remember { mutableStateOf("Nicht verbunden") }
     var busy by remember { mutableStateOf(false) }
+    var wakeMac by remember { mutableStateOf("") }
+    var wakeBroadcast by remember { mutableStateOf("192.168.1.255") }
+    var waking by remember { mutableStateOf(false) }
+    var wakeFeedback by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val clientPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -151,7 +155,53 @@ private fun MobileApp() {
                                 Text("Sicheres Streaming noch nicht eingerichtet", color = muted, fontSize = 12.sp)
                             }
                         }
-                        Info("Einschalten und Steuern", "Der ausgeschaltete PC kann nur mit einem unterstützten Wake-Verfahren geweckt werden. Maus, Tastatur und Power-Befehle erfordern eine zusätzliche abgesicherte Host-Schnittstelle.")
+                        Panel {
+                            Text("PC im lokalen WLAN einschalten", fontWeight = FontWeight.Bold,
+                                color = cyan, fontSize = 16.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Wake-on-LAN benötigt aktiviertes WoL im BIOS/Netzwerkadapter und Stromversorgung am PC. " +
+                                "Nur im selben LAN; kein Einschalten über mobile Daten oder das Internet.",
+                                color = muted, fontSize = 12.sp)
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(value = wakeMac, onValueChange = { wakeMac = it },
+                                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Ethernet-MAC des PCs") },
+                                placeholder = { Text("02:11:22:33:44:55") })
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(value = wakeBroadcast,
+                                onValueChange = { wakeBroadcast = it },
+                                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                label = { Text("LAN-Broadcast-Adresse") },
+                                placeholder = { Text("192.168.1.255") })
+                            Spacer(Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    waking = true
+                                    wakeFeedback = ""
+                                    scope.launch {
+                                        runCatching { WakeOnLan.send(wakeMac, wakeBroadcast) }
+                                            .onSuccess {
+                                                wakeFeedback = "Magic Packet gesendet. Ob der PC gestartet ist, kann die App ohne Host-Verbindung nicht feststellen."
+                                            }
+                                            .onFailure {
+                                                wakeFeedback = it.message ?: "Wake-on-LAN konnte nicht gesendet werden."
+                                            }
+                                        waking = false
+                                    }
+                                }, enabled = !waking && wakeMac.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.PowerSettingsNew, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (waking) "Sende..." else "Wake-on-LAN senden")
+                            }
+                            if (wakeFeedback.isNotBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(wakeFeedback, color = muted, fontSize = 12.sp)
+                            }
+                        }
+                        Info("Remote-Fernsteuerung",
+                            "Ein authentifizierter Live-Bildschirm und Eingabekanal müssen auf dem Host noch implementiert und getrennt freigegeben werden.")
                     }
                     Tab.Devices -> {
                         Heading("Gerät verbinden", "Eigene Verbindung ohne Fremdkonto")

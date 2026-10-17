@@ -17,3 +17,16 @@ CI builds a debug APK and publishes an Actions artifact.
 HAOS Mobile's source and credentials remain in your control, with no required
 Tailscale account or hosted relay. Direct WAN access will depend on Drei providing
 a reachable address (or an explicitly accepted alternative).
+
+## Wake-on-LAN im lokalen Netz
+
+Im Tab **Desktop** kann die App ein standardkonformes 102-Byte-Wake-on-LAN-
+Magic-Packet an eine explizite private IPv4-Broadcast-Adresse senden (UDP/9).
+Sie benötigt dazu nur die **kabelgebundene MAC-Adresse** des schlafenden PCs
+sowie das bereits eingerichtete WoL im UEFI/BIOS und Netzwerkadapter.
+Android und PC müssen dasselbe erreichbare lokale Netzwerk verwenden.
+Das Paket bestätigt keinen erfolgreichen Start und funktioniert bei CGNAT
+oder aus dem Mobilfunknetz allein **nicht**. Es verwendet weder einen
+Drittanbieter-Relay noch Router-Fernwartung oder automatisch konfigurierte Ports.
+Zertifikate, MAC-Adresse und Broadcast-Adresse werden von der App nicht
+dauerhaft gespeichert.

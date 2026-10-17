@@ -89,7 +89,7 @@ jobs:
           DIGEST="$(cat /tmp/haos-netinstall-digest)"
           [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::No valid remote manifest digest"; exit 1; }
           echo "image_ref=$IMAGE@$DIGEST" >>"$GITHUB_OUTPUT"
-          echo "source_commit=$GITHUB_SHA" > output/IMAGE.txt
+          echo "source_commit=$GITHUB_SHA" > output/IMAGE.txt\n          echo "artifact_kind=netinstall-and-ghcr-image" >> output/IMAGE.txt\n          echo "production_release=false" >> output/IMAGE.txt
           echo "oci_source=$IMAGE@$DIGEST" >> output/IMAGE.txt
           echo "development=true" >> output/IMAGE.txt
           echo "signed=false" >> output/IMAGE.txt
@@ -148,12 +148,12 @@ jobs:
           {
             echo '### HAOS network installer built (development, unsigned)'
             echo
-            echo "Source commit: `$GITHUB_SHA`"
-            echo "Registry image: `${{ steps.image.outputs.image_ref }}`"
+            printf 'Source commit: %s\\n' "$GITHUB_SHA"
+            printf 'Registry image: %s\\n' '${{ steps.image.outputs.image_ref }}'
             echo
             echo 'Download the **haos-netinstall-x86_64** GitHub Actions artifact (legacy Anaconda prototype only).'
             echo 'This ISO is based on Fedora 44 Everything Netinstall and does not contain the HAOS OCI layers.'
-            echo '**Warning:** This is the legacy Anaconda ISO. The dual-channel launcher is NOT integrated. Keep GHCR private; this ISO cannot install it.'
+            echo '**Warning:** This legacy Anaconda installer requires an anonymously readable OCI image. If GHCR remains private, this ISO cannot install it; use the separate authenticated dual-channel Live ISO instead.'
             echo 'To override the image, edit the GRUB boot command (press e) and append `haos.image=registry.example/repo@sha256:<digest>`.'
             echo 'This is not an accepted production release; signed-image, installer/UEFI boot, network and installed-guest verification remain separate.'
           } >>"$GITHUB_STEP_SUMMARY"

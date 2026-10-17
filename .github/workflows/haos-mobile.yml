@@ -26,9 +26,21 @@ jobs:
       - name: Build APK
         working-directory: apps/mobile
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Verify APK payload and record exact source identity
+        run: |
+          set -euo pipefail
+          APK=apps/mobile/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -n 1 | grep -Fq 'No errors detected'
+          (cd "$(dirname "$APK")" && sha256sum "$(basename "$APK")" > SHA256SUMS)
+          printf 'source_commit=%s\nartifact_kind=debug-apk\nproduction_release=false\n' \
+            "$GITHUB_SHA" > "$(dirname "$APK")/BUILD-IDENTITY.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: haos-mobile-debug-apk
-          path: apps/mobile/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            apps/mobile/app/build/outputs/apk/debug/app-debug.apk
+            apps/mobile/app/build/outputs/apk/debug/SHA256SUMS
+            apps/mobile/app/build/outputs/apk/debug/BUILD-IDENTITY.txt
           if-no-files-found: error
           retention-days: 7

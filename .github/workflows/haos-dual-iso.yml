@@ -1,4 +1,4 @@
-name: HAOS Dual-Channel Live ISO (experimental)
+name: HAOS Dual-Channel Live ISO (release candidate tests)
 on:
   push:
     branches: ['agent/haos-foundation']
@@ -63,6 +63,8 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" output
           (cd output && sha256sum haos-dual-channel-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
           ls -lh output/haos-dual-channel-x86_64.iso
+          printf 'source_commit=%s\nartifact_kind=dual-channel-iso\nproduction_release=false\n' \
+            "$GITHUB_SHA" > output/BUILD-IDENTITY.txt
       - name: Inspect ISO filesystem
         run: |
           set -euo pipefail
@@ -164,4 +166,5 @@ jobs:
             output/haos-live.ks
             output/boot-report.txt
             output/dracut-modules.txt
+            output/BUILD-IDENTITY.txt
           retention-days: 14
