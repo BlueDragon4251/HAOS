@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import subprocess
 import time
 from pathlib import Path
@@ -34,6 +35,56 @@ def audit(kind: str, details: dict):
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+def _kernel_virtual_terminal(device: str) -> bool:
+    """Only actual Linux kernel VTs, never pseudo-terminals, symlinks or serial TTYs."""
+    if not isinstance(device, str) or not device.startswith("/dev/tty"):
+        return False
+    number = device[8:]
+    if not number.isdecimal() or not 1 <= int(number) <= 63:
+        return False
+    try:
+        info = os.stat(device, follow_symlinks=False)
+    except (OSError, ValueError):
+        return False
+    return (stat.S_ISCHR(info.st_mode) and os.major(info.st_rdev) == 4
+            and os.minor(info.st_rdev) == int(number))
+
+
+def require_physical_setup_console() -> None:
+    """Validate the invoking owner VT even when sudo use_pty changes our stdin.
+
+    Fedora sudo commonly runs the privileged command on a fresh /dev/pts/N.
+    SUDO_TTY is populated by sudo from the *invoking* terminal, not stdin
+    of the child. Its user/UID must still match an enrolled owner, and its
+    device must be a kernel VT. Refuse SSH and all unverified origins.
+    """
+    from .owner_recovery import enrolled_owner, require_console
+    require_console()
+    if any(os.environ.get(key) for key in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY")):
+        raise PermissionError("initial setup requires a local physical console")
+    try:
+        stdin_device = os.ttyname(0)
+    except OSError:
+        stdin_device = ""
+    if _kernel_virtual_terminal(stdin_device):
+        return
+
+    sudo_device = os.environ.get("SUDO_TTY", "")
+    sudo_user = os.environ.get("SUDO_USER", "")
+    sudo_uid = os.environ.get("SUDO_UID", "")
+    if (not _kernel_virtual_terminal(sudo_device) or not sudo_user
+            or not sudo_uid.isdecimal()):
+        raise PermissionError("initial setup requires a local Linux virtual terminal")
+    # Never trust an unbound SUDO_TTY in isolation: this CLI is executable only
+    # through the enrolled owner's authenticated fixed-action sudo rule.
+    try:
+        owner = enrolled_owner(sudo_user)
+    except (KeyError, ValueError, PermissionError) as exc:
+        raise PermissionError("initial setup requires an authenticated local owner") from exc
+    if owner.pw_uid != int(sudo_uid):
+        raise PermissionError("initial setup requires an authenticated local owner")
 
 
 def main():
@@ -194,15 +245,8 @@ def main():
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
     if args.action == "setup":
-        # Only the authenticated, physically present owner may finish setup
-        # without the graphical wizard. No agent, gateway or SSH session.
-        from .owner_recovery import require_console
-        require_console()
-        if any(os.environ.get(key) for key in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY")):
-            raise PermissionError("initial setup requires a local physical console")
-        device = os.ttyname(0)
-        if not device.startswith("/dev/tty") or not device[8:].isdigit():
-            raise PermissionError("initial setup requires a local Linux virtual terminal")
+        # Owner-only fixed actions on the physical VT; handle sudo use_pty.
+        require_physical_setup_console()
         from . import initial_setup
         if args.setup_action == "status":
             print(json.dumps({"owner_recovery": initial_setup.account_status(),
