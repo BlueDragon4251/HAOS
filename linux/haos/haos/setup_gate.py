@@ -52,7 +52,11 @@ def main() -> None:
     if sys.argv[1] == "state":
         print(destination)
         return
-    raise SystemExit(0 if sys.argv[1] == destination else 1)
+    # The systemd owner-wizard command is named "prompt", but the boot
+    # decision is deliberately named "setup". Compare their mapped meanings,
+    # never the raw CLI argument (otherwise setup is skipped on every boot).
+    requested_destination = "setup" if sys.argv[1] == "prompt" else "desktop"
+    raise SystemExit(0 if requested_destination == destination else 1)
 
 
 if __name__ == "__main__":
