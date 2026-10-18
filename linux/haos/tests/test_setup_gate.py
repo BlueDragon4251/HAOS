@@ -67,3 +67,37 @@ def test_validated_receipt_denied_when_owner_or_codes_are_missing(monkeypatch):
                    state(owner=True, recovery=True, complete=True, pending=True)):
         monkeypatch.setattr(setup_gate.initial_setup, "account_status", lambda b=broken: b)
         assert setup_gate.boot_destination() == "setup"
+
+
+@pytest.mark.parametrize("destination,command,expected_code", [
+    ("setup", "prompt", 0),          # Native firstboot MUST start.
+    ("setup", "desktop", 1),         # Locked observer MUST stay blocked.
+    ("desktop", "prompt", 1),        # No repeat privileged setup after finish.
+    ("desktop", "desktop", 0),       # Normal shell starts only after receipt.
+])
+def test_real_systemd_execcondition_command_mapping(monkeypatch, destination, command, expected_code):
+    # Exercise the actual CLI rather than only the boot decision helper.
+    monkeypatch.setattr(setup_gate, "boot_destination", lambda: destination)
+    monkeypatch.setattr(setup_gate.sys, "argv", ["haos-setup-gate", command])
+    with pytest.raises(SystemExit) as exc:
+        setup_gate.main()
+    assert exc.value.code == expected_code
+
+
+@pytest.mark.parametrize("destination", ["setup", "desktop"])
+def test_state_cli_reports_actual_destination(monkeypatch, capsys, destination):
+    monkeypatch.setattr(setup_gate, "boot_destination", lambda: destination)
+    monkeypatch.setattr(setup_gate.sys, "argv", ["haos-setup-gate", "state"])
+    assert setup_gate.main() is None
+    assert capsys.readouterr().out == destination + "\n"
+
+
+@pytest.mark.parametrize("command", ["prompt", "desktop", "state"])
+def test_invalid_owner_state_never_unblocks_any_systemd_unit(monkeypatch, command):
+    def invalid_state():
+        raise PermissionError("missing trusted owner/recovery marker")
+    monkeypatch.setattr(setup_gate, "boot_destination", invalid_state)
+    monkeypatch.setattr(setup_gate.sys, "argv", ["haos-setup-gate", command])
+    with pytest.raises(SystemExit) as exc:
+        setup_gate.main()
+    assert exc.value.code == 255
