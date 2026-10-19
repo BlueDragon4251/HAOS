@@ -63,6 +63,15 @@ VALIDATION = {
         ("HAOS-MULTI-OWNER", "Mehrere registrierte Administratoren erfordern eine gesonderte Prüfung."),
     "a normal user display name must be chosen first":
         ("HAOS-PROFILE-NAME", "Bitte zuerst einen Anzeigenamen für das normale Benutzerprofil festlegen."),
+    "owner authority directory must be root-owned and protected":
+        ("HAOS-OWNER-DIRECTORY", "Das geschützte HAOS-Kontoverzeichnis hat ungültige Dateirechte."),
+    "owner password installation could not be verified":
+        ("HAOS-OWNER-AUTH", "Das Administrator-Passwort konnte nach dem Anlegen nicht verifiziert werden."),
+    "new owner must start with a locked password":
+        ("HAOS-OWNER-LOCK", "Der neue Administrator wurde nicht mit einem gesperrten Passwort angelegt."),
+    "owner account identity changed or is a system account":
+        ("HAOS-OWNER-IDENTITY", "Die Administrator-Identität ist ungültig oder wurde verändert."),
+
 }
 
 # The enrolment helper raises these exact templates without subprocess output.
@@ -91,6 +100,15 @@ def describe_error(error: Exception, *, area: str = "setup") -> SetupProblem:
             validation_code, summary = known
             notes.append(f"Ursache: {validation_code}")
 
+    if type(cause) is PermissionError:
+        match_service = re.fullmatch(
+            r"stop (haos-(?:controller|hermes)\\.service) before modifying authority or reconciling a mission",
+            str(cause))
+        if match_service:
+            summary = "Ein HAOS-Dienst ist noch aktiv; Kontoerstellung aus Sicherheitsgründen blockiert."
+            code = "HAOS-OWNER-SERVICE-ACTIVE"
+            notes[1] = f"Fehlercode: {code}"
+            notes.append(f"Dienst: {match_service.group(1)}")
     if type(cause) is RuntimeError:
         match = _PROGRAM.fullmatch(str(cause))
         if match:
