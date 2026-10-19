@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import json
+import re
 from pathlib import Path
 
 
@@ -42,7 +43,10 @@ def default_endpoint(provider):
     return row["endpoint"] if row else ""
 
 
-def default_mode(provider):
+def default_mode(provider, model=""):
+    if provider == "copilot":
+        match = re.match(r"^(?:openai/)?gpt-(\d+)", model)
+        return "codex_responses" if match and int(match[1]) >= 5 and not model.removeprefix("openai/").startswith("gpt-5-mini") else "chat_completions"
     if provider in {"local", "bedrock"}:
         return "chat_completions"
     row = descriptor(provider)
@@ -53,3 +57,7 @@ def default_mode(provider):
 
 def oauth_providers():
     return frozenset(slug for slug, row in registry().items() if row["auth_type"].startswith("oauth_"))
+
+
+def account_providers():
+    return oauth_providers() | {"anthropic", "openrouter", "copilot"}

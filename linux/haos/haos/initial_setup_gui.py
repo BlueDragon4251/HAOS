@@ -12,7 +12,7 @@ from pathlib import Path
 from . import initial_setup
 from .setup_errors import describe_error
 from .hermes_capabilities import provider_rows, gateway_rows
-from .provider_registry import http_providers, default_mode, oauth_providers, descriptor
+from .provider_registry import http_providers, default_mode, oauth_providers, descriptor, account_providers
 from .provider_cloud import CLOUD
 
 
@@ -391,7 +391,7 @@ class Wizard:
         elif name == "provider":
             self._head("Hermes · Provider & Modell",
                        "Zugangsdaten bleiben im getrennten Provider-Dienst. Wähle anschließend ein Modell deines Anbieters.")
-            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom"}), "openai-api")
+            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom", "copilot"}), "openai-api")
             model = self._field(self.content, "Modellkennung, vom Provider unterstützt")
             endpoint = self._field(self.content, "URL · leer = Standard des Anbieters")
             mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
@@ -417,7 +417,7 @@ class Wizard:
             logout_button = self._button(self.content, "Anbieter-Konto abmelden", lambda: account("logout"))
             logout_button.pack(anchor="w", pady=4)
             def update_provider(*_args):
-                available = provider.get() in oauth_providers() | {"anthropic", "openrouter"}
+                available = provider.get() in account_providers()
                 for button in (login_button, logout_button):
                     button.configure(state="normal" if available else "disabled")
             provider.trace_add("write", update_provider)
@@ -440,6 +440,19 @@ class Wizard:
             self._catalogue(
                 "Alle Provider des eingebundenen Hermes-Stands anzeigen",
                 [(label, status) for _slug, label, status in provider_rows()])
+            self._label(self.content, "Mixture of Agents · freigegebene Provider kombinieren",
+                        size=13, color=self.CYAN, bold=True).pack(anchor="w", pady=(18, 4))
+            self._label(self.content,
+                "Zuerst die beteiligten Provider und Modelle konfigurieren. Ein Preset verwendet ein oder zwei "
+                "Referenzmodelle und ein Aggregator-Modell. Alle Anfragen laufen über die bereits freigegebenen Broker-Routen.",
+                size=10, color=self.MUTED).pack(anchor="w")
+            moa_name = self._field(self.content, "MoA-Presetname", "personal")
+            moa_value = self._field(self.content, "Preset-JSON · references und aggregator, jeweils route / model")
+            def apply_moa():
+                selected_name, value = moa_name.get(), moa_value.get()
+                self._run_async(lambda: initial_setup.configure_moa(selected_name, value),
+                                success="MoA-Preset mit freigegebenen Broker-Routen als Standard gespeichert.")
+            self._button(self.content, "MoA-Preset sicher konfigurieren", apply_moa).pack(anchor="w", pady=10)
         elif name == "updates":
             self._head("HAOS Updates",
                        "Stabiler oder privater Entwicklungszweig. Der vorherige bootc-Stand bleibt für Rollback erhalten.")

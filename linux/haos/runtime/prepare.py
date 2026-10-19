@@ -19,7 +19,7 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
         raise ValueError("hashed runtime requirements changed without review")
     if source["python"] != "3.11" or source["extras"] != ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity"]:
         raise ValueError("runtime target changed")
-    for name, version in source["security_versions"].items():
+    for name, version in {**source["security_versions"], **source.get("provider_versions", {})}.items():
         versions = re.findall(rf"^{re.escape(name)}==([^\s;]+)", requirements.decode(), re.M)
         if versions != [version]:
             raise ValueError("security version mismatch: " + name)

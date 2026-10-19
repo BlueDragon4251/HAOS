@@ -19,6 +19,9 @@
     "tornado": "6.5.9",
     "urllib3": "2.8.0"
   },
-  "requirements_sha256": "303a806c67afd8b798dc360c2629e8dd2dd6dd41fb06c65c102175448e625d96",
-  "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514"
+  "requirements_sha256": "34f94c870d00aaebb3cd66756c1137c8e03126ba067978e4bf6b91d863eebf0b",
+  "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514",
+  "provider_versions": {
+    "msal": "1.39.0"
+  }
 }

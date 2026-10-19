@@ -15,7 +15,7 @@ from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 from .region import CONSOLE_MAP, LOCALES
 from .provider_policy import ProviderPolicy, ENDPOINTS
 from .setup_errors import SetupStageError
-from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers
+from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers, account_providers
 from .provider_cloud import CLOUD
 
 # Never store a plaintext password, recovery code, provider key or GHCR token
@@ -228,7 +228,7 @@ def configure_update(channel: str, automatic: bool):
 def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = "", api_mode: str = ""):
     """Provision a vetted HTTP or account route from the trusted local seat."""
     require_root()
-    if provider not in {*http_providers(), *oauth_providers(), *CLOUD, "openai", "local", "lmstudio", "gemini", "custom"}:
+    if provider not in {*http_providers(), *oauth_providers(), *CLOUD, "openai", "local", "lmstudio", "gemini", "custom", "copilot"}:
         raise ValueError("use a provider with an implemented graphical credential flow")
     from .provider_setup import add_route, stopped_provider
     from .gateway_setup import stopped_gateway
@@ -237,16 +237,16 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     data = {"version": 1, "provider": provider,
             "endpoint": endpoint or default_endpoint(provider),
             "models": [model], "default_model": model,
-            "api_mode": api_mode or default_mode(provider),
+            "api_mode": api_mode or default_mode(provider, model),
             "requests_per_day": 200, "requests_per_minute": 30}
     policy = ProviderPolicy(data)
-    if provider not in {"local", "lmstudio", "custom", "anthropic", "openrouter", *oauth_providers(), *CLOUD} and not api_key:
+    if provider not in {"local", "lmstudio", "custom", *account_providers(), *CLOUD} and not api_key:
         raise ValueError("cloud API key required")
     if provider not in CLOUD and api_key and (not 16 <= len(api_key) <= 16384 or
                                    any(ord(c) < 33 or ord(c) > 126 for c in api_key)):
         raise ValueError("invalid provider credential")
     quiesce_for_setup()
-    if provider in oauth_providers() or (provider in {"anthropic", "openrouter"} and not api_key):
+    if provider in oauth_providers() or (provider in {"anthropic", "openrouter", "copilot"} and not api_key):
         from .provider_setup import auth_helper
         auth_helper("status", provider, graphical_status=True)
     # Only now does the vetted owner credential publisher replace trusted files.
@@ -262,15 +262,36 @@ def provider_account(provider, action="login"):
     """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
     require_root()
     from .initial_setup_gui import session_allowed
-    if not session_allowed() or provider not in oauth_providers() | {"anthropic", "openrouter"} or action not in {"login", "logout"}:
+    if not session_allowed() or provider not in account_providers() or action not in {"login", "logout"}:
         raise PermissionError("provider account login requires the trusted local setup seat")
     quiesce_for_setup()
+    if action == "logout":
+        from .provider_setup import revoke_account_routes
+        from .network import install
+        revoke_account_routes(provider)
+        install(pwd.getpwnam("haos-agent").pw_uid)
     subprocess.run(["/usr/bin/xterm", "-T", "HAOS Provider-Anmeldung", "-geometry", "110x32+20+20",
                     "-e", "/usr/bin/python3", "-I", "/usr/lib/haos/provider-login.py", action, provider],
                    check=True, timeout=780, capture_output=True,
                    env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
                         "HAOS_TRUSTED_SETUP": "1", "PATH": "/usr/bin:/bin"})
     return {"credential_action_completed": True, "model_turn_tested": False}
+
+
+def configure_moa(name, value):
+    require_root()
+    import json
+    if not isinstance(value, str) or len(value) > 16384:
+        raise ValueError("invalid MoA configuration")
+    preset = json.loads(value)
+    if not isinstance(preset, dict) or set(preset) != {"references", "aggregator"}:
+        raise ValueError("MoA expects references and aggregator")
+    quiesce_for_setup()
+    from .provider_setup import configure_ensemble
+    from .owner import audit
+    result = configure_ensemble(name, preset["references"], preset["aggregator"])
+    audit("setup.moa", {"name": name})
+    return result
 
 
 def configure_gateway(connector: str, platform: str, token: str):

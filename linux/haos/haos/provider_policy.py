@@ -3,7 +3,7 @@
 import re
 import ipaddress
 from urllib.parse import urlsplit
-from .provider_registry import default_endpoint, descriptor, http_providers, oauth_providers
+from .provider_registry import default_endpoint, default_mode, descriptor, http_providers, oauth_providers
 from .provider_cloud import CLOUD, valid_endpoint
 
 PORT = 9120
@@ -18,6 +18,7 @@ ENDPOINTS.update({name: default_endpoint(name) for name in oauth_providers()})
 ENDPOINTS["gemini"] = default_endpoint("gemini")
 ENDPOINTS.update({name: default_endpoint(name) for name in CLOUD})
 ENDPOINTS["custom"] = ""
+ENDPOINTS["copilot"] = default_endpoint("copilot")
 
 
 def custom_endpoint(endpoint):
@@ -50,6 +51,12 @@ class ProviderPolicy:
             raise ValueError("invalid provider endpoint")
         if self.provider == "custom":
             custom_endpoint(endpoint)
+        elif self.provider == "copilot":
+            parsed = urlsplit(endpoint)
+            if (parsed.scheme != "https" or parsed.port not in {None, 443} or parsed.path not in {"", "/"}
+                    or parsed.username or parsed.password or parsed.query or parsed.fragment
+                    or not re.fullmatch(r"api(?:\.[a-z0-9-]+)?\.githubcopilot\.com", parsed.hostname or "")):
+                raise PermissionError("Copilot endpoint must remain inside its verified API service domain")
         elif self.provider in CLOUD:
             if not valid_endpoint(self.provider, endpoint):
                 raise PermissionError("cloud SDK endpoint is outside its verified service domain")
@@ -77,6 +84,8 @@ class ProviderPolicy:
             raise ValueError("Codex OAuth requires the native Responses transport")
         if self.provider in {"bedrock", "vertex", "gemini"} and self.api_mode != "chat_completions":
             raise ValueError("this broker SDK adapter requires local Chat Completions ingress")
+        if self.provider == "copilot" and any(default_mode("copilot", model) != self.api_mode for model in self.models):
+            raise ValueError("Copilot model allowlist must use the selected native protocol")
         for key, upper in (("requests_per_day", 10000), ("requests_per_minute", 120)):
             if type(data[key]) is not int or not 1 <= data[key] <= upper:
                 raise ValueError("invalid provider request limit")

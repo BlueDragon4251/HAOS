@@ -71,3 +71,43 @@ they do not certify this subsequent SDK continuation. Latest local broad run,
 excluding the explicitly environment-blocked remote/backup files: 670 passed,
 21 existing skips. Required graphical setup, frozen-runtime, kernel, ISO/QEMU,
 Android and real-account evidence remain separate.
+
+## MoA, account refresh and dependency correction
+
+MoA presets now resolve only owner-approved broker routes/models. The actual
+unmodified Hermes MoA client completed two reference calls plus its aggregator
+through the broker in a real loopback fixture, with distinct route keys and
+three durable usage admissions. Fanout is deliberately bounded to the broker's
+two concurrent model calls. Upstream's built-in default preset is overwritten
+with an approved broker-only preset; no real provider credential enters the
+agent configuration. Presets are available in the physical setup and owner CLI.
+
+Copilot device-code login, private token exchange/expiry cache and constrained
+enterprise endpoints are implemented. Qwen supports the exact upstream CLI
+credential import, private persistence and native refresh. A real local refresh
+probe exposed a stale Qwen pool seed in the pinned generic runtime resolver;
+HAOS now calls Qwen's own refreshing resolver at this boundary. MiniMax OAuth
+likewise uses its native refresh resolver. Local logout withdraws matching
+routes, real keys, fallback links and dependent MoA presets before account
+logout; a failure at the external account cannot silently retain a model route.
+
+SDK source `c0e455de` passed general CI and the graphical setup render gate. Its
+new frozen-provider workflow failed honestly before protocol execution:
+upstream's `msal==1.36.0` requires `cryptography<49`, while the pinned runtime uses
+`cryptography==50.0.0`. The reviewed compatibility overlay now pins hash-checked
+`msal==1.39.0` without weakening Cryptography. A fresh Python 3.11.17 environment,
+exact frozen Hermes SDK extras and the hashed overlay passed `uv pip check` and
+the actual provider/Codex, native Gemini, signed Bedrock and MoA probes. The
+existing red workflow is retained as historical evidence, not reported green.
+
+Remaining provider implementation includes Copilot ACP's separately isolated
+CLI runtime, model-discovery UX and remaining provider-specific protocol/plan
+contracts. Provider live tests and installed acceptance remain outstanding.
+Gateways and mobile desktop work remain subsequent priorities, not completed.
+
+Current local validation for this increment: 126 provider/capability tests pass;
+695 broader tests pass with 21 existing skips, excluding the two files blocked
+by this host's foreign-UID and AF_UNIX restrictions. Exact Python 3.11 frozen
+SDK probes (including Copilot and Qwen actual token endpoints over loopback)
+pass. Their bounded receipts are the `*-python311-fixture.json` files in the
+same evidence directory. They explicitly do not claim live account acceptance.

@@ -11,7 +11,7 @@ from .enrollment import ENV, protected_directory
 from .policy import atomic_json
 from .provider_policy import ENDPOINTS, ProviderPolicy
 from .sandbox import trusted_json
-from .provider_registry import default_mode, oauth_providers
+from .provider_registry import default_mode, oauth_providers, account_providers
 from .provider_routes import ProviderRoutes
 
 CONFIG = Path("/etc/haos")
@@ -58,7 +58,7 @@ def validate_credential(policy, credential):
     if credential is not None and (not isinstance(credential, str) or not 16 <= len(credential) <= 16384
                                    or any(ord(c) < 33 or ord(c) > 126 for c in credential)):
         raise ValueError("invalid provider credential")
-    if policy.provider not in {"local", "lmstudio", "custom", "anthropic", "openrouter", *oauth_providers()} and not credential:
+    if policy.provider not in {"local", "lmstudio", "custom", *account_providers()} and not credential:
         raise ValueError("API provider requires a securely entered credential")
 
 
@@ -102,6 +102,8 @@ def add_route(policy, credential, *, make_default=True, config=CONFIG):
     credentials[route_id] = {"api_key": credential}
     if make_default:
         data["default"] = route_id
+        if "default_ensemble" in data:
+            data["default_ensemble"] = None
     publish(data, credentials, config=config)
     return {"route": route_id, "default": data["default"], "routes": list(data["routes"])}
 
@@ -116,6 +118,8 @@ def route_settings(route_id, *, fallbacks=None, make_default=False, remove=False
     credentials = trusted_json(config / "provider-credentials")["routes"]
     if make_default:
         data["default"] = route_id
+        if "default_ensemble" in data:
+            data["default_ensemble"] = None
     if fallbacks is not None:
         data["fallbacks"][route_id] = list(fallbacks)
     if remove:
@@ -133,13 +137,78 @@ def route_settings(route_id, *, fallbacks=None, make_default=False, remove=False
     return {"default": data["default"], "routes": list(data["routes"]), "fallbacks": data["fallbacks"]}
 
 
+def configure_ensemble(name, references, aggregator, *, active=True, config=CONFIG):
+    if os.geteuid() != 0:
+        raise PermissionError("MoA configuration requires authenticated owner authority")
+    current = ProviderRoutes(trusted_json(config / "provider.json"))
+    if current.data["version"] != 2:
+        raise ValueError("configure named broker routes before creating a MoA preset")
+    data = current.data
+    data.setdefault("ensembles", {})[name] = {"references": references, "aggregator": aggregator}
+    data.setdefault("default_ensemble", None)
+    if active:
+        data["default_ensemble"] = name
+    publish(data, trusted_json(config / "provider-credentials")["routes"], config=config)
+    return {"preset": name, "default_ensemble": data["default_ensemble"], "model_turn_tested": False}
+
+
+def disable_configuration(*, config=CONFIG):
+    if os.geteuid() != 0:
+        raise PermissionError("provider withdrawal requires authenticated owner authority")
+    protected_directory(config)
+    for name in ("provider.json", "provider-client.json"):
+        path = config / name
+        if path.exists() or path.is_symlink():
+            trusted_json(path)
+            path.unlink()
+    parent = os.open(config, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(parent)
+    finally:
+        os.close(parent)
+    atomic_json(config / "provider-credentials", {"api_key": None})
+    atomic_json(config / "provider-token", {"token": secrets.token_urlsafe(48)})
+
+
+def revoke_account_routes(provider, *, config=CONFIG):
+    if os.geteuid() != 0:
+        raise PermissionError("provider withdrawal requires authenticated owner authority")
+    descriptor = config / "provider.json"
+    if not descriptor.exists() and not descriptor.is_symlink():
+        return {"withdrawn_routes": 0}
+    current = ProviderRoutes(trusted_json(descriptor))
+    removed = {key for key, policy in current.routes.items() if policy.provider == provider}
+    if not removed:
+        return {"withdrawn_routes": 0}
+    if len(removed) == len(current.routes):
+        disable_configuration(config=config)
+    else:
+        data = current.data
+        credentials = trusted_json(config / "provider-credentials")["routes"]
+        for key in removed:
+            del data["routes"][key]
+            del credentials[key]
+            data["fallbacks"].pop(key, None)
+        for source, targets in data["fallbacks"].items():
+            data["fallbacks"][source] = [target for target in targets if target not in removed]
+        if data["default"] in removed:
+            data["default"] = next(iter(data["routes"]))
+        for name, preset in list(data.get("ensembles", {}).items()):
+            if any(slot["route"] in removed for slot in [*preset["references"], preset["aggregator"]]):
+                del data["ensembles"][name]
+                if data.get("default_ensemble") == name:
+                    data["default_ensemble"] = None
+        publish(data, credentials, config=config)
+    return {"withdrawn_routes": len(removed)}
+
+
 def auth_helper(action, provider="openai-codex", *, graphical_status=False):
     # Transient service supplies a private state directory and the same security
     # boundary as the long-lived broker. No root CLI command/user/path is passed
     # from the model. --pty keeps device codes and OAuth output off the journal.
     if action not in {"login", "status", "logout"}:
         raise ValueError("unsupported provider credential action")
-    if provider not in oauth_providers() | {"anthropic", "openrouter"}:
+    if provider not in account_providers():
         raise ValueError("unsupported provider account login")
     from .owner_recovery import require_console
     if graphical_status:
@@ -194,6 +263,16 @@ def owner_provider(args):
     stopped()
     stopped_gateway()
     stopped_provider()
+    if args.provider_action == "ensemble":
+        import json
+        from .owner_recovery import require_console
+        require_console()
+        value = json.loads(input("MoA preset JSON (references + aggregator; route and model only): "))
+        if not isinstance(value, dict) or set(value) != {"references", "aggregator"}:
+            raise ValueError("invalid MoA preset")
+        result = configure_ensemble(args.name, value["references"], value["aggregator"])
+        audit("provider.ensemble", {"name": args.name})
+        return result
     if args.provider_action in {"set-default", "fallbacks", "remove"}:
         result = route_settings(args.route, make_default=args.provider_action == "set-default",
                                 fallbacks=args.fallback if args.provider_action == "fallbacks" else None,
@@ -203,16 +282,14 @@ def owner_provider(args):
     if args.provider_action in {"login-codex", "logout-codex", "login", "logout", "auth-status"}:
         provider = "openai-codex" if args.provider_action.endswith("-codex") else args.provider
         action = {"login-codex": "login", "logout-codex": "logout", "auth-status": "status"}.get(args.provider_action, args.provider_action)
+        if action == "logout":
+            revoke_account_routes(provider)
+            install(pwd.getpwnam("haos-agent").pw_uid)
         auth_helper(action, provider)
         audit("provider." + args.provider_action, {"provider": provider})
         return {"credential_action_completed": True, "model_turn_tested": False}
     if args.provider_action == "disable":
-        for name in ("provider.json", "provider-client.json"):
-            path = CONFIG / name
-            if path.exists() or path.is_symlink():
-                trusted_json(path)
-                path.unlink()
-        atomic_json(CONFIG / "provider-credentials", {"api_key": None})
+        disable_configuration()
         install(pwd.getpwnam("haos-agent").pw_uid)
         audit("provider.disabled", {})
         return {"disabled": True, "oauth_state": "private retained state; logout-codex removes local OAuth credentials"}
@@ -220,7 +297,7 @@ def owner_provider(args):
         raise ValueError("unsupported owner provider action")
     data = {"version": 1, "provider": args.provider, "endpoint": args.endpoint or ENDPOINTS.get(args.provider, ""),
             "models": list(dict.fromkeys([args.model, *args.allow_model])), "default_model": args.model,
-            "api_mode": args.api_mode or default_mode(args.provider),
+            "api_mode": args.api_mode or default_mode(args.provider, args.model),
             "requests_per_day": args.requests_per_day, "requests_per_minute": args.requests_per_minute}
     policy = ProviderPolicy(data)
     credential = None

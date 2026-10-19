@@ -133,3 +133,22 @@ def test_atomic_route_migration_rotation_revocation_and_default_model_change(loc
     route_settings("anthropic", remove=True, config=tmp_path)
     assert second not in (tmp_path / "provider-credentials").read_text()
     assert (tmp_path / "provider-credentials").stat().st_mode & 0o777 == 0o600
+
+
+def test_account_logout_withdraws_routes_keys_fallbacks_and_dependent_moa_before_remote_logout(location):
+    from haos.provider_setup import publish, add_route, configure_ensemble, revoke_account_routes
+    from haos.provider_registry import default_mode
+    from haos.provider_routes import ProviderRoutes
+    first, second = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
+    publish({**policy("openrouter"), "api_mode": default_mode("openrouter")}, first, config=location)
+    add_route({**policy("anthropic"), "api_mode": default_mode("anthropic")}, second, config=location)
+    configure_ensemble("owner", [{"route": "openrouter", "model": "fixture-model"}],
+                       {"route": "anthropic", "model": "fixture-model"}, config=location)
+    result = revoke_account_routes("anthropic", config=location)
+    current = ProviderRoutes(json.loads((location / "provider.json").read_text()))
+    assert result["withdrawn_routes"] == 1 and set(current.routes) == {"openrouter"}
+    assert not current.ensembles and current.default_ensemble is None
+    assert second not in (location / "provider-credentials").read_text()
+    assert revoke_account_routes("openrouter", config=location)["withdrawn_routes"] == 1
+    assert not (location / "provider.json").exists()
+    assert first not in (location / "provider-credentials").read_text()

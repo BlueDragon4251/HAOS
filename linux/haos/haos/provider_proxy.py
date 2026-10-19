@@ -94,8 +94,28 @@ class Credentials:
         self.lock = threading.Lock()
         self.cloud_data, self.cloud_cache = None, {}
         self.query = {}
+        self.request_state = threading.local()
+
+    @property
+    def effective_endpoint(self):
+        return getattr(self.request_state, "endpoint", self.policy.endpoint)
 
     def headers(self):
+        if self.policy.provider == "copilot":
+            from .provider_copilot import bind_transport
+            bind_transport()
+            from hermes_cli.copilot_auth import resolve_copilot_token, exchange_copilot_token, copilot_request_headers
+            with self.lock:
+                raw = self.credentials.get("api_key") or resolve_copilot_token()[0]
+                if not raw:
+                    raise PermissionError("Copilot device login or an authorized GitHub token is required")
+                token, expiry, endpoint = exchange_copilot_token(raw)
+                selected = endpoint or self.policy.endpoint
+                ProviderPolicy({**self.policy.data, "endpoint": selected})
+                self.request_state.endpoint = selected
+            if not isinstance(token, str) or not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
+                raise PermissionError("invalid exchanged Copilot credential")
+            return {**copilot_request_headers(), "Authorization": "Bearer " + token}, Redactor([raw, token])
         from .provider_cloud import CLOUD, cloud_headers, credential_data
         if self.policy.provider in CLOUD:
             with self.lock:
@@ -109,8 +129,18 @@ class Credentials:
             # runs under the separate provider UID and its own private HOME.
             with self.lock:
                 from hermes_cli.runtime_provider import resolve_runtime_provider
-                resolved = resolve_runtime_provider(requested=self.policy.provider,
-                                                     target_model=self.policy.data["default_model"])
+                if self.policy.provider == "qwen-oauth":
+                    # The generic pinned pool can return a stale CLI seed.
+                    # Qwen's own resolver owns its actual expiry/refresh/write
+                    # boundary; do not mistake pool visibility for valid auth.
+                    from hermes_cli.auth_qwen import resolve_qwen_runtime_credentials
+                    resolved = {**resolve_qwen_runtime_credentials(), "api_mode": "chat_completions"}
+                elif self.policy.provider == "minimax-oauth":
+                    from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
+                    resolved = {**resolve_minimax_oauth_runtime_credentials(), "api_mode": "anthropic_messages"}
+                else:
+                    resolved = resolve_runtime_provider(requested=self.policy.provider,
+                                                         target_model=self.policy.data["default_model"])
                 if (resolved["base_url"].rstrip("/") != self.policy.endpoint.rstrip("/")
                         or resolved["api_mode"] != self.policy.api_mode):
                     raise PermissionError("OAuth route changed; owner must approve its endpoint and transport")
@@ -309,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.policy.provider in {"gemini", "bedrock"}:
             from .provider_native import forward_native
             return forward_native(self, payload, headers, redactor)
-        endpoint = urlsplit(self.policy.endpoint)
+        endpoint = urlsplit(getattr(self.route_credentials, "effective_endpoint", self.policy.endpoint))
         conn = (http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443, timeout=180,
                                             context=ssl.create_default_context()) if endpoint.scheme == "https"
                 else http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=180))

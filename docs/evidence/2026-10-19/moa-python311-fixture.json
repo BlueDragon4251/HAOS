@@ -1,0 +1,7 @@
+{
+  "provider": "moa",
+  "actual_upstream_fanout_and_aggregation": true,
+  "broker_bound_requests": 3,
+  "private_provider_keys_in_agent_config": false,
+  "live_provider_tested": false
+}

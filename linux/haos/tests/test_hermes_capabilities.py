@@ -21,7 +21,7 @@ def test_ui_does_not_label_untested_adapters_as_supported():
     providers = {slug: status for slug, label, status in provider_rows()}
     gateways = dict(gateway_rows())
     assert providers["openai-codex"] == "GUI"
-    assert providers["qwen-oauth"] == "Konsole"
+    assert providers["qwen-oauth"] == "GUI"
     assert providers["openai-api"] == "GUI"
     assert providers["anthropic"] == "GUI"
     assert providers["bedrock"] == "GUI"
