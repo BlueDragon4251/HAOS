@@ -417,6 +417,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = response.read(MAX_OUTPUT + 1)
                 if len(data) > MAX_OUTPUT:
                     raise ValueError("model response exceeds owner broker bound")
+                from .provider_sse import require_complete
+                require_complete(response)
                 decoded = redactor.clean(restore(json.loads(data), wire_names))
                 self.send_response(response.status)
                 self.send_header("Content-Type", content_type)
@@ -433,9 +435,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.forward_started = True
-            usage, terminal = {}, False
+            usage, terminal, pending = {}, False, []
             from .provider_sse import events
             for fields, data in events(response, max_line=MAX_LINE, max_output=MAX_OUTPUT, deadline=time.monotonic() + 600):
+                finish = False
                 if data is not None and data != "[DONE]":
                     event = redactor.clean(restore(json.loads(data), wire_names))
                     if isinstance(event, dict):
@@ -444,6 +447,10 @@ class Handler(BaseHTTPRequestHandler):
                             raise ConnectionError("provider did not complete the model turn")
                         expected = {"codex_responses": "response.completed", "anthropic_messages": "message_stop"}.get(self.policy.api_mode)
                         terminal = terminal or (expected is not None and kind == expected)
+                        finish = ((self.policy.api_mode == "chat_completions" and
+                            any(isinstance(choice, dict) and choice.get("finish_reason") is not None for choice in event.get("choices", [])))
+                            or (self.policy.api_mode == "anthropic_messages" and kind == "message_delta"
+                                and isinstance(event.get("delta"), dict) and event["delta"].get("stop_reason") is not None))
                         candidate = event.get("response", event)
                         if kind == "message_start":
                             candidate = event.get("message", {})
@@ -456,10 +463,18 @@ class Handler(BaseHTTPRequestHandler):
                 if data is not None:
                     lines.append("data: " + data)
                 line = ("\n".join(lines) + "\n\n").encode()
+                # Forward deltas continuously, but do not certify completion
+                # before the upstream HTTP framing has itself completed. All
+                # trailing frames remain ordered and within the parser budget.
+                if pending or terminal or finish:
+                    pending.append(line)
+                    continue
                 self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n")
                 self.wfile.flush()
             if not terminal:
                 raise ConnectionError("provider stream ended without a terminal receipt")
+            for line in pending:
+                self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n")
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
             return response.status, usage

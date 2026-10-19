@@ -14,7 +14,7 @@ from haos.redaction import Redactor
 
 
 @contextmanager
-def fixture(payloads, *, status=200):
+def fixture(payloads, *, status=200, truncated=False):
     calls = []
     class Server(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -24,11 +24,13 @@ def fixture(payloads, *, status=200):
             data = json.dumps(payloads[min(len(calls) - 1, len(payloads) - 1)]).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Length", str(len(data) + (16 if truncated else 0)))
+            self.send_header("Connection", "close")
             if status == 302:
                 self.send_header("Location", "http://127.0.0.1:9119/api/env")
             self.end_headers()
             self.wfile.write(data)
+            self.close_connection = True
     server = ThreadingHTTPServer(("127.0.0.1", 0), Server)
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
@@ -65,6 +67,14 @@ def test_catalog_redirects_are_not_followed_and_offline_provenance_is_not_accoun
     offline = discovery.fallback("openai-codex", "account-required")
     assert offline["models"] and offline["source"] == "upstream-offline" and not offline["inference_tested"]
     assert discovery.fallback("copilot-acp", "account-required")["models"] == []
+
+
+def test_short_http_catalog_is_not_published_even_if_json_itself_is_valid():
+    with fixture([{"data": [{"id": "incomplete-fixture"}]}], truncated=True) as (endpoint, calls):
+        result = discovery.discover(local(endpoint), None)
+    assert len(calls) == 1
+    assert result["source"] == "unavailable" and result["models"] == []
+    assert result["diagnostic"] == "catalog-unavailable" and not result["inference_tested"]
 
 
 def test_native_gemini_catalog_pagination_uses_google_key_header_and_text_generation_models_only():

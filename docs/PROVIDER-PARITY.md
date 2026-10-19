@@ -58,6 +58,26 @@ checks its button dispatch; the root-seat/backend gate has an independent denial
 test. Device authorization fixtures are required by image build and provider CI;
 real Qwen account/entitlement and installed graphical login remain unaccepted.
 
+## HTTP framing and completion receipts
+
+An additional real-SDK regression reproduced a broker defect at `77275f1`:
+syntactically valid JSON with a prematurely closed fixed-length HTTP body was
+accepted because Python's bounded `HTTPResponse.read(size)` does not itself
+raise for a short body. The broker now requires a consumed declared length;
+catalog discovery applies the same check. SSE checks transport completion at
+EOF and holds completion/stop frames until then, while continuing to forward
+text/tool deltas immediately. A complete-looking terminal event followed by a
+short HTTP body therefore cannot become an SDK success receipt.
+
+The required matrix now covers **273** actual local SDK/HTTP cases (the original
+195 plus JSON and terminal-SSE framing failures for each of 39 HTTP profiles).
+All pass, including no retry, no unverified terminal, and unknown token counts
+for failed attempts. A real truncated-catalog regression passes too. Both
+minimal and full pinned-runtime suites pass **809 tests, two existing skips**;
+root-only backup/UID gates remain separate CI requirements. Thirteen runtime
+probes pass on these exact source inputs, without an external account or release
+claim. Older 195-case receipts retain their original source hashes.
+
 Base: `9e432326e2c7ef56a7d9c0899ced3f53debff0ce`.
 Hermes: `f97608f178d1ffeca59860195ab7da295f7c8e5f`.
 

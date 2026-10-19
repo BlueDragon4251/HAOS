@@ -56,7 +56,7 @@ def main():
                 mode, case = state["mode"], state["case"]
                 assert self.path == state["path"]
                 assert body["model"] == state["wire_model"]
-                assert body.get("stream", False) == (case in {"stream", "abort"})
+                assert body.get("stream", False) == (case in {"stream", "abort", "stream-framing"})
                 assert len(body["tools"]) == 1
                 tool = body["tools"][0]
                 name = tool.get("name") or tool["function"]["name"]
@@ -112,25 +112,31 @@ def main():
                     terminal = [{**early[0], "choices": [{"index": 0, "finish_reason": "tool_calls",
                         "delta": {"tool_calls": [{"index": 0, **result["choices"][0]["message"]["tool_calls"][0]}]}}],
                         "usage": result["usage"]}, "[DONE]"]
-                if case == "json":
+                if case in {"json", "json-framing"}:
                     data = json.dumps(result).encode()
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Content-Length", str(len(data) + (16 if case == "json-framing" else 0)))
+                    self.send_header("Connection", "close")
                     self.end_headers()
                     self.wfile.write(data)
+                    self.close_connection = True
                     return
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Connection", "close")
-                self.end_headers()
-
-                def event(value):
+                def frame(value):
                     # Anthropic dispatches on the named SSE event, not just the
                     # JSON type. Emit a complete valid native event sequence.
                     prefix = "event: " + value["type"] + "\n" if mode == "anthropic_messages" else ""
                     data = value if isinstance(value, str) else json.dumps(value)
-                    self.wfile.write((prefix + "data: " + data + "\n\n").encode())
+                    return (prefix + "data: " + data + "\n\n").encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Connection", "close")
+                if case == "stream-framing":
+                    self.send_header("Content-Length", str(sum(len(frame(value)) for value in [*early, *terminal]) + 16))
+                self.end_headers()
+
+                def event(value):
+                    self.wfile.write(frame(value))
                     self.wfile.flush()
 
                 for value in early:
@@ -171,7 +177,7 @@ def main():
                     path += "/v1"
                 path += {"anthropic_messages": "/messages", "codex_responses": "/responses",
                     "chat_completions": "/chat/completions"}[mode]
-                for case in ("json", "stream", "abort", "401", "429"):
+                for case in ("json", "stream", "abort", "401", "429", "json-framing", "stream-framing"):
                     print(provider + ":" + case, flush=True)
                     release.clear()
                     finished.clear()
@@ -187,11 +193,11 @@ def main():
                                     max_retries=0, http_client=httpx.Client(trust_env=False)) as client:
                                 call = (client.messages.create if mode == "anthropic_messages" else
                                     client.responses.create if mode == "codex_responses" else client.chat.completions.create)
-                                if case in {"401", "429"}:
+                                if case in {"401", "429", "json-framing"}:
                                     try:
                                         call(**body)
                                     except (anthropic.APIStatusError, openai.APIStatusError) as error:
-                                        assert error.status_code == int(case)
+                                        assert error.status_code == (502 if case == "json-framing" else int(case))
                                         assert key not in str(error) and capability not in str(error)
                                     else:
                                         raise AssertionError("SDK accepted rejected request")
@@ -220,10 +226,14 @@ def main():
                                     finally:
                                         stream.close()
                                     assert first, "SDK lost early text delta"
-                                    assert interrupted == (case == "abort"), "incomplete stream certified successful"
+                                    assert interrupted == (case in {"abort", "stream-framing"}), "incomplete stream certified successful"
+                                    if case == "stream-framing":
+                                        assert not any(getattr(value, "type", None) in {"message_stop", "response.completed"}
+                                            or any(choice.finish_reason is not None for choice in getattr(value, "choices", []))
+                                            for value in values), "unverified terminal was forwarded"
                                     if case == "stream":
                                         assert any("call_fixture" in value.model_dump_json() for value in values)
-                        expected = (502, None, None) if case == "abort" else (
+                        expected = (502, None, None) if case in {"abort", "json-framing", "stream-framing"} else (
                             (int(case), None, None) if case in {"401", "429"} else (200, 8, 5))
                         assert finished.wait(5), "broker did not durably finalize admission"
                         assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchall() == [expected]
@@ -233,13 +243,14 @@ def main():
             release.set()
             http.client.HTTPSConnection = original_https
     assert not failures, failures
-    assert len(received) == len(checks) == 195 and len(set(received)) == 195
+    assert len(received) == len(checks) == 273 and len(set(received)) == 273
     receipt = {"actual_pinned_builder_sdk_http_cases": checks, "http_profile_count": len(providers),
         "case_count": len(checks), "early_stream_before_withheld_terminal": True,
         "truncated_streams_rejected_without_retry": True, "native_tool_json_preserved": True,
+        "incomplete_http_framing_cannot_certify_json_or_terminal_sse": True,
         "private_credential_reflection_redacted": True, "live_provider_tested": False,
         "python": sys.version.split()[0], "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in (Path(__file__), root / "haos/provider_messages.py", root / "haos/provider_proxy.py",
+            for path in (Path(__file__), root / "haos/provider_messages.py", root / "haos/provider_proxy.py", root / "haos/provider_sse.py",
                 root / "haos/provider_profiles.py", root / "haos/hermes_registry.json")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps({"case_count": len(checks), "live_provider_tested": False}))

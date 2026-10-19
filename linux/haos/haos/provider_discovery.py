@@ -87,6 +87,8 @@ def get_json(policy, endpoint, path, headers):
         connection.request("GET", path, headers={"Accept": "application/json", "User-Agent": "HAOS/Hermes-model-catalog", **headers})
         response = connection.getresponse()
         body = response.read(MAX_BODY + 1)
+        from .provider_sse import require_complete
+        require_complete(response)
         if response.status in {401, 403}:
             raise PermissionError("provider catalog did not return bounded JSON")
         if (len(body) > MAX_BODY or response.getheader("Content-Encoding", "identity") != "identity"
