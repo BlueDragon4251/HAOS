@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import initial_setup
 from .setup_errors import describe_error
+from .hermes_capabilities import provider_rows, gateway_rows
 
 
 def session_allowed(env=None, uid=None):
@@ -83,8 +84,42 @@ class Wizard:
     def _choice(self, parent, label, items, default):
         self._label(parent, label, size=10, color=self.MUTED).pack(anchor="w", pady=(14, 4))
         value = self.tk.StringVar(value=default)
-        self.tk.OptionMenu(parent, value, *items).pack(anchor="w")
+        control = self.tk.OptionMenu(parent, value, *items)
+        control.configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
+                          activeforeground=self.TEXT, highlightthickness=0,
+                          relief="flat", bd=1, font=("DejaVu Sans", 11))
+        control["menu"].configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
+                                   activeforeground=self.TEXT, font=("DejaVu Sans", 11))
+        control.pack(anchor="w")
         return value
+
+    def _catalogue(self, heading, rows):
+        """Display pinned upstream availability without granting adapter authority."""
+        shell = self.tk.Frame(self.content, bg=self.PANEL)
+        shell.pack(fill="x", pady=(14, 12))
+        details = self.tk.Frame(shell, bg=self.PANEL2)
+        opened = False
+
+        def toggle():
+            nonlocal opened
+            opened = not opened
+            if opened:
+                details.pack(fill="x", pady=(5, 0))
+                for child in details.winfo_children():
+                    child.destroy()
+                for name, status in rows:
+                    self._label(details, f"{name} — {status}", size=10,
+                                color=self.CYAN if status == "GUI" else self.MUTED).pack(
+                                    anchor="w", padx=9, pady=2)
+            else:
+                details.pack_forget()
+            control.configure(text=heading + (" ▲" if opened else " ▼"))
+
+        control = self.tk.Button(shell, text=heading + " ▼", command=toggle, bg=self.PANEL2,
+                                 fg=self.CYAN, relief="flat", activebackground=self.BORDER,
+                                 activeforeground=self.TEXT, font=("DejaVu Sans", 10, "bold"))
+        control.pack(anchor="w", fill="x")
+        return shell
 
     def _build(self):
         tk = self.tk
@@ -363,8 +398,14 @@ class Wizard:
                 self._run_async(lambda: initial_setup.configure_provider(
                     selected_provider, selected_model, key, selected_endpoint))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
-            self._label(self.content, "Codex-Kontologin und Multi-Provider-Auswahl sind in dieser Stufe noch nicht verfügbar.",
+            self._label(self.content,
+                        "Der Hermes-Katalog enthält weitere Anbieter. Ein Katalogeintrag "
+                        "ist keine HAOS-Integration: Ungetestete Transport- und OAuth-Verfahren "
+                        "werden weder freigeschaltet noch mit Zugangsdaten versorgt.",
                         color=self.MUTED).pack(anchor="w")
+            self._catalogue(
+                "Alle Provider des eingebundenen Hermes-Stands anzeigen",
+                [(label, status) for _slug, label, status in provider_rows()])
         elif name == "updates":
             self._head("HAOS Updates",
                        "Stabiler oder privater Entwicklungszweig. Der vorherige bootc-Stand bleibt für Rollback erhalten.")
@@ -414,6 +455,11 @@ class Wizard:
                                 success="Absender explizit freigegeben. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
                          pair_sender, primary=True).pack(anchor="w", pady=(10, 0))
+            self._label(self.content,
+                        "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
+                        "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",
+                        color=self.MUTED).pack(anchor="w", pady=(15, 0))
+            self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
         elif name == "finish":
             self._head("Einrichtung abschließen",
                        "Erst nach Administrator + Recovery kann die normale HAOS-Sitzung sicher starten.")
