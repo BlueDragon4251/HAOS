@@ -57,6 +57,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"
           "$PYTHON" linux/haos/runtime/probe_cloud_tokens.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-tokens.json"
           "$PYTHON" linux/haos/runtime/probe_provider_profiles.py linux/haos "$RUNNER_TEMP/provider-contracts/wire-profiles.json"
+          "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
       - uses: actions/upload-artifact@v4

@@ -17,6 +17,7 @@ def main():
     from agent.transports import get_transport
     from agent.transports.chat_completions import ChatCompletionsTransport
     from agent.transports.codex import ResponsesApiTransport
+    from agent.transports.anthropic import AnthropicTransport
     checks = []
     old_dns, old_connect = socket.getaddrinfo, socket.socket.connect
     def no_network(*_args, **_kwargs):
@@ -43,16 +44,14 @@ def main():
             assert profile.auth_handler is None and profile.refresh_credential is None
             assert profile.process_command == "" and profile.process_args == ()
             assert profile.default_headers == {} and profile.create_client(api_key="fixture-capability") is None
-            if mode == "anthropic_messages":
-                checks.append(provider + ":safe-profile-admission")
-                continue
             messages = [{"role": "system", "content": "fixture-only system"}, {"role": "user", "content": "fixture-only prompt"}]
             tools = [{"type": "function", "function": {"name": "fixture", "parameters": {"type": "object"}}}]
             params = {"reasoning_config": {"enabled": True, "effort": "high"}, "supports_reasoning": True,
                 "max_tokens": 4096, "temperature": 0.2, "session_id": "fixture-session", "cache_scope_id": "fixture-cache"}
             if provider == "qwen-oauth":
                 params["qwen_session_metadata"] = {"sessionId": "fixture-session", "promptId": "fixture-prompt"}
-            native = ChatCompletionsTransport() if mode == "chat_completions" else ResponsesApiTransport()
+            native = {"chat_completions": ChatCompletionsTransport, "codex_responses": ResponsesApiTransport,
+                "anthropic_messages": AnthropicTransport}[mode]()
             expected = native.build_kwargs(model, messages, tools, base_url=policy.endpoint,
                 provider=provider, provider_profile=original, **params)
             actual = get_transport(mode).build_kwargs(model, messages, tools,
@@ -74,11 +73,21 @@ def main():
         messages = [{"role": "assistant", "content": "fixture", "reasoning_details": [{"type": "reasoning.text", "text": "fixture-only"}]}]
         actual = get_transport("chat_completions").build_kwargs("fixture", messages, base_url=policy.client_config()["model"]["base_url"])
         assert actual["messages"][0]["reasoning_details"] == messages[0]["reasoning_details"]
+        policy = ProviderPolicy({**policy.data, "provider": "anthropic", "endpoint": default_endpoint("anthropic"),
+            "models": ["claude-opus-4-6"], "default_model": "claude-opus-4-6", "api_mode": "anthropic_messages"})
+        register_profiles(policy.data)
+        messages = [{"role": "user", "content": "fixture"}, {"role": "assistant", "content": "fixture reply",
+            "reasoning_details": [{"type": "thinking", "thinking": "fixture thought", "signature": "fixture-signature"}]}]
+        kwargs = get_transport("anthropic_messages").build_kwargs("claude-opus-4-6", messages,
+            base_url=policy.client_config()["model"]["base_url"])
+        assert any(block.get("signature") == "fixture-signature" for message in kwargs["messages"]
+            for block in message["content"] if isinstance(message["content"], list))
     finally:
         socket.getaddrinfo, socket.socket.connect = old_dns, old_connect
     receipt = {"actual_pinned_provider_wire_cases": checks, "network_disabled_during_projection": True,
         "agent_profiles_have_only_broker_capability": True, "upstream_client_and_auth_hooks_not_delegated": True,
         "openrouter_reasoning_replay_through_broker": True, "live_provider_tested": False, "python": sys.version.split()[0],
+        "native_anthropic_signed_thinking_replay_through_broker": True,
         "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in (Path(__file__), root / "haos/provider_profiles.py", root / "haos/sandbox.py", root / "haos/serve.py")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")

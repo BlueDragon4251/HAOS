@@ -10,9 +10,18 @@
     "azure-identity": "1.25.3",
     "msal": "1.39.0"
   },
-  "source_sha256": {
-    "probe_cloud_tokens.py": "d7f60154d19512de4791884db73f037b65e49bd10def23b30f5eeb04dea68922",
-    "provider_cloud.py": "4cc49c1df3ba67603b4fa1fbc538bf5b82541c0f0fbe22af03f52f26ccd307c8",
-    "provider_proxy.py": "a755b522c3e81582ee80bad09f1ac87f1dcca8beee2baaddb57d24f434243b91"
-  }
+  "source_files": [
+    {
+      "path": "probe_cloud_tokens.py",
+      "sha256": "c3f61fc81e799b471640d5e7d06914704db909654ac3950dc16eadea312b1415"
+    },
+    {
+      "path": "provider_cloud.py",
+      "sha256": "4cc49c1df3ba67603b4fa1fbc538bf5b82541c0f0fbe22af03f52f26ccd307c8"
+    },
+    {
+      "path": "provider_proxy.py",
+      "sha256": "fe76ca124ccabf85f0e9f69834eb9c9544d5da352c5a25e5381532c66ec2f1e7"
+    }
+  ]
 }

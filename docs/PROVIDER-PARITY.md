@@ -205,3 +205,36 @@ host-blocked foreign-UID/AF_UNIX files still required in CI. All five catalog
 source gates at f8d4df8c passed, including native interactive Tk and real kernel
 boundaries. Advanced Bedrock/Mantle, Anthropic subscription body contracts,
 gateways, mobile desktop and installed/live-account acceptance remain open.
+
+## Anthropic subscription and native Messages continuation
+
+The broker applies the pinned Claude Code subscription identity, prose/tool
+aliases, forced tool-choice and replay-name transforms using the real private
+credential's classification. It reverses only the exact names owned by the
+request before returning native JSON/SSE to the agent. API keys and third-party
+Messages credentials retain their own auth behavior. Native fast-mode bodies
+retain the reviewed model-gated beta. Case-insensitive SDK header merging
+prevents a duplicate SDK User-Agent from preceding the subscription identity.
+
+The public transport extension now supplies the true owner-approved endpoint
+as Messages conversion context too. This preserves native signed thinking
+replay without giving the agent an upstream HTTP client. All 53 projected
+profile cases now compare actual native kwargs, including Messages; a separate
+signed-thinking replay assertion passes with network access disabled.
+
+The real Anthropic SDK and pinned Hermes client constructor complete six
+loopback JSON/SSE cases: API key and subscription, tool alias collisions, MCP
+names, forced tools, fast mode, reflected-token redaction, multiline SSE JSON
+and an early delta while the upstream terminal event is deliberately withheld.
+SSE framing is bounded by line/total/time and rejects incomplete final frames.
+Eight parser/restoration checks and the broader suite pass: 725 tests, 21
+existing skips, with the same two host-blocked files excluded locally.
+
+The prior bb623a47 provider and GUI gates passed, but CI and services failed:
+Gitleaks mistook a documented source SHA-256 for a credential, and the real
+kernel fixture lacked the newly bound public policy source. The exact historical
+hash finding is reviewed by commit/path/rule/line; new cloud provenance separates
+paths from hashes. The kernel fixture now supplies that source and additionally
+checks that it is read-only, contains no credential fields and is absent without
+a model capability. No kernel gate is weakened or reported passed before rerun.
+Advanced Bedrock/Mantle and external account/installed acceptance remain open.

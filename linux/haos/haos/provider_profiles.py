@@ -19,6 +19,7 @@ def register_profiles(data):
     from agent.transports import get_transport, register_transport
     from agent.transports.chat_completions import ChatCompletionsTransport
     from agent.transports.codex import ResponsesApiTransport
+    from agent.transports.anthropic import AnthropicTransport
     routes = ProviderRoutes(data)
     config = routes.client_config()
     selected = {"haos-model": routes.primary}
@@ -87,11 +88,27 @@ def register_profiles(data):
                 params["base_url"] = selected[1]
             return super().build_kwargs(model, messages, tools, **params)
 
+    class BrokerMessages(AnthropicTransport):
+        def convert_messages(self, messages, **kwargs):
+            selected = profiles.get(str(kwargs.get("base_url") or "").rstrip("/"))
+            if selected:
+                kwargs["base_url"] = selected[1]
+            return super().convert_messages(messages, **kwargs)
+        def build_kwargs(self, model, messages, tools=None, **params):
+            selected = profiles.get(str(params.get("base_url") or "").rstrip("/"))
+            if selected:
+                params["base_url"] = selected[1]
+                # Only the private broker can classify the real credential.
+                params["is_oauth"] = False
+            return super().build_kwargs(model, messages, tools, **params)
+
     # Complete normal discovery first so it cannot overwrite these adapters.
     get_transport("chat_completions")
     get_transport("codex_responses")
+    get_transport("anthropic_messages")
     register_transport("chat_completions", BrokerChat)
     register_transport("codex_responses", BrokerResponses)
+    register_transport("anthropic_messages", BrokerMessages)
     return profiles
 
 

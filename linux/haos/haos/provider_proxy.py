@@ -101,6 +101,7 @@ class Credentials:
         return getattr(self.request_state, "endpoint", self.policy.endpoint)
 
     def headers(self):
+        self.request_state.oauth_messages = False
         if self.policy.provider == "copilot-acp":
             if self.credentials.get("api_key") is not None:
                 raise PermissionError("ACP credentials belong only to its isolated identity")
@@ -167,6 +168,8 @@ class Credentials:
                 # deliberately use different authentication headers. Let the
                 # pinned native client own that classification and its betas.
                 from agent.anthropic_adapter import build_anthropic_client
+                from agent.anthropic_credentials import anthropic_route_is_oauth
+                self.request_state.oauth_messages = anthropic_route_is_oauth(self.policy.endpoint, token)
                 with build_anthropic_client(token, self.policy.endpoint) as client:
                     headers.update({key: value for key, value in client.default_headers.items()
                                     if isinstance(value, str)})
@@ -358,6 +361,8 @@ class Handler(BaseHTTPRequestHandler):
             conn._create_connection = lambda pair, timeout, source_address=None: socket.create_connection(
                 (address, endpoint.port or 443), timeout=timeout, source_address=source_address)
         try:
+            from .provider_messages import prepare, restore
+            payload, wire_names = prepare(payload, oauth=getattr(getattr(self.route_credentials, "request_state", None), "oauth_messages", False))
             body = json.dumps(payload, ensure_ascii=False).encode()
             route = {"codex_responses": "/responses", "chat_completions": "/chat/completions",
                      "anthropic_messages": "/messages"}[self.policy.api_mode]
@@ -371,8 +376,19 @@ class Handler(BaseHTTPRequestHandler):
             suffix = "?" + urlencode(query) if query else ""
             # Never forward caller URLs, Host/Authorization, cookies, user IDs,
             # arbitrary headers, redirects or SDK credential overrides.
-            conn.request("POST", path + route + suffix, body=body,
-                         headers={**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"})
+            # Match the native SDK's case-insensitive header merge. Otherwise
+            # User-Agent and user-agent would emit conflicting identities.
+            if self.policy.api_mode == "anthropic_messages":
+                from .provider_messages import feature_headers
+                headers = feature_headers(payload, headers, self.policy.endpoint)
+            wire_headers, spelling = {}, {}
+            for key, value in {**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"}.items():
+                previous = spelling.get(key.lower())
+                if previous is not None:
+                    wire_headers.pop(previous)
+                wire_headers[key] = value
+                spelling[key.lower()] = key
+            conn.request("POST", path + route + suffix, body=body, headers=wire_headers)
             response = conn.getresponse()
             if not 200 <= response.status < 300:
                 # Keep the real provider status (including 401/403/429/5xx), but
@@ -389,7 +405,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = response.read(MAX_OUTPUT + 1)
                 if len(data) > MAX_OUTPUT:
                     raise ValueError("model response exceeds owner broker bound")
-                decoded = redactor.clean(json.loads(data))
+                decoded = redactor.clean(restore(json.loads(data), wire_names))
                 self.send_response(response.status)
                 self.send_header("Content-Type", content_type)
                 clean = json.dumps(decoded).encode()
@@ -405,34 +421,29 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.forward_started = True
-            total, usage, deadline, terminal = 0, {}, time.monotonic() + 600, False
-            while True:
-                if time.monotonic() > deadline:
-                    raise TimeoutError("model stream exceeded broker deadline")
-                line = response.readline(MAX_LINE + 1)
-                if not line:
-                    break
-                total += len(line)
-                if len(line) > MAX_LINE or total > MAX_OUTPUT:
-                    raise ValueError("model stream exceeded broker bounds")
-                # SSE is framed by lines. Buffer complete lines so credentials
-                # split across TCP chunks cannot bypass exact-value redaction.
-                if line.startswith(b"data:") and line.strip() != b"data: [DONE]":
-                    event = redactor.clean(json.loads(line[5:]))
+            usage, terminal = {}, False
+            from .provider_sse import events
+            for fields, data in events(response, max_line=MAX_LINE, max_output=MAX_OUTPUT, deadline=time.monotonic() + 600):
+                if data is not None and data != "[DONE]":
+                    event = redactor.clean(restore(json.loads(data), wire_names))
                     if isinstance(event, dict):
                         kind = event.get("type")
                         if kind in {"response.failed", "response.incomplete", "error"}:
                             raise ConnectionError("provider did not complete the model turn")
-                        terminal = terminal or kind in {"response.completed", "message_stop"}
+                        expected = {"codex_responses": "response.completed", "anthropic_messages": "message_stop"}.get(self.policy.api_mode)
+                        terminal = terminal or (expected is not None and kind == expected)
                         candidate = event.get("response", event)
                         if kind == "message_start":
                             candidate = event.get("message", {})
                         if isinstance(candidate, dict) and isinstance(candidate.get("usage"), dict):
                             usage.update(candidate["usage"])
-                    line = b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n"
+                    data = json.dumps(event, ensure_ascii=False)
                 else:
-                    terminal = terminal or line.strip() == b"data: [DONE]"
-                    line = redactor.text(line.decode()).encode()
+                    terminal = terminal or (data == "[DONE]" and self.policy.api_mode == "chat_completions")
+                lines = [redactor.text(field) for field in fields]
+                if data is not None:
+                    lines.append("data: " + data)
+                line = ("\n".join(lines) + "\n\n").encode()
                 self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n")
                 self.wfile.flush()
             if not terminal:

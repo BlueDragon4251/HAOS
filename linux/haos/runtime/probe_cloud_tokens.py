@@ -142,8 +142,8 @@ def main():
         "actual_azure_msal_client_credentials_refresh_cache": True, "actual_loopback_http": True,
         "live_provider_tested": False, "python": sys.version.split()[0],
         "sdk_versions": {name: importlib.metadata.version(name) for name in ("google-auth", "azure-identity", "msal")},
-        "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in (Path(__file__), root / "haos/provider_cloud.py", root / "haos/provider_proxy.py")}}
+        "source_files": [{"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            for path in (Path(__file__), root / "haos/provider_cloud.py", root / "haos/provider_proxy.py")]}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 
