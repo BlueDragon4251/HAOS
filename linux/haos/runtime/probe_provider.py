@@ -32,6 +32,8 @@ def main():
         config = home / "config.yaml"
         config.write_text(json.dumps(client))
         config.chmod(0o400)
+        from haos.provider_profiles import register_profiles
+        register_profiles(policy.data)
         loaded = load_config()
         assert loaded["model"]["base_url"] == BASE
         runtime = resolve_runtime_provider(requested="custom:haos-model", target_model="gpt-5.4")
@@ -47,6 +49,7 @@ def main():
         assert wire["store"] is False and "max_output_tokens" not in wire
         assert callable(resolve_codex_runtime_credentials) and codex_cloudflare_headers("")["originator"] == "hermes-agent"
         result = {"native_runtime_resolver": True, "native_responses_tool_contract": True,
+                  "native_broker_profile_projection": True,
                   "oauth_resolver_present": True, "provider_connected": False, "model_turn_tested": False}
     Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result))

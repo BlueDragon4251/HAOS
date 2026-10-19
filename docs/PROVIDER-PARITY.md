@@ -174,3 +174,34 @@ also passed. These results belong to the prior ACP source. This catalog
 continuation repeats them separately. Remaining provider work includes
 advanced Bedrock/Mantle and native/profile contracts plus cloud SDK token-flow
 fixtures; real vendor inference/account/installed acceptance is outstanding.
+
+## Native wire profiles and cloud token flows
+
+The agent now registers capability-only profiles through Hermes's public
+provider/transport seams before starting the canonical web runtime. A read-only
+owner policy supplies public routing context; it contains no provider secrets.
+Only pinned pure wire-building hooks and declarative model capabilities are
+projected. Original client factories, OAuth refreshers, process commands and
+credential headers never enter the agent profile. The actual HTTP client stays
+bound to the local broker and its scoped capability.
+
+This preserves vendor behavior previously obscured by the broker's generic
+URL: Qwen session metadata, Meta AI prompt-cache retention, and OpenRouter
+reasoning replay. Fifty-three actual pinned profile cases compare native wire
+kwargs or safe Messages profile admission with network access disabled. The
+actual Hermes runtime resolver and three-request MoA fanout/aggregation probes
+also pass with these profiles installed. Messages admission does not certify
+the still-open Anthropic subscription body transforms or native Bedrock paths.
+
+Real google-auth service-account RSA/JWT signing, authorized-user refresh, and
+Azure Identity/MSAL client-credentials flows run against explicit local HTTP
+fixtures, including expiry refresh and cached-token reuse. These are real SDK
+protocol tests, not external account inference. Receipts with source hashes
+are archived as cloud-tokens-python311-fixture.json and
+wire-profiles-python311-fixture.json under evidence/2026-10-19.
+
+Local validation: 717 tests passed and 21 existing skips, excluding the two
+host-blocked foreign-UID/AF_UNIX files still required in CI. All five catalog
+source gates at f8d4df8c passed, including native interactive Tk and real kernel
+boundaries. Advanced Bedrock/Mantle, Anthropic subscription body contracts,
+gateways, mobile desktop and installed/live-account acceptance remain open.

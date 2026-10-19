@@ -59,6 +59,7 @@ def command(grants: list[dict], credential_fd: int, *, certificates: list[str], 
         if type(provider_fd) is not int or provider_fd < 3 or provider_fd == credential_fd:
             raise ValueError("separate scoped model credential descriptor required")
         args.extend(["--perms", "0400", "--ro-bind-data", str(provider_fd), "/run/haos-credentials/provider-token",
+                     "--ro-bind", "/etc/haos/provider.json", "/run/haos-credentials/provider-policy.json",
                      "--ro-bind", "/etc/haos/provider-client.json", "/home/agent/.hermes/config.yaml"])
     seen = set()
     for grant in grants:

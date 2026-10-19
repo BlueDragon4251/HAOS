@@ -64,6 +64,8 @@ def main():
                 try:
                     config = routes.client_config()
                     Path(os.environ["HERMES_HOME"], "config.yaml").write_text(json.dumps(config))
+                    from haos.provider_profiles import register_profiles
+                    register_profiles(routes.data)
                     from hermes_cli.config import load_config
                     from hermes_cli.moa_config import validate_moa_payload
                     from hermes_cli.runtime_provider import resolve_runtime_provider
