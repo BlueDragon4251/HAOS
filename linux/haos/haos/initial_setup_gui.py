@@ -35,10 +35,16 @@ class Wizard:
         self.root = tk.Tk()
         self.root.title("HAOS — Administrator Setup")
         self.root.configure(bg=self.BG)
-        self.root.attributes("-fullscreen", True)
-        # Firmware GOP and old laptop panels may start at 640x480. Never
-        # force the window larger than the available physical screen.
+        # The dedicated root Xorg seat intentionally runs WITHOUT a window
+        # manager. Tk's -fullscreen is only an EWMH window-manager hint:
+        # without one, Tk remains at its tiny requested widget size in the
+        # upper-left corner. Set real X screen geometry directly and make the
+        # window override-redirect so there are no decorations or WM requests.
+        # Use the reported X screen dimensions; never hard-code an HP model.
         screen_w, screen_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.root.overrideredirect(True)
+        self.root.geometry(f"{screen_w}x{screen_h}+0+0")
+        self.root.attributes("-fullscreen", True)
         self.compact = screen_w < 900 or screen_h < 600
         self.label_wrap = max(220, min(780, screen_w - (225 if self.compact else 390)))
         self.root.minsize(min(560, screen_w), min(380, screen_h))
