@@ -41,6 +41,13 @@ def test_wizard_is_behind_gate_and_separate_recovery_stays_available():
     assert "StandardInput=tty-force" in setup
     assert "TTYPath=/dev/tty1" in setup
     assert "Conflicts=getty@tty1.service" in setup
+    # Owner onboarding creates /home/<owner> and normal observer files; the
+    # trusted root-only wizard cannot use systemd ProtectHome=yes.
+    assert "ProtectHome=no" in setup
+    assert "ProtectHome=yes" not in "\n".join(line for line in setup.splitlines()
+                                         if not line.lstrip().startswith("#"))
+    assert "NoNewPrivileges=yes" in setup
+    assert "ExecCondition=/usr/bin/haos-setup-gate prompt" in setup
     assert "TTYPath=/dev/tty8" not in setup
     assert "chvt 1" in (ROOT / "linux/haos/setup-gui-session.sh").read_text(encoding="utf-8")
     display = (ROOT / "linux/haos/setup-display.sh").read_text(encoding="utf-8")
