@@ -102,7 +102,7 @@ def describe_error(error: Exception, *, area: str = "setup") -> SetupProblem:
 
     if type(cause) is PermissionError:
         match_service = re.fullmatch(
-            r"stop (haos-(?:controller|hermes)\\.service) before modifying authority or reconciling a mission",
+            r"stop (haos-(?:controller|hermes)\.service) before modifying authority or reconciling a mission",
             str(cause))
         if match_service:
             summary = "Ein HAOS-Dienst ist noch aktiv; Kontoerstellung aus Sicherheitsgründen blockiert."
