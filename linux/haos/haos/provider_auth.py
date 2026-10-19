@@ -75,13 +75,9 @@ def main():
     executable = "/usr/lib/haos/hermes/.venv/bin/hermes"
     if action == "login":
         if provider == "qwen-oauth":
-            from pathlib import Path
-            if not (Path.home() / ".qwen/oauth_creds.json").exists():
-                import getpass
-                print("Hermes uses an existing Qwen CLI login. Import its oauth_creds.json here; tokens stay private to the provider UID.")
-                data = qwen_import(getpass.getpass("Qwen CLI credential JSON (hidden): "))
-                from hermes_cli.auth_qwen import _save_qwen_cli_tokens
-                _save_qwen_cli_tokens(data)
+            from .provider_qwen import device_login
+            from hermes_cli.auth_qwen import _save_qwen_cli_tokens
+            _save_qwen_cli_tokens(device_login())
         if provider == "copilot":
             from hermes_cli.copilot_auth import copilot_device_code_login
             from hermes_cli.config import save_env_value
@@ -110,8 +106,12 @@ def main():
 
 
 if __name__ == "__main__":
+    from .provider_qwen import QwenLoginError
     try:
         main()
+    except QwenLoginError as error:
+        print("Qwen authorization did not complete (" + str(error) + "). Check the account/network and retry; existing credentials are retained.", file=sys.stderr)
+        raise SystemExit(1)
     except Exception:
         print("Provider credential action refused; complete the protected owner setup.", file=sys.stderr)
         raise SystemExit(1)

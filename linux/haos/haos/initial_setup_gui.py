@@ -461,13 +461,16 @@ class Wizard:
                 selected_provider = provider.get()
                 self.root.withdraw()
                 self._run_async(lambda: initial_setup.provider_account(selected_provider, action),
-                                success="Konto-Aktion abgeschlossen. Provider anschließend konfigurieren.",
+                                success=("Kontostatus bestätigt. Keine Inferenz geprüft." if action == "status" else
+                                         "Konto-Aktion abgeschlossen. Provider anschließend konfigurieren."),
                                 completed=self.root.deiconify)
             login_button = self._button(self.content, "Mit Anbieter-Konto anmelden (OAuth / Device-Code)",
                                         lambda: account("login"))
             login_button.pack(anchor="w", pady=8)
             logout_button = self._button(self.content, "Anbieter-Konto abmelden", lambda: account("logout"))
             logout_button.pack(anchor="w", pady=4)
+            status_button = self._button(self.content, "Anbieter-Kontostatus prüfen", lambda: account("status"))
+            status_button.pack(anchor="w", pady=4)
             def update_provider(*_args):
                 # An old key must never follow a new provider selection.
                 secret.delete(0, tk.END)
@@ -478,7 +481,7 @@ class Wizard:
                 model_list.delete(0, tk.END)
                 catalog_status.config(text="Modellkennung direkt eingeben oder den Provider-Katalog laden.")
                 available = provider.get() in account_providers()
-                for button in (login_button, logout_button):
+                for button in (login_button, logout_button, status_button):
                     button.configure(state="normal" if available else "disabled")
             provider.trace_add("write", update_provider)
             update_provider()

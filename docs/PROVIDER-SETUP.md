@@ -186,6 +186,13 @@ Generic account commands are `provider login PROVIDER`, `provider auth-status
 PROVIDER`, and `provider logout PROVIDER`. The graphical physical setup launches
 the same private provider-UID OAuth process in a dedicated native terminal;
 credentials are neither sent to the model nor written to the system journal.
-Qwen OAuth currently needs an existing Qwen CLI credential file in the provider
-home; a fresh Qwen device-login/import flow remains open. Account login is not
+Qwen's login now starts a fresh device-code authorization with PKCE in the
+private provider terminal. Open only the displayed checked `chat.qwen.ai`
+authorization URI and approve its user code; Ctrl-C cancels. No Qwen CLI or
+pre-existing token file is required. The access/refresh tokens and device code
+are never displayed. Pending/slow-down, expiry, denial and invalid responses
+are handled with bounded polling; failed/cancelled login retains old credentials.
+Successful credentials use Hermes's private Qwen storage and native refresh.
+The graphical account-status control checks the private credential helper
+without stopping missions or claiming model inference. Account login is not
 proof of account entitlement or a successful inference.

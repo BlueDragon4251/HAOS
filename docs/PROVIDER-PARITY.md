@@ -37,6 +37,27 @@ Full provider-specific protocol variants, gateway expansion, mobile continuous
 desktop/control, phone firstboot and installed/artifact/live acceptance remain
 open. No external account, inference or final release is claimed by fixtures.
 
+## Fresh Qwen account authorization
+
+Qwen login no longer requires a separately installed CLI or pasted refresh-token
+JSON. A private native device-code/PKCE client uses the fixed official Qwen
+endpoints and the pinned Hermes public client ID. Its protocol reference is
+`QwenLM/qwen-code@c08007668ce01d9282ea702e95ddbc1f5adf57c9`,
+`packages/core/src/qwen/qwenOAuth2.ts` (Apache-2.0). Only the checked user-code
+authorization URI is printed in the protected owner terminal. Access, refresh,
+device and PKCE verifier secrets stay private. A denied, cancelled, expired or
+malformed response never replaces an existing credential. Successful results
+are saved and subsequently refreshed by the actual pinned Hermes implementation.
+
+Fourteen actual loopback HTTP cases verify PKCE, pending/slow-down, cancellation,
+expiry, denial, untrusted authorization/resource URLs, malformed/oversized token
+responses, HTTP redirect/truncation refusal and private 0600 native storage. Unit tests enforce URI and timing
+limits without importing Hermes. The GUI now exposes the existing private
+account-status backend without stopping execution. Native interactive Tk CI
+checks its button dispatch; the root-seat/backend gate has an independent denial
+test. Device authorization fixtures are required by image build and provider CI;
+real Qwen account/entitlement and installed graphical login remain unaccepted.
+
 Base: `9e432326e2c7ef56a7d9c0899ced3f53debff0ce`.
 Hermes: `f97608f178d1ffeca59860195ab7da295f7c8e5f`.
 
@@ -51,7 +72,7 @@ authorized. Additional bundled HTTP profiles require a reviewed image/export.
 | Component | Implemented here | Remaining acceptance/work |
 | --- | --- | --- |
 | HTTP API profiles | Registry-driven endpoint allowlists, setup/CLI, isolated credentials, three real native HTTP protocols | Provider-specific live/model/plan validation; complete per-provider quirks and dynamic discovery |
-| Account providers | Native private refresh, Qwen CLI import, Copilot device authorization, isolated ACP login/status/local logout; physical GUI account launcher | Real account flows, installed GUI acceptance and remote account revocation |
+| Account providers | Native private refresh, fresh Qwen device/PKCE login, Copilot device authorization, isolated ACP login/status/local logout; physical GUI account launcher/status | Real account flows, installed GUI acceptance and remote account revocation |
 | Multiple providers | Version 2 atomic migration, route-bound keys/models, GUI default/removal/fallback controls, explicit same-protocol fallback, no replay after stream starts | Installed/live failover acceptance; mixed-protocol fallback conversion is not implemented |
 | Native streaming | Bounded multiline Messages, Responses and Chat Completions SSE, subscription tools, signed replay, token redaction, durable usage | External protocol/account stress and installed acceptance |
 | Native Gemini | Real upstream native codec, continuous SSE, tool/signature preservation, rate/error/truncation handling | External Google account and installed acceptance |

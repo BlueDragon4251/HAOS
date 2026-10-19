@@ -300,8 +300,12 @@ def provider_account(provider, action="login"):
     """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
     require_root()
     from .initial_setup_gui import session_allowed
-    if not session_allowed() or provider not in account_providers() or action not in {"login", "logout"}:
+    if not session_allowed() or provider not in account_providers() or action not in {"login", "logout", "status"}:
         raise PermissionError("provider account login requires the trusted local setup seat")
+    if action == "status":
+        from .provider_setup import auth_helper
+        auth_helper("status", provider, graphical_status=True)
+        return {"credential_action_completed": True, "model_turn_tested": False}
     quiesce_for_setup()
     if action == "logout":
         from .provider_setup import revoke_account_routes
