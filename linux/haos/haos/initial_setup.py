@@ -14,6 +14,7 @@ from .enrollment import enroll, validate_name
 from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 from .region import CONSOLE_MAP, LOCALES
 from .provider_policy import ProviderPolicy, ENDPOINTS
+from .setup_errors import SetupStageError
 
 # Never store a plaintext password, recovery code, provider key or GHCR token
 # in setup state, IPC, temporary files, shell argv, or the audit log.
@@ -165,7 +166,10 @@ def configure_region(language: str, keyboard: str):
         raise ValueError("unsupported language or keyboard")
     from .region import owner_region
     from types import SimpleNamespace
-    result = owner_region(SimpleNamespace(region_action="apply", language=language, keyboard=keyboard))
+    try:
+        result = owner_region(SimpleNamespace(region_action="apply", language=language, keyboard=keyboard))
+    except Exception as error:
+        raise SetupStageError("REGION_SYSTEM", error) from None
     # The private VT8 X keyboard must change immediately too; other callers
     # cannot ask the owner broker to modify the normal observer's X display.
     if os.getenv("HAOS_TRUSTED_SETUP") == "1" and os.getenv("DISPLAY") == ":8":
@@ -174,7 +178,10 @@ def configure_region(language: str, keyboard: str):
                        env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
                             "PATH": "/usr/bin:/bin"})
     from .normal_profile import configure_region as observer_region
-    observer_region(language, keyboard)
+    try:
+        observer_region(language, keyboard)
+    except Exception as error:
+        raise SetupStageError("REGION_OBSERVER", error) from None
     return result
 
 
@@ -182,7 +189,10 @@ def configure_normal_user(display_name: str):
     require_root()
     from .normal_profile import configure_name
     from .owner import audit
-    result = configure_name(display_name)
+    try:
+        result = configure_name(display_name)
+    except Exception as error:
+        raise SetupStageError("PROFILE", error) from None
     audit("setup.normal-user-named", {"configured": True})
     return result
 
