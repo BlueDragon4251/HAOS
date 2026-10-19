@@ -58,6 +58,14 @@ jobs:
           initial_setup.setup_in_progress=lambda: False
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
+          # Xvfb has no window manager: EWMH -fullscreen alone previously left
+          # the root wizard window tiny in the upper-left corner of the screen.
+          wizard.root.update()
+          assert wizard.root.overrideredirect(), "Kiosk setup must not need a window manager"
+          assert (wizard.root.winfo_width(), wizard.root.winfo_height()) == (
+              wizard.root.winfo_screenwidth(), wizard.root.winfo_screenheight()), (
+              wizard.root.geometry(), wizard.root.winfo_screenwidth(), wizard.root.winfo_screenheight())
+          assert (wizard.root.winfo_rootx(), wizard.root.winfo_rooty()) == (0, 0)
           for page in ("security", "user", "region", "provider", "updates", "gateways", "finish"):
               wizard.show(page)
               wizard.root.update_idletasks()
@@ -102,8 +110,11 @@ jobs:
           initial_setup.normal_user_ready = lambda: True
           initial_setup.setup_in_progress = lambda: False
           wizard = Wizard(tkinter)
+          wizard.root.update()
           assert wizard.compact
           assert wizard.root.winfo_screenwidth() == 640
+          assert (wizard.root.winfo_width(), wizard.root.winfo_height()) == (640, 480)
+          assert (wizard.root.winfo_rootx(), wizard.root.winfo_rooty()) == (0, 0)
           for page in ('security', 'user', 'region', 'provider', 'updates', 'gateways', 'finish'):
               wizard.show(page)
               wizard.root.update()
