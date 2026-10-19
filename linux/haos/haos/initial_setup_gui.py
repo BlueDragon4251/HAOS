@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from . import initial_setup
+from .setup_errors import describe_error
 
 
 def session_allowed(env=None, uid=None):
@@ -113,6 +114,8 @@ class Wizard:
         self.card.pack(side="left", fill="both", expand=True)
         self.status = self._label(self.card, "", size=10, color=self.MUTED)
         self.status.pack(side="bottom", fill="x", pady=(15, 0))
+        self.error_panel = tk.Frame(self.card, bg=self.PANEL2)
+        self.error_panel.pack(side="bottom", fill="x")
         # Scroll the card, not the desktop: keyboard-only users and small
         # firmware framebuffers must still reach every credential field.
         self.viewport = tk.Canvas(self.card, bg=self.PANEL, bd=0,
@@ -142,20 +145,45 @@ class Wizard:
         self._label(self.content, subtitle, size=11, color=self.MUTED,
                     wrap=800).pack(anchor="w", pady=(0, 23))
 
+    def _clear_error(self):
+        for child in self.error_panel.winfo_children():
+            child.destroy()
+
+    def _show_error(self, report):
+        self._clear_error()
+        self.status.config(text=report.title, fg="#ffafba")
+        self._label(self.error_panel, report.title, size=11, color="#ffafba").pack(
+            fill="x", padx=8, pady=(5, 2))
+        details = self._label(self.error_panel, report.details, size=9, color=self.TEXT)
+        details_open = False
+
+        def toggle():
+            nonlocal details_open
+            details_open = not details_open
+            toggle_button.config(text=("Technische Details ausblenden ▲" if details_open
+                                       else "Technische Details anzeigen ▼"))
+            if details_open:
+                details.pack(fill="x", padx=8, pady=(3, 8))
+            else:
+                details.pack_forget()
+
+        toggle_button = self.tk.Button(
+            self.error_panel, text="Technische Details anzeigen ▼", command=toggle,
+            bg=self.PANEL2, fg=self.CYAN, relief="flat", bd=0,
+            activebackground=self.PANEL2, activeforeground=self.TEXT)
+        toggle_button.pack(anchor="w", padx=8, pady=(0, 5))
+
     def _run(self, action, *, success="Gespeichert."):
-        from tkinter import messagebox
         if self.running:
             self.status.config(text="Warte, bis die laufende Systemaktion beendet ist.", fg=self.MUTED)
             return None
+        self._clear_error()
         self.status.config(text="Wird sicher angewendet …", fg=self.MUTED)
         self.root.update_idletasks()
         try:
             result = action()
-        except Exception:
-            # Credential material never belongs in UI exception text: existing
-            # privileged helpers intentionally suppress stdout/stderr.
-            self.status.config(text="Vorgang fehlgeschlagen; Änderungen wurden nicht bestätigt.", fg="#ffafba")
-            messagebox.showerror("HAOS", "Vorgang nicht abgeschlossen. Prüfe Voraussetzungen oder Verbindung.")
+        except Exception as error:
+            self._show_error(describe_error(error, area=self.page))
             return None
         self.status.config(text=success, fg=self.CYAN)
         return result
@@ -168,11 +196,11 @@ class Wizard:
         """
         import queue
         import threading
-        from tkinter import messagebox
         if self.running:
             self.status.config(text="Bitte warte, bis die aktuelle Systemaktion abgeschlossen ist.")
             return
         self.running = True
+        self._clear_error()
         self.status.config(text="Aktion läuft … Netzwerk und Datenträger können Zeit benötigen.",
                            fg=self.CYAN)
         results = queue.Queue(maxsize=1)
@@ -180,15 +208,15 @@ class Wizard:
         def worker():
             try:
                 action()
-                results.put(True)
-            except Exception:
-                results.put(False)
+                results.put((True, None))
+            except Exception as error:
+                results.put((False, describe_error(error, area=self.page)))
 
         threading.Thread(target=worker, daemon=True, name="haos-setup-action").start()
 
         def poll():
             try:
-                ok = results.get_nowait()
+                ok, report = results.get_nowait()
             except queue.Empty:
                 self.root.after(150, poll)
                 return
@@ -196,8 +224,7 @@ class Wizard:
             if ok:
                 self.status.config(text=success, fg=self.CYAN)
             else:
-                self.status.config(text="Aktion fehlgeschlagen; keine Bestätigung.", fg="#ffafba")
-                messagebox.showerror("HAOS", "Aktion nicht abgeschlossen. Prüfe Internet, Credentials und Systemstatus.")
+                self._show_error(report)
         self.root.after(150, poll)
 
     def show(self, name):
@@ -207,6 +234,7 @@ class Wizard:
         for child in self.content.winfo_children():
             child.destroy()
         self.status.config(text="", fg=self.MUTED)
+        self._clear_error()
         if name == "security":
             self._head("Administrator & Wiederherstellung",
                        "Ein separates Administrator-Konto, niemals das Hermes-Konto. Zugangsdaten bleiben auf diesem Gerät.")
