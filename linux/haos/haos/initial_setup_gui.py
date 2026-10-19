@@ -12,6 +12,7 @@ from pathlib import Path
 from . import initial_setup
 from .setup_errors import describe_error
 from .hermes_capabilities import provider_rows, gateway_rows
+from .provider_registry import http_providers, default_mode, oauth_providers, descriptor
 
 
 def session_allowed(env=None, uid=None):
@@ -223,7 +224,7 @@ class Wizard:
         self.status.config(text=success, fg=self.CYAN)
         return result
 
-    def _run_async(self, action, *, success="Gespeichert."):
+    def _run_async(self, action, *, success="Gespeichert.", completed=None):
         """Keep Tk's event loop responsive during authenticated slow system actions.
 
         Exactly one privileged mutation can be underway. No worker thread
@@ -256,6 +257,8 @@ class Wizard:
                 self.root.after(150, poll)
                 return
             self.running = False
+            if completed is not None:
+                completed()
             if ok:
                 self.status.config(text=success, fg=self.CYAN)
             else:
@@ -386,17 +389,41 @@ class Wizard:
                          primary=True).pack(anchor="w", pady=24)
         elif name == "provider":
             self._head("Hermes · Provider & Modell",
-                       "Authentifizierte Konfiguration eines Providers. Mehrere aktive Provider/automatische Verteilung folgen nach Broker-Integration.")
-            provider = self._choice(self.content, "Provider", ["openai", "openrouter", "local"], "openai")
+                       "Zugangsdaten bleiben im getrennten Provider-Dienst. Wähle anschließend ein Modell deines Anbieters.")
+            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | {"local", "lmstudio"}), "openai-api")
             model = self._field(self.content, "Modellkennung, vom Provider unterstützt")
-            endpoint = self._field(self.content, "Lokale URL nur für local", "http://127.0.0.1:11434/v1")
+            endpoint = self._field(self.content, "URL · leer = Standard des Anbieters")
+            mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
+                                ["auto", "chat_completions", "codex_responses", "anthropic_messages"], "auto")
             secret = self._field(self.content, "API-Schlüssel · nicht gespeichert im GUI", secret=True)
+            def account(action):
+                if self.running:
+                    return
+                selected_provider = provider.get()
+                self.root.withdraw()
+                self._run_async(lambda: initial_setup.provider_account(selected_provider, action),
+                                success="Konto-Aktion abgeschlossen. Provider anschließend konfigurieren.",
+                                completed=self.root.deiconify)
+            login_button = self._button(self.content, "Mit Anbieter-Konto anmelden (OAuth / Device-Code)",
+                                        lambda: account("login"))
+            login_button.pack(anchor="w", pady=8)
+            logout_button = self._button(self.content, "Anbieter-Konto abmelden", lambda: account("logout"))
+            logout_button.pack(anchor="w", pady=4)
+            def update_provider(*_args):
+                available = provider.get() in oauth_providers() | {"anthropic", "openrouter"}
+                for button in (login_button, logout_button):
+                    button.configure(state="normal" if available else "disabled")
+            provider.trace_add("write", update_provider)
+            update_provider()
             def apply():
                 key=secret.get()
                 secret.delete(0, tk.END)
-                selected_provider, selected_model, selected_endpoint = provider.get(), model.get(), endpoint.get()
+                selected_provider, selected_model, selected_endpoint, selected_mode = provider.get(), model.get(), endpoint.get(), mode.get()
+                if selected_provider == "local" and not selected_endpoint:
+                    selected_endpoint = "http://127.0.0.1:11434/v1"
                 self._run_async(lambda: initial_setup.configure_provider(
-                    selected_provider, selected_model, key, selected_endpoint))
+                    selected_provider, selected_model, key, selected_endpoint,
+                    "" if selected_mode == "auto" else selected_mode))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
             self._label(self.content,
                         "Der Hermes-Katalog enthält weitere Anbieter. Ein Katalogeintrag "

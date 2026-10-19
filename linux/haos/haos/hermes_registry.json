@@ -1,0 +1,1198 @@
+{
+  "version": 1,
+  "hermes_sha": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "providers": [
+    {
+      "slug": "nous",
+      "label": "Nous Research",
+      "description": "Nous Research — Hermes model family",
+      "auth_type": "oauth_device_code",
+      "tab": "accounts",
+      "api_key_env_vars": [
+        "NOUS_API_KEY"
+      ],
+      "base_url_env_var": "",
+      "signup_url": "https://nousresearch.com/",
+      "order": 0,
+      "endpoint": "https://inference-api.nousresearch.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "hermes-3-405b",
+        "hermes-3-70b"
+      ],
+      "endpoints": [
+        "https://inference-api.nousresearch.com/v1",
+        "https://welcome-api.nousresearch.com/v1"
+      ]
+    },
+    {
+      "slug": "fireworks",
+      "label": "Fireworks AI",
+      "description": "Fireworks AI — OpenAI-compatible direct model API",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "FIREWORKS_API_KEY"
+      ],
+      "base_url_env_var": "",
+      "signup_url": "https://app.fireworks.ai/settings/users/api-keys",
+      "order": 1,
+      "endpoint": "https://api.fireworks.ai/inference/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent",
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [
+        "accounts/fireworks/models/kimi-k2p6",
+        "accounts/fireworks/models/glm-5p2",
+        "accounts/fireworks/models/kimi-k2p7-code"
+      ],
+      "endpoints": [
+        "https://api.fireworks.ai/inference/v1"
+      ]
+    },
+    {
+      "slug": "openrouter",
+      "label": "OpenRouter",
+      "description": "OpenRouter — unified API for 200+ models",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "OPENROUTER_API_KEY"
+      ],
+      "base_url_env_var": "",
+      "signup_url": "https://openrouter.ai/keys",
+      "order": 2,
+      "endpoint": "https://openrouter.ai/api/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "anthropic/claude-sonnet-4.6",
+        "openai/gpt-5.4",
+        "deepseek/deepseek-chat",
+        "google/gemini-3.8-flash",
+        "google/gemini-3.7-flash",
+        "qwen/qwen3-plus"
+      ],
+      "endpoints": [
+        "https://openrouter.ai/api/v1"
+      ]
+    },
+    {
+      "slug": "moa",
+      "label": "Mixture of Agents",
+      "description": "Mixture of Agents (named presets; aggregator acts after reference models)",
+      "auth_type": "virtual",
+      "tab": "keys",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 3,
+      "endpoint": "moa://local",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "moa://local"
+      ]
+    },
+    {
+      "slug": "novita",
+      "label": "NovitaAI",
+      "description": "NovitaAI — AI-native cloud for builders and agents",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "NOVITA_API_KEY"
+      ],
+      "base_url_env_var": "NOVITA_BASE_URL",
+      "signup_url": "https://novita.ai/settings/key-management",
+      "order": 4,
+      "endpoint": "https://api.novita.ai/openai/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "moonshotai/kimi-k2.5",
+        "minimax/minimax-m2.7",
+        "zai-org/glm-5",
+        "deepseek/deepseek-v3-0324",
+        "deepseek/deepseek-r1-0528",
+        "qwen/qwen3-235b-a22b-fp8"
+      ],
+      "endpoints": [
+        "https://api.novita.ai/openai/v1"
+      ]
+    },
+    {
+      "slug": "lmstudio",
+      "label": "LM Studio",
+      "description": "LM Studio (Local desktop app with built-in model server)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "LM_API_KEY"
+      ],
+      "base_url_env_var": "LM_BASE_URL",
+      "signup_url": "",
+      "order": 5,
+      "endpoint": "http://127.0.0.1:1234/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "http://127.0.0.1:1234/v1"
+      ]
+    },
+    {
+      "slug": "anthropic",
+      "label": "Anthropic",
+      "description": "Anthropic (Claude models via API key or Claude Code)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ],
+      "base_url_env_var": "ANTHROPIC_BASE_URL",
+      "signup_url": "",
+      "order": 6,
+      "endpoint": "https://api.anthropic.com",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.anthropic.com"
+      ]
+    },
+    {
+      "slug": "openai-codex",
+      "label": "ChatGPT or Codex Subscription",
+      "description": "ChatGPT or Codex Subscription (Sign in with your ChatGPT account, uses Codex models)",
+      "auth_type": "oauth_external",
+      "tab": "accounts",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 7,
+      "endpoint": "https://chatgpt.com/backend-api/codex",
+      "api_mode": "codex_responses",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://chatgpt.com/backend-api/codex"
+      ]
+    },
+    {
+      "slug": "openai-api",
+      "label": "OpenAI API",
+      "description": "OpenAI API (api.openai.com, API key)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "OPENAI_API_KEY"
+      ],
+      "base_url_env_var": "OPENAI_BASE_URL",
+      "signup_url": "",
+      "order": 8,
+      "endpoint": "https://api.openai.com/v1",
+      "api_mode": "codex_responses",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.openai.com/v1"
+      ]
+    },
+    {
+      "slug": "alibaba",
+      "label": "Qwen Cloud",
+      "description": "Qwen Cloud / DashScope (Qwen + multi-provider)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "DASHSCOPE_API_KEY"
+      ],
+      "base_url_env_var": "DASHSCOPE_BASE_URL",
+      "signup_url": "https://modelstudio.console.alibabacloud.com/",
+      "order": 9,
+      "endpoint": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+      ]
+    },
+    {
+      "slug": "xai-oauth",
+      "label": "xAI Grok OAuth (SuperGrok / Premium+)",
+      "description": "xAI Grok OAuth (SuperGrok / Premium+ subscription)",
+      "auth_type": "oauth_external",
+      "tab": "accounts",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 10,
+      "endpoint": "https://api.x.ai/v1",
+      "api_mode": "codex_responses",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.x.ai/v1"
+      ]
+    },
+    {
+      "slug": "xiaomi",
+      "label": "Xiaomi MiMo",
+      "description": "Xiaomi MiMo (MiMo-V2.5 and V2 models: pro, omni, flash)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "XIAOMI_API_KEY"
+      ],
+      "base_url_env_var": "XIAOMI_BASE_URL",
+      "signup_url": "https://platform.xiaomimimo.com",
+      "order": 11,
+      "endpoint": "https://api.xiaomimimo.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.xiaomimimo.com/v1"
+      ]
+    },
+    {
+      "slug": "tencent-tokenhub",
+      "label": "Tencent TokenHub",
+      "description": "Tencent TokenHub (Hy4 preview via tokenhub.tencentmaas.com)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "TOKENHUB_API_KEY"
+      ],
+      "base_url_env_var": "TOKENHUB_BASE_URL",
+      "signup_url": "",
+      "order": 12,
+      "endpoint": "https://tokenhub.tencentmaas.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://tokenhub.tencentmaas.com/v1"
+      ]
+    },
+    {
+      "slug": "tencent-tokenplan",
+      "label": "Tencent TokenPlan",
+      "description": "Tencent TokenPlan (Hy4 preview via api.lkeap.cloud.tencent.com, Anthropic Messages)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "TOKENPLAN_API_KEY"
+      ],
+      "base_url_env_var": "TOKENPLAN_BASE_URL",
+      "signup_url": "",
+      "order": 13,
+      "endpoint": "https://api.lkeap.cloud.tencent.com/plan/anthropic",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.lkeap.cloud.tencent.com/plan/anthropic"
+      ]
+    },
+    {
+      "slug": "nvidia",
+      "label": "NVIDIA NIM",
+      "description": "NVIDIA NIM — accelerated inference",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "NVIDIA_API_KEY"
+      ],
+      "base_url_env_var": "NVIDIA_BASE_URL",
+      "signup_url": "https://build.nvidia.com/",
+      "order": 14,
+      "endpoint": "https://integrate.api.nvidia.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "nvidia/llama-3.3-70b-instruct"
+      ],
+      "endpoints": [
+        "https://integrate.api.nvidia.com/v1"
+      ]
+    },
+    {
+      "slug": "copilot",
+      "label": "GitHub Copilot",
+      "description": "GitHub Copilot (Uses GITHUB_TOKEN or gh auth token)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "COPILOT_GITHUB_TOKEN",
+        "GH_TOKEN",
+        "GITHUB_TOKEN"
+      ],
+      "base_url_env_var": "COPILOT_API_BASE_URL",
+      "signup_url": "",
+      "order": 15,
+      "endpoint": "https://api.githubcopilot.com",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.githubcopilot.com"
+      ]
+    },
+    {
+      "slug": "copilot-acp",
+      "label": "GitHub Copilot ACP",
+      "description": "GitHub Copilot ACP (Spawns copilot --acp --stdio)",
+      "auth_type": "external_process",
+      "tab": "accounts",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 16,
+      "endpoint": "acp://copilot",
+      "api_mode": "codex_responses",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "acp://copilot"
+      ]
+    },
+    {
+      "slug": "huggingface",
+      "label": "HuggingFace",
+      "description": "HuggingFace Inference API",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "HF_TOKEN"
+      ],
+      "base_url_env_var": "HF_BASE_URL",
+      "signup_url": "https://huggingface.co/settings/tokens",
+      "order": 17,
+      "endpoint": "https://router.huggingface.co/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "Qwen/Qwen3.5-72B-Instruct",
+        "deepseek-ai/DeepSeek-V3.2"
+      ],
+      "endpoints": [
+        "https://router.huggingface.co/v1"
+      ]
+    },
+    {
+      "slug": "gemini",
+      "label": "Google AI Studio",
+      "description": "Google AI Studio (Native Gemini API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY"
+      ],
+      "base_url_env_var": "GEMINI_BASE_URL",
+      "signup_url": "https://aistudio.google.com/app/apikey",
+      "order": 18,
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://generativelanguage.googleapis.com/v1beta"
+      ]
+    },
+    {
+      "slug": "vertex",
+      "label": "Google Vertex AI",
+      "description": "Google Vertex AI (Gemini via GCP; OAuth2 service account or ADC, GCP billing/quotas)",
+      "auth_type": "vertex",
+      "tab": "keys",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 19,
+      "endpoint": "https://aiplatform.googleapis.com",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://aiplatform.googleapis.com"
+      ]
+    },
+    {
+      "slug": "deepseek",
+      "label": "DeepSeek",
+      "description": "DeepSeek — native DeepSeek API",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "base_url_env_var": "DEEPSEEK_BASE_URL",
+      "signup_url": "https://platform.deepseek.com/",
+      "order": 20,
+      "endpoint": "https://api.deepseek.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "deepseek-v4-pro",
+        "deepseek-flash"
+      ],
+      "endpoints": [
+        "https://api.deepseek.com/v1"
+      ]
+    },
+    {
+      "slug": "xai",
+      "label": "xAI",
+      "description": "xAI Grok (Direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "XAI_API_KEY"
+      ],
+      "base_url_env_var": "XAI_BASE_URL",
+      "signup_url": "https://console.x.ai/",
+      "order": 21,
+      "endpoint": "https://api.x.ai/v1",
+      "api_mode": "codex_responses",
+      "headers": {
+        "User-Agent": "Hermes-Agent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.x.ai/v1"
+      ]
+    },
+    {
+      "slug": "zai",
+      "label": "Z.AI (GLM)",
+      "description": "Z.AI / GLM — Zhipu AI models",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "GLM_API_KEY",
+        "ZAI_API_KEY",
+        "Z_AI_API_KEY"
+      ],
+      "base_url_env_var": "GLM_BASE_URL",
+      "signup_url": "https://z.ai/",
+      "order": 22,
+      "endpoint": "https://api.z.ai/api/paas/v4",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "glm-5.2",
+        "glm-5",
+        "glm-4-9b"
+      ],
+      "endpoints": [
+        "https://api.z.ai/api/paas/v4",
+        "https://open.bigmodel.cn/api/paas/v4",
+        "https://api.z.ai/api/coding/paas/v4",
+        "https://open.bigmodel.cn/api/coding/paas/v4"
+      ]
+    },
+    {
+      "slug": "kimi-coding",
+      "label": "Kimi / Kimi Coding Plan",
+      "description": "Kimi Coding Plan (api.kimi.com & Moonshot API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "KIMI_API_KEY",
+        "KIMI_CODING_API_KEY"
+      ],
+      "base_url_env_var": "KIMI_BASE_URL",
+      "signup_url": "https://platform.moonshot.cn/",
+      "order": 23,
+      "endpoint": "https://api.moonshot.ai/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent",
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.moonshot.ai/v1",
+        "https://api.kimi.com/coding"
+      ]
+    },
+    {
+      "slug": "kimi-coding-cn",
+      "label": "Kimi / Moonshot (China)",
+      "description": "Kimi / Moonshot China (Domestic direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "KIMI_CN_API_KEY"
+      ],
+      "base_url_env_var": "",
+      "signup_url": "https://platform.moonshot.cn/",
+      "order": 24,
+      "endpoint": "https://api.moonshot.cn/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent",
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.moonshot.cn/v1",
+        "https://api.kimi.com/coding"
+      ]
+    },
+    {
+      "slug": "stepfun",
+      "label": "StepFun Step Plan",
+      "description": "StepFun Step Plan (Agent / coding models via Step Plan API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "STEPFUN_API_KEY"
+      ],
+      "base_url_env_var": "STEPFUN_BASE_URL",
+      "signup_url": "https://platform.stepfun.com/",
+      "order": 25,
+      "endpoint": "https://api.stepfun.ai/step_plan/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.stepfun.ai/step_plan/v1"
+      ]
+    },
+    {
+      "slug": "minimax",
+      "label": "MiniMax",
+      "description": "MiniMax (Global direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "MINIMAX_API_KEY"
+      ],
+      "base_url_env_var": "MINIMAX_BASE_URL",
+      "signup_url": "https://www.minimax.io/",
+      "order": 26,
+      "endpoint": "https://api.minimax.io/anthropic",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.minimax.io/anthropic"
+      ]
+    },
+    {
+      "slug": "minimax-oauth",
+      "label": "MiniMax (OAuth)",
+      "description": "MiniMax via OAuth browser flow — no API key required",
+      "auth_type": "oauth_minimax",
+      "tab": "accounts",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "https://api.minimax.io/",
+      "order": 27,
+      "endpoint": "https://api.minimax.io/anthropic",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.minimax.io/anthropic",
+        "https://api.minimaxi.com/anthropic"
+      ]
+    },
+    {
+      "slug": "minimax-cn",
+      "label": "MiniMax (China)",
+      "description": "MiniMax China (Domestic direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "MINIMAX_CN_API_KEY"
+      ],
+      "base_url_env_var": "MINIMAX_CN_BASE_URL",
+      "signup_url": "https://www.minimaxi.com/",
+      "order": 28,
+      "endpoint": "https://api.minimaxi.com/anthropic",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.minimaxi.com/anthropic"
+      ]
+    },
+    {
+      "slug": "ollama-cloud",
+      "label": "Ollama Cloud",
+      "description": "Ollama Cloud (Cloud-hosted open models, ollama.com)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "OLLAMA_API_KEY"
+      ],
+      "base_url_env_var": "OLLAMA_BASE_URL",
+      "signup_url": "https://ollama.com/settings",
+      "order": 29,
+      "endpoint": "https://ollama.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://ollama.com/v1"
+      ]
+    },
+    {
+      "slug": "arcee",
+      "label": "Arcee AI",
+      "description": "Arcee AI (Trinity models, direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ARCEEAI_API_KEY"
+      ],
+      "base_url_env_var": "ARCEE_BASE_URL",
+      "signup_url": "https://chat.arcee.ai/",
+      "order": 30,
+      "endpoint": "https://api.arcee.ai/api/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.arcee.ai/api/v1"
+      ]
+    },
+    {
+      "slug": "gmi",
+      "label": "GMI Cloud",
+      "description": "GMI Cloud — multi-model direct API (slash-form model IDs)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "GMI_API_KEY"
+      ],
+      "base_url_env_var": "GMI_BASE_URL",
+      "signup_url": "https://www.gmicloud.ai/",
+      "order": 31,
+      "endpoint": "https://api.gmi-serving.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [
+        "zai-org/GLM-5.1-FP8",
+        "deepseek-ai/DeepSeek-V3.2",
+        "moonshotai/Kimi-K2.5",
+        "google/gemini-3.1-flash-lite-preview",
+        "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-4.6",
+        "openai/gpt-5.4"
+      ],
+      "endpoints": [
+        "https://api.gmi-serving.com/v1"
+      ]
+    },
+    {
+      "slug": "kilocode",
+      "label": "Kilo Code",
+      "description": "Kilo Code (Kilo Gateway API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "KILOCODE_API_KEY"
+      ],
+      "base_url_env_var": "KILOCODE_BASE_URL",
+      "signup_url": "",
+      "order": 32,
+      "endpoint": "https://api.kilo.ai/api/gateway",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.kilo.ai/api/gateway"
+      ]
+    },
+    {
+      "slug": "opencode-zen",
+      "label": "OpenCode Zen",
+      "description": "OpenCode Zen (Curated models, pay-as-you-go)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "OPENCODE_ZEN_API_KEY"
+      ],
+      "base_url_env_var": "OPENCODE_ZEN_BASE_URL",
+      "signup_url": "https://opencode.ai/auth",
+      "order": 33,
+      "endpoint": "https://opencode.ai/zen/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent",
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://opencode.ai/zen/v1"
+      ]
+    },
+    {
+      "slug": "opencode-go",
+      "label": "OpenCode Go",
+      "description": "OpenCode Go (Open models subscription)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "OPENCODE_GO_API_KEY"
+      ],
+      "base_url_env_var": "OPENCODE_GO_BASE_URL",
+      "signup_url": "https://opencode.ai/auth",
+      "order": 34,
+      "endpoint": "https://opencode.ai/zen/go/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent",
+        "User-Agent": "HermesAgent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://opencode.ai/zen/go/v1"
+      ]
+    },
+    {
+      "slug": "bedrock",
+      "label": "AWS Bedrock",
+      "description": "AWS Bedrock (Claude, Nova, Llama, DeepSeek; IAM or API key)",
+      "auth_type": "aws_sdk",
+      "tab": "keys",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 35,
+      "endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com",
+      "api_mode": "bedrock_converse",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://bedrock-runtime.us-east-1.amazonaws.com"
+      ]
+    },
+    {
+      "slug": "azure-foundry",
+      "label": "Azure Foundry",
+      "description": "Microsoft Foundry - OpenAI-compatible endpoint (user-supplied base URL)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "AZURE_FOUNDRY_API_KEY"
+      ],
+      "base_url_env_var": "AZURE_FOUNDRY_BASE_URL",
+      "signup_url": "https://ai.azure.com/",
+      "order": 36,
+      "endpoint": "",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        ""
+      ]
+    },
+    {
+      "slug": "ai-gateway",
+      "label": "Vercel AI Gateway",
+      "description": "Vercel AI Gateway (Multi-model aggregator)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "AI_GATEWAY_API_KEY"
+      ],
+      "base_url_env_var": "AI_GATEWAY_BASE_URL",
+      "signup_url": "",
+      "order": 37,
+      "endpoint": "https://ai-gateway.vercel.sh/v1",
+      "api_mode": "chat_completions",
+      "headers": {
+        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "X-Title": "Hermes Agent"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://ai-gateway.vercel.sh/v1"
+      ]
+    },
+    {
+      "slug": "qwen-oauth",
+      "label": "Qwen OAuth (Portal)",
+      "description": "Qwen OAuth (Reuses local Qwen CLI login)",
+      "auth_type": "oauth_external",
+      "tab": "accounts",
+      "api_key_env_vars": [
+        "QWEN_API_KEY"
+      ],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 38,
+      "endpoint": "https://portal.qwen.ai/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://portal.qwen.ai/v1"
+      ]
+    },
+    {
+      "slug": "actual",
+      "label": "Actual Computer",
+      "description": "Actual Computer - hosted inference via api.actual.inc, or local offline inference via model.base_url in config.yaml",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ACTUAL_API_KEY"
+      ],
+      "base_url_env_var": "ACTUAL_BASE_URL",
+      "signup_url": "https://actual.inc",
+      "order": 39,
+      "endpoint": "https://api.actual.inc/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.actual.inc/v1"
+      ]
+    },
+    {
+      "slug": "alibaba-cn",
+      "label": "Alibaba Cloud DashScope (China)",
+      "description": "Alibaba Cloud DashScope, mainland-China endpoint",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "DASHSCOPE_API_KEY"
+      ],
+      "base_url_env_var": "DASHSCOPE_CN_BASE_URL",
+      "signup_url": "https://modelstudio.console.alibabacloud.com/",
+      "order": 40,
+      "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      ]
+    },
+    {
+      "slug": "alibaba-token-plan",
+      "label": "Alibaba Cloud (Token Plan)",
+      "description": "Alibaba Cloud Model Studio Token Plan (flat-token tier)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ALIBABA_TOKEN_PLAN_API_KEY"
+      ],
+      "base_url_env_var": "ALIBABA_TOKEN_PLAN_BASE_URL",
+      "signup_url": "https://help.aliyun.com/zh/model-studio/",
+      "order": 41,
+      "endpoint": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+      ]
+    },
+    {
+      "slug": "alibaba-token-plan-cn",
+      "label": "Alibaba Cloud (Token Plan, China)",
+      "description": "Alibaba Cloud Model Studio Token Plan, mainland-China endpoint",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ALIBABA_TOKEN_PLAN_CN_API_KEY",
+        "ALIBABA_TOKEN_PLAN_API_KEY"
+      ],
+      "base_url_env_var": "ALIBABA_TOKEN_PLAN_CN_BASE_URL",
+      "signup_url": "https://help.aliyun.com/zh/model-studio/",
+      "order": 42,
+      "endpoint": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+      ]
+    },
+    {
+      "slug": "alibaba-coding-plan",
+      "label": "Alibaba Cloud (Coding Plan)",
+      "description": "Alibaba Cloud Coding Plan (Dedicated coding tier)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ALIBABA_CODING_PLAN_API_KEY",
+        "DASHSCOPE_API_KEY"
+      ],
+      "base_url_env_var": "ALIBABA_CODING_PLAN_BASE_URL",
+      "signup_url": "https://help.aliyun.com/zh/model-studio/",
+      "order": 43,
+      "endpoint": "https://coding-intl.dashscope.aliyuncs.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://coding-intl.dashscope.aliyuncs.com/v1"
+      ]
+    },
+    {
+      "slug": "alibaba-coding-plan-cn",
+      "label": "Alibaba Cloud (Coding Plan, China)",
+      "description": "Alibaba Cloud Coding Plan, mainland-China endpoint",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "ALIBABA_CODING_PLAN_CN_API_KEY",
+        "ALIBABA_CODING_PLAN_API_KEY",
+        "DASHSCOPE_API_KEY"
+      ],
+      "base_url_env_var": "ALIBABA_CODING_PLAN_CN_BASE_URL",
+      "signup_url": "https://help.aliyun.com/zh/model-studio/",
+      "order": 44,
+      "endpoint": "https://coding.dashscope.aliyuncs.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://coding.dashscope.aliyuncs.com/v1"
+      ]
+    },
+    {
+      "slug": "commandcode",
+      "label": "CommandCode",
+      "description": "CommandCode — 20+ models via OpenAI-compatible API",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "COMMANDCODE_API_KEY"
+      ],
+      "base_url_env_var": "COMMANDCODE_BASE_URL",
+      "signup_url": "https://commandcode.ai/",
+      "order": 45,
+      "endpoint": "https://api.commandcode.ai/provider/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-flash",
+        "Qwen/Qwen3.7-Max",
+        "Qwen/Qwen3.6-Plus",
+        "moonshotai/Kimi-K2.6",
+        "zai-org/GLM-5.1",
+        "MiniMaxAI/MiniMax-M2.7",
+        "stepfun/Step-3.5-Flash",
+        "xiaomi/mimo-v2.5-pro",
+        "google/gemini-3.5-flash",
+        "gpt-5.5"
+      ],
+      "endpoints": [
+        "https://api.commandcode.ai/provider/v1"
+      ]
+    },
+    {
+      "slug": "commandcode-anthropic",
+      "label": "CommandCode (Anthropic)",
+      "description": "CommandCode — Claude models via Anthropic Messages API",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "COMMANDCODE_API_KEY"
+      ],
+      "base_url_env_var": "COMMANDCODE_ANTHROPIC_BASE_URL",
+      "signup_url": "https://commandcode.ai/",
+      "order": 46,
+      "endpoint": "https://api.commandcode.ai/provider/v1",
+      "api_mode": "anthropic_messages",
+      "headers": {},
+      "fallback_models": [
+        "claude-sonnet-4-6",
+        "claude-opus-4-7",
+        "claude-haiku-4-5-20251001"
+      ],
+      "endpoints": [
+        "https://api.commandcode.ai/provider/v1"
+      ]
+    },
+    {
+      "slug": "custom",
+      "label": "custom",
+      "description": "custom (direct API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [],
+      "base_url_env_var": "",
+      "signup_url": "",
+      "order": 47,
+      "endpoint": "",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        ""
+      ]
+    },
+    {
+      "slug": "deepinfra",
+      "label": "DeepInfra",
+      "description": "DeepInfra — 100+ open models, pay-per-use",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "DEEPINFRA_API_KEY"
+      ],
+      "base_url_env_var": "DEEPINFRA_BASE_URL",
+      "signup_url": "https://deepinfra.com/dash/api_keys",
+      "order": 48,
+      "endpoint": "https://api.deepinfra.com/v1/openai",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.deepinfra.com/v1/openai"
+      ]
+    },
+    {
+      "slug": "meta-ai",
+      "label": "Meta Model API",
+      "description": "Meta Muse Spark family (Meta Superintelligence Labs)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "MODEL_API_KEY",
+        "META_API_KEY",
+        "META_MODEL_API_KEY"
+      ],
+      "base_url_env_var": "META_BASE_URL",
+      "signup_url": "https://developer.meta.com/ai/",
+      "order": 49,
+      "endpoint": "https://api.meta.ai/v1",
+      "api_mode": "codex_responses",
+      "headers": {},
+      "fallback_models": [
+        "muse-spark-1.2"
+      ],
+      "endpoints": [
+        "https://api.meta.ai/v1"
+      ]
+    },
+    {
+      "slug": "nebius-token-factory",
+      "label": "Nebius Token Factory",
+      "description": "Nebius Token Factory — OpenAI-compatible inference",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "NEBIUS_API_KEY",
+        "NEBIUS_TOKEN_FACTORY_API_KEY"
+      ],
+      "base_url_env_var": "NEBIUS_BASE_URL",
+      "signup_url": "https://tokenfactory.nebius.com/",
+      "order": 50,
+      "endpoint": "https://api.tokenfactory.nebius.com/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "Qwen/Qwen3.5-397B-A17B-fast",
+        "deepseek-ai/DeepSeek-V4-Pro",
+        "zai-org/GLM-5.1",
+        "moonshotai/Kimi-K2.5-fast",
+        "MiniMaxAI/MiniMax-M2.5-fast",
+        "deepseek-ai/DeepSeek-V3.2-fast",
+        "NousResearch/Hermes-4-70B",
+        "openai/gpt-oss-120b-fast",
+        "meta-llama/Llama-3.3-70B-Instruct"
+      ],
+      "endpoints": [
+        "https://api.tokenfactory.nebius.com/v1"
+      ]
+    },
+    {
+      "slug": "router",
+      "label": "Ramp Router",
+      "description": "Ramp Router (router.com) — routes each request to the cheapest model that clears your quality bar",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "RAMP_ROUTER_API_KEY",
+        "ROUTER_API_KEY"
+      ],
+      "base_url_env_var": "RAMP_ROUTER_BASE_URL",
+      "signup_url": "https://app.router.com/keys",
+      "order": 51,
+      "endpoint": "https://api.router.com/v1",
+      "api_mode": "codex_responses",
+      "headers": {
+        "User-Agent": "Hermes-Agent/0.21.5"
+      },
+      "fallback_models": [],
+      "endpoints": [
+        "https://api.router.com/v1"
+      ]
+    },
+    {
+      "slug": "upstage",
+      "label": "Upstage Solar",
+      "description": "Upstage (Solar API)",
+      "auth_type": "api_key",
+      "tab": "keys",
+      "api_key_env_vars": [
+        "UPSTAGE_API_KEY"
+      ],
+      "base_url_env_var": "UPSTAGE_BASE_URL",
+      "signup_url": "https://console.upstage.ai/api-keys",
+      "order": 52,
+      "endpoint": "https://api.upstage.ai/v1",
+      "api_mode": "chat_completions",
+      "headers": {},
+      "fallback_models": [
+        "solar-pro3"
+      ],
+      "endpoints": [
+        "https://api.upstage.ai/v1"
+      ]
+    }
+  ],
+  "platforms": [
+    "a2a",
+    "buzz",
+    "dingtalk",
+    "discord",
+    "email",
+    "feishu",
+    "google_chat",
+    "homeassistant",
+    "irc",
+    "line",
+    "matrix",
+    "mattermost",
+    "ntfy",
+    "photon",
+    "raft",
+    "simplex",
+    "slack",
+    "sms",
+    "teams",
+    "telegram",
+    "wecom",
+    "whatsapp"
+  ]
+}

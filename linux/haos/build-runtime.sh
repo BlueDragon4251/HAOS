@@ -10,9 +10,13 @@ HAOS_RUNTIME_OVERLAY=/tmp/herald-os/linux/haos/runtime
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
-uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging
+uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic
 uv pip install --python .venv/bin/python --require-hashes --no-deps -r "$HAOS_RUNTIME_OVERLAY/requirements.txt"
 uv pip check --python .venv/bin/python
+# Fail the build on upstream registry drift. The setup process reads only this
+# reviewed data snapshot; it must never import arbitrary plugins as root.
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/export_registry.py" /usr/lib/haos/hermes /tmp/haos-registry.json
+cmp /tmp/haos-registry.json /usr/lib/haos/haos/hermes_registry.json
 mkdir -p /usr/lib/haos/runtime-provenance
 cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" /usr/lib/haos/runtime-provenance/
 uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/installed.txt

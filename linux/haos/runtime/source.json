@@ -4,7 +4,8 @@
   "uv_lock_sha256": "5b3798f326209475abca8ef7cbf7c9406f12e687c28c0b540dfe597466f48590",
   "extras": [
     "web",
-    "messaging"
+    "messaging",
+    "anthropic"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",

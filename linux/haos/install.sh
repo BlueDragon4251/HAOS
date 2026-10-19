@@ -8,6 +8,7 @@ install -m 0644 "$HAOS_SOURCE"/*.service /usr/lib/systemd/system/
 install -m 0644 "$HAOS_SOURCE"/*.socket /usr/lib/systemd/system/
 install -m 0644 "$HAOS_SOURCE"/*.timer /usr/lib/systemd/system/
 install -m 0644 "$HAOS_SOURCE/runtime/backup-schedule-entry.py" /usr/lib/haos/backup-schedule-entry.py
+install -m 0644 "$HAOS_SOURCE/runtime/provider-login.py" /usr/lib/haos/provider-login.py
 install -m 0644 "$HAOS_SOURCE/haos.sysusers" /usr/lib/sysusers.d/haos.conf
 # Only the physical graphical observer can manage Wi-Fi; never grant to the
 # separate Hermes agent, controllers, remote sessions or generic local users.

@@ -15,6 +15,7 @@ from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 from .region import CONSOLE_MAP, LOCALES
 from .provider_policy import ProviderPolicy, ENDPOINTS
 from .setup_errors import SetupStageError
+from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers
 
 # Never store a plaintext password, recovery code, provider key or GHCR token
 # in setup state, IPC, temporary files, shell argv, or the audit log.
@@ -223,36 +224,52 @@ def configure_update(channel: str, automatic: bool):
     return result
 
 
-def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = ""):
-    """Cloud API or local model; OAuth flow is not yet supported in this GUI."""
+def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = "", api_mode: str = ""):
+    """Provision a vetted HTTP or account route from the trusted local seat."""
     require_root()
-    if provider not in {"openai", "openrouter", "local"}:
+    if provider not in {*http_providers(), *oauth_providers(), "openai", "local", "lmstudio"}:
         raise ValueError("use a provider with an implemented graphical credential flow")
-    from .provider_setup import publish, stopped_provider
+    from .provider_setup import add_route, stopped_provider
     from .gateway_setup import stopped_gateway
     from .network import install
     from .owner import stopped, audit
     data = {"version": 1, "provider": provider,
-            "endpoint": endpoint if provider == "local" else ENDPOINTS[provider],
+            "endpoint": endpoint or default_endpoint(provider),
             "models": [model], "default_model": model,
-            "api_mode": "chat_completions" if provider in {"openrouter", "local"} else "codex_responses",
+            "api_mode": api_mode or default_mode(provider),
             "requests_per_day": 200, "requests_per_minute": 30}
     policy = ProviderPolicy(data)
-    if provider == "local" and api_key:
-        raise ValueError("a local endpoint does not use a cloud credential")
-    if provider != "local" and not api_key:
+    if provider not in {"local", "lmstudio", "anthropic", "openrouter", *oauth_providers()} and not api_key:
         raise ValueError("cloud API key required")
-    if provider != "local" and (not 16 <= len(api_key) <= 16384 or
+    if api_key and (not 16 <= len(api_key) <= 16384 or
                                    any(ord(c) < 33 or ord(c) > 126 for c in api_key)):
         raise ValueError("invalid provider credential")
     quiesce_for_setup()
+    if provider in oauth_providers() or (provider in {"anthropic", "openrouter"} and not api_key):
+        from .provider_setup import auth_helper
+        auth_helper("status", provider, graphical_status=True)
     # Only now does the vetted owner credential publisher replace trusted files.
-    publish(policy.data, api_key if provider != "local" else None)
+    add_route(policy.data, api_key or None)
     install(pwd.getpwnam("haos-agent").pw_uid)
     subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"],
                    check=True, timeout=30, capture_output=True)
     audit("setup.provider", {"provider": provider, "models": [model]})
     return {"configured": True, "provider": provider, "model_turn_tested": False}
+
+
+def provider_account(provider, action="login"):
+    """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
+    require_root()
+    from .initial_setup_gui import session_allowed
+    if not session_allowed() or provider not in oauth_providers() | {"anthropic", "openrouter"} or action not in {"login", "logout"}:
+        raise PermissionError("provider account login requires the trusted local setup seat")
+    quiesce_for_setup()
+    subprocess.run(["/usr/bin/xterm", "-T", "HAOS Provider-Anmeldung", "-geometry", "110x32+20+20",
+                    "-e", "/usr/bin/python3", "-I", "/usr/lib/haos/provider-login.py", action, provider],
+                   check=True, timeout=780, capture_output=True,
+                   env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
+                        "HAOS_TRUSTED_SETUP": "1", "PATH": "/usr/bin:/bin"})
+    return {"credential_action_completed": True, "model_turn_tested": False}
 
 
 def configure_gateway(connector: str, platform: str, token: str):

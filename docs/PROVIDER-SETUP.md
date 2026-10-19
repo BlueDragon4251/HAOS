@@ -1,9 +1,12 @@
 # Credential-isolated HAOS providers
 
-The installed owner CLI provisions OpenAI Codex OAuth, OpenAI API, OpenRouter API,
-or an explicitly configured loopback OpenAI-compatible local model. These are
-the interfaces supported by the pinned Hermes runtime; no provider response is
-fabricated when credentials are absent.
+HAOS reads a generated, commit-pinned snapshot of Hermes's own provider registry.
+The snapshot contains 39 regular entries and 14 additional bundled profiles.
+The HTTP broker implements Chat Completions, Responses and native Anthropic
+Messages, with exact owner-selected endpoints and local function-tool admission.
+Account flows run upstream login/refresh under the separate provider identity.
+This is ongoing parity work; SDK, native Gemini, Copilot/ACP, MoA, discovery and
+full installed acceptance are tracked in [PROVIDER-PARITY.md](PROVIDER-PARITY.md).
 
 `haos-provider` is a separate unprivileged identity. Real API keys stay in
 root-private `/etc/haos/provider-credentials`, delivered by systemd credentials.
@@ -145,3 +148,35 @@ remain rejected. Actual root/dropped-UID fixtures exercise each case; the real
 production-hardening systemd probe reads its delivered credential through this
 same loader. Corrected Fedora image acceptance remains required after the
 concrete controller-startup failure in `e954dd3` / `720c08c` guest evidence.
+
+## Several configured providers
+
+Configuring another provider preserves existing routes and credentials. Legacy
+single-provider policy is migrated atomically to version 2; every change still
+requires stopped execution, rotates the scoped broker capability, and publishes
+the authority descriptor last. Existing missions, data and accounts are retained.
+
+```sh
+sudo haos-owner stop
+sudo haos-owner provider configure anthropic --model YOUR_CLAUDE_MODEL
+sudo haos-owner provider configure deepseek --model YOUR_DEEPSEEK_MODEL
+sudo haos-owner provider set-default anthropic
+sudo haos-owner provider fallbacks deepseek --fallback openrouter
+sudo haos-owner provider remove deepseek
+sudo haos-owner start
+```
+
+Only configured routes with the same native wire protocol can be fallbacks.
+Explicit fallback selection authorizes sending a prompt to those providers.
+Fallback runs on an upstream HTTP 429/502/503/504 before output starts. A lost
+connection or a partial stream is ambiguous and is never automatically replayed.
+Each attempt is durably charged to the broker request quota before dispatch.
+`GET /v1/models` returns the owner-approved model list, not a live discovery claim.
+
+Generic account commands are `provider login PROVIDER`, `provider auth-status
+PROVIDER`, and `provider logout PROVIDER`. The graphical physical setup launches
+the same private provider-UID OAuth process in a dedicated native terminal;
+credentials are neither sent to the model nor written to the system journal.
+Qwen OAuth currently needs an existing Qwen CLI credential file in the provider
+home; a fresh Qwen device-login/import flow remains open. Account login is not
+proof of account entitlement or a successful inference.

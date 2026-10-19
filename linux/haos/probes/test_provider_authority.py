@@ -110,3 +110,26 @@ def test_service_credential_loader_refuses_unsafe_descriptors(location, kind):
         path.write_text("x" * 32769)
     with pytest.raises((PermissionError, OSError)):
         private_credential(path)
+
+def test_atomic_route_migration_rotation_revocation_and_default_model_change(location):
+    from haos.provider_routes import ProviderRoutes
+    from haos.provider_registry import default_mode
+    import json
+    tmp_path = location
+    def route(provider):
+        return {**policy(provider), "api_mode": default_mode(provider)}
+    from haos.provider_setup import publish, add_route, route_settings
+    first, second = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
+    publish(route("openrouter"), first, config=tmp_path)
+    original = json.loads((tmp_path / "provider-token").read_text())["token"]
+    add_route(route("anthropic"), second, config=tmp_path)
+    configuration = ProviderRoutes(json.loads((tmp_path / "provider.json").read_text()))
+    envelope = json.loads((tmp_path / "provider-credentials").read_text())
+    assert configuration.default == "anthropic" and set(configuration.routes) == {"anthropic", "openrouter"}
+    assert envelope == {"routes": {"openrouter": {"api_key": first}, "anthropic": {"api_key": second}}}
+    assert json.loads((tmp_path / "provider-token").read_text())["token"] != original
+    assert first not in (tmp_path / "provider-client.json").read_text() and second not in (tmp_path / "provider.json").read_text()
+    route_settings("openrouter", make_default=True, config=tmp_path)
+    route_settings("anthropic", remove=True, config=tmp_path)
+    assert second not in (tmp_path / "provider-credentials").read_text()
+    assert (tmp_path / "provider-credentials").stat().st_mode & 0o777 == 0o600

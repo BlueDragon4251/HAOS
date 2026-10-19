@@ -94,8 +94,8 @@ def main():
         os.set_inheritable(ui_fd, True)
         provider = Path("/etc/haos/provider.json")
         if provider.exists() or provider.is_symlink():
-            from .provider_policy import ProviderPolicy
-            policy = ProviderPolicy(trusted_json(provider))
+            from .provider_routes import ProviderRoutes
+            policy = ProviderRoutes(trusted_json(provider))
             client = trusted_json(Path("/etc/haos/provider-client.json"))
             if client != policy.client_config():
                 raise PermissionError("model client configuration differs from owner policy")

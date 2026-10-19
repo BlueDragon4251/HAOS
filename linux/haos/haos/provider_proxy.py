@@ -22,6 +22,8 @@ from .provider_policy import PORT, ProviderPolicy
 from .redaction import Redactor
 from .sandbox import trusted_json
 from .credentials import private_credential
+from .provider_registry import descriptor, oauth_providers
+from .provider_routes import ProviderRoutes
 
 MAX_INPUT = 4 * 1024 * 1024
 MAX_LINE = 1024 * 1024
@@ -91,23 +93,41 @@ class Credentials:
         self.lock = threading.Lock()
 
     def headers(self):
-        if self.policy.provider == "openai-codex":
+        if (self.policy.provider in oauth_providers() or
+                (self.policy.provider in {"anthropic", "openrouter"} and not self.credentials.get("api_key"))):
             # The pinned upstream owns OAuth validation, locking and refresh. It
             # runs under the separate provider UID and its own private HOME.
             with self.lock:
-                from hermes_cli.auth_codex import resolve_codex_runtime_credentials
-                from agent.codex_headers import codex_cloudflare_headers
-                token = resolve_codex_runtime_credentials()["api_key"]
-                headers = codex_cloudflare_headers(token)
+                from hermes_cli.runtime_provider import resolve_runtime_provider
+                resolved = resolve_runtime_provider(requested=self.policy.provider,
+                                                     target_model=self.policy.data["default_model"])
+                if (resolved["base_url"].rstrip("/") != self.policy.endpoint.rstrip("/")
+                        or resolved["api_mode"] != self.policy.api_mode):
+                    raise PermissionError("OAuth route changed; owner must approve its endpoint and transport")
+                token = resolved["api_key"]
+                headers = dict(resolved.get("extra_headers") or {})
+                if self.policy.provider == "openai-codex":
+                    from agent.codex_headers import codex_cloudflare_headers
+                    headers.update(codex_cloudflare_headers(token))
         else:
             token = self.credentials.get("api_key")
-            if self.policy.provider != "local" and not token:
+            if self.policy.provider not in {"local", "lmstudio"} and not token:
                 raise PermissionError("provider credentials are not configured")
-            headers = {}
+            row = descriptor(self.policy.provider)
+            headers = dict(row["headers"]) if row else {}
         if token:
             if not isinstance(token, str) or not 1 <= len(token) <= 16384 or any(ord(c) < 33 or ord(c) > 126 for c in token):
                 raise PermissionError("invalid provider credential")
-            headers["Authorization"] = "Bearer " + token
+            if self.policy.api_mode == "anthropic_messages":
+                # MiniMax/TokenPlan, Claude subscription tokens and API keys
+                # deliberately use different authentication headers. Let the
+                # pinned native client own that classification and its betas.
+                from agent.anthropic_adapter import build_anthropic_client
+                with build_anthropic_client(token, self.policy.endpoint) as client:
+                    headers.update({key: value for key, value in client.default_headers.items()
+                                    if isinstance(value, str)})
+            else:
+                headers["Authorization"] = "Bearer " + token
         return headers, Redactor([token] if token else [])
 
 
@@ -118,7 +138,9 @@ class Broker(ThreadingHTTPServer):
     def __init__(self, address, policy, token, credentials, ledger, *, bind_and_activate=True):
         if not re.fullmatch(r"[A-Za-z0-9_-]{43,128}", token):
             raise ValueError("invalid scoped model capability")
-        self.policy, self.token, self.credentials, self.ledger = policy, token, credentials, ledger
+        self.routes = policy if isinstance(policy, ProviderRoutes) else ProviderRoutes(policy.data)
+        self.policy, self.token, self.ledger = self.routes.primary, token, ledger
+        self.credentials = credentials
         self.workers = threading.BoundedSemaphore(16)
         self.turns = threading.BoundedSemaphore(2)
         super().__init__(address, Handler, bind_and_activate=bind_and_activate)
@@ -170,7 +192,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.reply(401, "model capability required")
             return
-        if self.path != "/v1/haos/usage":
+        try:
+            route, path = self.server.routes.resolve(self.path)
+            policy = self.server.routes.routes[route]
+        except PermissionError:
+            self.reply(403, "provider route is outside owner policy")
+            return
+        if path not in {"/v1/haos/usage", "/v1/models"}:
             self.reply(405, "only fixed model and aggregate usage routes are supported")
             return
         sizes = self.headers.get_all("Content-Length", [])
@@ -178,8 +206,13 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(400, "usage requests cannot carry a body")
             return
         try:
-            from .provider_usage import validate_snapshot
-            data = json.dumps(validate_snapshot(self.server.ledger.snapshot(self.server.policy))).encode()
+            if path == "/v1/models":
+                data = json.dumps({"object": "list", "data": [
+                    {"id": model, "object": "model", "owned_by": policy.provider}
+                    for model in policy.models]}).encode()
+            else:
+                from .provider_usage import validate_snapshot
+                data = json.dumps(validate_snapshot(self.server.ledger.snapshot(self.server.policy))).encode()
         except Exception:
             self.reply(503, "provider usage unavailable")
             return
@@ -195,10 +228,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def authorized(self):
         supplied = self.headers.get_all("Authorization", [])
-        return len(supplied) == 1 and hmac.compare_digest(supplied[0].encode(), ("Bearer " + self.server.token).encode())
+        native = self.headers.get_all("x-api-key", [])
+        if len(supplied) + len(native) != 1:
+            return False
+        value, expected = (supplied[0], "Bearer " + self.server.token) if supplied else (native[0], self.server.token)
+        return hmac.compare_digest(value.encode(), expected.encode())
 
     def do_POST(self):
         self.close_connection = True
+        self.forward_started = False
         if not self.authorized():
             self.reply(401, "model capability required")
             return
@@ -210,7 +248,9 @@ class Handler(BaseHTTPRequestHandler):
             raw = self.rfile.read(int(sizes[0]))
             if len(raw) != int(sizes[0]):
                 raise ValueError("incomplete model request")
-            payload = self.server.policy.request(self.path, json.loads(raw))
+            route, path = self.server.routes.resolve(self.path)
+            self.policy = self.server.routes.routes[route]
+            payload = self.policy.request(path, json.loads(raw))
         except (ValueError, TypeError, PermissionError, UnicodeError):
             self.reply(403, "request refused by owner model policy")
             return
@@ -219,10 +259,25 @@ class Handler(BaseHTTPRequestHandler):
             return
         request_id, status, usage = None, 502, {}
         try:
-            request_id = self.server.ledger.admit(self.server.policy, payload["model"])
-            headers, redactor = self.server.credentials.headers()
-            redactor.secrets = (*redactor.secrets, self.server.token)
-            status, usage = self.forward(payload, headers, redactor)
+            # Only explicitly owner-selected, same-protocol fallbacks may see
+            # this prompt. No retry follows a started stream or ambiguous I/O.
+            for target in [route, *self.server.routes.fallbacks.get(route, [])]:
+                self.policy = self.server.routes.routes[target]
+                attempt = dict(payload)
+                if target != route:
+                    attempt["model"] = self.policy.data["default_model"]
+                attempt = self.policy.request(path, attempt)
+                request_id = self.server.ledger.admit(self.policy, attempt["model"])
+                credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
+                headers, redactor = credentials.headers()
+                redactor.secrets = (*redactor.secrets, self.server.token)
+                status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
+                if status not in {429, 502, 503, 504} or self.forward_started:
+                    break
+                self.server.ledger.finish(request_id, status, usage)
+                request_id = None
+            if not getattr(self, "forward_started", False):
+                self.reply(status, "provider rejected the request")
         except PermissionError:
             status = 429 if request_id is None else 503
             self.reply(status, "provider admission or credential setup requires owner attention")
@@ -238,24 +293,30 @@ class Handler(BaseHTTPRequestHandler):
                 print(json.dumps({"event": "provider.request-finished", "id": request_id, "status": status}), flush=True)
             self.server.turns.release()
 
-    def forward(self, payload, headers, redactor):
-        endpoint = urlsplit(self.server.policy.endpoint)
+    def forward(self, payload, headers, redactor, *, defer_errors=False):
+        endpoint = urlsplit(self.policy.endpoint)
         conn = (http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443, timeout=180,
                                             context=ssl.create_default_context()) if endpoint.scheme == "https"
                 else http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=180))
         try:
             body = json.dumps(payload, ensure_ascii=False).encode()
-            route = "/responses" if self.server.policy.api_mode == "codex_responses" else "/chat/completions"
+            route = {"codex_responses": "/responses", "chat_completions": "/chat/completions",
+                     "anthropic_messages": "/messages"}[self.policy.api_mode]
+            path = endpoint.path.rstrip("/")
+            if self.policy.api_mode == "anthropic_messages" and not path.endswith("/v1"):
+                path += "/v1"
             # Never forward caller URLs, Host/Authorization, cookies, user IDs,
             # arbitrary headers, redirects or SDK credential overrides.
-            conn.request("POST", endpoint.path + route, body=body,
+            conn.request("POST", path + route, body=body,
                          headers={**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"})
             response = conn.getresponse()
             if not 200 <= response.status < 300:
                 # Keep the real provider status (including 401/403/429/5xx), but
                 # never expose its body or redirect location to the model/log.
-                self.reply(response.status if 400 <= response.status <= 599 else 502, "provider rejected the request")
-                return response.status, {}
+                status = response.status if 400 <= response.status <= 599 else 502
+                if not defer_errors:
+                    self.reply(status, "provider rejected the request")
+                return status, {}
             streaming = payload.get("stream") is True
             content_type = response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type != ("text/event-stream" if streaming else "application/json") or response.getheader("Content-Encoding", "identity") != "identity":
@@ -295,10 +356,15 @@ class Handler(BaseHTTPRequestHandler):
                 if line.startswith(b"data:") and line.strip() != b"data: [DONE]":
                     event = redactor.clean(json.loads(line[5:]))
                     if isinstance(event, dict):
-                        terminal = terminal or event.get("type") in {"response.completed", "response.failed", "response.incomplete"}
+                        kind = event.get("type")
+                        if kind in {"response.failed", "response.incomplete", "error"}:
+                            raise ConnectionError("provider did not complete the model turn")
+                        terminal = terminal or kind in {"response.completed", "message_stop"}
                         candidate = event.get("response", event)
+                        if kind == "message_start":
+                            candidate = event.get("message", {})
                         if isinstance(candidate, dict) and isinstance(candidate.get("usage"), dict):
-                            usage = candidate["usage"]
+                            usage.update(candidate["usage"])
                     line = b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n"
                 else:
                     terminal = terminal or line.strip() == b"data: [DONE]"
@@ -319,14 +385,20 @@ def main():
         raise PermissionError("model broker requires its separate unprivileged UID")
     if os.environ.get("LISTEN_PID") != str(os.getpid()) or os.environ.get("LISTEN_FDS") != "1":
         raise PermissionError("model broker requires its root-bound activation socket")
-    policy = ProviderPolicy(trusted_json(Path("/etc/haos/provider.json")))
+    policy = ProviderRoutes(trusted_json(Path("/etc/haos/provider.json")))
     directory = Path(os.environ["CREDENTIALS_DIRECTORY"])
     token = json.loads(private_credential(directory / "provider-token"))["token"]
     secrets = json.loads(private_credential(directory / "provider-credentials"))
-    if set(secrets) != {"api_key"}:
-        raise ValueError("invalid provider credential envelope")
+    if policy.data["version"] == 1:
+        if set(secrets) != {"api_key"}:
+            raise ValueError("invalid provider credential envelope")
+        credentials = Credentials(policy.primary, secrets)
+    else:
+        if set(secrets) != {"routes"} or set(secrets["routes"]) != set(policy.routes):
+            raise ValueError("provider credential routes disagree with owner policy")
+        credentials = {key: Credentials(route, secrets["routes"][key]) for key, route in policy.routes.items()}
     ledger = UsageLedger("/var/lib/haos-provider/usage.db")
-    server = Broker(("127.0.0.1", PORT), policy, token, Credentials(policy, secrets), ledger, bind_and_activate=False)
+    server = Broker(("127.0.0.1", PORT), policy, token, credentials, ledger, bind_and_activate=False)
     server.socket.close()
     server.socket = socket.socket(fileno=3)
     if server.socket.getsockname() != ("127.0.0.1", PORT) or not server.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN):

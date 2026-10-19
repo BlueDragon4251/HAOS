@@ -195,11 +195,21 @@ def main():
     provider_sub = provider.add_subparsers(dest="provider_action", required=True)
     for action in ("status", "stop", "disable", "login-codex", "logout-codex"):
         provider_sub.add_parser(action)
+    from .provider_registry import oauth_providers
+    for action in ("login", "logout", "auth-status"):
+        auth_action = provider_sub.add_parser(action)
+        auth_action.add_argument("provider", choices=sorted(oauth_providers() | {"anthropic", "openrouter"}))
+    for action in ("set-default", "fallbacks", "remove"):
+        route_action = provider_sub.add_parser(action)
+        route_action.add_argument("route")
+        if action == "fallbacks":
+            route_action.add_argument("--fallback", action="append", default=[])
     configure = provider_sub.add_parser("configure")
-    configure.add_argument("provider", choices=["openai-codex", "openai", "openrouter", "local"])
+    from .provider_policy import ENDPOINTS
+    configure.add_argument("provider", choices=sorted({*ENDPOINTS, "local", "lmstudio"}))
     configure.add_argument("--model", required=True)
     configure.add_argument("--allow-model", action="append", default=[])
-    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions"])
+    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions", "anthropic_messages"])
     configure.add_argument("--endpoint", help="local loopback /v1 endpoint; remote endpoints are fixed")
     configure.add_argument("--requests-per-day", type=int, default=200)
     configure.add_argument("--requests-per-minute", type=int, default=30)
