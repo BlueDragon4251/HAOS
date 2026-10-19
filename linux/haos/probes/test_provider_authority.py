@@ -32,6 +32,108 @@ def policy(provider="openai"):
             "requests_per_day": 20, "requests_per_minute": 10}
 
 
+def test_acp_actual_socket_activation_peer_uids_private_credentials_and_immediate_revocation(location, monkeypatch):
+    """Real kernel IPC/UID boundary; model result is explicitly a fixture."""
+    import socket
+    from types import SimpleNamespace
+    from haos import provider_acp
+    from haos import provider_native  # Import trusted code before dropping UID.
+    location.chmod(0o755)
+    endpoint = location / "control.sock"
+    broker_key, acp_key = location / "broker-secret", location / "acp-secret"
+    for path, uid in ((broker_key, 65534), (acp_key, 65533)):
+        path.write_text(secrets.token_urlsafe(48))
+        path.chmod(0o600)
+        os.chown(path, uid, uid)
+    value = {**policy("copilot-acp"), "api_mode": "chat_completions"}
+    config = location / "provider.json"
+    config.write_text(json.dumps(value))
+    config.chmod(0o644)
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.bind(str(endpoint))
+    os.chown(endpoint, 0, 65534)
+    endpoint.chmod(0o660)
+    listener.listen(4)
+    listener.settimeout(10)
+    monkeypatch.setattr(provider_acp, "SOCKET", str(endpoint))
+    def drop(uid):
+        os.setgroups([])
+        os.setgid(uid)
+        os.setuid(uid)
+    def denied_read(path):
+        try:
+            path.read_text()
+        except PermissionError:
+            return
+        raise AssertionError("another actual UID read private provider credentials")
+    worker = os.fork()
+    if worker == 0:
+        try:
+            drop(65533)
+            denied_read(broker_key)
+            def factory():
+                return SimpleNamespace(close=lambda: None, chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: {
+                    "choices": [{"message": {"content": "fixture-only", "tool_calls": []}, "finish_reason": "stop"}],
+                    "model": "fixture-model"})))
+            for _ in range(3):
+                peer, _ = listener.accept()
+                with peer:
+                    try:
+                        provider_acp.handle(peer, 65534, config=config, factory=factory)
+                    except (PermissionError, ValueError):
+                        pass
+            os._exit(0)
+        except BaseException:
+            os._exit(3)
+    def child(uid, *, allowed=False, kernel_denied=False):
+        pid = os.fork()
+        if pid == 0:
+            try:
+                drop(uid)
+                if uid == 65534:
+                    denied_read(acp_key)
+                client = provider_acp.ACPClient(SimpleNamespace(data=value))
+                try:
+                    result = client.create(model="fixture-model", messages=[{"role": "user", "content": "fixture"}])
+                except PermissionError:
+                    assert kernel_denied
+                except (ValueError, ConnectionError):
+                    assert not allowed and not kernel_denied
+                else:
+                    assert allowed and result["choices"][0]["message"]["content"] == "fixture-only"
+                finally:
+                    client.close()
+                os._exit(0)
+            except BaseException:
+                os._exit(3)
+        _, status = os.waitpid(pid, 0)
+        assert os.waitstatus_to_exitcode(status) == 0
+    worker_done = False
+    try:
+        # A world-unprivileged identity is denied by the actual socket mode.
+        child(65532, kernel_denied=True)
+        # Root can bypass socket mode but cannot pass broker peer admission.
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
+            peer.connect(str(endpoint))
+            peer.settimeout(5)
+            assert peer.recv(1) == b""
+        child(65534, allowed=True)
+        # Same broker capability does not retain a removed route in the worker.
+        config.write_text(json.dumps({**value, "models": ["other"], "default_model": "other"}))
+        child(65534)
+        _, status = os.waitpid(worker, 0)
+        worker_done = True
+        assert os.waitstatus_to_exitcode(status) == 0
+    finally:
+        listener.close()
+        if not worker_done:
+            try:
+                os.kill(worker, 9)
+                os.waitpid(worker, 0)
+            except ProcessLookupError:
+                pass
+
+
 def test_private_real_credentials_are_not_client_configuration_and_rotation_withdraws_old_capability(location):
     key = secrets.token_urlsafe(48)
     provider_setup.publish(policy(), key, config=location)

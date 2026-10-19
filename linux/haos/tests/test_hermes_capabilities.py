@@ -26,7 +26,7 @@ def test_ui_does_not_label_untested_adapters_as_supported():
     assert providers["anthropic"] == "GUI"
     assert providers["bedrock"] == "GUI"
     assert providers["gemini"] == "GUI"
-    assert providers["copilot-acp"] == "Nicht integriert"
+    assert providers["copilot-acp"] == "GUI"
     assert gateways["telegram"] == "GUI"
     assert gateways["discord"] == "GUI"
     for name in ("whatsapp", "matrix", "slack", "feishu", "email"):

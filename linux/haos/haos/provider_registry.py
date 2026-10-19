@@ -39,6 +39,8 @@ def http_providers():
 
 
 def default_endpoint(provider):
+    if provider == "copilot-acp":
+        return "acp://copilot"
     row = descriptor(provider)
     return row["endpoint"] if row else ""
 
@@ -47,7 +49,7 @@ def default_mode(provider, model=""):
     if provider == "copilot":
         match = re.match(r"^(?:openai/)?gpt-(\d+)", model)
         return "codex_responses" if match and int(match[1]) >= 5 and not model.removeprefix("openai/").startswith("gpt-5-mini") else "chat_completions"
-    if provider in {"local", "bedrock"}:
+    if provider in {"local", "bedrock", "copilot-acp"}:
         return "chat_completions"
     row = descriptor(provider)
     if row is None:
@@ -60,4 +62,4 @@ def oauth_providers():
 
 
 def account_providers():
-    return oauth_providers() | {"anthropic", "openrouter", "copilot"}
+    return oauth_providers() | {"anthropic", "openrouter", "copilot", "copilot-acp"}

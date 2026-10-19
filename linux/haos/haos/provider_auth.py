@@ -25,13 +25,44 @@ def qwen_import(value):
 
 
 def main():
-    if os.geteuid() == 0 or os.environ.get("HERMES_HOME") != "/var/lib/haos-provider/.hermes":
-        raise PermissionError("provider OAuth needs its separate, private identity")
     action = sys.argv[1] if len(sys.argv) in {2, 3} else ""
     provider = sys.argv[2] if len(sys.argv) == 3 else "openai-codex"
+    identity = "haos-provider-acp" if provider == "copilot-acp" else "haos-provider"
+    import pwd
+    if (os.geteuid() == 0 or os.geteuid() != pwd.getpwnam(identity).pw_uid
+            or os.environ.get("HERMES_HOME") != "/var/lib/" + identity + "/.hermes"):
+        raise PermissionError("provider OAuth needs its separate, private identity")
     from .provider_registry import account_providers
     if provider not in account_providers():
         raise ValueError("unsupported provider account")
+    if provider == "copilot-acp":
+        from .provider_acp import COMMAND, HOME, isolated_client
+        if os.environ.get("HOME") != HOME:
+            raise PermissionError("separate ACP authentication HOME required")
+        if action == "login":
+            os.execv(COMMAND, [COMMAND, "login", "--device-code"])
+        if action == "logout":
+            import shutil
+            from pathlib import Path
+            path = Path(HOME) / ".copilot"
+            if path.is_symlink():
+                path.unlink()
+            elif path.exists():
+                shutil.rmtree(path)
+            print("Local Copilot CLI account state removed. Revoke the OAuth grant at GitHub if required.")
+            return
+        if action == "status":
+            import tempfile
+            with tempfile.TemporaryDirectory() as cwd:
+                client = isolated_client(cwd=cwd)
+                try:
+                    if not client.list_models(timeout_seconds=30):
+                        raise PermissionError("ACP account has no enabled models")
+                finally:
+                    client.close()
+            print("Copilot ACP session authenticated. No model turn tested.")
+            return
+        raise ValueError("unsupported ACP account action")
     if provider == "copilot":
         from .provider_copilot import bind_transport
         bind_transport()

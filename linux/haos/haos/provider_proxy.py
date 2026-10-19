@@ -101,6 +101,10 @@ class Credentials:
         return getattr(self.request_state, "endpoint", self.policy.endpoint)
 
     def headers(self):
+        if self.policy.provider == "copilot-acp":
+            if self.credentials.get("api_key") is not None:
+                raise PermissionError("ACP credentials belong only to its isolated identity")
+            return {}, Redactor()
         if self.policy.provider == "copilot":
             from .provider_copilot import bind_transport
             bind_transport()
@@ -336,7 +340,7 @@ class Handler(BaseHTTPRequestHandler):
             self.server.turns.release()
 
     def forward(self, payload, headers, redactor, *, defer_errors=False):
-        if self.policy.provider in {"gemini", "bedrock"}:
+        if self.policy.provider in {"gemini", "bedrock", "copilot-acp"}:
             from .provider_native import forward_native
             return forward_native(self, payload, headers, redactor)
         endpoint = urlsplit(getattr(self.route_credentials, "effective_endpoint", self.policy.endpoint))

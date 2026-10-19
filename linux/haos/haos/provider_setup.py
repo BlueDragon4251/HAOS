@@ -15,7 +15,7 @@ from .provider_registry import default_mode, oauth_providers, account_providers
 from .provider_routes import ProviderRoutes
 
 CONFIG = Path("/etc/haos")
-UNITS = ("haos-provider.service", "haos-provider.socket")
+UNITS = ("haos-provider.service", "haos-provider.socket", "haos-provider-acp.socket", "haos-provider-acp.service")
 
 
 def stopped_provider():
@@ -51,6 +51,10 @@ def publish(policy, credential, *, config=CONFIG):
 
 
 def validate_credential(policy, credential):
+    if policy.provider == "copilot-acp":
+        if credential is not None:
+            raise PermissionError("ACP requires login under its separate service identity")
+        return
     from .provider_cloud import CLOUD, credential_data
     if policy.provider in CLOUD:
         credential_data(policy.provider, credential)
@@ -217,13 +221,14 @@ def auth_helper(action, provider="openai-codex", *, graphical_status=False):
             raise PermissionError("graphical auth status requires the trusted local setup seat")
     else:
         require_console()
-    entry = pwd.getpwnam("haos-provider")
+    identity = "haos-provider-acp" if provider == "copilot-acp" else "haos-provider"
+    entry = pwd.getpwnam(identity)
     if entry.pw_uid == 0:
         raise PermissionError("invalid provider service identity")
     command = ["/usr/bin/systemd-run", "--pipe" if graphical_status else "--pty", "--wait", "--collect", "--quiet", "--service-type=exec",
                "--unit=haos-provider-owner-" + secrets.token_hex(12),
-               "--property=User=haos-provider", "--property=Group=haos-provider",
-               "--property=StateDirectory=haos-provider", "--property=StateDirectoryMode=0700",
+               "--property=User=" + identity, "--property=Group=" + identity,
+               "--property=StateDirectory=" + identity, "--property=StateDirectoryMode=0700",
                "--property=UMask=0077", "--property=RuntimeMaxSec=720", "--property=KillMode=control-group",
                "--property=NoNewPrivileges=yes", "--property=CapabilityBoundingSet=",
                "--property=PrivateTmp=yes", "--property=PrivateDevices=yes", "--property=ProtectSystem=strict",
@@ -232,10 +237,18 @@ def auth_helper(action, provider="openai-codex", *, graphical_status=False):
                "--property=RestrictSUIDSGID=yes", "--property=RestrictNamespaces=yes",
                "--property=RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "--property=TasksMax=64", "--property=MemoryMax=1G",
                "--property=InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace -/etc/haos/backend-token -/run/haos-control -/run/haos-volumes -/run/haos-policy",
-               "--setenv=HOME=/var/lib/haos-provider", "--setenv=HERMES_HOME=/var/lib/haos-provider/.hermes",
+               "--setenv=HOME=/var/lib/" + identity, "--setenv=HERMES_HOME=/var/lib/" + identity + "/.hermes",
                "--setenv=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes", "--setenv=PYTHONDONTWRITEBYTECODE=1",
                "--setenv=PATH=/usr/lib/haos/hermes/.venv/bin:/usr/bin",
                "/usr/lib/haos/hermes/.venv/bin/python", "-m", "haos.provider_auth", action, provider]
+    if provider == "copilot-acp":
+        subprocess.run(["/usr/bin/systemctl", "start", "haos-provider-acp-network.service"],
+                       check=True, capture_output=True, timeout=30)
+        command.insert(1, "--property=InaccessiblePaths=-/var/lib/haos-provider -/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace -/var/lib/haos-gateway -/run/haos-control -/run/haos-policy -/run/haos-volumes -/run/haos-applications-control -/run/haos-gui-agent -/run/dbus -/run/user -/run/credentials -/etc/haos/provider-credentials -/etc/haos/provider-token -/etc/haos/backend-token")
+        # Use the ACP-specific boundary instead of the shared account helper's.
+        command = [item for item in command if not item.startswith("--property=InaccessiblePaths=-/var/lib/haos-agent ")]
+        command.insert(1, "--setenv=COPILOT_AUTO_UPDATE=false")
+        command.insert(1, "--setenv=DO_NOT_TRACK=1")
     result = subprocess.run(command, env=ENV, timeout=740, capture_output=graphical_status)
     if result.returncode:
         raise RuntimeError("provider credential action failed; inspect the trusted owner console")
@@ -302,7 +315,7 @@ def owner_provider(args):
     policy = ProviderPolicy(data)
     credential = None
     from .provider_cloud import CLOUD
-    if policy.provider not in {"local", "lmstudio", *oauth_providers(), *CLOUD}:
+    if policy.provider not in {"local", "lmstudio", "copilot-acp", *oauth_providers(), *CLOUD}:
         from .owner_recovery import require_console
         require_console()
         credential = getpass.getpass("Provider API key (owner store only, never agent state): ") or None
@@ -310,7 +323,7 @@ def owner_provider(args):
         from .owner_recovery import require_console
         require_console()
         credential = getpass.getpass("Cloud credential JSON (Azure also accepts an API key; blank = service UID SDK chain): ") or None
-    if policy.provider in oauth_providers():
+    if policy.provider in oauth_providers() or policy.provider == "copilot-acp":
         auth_helper("status", policy.provider)
     add_route(policy.data, credential)
     install(pwd.getpwnam("haos-agent").pw_uid)

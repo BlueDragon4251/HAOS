@@ -1,0 +1,20 @@
+{
+  "actual_upstream_acp_subprocess": true,
+  "early_stream_before_terminal": true,
+  "filesystem_terminal_permission_denials": true,
+  "native_model_selection": true,
+  "tool_bridge_codec": true,
+  "unknown_model_refused": true,
+  "live_provider_tested": false,
+  "python": "3.11.17",
+  "source_sha256": {
+    "probe_acp_provider.py": "38ba7bbcf005da12c4557882c3e96b2e8709f6c2fb7161b717d57fe8531a8aaa",
+    "provider_acp.py": "55b0ad88d8088e993f5e0d3b972dc7fc98f050e1848a32c5887daeb38bf3f944",
+    "acp-fixture.py": "44497c77b3300988158dfb44296aa4b4739c9a1a8055a8825859976238efd371"
+  },
+  "official_cli": {
+    "version": "1.0.98",
+    "secured_initialize": true,
+    "account_tested": false
+  }
+}

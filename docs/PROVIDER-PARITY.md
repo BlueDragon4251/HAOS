@@ -14,13 +14,13 @@ authorized. Additional bundled HTTP profiles require a reviewed image/export.
 | Component | Implemented here | Remaining acceptance/work |
 | --- | --- | --- |
 | HTTP API profiles | Registry-driven endpoint allowlists, setup/CLI, isolated credentials, three real native HTTP protocols | Provider-specific live/model/plan validation; complete per-provider quirks and dynamic discovery |
-| Account providers | Upstream resolver/refresh dispatch; endpoint/mode mismatch denied; generic owner login/status/logout; physical GUI account launcher | Real account flows, installed GUI acceptance; fresh Qwen login/import; account revocation at provider |
+| Account providers | Native private refresh, Qwen CLI import, Copilot device authorization, isolated ACP login/status/local logout; physical GUI account launcher | Real account flows, installed GUI acceptance and remote account revocation |
 | Multiple providers | Version 2 atomic migration, route-bound keys/models, default selection, removal, explicit same-protocol fallback, no replay after stream starts | GUI management of existing routes and mixed-protocol fallback conversion |
 | Native streaming | Messages, Responses and Chat Completions SSE, local tool definitions, token redaction, durable usage | Multiline SSE and full protocol stress matrix; additional provider-specific contracts |
 | Native Gemini | Real upstream native codec, continuous SSE, tool/signature preservation, rate/error/truncation handling | External Google account and installed acceptance |
 | Cloud SDKs | boto3 Converse signing + continuous AWS EventStream; Vertex service-account/ADC token refresh; Azure API-key/service-principal/default-chain token handling and native Messages query/header handling | Bedrock Mantle/OpenAI path and advanced native reasoning replay; real SDK account entitlement and cloud live tests |
 | Custom API | Explicit HTTPS owner route, fixed capability/model admission, private-address refusal and pinned public DNS address with original TLS hostname | Real custom endpoint acceptance and full provider-specific extension contract |
-| External/virtual providers | Remain unavailable rather than dropdown-only support | Copilot/ACP, MoA, fresh Qwen login/import and complete reviewed external plugin admission |
+| External/virtual providers | Separate UID/Unix ACP process, secured official pinned CLI; actual upstream broker-only MoA fanout/aggregation | Real subscribed accounts, installed ACP isolation acceptance, complete reviewed external plugin admission |
 | Gateways | Existing Telegram/Discord paths retained | Remaining 20 adapter integrations; no new gateway support claimed |
 | Android / smartphone setup | Existing application retained | Continuous screen stream, desktop input, management, network/Wake wizard and optional firstboot page |
 
@@ -111,3 +111,36 @@ by this host's foreign-UID and AF_UNIX restrictions. Exact Python 3.11 frozen
 SDK probes (including Copilot and Qwen actual token endpoints over loopback)
 pass. Their bounded receipts are the `*-python311-fixture.json` files in the
 same evidence directory. They explicitly do not claim live account acceptance.
+
+## Isolated Copilot ACP continuation
+
+Copilot ACP now has its own system identity and private HOME, root-created
+Unix socket with exact broker UID admission, independent network guard and
+read-denied broker/agent/controller state. The CLI receives no other provider
+keys, backend capabilities, workspace mounts, MCP servers or executable args
+from a model request. Its own tools are filtered out; client filesystem,
+terminal and permission requests are always refused. It cannot connect to
+private/loopback services, except exact resolver/port DNS allowances.
+
+The image builds the official Copilot CLI 1.0.98 from its reviewed SHA-256.
+The actual binary accepted the secured ACP initialize handshake locally.
+The pinned Hermes ACP subprocess client and upstream tool codec completed a
+local protocol fixture with an early text delta before its terminal receipt,
+function calls, filesystem/terminal/permission refusals and authoritative
+model selection. Unknown/disabled models fail instead of silently substituting
+the CLI's default. Token counts remain absent when ACP does not report usage.
+Private credentials and XML bridge fragments are filtered across text deltas.
+
+Login uses the CLI's actual device-code flow under the ACP identity. Local
+logout withdraws the broker route first and removes that identity's private
+Copilot state; revoking the account's remote OAuth grant remains a GitHub action.
+Real subscribed-account inference is outstanding. A real kernel Unix-socket,
+separate UID, socket-mode, credential-read and immediate revocation probe is
+added to the required disposable-root CI; this host cannot change foreign UIDs.
+
+At source `0e564941`, the general CI (39230128220), services/kernel
+(39230128116), graphical setup (39230128170), frozen provider contracts
+(39230128020) and Arch (39230128147) passed. Those receipts certify that earlier
+source, not this ACP continuation. Model-discovery UX and remaining
+provider-specific contracts are the next provider work. Gateways/mobile and
+installed ISO/HP/real-account acceptance remain open.

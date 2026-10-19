@@ -1,0 +1,20 @@
+[Unit]
+Description=HAOS ACP subprocess local-network boundary
+Before=haos-provider-acp.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/lib/haos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m haos.provider_acp_network
+RemainAfterExit=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN
+RestrictAddressFamilies=AF_NETLINK
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+UMask=0077

@@ -21,6 +21,9 @@ def plain(value):
 
 
 def create_client(policy, headers, credentials=None):
+    if policy.provider == "copilot-acp":
+        from .provider_acp import ACPClient
+        return ACPClient(policy)
     if policy.provider == "gemini":
         from agent.gemini_native_adapter import GeminiNativeClient
         token = headers["Authorization"].removeprefix("Bearer ")

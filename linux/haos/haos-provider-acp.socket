@@ -1,0 +1,13 @@
+[Unit]
+Description=Private broker-only ACP process boundary
+PartOf=haos-provider.service
+
+[Socket]
+ListenStream=/run/haos-provider-acp/control.sock
+SocketUser=root
+SocketGroup=haos-provider
+SocketMode=0660
+DirectoryMode=0755
+Service=haos-provider-acp.service
+Backlog=4
+RemoveOnStop=yes

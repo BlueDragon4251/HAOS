@@ -7,6 +7,7 @@ test -f .herald-os-upstream-sha
 export UV_CACHE_DIR=/tmp/haos-uv-cache
 export UV_PROJECT_ENVIRONMENT=/usr/lib/haos/hermes/.venv
 HAOS_RUNTIME_OVERLAY=/tmp/herald-os/linux/haos/runtime
+python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
@@ -35,4 +36,5 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_bedrock_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/bedrock-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_account_providers.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/account-provider-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_acp_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/acp-provider-build-probe.json /usr/lib/haos/copilot/copilot
 rpm -q python3.11 python3.11-libs > /usr/lib/haos/python-runtime.txt

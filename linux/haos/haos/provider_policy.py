@@ -19,6 +19,7 @@ ENDPOINTS["gemini"] = default_endpoint("gemini")
 ENDPOINTS.update({name: default_endpoint(name) for name in CLOUD})
 ENDPOINTS["custom"] = ""
 ENDPOINTS["copilot"] = default_endpoint("copilot")
+ENDPOINTS["copilot-acp"] = "acp://copilot"
 
 
 def custom_endpoint(endpoint):
@@ -51,6 +52,9 @@ class ProviderPolicy:
             raise ValueError("invalid provider endpoint")
         if self.provider == "custom":
             custom_endpoint(endpoint)
+        elif self.provider == "copilot-acp":
+            if endpoint != "acp://copilot":
+                raise PermissionError("ACP executable and transport are fixed by the image")
         elif self.provider == "copilot":
             parsed = urlsplit(endpoint)
             if (parsed.scheme != "https" or parsed.port not in {None, 443} or parsed.path not in {"", "/"}
@@ -82,7 +86,7 @@ class ProviderPolicy:
             raise ValueError("unsupported model transport")
         if self.provider == "openai-codex" and self.api_mode != "codex_responses":
             raise ValueError("Codex OAuth requires the native Responses transport")
-        if self.provider in {"bedrock", "vertex", "gemini"} and self.api_mode != "chat_completions":
+        if self.provider in {"bedrock", "vertex", "gemini", "copilot-acp"} and self.api_mode != "chat_completions":
             raise ValueError("this broker SDK adapter requires local Chat Completions ingress")
         if self.provider == "copilot" and any(default_mode("copilot", model) != self.api_mode for model in self.models):
             raise ValueError("Copilot model allowlist must use the selected native protocol")

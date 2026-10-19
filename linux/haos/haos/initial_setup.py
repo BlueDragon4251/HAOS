@@ -228,7 +228,7 @@ def configure_update(channel: str, automatic: bool):
 def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = "", api_mode: str = ""):
     """Provision a vetted HTTP or account route from the trusted local seat."""
     require_root()
-    if provider not in {*http_providers(), *oauth_providers(), *CLOUD, "openai", "local", "lmstudio", "gemini", "custom", "copilot"}:
+    if provider not in {*http_providers(), *oauth_providers(), *CLOUD, "openai", "local", "lmstudio", "gemini", "custom", "copilot", "copilot-acp"}:
         raise ValueError("use a provider with an implemented graphical credential flow")
     from .provider_setup import add_route, stopped_provider
     from .gateway_setup import stopped_gateway
@@ -246,7 +246,7 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
                                    any(ord(c) < 33 or ord(c) > 126 for c in api_key)):
         raise ValueError("invalid provider credential")
     quiesce_for_setup()
-    if provider in oauth_providers() or (provider in {"anthropic", "openrouter", "copilot"} and not api_key):
+    if provider in oauth_providers() or provider == "copilot-acp" or (provider in {"anthropic", "openrouter", "copilot"} and not api_key):
         from .provider_setup import auth_helper
         auth_helper("status", provider, graphical_status=True)
     # Only now does the vetted owner credential publisher replace trusted files.

@@ -391,7 +391,7 @@ class Wizard:
         elif name == "provider":
             self._head("Hermes · Provider & Modell",
                        "Zugangsdaten bleiben im getrennten Provider-Dienst. Wähle anschließend ein Modell deines Anbieters.")
-            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom", "copilot"}), "openai-api")
+            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom", "copilot", "copilot-acp"}), "openai-api")
             model = self._field(self.content, "Modellkennung, vom Provider unterstützt")
             endpoint = self._field(self.content, "URL · leer = Standard des Anbieters")
             mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
