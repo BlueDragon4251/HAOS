@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "run_id": 38118602163,
+  "conclusion": "failure",
+  "artifact_id": 11695254922,
+  "archive_digest": "sha256:773874963646c246b3ef8a1a865c1da2937ada86393f7bd5ff24c38c34424f24",
+  "image_run_id": 38092528231,
+  "image_source_commit": "699bc82b76c927aced09784c6442d2b97713753c",
+  "guest_probe_commit": "699bc82b76c927aced09784c6442d2b97713753c",
+  "harness_commit": "34c8ad8220160da5d53401947f39c619a4395fa9",
+  "diagnostics_commit": "34c8ad8220160da5d53401947f39c619a4395fa9",
+  "iso_sha256": "f16ce8a4388bd7eaf584e35169b381a4063f90def3469007e07bfebf8af37d02",
+  "production_acceptance": false,
+  "backend": {
+    "started_kernel_seconds": 226.05,
+    "ready_kernel_seconds": 397.94,
+    "ready": true
+  },
+  "failure": {
+    "phase": "theme-watchdog-rollback",
+    "phase_kernel_seconds": 420.84,
+    "wrapper": "installed_theme_watchdog_proof",
+    "observer_subprocess_returncode": 1,
+    "exact_assertion_hidden_by_old_capture_wrapper": true,
+    "guest_receipts": 0,
+    "second_boot_tested": false,
+    "installed_theme_acceptance": false
+  },
+  "writable_capacity_diagnosis": {
+    "immutable_root_type": "overlay",
+    "immutable_root_total_bytes": 20840448,
+    "immutable_root_free_bytes": 0,
+    "writable_var_type": "btrfs",
+    "writable_var_total_bytes": 40170946560,
+    "writable_var_free_bytes": 32648683520,
+    "observed_controller_alert": "disk-reserve:system",
+    "fix": "Measure writable /var for system reserve; retain workspace, ledger and pressure checks",
+    "installed_fix_acceptance_pending": true
+  }
+}

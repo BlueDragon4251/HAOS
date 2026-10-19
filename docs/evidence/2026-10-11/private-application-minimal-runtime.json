@@ -1,0 +1,34 @@
+{
+  "checked_parent_commit": "5a11df1e43de30bc09c86a25fac72ace75ff8581",
+  "failed_ci_runs": [
+    38175870595,
+    38175874565
+  ],
+  "diagnosed_cause": "labwc 0.9.6 exits when optional Xwayland binary is absent with install_weak_deps=false",
+  "correction": "install the signed private-session Xwayland package explicitly; retain all original conditions and deadlines",
+  "terminal_readiness": "the real interactive shell writes a separate startup marker before the independently typed goal command; no goal results or terminal output are synthesized",
+  "local_clean_fixture": "sha256:860b6418f4bdec03e9c71c09f9720d67fff1ee59f37e2b982c2a050d1f9796f3",
+  "local_trust": "cloud public proxy CA added only to disposable build trust; RPM signatures and TLS verification retained",
+  "receipt": {
+    "schema": 1,
+    "scope": "disposable private application session component",
+    "source_commit": null,
+    "source_sha256": "c37096ec30f48cf7dbf63116a39554d76654113e43562cb4f0a2d2c28e33f9ee",
+    "real_application_toplevel": true,
+    "real_application_focus": true,
+    "actual_shell_readiness_verified": true,
+    "real_keyboard_result_verified": true,
+    "real_capture_integrity": true,
+    "real_capture_changed": true,
+    "clipboard_and_global_modifiers_denied": true,
+    "paths_and_shell_controls_denied": true,
+    "unprivileged_app_control_peer_denied": true,
+    "root_broker_peer_pid_verified": true,
+    "application_effective_capabilities_zero": true,
+    "application_no_new_privileges": true,
+    "installed_systemd_launch_verified": false,
+    "hermes_model_execution_verified": false
+  },
+  "installed_systemd_verified": false,
+  "real_model_verified": false
+}

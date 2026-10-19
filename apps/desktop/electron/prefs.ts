@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { type EventAutomation, isEventName } from '../shared/events.ts'
 import type { ContinuityPrefs, CrashHelpPrefs, HeraldOSPrefs } from '../shared/ipc.ts'
 import { normalizeMenuBar } from '../shared/menu-bar.ts'
@@ -91,8 +92,27 @@ export function writePrefs(patch: Partial<HeraldOSPrefs>): HeraldOSPrefs {
     crashHelp: normalizeCrashHelp({ ...current.crashHelp, ...(patch.crashHelp ?? {}) }),
     ...(patch.menuBar ? { menuBar: normalizeMenuBar({ ...current.menuBar, ...patch.menuBar }) } : {})
   }
-  fs.mkdirSync(heraldOsDataDir(), { recursive: true })
-  fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2))
+  fs.mkdirSync(heraldOsDataDir(), { recursive: true, mode: 0o700 })
+  const target = prefsFile()
+  const scratch = path.join(heraldOsDataDir(), `.prefs-${randomUUID()}`)
+  const metadata = fs.lstatSync(target, { throwIfNoEntry: false })
+  if (metadata && (!metadata.isFile() || metadata.nlink !== 1)) throw new Error('Unsafe preferences file')
+  const fd = fs.openSync(scratch, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600)
+  try {
+    fs.writeFileSync(fd, JSON.stringify(next, null, 2))
+    fs.fsyncSync(fd)
+    fs.closeSync(fd)
+    fs.renameSync(scratch, target)
+    if (process.platform !== 'win32') {
+      const directory = fs.openSync(heraldOsDataDir(), fs.constants.O_RDONLY)
+      try { fs.fsyncSync(directory) } finally { fs.closeSync(directory) }
+    }
+  } catch (error) {
+    try { fs.closeSync(fd) } catch { /* The descriptor may already be closed. */ }
+    throw error
+  } finally {
+    fs.rmSync(scratch, { force: true })
+  }
 
   return next
 }

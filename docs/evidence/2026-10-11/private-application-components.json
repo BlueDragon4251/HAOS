@@ -1,0 +1,59 @@
+{
+  "scope": "local disposable application components; not installed or model execution",
+  "checked_parent_commit": "1080f2ce186f6c2cc0c67738a0294ba3d65b0315",
+  "tests": {
+    "haos": 400,
+    "new_application_unit_cases": 20
+  },
+  "source_files_sha256": {
+    "linux/haos/haos/application_session.py": "dc054954c9450f05a2366cf73d76b8add8f5e3732e505331dd106ce99b4a271a",
+    "linux/haos/haos/application_launcher.py": "b60793f2a04fdb4ccf5654adbd21155f72793b730b96e56eda0ddd417987d606"
+  },
+  "session": {
+    "schema": 1,
+    "scope": "disposable private application session component",
+    "source_commit": null,
+    "source_sha256": "dc054954c9450f05a2366cf73d76b8add8f5e3732e505331dd106ce99b4a271a",
+    "real_application_toplevel": true,
+    "real_application_focus": true,
+    "real_keyboard_result_verified": true,
+    "real_capture_integrity": true,
+    "real_capture_changed": true,
+    "clipboard_and_global_modifiers_denied": true,
+    "paths_and_shell_controls_denied": true,
+    "unprivileged_app_control_peer_denied": true,
+    "root_broker_peer_pid_verified": true,
+    "application_effective_capabilities_zero": true,
+    "application_no_new_privileges": true,
+    "installed_systemd_launch_verified": false,
+    "hermes_model_execution_verified": false
+  },
+  "authority": {
+    "scope": "disposable root/controller authority component",
+    "real_fork_uid_wal_admission": true,
+    "cancelled_mission_denied": true,
+    "expired_mission_denied": true,
+    "aliases_and_public_ledger_denied": true,
+    "root_private_path_substitution_denied": true,
+    "installed_application_unit_verified": false
+  },
+  "fixture": {
+    "image": "sha256:afef6c5ec849f881285ad86d34d8cfc46632e84851fcc3afb50b0d4c136718b1",
+    "fedora_base": "sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80",
+    "private_tmpfs": true,
+    "read_only_root": true,
+    "network": "none",
+    "app_capabilities": 0,
+    "no_new_privileges": true,
+    "pids_limit": 64,
+    "memory": "1g",
+    "cpus": 1
+  },
+  "still_required": [
+    "actual fixed systemd unit and cgroup cleanup",
+    "queue proof and native/root broker wiring",
+    "mission cancellation and owner revocation watcher",
+    "installed HAOS application evidence",
+    "credentialed Hermes model task"
+  ]
+}

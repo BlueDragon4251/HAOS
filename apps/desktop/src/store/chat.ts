@@ -5,6 +5,7 @@ import { $env, $prefs } from './backend.ts'
 import { gatewayRequest, onAnyGatewayEvent } from './gateway.ts'
 import { notify } from './notifications.ts'
 import { refreshSessions, rememberRuntimeId } from './sessions.ts'
+import { resolveMissionMode } from './mission-mode.ts'
 
 export const SESSION_SOURCE = 'herald_os'
 /** Sessions this shell lists: its own (including those saved before the rename) and other interactive clients. */
@@ -119,6 +120,8 @@ export interface SendPromptOptions {
   voiceContext?: string
   /** The user spoke over an in-flight reply; the backend notes the interruption for the model. */
   interrupted?: boolean
+  /** Stable admission key retained by the native conversation on transport failure. */
+  requestKey?: string
 }
 
 /** Send a prompt to the active chat, creating one when none exists. Resolves with the session id used. */
@@ -127,6 +130,19 @@ export async function sendPrompt(text: string, options: SendPromptOptions = {}):
 
   if (!trimmed) {
     return null
+  }
+
+  if (await resolveMissionMode()) {
+    const { submitMissionMessage } = await import('./mission-conversation.ts')
+    const { showPage } = await import('./windows.ts')
+    showPage('hermes')
+    try {
+      const mission = await submitMissionMessage(trimmed, options.requestKey)
+      return mission.session_id
+    } catch (error) {
+      notify({ title: 'Message admission needs attention', body: error instanceof Error ? error.message : String(error), level: 'error', surface: 'hermes' })
+      return null
+    }
   }
 
   let sid = options.sessionId ?? $activeChatId.get()
@@ -161,6 +177,12 @@ export async function sendPrompt(text: string, options: SendPromptOptions = {}):
 }
 
 export async function runSlash(command: string, sessionId?: string): Promise<void> {
+  if (await resolveMissionMode()) {
+    // In HAOS, text is a durable owner/observer task, never an upstream auth,
+    // model-switch or executable slash command that bypasses the controller.
+    await sendPrompt(command)
+    return
+  }
   let sid = sessionId ?? $activeChatId.get()
 
   if (!sid || !$chats.get()[sid]) {
@@ -201,6 +223,11 @@ export async function runSlash(command: string, sessionId?: string): Promise<voi
 }
 
 export async function interruptChat(sessionId?: string): Promise<void> {
+  if (await resolveMissionMode()) {
+    const health = await window.heraldOS.missions.request('health', {})
+    if (health.current_mission) await window.heraldOS.missions.request('missions.cancel', { id: health.current_mission })
+    return
+  }
   const sid = sessionId ?? $activeChatId.get()
 
   if (!sid) {

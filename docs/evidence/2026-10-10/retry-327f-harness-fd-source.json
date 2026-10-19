@@ -1,0 +1,9 @@
+{
+  "image_source_commit": "327f3cdcffd8cf5da1be494c3e176c77196fd867",
+  "guest_probe_commit": "327f3cdcffd8cf5da1be494c3e176c77196fd867",
+  "harness_commit": "fd7987d35aabd62f0b3d6f6e3b13190c51ffbac5",
+  "diagnostics_commit": "fd7987d35aabd62f0b3d6f6e3b13190c51ffbac5",
+  "image_run_id": "38048845903",
+  "checksums": "0e2b8af0bc043dccaf906d317a8fe30dbb51eb725d4bb3fca7de00b4f6d0a74f  haos-x86_64-development.iso\n",
+  "production_acceptance": false
+}

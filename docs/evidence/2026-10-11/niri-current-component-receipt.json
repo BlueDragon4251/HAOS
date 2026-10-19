@@ -1,0 +1,102 @@
+{
+  "source_commit": "8dcb332e3cf42edd0ffe6b2056634f1b628f6201",
+  "work_tree_dirty": false,
+  "weston": "weston 15.0.1",
+  "niri": "niri 26.04",
+  "actual_virtual_niri": true,
+  "compositor_shell": "desktop-shell.so",
+  "actual_virtual_wayland": true,
+  "installed_niri": false,
+  "physical_hardware": false,
+  "real_model_turn": false,
+  "session_is_explicit_fixture": true,
+  "protocol": {
+    "browser": {
+      "mission_toplevels": 7,
+      "surface_commits": 42
+    },
+    "integration": {
+      "mission_toplevels": 1,
+      "surface_commits": 9
+    },
+    "theme": {
+      "mission_toplevels": 1,
+      "surface_commits": 9
+    }
+  },
+  "gates": {
+    "browser": {
+      "checks": {
+        "typed_actual_fields": true,
+        "captured_actual_pixels": true,
+        "renderer_sandbox": true,
+        "no_caller_scripts": true,
+        "network_canary_denied": true,
+        "chooser_intercepted": true,
+        "clipboard_shortcut_denied": true,
+        "mission_and_window_denials": true,
+        "closed_window_denied": true,
+        "mission_cleanup": true,
+        "actual_form_inspection": true,
+        "sensitive_fields_masked": true,
+        "visible_text_from_actual_layout": true,
+        "hidden_and_form_text_excluded": true,
+        "actual_scrolling_verified": true,
+        "multiple_windows_isolated": true,
+        "window_and_scroll_budgets_enforced": true,
+        "actual_niri_pid_title_inventory": true,
+        "actual_niri_window_center": true,
+        "actual_niri_workspace_move_verified": true,
+        "niri_foreign_window_and_workspace_denied": true
+      },
+      "source_commit": "8dcb332e3cf42edd0ffe6b2056634f1b628f6201",
+      "shared_memory_total_bytes": 268435456,
+      "shared_memory_lowest_free_bytes": 194666496
+    },
+    "integration": {
+      "checks": {
+        "actual_input_and_inspection": true,
+        "actual_capture": true,
+        "actual_read_without_body_persistence": true,
+        "private_bodies_absent_from_audit": true,
+        "unauthorized_methods_denied": true,
+        "lost_ack_not_reexecuted": true,
+        "controller_restart_blocks_mission": true,
+        "durable_audit_survives": true,
+        "actual_fragmented_readiness_framed": true
+      },
+      "source_commit": "8dcb332e3cf42edd0ffe6b2056634f1b628f6201",
+      "shared_memory_total_bytes": 268435456,
+      "shared_memory_lowest_free_bytes": 248811520
+    },
+    "theme": {
+      "checks": {
+        "actual_preview_and_renderer_confirmed": true,
+        "actual_fixed_linux_outputs": true,
+        "actual_unusable_renderer_rolls_back": true,
+        "prior_renderer_restored": true,
+        "unreadable_draft_never_activates": true,
+        "missing_or_wrong_shell_denied": true,
+        "renderer_remains_sandboxed": true
+      },
+      "source_commit": "8dcb332e3cf42edd0ffe6b2056634f1b628f6201",
+      "shared_memory_total_bytes": 268435456,
+      "shared_memory_lowest_free_bytes": 231366656
+    }
+  },
+  "fixture": {
+    "image": "sha256:75a6f4d498f9e6e7037923fac17166a2ff0f877af0221acd231e63595ab26896",
+    "network": "none",
+    "source_readonly": true,
+    "outer_readonly": true,
+    "outer_capabilities_dropped": true,
+    "memory_limit_bytes": 4294967296,
+    "cpu_limit": 2,
+    "pid_limit": 512,
+    "shm_bytes": 268435456,
+    "outer_disposable_seccomp_apparmor_unconfined": true,
+    "renderer_sandbox_required": true
+  },
+  "original_receipt_sha256": "bf8c3e055dfe9b743445e3178260e8087f798883edce1e988a7a9bbea09dba99",
+  "raw_private_log_sha256": "b2cedab77a4d1722daeab13b1186161ac813228cc68a07c2fbe8168e8f086c09"
+}

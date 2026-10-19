@@ -1,0 +1,10 @@
+#!/usr/bin/python3 -I
+"""Fixed owner console; no model-facing or arbitrary command endpoint."""
+import sys
+sys.path.insert(0, "/usr/lib/haos")
+from haos.owner_recovery import main
+try:
+    main()
+except (PermissionError, ValueError, RuntimeError, OSError):
+    print("Owner recovery refused or could not complete.", file=sys.stderr)
+    raise SystemExit(1)

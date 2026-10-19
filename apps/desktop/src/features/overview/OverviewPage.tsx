@@ -7,6 +7,8 @@ import { greetingFor } from '../../lib/format.ts'
 import { createChat, runSlash, sendPrompt } from '../../store/chat.ts'
 import { $threads } from '../../store/continuity.ts'
 import { $connection } from '../../store/gateway.ts'
+import { $managedMissions, resolveMissionMode } from '../../store/mission-mode.ts'
+import { DurableMissionsPage } from '../missions/DurableMissionsPage.tsx'
 import { $activeMissions, $reviewMissions } from '../../store/missions.ts'
 import { useSystemInfo } from '../../store/system.ts'
 import { showPage } from '../../store/windows.ts'
@@ -21,10 +23,11 @@ const MISSIONS_SHOWN = 3
 
 const PLAN_MY_DAY_PROMPT = "Plan my day. Look at today's calendar events and my open tasks and missions, then propose a realistic schedule with priorities, time blocks and anything I should prepare for. Keep it short and actionable."
 /** Left for the person to finish; the herald-os-tailor skill tells Hermes how to make it. */
-const MAKE_THEME_DRAFT = 'Make me a Herald OS theme that feels like '
+const MAKE_THEME_DRAFT = 'Make me a HAOS theme that feels like '
 
 /** Home of the main window: greeting, prompt, what is in motion and what needs the user. */
 export function OverviewPage() {
+  const managed = useStore($managedMissions)
   const connection = useStore($connection)
   const active = useStore($activeMissions)
   const review = useStore($reviewMissions)
@@ -41,6 +44,8 @@ export function OverviewPage() {
     return () => clearInterval(timer)
   }, [])
 
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
+
   const online = connection === 'open'
   const firstName = titleCase((info?.fullName || info?.userName || '').trim().split(/[\s._-]+/)[0] ?? '')
   const greeting = `${greetingFor(now)}${firstName ? `, ${firstName}` : ''}.`
@@ -55,6 +60,11 @@ export function OverviewPage() {
     showPage('hermes')
     await createChat()
   }
+
+  // HAOS boots into its real durable mission surface instead of the legacy
+  // chat composer, whose direct Hermes mutations are not permitted to observers.
+  if (managed === true) return <DurableMissionsPage />
+  if (managed === null) return <p role="status" className="p-6 text-sm text-fg-3">Connecting to HAOS mission controller…</p>
 
   return (
     <div ref={rootRef} className="h-full overflow-y-auto">

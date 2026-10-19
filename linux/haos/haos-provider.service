@@ -1,0 +1,46 @@
+[Unit]
+Description=HAOS credential-isolated model provider broker
+Requires=haos-owner-ready.service
+After=haos-owner-ready.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/haos/provider.json
+
+[Service]
+Type=simple
+User=haos-provider
+Group=haos-provider
+WorkingDirectory=/usr/lib/haos/hermes
+Environment=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/haos-provider
+Environment=HERMES_HOME=/var/lib/haos-provider/.hermes
+LoadCredential=provider-token:/etc/haos/provider-token
+LoadCredential=provider-credentials:/etc/haos/provider-credentials
+ExecStart=/usr/bin/python3 -m haos.provider_launch
+Sockets=haos-provider.socket
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+StateDirectory=haos-provider
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace
+InaccessiblePaths=-/run/haos-control -/run/haos-volumes -/run/haos-policy -/etc/haos/backend-token
+TasksMax=64
+MemoryMax=1G

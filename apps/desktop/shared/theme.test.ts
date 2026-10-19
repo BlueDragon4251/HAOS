@@ -113,6 +113,21 @@ describe('themes on disk', () => {
     expect(validateTheme({ name: 'ok', colors: { ...OCEAN, accent: 'blue' } })).toMatch(/accent/)
     expect(themeSlug('  Calm Green!! ')).toBe('calm-green')
   })
+
+  it('refuses path escapes, executable fields and configuration injection', () => {
+    const base = { name: 'safe', colors: OCEAN }
+    for (const wallpaper of ['/etc/shadow', '../private.png', 'nested/image.png', 'file:///secret.png', 'image.svg']) {
+      expect(validateTheme({ ...base, wallpaper })).toMatch(/wallpaper/)
+    }
+    expect(validateTheme({ ...base, wallpaper: 'wallpaper.webp' })).toBeNull()
+    expect(validateTheme({ ...base, script: 'run-me' })).toMatch(/unsupported/)
+    expect(validateTheme({ ...base, label: '\u001b[2J' })).toMatch(/control/)
+    expect(validateTheme({ ...base, shell: { scheme: 'invalid' } })).toMatch(/shell/)
+    expect(validateTheme({ ...base, gtk: { theme: 'Adwaita\n[evil]' } })).toMatch(/gtk/)
+    expect(validateTheme({ ...base, terminal: { cursor: '#fff\nfont=evil' } })).toMatch(/terminal/)
+    expect(validateTheme({ ...base, terminal: { palette: ['#ffffff'] } })).toMatch(/terminal/)
+    expect(validateTheme({ ...base, colors: { ...OCEAN, accent: '#fff' } })).toMatch(/accent/)
+  })
 })
 
 describe('Hermes skins', () => {

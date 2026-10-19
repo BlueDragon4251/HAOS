@@ -402,6 +402,10 @@ export interface CatalogGroupView {
 }
 
 export interface SetupState {
+  /** HAOS uses a locked observer desktop and separate tty2 owner authentication. */
+  haosManaged?: boolean
+  /** Root-owned readiness service has validated owner and offline recovery. Status only. */
+  ownerReady?: boolean
   /** The Herald OS image has not been set up by its owner yet. */
   needed: boolean
   user: string
@@ -494,6 +498,8 @@ export interface HeraldOSPrefs {
   theme: 'ocean' | 'graphite'
   /** The installed theme in use (a folder name under the theme directories). */
   themeName?: string
+  /** Exact saved bundle in use, independent of a later update to the same name. */
+  themeRevision?: string
   /** Colours of a theme without a hand-tuned preset; the shell derives its whole palette from them. */
   themeColors?: ThemeColors
   themeScheme?: ColorScheme
@@ -706,8 +712,21 @@ export interface EnvInfo {
   shellMode: ShellMode
 }
 
+/** Read-only status published by the root-owned HAOS update timer. No credentials. */
+export interface HaosUpdateStatus {
+  version: 1
+  channel: 'dev' | 'stable' | 'unconfigured'
+  auto_stage: boolean
+  state: 'not-checked' | 'unconfigured' | 'configured' | 'checking' | 'checked' | 'up-to-date' | 'update-available' | 'staged' | 'offline-or-error'
+  reboot_required: boolean
+  checked_at: string | null
+  message: string | null
+}
+
 /** Channel names, table-driven so preload and main cannot drift. */
 export const IPC = {
+  missionServiceInfo: 'haos:missions:service-info',
+  missionRequest: 'haos:missions:request',
   backendGetState: 'herald-os:backend:get-state',
   backendState: 'herald-os:backend:state',
   backendRestart: 'herald-os:backend:restart',
@@ -715,6 +734,7 @@ export const IPC = {
   backendLogTail: 'herald-os:backend:log-tail',
 
   systemInfo: 'herald-os:system:info',
+  systemHaosUpdate: 'haos:system:update-status',
   systemStats: 'herald-os:system:stats',
   systemStatsPush: 'herald-os:system:stats-push',
   systemStatsSubscribe: 'herald-os:system:stats-subscribe',
@@ -762,6 +782,8 @@ export const IPC = {
 
   /** Installed themes (built in and the user's own). */
   themeList: 'herald-os:theme:list',
+  themeHistory: 'herald-os:theme:history',
+  themePreview: 'herald-os:theme:preview',
   /** Apply a theme everywhere: the shell, Hermes's skin and, on Herald OS Linux, the whole session. */
   themeApply: 'herald-os:theme:apply',
   /** Save a theme the shell made (from an image) into the user's theme folder. */
@@ -814,6 +836,8 @@ export const IPC = {
 
   /** First-boot setup on the Herald OS image: whether it is due, the name, the password, done. */
   setupState: 'herald-os:setup:state',
+  setupRegionGet: 'herald-os:setup:region-get',
+  setupRegionSet: 'herald-os:setup:region-set',
   setupName: 'herald-os:setup:name',
   setupPassword: 'herald-os:setup:password',
   setupFinish: 'herald-os:setup:finish',

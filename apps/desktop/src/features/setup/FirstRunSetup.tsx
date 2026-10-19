@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { IconArrowRight, IconCheck, IconGift, IconLock, IconUser, IconWifi } from '@tabler/icons-react'
+import { IconArrowRight, IconCheck, IconGift, IconKeyboard, IconLock, IconUser, IconWifi } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { HeraldLogo } from '../../components/herald-logo.tsx'
 import { GlassButton } from '../../components/ui/glass.tsx'
@@ -7,8 +7,10 @@ import { Spinner } from '../../components/ui/primitives.tsx'
 import { cn } from '../../lib/cn.ts'
 import { $hermesAuth, refreshHermesAuth, requestHermesLogin } from '../../store/hermes-auth.ts'
 import { StatusPanel } from '../status/StatusPanel.tsx'
+import { OwnerProviderSetup } from '../settings/sections/OwnerProviderSetup.tsx'
+import { RegionPicker } from './RegionPicker.tsx'
 
-type Step = 'welcome' | 'account' | 'wifi' | 'hermes' | 'done'
+type Step = 'welcome' | 'region' | 'account' | 'wifi' | 'provider' | 'hermes' | 'done'
 
 /**
  * First-boot setup on the Herald OS image: who the computer is for, their name and password,
@@ -17,6 +19,9 @@ type Step = 'welcome' | 'account' | 'wifi' | 'hermes' | 'done'
  */
 export function FirstRunSetup() {
   const [due, setDue] = useState(false)
+  const [haosManaged, setHaosManaged] = useState(false)
+  const [ownerReady, setOwnerReady] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('welcome')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const auth = useStore($hermesAuth)
@@ -24,7 +29,7 @@ export function FirstRunSetup() {
   useEffect(() => {
     void window.heraldOS.setup
       ?.state()
-      .then(state => setDue(state.needed))
+      .then(state => { setDue(state.needed); setHaosManaged(Boolean(state.haosManaged)); setOwnerReady(Boolean(state.ownerReady)) })
       .catch(() => undefined)
   }, [])
 
@@ -38,16 +43,17 @@ export function FirstRunSetup() {
   }
 
   const finish = async () => {
-    await window.heraldOS.setup.finish({ later: forSomeoneElse })
+    const result = await window.heraldOS.setup.finish({ later: forSomeoneElse })
+    if (!result.ok) { setFinishError(result.error ?? 'Einrichtung noch nicht vollständig.'); return }
     setDue(false)
   }
 
-  const steps: Step[] = forSomeoneElse ? ['welcome', 'wifi', 'done'] : ['welcome', 'account', 'wifi', 'hermes', 'done']
+  const steps: Step[] = forSomeoneElse ? ['welcome', 'region', 'wifi', 'done'] : haosManaged ? ['welcome', 'region', 'account', 'wifi', 'provider', 'done'] : ['welcome', 'region', 'account', 'wifi', 'hermes', 'done']
   const next = () => setStep(steps[Math.min(steps.length - 1, steps.indexOf(step) + 1)] ?? 'done')
 
   return (
-    <div className="absolute inset-0 z-(--z-boot) flex items-center justify-center bg-bg/85 backdrop-blur-md animate-fade-in" role="dialog" aria-label="Set up Herald OS">
-      <div className="float flex w-[min(560px,92vw)] flex-col gap-5 rounded-2xl p-7">
+    <div className="absolute inset-0 z-(--z-boot) flex items-center justify-center bg-bg/85 backdrop-blur-md animate-fade-in" role="dialog" aria-label="Set up HAOS">
+      <div className="float flex max-h-[95vh] w-[min(680px,94vw)] flex-col gap-5 overflow-y-auto rounded-2xl p-7">
         <div className="flex items-center gap-3">
           <HeraldLogo height={22} />
           <span className="flex-1" />
@@ -62,18 +68,34 @@ export function FirstRunSetup() {
           <Welcome
             onChoose={someoneElse => {
               setForSomeoneElse(someoneElse)
-              setStep(someoneElse ? 'wifi' : 'account')
+              setStep('region')
             }}
           />
         )}
-        {step === 'account' && <Account onDone={next} />}
+        {step === 'region' && (
+          <div className="flex flex-col gap-4">
+            <Heading icon={<IconKeyboard size={18} />} title="Sprache und Tastatur / Language & keyboard" text="Wähle die Sprache deiner Sitzung und dein Tastaturlayout. Du kannst beides später unter Einstellungen ändern." />
+            <RegionPicker onSaved={next} />
+          </div>
+        )}
+        {step === 'account' && <Account onDone={next} haosManaged={haosManaged} />}
         {step === 'wifi' && (
           <div className="flex flex-col gap-4">
             <Heading icon={<IconWifi size={18} />} title="Get online" text="Pick a network; you can also plug in a cable. Skip it to stay offline for now." />
             <div className="max-h-[320px] overflow-y-auto rounded-xl">
               <StatusPanel panel="wifi" />
             </div>
-            <Footer onNext={next} label="Next" />
+            <div className="flex items-center justify-between gap-3">
+              <GlassButton variant="ghost" onClick={next}>Skip Wi-Fi for now</GlassButton>
+              <Footer onNext={next} label="Next" />
+            </div>
+          </div>
+        )}
+        {step === 'provider' && (
+          <div className="flex flex-col gap-4">
+            <Heading icon={<IconUser size={18} />} title="Choose Hermes's model" text="Your model provider requires separate owner authorization; this desktop does not store API keys." />
+            <OwnerProviderSetup />
+            <Footer onNext={next} label="Continue without activating a provider" />
           </div>
         )}
         {step === 'hermes' && <HermesStep onDone={next} />}
@@ -81,10 +103,12 @@ export function FirstRunSetup() {
           <div className="flex flex-col gap-4">
             <Heading
               icon={forSomeoneElse ? <IconGift size={18} /> : <IconCheck size={18} />}
-              title={forSomeoneElse ? 'Ready to hand over' : 'You are all set'}
-              text={forSomeoneElse ? 'The next time it starts, it asks its new owner for a name, a password and their Hermes sign-in.' : 'Press Super+Space to ask Hermes about anything on screen, or Super+M for the Herald OS menu.'}
+              title={forSomeoneElse ? 'Ready to hand over' : 'HAOS is ready'}
+              text={forSomeoneElse ? 'The next person can finish personal setup later. HAOS owner authority remains separate from the desktop.' : haosManaged ? 'Open Hermes or Missions to view durable work. An authenticated owner configures model providers using haos-owner.' : 'Press Super+Space to ask Hermes about anything on screen, or Super+M for the menu.'}
             />
-            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using Herald OS'} />
+            {haosManaged && !ownerReady && <p role="alert" className="rounded-xl border border-line p-3 text-[12px] text-fg-2">Sicherheits-Setup ausstehend: Der Administrator und die zehn Wiederherstellungscodes müssen durch die geschützte lokale Einrichtung bestätigt werden. Der normale Hermes-Desktop bekommt dafür keine Root-Rechte.</p>}
+            {finishError && <p role="alert" className="text-[12px] text-danger">{finishError}</p>}
+            <Footer onNext={() => void finish()} label={forSomeoneElse ? 'Done' : 'Start using HAOS'} disabled={haosManaged && !ownerReady} />
           </div>
         )}
       </div>
@@ -117,11 +141,11 @@ function Footer({ onNext, label, busy, disabled }: { onNext: () => void; label: 
 function Welcome({ onChoose }: { onChoose: (someoneElse: boolean) => void }) {
   return (
     <div className="flex flex-col gap-4">
-      <Heading icon={<IconUser size={18} />} title="Welcome to Herald OS" text="A computer you can talk to. A few questions and it is yours." />
+      <Heading icon={<IconUser size={18} />} title="Welcome to HAOS" text="A computer you can talk to. A few questions and it is yours." />
       <div className="grid grid-cols-2 gap-3">
         <button type="button" onClick={() => onChoose(false)} className="glass-input flex flex-col items-start gap-1 rounded-xl p-4 text-left hover:border-line-strong">
           <span className="text-[14px] font-medium text-fg">It is for me</span>
-          <span className="text-[12px] text-fg-3">Choose your name, a password and sign in to Hermes.</span>
+          <span className="text-[12px] text-fg-3">Choose your display name and complete the guided setup.</span>
         </button>
         <button type="button" onClick={() => onChoose(true)} className="glass-input flex flex-col items-start gap-1 rounded-xl p-4 text-left hover:border-line-strong">
           <span className="text-[14px] font-medium text-fg">For someone else</span>
@@ -132,7 +156,7 @@ function Welcome({ onChoose }: { onChoose: (someoneElse: boolean) => void }) {
   )
 }
 
-function Account({ onDone }: { onDone: () => void }) {
+function Account({ onDone, haosManaged }: { onDone: () => void; haosManaged: boolean }) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [again, setAgain] = useState('')
@@ -145,13 +169,18 @@ function Account({ onDone }: { onDone: () => void }) {
     setError(null)
 
     try {
-      await window.heraldOS.setup.name(name)
-      const result = await window.heraldOS.setup.password(password)
+      const result = await window.heraldOS.setup.name(name)
+      if (haosManaged) {
+        if (result.ok) onDone()
+        else setError(result.error ?? 'Could not save your display name.')
+        return
+      }
+      const passwordResult = await window.heraldOS.setup.password(password)
 
-      if (result.ok) {
+      if (passwordResult.ok) {
         onDone()
       } else {
-        setError(result.error ?? 'The password was not set.')
+        setError(passwordResult.error ?? 'The password was not set.')
       }
     } finally {
       setBusy(false)
@@ -166,21 +195,21 @@ function Account({ onDone }: { onDone: () => void }) {
         void save()
       }}
     >
-      <Heading icon={<IconLock size={18} />} title="Your name and password" text="Herald OS greets you by name. The password unlocks the screen and approves changes to the system." />
+      <Heading icon={<IconLock size={18} />} title={haosManaged ? 'Your name and owner security' : 'Your name and password'} text={haosManaged ? 'HAOS uses a locked observer desktop. The independent owner account is enrolled from Ctrl+Alt+F2 (tty2), not by changing this account password.' : 'Your desktop greets you by name. Your password unlocks the screen.'} />
       <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Name
         <input value={name} onChange={event => setName(event.target.value)} autoFocus autoComplete="name" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
       </label>
-      <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
+      {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         Password (at least 8 characters)
         <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
-      </label>
-      <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
+      </label>}
+      {!haosManaged && <label className="flex flex-col gap-1.5 text-[12px] text-fg-3">
         The same password again
         <input type="password" value={again} onChange={event => setAgain(event.target.value)} autoComplete="new-password" className="glass-input h-10 rounded-lg px-3 text-[14px] text-fg outline-none" />
-      </label>
-      {(error || mismatch) && <p className="text-[12.5px] text-danger">{mismatch ? 'The passwords do not match.' : error}</p>}
-      <Footer onNext={() => void save()} label="Next" busy={busy} disabled={!name.trim() || password.length < 8 || password !== again} />
+      </label>}
+      {(error || (!haosManaged && mismatch)) && <p className="text-[12.5px] text-danger">{mismatch ? 'The passwords do not match.' : error}</p>}
+      <Footer onNext={() => void save()} label="Next" busy={busy} disabled={!name.trim() || (!haosManaged && (password.length < 8 || password !== again))} />
     </form>
   )
 }

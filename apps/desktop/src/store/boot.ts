@@ -27,6 +27,8 @@ import { bindBridgeSetupNotice } from './tool-search.ts'
 import { bindUsage } from './usage.ts'
 import { bindVoice } from './voice.ts'
 import { bindWake } from './wake.ts'
+import { resolveMissionMode } from './mission-mode.ts'
+import { showPage } from './windows.ts'
 
 const BOOT_FLAG = '__heraldOSBooted'
 
@@ -68,6 +70,7 @@ export function bootRenderer(): void {
 
   // The Hermes window owns the notification list; the history follows it.
   if (isMainSurface) {
+    void resolveMissionMode().then(managed => { if (managed) showPage('hermes') }).catch(() => undefined)
     bindNotificationHistory()
     bindBridgeSetupNotice()
   }

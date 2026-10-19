@@ -7,6 +7,8 @@ import { ActivityTimeline } from './ActivityTimeline.tsx'
 import { MissionCard } from './MissionCard.tsx'
 import { MissionComposer } from './MissionComposer.tsx'
 import { MissionDetail } from './MissionDetail.tsx'
+import { DurableMissionsPage } from './DurableMissionsPage.tsx'
+import { $managedMissions, $missionModeError, resolveMissionMode } from '../../store/mission-mode.ts'
 
 type TabId = 'active' | 'review' | 'completed'
 
@@ -20,6 +22,15 @@ const EMPTY_COPY: Record<TabId, { title: string; description: string }> = {
 }
 
 export function MissionsPage() {
+  const managed = useStore($managedMissions)
+  const serviceError = useStore($missionModeError)
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
+  if (serviceError) return <p role="alert" className="p-6 text-sm text-danger">Could not identify the mission service: {serviceError}</p>
+  if (managed === null) return <p role="status" className="p-6 text-sm text-fg-3">Loading mission service…</p>
+  return managed ? <DurableMissionsPage /> : <SessionMissionsPage />
+}
+
+function SessionMissionsPage() {
   const active = useStore($activeMissions)
   const review = useStore($reviewMissions)
   const completed = useStore($completedMissions)

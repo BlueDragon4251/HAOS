@@ -1,3 +1,15 @@
+# HAOS security boundary
+
+Agent, controller and observer identities are separate. Agent/controller service accounts have no sudo authority. Policy changes and ambiguous mission reconciliation require root through `haos-owner`, after stopping execution. The mission socket provides neither operation; actors come from Linux `SO_PEERCRED`, not request fields.
+
+Mandatory user/mount/PID namespaces, empty capabilities, protected root-owned policy and explicit binds constrain arbitrary agent code. Unknown data volumes are absent. Host networking is shared; no egress allowlist is implemented. The inherited first-login configuration is not suitable for production. See [threat model](docs/THREAT-MODEL.md) and [limitations](docs/KNOWN-LIMITATIONS.md).
+
+The backend credential is generated per installed host and passed to Hermes through systemd credentials; it does not rotate on each UI launch. Provider secrets must be available to the runtime that uses them. Complete event redaction, retention and encryption are not guaranteed.
+
+Report HAOS problems privately to the repository owner. Use private vulnerability reporting if available; do not assume it is enabled. The inherited Herald policy below is upstream context, not a claim that all of its guarantees have been verified in HAOS.
+
+---
+
 # Security policy
 
 Herald OS lets an AI agent operate your computer, so security reports matter. Thank you for taking

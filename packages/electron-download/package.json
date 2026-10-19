@@ -1,0 +1,12 @@
+{
+  "name": "@haos/electron-download",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.cjs",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": { "test": "node --test test.cjs" },
+  "dependencies": {
+    "@electron/get": "5.1.0",
+    "undici": "7.30.0"
+  }
+}

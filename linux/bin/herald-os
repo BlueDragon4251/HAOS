@@ -1442,6 +1442,8 @@ def debug() -> int:
 # makes Super+C, X and V copy, cut and paste in every app (terminals included, through Ctrl+Insert and
 # Shift+Insert), and moves the Herald binds they replace one modifier over.
 KEYMAP_FILE = CONFIG_DIR / "keymap"
+REGION_FILE = CONFIG_DIR / "region.json"
+REGIONAL_LAYOUTS = ("at", "de", "us", "gb", "fr", "ch")
 KEYMAPS = ("herald", "omarchy")
 NIRI_CONFIG = HOME / ".config" / "niri" / "herald-os.kdl"
 # The template that came with this command comes first: a checkout's, or the app's own when the
@@ -1490,6 +1492,29 @@ def render_keymap(template: str, keymap: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def current_keyboard_layout() -> str | None:
+    """Regional layout selected by the session owner, independent of shortcut keymap."""
+    try:
+        # The region record is owned by the session user, not the agent or root.
+        record = json.loads(REGION_FILE.read_text())
+        layout = record.get("keyboard") if isinstance(record, dict) else None
+        return layout if layout in REGIONAL_LAYOUTS else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def render_keyboard_layout(template: str, layout: str | None) -> str:
+    """Patch only the shipped, empty XKB block. No arbitrary KDL injection."""
+    if layout is None:
+        return template
+    if layout not in REGIONAL_LAYOUTS:
+        raise ValueError("unsupported regional keyboard layout")
+    needle = "        xkb {\n        }"
+    if template.count(needle) != 1:
+        raise ValueError("niri input template lacks the one empty XKB block")
+    return template.replace(needle, '        xkb {\n            layout "' + layout + '"\n        }', 1)
+
+
 def keymap_cmd(args: list[str]) -> int:
     action = args[0] if args else "show"
     if action == "show":
@@ -1505,7 +1530,7 @@ def keymap_cmd(args: list[str]) -> int:
     template = next((path for path in NIRI_TEMPLATES if path.is_file()), None)
     if not template:
         die("the niri template is missing; reinstall Herald OS or run herald-os-build")
-    rendered = render_keymap(template.read_text(), current_keymap())
+    rendered = render_keyboard_layout(render_keymap(template.read_text(), current_keymap()), current_keyboard_layout())
     # niri reloads on every write: only a changed config is written, once and atomically, so it
     # never reads half a file.
     if not NIRI_CONFIG.is_file() or NIRI_CONFIG.read_text(errors="replace") != rendered:

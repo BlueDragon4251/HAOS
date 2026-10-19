@@ -28,8 +28,8 @@ export function findTheme(themes: readonly ThemeSummary[], query: string): Theme
   )
 }
 
-export async function applyTheme(name: string): Promise<HeraldOSPrefs> {
-  const next = await window.heraldOS.theme.apply(name)
+export async function applyTheme(name: string, revision?: string): Promise<HeraldOSPrefs> {
+  const next = await window.heraldOS.theme.apply(name, revision)
   $prefs.set(next)
   applyPrefsToDocument(next)
 

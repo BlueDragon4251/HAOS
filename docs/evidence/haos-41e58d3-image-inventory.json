@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "image_source_commit": "41e58d3758cc11e82690c2097ab683ef426af4fb",
+  "image_run_id": 37994395134,
+  "image_workflow_conclusion": "failure",
+  "failure_stage": "old verifier rejected actual 82145743-byte catalog at 64 MiB; ISO and installation not run",
+  "artifact": {
+    "artifact_id": 11647441671,
+    "zip_sha256": "da3ebae698f81d7740c9bad1498568747de39eba71c088412db372f67371cb4a"
+  },
+  "scanner": {
+    "event": "haos.sbom.scanner",
+    "status": "exited",
+    "exit_code": 0,
+    "oom_killed": false
+  },
+  "verification": {
+    "kind": "local verification of downloaded digest-verified actual image catalogs",
+    "verifier_source_commit": "e12a55d6d74c07d8f430947aad541efdf1371645",
+    "verifier_sha256": "2f0de09d832ebd5d854b71c8fcd1597c212b371635c31cbc9f9a836eca6cd43b",
+    "offline_nonroot_container_memory_limit_bytes": 2147483648,
+    "actual_container_maximum_resident_kib": 564812,
+    "linux_cli_address_space_limit_bytes": 2147483648,
+    "actual_cli_maximum_resident_kib": 562820
+  },
+  "inventory": {
+    "schema": 1,
+    "source_commit": "41e58d3758cc11e82690c2097ab683ef426af4fb",
+    "image_id": "sha256:9bad188288c408f6ba20ec3ef6f447cc243031578636fcb0ab0acf7660faaec9",
+    "scanner": {
+      "version": "1.54.1",
+      "container": "ghcr.io/anchore/syft@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa",
+      "network_disabled": true
+    },
+    "npm_generator": {
+      "version": "10.9.4",
+      "original_retained": true,
+      "normalized_component_occurrences": 1
+    },
+    "document_sha256": {
+      "image.cdx.json": "4fa34532d0cb21a2021da5ffc5fef0f722c885d2b7319610519336df3dabaea9",
+      "image.syft.json": "4402c737419271a9adfe661bdf916ce780583630479e2d6fed4d28e2151e472f",
+      "npm.cdx.json": "38a6e7c2dccce044cb63f18c3db69cef097c8436df66ec076d588b6f566d9c23",
+      "npm.raw.cdx.json": "4c5f09eb7233054c1bb5e87b0eef30a9c3f6eea8c2643f8f58103333086c5065",
+      "image.json": "4be02ca76413b1d80f6158631d031f42189ac9a8ef627df9e8b68eee9690bf34",
+      "python-runtime-installed.txt": "a81f10b6db02e12a71407ae9a61d1065ab27d3ae72355d689cecb4059a3e973a",
+      "python-runtime-requirements.txt": "303a806c67afd8b798dc360c2629e8dd2dd6dd41fb06c65c102175448e625d96",
+      "rpm-with-epochs.txt": "37bd79dfabd1f442ed7a68e06618dfaefa2e93ed7bf68e552c02c23292a96bf9"
+    },
+    "document_bytes": {
+      "image.cdx.json": 33322515,
+      "image.syft.json": 82145743,
+      "npm.cdx.json": 282887,
+      "npm.raw.cdx.json": 284121,
+      "image.json": 31118,
+      "python-runtime-installed.txt": 1423,
+      "python-runtime-requirements.txt": 180581,
+      "rpm-with-epochs.txt": 43252
+    },
+    "coverage": {
+      "python_installed_versions": 80,
+      "python_frozen_versions": 80,
+      "rpm_installed_versions_architectures": 1210,
+      "image_package_types": {
+        "generic": 376,
+        "golang": 435,
+        "maven": 1,
+        "npm": 12,
+        "pypi": 104,
+        "rpm": 1210
+      },
+      "npm_build_packages": 188
+    },
+    "installed_inventory_checks_passed": true,
+    "complete_release_acceptance": false,
+    "limitations": [
+      "catalogs are not proof that every embedded/vendored component was identified",
+      "npm build graph and image catalog are distinct documents, not a merged dependency graph",
+      "vulnerability, licensing, provenance, signing, hardware and behavioral acceptance are separate gates"
+    ]
+  },
+  "runtime_ui_boundary": {
+    "actual_pinned_backend": true,
+    "observer_identity_matches_child": true,
+    "observer_read_rpc_works": true,
+    "observer_config_credentials_terminal_denied": true,
+    "observer_direct_turn_and_session_mutations_denied": true,
+    "wrong_or_missing_identity_denied": true,
+    "controller_session_creation_preserved": true,
+    "dashboard_credentials_absent_from_process_log": true,
+    "runtime_session_created": true,
+    "durable_session_created": true,
+    "real_model_turn": false,
+    "installed_owner_ui_acceptance": false
+  },
+  "installed_guest_acceptance": false,
+  "complete_release_acceptance": false
+}

@@ -1,0 +1,94 @@
+name: HAOS bounded guest evidence inspection
+
+on:
+  push:
+    branches: ['agent/haos-*']
+    paths: ['.github/workflows/haos-evidence.yml', 'scripts/inspect-haos-evidence.py']
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed HAOS image run containing a small QEMU guest artifact
+        required: true
+        type: string
+      evidence_kind:
+        description: Guest receipts or bounded failed-build process/image metadata
+        required: true
+        default: guest
+        type: choice
+        options: [guest, build]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  select:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      runs: ${{ steps.runs.outputs.runs }}
+    steps:
+      - name: Select an explicit nonempty set of bounded evidence runs
+        id: runs
+        env:
+          HAOS_REQUESTED_RUN: ${{ inputs.run_id }}
+          HAOS_EVENT: ${{ github.event_name }}
+          HAOS_EVIDENCE_BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from urllib.parse import quote
+          if os.environ['HAOS_EVENT'] == 'workflow_dispatch':
+              requested = os.environ['HAOS_REQUESTED_RUN']
+              if not re.fullmatch(r'[0-9]{1,20}', requested):
+                  raise ValueError('Evidence inspection needs one numeric run ID')
+              runs = [requested]
+          else:
+              # Historical artifact expiry must not create an empty green job
+              # or force new installs. Inspect the newest available completed
+              # image; an explicit dispatch can inspect any eligible older run.
+              repository = os.environ['GITHUB_REPOSITORY']
+              def get(path):
+                  result = subprocess.run(['gh', 'api', f'repos/{repository}/' + path],
+                                          capture_output=True, timeout=30)
+                  if result.returncode:
+                      raise RuntimeError('Cannot select bounded GitHub evidence')
+                  return json.loads(result.stdout)
+              branch = quote(os.environ['HAOS_EVIDENCE_BRANCH'], safe='')
+              candidates = get(f'actions/workflows/haos-image.yml/runs?branch={branch}&status=completed&per_page=10')['workflow_runs']
+              runs = []
+              for candidate in candidates:
+                  source = candidate['head_sha']
+                  artifacts = get(f"actions/runs/{candidate['id']}/artifacts?per_page=100")['artifacts']
+                  if any(a['name'] == f'haos-qemu-acceptance-{source}' and not a['expired'] for a in artifacts):
+                      runs = [str(candidate['id'])]
+                      break
+              if not runs:
+                  raise ValueError('No completed image with available guest evidence; no inspection claimed')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('runs=' + json.dumps(runs) + '\n')
+          PY
+  inspect:
+    needs: select
+    strategy:
+      fail-fast: false
+      matrix:
+        run_id: ${{ fromJSON(needs.select.outputs.runs) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Verify evidence authenticity and privacy before publishing
+        run: |
+          python -m pip install pytest==9.0.2
+          python -m pytest -q tests/e2e/test_evidence_inspection.py
+      - name: Verify archive digest and inspect bounded guest receipts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAOS_EVIDENCE_RUN: ${{ matrix.run_id }}
+          HAOS_EVIDENCE_KIND: ${{ inputs.evidence_kind || 'guest' }}
+        run: python3 scripts/inspect-haos-evidence.py

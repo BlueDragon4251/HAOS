@@ -11,12 +11,23 @@ import { SessionList } from '../chat/SessionList.tsx'
 import { ArtifactPane } from './ArtifactPane.tsx'
 import { Conversation } from './Conversation.tsx'
 import { MenuDivider, MenuItem, PopMenu } from './Menu.tsx'
+import { $managedMissions, $missionModeError, resolveMissionMode } from '../../store/mission-mode.ts'
+import { DurableMissionsPage } from '../missions/DurableMissionsPage.tsx'
 
 /*
  * The Hermes page: a conversation on the left, what Hermes produced on the right. Chat state is
  * the shared store/chat.ts pipeline; this page only lays it out and adds the artifact pane.
  */
 export function HermesPage() {
+  const managed = useStore($managedMissions)
+  const error = useStore($missionModeError)
+  useEffect(() => { void resolveMissionMode().catch(() => undefined) }, [])
+  if (error) return <p role="alert" className="p-6 text-sm text-danger">Could not identify the mission service: {error}</p>
+  if (managed === null) return <p role="status" className="p-6 text-sm text-fg-3">Connecting to the mission service…</p>
+  return managed ? <DurableMissionsPage conversation /> : <SessionHermesPage />
+}
+
+function SessionHermesPage() {
   const chat = useStore($activeChat)
   const activeId = useStore($activeChatId)
   const connection = useStore($connection)

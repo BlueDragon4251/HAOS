@@ -28,7 +28,8 @@
     },
     "usocket": {
       "node-gyp": "12.4.0"
-    }
+    },
+    "@electron/get": "5.1.0"
   },
   "allowScripts": {
     "node-pty": true,
@@ -47,6 +48,7 @@
     "dist:mac": "npm run dist:mac --workspace apps/desktop"
   },
   "devDependencies": {
-    "cross-env": "^10.1.0"
+    "cross-env": "^10.1.0",
+    "app-builder-lib": "26.15.3"
   }
 }

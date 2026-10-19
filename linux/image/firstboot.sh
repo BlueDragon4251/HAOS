@@ -31,9 +31,14 @@ done
 system_phase() {
   step "The session user ($HERMES_USER)"
   if ! id "$HERMES_USER" >/dev/null 2>&1; then
-    # No password yet: the lock screen refuses until one is set (first-boot setup or herald-os password).
-    useradd -m -G wheel "$HERMES_USER"
-    passwd -d "$HERMES_USER" >/dev/null
+    if [[ -d /usr/lib/haos/haos ]]; then
+      # Locked, non-administrator observer. Owner enrollment is a separate gate.
+      useradd -m "$HERMES_USER"
+    else
+      # Original Herald development behavior.
+      useradd -m -G wheel "$HERMES_USER"
+      passwd -d "$HERMES_USER" >/dev/null
+    fi
   fi
   HOME_DIR="$(getent passwd "$HERMES_USER" | cut -d: -f6)"
   usermod -aG video,input,render,audio "$HERMES_USER" 2>/dev/null || true
@@ -45,22 +50,42 @@ system_phase() {
   sed -i "s/^user = .*/user = \"$HERMES_USER\"/" /etc/greetd/config.toml
 
   step "The login screen"
-  # Anaconda picks multi-user.target unless its kickstart says otherwise, because greetd provides
-  # no service(graphical-login); only graphical.target starts greetd and so the session.
+  # Preserve the graphical default for every future boot, but DO NOT start
+  # graphical.target from inside the still-running firstboot service.
+  # HAOS isn't initialized yet: controller.json, the root setup gate and its
+  # marker are created only at the very end of this system phase. A premature
+  # graphical.target activation can evaluate both ExecConditions against
+  # partial state and leave BOTH normal greetd and the owner wizard skipped.
+  # The owner wizard is WantedBy=multi-user.target and After=this firstboot
+  # service, so it runs automatically even if Anaconda boots multi-user first.
   if [[ "$(systemctl get-default)" != "graphical.target" ]]; then
     systemctl set-default graphical.target
-    systemctl --no-block start graphical.target
   fi
 
   step "Home folder"
   as_user mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.local/share" "$HOME_DIR/.local/state" "$HOME_DIR/.config/herald-os" "$HOME_DIR/.config/niri" "$HOME_DIR/.config/swaylock" "$HOME_DIR/.config/systemd/user"
-  as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
+  # HAOS managed images run their own root-controlled update timer. The legacy
+  # per-user update tool invokes sudo -n, which the locked observer cannot do.
+  if [[ ! -d /usr/lib/haos/haos ]]; then
+    as_user env XDG_RUNTIME_DIR="/run/user/$(id -u "$HERMES_USER")" systemctl --user enable herald-os-update-check.timer 2>/dev/null || true
+  fi
   as_user herald-os-theme set "$(as_user herald-os-theme current)" || true
   # Herald's niri config, rendered with the person's keymap (managed; local.kdl is theirs).
   as_user herald-os keymap apply || install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/niri/config.kdl" "$HOME_DIR/.config/niri/herald-os.kdl"
   install -m 0644 -o "$HERMES_USER" -g "$HERMES_USER" "$SHARE/session/swaylock.conf" "$HOME_DIR/.config/swaylock/config"
 
   step "Hermes Agent for $HERMES_USER"
+  if [[ -d /usr/lib/haos/haos ]]; then
+    [[ -x /usr/lib/haos/hermes/.venv/bin/hermes ]] || {
+      echo "firstboot: the mandatory HAOS runtime is missing; refusing unrestricted fallback" >&2
+      exit 1
+    }
+    # Never install an unrestricted second agent in the observer's account.
+    usermod -aG haos-ui "$HERMES_USER"
+    (cd /usr/lib/haos && python3 -m haos.initialize "$HERMES_USER")
+    date -Is >"$STATE/firstboot-done"
+    return
+  fi
   if [[ -f /etc/herald-os/ref ]]; then
     # shellcheck disable=SC1091
     source /etc/herald-os/ref

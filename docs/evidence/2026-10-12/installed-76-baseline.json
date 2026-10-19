@@ -1,0 +1,184 @@
+{
+  "scope": "exact 76d5986 installed baseline; before later root capability/umask and theme-agent changes",
+  "source_commit": "76d5986ca78d9b2ae77d771d8a01ab03cc363b04",
+  "run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38201054973",
+  "conclusion": "success",
+  "installer_and_both_tcg_boots_exit_zero": true,
+  "guest": {
+    "artifact_id": 11727813223,
+    "digest": "sha256:e5dfec4172351793d0d3ed0f8fc5e0114e13be45ad32ada32b334635436ae706",
+    "inspection": {
+      "guest_receipts": [
+        {
+          "stage": 1,
+          "receipt_sha256": "87f396d9325736eb4059fdc43c78fd313e444047ffb102bbe000312f67efdd1b",
+          "assertions": {
+            "write": {
+              "data_access": true,
+              "blocked_volume_hidden": true,
+              "connected_removable_volume_read_write": true,
+              "foreign_owner_write_rename_delete": true,
+              "owner_policy_immutable": true,
+              "raw_devices_hidden": true,
+              "mount_denied": true,
+              "nested_userns_denied": true
+            },
+            "observer_sudo_denied": true,
+            "observer_administrator_groups_absent": true,
+            "observer_empty_password_denied": true,
+            "observer_backend_credential_denied": true,
+            "observer_dashboard_read_authenticated": true,
+            "observer_privileged_dashboard_routes_denied": true,
+            "installed_agent_local_network_guard": true,
+            "installed_owner_backup_restore": true,
+            "restore_live_state_untouched": true,
+            "installed_encrypted_scheduler": true,
+            "installed_scheduled_snapshot_restored": true,
+            "installed_schedule_retention_preview": true,
+            "installed_live_ledger_scheduler": true,
+            "installed_live_ledger_restore_verified": true,
+            "installed_live_backup_runtime_pids_preserved": true,
+            "installed_owner_console_enrollment": true,
+            "installed_owner_password_authentication": true,
+            "installed_owner_wrong_password_denied": true,
+            "installed_owner_cached_auth_denied": true,
+            "installed_owner_arbitrary_root_denied": true,
+            "installed_owner_python_override_denied": true,
+            "installed_owner_credential_absent_from_audit": true,
+            "installed_owner_authentication_after_reboot": false,
+            "installed_owner_recovery_codes_issued": true,
+            "installed_owner_password_recovery": false,
+            "installed_owner_used_recovery_code_denied": false,
+            "installed_theme_watchdog_parent_sigkill": true,
+            "installed_theme_fixed_outputs_restored": true,
+            "installed_theme_recovery_cli_restart": true,
+            "read_only": {
+              "data_access": true,
+              "blocked_volume_hidden": true,
+              "connected_removable_volume_read_write": true,
+              "foreign_owner_write_rename_delete": false,
+              "owner_policy_immutable": true,
+              "raw_devices_hidden": true,
+              "mount_denied": true,
+              "nested_userns_denied": true
+            },
+            "ui_restart_preserves_backend": true
+          }
+        },
+        {
+          "stage": 2,
+          "receipt_sha256": "4eb362c03a642179773f06fca5f6ff3fa6ca52975f10f082589a28ebae744ff1",
+          "assertions": {
+            "journal_survives_reboot": true,
+            "backend_healthy_after_reboot": true,
+            "observer_sudo_denied": true,
+            "observer_administrator_groups_absent": true,
+            "observer_empty_password_denied": true,
+            "observer_backend_credential_denied": true,
+            "observer_dashboard_read_authenticated": true,
+            "observer_privileged_dashboard_routes_denied": true,
+            "installed_agent_local_network_guard": true,
+            "installed_owner_console_enrollment": true,
+            "installed_owner_password_authentication": true,
+            "installed_owner_wrong_password_denied": true,
+            "installed_owner_cached_auth_denied": true,
+            "installed_owner_arbitrary_root_denied": true,
+            "installed_owner_python_override_denied": true,
+            "installed_owner_credential_absent_from_audit": true,
+            "installed_owner_authentication_after_reboot": true,
+            "installed_owner_recovery_codes_issued": true,
+            "installed_owner_password_recovery": true,
+            "installed_owner_used_recovery_code_denied": true,
+            "installed_disconnected_volume_namespace_denied": true,
+            "installed_remaining_workspace_access_preserved": true,
+            "installed_disconnected_volume_owner_policy_preserved": true,
+            "installed_disconnected_volume_compiled_bind_absent": true,
+            "installed_theme_watchdog_journal_survives_reboot": true
+          }
+        }
+      ],
+      "source_identities": null,
+      "startup_errors": []
+    },
+    "original_zip_digest_verified": true
+  },
+  "build": {
+    "artifact_id": 11726008160,
+    "digest": "sha256:4e768ca2b8950bb60220296cefb1b997c493d5b663e8748d157f096d7c6f353a",
+    "inspection": {
+      "image_id": "sha256:adf115f6d04cbe4649513a01fda8f198c56e1590c12966c487e5226b518bc177",
+      "image_bytes": 6308303968,
+      "installed_guest_acceptance": false,
+      "installed_inventory_acceptance": false,
+      "scanner": {
+        "status": "exited",
+        "exit_code": 0,
+        "oom_killed": false
+      },
+      "image_cdx_json": {
+        "present_in_this_artifact": false,
+        "bytes": 0,
+        "json_valid": false
+      },
+      "image_syft_json": {
+        "present_in_this_artifact": false,
+        "bytes": 0,
+        "json_valid": false
+      },
+      "image_inventory": {
+        "checks_passed": true,
+        "complete_release_acceptance": false,
+        "counts": {
+          "python_installed_versions": 80,
+          "python_frozen_versions": 80,
+          "rpm_installed_versions_architectures": 1219,
+          "npm_build_packages": 191
+        },
+        "document_sha256": {
+          "image.cdx.json": "0c760b9ab45e5ef93d0003f018e13e344911f7cb9bd5a37f3bdc24326c818db7",
+          "image.syft.json": "a3792013605841d26b98ab913dfbb8e50440942d28dc106224b5f0058f2aed09",
+          "npm.cdx.json": "5380012dfdf15d95e451bddb3ab3df7ced73a2112fda0673395833e7852f9303",
+          "npm.raw.cdx.json": "1c32fb4a8021982fd62c69a89e3a2881e5804fd2e5ca2027a236e01c8fbaa50a",
+          "image.json": "cd71e6fdd8ec4c51757f0fd3f5c0bf7fdc680a64f839407ed4b33112b5f0c468",
+          "python-runtime-installed.txt": "a81f10b6db02e12a71407ae9a61d1065ab27d3ae72355d689cecb4059a3e973a",
+          "python-runtime-requirements.txt": "303a806c67afd8b798dc360c2629e8dd2dd6dd41fb06c65c102175448e625d96",
+          "rpm-with-epochs.txt": "f91286e08f3c8ec2c067f547ccb0731911944aec7f77b79f1797d438e205e679"
+        },
+        "document_bytes": {
+          "image.cdx.json": 33475176,
+          "image.syft.json": 82543766,
+          "npm.cdx.json": 286509,
+          "npm.raw.cdx.json": 287743,
+          "image.json": 31119,
+          "python-runtime-installed.txt": 1423,
+          "python-runtime-requirements.txt": 180581,
+          "rpm-with-epochs.txt": 43583
+        },
+        "index_sha256": "20829316c3258163f3ece9c7a8accd4464564c6fb760213d35774bd58bf5da0d"
+      },
+      "runtime_ui_boundary": {
+        "actual_pinned_backend": true,
+        "observer_identity_matches_child": true,
+        "observer_read_rpc_works": true,
+        "observer_config_credentials_terminal_denied": true,
+        "observer_direct_turn_and_session_mutations_denied": true,
+        "wrong_or_missing_identity_denied": true,
+        "controller_session_creation_preserved": true,
+        "dashboard_credentials_absent_from_process_log": true,
+        "runtime_session_created": true,
+        "durable_session_created": true,
+        "real_model_turn": false,
+        "installed_owner_ui_acceptance": false
+      },
+      "iso_sha256": "6e22524eb063170dc96d15d1d6799576386e9e970c01838d26c4752b5bca9c98"
+    },
+    "original_zip_digest_verified": true
+  },
+  "guest_serial_and_saved_receipts_match": true,
+  "separate_guest_source_attestation_emitted": false,
+  "source_mapping": "workflow HEAD and build manifest, default same-checkout frozen guest program; not independent guest attestation",
+  "full_iso_zip_redownloaded": false,
+  "full_image_catalog_redownloaded": false,
+  "newer_private_application_or_remote_or_model_acceptance": false,
+  "earlier_767_backend_failure_root_cause_proven": false
+}

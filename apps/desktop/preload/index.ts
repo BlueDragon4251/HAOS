@@ -31,6 +31,7 @@ import {
   type EnvInfo,
   type FilePreview,
   type HeraldOSPrefs,
+  type HaosUpdateStatus,
   type ImageInfo,
   type InstalledApp,
   IPC,
@@ -65,12 +66,14 @@ import {
   type WmAction,
   type WmState
 } from '../shared/ipc.ts'
+import type { HaosRegion } from '../shared/region.ts'
 import type { BrandingPatch, BrandingView } from '../shared/branding.ts'
 import type { ModelId, ModelProgress, ModelStatus } from '../shared/canvas/models.ts'
 import type { MenuExtensions } from '../shared/menu-extensions.ts'
 import type { PluginMethod, PluginView } from '../shared/plugins.ts'
 import type { HeraldEvent } from '../shared/events.ts'
-import type { ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { ThemePreview, ThemeSpec, ThemeSummary } from '../shared/theme.ts'
+import type { MissionMethods } from '../shared/missions.ts'
 
 type Unsubscribe = () => void
 
@@ -88,6 +91,10 @@ const subscribe = <T,>(channel: string, listener: (payload: T) => void): Unsubsc
 
 /** The whole capability surface the renderer gets. Keep it narrow and typed. */
 const api = {
+  missions: {
+    serviceInfo: (): Promise<{ managed: boolean }> => ipcRenderer.invoke(IPC.missionServiceInfo),
+    request: <M extends keyof MissionMethods>(method: M, params: MissionMethods[M]['params']): Promise<MissionMethods[M]['result']> => ipcRenderer.invoke(IPC.missionRequest, method, params)
+  },
   backend: {
     getState: (): Promise<BackendState> => ipcRenderer.invoke(IPC.backendGetState),
     onState: (listener: (state: BackendState) => void): Unsubscribe => subscribe(IPC.backendState, listener),
@@ -97,6 +104,7 @@ const api = {
   },
   system: {
     info: (): Promise<SystemInfo> => ipcRenderer.invoke(IPC.systemInfo),
+    haosUpdate: (): Promise<HaosUpdateStatus | null> => ipcRenderer.invoke(IPC.systemHaosUpdate),
     stats: (): Promise<SystemStats> => ipcRenderer.invoke(IPC.systemStats),
     processes: (sort: 'cpu' | 'memory', limit: number): Promise<ProcessInfo[]> => ipcRenderer.invoke(IPC.systemProcesses, sort, limit),
     network: (): Promise<NetworkStatus> => ipcRenderer.invoke(IPC.systemNetwork),
@@ -162,9 +170,11 @@ const api = {
   },
   theme: {
     list: (): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeList),
+    history: (name: string): Promise<ThemeSummary[]> => ipcRenderer.invoke(IPC.themeHistory, name),
+    preview: (name: string, revision?: string): Promise<ThemePreview> => ipcRenderer.invoke(IPC.themePreview, name, revision),
     /** Apply an installed theme everywhere; resolves with the new preferences. */
-    apply: (name: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name),
-    /** Save a theme into ~/.config/herald-os/themes (with its wallpaper image copied in). */
+    apply: (name: string, revision?: string): Promise<HeraldOSPrefs> => ipcRenderer.invoke(IPC.themeApply, name, revision),
+    /** Save a complete versioned bundle; previous manifests/assets remain available. */
     save: (spec: ThemeSpec, imagePath?: string): Promise<string> => ipcRenderer.invoke(IPC.themeSave, spec, imagePath),
     /** A small PNG data URL of an image, to take theme colours from (null when it is not an image). */
     sample: (imagePath: string): Promise<string | null> => ipcRenderer.invoke(IPC.themeSample, imagePath),
@@ -268,6 +278,8 @@ const api = {
   setup: {
     /** First-boot setup on the Herald OS image: due or not, the account, the name so far. */
     state: (): Promise<SetupState> => ipcRenderer.invoke(IPC.setupState),
+    region: (): Promise<HaosRegion> => ipcRenderer.invoke(IPC.setupRegionGet),
+    setRegion: (region: HaosRegion): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupRegionSet, region),
     name: (name: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupName, name),
     password: (password: string): Promise<SetupResult> => ipcRenderer.invoke(IPC.setupPassword, password),
     /** `later`: setting it up for someone else, who finishes setup at the next start. */

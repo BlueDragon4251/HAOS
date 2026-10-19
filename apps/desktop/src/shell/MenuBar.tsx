@@ -183,13 +183,17 @@ function UsageMeter() {
 export function BackendBadge() {
   const backend = useStore($backend)
   const connection = useStore($connection)
-  const online = backend.phase === 'ready' && connection === 'open'
-
-  if (online) {
+  // The HTTP backend can be healthy while the read-only gateway socket is
+  // reconnecting. Do not mislabel a live Hermes backend as "Starting Hermes".
+  if (backend.phase === 'ready' && connection === 'open') {
     return null
   }
 
-  return <span className="ml-2 rounded-full bg-warn/20 px-2 py-0.5 text-[11px] text-warn">{backend.phase === 'failed' ? 'Hermes offline' : 'Starting Hermes'}</span>
+  const label = backend.phase === 'ready'
+    ? (connection === 'connecting' ? 'Gateway connecting' : 'Gateway unavailable')
+    : (backend.phase === 'failed' ? 'Hermes offline' : 'Starting Hermes')
+
+  return <span className="ml-2 rounded-full bg-warn/20 px-2 py-0.5 text-[11px] text-warn">{label}</span>
 }
 
 export function MenuBar() {
@@ -219,8 +223,8 @@ export function MenuBar() {
     <header className="drag-region absolute inset-x-0 top-0 z-(--z-menubar) flex h-(--menubar-h) items-center justify-between px-3 text-[12.5px] text-fg select-none" style={{ background: 'linear-gradient(180deg, var(--menubar-from, rgba(3,10,40,.55)), var(--menubar-to, rgba(3,10,40,.15)))' }}>
       <div className="flex items-center gap-2.5 pl-[74px]">
         <HeraldLogo height={12} />
-        <span className="font-semibold">Herald OS</span>
-        {title !== 'Herald OS' && (
+        <span className="font-semibold">HAOS</span>
+        {title !== 'HAOS' && (
           <>
             <span className="text-fg-4">·</span>
             <span className="text-fg-2">{title}</span>

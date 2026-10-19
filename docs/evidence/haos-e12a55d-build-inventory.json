@@ -1,0 +1,82 @@
+{
+  "repository": "BlueDragon4251/HAOS",
+  "source_commit": "e12a55d6d74c07d8f430947aad541efdf1371645",
+  "image_run_id": 38024496453,
+  "build_job_id": 114132325410,
+  "build_job_conclusion": "success",
+  "overall_run_status_at_inspection": "in_progress",
+  "overall_run_conclusion_at_inspection": null,
+  "inspected_at_utc": "2026-10-10T05:24:20.497517+00:00",
+  "artifact_id": 11660880022,
+  "artifact_archive_digest": "sha256:b616d3bb6f49119d06515e302fd2fa1c8a9c1978e5383705c4c0634828cd6b71",
+  "metadata_archive_bytes": 200184,
+  "bounded_inspector_source_commit": "08c0b1adc7440a8399083a706efc4ea43ce5df29",
+  "build_evidence": {
+    "image_id": "sha256:3f14faf807eb7d92257cd7d01a1d194ea4e887a7b1138fb8f197f1f002fefdfe",
+    "image_bytes": 6275803745,
+    "installed_guest_acceptance": false,
+    "installed_inventory_acceptance": false,
+    "scanner": {
+      "status": "exited",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "image_cdx_json": {
+      "present_in_this_artifact": false,
+      "bytes": 0,
+      "json_valid": false
+    },
+    "image_syft_json": {
+      "present_in_this_artifact": false,
+      "bytes": 0,
+      "json_valid": false
+    },
+    "image_inventory": {
+      "checks_passed": true,
+      "complete_release_acceptance": false,
+      "counts": {
+        "python_installed_versions": 80,
+        "python_frozen_versions": 80,
+        "rpm_installed_versions_architectures": 1210,
+        "npm_build_packages": 188
+      },
+      "document_sha256": {
+        "image.cdx.json": "b3fd297b2c3d847d17fc1e0a058ac34ce1971ccf54780c8c3a97ee9a936bb62c",
+        "image.syft.json": "6655ef66f9ba611fe9657d960c7241ff1fce4caaba1ceedb29ef4ef6a60b16ed",
+        "npm.cdx.json": "3519194539845e5e52aaa748947973b3b1c88d2a6e66b0e660e42ef8b421d3da",
+        "npm.raw.cdx.json": "95cf3b713e926c2639169ee1bee50fbc34c4b9f73fa4fa0b7b684d1560bca6d0",
+        "image.json": "82707311fb88c5364a747b05c7b9c81b844f2e1e924683c66eb7c5e0e0bc6f7f",
+        "python-runtime-installed.txt": "a81f10b6db02e12a71407ae9a61d1065ab27d3ae72355d689cecb4059a3e973a",
+        "python-runtime-requirements.txt": "303a806c67afd8b798dc360c2629e8dd2dd6dd41fb06c65c102175448e625d96",
+        "rpm-with-epochs.txt": "357858f8e2321f109661eeab0ec4137a7bbf3d3012344e43aaf1bdc7697b2179"
+      },
+      "document_bytes": {
+        "image.cdx.json": 33313173,
+        "image.syft.json": 82120803,
+        "npm.cdx.json": 282887,
+        "npm.raw.cdx.json": 284121,
+        "image.json": 31120,
+        "python-runtime-installed.txt": 1423,
+        "python-runtime-requirements.txt": 180581,
+        "rpm-with-epochs.txt": 43252
+      },
+      "index_sha256": "dd676f6ad6909cd2e44cba642281a0837558d47dabde1a09291ffb7a0f2a85e7"
+    },
+    "runtime_ui_boundary": {
+      "actual_pinned_backend": true,
+      "observer_identity_matches_child": true,
+      "observer_read_rpc_works": true,
+      "observer_config_credentials_terminal_denied": true,
+      "observer_direct_turn_and_session_mutations_denied": true,
+      "wrong_or_missing_identity_denied": true,
+      "controller_session_creation_preserved": true,
+      "dashboard_credentials_absent_from_process_log": true,
+      "runtime_session_created": true,
+      "durable_session_created": true,
+      "real_model_turn": false,
+      "installed_owner_ui_acceptance": false
+    }
+  },
+  "installed_guest_acceptance": false,
+  "complete_release_acceptance": false
+}

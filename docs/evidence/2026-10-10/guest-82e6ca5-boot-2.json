@@ -1,0 +1,32 @@
+{
+  "stage": 2,
+  "journal_survives_reboot": true,
+  "backend_healthy_after_reboot": true,
+  "mission_id": "ab9d649c-bd4b-4e41-a824-bb369cd3ade9",
+  "observer_sudo_denied": true,
+  "observer_administrator_groups_absent": true,
+  "observer_empty_password_denied": true,
+  "observer_backend_credential_denied": true,
+  "observer_dashboard_read_authenticated": true,
+  "observer_privileged_dashboard_routes_denied": true,
+  "installed_agent_local_network_guard": true,
+  "installed_owner_console_enrollment": true,
+  "installed_owner_password_authentication": true,
+  "installed_owner_wrong_password_denied": true,
+  "installed_owner_cached_auth_denied": true,
+  "installed_owner_arbitrary_root_denied": true,
+  "installed_owner_python_override_denied": true,
+  "installed_owner_credential_absent_from_audit": true,
+  "installed_owner_authentication_after_reboot": true,
+  "installed_owner_recovery_codes_issued": true,
+  "installed_owner_password_recovery": true,
+  "installed_owner_used_recovery_code_denied": true,
+  "installed_disconnected_volume_namespace_denied": true,
+  "installed_remaining_workspace_access_preserved": true,
+  "installed_disconnected_volume_owner_policy_preserved": true,
+  "installed_disconnected_volume_compiled_bind_absent": true,
+  "limitations": [
+    "offline cancelled queue fixture; no real provider mission",
+    "theme/gateway/off-host/whole-system recovery not covered"
+  ]
+}

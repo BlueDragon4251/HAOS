@@ -1,0 +1,63 @@
+{
+  "source_commit": "1080f2ce186f6c2cc0c67738a0294ba3d65b0315",
+  "workflow": "https://github.com/BlueDragon4251/HAOS/actions/runs/38172320479",
+  "workflow_conclusion": "success",
+  "source_mapping": "workflow HEAD and exact build-manifest source; matching build and guest job; no separate guest source attestation file emitted",
+  "guest_artifact": {
+    "id": 11717136565,
+    "sha256": "dd152a30ee58dd08cf818dd496cfb0db81496cbf738b8474a41e00b64e2b9388",
+    "original_zip_verified": true
+  },
+  "build_metadata_artifact": {
+    "id": 11714579571,
+    "sha256": "f4b09f91f7a38b76e9c8f93943325fa5d2a02d258ceb4e0e3e46c0741a39aaf6",
+    "original_zip_verified": true
+  },
+  "iso_sha256": "8814b33d79d21ee0dc457aaa81340b153994c64aae5e57a741480adb1f1bb09d",
+  "full_iso_zip_downloaded_locally": false,
+  "image_id": "sha256:5e929cd97002f5e3acebb3ec7f51bc9099cc820c68109613827ced7eff991d8c",
+  "installer_and_two_boots": {
+    "runtime-install.json": {
+      "accelerator": "tcg,thread=multi",
+      "returncodes": [
+        1,
+        0
+      ]
+    },
+    "runtime-boot-1.json": {
+      "accelerator": "tcg,thread=multi",
+      "returncodes": [
+        0
+      ]
+    },
+    "runtime-boot-2.json": {
+      "accelerator": "tcg,thread=multi",
+      "returncodes": [
+        0
+      ]
+    }
+  },
+  "guest_receipts_match_actual_serial_output": true,
+  "first_boot_verified_flags": {
+    "installed_theme_watchdog_parent_sigkill": true,
+    "installed_theme_fixed_outputs_restored": true,
+    "installed_theme_recovery_cli_restart": true,
+    "installed_encrypted_scheduler": true,
+    "installed_scheduled_snapshot_restored": true,
+    "installed_live_ledger_scheduler": true,
+    "installed_live_ledger_restore_verified": true,
+    "installed_live_backup_runtime_pids_preserved": true
+  },
+  "second_boot_theme_journal": true,
+  "receipt_sha256": [
+    "87f396d9325736eb4059fdc43c78fd313e444047ffb102bbe000312f67efdd1b",
+    "547da11f91dc212a3a985a4158bc0b78e47b947b4a689073040fbd59078dbd89"
+  ],
+  "startup_errors": [],
+  "does_not_prove": [
+    "host application unit or native presentation",
+    "real model or gateway turn",
+    "full system recovery or hardware",
+    "complete autonomous theme generation or Stable release"
+  ]
+}

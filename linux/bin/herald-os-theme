@@ -3,20 +3,24 @@
 
 One theme definition (linux/themes/<name>/theme.json) recolours the whole system at once: the
 shell (theme + accent preference), niri (borders, backdrop), swaylock, GTK 3/4 apps, the foot
-rescue terminal, and the wallpaper. Applied atomically: every file is written before the shell is
-told, and the previous theme is restored if a step fails.
+rescue terminal, and the wallpaper. Each generated file is replaced before the shell is told,
+and previous files are restored on a caught error. This is not a crash-safe whole-session swap.
 
-  herald-os-theme list | current | set <name> | show <name>
+  herald-os-theme list | current | current-revision | set <name> [--revision <sha256>] | show <name>
 """
 
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
+import runpy
 from pathlib import Path
 
 HOME = Path.home()
@@ -38,6 +42,71 @@ THEME_DIRS = [
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
 SOCKET = RUNTIME / "herald-os" / "control.sock"
 DEFAULT = "herald-ocean"
+NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+REVISION = re.compile(r"^[a-f0-9]{64}$")
+COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+COLOR_KEYS = {"bg", "bg2", "surface", "fg", "fg_dim", "accent", "accent_strong", "border_active", "border_inactive", "urgent", "ok", "warn"}
+
+
+def validate(theme: dict) -> None:
+    """Match the native data schema before rendering KDL/CSS/INI or opening assets."""
+    if not isinstance(theme, dict) or set(theme) - {"name", "label", "description", "shell", "wallpaper", "colors", "gtk", "terminal"}:
+        raise ValueError("unsupported theme fields")
+    if not isinstance(theme.get("name"), str) or not NAME.fullmatch(theme["name"]):
+        raise ValueError("invalid theme name")
+    colors = theme.get("colors")
+    if not isinstance(colors, dict) or set(colors) != COLOR_KEYS or any(not isinstance(v, str) or not COLOR.fullmatch(v) for v in colors.values()):
+        raise ValueError("theme colors must be #rrggbb")
+    for field, limit in (("label", 128), ("description", 2048)):
+        if field in theme and (not isinstance(theme[field], str) or len(theme[field]) > limit or re.search(r"[\x00-\x1f\x7f-\x9f]", theme[field])):
+            raise ValueError("invalid theme text")
+    wallpaper = theme.get("wallpaper", "default")
+    if not isinstance(wallpaper, str) or (wallpaper != "default" and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}\.(png|jpe?g|webp|avif)", wallpaper, re.I)):
+        raise ValueError("wallpaper must be a local raster image basename")
+    for field, allowed in (("shell", {"theme", "accent", "scheme"}), ("gtk", {"color_scheme", "theme"}), ("terminal", {"background", "foreground", "cursor", "palette"})):
+        section = theme.get(field, {})
+        if not isinstance(section, dict) or set(section) - allowed:
+            raise ValueError(f"invalid theme {field}")
+    shell = theme.get("shell", {})
+    for field, allowed in (("theme", {"ocean", "graphite"}), ("accent", {"blue", "ice", "violet"}), ("scheme", {"dark", "light"})):
+        if field in shell and (not isinstance(shell[field], str) or shell[field] not in allowed):
+            raise ValueError("invalid shell preset")
+    gtk = theme.get("gtk", {})
+    if "color_scheme" in gtk and gtk["color_scheme"] not in ("default", "prefer-dark", "prefer-light"):
+        raise ValueError("invalid GTK scheme")
+    if "theme" in gtk and (not isinstance(gtk["theme"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9 ._-]{0,127}", gtk["theme"], re.I)):
+        raise ValueError("invalid GTK theme")
+    terminal = theme.get("terminal", {})
+    for field in ("background", "foreground", "cursor"):
+        if field in terminal and (not isinstance(terminal[field], str) or not COLOR.fullmatch(terminal[field])):
+            raise ValueError("invalid terminal color")
+    if "palette" in terminal and (not isinstance(terminal["palette"], list) or len(terminal["palette"]) != 16 or any(not isinstance(v, str) or not COLOR.fullmatch(v) for v in terminal["palette"])):
+        raise ValueError("terminal palette must contain 16 hex colors")
+
+
+def read_spec(directory: Path) -> dict:
+    if directory.is_symlink() or not NAME.fullmatch(directory.name):
+        raise ValueError("invalid theme directory")
+    fd = os.open(directory / "theme.json", os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 65536:
+            raise ValueError("theme.json must be a bounded regular file")
+        with os.fdopen(fd) as stream:
+            fd = -1
+            theme = json.load(stream)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    validate(theme)
+    if theme["name"] != directory.name:
+        raise ValueError("theme name does not match directory")
+    wallpaper = theme.get("wallpaper", "default")
+    if wallpaper != "default":
+        asset = (directory / wallpaper).lstat()
+        if not stat.S_ISREG(asset.st_mode) or asset.st_size > 25 * 1024 * 1024:
+            raise ValueError("wallpaper must be a bounded regular file, not a symlink")
+    return theme
 
 
 def die(message: str, code: int = 1) -> None:
@@ -45,18 +114,79 @@ def die(message: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def find(name: str) -> tuple[Path, dict] | None:
+def revision_theme(name: str, revision: str | None = None) -> tuple[Path, dict]:
+    """Read the same complete, checksum-verified bundle as the native shell."""
+    if not NAME.fullmatch(name):
+        raise ValueError("invalid theme name")
+    base = STATE / "theme-versions" / name
+    for parent in (HOME, CONFIG, STATE, base.parent, base):
+        info = parent.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+            raise ValueError("unsafe theme bundle directory")
+
+    def bounded(file: Path, limit: int) -> bytes:
+        fd = os.open(file, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > limit:
+                raise ValueError("unsafe theme bundle file")
+            with os.fdopen(fd, "rb") as stream:
+                fd = -1
+                data = stream.read(limit + 1)
+            if len(data) != info.st_size:
+                raise ValueError("theme bundle file changed")
+            return data
+        finally:
+            if fd >= 0:
+                os.close(fd)
+
+    if revision is None:
+        index = json.loads(bounded(base / "current.json", 1024))
+        if not isinstance(index, dict) or set(index) != {"schema", "revision"} or type(index["schema"]) is not int or index["schema"] != 1:
+            raise ValueError("invalid theme revision index")
+        revision = index["revision"]
+    if not isinstance(revision, str) or not REVISION.fullmatch(revision):
+        raise ValueError("invalid theme revision")
+    directory = base / revision
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+        raise ValueError("unsafe theme revision directory")
+    manifest = bounded(directory / "theme.json", 65536)
+    theme = json.loads(manifest)
+    validate(theme)
+    if theme["name"] != name:
+        raise ValueError("theme revision identity changed")
+    wallpaper = theme.get("wallpaper", "default")
+    image = bounded(directory / wallpaper, 25 * 1024 * 1024) if wallpaper != "default" else b""
+    if hashlib.sha256(manifest + b"\0" + image).hexdigest() != revision:
+        raise ValueError("theme revision failed its checksum")
+    return directory, theme
+
+
+def find(name: str, revision: str | None = None) -> tuple[Path, dict] | None:
+    if not NAME.fullmatch(name):
+        return None
+    if revision is not None:
+        return revision_theme(name, revision)
     for base in THEME_DIRS:
+        if base == STATE / "themes" and (STATE / "theme-versions" / name).exists():
+            return revision_theme(name)
         if not base or not base.is_dir():
             continue
         candidate = base / name / "theme.json"
         if candidate.exists():
-            return candidate.parent, json.loads(candidate.read_text())
+            try:
+                return candidate.parent, read_spec(candidate.parent)
+            except (OSError, ValueError):
+                return None
+    if (STATE / "theme-versions" / name).exists():
+        return revision_theme(name)
     return None
 
 
 def all_themes() -> dict[str, dict]:
     found: dict[str, dict] = {}
+    builtin = set()
     for base in THEME_DIRS:
         if not base or not base.is_dir():
             continue
@@ -64,9 +194,21 @@ def all_themes() -> dict[str, dict]:
             spec = entry / "theme.json"
             if entry.is_dir() and spec.exists() and entry.name not in found:
                 try:
-                    found[entry.name] = json.loads(spec.read_text())
-                except json.JSONDecodeError:
+                    found[entry.name] = read_spec(entry)
+                    if base != STATE / "themes":
+                        builtin.add(entry.name)
+                except (OSError, ValueError):
                     pass
+    versions = STATE / "theme-versions"
+    if versions.exists():
+        for entry in sorted(versions.iterdir()):
+            if entry.name in builtin:
+                continue
+            found.pop(entry.name, None)
+            try:
+                found[entry.name] = revision_theme(entry.name)[1]
+            except (OSError, ValueError):
+                pass
     return found
 
 
@@ -242,28 +384,59 @@ def relay(payload: dict) -> bool:
 
 def gsettings(schema: str, key: str, value: str) -> None:
     if shutil.which("gsettings"):
-        subprocess.run(["gsettings", "set", schema, key, value], check=False, capture_output=True)
+        try:
+            subprocess.run(["gsettings", "set", schema, key, value], check=False, capture_output=True, timeout=3)
+        except subprocess.TimeoutExpired:
+            pass  # Existing best-effort GTK synchronization must not hang the shell.
+
+
+def theme_guard():
+    # Installed beside this command by the existing Linux packaging rules.
+    return runpy.run_path(str(Path(__file__).resolve().with_name("herald-os-theme-watchdog")))["ThemeGuard"]()
 
 
 # ---------------------------------------------------------------------------------------------
-def apply(name: str) -> int:
-    found = find(name)
+def generated_outputs(theme: dict, revision: str | None, guard=None) -> dict:
+    c = theme["colors"]
+    config = guard.home / ".config" if guard else CONFIG
+    state = config / "herald-os" if guard else STATE
+    hermes_home = guard.hermes if guard else Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
+    return {
+        config / "niri" / "theme.kdl": render_niri(c),
+        config / "swaylock" / "config": render_swaylock(c),
+        config / "gtk-3.0" / "gtk.css": render_gtk_css(c),
+        config / "gtk-4.0" / "gtk.css": render_gtk_css(c),
+        config / "foot" / "foot.ini": render_foot(theme),
+        hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
+        state / "theme": theme["name"] + "\n",
+        state / "theme-revision": (revision or "") + "\n",
+    }
+
+
+def apply(name: str, revision: str | None = None, guard=None, token=None) -> int:
+    found = find(name, revision)
     if not found:
         die(f"no theme named {name!r} (see `herald-os-theme list`)", 1)
     theme_dir, theme = found
+    selected_revision = theme_dir.name if REVISION.fullmatch(theme_dir.name) else None
     c = theme["colors"]
     shell = theme.get("shell", {})
     gtk = theme.get("gtk", {})
 
-    hermes_home = Path(os.environ.get("HERMES_HOME") or HOME / ".hermes")
-    targets = {
-        CONFIG / "niri" / "theme.kdl": render_niri(c),
-        CONFIG / "swaylock" / "config": render_swaylock(c),
-        CONFIG / "gtk-3.0" / "gtk.css": render_gtk_css(c),
-        CONFIG / "gtk-4.0" / "gtk.css": render_gtk_css(c),
-        CONFIG / "foot" / "foot.ini": render_foot(theme),
-        hermes_home / "skins" / f"{HERMES_SKIN}.yaml": render_hermes_skin(theme),
-    }
+    targets = generated_outputs(theme, selected_revision, guard)
+    if guard is not None:
+        state = guard.pending(token)
+        if guard.expired(state) or state["name"] != name or state["revision"] != selected_revision:
+            raise PermissionError("guarded theme identity changed or expired")
+        for target, text in targets.items():
+            key = next(key for key, value in guard.targets.items() if value == target)
+            if hashlib.sha256(text.encode()).hexdigest() != state["files"][key]["expected"]:
+                raise PermissionError("guarded theme outputs changed before activation")
+            guard.write(target, text.encode())
+        # Keep Dconf unchanged while pending. Its existing best-effort GTK
+        # synchronization runs only after the actual shell confirms the revision.
+        print("saved revision awaiting actual shell verification")
+        return 0
     backups = {path: (path.read_text() if path.exists() else None) for path in targets}
     try:
         for path, text in targets.items():
@@ -271,7 +444,6 @@ def apply(name: str) -> int:
         gsettings("org.gnome.desktop.interface", "color-scheme", gtk.get("color_scheme", "prefer-dark"))
         if gtk.get("theme"):
             gsettings("org.gnome.desktop.interface", "gtk-theme", gtk["theme"])
-        write(STATE / "theme", name + "\n")
     except Exception as exc:  # noqa: BLE001 - restore whatever was written.
         for path, text in backups.items():
             if text is None:
@@ -284,6 +456,8 @@ def apply(name: str) -> int:
     wallpaper = theme.get("wallpaper", "default")
     wallpaper_path = "" if wallpaper in ("default", "", None) else str((theme_dir / wallpaper).resolve())
     payload = {"cmd": "theme", "args": [name], "shell": shell, "wallpaper": wallpaper_path, "colors": c}
+    if selected_revision:
+        payload["revision"] = selected_revision
     if not relay(payload):
         print("shell not running; it will pick the theme up on next start")
     print(f"applied {theme.get('label', name)}")
@@ -304,6 +478,13 @@ def main(argv: list[str]) -> int:
     if cmd == "current":
         print(current())
         return 0
+    if cmd == "current-revision":
+        marker = STATE / "theme-revision"
+        revision = marker.read_text().strip() if marker.exists() else ""
+        if revision and not REVISION.fullmatch(revision):
+            die("invalid current theme revision", 1)
+        print(revision)
+        return 0
     if cmd == "show":
         found = find(args[0]) if args else None
         if not found:
@@ -311,9 +492,50 @@ def main(argv: list[str]) -> int:
         print(json.dumps(found[1], indent=2))
         return 0
     if cmd == "set":
-        if not args:
-            die("set <name>", 2)
-        return apply(args[0])
+        if len(args) not in (1, 3) or (len(args) == 3 and args[1] != "--revision"):
+            die("set <name> [--revision <sha256>]", 2)
+        # A normal CLI operation must not trample a pending guarded activation.
+        if (STATE / "theme-activation").exists():
+            guard = theme_guard()
+            with guard.lock():
+                state = guard.load()
+                if state and state["status"] in {"pending", "rollback_conflict"}:
+                    raise PermissionError("recover the pending theme activation first")
+                return apply(args[0], args[2] if len(args) == 3 else None)
+        return apply(args[0], args[2] if len(args) == 3 else None)
+    if cmd == "guarded-set":
+        if len(args) != 5 or args[1] != "--revision" or args[3] != "--parent" or not args[4].isdigit():
+            die("guarded-set <name> --revision <sha256> --parent <shell-pid>", 2)
+        found = find(args[0], args[2])
+        if not found or found[0].name != args[2]:
+            raise ValueError("an exact verified saved revision is required")
+        guard = theme_guard()
+        token = guard.begin(args[0], args[2], int(args[4]), generated_outputs(found[1], args[2], guard))
+        with guard.lock():
+            apply(args[0], args[2], guard, token)
+        print(json.dumps({"theme_guard": token, "pending": True}))
+        return 0
+    if cmd == "confirm":
+        if len(args) != 1:
+            die("confirm <theme-guard-id>", 2)
+        guard = theme_guard()
+        state = guard.pending(args[0])
+        found = find(state["name"], state["revision"])
+        if not found:
+            raise ValueError("confirmed revision became unavailable")
+        guard.commit(args[0])
+        gtk = found[1].get("gtk", {})
+        gsettings("org.gnome.desktop.interface", "color-scheme", gtk.get("color_scheme", "prefer-dark"))
+        if gtk.get("theme"):
+            gsettings("org.gnome.desktop.interface", "gtk-theme", gtk["theme"])
+        return 0
+    if cmd == "recover":
+        if args:
+            die("recover", 2)
+        if not (STATE / "theme-activation").exists():
+            return 0
+        theme_guard().recover()
+        return 0
     die(f"unknown command {cmd!r}", 2)
     return 2
 

@@ -1,0 +1,29 @@
+{
+  "scope": "actual disposable systemd application units; no installed or model proof",
+  "source_commit": "76d5986ca78d9b2ae77d771d8a01ab03cc363b04",
+  "run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38201054984",
+  "conclusion": "success",
+  "artifact": {
+    "id": 11725028278,
+    "digest": "sha256:26d72906ae5f38b66fe591707755a74b7c3048c8a783e1bf212a9eabb93d87fb",
+    "original_zip_digest_verified": true
+  },
+  "receipt": {
+    "scope": "actual disposable systemd application units; providerless",
+    "source_commit": "76d5986ca78d9b2ae77d771d8a01ab03cc363b04",
+    "actual_root_launcher": true,
+    "actual_dynamic_uids_distinct": true,
+    "actual_private_rootfs_and_networks": true,
+    "actual_cgroup_cpu_memory_tasks_limits": true,
+    "actual_window_input_and_capture": true,
+    "foreign_mission_and_clipboard_denied": true,
+    "durable_start_replay_denied": true,
+    "escaped_child_cgroup_cleanup": true,
+    "other_application_survives_cleanup": true,
+    "owner_revoked_application_controls_denied": true,
+    "changed_limits_same_elf_controls_denied": true,
+    "guardian_sigkill_stops_application_without_broker": true,
+    "installed_haos_verified": false,
+    "real_hermes_model_verified": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "scope": "verified new image guest failure and bounded startup diagnostics; not a fixed installed boot",
+  "failed_source_commit": "7678f59601df9b93a0f2aa6c0826779c09f21b44",
+  "run": "https://github.com/BlueDragon4251/HAOS/actions/runs/38184515599",
+  "guest_artifact": {
+    "id": 11720998432,
+    "digest": "sha256:a388813fcf71ce5351a418d31b7f7c16adb997de9dda1b7c2e15d80ac1f60c3b",
+    "original_zip_digest_verified": true
+  },
+  "actual_failure": "haos_guest.py:343 wait_for(health): TimeoutError; active Hermes process without listening backend port; first boot only",
+  "theme_test_reached": false,
+  "new_installed_acceptance": false,
+  "cause_proven": false,
+  "retained_health_timeout_seconds": 180,
+  "diagnostic_change": "fixed phases plus three bounded pre-bind immutable-code stack identities; no arguments, locals or source content",
+  "local_haos_tests": 458,
+  "actual_pinned_runtime_ui_probe": {
+    "actual_pinned_backend": true,
+    "observer_identity_matches_child": true,
+    "observer_read_rpc_works": true,
+    "observer_config_credentials_terminal_denied": true,
+    "observer_direct_turn_and_session_mutations_denied": true,
+    "wrong_or_missing_identity_denied": true,
+    "controller_session_creation_preserved": true,
+    "dashboard_credentials_absent_from_process_log": true,
+    "runtime_session_created": true,
+    "durable_session_created": true,
+    "real_model_turn": false,
+    "installed_owner_ui_acceptance": false
+  }
+}

@@ -11,6 +11,7 @@ import { openEmojiPicker } from '../../../store/emoji.ts'
 import { notify } from '../../../store/notifications.ts'
 import { $spaces } from '../../../store/spaces.ts'
 import { $switches, setSwitch, SWITCH_LABELS } from '../../../store/switches.ts'
+import { RegionSettings } from '../../setup/RegionPicker.tsx'
 import { errorText, markSaved, MenuDropdown, SectionTitle, SettingsGroup, SettingsRow, Stepper } from './shared.tsx'
 
 export function GeneralSection() {
@@ -41,13 +42,13 @@ export function GeneralSection() {
 
   return (
     <>
-      <SectionTitle title="General" subtitle="How Herald OS starts and where it works." />
+      <SectionTitle title="General" subtitle="How HAOS starts and where it works." />
 
       <SettingsGroup title="Startup">
-        <SettingsRow icon={<IconMaximize />} label="Launch fullscreen" description="Herald OS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time." keywords="full screen start">
+        <SettingsRow icon={<IconMaximize />} label="Launch fullscreen" description="HAOS takes over the screen when it starts. Cmd+Ctrl+F toggles at any time." keywords="full screen start">
           <Toggle checked={prefs.fullscreenOnLaunch} onChange={next => void save({ fullscreenOnLaunch: next })} label="Launch fullscreen" />
         </SettingsRow>
-        <SettingsRow icon={<IconStack2 />} label="Default Space" description="The Space Herald OS opens in.">
+        <SettingsRow icon={<IconStack2 />} label="Default Space" description="The Space HAOS opens in.">
           <MenuDropdown
             ariaLabel="Default Space"
             label={
@@ -81,6 +82,7 @@ export function GeneralSection() {
         </SettingsRow>
       </SettingsGroup>
 
+      {hostPlatform() === 'linux' && <RegionSettings />}
       <SwitchesGroup />
       {hostPlatform() === 'linux' && <IdleGroup />}
       <TypingGroup />
@@ -88,14 +90,14 @@ export function GeneralSection() {
 
       <SettingsGroup title="Session">
         {hostPlatform() === 'linux' ? (
-          <SettingsRow icon={<IconPower />} label="Restart Herald OS" description="Stops the Hermes backend this shell started and starts a fresh session." keywords="exit close quit">
-            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Restart Herald OS">
+          <SettingsRow icon={<IconPower />} label="Restart HAOS" description="Stops the Hermes backend this shell started and starts a fresh session." keywords="exit close quit">
+            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Restart HAOS">
               Restart
             </GlassButton>
           </SettingsRow>
         ) : (
-          <SettingsRow icon={<IconPower />} label="Quit Herald OS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
-            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Quit Herald OS">
+          <SettingsRow icon={<IconPower />} label="Quit HAOS" description="Stops the Hermes backend this shell started and returns to macOS." keywords="exit close">
+            <GlassButton size="sm" variant="danger" onClick={() => void window.heraldOS.window.quit()} aria-label="Quit HAOS">
               Quit
             </GlassButton>
           </SettingsRow>
@@ -149,7 +151,7 @@ function TypingGroup() {
       <SettingsRow icon={<IconMicrophone />} label="Dictation" description='Speak in any app and the words are typed where the cursor is; it stops after a pause. Say "comma", "new line" or "press enter".' keywords="speech to text voice typing dictate">
         <Kbd>{mod}+Ctrl+X</Kbd>
       </SettingsRow>
-      <SettingsRow icon={<IconMoodSmile />} label="Emoji" description={linux ? 'Search and insert an emoji into the app you are typing in.' : 'The picker inside Herald OS; Ctrl+Cmd+Space opens the macOS one anywhere else.'} keywords="emoji picker smiley">
+      <SettingsRow icon={<IconMoodSmile />} label="Emoji" description={linux ? 'Search and insert an emoji into the app you are typing in.' : 'The picker inside HAOS; Ctrl+Cmd+Space opens the macOS one anywhere else.'} keywords="emoji picker smiley">
         <Kbd>{mod}+Ctrl+E</Kbd>
         <GlassButton size="sm" onClick={openEmojiPicker} aria-label="Open the emoji picker">
           Open
@@ -174,7 +176,7 @@ function TypingGroup() {
   )
 }
 
-/** Herald OS Linux: what Super+Return opens; terminals installed from Software join the list. */
+/** HAOS Linux: what Super+Return opens; terminals installed from Software join the list. */
 function DefaultTerminalRow() {
   const prefs = useStore($prefs)
   const catalog = useStore($catalog)
@@ -187,7 +189,7 @@ function DefaultTerminalRow() {
   }, [])
 
   const installed = catalog.groups.flatMap(group => group.entries).filter(entry => entry.terminalApp && entry.installed)
-  const items = [{ id: 'herald', label: 'Herald OS Terminal' }, { id: 'foot', label: 'Foot' }, ...installed.map(entry => ({ id: entry.terminalApp as string, label: entry.label }))]
+  const items = [{ id: 'herald', label: 'HAOS Terminal' }, { id: 'foot', label: 'Foot' }, ...installed.map(entry => ({ id: entry.terminalApp as string, label: entry.label }))]
   const current = prefs.defaultTerminal ?? 'herald'
 
   return (
@@ -197,7 +199,7 @@ function DefaultTerminalRow() {
   )
 }
 
-/** Herald OS Linux: the idle timings swayidle runs with. */
+/** HAOS Linux: the idle timings swayidle runs with. */
 function IdleGroup() {
   const prefs = useStore($prefs)
   const idle = { lockAfter: 10, screenOffAfter: 15, suspendAfter: 0, ...prefs.idle }

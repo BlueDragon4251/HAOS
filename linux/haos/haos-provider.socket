@@ -1,0 +1,13 @@
+[Unit]
+Description=Root-bound HAOS model capability endpoint
+ConditionPathExists=/etc/haos/enabled
+ConditionPathExists=/etc/haos/provider.json
+
+[Socket]
+ListenStream=127.0.0.1:9120
+Service=haos-provider.service
+Accept=no
+Backlog=32
+
+[Install]
+WantedBy=sockets.target

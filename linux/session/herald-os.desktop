@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=Herald OS
-Comment=Agent-native desktop powered by Hermes Agent
+Name=HAOS
+Comment=HAOS desktop and supervised Hermes missions
 Exec=herald-os-compositor
 Type=Application
 DesktopNames=HeraldOS
