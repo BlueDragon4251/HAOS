@@ -101,6 +101,14 @@ def describe_error(error: Exception, *, area: str = "setup") -> SetupProblem:
                          else "Prüfung: Programm nicht verfügbar oder Zeitlimit überschritten")
 
     if type(cause) is subprocess.CalledProcessError and type(cause.returncode) is int:
+        # Exact safe fixed command from create_initial_owner; never echo argv
+        # from other subprocesses (they can include provider credentials).
+        if cause.cmd == ["/usr/bin/systemctl", "stop", "haos-gateway.service",
+                         "haos-controller.service", "haos-hermes.service"]:
+            summary = "Die benötigten HAOS-Dienste konnten vor der Administrator-Einrichtung nicht angehalten werden."
+            code = "HAOS-OWNER-STOP"
+            notes[1] = f"Fehlercode: {code}"
+            notes.append("Systemschritt: Dienst-Stopp vor dem Anlegen des Kontos")
         notes.append(f"Systemprozess-Rückgabecode: {cause.returncode}")
     if type(cause) is subprocess.TimeoutExpired and type(cause.timeout) in (int, float):
         notes.append(f"Zeitüberschreitung nach {cause.timeout:g} Sekunden")
