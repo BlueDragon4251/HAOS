@@ -36,6 +36,9 @@ STAGES = {
     "OWNER_VERIFY": ("HAOS-OWNER-VERIFY", "Das neu angelegte Administrator-Konto konnte nicht verifiziert werden."),
     "OWNER_CODES": ("HAOS-OWNER-RECOVERY", "Die Wiederherstellungscodes konnten nicht erzeugt werden."),
     "OWNER_AUDIT": ("HAOS-OWNER-AUDIT", "Der geschützte Abschluss der Kontoerstellung ist fehlgeschlagen."),
+    "PROFILE": ("HAOS-PROFILE-WRITE", "Benutzerprofil konnte nicht in /home/hermes gespeichert werden."),
+    "REGION_SYSTEM": ("HAOS-REGION-SYSTEM", "Die systemweite Sprache oder Tastatur konnte nicht gesetzt werden."),
+    "REGION_OBSERVER": ("HAOS-REGION-PROFILE", "Die Spracheinstellungen konnten nicht in /home/hermes gespeichert werden."),
 }
 
 # These messages are fixed strings emitted by audited HAOS code. No field
@@ -71,6 +74,22 @@ VALIDATION = {
         ("HAOS-OWNER-LOCK", "Der neue Administrator wurde nicht mit einem gesperrten Passwort angelegt."),
     "owner account identity changed or is a system account":
         ("HAOS-OWNER-IDENTITY", "Die Administrator-Identität ist ungültig oder wurde verändert."),
+    "normal session setup is a privileged firstboot operation":
+        ("HAOS-PROFILE-ROOT", "Das Setup besitzt nicht die erforderlichen lokalen Administrationsrechte."),
+    "unexpected HAOS observer account":
+        ("HAOS-PROFILE-ACCOUNT", "Das technische Sitzungskonto hermes hat ungültige UID-, GID- oder Home-Daten."),
+    "observer home not provisioned":
+        ("HAOS-PROFILE-HOME", "Das Benutzerverzeichnis /home/hermes fehlt."),
+    "unsafe observer configuration directory":
+        ("HAOS-PROFILE-PERMISSIONS", "Das Benutzerverzeichnis oder ein Unterordner hat falsche Besitzer- oder Schreibrechte."),
+    "write is outside the fixed HAOS observer home":
+        ("HAOS-PROFILE-BOUNDARY", "Ein Profilpfad liegt außerhalb des erlaubten Benutzerverzeichnisses."),
+    "configuration symlinks are forbidden":
+        ("HAOS-PROFILE-SYMLINK", "Ein Profilpfad ist ein nicht erlaubter symbolischer Link."),
+    "existing observer data must remain owned by its user":
+        ("HAOS-PROFILE-FILE-OWNER", "Eine bestehende Profildatei gehört nicht dem vorgesehenen Benutzer."),
+    "invalid user display name":
+        ("HAOS-PROFILE-INVALID-NAME", "Der Anzeigename ist ungültig (1 bis 64 Zeichen ohne Steuerzeichen)."),
 
 }
 
@@ -98,6 +117,8 @@ def describe_error(error: Exception, *, area: str = "setup") -> SetupProblem:
         known = VALIDATION.get(str(cause))
         if known:
             validation_code, summary = known
+            code = validation_code
+            notes[1] = f"Fehlercode: {code}"
             notes.append(f"Ursache: {validation_code}")
 
     if type(cause) is PermissionError:
