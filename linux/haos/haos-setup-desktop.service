@@ -26,7 +26,11 @@ Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
 # Only one local native UI with a private cookie, no shared normal desktop.
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectHome=yes
+# The *local root-only firstboot wizard* creates a genuine Unix owner home
+# and configures /home/hermes. ProtectHome=yes makes /home inaccessible to
+# useradd --create-home; tty2 enrollment works because its recovery service
+# explicitly exposes /home. This is a separate gated setup seat, not Hermes.
+ProtectHome=no
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
