@@ -8,6 +8,8 @@ on:
       - 'linux/haos/tests/test_owner_setup_console.py'
       - 'linux/haos/haos/owner_ready.py'
       - 'linux/haos/haos/initial_setup_gui.py'
+      - 'linux/haos/haos/setup_errors.py'
+      - 'linux/haos/tests/test_setup_errors.py'
       - 'linux/haos/tests/test_initial_setup*.py'
       - 'linux/haos/setup-display.sh'
       - 'linux/haos/haos-setup-desktop.service'
@@ -43,7 +45,7 @@ jobs:
           PYTHONPATH: linux/haos
         run: |
           python -m pip install pytest
-          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py linux/haos/tests/test_setup_gate.py linux/haos/tests/test_normal_profile.py linux/haos/tests/test_firstboot_graphical_wiring.py linux/haos/tests/test_owner_setup_console.py
+          python -m pytest -q linux/haos/tests/test_initial_setup.py linux/haos/tests/test_initial_setup_gui.py linux/haos/tests/test_setup_gate.py linux/haos/tests/test_normal_profile.py linux/haos/tests/test_firstboot_graphical_wiring.py linux/haos/tests/test_owner_setup_console.py linux/haos/tests/test_setup_errors.py
       - name: Render native setup under virtual X display (nonprivileged fixture)
         run: |
           sudo apt-get update -qq
@@ -94,7 +96,17 @@ jobs:
                   break
               time.sleep(0.02)
           assert not wizard.running, "An unhandled OS error must never freeze setup"
-          assert "fehlgeschlagen" in wizard.status.cget("text")
+          assert "nicht abgeschlossen" in wizard.status.cget("text")
+          # The error summary and expandable technical details must be present.
+          labels = [child.cget("text") for child in wizard.error_panel.winfo_children()
+                    if "text" in child.keys()]
+          assert any("Technische Details anzeigen" in value for value in labels)
+          for child in wizard.error_panel.winfo_children():
+              if "text" in child.keys() and "Technische Details anzeigen" in child.cget("text"):
+                  child.invoke()
+          labels = [child.cget("text") for child in wizard.error_panel.winfo_children()
+                    if "text" in child.keys()]
+          assert any("Fehlercode:" in value for value in labels)
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY
