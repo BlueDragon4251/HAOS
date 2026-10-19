@@ -16,7 +16,7 @@ HERMES_PLATFORMS = tuple(_EXPORT["platforms"])
 
 # Implemented owner provisioning, transport, and security admission paths.
 # The pinned Hermes picker uses 'openai-api'; HAOS's policy uses 'openai'.
-HAOS_GUI_PROVIDERS = http_providers() | {"lmstudio", "nous", "openai-codex", "xai-oauth", "minimax-oauth"}
+HAOS_GUI_PROVIDERS = http_providers() | {"lmstudio", "nous", "openai-codex", "xai-oauth", "minimax-oauth", "gemini", "bedrock", "vertex", "azure-foundry"}
 HAOS_GUI_GATEWAYS = frozenset({"telegram", "discord"})
 # Local compatible model API is an HAOS route but not a Hermes vendor slug.
 HAOS_EXTRA_GUI_PROVIDERS = (("local", "Lokaler OpenAI-kompatibler Server"),)

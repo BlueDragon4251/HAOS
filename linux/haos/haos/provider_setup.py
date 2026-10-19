@@ -51,10 +51,14 @@ def publish(policy, credential, *, config=CONFIG):
 
 
 def validate_credential(policy, credential):
+    from .provider_cloud import CLOUD, credential_data
+    if policy.provider in CLOUD:
+        credential_data(policy.provider, credential)
+        return
     if credential is not None and (not isinstance(credential, str) or not 16 <= len(credential) <= 16384
                                    or any(ord(c) < 33 or ord(c) > 126 for c in credential)):
         raise ValueError("invalid provider credential")
-    if policy.provider not in {"local", "lmstudio", "anthropic", "openrouter", *oauth_providers()} and not credential:
+    if policy.provider not in {"local", "lmstudio", "custom", "anthropic", "openrouter", *oauth_providers()} and not credential:
         raise ValueError("API provider requires a securely entered credential")
 
 
@@ -220,10 +224,15 @@ def owner_provider(args):
             "requests_per_day": args.requests_per_day, "requests_per_minute": args.requests_per_minute}
     policy = ProviderPolicy(data)
     credential = None
-    if policy.provider not in {"local", "lmstudio", *oauth_providers()}:
+    from .provider_cloud import CLOUD
+    if policy.provider not in {"local", "lmstudio", *oauth_providers(), *CLOUD}:
         from .owner_recovery import require_console
         require_console()
-        credential = getpass.getpass("Provider API key (owner store only, never agent state): ")
+        credential = getpass.getpass("Provider API key (owner store only, never agent state): ") or None
+    elif policy.provider in CLOUD:
+        from .owner_recovery import require_console
+        require_console()
+        credential = getpass.getpass("Cloud credential JSON (Azure also accepts an API key; blank = service UID SDK chain): ") or None
     if policy.provider in oauth_providers():
         auth_helper("status", policy.provider)
     add_route(policy.data, credential)

@@ -43,7 +43,7 @@ def default_endpoint(provider):
 
 
 def default_mode(provider):
-    if provider == "local":
+    if provider in {"local", "bedrock"}:
         return "chat_completions"
     row = descriptor(provider)
     if row is None:

@@ -1,0 +1,23 @@
+{
+  "provider": "bedrock",
+  "actual_boto3_signing_eventstream": true,
+  "actual_loopback_http": true,
+  "checks": [
+    "json-tools",
+    "stream-tools",
+    "truncated",
+    "rate-limit"
+  ],
+  "live_provider_tested": false,
+  "python": "3.12.14",
+  "sdk_versions": {
+    "boto3": "1.42.89",
+    "botocore": "1.42.97"
+  },
+  "source_sha256": {
+    "probe_bedrock_provider.py": "5f6e87cceceaf21e50c84718001103c775411eeeaf950ef0eeecde8edd17eb02",
+    "provider_cloud.py": "4cc49c1df3ba67603b4fa1fbc538bf5b82541c0f0fbe22af03f52f26ccd307c8",
+    "provider_proxy.py": "998fa789d871697a3d437b33c3a12c87eae65114723b31775b20ece0739c94a4",
+    "provider_policy.py": "8b2a0bcb19c6d8f2b990a8253e15752cc955489154a3936539ec9cdfe21253c2"
+  }
+}

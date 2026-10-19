@@ -1,5 +1,10 @@
 name: HAOS Graphical Initial Setup Security
 on:
+  pull_request:
+    paths:
+      - 'linux/haos/**'
+      - 'linux/image/packages.txt'
+      - '.github/workflows/haos-initial-setup.yml'
   push:
     branches: [agent/haos-foundation]
     paths:

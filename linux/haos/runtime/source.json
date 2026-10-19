@@ -5,7 +5,10 @@
   "extras": [
     "web",
     "messaging",
-    "anthropic"
+    "anthropic",
+    "bedrock",
+    "vertex",
+    "azure-identity"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",

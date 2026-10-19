@@ -16,8 +16,11 @@ authorized. Additional bundled HTTP profiles require a reviewed image/export.
 | HTTP API profiles | Registry-driven endpoint allowlists, setup/CLI, isolated credentials, three real native HTTP protocols | Provider-specific live/model/plan validation; complete per-provider quirks and dynamic discovery |
 | Account providers | Upstream resolver/refresh dispatch; endpoint/mode mismatch denied; generic owner login/status/logout; physical GUI account launcher | Real account flows, installed GUI acceptance; fresh Qwen login/import; account revocation at provider |
 | Multiple providers | Version 2 atomic migration, route-bound keys/models, default selection, removal, explicit same-protocol fallback, no replay after stream starts | GUI management of existing routes and mixed-protocol fallback conversion |
-| Native streaming | Messages, Responses and Chat Completions SSE, local tool definitions, token redaction, durable usage | SDK/Gemini-specific streaming adapters, multiline SSE and full protocol stress matrix |
-| SDK/external/virtual providers | Kept unavailable, not falsely enabled by catalog visibility | Bedrock, Vertex, Azure Foundry, Gemini, Copilot/ACP, MoA, configurable custom API and reviewed external plugin admission |
+| Native streaming | Messages, Responses and Chat Completions SSE, local tool definitions, token redaction, durable usage | Multiline SSE and full protocol stress matrix; additional provider-specific contracts |
+| Native Gemini | Real upstream native codec, continuous SSE, tool/signature preservation, rate/error/truncation handling | External Google account and installed acceptance |
+| Cloud SDKs | boto3 Converse signing + continuous AWS EventStream; Vertex service-account/ADC token refresh; Azure API-key/service-principal/default-chain token handling and native Messages query/header handling | Bedrock Mantle/OpenAI path and advanced native reasoning replay; real SDK account entitlement and cloud live tests |
+| Custom API | Explicit HTTPS owner route, fixed capability/model admission, private-address refusal and pinned public DNS address with original TLS hostname | Real custom endpoint acceptance and full provider-specific extension contract |
+| External/virtual providers | Remain unavailable rather than dropdown-only support | Copilot/ACP, MoA, fresh Qwen login/import and complete reviewed external plugin admission |
 | Gateways | Existing Telegram/Discord paths retained | Remaining 20 adapter integrations; no new gateway support claimed |
 | Android / smartphone setup | Existing application retained | Continuous screen stream, desktop input, management, network/Wake wizard and optional firstboot page |
 
@@ -47,3 +50,24 @@ Local verification of this development checkpoint:
 
 No final ISO/container/APK is produced or certified by these component tests.
 The remaining ordered implementation scope is tracked in Issue #2.
+
+## Native SDK continuation
+
+Gemini and Bedrock probes now execute the actual pinned Hermes codec/boto3
+signing and CRC-checked AWS EventStream decoder against real loopback servers.
+The first delta is observed before the fixture sends its terminal event. Both
+probes cover function calls, secret reflection, throttling and interrupted
+streams. Bedrock adapts available-byte reads instead of waiting for urllib3's
+large default buffer; missing terminal events never produce `[DONE]`.
+
+Bounded source-digest receipts are archived under `docs/evidence/2026-10-19/`.
+Local runtime is Python 3.12.14; the new pinned-runtime workflow repeats these
+probes on the actual image target Python 3.11 with frozen SDK dependencies and
+the existing hashed security overlay. Local fixtures are not AWS/Google tests.
+
+At commit `9875cdb4`, CI `39224402499`, services/kernel `39224402393` and Arch
+packaging `39224402413` passed. These results belong to that earlier source;
+they do not certify this subsequent SDK continuation. Latest local broad run,
+excluding the explicitly environment-blocked remote/backup files: 670 passed,
+21 existing skips. Required graphical setup, frozen-runtime, kernel, ISO/QEMU,
+Android and real-account evidence remain separate.

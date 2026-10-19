@@ -19,7 +19,7 @@ def inputs(tmp_path):
     (upstream / "pyproject.toml").write_text('dependencies = ["PyJWT[crypto]==2.13.0"]\n')
     (upstream / "uv.lock").write_text("fixture upstream lock\n")
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
-    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic"],
+    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity"],
               "security_versions": {"pyjwt": "2.15.1"}}
     for filename, key, root in [("pyproject.toml", "pyproject_sha256", upstream),
                                 ("uv.lock", "uv_lock_sha256", upstream),

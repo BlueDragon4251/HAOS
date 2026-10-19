@@ -17,6 +17,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 import uuid
+import ipaddress
 
 from .provider_policy import PORT, ProviderPolicy
 from .redaction import Redactor
@@ -91,8 +92,17 @@ class Credentials:
     def __init__(self, policy, credentials):
         self.policy, self.credentials = policy, credentials
         self.lock = threading.Lock()
+        self.cloud_data, self.cloud_cache = None, {}
+        self.query = {}
 
     def headers(self):
+        from .provider_cloud import CLOUD, cloud_headers, credential_data
+        if self.policy.provider in CLOUD:
+            with self.lock:
+                self.cloud_data = credential_data(self.policy.provider, self.credentials.get("api_key"))
+                headers, values = cloud_headers(self.policy, self.cloud_data, self.cloud_cache)
+                self.query = dict(self.cloud_cache.get("query", {}))
+            return headers, Redactor(values)
         if (self.policy.provider in oauth_providers() or
                 (self.policy.provider in {"anthropic", "openrouter"} and not self.credentials.get("api_key"))):
             # The pinned upstream owns OAuth validation, locking and refresh. It
@@ -111,7 +121,7 @@ class Credentials:
                     headers.update(codex_cloudflare_headers(token))
         else:
             token = self.credentials.get("api_key")
-            if self.policy.provider not in {"local", "lmstudio"} and not token:
+            if self.policy.provider not in {"local", "lmstudio", "custom"} and not token:
                 raise PermissionError("provider credentials are not configured")
             row = descriptor(self.policy.provider)
             headers = dict(row["headers"]) if row else {}
@@ -126,6 +136,7 @@ class Credentials:
                 with build_anthropic_client(token, self.policy.endpoint) as client:
                     headers.update({key: value for key, value in client.default_headers.items()
                                     if isinstance(value, str)})
+                    self.query = dict(client.default_query)
             else:
                 headers["Authorization"] = "Bearer " + token
         return headers, Redactor([token] if token else [])
@@ -269,6 +280,7 @@ class Handler(BaseHTTPRequestHandler):
                 attempt = self.policy.request(path, attempt)
                 request_id = self.server.ledger.admit(self.policy, attempt["model"])
                 credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
+                self.route_credentials = credentials
                 headers, redactor = credentials.headers()
                 redactor.secrets = (*redactor.secrets, self.server.token)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
@@ -294,10 +306,23 @@ class Handler(BaseHTTPRequestHandler):
             self.server.turns.release()
 
     def forward(self, payload, headers, redactor, *, defer_errors=False):
+        if self.policy.provider in {"gemini", "bedrock"}:
+            from .provider_native import forward_native
+            return forward_native(self, payload, headers, redactor)
         endpoint = urlsplit(self.policy.endpoint)
         conn = (http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443, timeout=180,
                                             context=ssl.create_default_context()) if endpoint.scheme == "https"
                 else http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=180))
+        if self.policy.provider == "custom":
+            addresses = socket.getaddrinfo(endpoint.hostname, endpoint.port or 443, type=socket.SOCK_STREAM)
+            if not addresses or any(not ipaddress.ip_address(row[4][0]).is_global for row in addresses):
+                raise PermissionError("custom API DNS resolves outside its public network scope")
+            # Pin the checked address for this connection. HTTPSConnection
+            # retains the original hostname for SNI/certificate verification;
+            # a second DNS lookup must not rebind it to a private service.
+            address = addresses[0][4][0]
+            conn._create_connection = lambda pair, timeout, source_address=None: socket.create_connection(
+                (address, endpoint.port or 443), timeout=timeout, source_address=source_address)
         try:
             body = json.dumps(payload, ensure_ascii=False).encode()
             route = {"codex_responses": "/responses", "chat_completions": "/chat/completions",
@@ -305,9 +330,14 @@ class Handler(BaseHTTPRequestHandler):
             path = endpoint.path.rstrip("/")
             if self.policy.api_mode == "anthropic_messages" and not path.endswith("/v1"):
                 path += "/v1"
+            from urllib.parse import urlencode
+            query = getattr(self.route_credentials, "query", {})
+            if set(query) - {"api-version"} or any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,40}", value) for value in query.values()):
+                raise PermissionError("unsupported SDK query parameter")
+            suffix = "?" + urlencode(query) if query else ""
             # Never forward caller URLs, Host/Authorization, cookies, user IDs,
             # arbitrary headers, redirects or SDK credential overrides.
-            conn.request("POST", path + route, body=body,
+            conn.request("POST", path + route + suffix, body=body,
                          headers={**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"})
             response = conn.getresponse()
             if not 200 <= response.status < 300:

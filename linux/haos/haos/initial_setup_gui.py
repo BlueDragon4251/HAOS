@@ -13,6 +13,7 @@ from . import initial_setup
 from .setup_errors import describe_error
 from .hermes_capabilities import provider_rows, gateway_rows
 from .provider_registry import http_providers, default_mode, oauth_providers, descriptor
+from .provider_cloud import CLOUD
 
 
 def session_allowed(env=None, uid=None):
@@ -390,12 +391,18 @@ class Wizard:
         elif name == "provider":
             self._head("Hermes · Provider & Modell",
                        "Zugangsdaten bleiben im getrennten Provider-Dienst. Wähle anschließend ein Modell deines Anbieters.")
-            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | {"local", "lmstudio"}), "openai-api")
+            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom"}), "openai-api")
             model = self._field(self.content, "Modellkennung, vom Provider unterstützt")
             endpoint = self._field(self.content, "URL · leer = Standard des Anbieters")
             mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
                                 ["auto", "chat_completions", "codex_responses", "anthropic_messages"], "auto")
             secret = self._field(self.content, "API-Schlüssel · nicht gespeichert im GUI", secret=True)
+            self._label(self.content,
+                "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key, optional session_token oder profile. "
+                "Vertex erwartet Service-Account-/Authorized-User-JSON und die vollständige OpenAPI-URL. "
+                "Azure akzeptiert einen API-Key oder JSON mit tenant_id / client_id / client_secret. "
+                "Ein leeres Cloud-Feld verwendet ausschließlich die SDK-Identität des getrennten Provider-Dienstes.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=8)
             def account(action):
                 if self.running:
                     return

@@ -1,8 +1,10 @@
 """Owner-defined model routes. Requests cannot select URLs, credentials or remote tools."""
 
 import re
+import ipaddress
 from urllib.parse import urlsplit
 from .provider_registry import default_endpoint, descriptor, http_providers, oauth_providers
+from .provider_cloud import CLOUD, valid_endpoint
 
 PORT = 9120
 BASE = f"http://127.0.0.1:{PORT}/v1"
@@ -13,6 +15,24 @@ ENDPOINTS = {
 }
 ENDPOINTS.update({name: default_endpoint(name) for name in http_providers()})
 ENDPOINTS.update({name: default_endpoint(name) for name in oauth_providers()})
+ENDPOINTS["gemini"] = default_endpoint("gemini")
+ENDPOINTS.update({name: default_endpoint(name) for name in CLOUD})
+ENDPOINTS["custom"] = ""
+
+
+def custom_endpoint(endpoint):
+    parsed = urlsplit(endpoint)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.port not in {None, 443}
+            or parsed.username or parsed.password or parsed.query or parsed.fragment
+            or len(endpoint) > 1024 or not re.fullmatch(r"(?:/[A-Za-z0-9_.~-]+)*/?", parsed.path)
+            or any(part in {".", ".."} for part in parsed.path.split("/"))):
+        raise PermissionError("custom API requires an explicit HTTPS base URL")
+    try:
+        if not ipaddress.ip_address(parsed.hostname).is_global:
+            raise PermissionError("custom API cannot expose private-address administration services")
+    except ValueError:
+        if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", parsed.hostname) or parsed.hostname.endswith((".localhost", ".local", ".home.arpa")):
+            raise PermissionError("custom API requires an explicit public DNS name")
 
 
 class ProviderPolicy:
@@ -28,7 +48,12 @@ class ProviderPolicy:
         endpoint = data["endpoint"]
         if not isinstance(endpoint, str):
             raise ValueError("invalid provider endpoint")
-        if self.provider in ENDPOINTS:
+        if self.provider == "custom":
+            custom_endpoint(endpoint)
+        elif self.provider in CLOUD:
+            if not valid_endpoint(self.provider, endpoint):
+                raise PermissionError("cloud SDK endpoint is outside its verified service domain")
+        elif self.provider in ENDPOINTS:
             row = descriptor(self.provider)
             if endpoint not in (row["endpoints"] if row else [ENDPOINTS[self.provider]]):
                 raise PermissionError("remote provider endpoints are fixed and require verified TLS")
@@ -41,7 +66,8 @@ class ProviderPolicy:
         self.endpoint = endpoint
         self.models = data["models"]
         if (not isinstance(self.models, list) or not 1 <= len(self.models) <= 16
-                or any(not isinstance(m, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}", m) for m in self.models)
+                or any(not isinstance(m, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./:-]{0,511}", m)
+                       or any(part in {".", ".."} for part in m.split("/")) for m in self.models)
                 or len(set(self.models)) != len(self.models) or data["default_model"] not in self.models):
             raise ValueError("invalid allowed models")
         self.api_mode = data["api_mode"]
@@ -49,6 +75,8 @@ class ProviderPolicy:
             raise ValueError("unsupported model transport")
         if self.provider == "openai-codex" and self.api_mode != "codex_responses":
             raise ValueError("Codex OAuth requires the native Responses transport")
+        if self.provider in {"bedrock", "vertex", "gemini"} and self.api_mode != "chat_completions":
+            raise ValueError("this broker SDK adapter requires local Chat Completions ingress")
         for key, upper in (("requests_per_day", 10000), ("requests_per_minute", 120)):
             if type(data[key]) is not int or not 1 <= data[key] <= upper:
                 raise ValueError("invalid provider request limit")

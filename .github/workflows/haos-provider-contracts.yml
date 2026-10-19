@@ -1,0 +1,60 @@
+name: HAOS pinned provider protocol contracts
+on:
+  pull_request:
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: provider-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pinned-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Prepare the exact immutable Hermes runtime and frozen SDK dependencies
+        run: |
+          python -m pip install uv
+          bash scripts/sync-upstream.sh
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+      - name: Compare the generated registry and execute real local protocol probes
+        env:
+          PYTHONPATH: upstream/hermes-agent
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/provider-contracts" "$RUNNER_TEMP/provider-home"
+          export HERMES_HOME="$RUNNER_TEMP/provider-home"
+          PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
+          "$PYTHON" linux/haos/runtime/export_registry.py upstream/hermes-agent "$RUNNER_TEMP/provider-contracts/registry.json"
+          cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
+          "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
+          "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
+          "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: provider-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/provider-contracts/*.json
+          if-no-files-found: error
+          retention-days: 14
