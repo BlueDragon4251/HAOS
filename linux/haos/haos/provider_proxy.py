@@ -303,7 +303,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("incomplete model request")
             route, path = self.server.routes.resolve(self.path)
             self.policy = self.server.routes.routes[route]
-            payload = self.policy.request(path, json.loads(raw))
+            from .provider_messages import admit
+            payload = admit(self.policy, path, json.loads(raw))
         except (ValueError, TypeError, PermissionError, UnicodeError):
             self.reply(403, "request refused by owner model policy")
             return
@@ -319,7 +320,7 @@ class Handler(BaseHTTPRequestHandler):
                 attempt = dict(payload)
                 if target != route:
                     attempt["model"] = self.policy.data["default_model"]
-                attempt = self.policy.request(path, attempt)
+                attempt = admit(self.policy, path, attempt)
                 request_id = self.server.ledger.admit(self.policy, attempt["model"])
                 credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
                 self.route_credentials = credentials

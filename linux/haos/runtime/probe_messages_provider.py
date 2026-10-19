@@ -32,6 +32,38 @@ def main():
     from haos.provider_profiles import register_profiles
     from haos.provider_policy import ProviderPolicy
     from haos.provider_proxy import Broker, Credentials, UsageLedger
+    from haos.provider_routes import ProviderRoutes
+    from haos.provider_messages import admit
+    from haos.provider_registry import default_endpoint
+    alias_checks = 0
+    for provider, owner, wire in (
+            ("anthropic", "claude-opus-4.8", "claude-opus-4-8"),
+            ("anthropic", "anthropic/claude-opus-4.6", "claude-opus-4-6"),
+            ("commandcode-anthropic", "anthropic/claude-opus-4.6", "claude-opus-4-6"),
+            ("nous", "anthropic/claude-opus-4.8", "anthropic/claude-opus-4.8")):
+        policy = ProviderPolicy({"version": 1, "provider": provider, "endpoint": default_endpoint(provider),
+            "models": [owner], "default_model": owner, "api_mode": "anthropic_messages",
+            "requests_per_day": 200, "requests_per_minute": 30})
+        for model in (owner, wire):
+            payload = {"model": model, "messages": []}
+            assert admit(policy, "/v1/messages", payload)["model"] == wire
+            assert payload["model"] == model
+            alias_checks += 1
+        for change in ({"model": "claude-opus-4-9"}, {"model": "anthropic/claude-opus-4-8"},
+                {"model": [wire]}, {"tools": [{"type": "computer_20250124", "name": "computer"}]},
+                {"extra_headers": {"Authorization": "untrusted"}}):
+            try:
+                admit(policy, "/v1/messages", {"model": wire, **change})
+            except (PermissionError, ValueError):
+                alias_checks += 1
+            else:
+                raise AssertionError("native aliases broadened owner authority")
+        try:
+            admit(policy, "/v1/chat/completions", {"model": wire})
+        except PermissionError:
+            alias_checks += 1
+        else:
+            raise AssertionError("native alias changed the permitted protocol")
     received, failures = [], []
     state = {}
     release = threading.Event()
@@ -106,7 +138,7 @@ def main():
         try:
             for oauth in (False, True):
                 for streaming, fast in ((False, False), (True, False), (True, True)):
-                    model = "claude-opus-4-8" if fast else "claude-opus-4-6"
+                    model = "claude-opus-4.8" if fast else "anthropic/claude-opus-4.6"
                     key = ("sk-ant-oat01-" if oauth else "sk-ant-api03-") + secrets.token_urlsafe(40)
                     policy = ProviderPolicy({"version": 1, "provider": "anthropic", "endpoint": "https://api.anthropic.com",
                         "models": [model], "default_model": model, "api_mode": "anthropic_messages",
@@ -155,10 +187,59 @@ def main():
             http.client.HTTPSConnection = original_https
             release.set()
     assert len(received) == 6 and not failures
+    # Real broker fallback must admit the second route's owner alias too, and
+    # send only that route's normalized model and private credential.
+    fallback_calls = []
+    fallback_keys = [secrets.token_urlsafe(40), secrets.token_urlsafe(40)]
+    class FallbackFixture(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            fallback_calls.append((body["model"], self.headers["x-api-key"]))
+            first = len(fallback_calls) == 1
+            data = json.dumps({"id": "msg_fallback", "type": "message", "role": "assistant",
+                "model": body["model"], "content": [{"type": "text", "text": "fallback fixture"}],
+                "stop_reason": "end_turn", "stop_sequence": None,
+                "usage": {"input_tokens": 2, "output_tokens": 1}}).encode()
+            self.send_response(429 if first else 200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+    with tempfile.TemporaryDirectory() as temp, serving(ThreadingHTTPServer(("127.0.0.1", 0), FallbackFixture)) as fixture_port:
+        policies = [ProviderPolicy({"version": 1, "provider": "anthropic", "endpoint": "https://api.anthropic.com",
+            "models": [model], "default_model": model, "api_mode": "anthropic_messages",
+            "requests_per_day": 200, "requests_per_minute": 30})
+            for model in ("anthropic/claude-opus-4.6", "claude-opus-4.8")]
+        routes = ProviderRoutes({"version": 2, "default": "first", "routes": {
+            name: policy.data for name, policy in zip(("first", "second"), policies)},
+            "fallbacks": {"first": ["second"]}})
+        ledger = UsageLedger(Path(temp) / "fallback.db")
+        def fallback_https(host, port=443, **kwargs):
+            assert host == "api.anthropic.com" and port == 443
+            return http.client.HTTPConnection("127.0.0.1", fixture_port, timeout=kwargs.get("timeout", 5))
+        http.client.HTTPSConnection = fallback_https
+        try:
+            capability = secrets.token_urlsafe(48)
+            credentials = {name: Credentials(policy, {"api_key": key})
+                for name, policy, key in zip(("first", "second"), policies, fallback_keys)}
+            with serving(Broker(("127.0.0.1", 0), routes, capability, credentials, ledger)) as port:
+                with build_anthropic_client(capability, f"http://127.0.0.1:{port}/v1", timeout=10) as client:
+                    result = client.messages.create(model="claude-opus-4-6", max_tokens=20,
+                        messages=[{"role": "user", "content": "fallback fixture"}])
+                    assert result.model == "claude-opus-4-8" and result.content[0].text == "fallback fixture"
+            assert fallback_calls == list(zip(("claude-opus-4-6", "claude-opus-4-8"), fallback_keys))
+            assert ledger.db.execute("SELECT status FROM requests ORDER BY rowid").fetchall() == [(429,), (200,)]
+        finally:
+            http.client.HTTPSConnection = original_https
+            ledger.close()
     receipt = {"actual_anthropic_sdk_api_key_and_subscription_json_sse": True,
         "actual_pinned_subscription_body_and_header_contract": True, "signed_thinking_replay_preserved": True,
         "forced_tool_alias_collision_mcp_names_restored": True, "multiline_sse_and_early_delta_before_terminal": True,
         "native_fast_mode_body_beta_preserved": True,
+        "actual_native_alias_positive_negative_checks": alias_checks,
+        "actual_native_alias_fallback_http_requests": len(fallback_calls),
         "reflected_private_tokens_redacted": True, "actual_loopback_http_cases": len(received),
         "live_provider_tested": False, "python": sys.version.split()[0],
         "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in

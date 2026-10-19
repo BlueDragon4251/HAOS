@@ -1,0 +1,73 @@
+{
+  "branch_source": "df385f585408508a7b5a980ff63903190a3a6549",
+  "branch_tree": "a6d159e2c7e64846962e43d06ea6c3f3d71a9a84",
+  "actual_pr_merge_source": "55af14151103e627e70f7b78feee2131049364fc",
+  "workflow_runs": [
+    {
+      "id": 39309865515,
+      "name": "Arch package",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 353,
+      "jobs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865515/jobs",
+      "logs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865515/logs",
+      "workflow_id": 378647604
+    },
+    {
+      "id": 39309865493,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 707,
+      "jobs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865493/jobs",
+      "logs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865493/logs",
+      "workflow_id": 378688979
+    },
+    {
+      "id": 39309865532,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 14,
+      "jobs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865532/jobs",
+      "logs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865532/logs",
+      "workflow_id": 389210743
+    },
+    {
+      "id": 39309865678,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 54,
+      "jobs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865678/jobs",
+      "logs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865678/logs",
+      "workflow_id": 387728288
+    },
+    {
+      "id": 39309865727,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 353,
+      "jobs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865727/jobs",
+      "logs_url": "https://api.github.com/repos/BlueDragon4251/HAOS/actions/runs/39309865727/logs",
+      "workflow_id": 378647607
+    }
+  ],
+  "services_job_id": 118256347865,
+  "services_log_summary": [
+    "2026-10-19T19:18:45.0576718Z 785 passed, 2 skipped in 8.46s",
+    "2026-10-19T19:18:46.3272085Z 57 passed in 0.97s",
+    "2026-10-19T19:18:52.6081122Z 89 passed in 6.03s",
+    "2026-10-19T19:21:23.8730766Z 5 passed in 0.28s",
+    "2026-10-19T19:21:28.9610058Z {\"production_systemd_hardening\": true, \"systemd_credential_acl_checked\": true, \"read_only_enforced\": true, \"write_grant_enforced\": true, \"symlink_escape_denied\": true, \"owner_and_devices_hidden\": true, \"no_new_privileges\": true, \"nested_userns_denied\": true, \"mount_denied\": true, \"kernel_tunables_read_only\": true, \"foreign_host_uid_unmapped\": true}",
+    "2026-10-19T19:21:29.0173586Z 1 passed in 0.19s",
+    "2026-10-19T19:21:30.5041974Z 3 passed in 1.26s",
+    "2026-10-19T19:23:12.7745632Z 22 passed in 87.90s (0:01:27)",
+    "2026-10-19T19:23:13.2738271Z 1 passed in 0.23s",
+    "2026-10-19T19:23:19.3854887Z 1 passed in 5.73s",
+    "2026-10-19T19:23:22.2280218Z 1 passed in 2.57s"
+  ],
+  "live_inference_tested": false,
+  "installed_boot_tested": false
+}

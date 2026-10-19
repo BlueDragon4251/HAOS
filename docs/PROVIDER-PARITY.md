@@ -1,5 +1,42 @@
 # Hermes parity work — development, not release acceptance
 
+## Resumed native alias and HTTP matrix verification
+
+The broker now admits exact owner model IDs and only their wire equivalents
+derived by the pinned Hermes Messages normalizer. Policy checks still run on
+the approved owner ID; outbound requests use the native ID. Nous Portal IDs
+retain their namespace and dots. Both ingress and explicitly permitted fallback
+attempts use this admission. Thirty-two real-normalizer checks cover accepted
+aliases and refused models, tools, protocols and header overrides. Six native
+Anthropic SDK API-key/subscription fixtures now use dotted/prefixed aliases;
+two more actual HTTP calls prove per-route alias/credential isolation on fallback.
+
+The new `probe_http_provider_matrix.py` exercises all 39 reviewed HTTP profiles
+through real pinned Hermes wire builders, actual OpenAI/Anthropic clients and
+the real broker. All **195** local cases pass: tool JSON, continuous early SSE
+before a withheld terminal event, interrupted streams, HTTP 401 and HTTP 429.
+Anthropic fixtures emit correctly named native SSE events; ledger checks wait
+for actual durable finalization. Errors redact reflected keys; incomplete streams
+raise in the real SDK and are never certified complete or automatically retried.
+The probe is required by both the image build and provider-contract workflow.
+
+Python 3.11.16 with the frozen SDK extras and hashed overlay passes dependency
+checks. The ordinary suite passes **785 tests, two existing skips**, both with
+Hermes source on PYTHONPATH and in a fresh minimal test environment without it.
+Root-only backup/identity checks remain separate required CI gates. The first
+local run inherited umask 0077, so a negative PKI fixture requesting mode 0755
+actually created mode 0700; rerunning under CI's normal umask 0022 passes without
+changing or relaxing that assertion. Ten other native/account/cloud/profile
+runtime probes pass too. Source hashes and bounded receipts are archived nearby.
+
+Fresh GitHub verification confirms all five gates at branch source `df385f5`
+passed, including services/kernel run `39309865493` and its actual UID/socket/
+credential tests. That PR run checked out merge source `55af1415`; its tree is
+recorded separately. These historical results do not certify the new alias patch.
+Full provider-specific protocol variants, gateway expansion, mobile continuous
+desktop/control, phone firstboot and installed/artifact/live acceptance remain
+open. No external account, inference or final release is claimed by fixtures.
+
 Base: `9e432326e2c7ef56a7d9c0899ced3f53debff0ce`.
 Hermes: `f97608f178d1ffeca59860195ab7da295f7c8e5f`.
 

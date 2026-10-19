@@ -2,6 +2,35 @@
 from copy import deepcopy
 
 
+def admit(policy, path, payload):
+    """Validate the owner model before translating its pinned native wire ID.
+
+    SDK builders can already have translated an approved alias. Only wire IDs
+    derived from this route's exact allowlist are equivalent; normalizing an
+    arbitrary caller model must never broaden that allowlist.
+    """
+    if policy.api_mode != "anthropic_messages" or not isinstance(payload, dict):
+        return policy.request(path, payload)
+
+    def wire(model):
+        # Keep ordinary/minimal broker fixtures independent of optional Hermes
+        # imports. Only the native Claude/prefixed aliases need its normalizer.
+        if not model.lower().startswith(("claude-", "anthropic/")):
+            return model
+        from agent.anthropic_adapter import normalize_model_name
+        from agent.anthropic_endpoints import _is_nous_portal_endpoint
+        return model if _is_nous_portal_endpoint(policy.endpoint) else normalize_model_name(model)
+
+    requested = payload.get("model")
+    owner = requested if isinstance(requested, str) and requested in policy.models else next(
+        (model for model in policy.models if wire(model) == requested), None)
+    if owner is None:
+        raise PermissionError("model or API route is outside owner policy")
+    admitted = policy.request(path, {**payload, "model": owner})
+    admitted["model"] = wire(owner)
+    return admitted
+
+
 def feature_headers(payload, headers, endpoint):
     if payload.get("speed") != "fast":
         return headers
