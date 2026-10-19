@@ -65,6 +65,7 @@ jobs:
           initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True, "pending": False}
           initial_setup.normal_user_ready=lambda: True
           initial_setup.setup_in_progress=lambda: False
+          initial_setup.provider_state=lambda: {"routes": [], "default": None, "fallbacks": {}}
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
           # Xvfb has no window manager: EWMH -fullscreen alone previously left
@@ -80,6 +81,55 @@ jobs:
               wizard.root.update_idletasks()
               assert wizard.content.winfo_children(), page
           import time
+          # Native interactive provider controls: a changed provider must never
+          # inherit a key or endpoint entered for the previous service.
+          wizard.show("provider")
+          wizard.root.update()
+          def field(prefix):
+              children = wizard.content.winfo_children()
+              for i, widget in enumerate(children):
+                  if isinstance(widget, tkinter.Label) and widget.cget("text").startswith(prefix):
+                      return next(item for item in children[i+1:] if isinstance(item, tkinter.Entry))
+              raise AssertionError("missing native setup field")
+          secret = field("API-Schlüssel")
+          endpoint = field("URL")
+          secret.insert(0, "fixture-only-previous-provider-key")
+          endpoint.insert(0, "https://previous-provider.invalid/v1")
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "anthropic")
+          wizard.root.update()
+          assert not secret.get() and not endpoint.get(), "provider changes must clear private input"
+          initial_setup.provider_models = lambda *args: {"version": 1, "provider": "anthropic", "source": "provider-api",
+              "diagnostic": "none", "inference_tested": False,
+              "models": [{"id": "claude-fixture", "api_mode": "anthropic_messages"}]}
+          button = next(item for item in wizard.content.winfo_children()
+                        if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden")
+          button.invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running
+          picker = next(item for parent in wizard.content.winfo_children() for item in parent.winfo_children()
+                        if isinstance(item, tkinter.Listbox))
+          assert picker.get(0) == "claude-fixture"
+          picker.selection_set(0)
+          picker.event_generate("<<ListboxSelect>>")
+          wizard.root.update()
+          assert field("Modellkennung").get() == "claude-fixture"
+          assert wizard.root.getvar(menus[1].cget("textvariable")) == "anthropic_messages"
+          calls = []
+          initial_setup.configure_provider = lambda *args: calls.append(args)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Provider konfigurieren").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert len(calls) == 1 and calls[0][:2] == ("anthropic", "claude-fixture")
+          assert calls[0][4] == "anthropic_messages"
           wizard._run_async(lambda: time.sleep(0.05), success="Async operation complete")
           assert wizard.running
           for _ in range(80):
@@ -128,6 +178,7 @@ jobs:
           initial_setup.account_status = lambda: {'owner': True, 'recovery': True, 'complete': True, 'pending': False}
           initial_setup.normal_user_ready = lambda: True
           initial_setup.setup_in_progress = lambda: False
+          initial_setup.provider_state = lambda: {"routes": [], "default": None, "fallbacks": {}}
           wizard = Wizard(tkinter)
           wizard.root.update()
           assert wizard.compact

@@ -137,6 +137,11 @@ def route_settings(route_id, *, fallbacks=None, make_default=False, remove=False
         for targets in data["fallbacks"].values():
             if route_id in targets:
                 targets.remove(route_id)
+        for name, preset in list(data.get("ensembles", {}).items()):
+            if any(slot["route"] == route_id for slot in [*preset["references"], preset["aggregator"]]):
+                del data["ensembles"][name]
+                if data.get("default_ensemble") == name:
+                    data["default_ensemble"] = None
     publish(data, credentials, config=config)
     return {"default": data["default"], "routes": list(data["routes"]), "fallbacks": data["fallbacks"]}
 
@@ -206,14 +211,46 @@ def revoke_account_routes(provider, *, config=CONFIG):
     return {"withdrawn_routes": len(removed)}
 
 
+def private_command(provider, module, arguments=(), *, pipe=True):
+    """Fixed helper entrypoints, private service identities and no secret argv."""
+    if os.geteuid() != 0 or module not in {"haos.provider_auth", "haos.provider_discovery"}:
+        raise PermissionError("root-owned fixed provider helper required")
+    identity = "haos-provider-acp" if provider == "copilot-acp" else "haos-provider"
+    entry = pwd.getpwnam(identity)
+    if entry.pw_uid == 0:
+        raise PermissionError("invalid provider service identity")
+    inaccessible = ["/var/lib/haos-agent", "/var/lib/haos-control", "/var/lib/haos-owner", "/var/lib/haos-workspace",
+        "/var/lib/haos-gateway", "/var/lib/" + ("haos-provider" if provider == "copilot-acp" else "haos-provider-acp"),
+        "/etc/haos/backend-token", "/etc/haos/provider-token", "/etc/haos/provider-credentials",
+        "/run/haos-control", "/run/haos-volumes", "/run/haos-policy", "/run/haos-applications-control",
+        "/run/haos-gui-agent", "/run/credentials", "/run/dbus", "/run/user"]
+    command = ["/usr/bin/systemd-run", "--pipe" if pipe else "--pty", "--wait", "--collect", "--quiet", "--service-type=exec",
+               "--unit=haos-provider-owner-" + secrets.token_hex(12),
+               "--property=User=" + identity, "--property=Group=" + identity,
+               "--property=StateDirectory=" + identity, "--property=StateDirectoryMode=0700",
+               "--property=UMask=0077", "--property=RuntimeMaxSec=" + ("90" if module == "haos.provider_discovery" else "720"), "--property=KillMode=control-group",
+               "--property=NoNewPrivileges=yes", "--property=CapabilityBoundingSet=",
+               "--property=PrivateTmp=yes", "--property=PrivateDevices=yes", "--property=ProtectSystem=strict",
+               "--property=ProtectHome=yes", "--property=ProtectKernelTunables=yes", "--property=ProtectKernelModules=yes",
+               "--property=ProtectControlGroups=yes", "--property=ProtectProc=invisible",
+               "--property=RestrictSUIDSGID=yes", "--property=RestrictNamespaces=yes",
+               "--property=RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "--property=TasksMax=64", "--property=MemoryMax=1G",
+               "--property=InaccessiblePaths=" + " ".join("-" + path for path in inaccessible),
+               "--setenv=HOME=/var/lib/" + identity, "--setenv=HERMES_HOME=/var/lib/" + identity + "/.hermes",
+               "--setenv=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes", "--setenv=PYTHONDONTWRITEBYTECODE=1",
+               "--setenv=PATH=/usr/lib/haos/hermes/.venv/bin:/usr/bin",
+               "--setenv=COPILOT_AUTO_UPDATE=false", "--setenv=DO_NOT_TRACK=1",
+               "/usr/lib/haos/hermes/.venv/bin/python", "-m", module, *arguments]
+    if provider == "copilot-acp":
+        subprocess.run(["/usr/bin/systemctl", "start", "haos-provider-acp-network.service"],
+                       check=True, capture_output=True, timeout=30)
+    return command
+
+
 def auth_helper(action, provider="openai-codex", *, graphical_status=False):
-    # Transient service supplies a private state directory and the same security
-    # boundary as the long-lived broker. No root CLI command/user/path is passed
-    # from the model. --pty keeps device codes and OAuth output off the journal.
-    if action not in {"login", "status", "logout"}:
+    # --pty keeps device codes and OAuth output off the journal.
+    if action not in {"login", "status", "logout"} or provider not in account_providers():
         raise ValueError("unsupported provider credential action")
-    if provider not in account_providers():
-        raise ValueError("unsupported provider account login")
     from .owner_recovery import require_console
     if graphical_status:
         from .initial_setup_gui import session_allowed
@@ -221,37 +258,33 @@ def auth_helper(action, provider="openai-codex", *, graphical_status=False):
             raise PermissionError("graphical auth status requires the trusted local setup seat")
     else:
         require_console()
-    identity = "haos-provider-acp" if provider == "copilot-acp" else "haos-provider"
-    entry = pwd.getpwnam(identity)
-    if entry.pw_uid == 0:
-        raise PermissionError("invalid provider service identity")
-    command = ["/usr/bin/systemd-run", "--pipe" if graphical_status else "--pty", "--wait", "--collect", "--quiet", "--service-type=exec",
-               "--unit=haos-provider-owner-" + secrets.token_hex(12),
-               "--property=User=" + identity, "--property=Group=" + identity,
-               "--property=StateDirectory=" + identity, "--property=StateDirectoryMode=0700",
-               "--property=UMask=0077", "--property=RuntimeMaxSec=720", "--property=KillMode=control-group",
-               "--property=NoNewPrivileges=yes", "--property=CapabilityBoundingSet=",
-               "--property=PrivateTmp=yes", "--property=PrivateDevices=yes", "--property=ProtectSystem=strict",
-               "--property=ProtectHome=yes", "--property=ProtectKernelTunables=yes", "--property=ProtectKernelModules=yes",
-               "--property=ProtectControlGroups=yes", "--property=ProtectProc=invisible",
-               "--property=RestrictSUIDSGID=yes", "--property=RestrictNamespaces=yes",
-               "--property=RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "--property=TasksMax=64", "--property=MemoryMax=1G",
-               "--property=InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace -/etc/haos/backend-token -/run/haos-control -/run/haos-volumes -/run/haos-policy",
-               "--setenv=HOME=/var/lib/" + identity, "--setenv=HERMES_HOME=/var/lib/" + identity + "/.hermes",
-               "--setenv=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes", "--setenv=PYTHONDONTWRITEBYTECODE=1",
-               "--setenv=PATH=/usr/lib/haos/hermes/.venv/bin:/usr/bin",
-               "/usr/lib/haos/hermes/.venv/bin/python", "-m", "haos.provider_auth", action, provider]
-    if provider == "copilot-acp":
-        subprocess.run(["/usr/bin/systemctl", "start", "haos-provider-acp-network.service"],
-                       check=True, capture_output=True, timeout=30)
-        command.insert(1, "--property=InaccessiblePaths=-/var/lib/haos-provider -/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace -/var/lib/haos-gateway -/run/haos-control -/run/haos-policy -/run/haos-volumes -/run/haos-applications-control -/run/haos-gui-agent -/run/dbus -/run/user -/run/credentials -/etc/haos/provider-credentials -/etc/haos/provider-token -/etc/haos/backend-token")
-        # Use the ACP-specific boundary instead of the shared account helper's.
-        command = [item for item in command if not item.startswith("--property=InaccessiblePaths=-/var/lib/haos-agent ")]
-        command.insert(1, "--setenv=COPILOT_AUTO_UPDATE=false")
-        command.insert(1, "--setenv=DO_NOT_TRACK=1")
+    command = private_command(provider, "haos.provider_auth", (action, provider), pipe=graphical_status)
     result = subprocess.run(command, env=ENV, timeout=740, capture_output=graphical_status)
     if result.returncode:
         raise RuntimeError("provider credential action failed; inspect the trusted owner console")
+
+
+def catalog_helper(policy, credential):
+    """Root-seat key input goes only through stdin to the protected identity."""
+    import json
+    from .provider_discovery import validate_catalog, fallback
+    if os.geteuid() != 0:
+        raise PermissionError("model discovery requires owner authority")
+    policy = ProviderPolicy(policy)
+    # Public/offline catalogs do not require saving an incomplete API credential.
+    if credential is not None:
+        validate_credential(policy, credential)
+    request = json.dumps({"policy": policy.data, "credential": credential}).encode()
+    if len(request) > 32768:
+        raise ValueError("private catalog input exceeds its bound")
+    command = private_command(policy.provider, "haos.provider_discovery")
+    result = subprocess.run(command, input=request, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            env=ENV, timeout=110)
+    if result.returncode:
+        return fallback(policy.provider, "catalog-unavailable")
+    if len(result.stdout) > 4 * 1024 * 1024:
+        raise ValueError("private catalog reply exceeds its bound")
+    return validate_catalog(json.loads(result.stdout), policy.provider)
 
 
 def owner_provider(args):

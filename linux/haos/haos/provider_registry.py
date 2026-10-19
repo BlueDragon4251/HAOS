@@ -12,11 +12,16 @@ from pathlib import Path
 
 
 @lru_cache(maxsize=1)
-def registry():
+def registry_export():
     data = json.loads(Path(__file__).with_name("hermes_registry.json").read_text())
     if data["version"] != 1:
         raise ValueError("unsupported Hermes registry export")
-    return {row["slug"]: row for row in data["providers"]}
+    return data
+
+
+@lru_cache(maxsize=1)
+def registry():
+    return {row["slug"]: row for row in registry_export()["providers"]}
 
 
 def descriptor(provider):
@@ -42,10 +47,24 @@ def default_endpoint(provider):
     if provider == "copilot-acp":
         return "acp://copilot"
     row = descriptor(provider)
-    return row["endpoint"] if row else ""
+    endpoint = row["endpoint"] if row else ""
+    if provider == "lmstudio":
+        # The upstream default uses localhost; this broker requires a literal
+        # loopback address so local-model routing never depends on DNS.
+        endpoint = endpoint.replace("http://localhost:", "http://127.0.0.1:")
+    return endpoint
 
 
 def default_mode(provider, model=""):
+    rules = registry_export().get("model_routing", {})
+    if provider in rules.get("opencode", {}):
+        normalized = model.removeprefix(provider + "/").lower()
+        for prefixes, mode in rules["opencode"][provider]:
+            if normalized.startswith(tuple(prefixes)):
+                return mode
+        return "chat_completions"
+    if provider == "azure-foundry" and model.lower().rsplit("/", 1)[-1].startswith(tuple(rules.get("azure_responses_prefixes", []))):
+        return "codex_responses"
     if provider == "copilot":
         match = re.match(r"^(?:openai/)?gpt-(\d+)", model)
         return "codex_responses" if match and int(match[1]) >= 5 and not model.removeprefix("openai/").startswith("gpt-5-mini") else "chat_completions"

@@ -1,0 +1,139 @@
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import secrets
+from types import SimpleNamespace
+import threading
+import pytest
+
+from haos import provider_discovery as discovery
+from haos.provider_policy import ProviderPolicy
+from haos.provider_proxy import Credentials
+from haos.provider_registry import default_mode
+from haos.redaction import Redactor
+
+
+@contextmanager
+def fixture(payloads, *, status=200):
+    calls = []
+    class Server(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+        def do_GET(self):
+            calls.append((self.path, dict(self.headers)))
+            data = json.dumps(payloads[min(len(calls) - 1, len(payloads) - 1)]).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            if status == 302:
+                self.send_header("Location", "http://127.0.0.1:9119/api/env")
+            self.end_headers()
+            self.wfile.write(data)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Server)
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+    thread.start()
+    try:
+        yield "http://127.0.0.1:" + str(server.server_port), calls
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(5)
+
+
+def local(endpoint):
+    return ProviderPolicy({"version": 1, "provider": "local", "endpoint": endpoint + "/v1",
+        "models": ["fixture"], "default_model": "fixture", "api_mode": "chat_completions",
+        "requests_per_day": 200, "requests_per_minute": 30})
+
+
+def test_real_catalog_http_key_is_private_and_reflected_or_unsafe_model_ids_are_not_returned():
+    key = secrets.token_urlsafe(40)
+    with fixture([{"data": [{"id": value} for value in ("fixture-model", "fixture-model", key, "../admin", "untrusted\nheader")]}]) as (endpoint, calls):
+        policy = local(endpoint)
+        result = discovery.discover(policy, key)
+    assert result["models"] == [{"id": "fixture-model", "api_mode": "chat_completions"}]
+    assert result["source"] == "provider-api" and result["inference_tested"] is False
+    assert calls[0][0] == "/v1/models" and calls[0][1]["Authorization"] == "Bearer " + key
+    assert key not in json.dumps(result)
+
+
+def test_catalog_redirects_are_not_followed_and_offline_provenance_is_not_account_acceptance():
+    with fixture([{}], status=302) as (endpoint, calls):
+        result = discovery.discover(local(endpoint), None)
+    assert len(calls) == 1 and result["source"] == "unavailable"
+    assert result["diagnostic"] == "catalog-unavailable" and result["inference_tested"] is False
+    offline = discovery.fallback("openai-codex", "account-required")
+    assert offline["models"] and offline["source"] == "upstream-offline" and not offline["inference_tested"]
+    assert discovery.fallback("copilot-acp", "account-required")["models"] == []
+
+
+def test_native_gemini_catalog_pagination_uses_google_key_header_and_text_generation_models_only():
+    key = secrets.token_urlsafe(40)
+    with fixture([{"models": [{"name": "models/gemini-fixture", "supportedGenerationMethods": ["generateContent"]},
+                              {"name": "models/embedding", "supportedGenerationMethods": ["embedContent"]}], "nextPageToken": "cursor"},
+                  {"models": [{"name": "models/gemini-next", "supportedGenerationMethods": ["generateContent"]}]}]) as (endpoint, calls):
+        # Only the test supplies this loopback replacement; production accepts
+        # Gemini's fixed HTTPS endpoint through ProviderPolicy.
+        policy = SimpleNamespace(provider="gemini", endpoint=endpoint + "/v1beta", api_mode="chat_completions")
+        credentials = SimpleNamespace(headers=lambda: ({"Authorization": "Bearer " + key}, Redactor([key])),
+                                       effective_endpoint=policy.endpoint, query={})
+        result = discovery.http_catalog(policy, credentials)
+    assert [row["id"] for row in result["models"]] == ["gemini-fixture", "gemini-next"]
+    assert len(calls) == 2 and "pageToken=cursor" in calls[1][0]
+    assert calls[0][1]["x-goog-api-key"] == key and "Authorization" not in calls[0][1]
+
+
+def test_native_messages_catalog_retains_native_auth_and_bounded_cursor_pagination():
+    with fixture([{"data": [{"id": "claude-fixture"}], "has_more": True, "last_id": "one"},
+                  {"data": [{"id": "claude-next"}], "has_more": False}]) as (endpoint, calls):
+        policy = SimpleNamespace(provider="anthropic", endpoint=endpoint, api_mode="anthropic_messages")
+        credentials = SimpleNamespace(headers=lambda: ({"x-api-key": "fixture-only-key"}, Redactor()),
+                                       effective_endpoint=endpoint, query={})
+        result = discovery.http_catalog(policy, credentials)
+    assert len(result["models"]) == 2 and calls[0][0] == "/v1/models?limit=1000"
+    assert "after_id=one" in calls[1][0] and calls[0][1]["x-api-key"] == "fixture-only-key"
+
+
+@pytest.mark.parametrize("change", [{"source": "live-model-tested"}, {"inference_tested": True},
+    {"credential": "must-never-return"}, {"models": [{"id": "../../admin", "api_mode": "chat_completions"}]},
+    {"models": [{"id": "fixture", "api_mode": "arbitrary-process"}]}])
+def test_catalog_receipt_cannot_export_secrets_or_claim_inference_or_grant_an_unreviewed_transport(change):
+    result = discovery.receipt("local", ["fixture"], "provider-api")
+    with pytest.raises(ValueError):
+        discovery.validate_catalog({**result, **change}, "local")
+
+
+def test_lmstudio_upstream_default_obeys_literal_loopback_policy():
+    from haos.provider_registry import default_endpoint
+    data = local("http://127.0.0.1:11434").data
+    policy = ProviderPolicy({**data, "provider": "lmstudio", "endpoint": default_endpoint("lmstudio")})
+    assert policy.endpoint.startswith("http://127.0.0.1:")
+
+
+def test_catalog_helper_sends_key_only_on_private_stdin_and_keeps_provider_identity_separate(monkeypatch):
+    from haos import provider_setup
+    key = secrets.token_urlsafe(40)
+    monkeypatch.setattr(provider_setup.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(provider_setup.pwd, "getpwnam", lambda _: SimpleNamespace(pw_uid=1234))
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        assert key not in " ".join(command) and key not in json.dumps(kwargs["env"])
+        assert json.loads(kwargs["input"])["credential"] == key
+        return SimpleNamespace(returncode=0, stdout=json.dumps(discovery.receipt("local", ["fixture"], "provider-api")).encode())
+    monkeypatch.setattr(provider_setup.subprocess, "run", run)
+    assert provider_setup.catalog_helper(local("http://127.0.0.1:11434").data, key)["models"]
+    command = calls[0][0]
+    assert "--pipe" in command and "--property=User=haos-provider" in command
+    assert any("/var/lib/haos-provider-acp" in arg for arg in command if arg.startswith("--property=InaccessiblePaths="))
+    assert command[-1] == "haos.provider_discovery"
+    monkeypatch.setattr(provider_setup.os, "geteuid", lambda: 1234)
+    with pytest.raises(PermissionError):
+        provider_setup.catalog_helper(local("http://127.0.0.1:11434").data, key)
+
+
+@pytest.mark.parametrize("provider,model,mode", [("opencode-zen", "claude-sonnet-5", "anthropic_messages"),
+    ("opencode-zen", "gpt-6-sol", "codex_responses"), ("opencode-go", "qwen-fixture", "anthropic_messages"),
+    ("opencode-go", "kimi-fixture", "chat_completions"), ("azure-foundry", "openai/gpt-5-mini", "codex_responses")])
+def test_generated_model_protocol_rules_are_applied_without_importing_plugins_in_root_setup(provider, model, mode):
+    assert default_mode(provider, model) == mode

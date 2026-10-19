@@ -225,7 +225,7 @@ class Wizard:
         self.status.config(text=success, fg=self.CYAN)
         return result
 
-    def _run_async(self, action, *, success="Gespeichert.", completed=None):
+    def _run_async(self, action, *, success="Gespeichert.", completed=None, result_handler=None):
         """Keep Tk's event loop responsive during authenticated slow system actions.
 
         Exactly one privileged mutation can be underway. No worker thread
@@ -244,8 +244,8 @@ class Wizard:
 
         def worker():
             try:
-                action()
-                results.put((True, None))
+                result = action()
+                results.put((True, result if result_handler is not None else None))
             except Exception as error:
                 results.put((False, describe_error(error, area=self.page)))
 
@@ -262,12 +262,20 @@ class Wizard:
                 completed()
             if ok:
                 self.status.config(text=success, fg=self.CYAN)
+                if result_handler is not None:
+                    try:
+                        result_handler(report)
+                    except Exception as error:
+                        self._show_error(describe_error(error, area=self.page))
             else:
                 self._show_error(report)
         self.root.after(150, poll)
 
     def show(self, name):
         tk = self.tk
+        if self.running:
+            self.status.config(text="Bitte warte, bis die aktuelle Systemaktion abgeschlossen ist.")
+            return
         self.page = name
         self.viewport.yview_moveto(0)
         for child in self.content.winfo_children():
@@ -397,6 +405,50 @@ class Wizard:
             mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
                                 ["auto", "chat_completions", "codex_responses", "anthropic_messages"], "auto")
             secret = self._field(self.content, "API-Schlüssel · nicht gespeichert im GUI", secret=True)
+            model_rows = []
+            catalog_status = self._label(self.content, "Modellkennung direkt eingeben oder den Provider-Katalog laden.",
+                                         size=10, color=self.MUTED)
+            catalog_status.pack(anchor="w", pady=(12, 0))
+            model_filter = self._field(self.content, "Modellliste filtern")
+            model_frame = tk.Frame(self.content, bg=self.PANEL)
+            model_frame.pack(fill="x", pady=5)
+            model_list = tk.Listbox(model_frame, height=6, bg=self.PANEL2, fg=self.TEXT,
+                selectbackground=self.CYAN, selectforeground=self.BG, relief="flat", exportselection=False,
+                font=("DejaVu Sans", 11))
+            model_scroll = tk.Scrollbar(model_frame, orient="vertical", command=model_list.yview)
+            model_list.configure(yscrollcommand=model_scroll.set)
+            model_scroll.pack(side="right", fill="y")
+            model_list.pack(side="left", fill="both", expand=True)
+            def filter_models(_event=None):
+                query = model_filter.get().casefold()
+                model_list.delete(0, tk.END)
+                for row in model_rows:
+                    if query in row["id"].casefold():
+                        model_list.insert(tk.END, row["id"])
+            model_filter.bind("<KeyRelease>", filter_models)
+            def choose_model(_event=None):
+                if model_list.curselection():
+                    selected = model_list.get(model_list.curselection()[0])
+                    model.delete(0, tk.END)
+                    model.insert(0, selected)
+                    mode.set(next(row["api_mode"] for row in model_rows if row["id"] == selected))
+            model_list.bind("<<ListboxSelect>>", choose_model)
+            def show_models(value):
+                from .provider_discovery import validate_catalog
+                validate_catalog(value, provider.get())
+                model_rows[:] = value["models"]
+                source = ("Provider-Katalog · Inferenz noch nicht geprüft" if value["source"] in {"provider-api", "sdk-catalog"}
+                          else "Upstream-Vorschläge · Konto und Verfügbarkeit nicht bestätigt" if value["source"] == "upstream-offline"
+                          else "Kein Katalog verfügbar · Konto/URL prüfen oder Modellkennung direkt eingeben")
+                catalog_status.config(text=source + " · " + str(len(model_rows)) + " Modelle")
+                filter_models()
+            def load_models():
+                selected, key, url, wire = provider.get(), secret.get(), endpoint.get(), mode.get()
+                if selected == "local" and not url:
+                    url = "http://127.0.0.1:11434/v1"
+                self._run_async(lambda: initial_setup.provider_models(selected, key, url, "" if wire == "auto" else wire),
+                                success="Modellkatalog geladen. Auswahl gibt noch keine Inferenz frei.", result_handler=show_models)
+            self._button(self.content, "Modellliste laden", load_models).pack(anchor="w", pady=8)
             self._label(self.content,
                 "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key, optional session_token oder profile. "
                 "Vertex erwartet Service-Account-/Authorized-User-JSON und die vollständige OpenAPI-URL. "
@@ -417,6 +469,14 @@ class Wizard:
             logout_button = self._button(self.content, "Anbieter-Konto abmelden", lambda: account("logout"))
             logout_button.pack(anchor="w", pady=4)
             def update_provider(*_args):
+                # An old key must never follow a new provider selection.
+                secret.delete(0, tk.END)
+                endpoint.delete(0, tk.END)
+                model.delete(0, tk.END)
+                mode.set("auto")
+                model_rows.clear()
+                model_list.delete(0, tk.END)
+                catalog_status.config(text="Modellkennung direkt eingeben oder den Provider-Katalog laden.")
                 available = provider.get() in account_providers()
                 for button in (login_button, logout_button):
                     button.configure(state="normal" if available else "disabled")
@@ -432,6 +492,22 @@ class Wizard:
                     selected_provider, selected_model, key, selected_endpoint,
                     "" if selected_mode == "auto" else selected_mode))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
+            configured = self._run(initial_setup.provider_state, success="")
+            if configured and configured["routes"]:
+                route_ids = [row["id"] for row in configured["routes"]]
+                selected_route = self._choice(self.content, "Konfigurierte Route · Standard: " + configured["default"],
+                                               route_ids, configured["default"])
+                fallbacks = self._field(self.content, "Fallback-Routen in Reihenfolge · IDs durch Komma trennen")
+                self._label(self.content, ", ".join(row["id"] + ": " + row["model"] for row in configured["routes"]),
+                            size=10, color=self.MUTED).pack(anchor="w", pady=6)
+                def route_action(action):
+                    route = selected_route.get()
+                    targets = [item.strip() for item in fallbacks.get().split(",") if item.strip()]
+                    self._run_async(lambda: initial_setup.manage_provider_route(route, action, targets),
+                                    success="Provider-Routen aktualisiert.", result_handler=lambda _: self.show("provider"))
+                for label, action in (("Als Standard wählen", "default"), ("Fallbacks speichern", "fallbacks"),
+                                      ("Route entfernen", "remove")):
+                    self._button(self.content, label, lambda action=action: route_action(action)).pack(anchor="w", pady=4)
             self._label(self.content,
                         "Der Hermes-Katalog enthält weitere Anbieter. Ein Katalogeintrag "
                         "ist keine HAOS-Integration: Ungetestete Transport- und OAuth-Verfahren "

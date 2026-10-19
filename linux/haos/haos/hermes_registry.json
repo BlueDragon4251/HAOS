@@ -18,6 +18,52 @@
       "api_mode": "chat_completions",
       "headers": {},
       "fallback_models": [
+        "anthropic/claude-fable-5.1",
+        "anthropic/claude-fable-5",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-opus-5",
+        "anthropic/claude-opus-4.8",
+        "anthropic/claude-sonnet-5",
+        "anthropic/claude-haiku-4.5",
+        "openai/gpt-6-astra",
+        "openai/gpt-6-astra-fast",
+        "openai/gpt-6-astra-flex",
+        "openai/gpt-6-astra-pro",
+        "openai/gpt-6-astra-pro-fast",
+        "openai/gpt-6-astra-pro-flex",
+        "openai/gpt-6-sol",
+        "openai/gpt-6-sol-pro",
+        "openai/gpt-6-luna",
+        "openai/gpt-6-luna-pro",
+        "openai/gpt-5.5",
+        "openai/gpt-5.5-pro",
+        "openai/gpt-5.4-mini",
+        "google/gemini-3.1-pro-preview",
+        "google/gemini-3.8-flash",
+        "google/gemini-3.7-flash",
+        "x-ai/grok-4.7",
+        "x-ai/grok-4.6",
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-pro-0813",
+        "deepseek/deepseek-v4.1-flash",
+        "deepseek/deepseek-v4-flash-0731",
+        "qwen/qwen3.8-max-0902",
+        "qwen/qwen3.8-flash",
+        "moonshotai/kimi-k3",
+        "minimax/minimax-m3",
+        "z-ai/glm-5.3",
+        "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.3-flashx",
+        "z-ai/glm-5.2",
+        "xiaomi/mimo-v2.6-pro",
+        "xiaomi/mimo-v2.6-flash",
+        "xiaomi/mimo-v2.6-pro-ultraspeed",
+        "xiaomi/mimo-v2.5-pro",
+        "tencent/hy4-preview",
+        "tencent/hy3",
+        "stepfun/step-3.7-flash",
+        "nvidia/nemotron-3-super-120b-a12b",
+        "sakana/fugu-ultra",
         "hermes-3-405b",
         "hermes-3-70b"
       ],
@@ -94,7 +140,9 @@
       "endpoint": "moa://local",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "default"
+      ],
       "endpoints": [
         "moa://local"
       ]
@@ -163,7 +211,21 @@
       "endpoint": "https://api.anthropic.com",
       "api_mode": "anthropic_messages",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "claude-fable-5.1",
+        "claude-fable-5",
+        "claude-opus-5",
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-opus-4-5-20251101",
+        "claude-sonnet-4-5-20250929",
+        "claude-opus-4-20250514",
+        "claude-sonnet-4-20250514",
+        "claude-haiku-4-5-20251001"
+      ],
       "endpoints": [
         "https://api.anthropic.com"
       ]
@@ -181,7 +243,23 @@
       "endpoint": "https://chatgpt.com/backend-api/codex",
       "api_mode": "codex_responses",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "gpt-6-sol",
+        "gpt-6-sol-900k",
+        "gpt-6-luna",
+        "gpt-6-luna-900k",
+        "gpt-5.6-sol",
+        "gpt-5.6-sol-900k",
+        "gpt-5.6-terra",
+        "gpt-5.6-terra-900k",
+        "gpt-5.6-luna",
+        "gpt-5.6-luna-900k",
+        "gpt-5.5",
+        "gpt-5.4-mini",
+        "gpt-5.4",
+        "gpt-5.4-900k",
+        "gpt-5.3-codex-spark"
+      ],
       "endpoints": [
         "https://chatgpt.com/backend-api/codex"
       ]
@@ -201,7 +279,28 @@
       "endpoint": "https://api.openai.com/v1",
       "api_mode": "codex_responses",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "gpt-6-sol",
+        "gpt-6-sol-pro",
+        "gpt-6-luna",
+        "gpt-6-luna-pro",
+        "gpt-5.6-sol",
+        "gpt-5.6-sol-pro",
+        "gpt-5.6-terra",
+        "gpt-5.6-terra-pro",
+        "gpt-5.6-luna",
+        "gpt-5.6-luna-pro",
+        "gpt-5.5",
+        "gpt-5.5-pro",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5-mini",
+        "gpt-5.3-codex",
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-4o-mini"
+      ],
       "endpoints": [
         "https://api.openai.com/v1"
       ]
@@ -221,7 +320,23 @@
       "endpoint": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.8-max",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.6-flash",
+        "kimi-k2.5",
+        "qwen3.5-plus",
+        "qwen3-coder-plus",
+        "qwen3-coder-next",
+        "glm-5.2",
+        "glm-5",
+        "glm-4.7",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash-0731",
+        "MiniMax-M2.5"
+      ],
       "endpoints": [
         "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
       ]
@@ -239,7 +354,16 @@
       "endpoint": "https://api.x.ai/v1",
       "api_mode": "codex_responses",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "grok-4.6",
+        "grok-composer-2.5-fast",
+        "grok-build-0.1",
+        "grok-4.5",
+        "grok-4.3",
+        "grok-4.20-0309-reasoning",
+        "grok-4.20-0309-non-reasoning",
+        "grok-4.20-multi-agent-0309"
+      ],
       "endpoints": [
         "https://api.x.ai/v1"
       ]
@@ -259,7 +383,16 @@
       "endpoint": "https://api.xiaomimimo.com/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "mimo-v2.6-pro",
+        "mimo-v2.6-flash",
+        "mimo-v2.6-pro-ultraspeed",
+        "mimo-v2.5-pro",
+        "mimo-v2.5",
+        "mimo-v2-pro",
+        "mimo-v2-omni",
+        "mimo-v2-flash"
+      ],
       "endpoints": [
         "https://api.xiaomimimo.com/v1"
       ]
@@ -279,7 +412,11 @@
       "endpoint": "https://tokenhub.tencentmaas.com/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "hy4-preview",
+        "hy3",
+        "hy3-preview"
+      ],
       "endpoints": [
         "https://tokenhub.tencentmaas.com/v1"
       ]
@@ -299,7 +436,11 @@
       "endpoint": "https://api.lkeap.cloud.tencent.com/plan/anthropic",
       "api_mode": "anthropic_messages",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "hy4-preview",
+        "hy3",
+        "hy3-preview"
+      ],
       "endpoints": [
         "https://api.lkeap.cloud.tencent.com/plan/anthropic"
       ]
@@ -320,6 +461,14 @@
       "api_mode": "chat_completions",
       "headers": {},
       "fallback_models": [
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        "z-ai/glm-5.3",
+        "z-ai/glm-5.2",
+        "moonshotai/kimi-k2.6",
+        "minimaxai/minimax-m3",
         "nvidia/llama-3.1-nemotron-70b-instruct",
         "nvidia/llama-3.3-70b-instruct"
       ],
@@ -344,7 +493,25 @@
       "endpoint": "https://api.githubcopilot.com",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5-mini",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "claude-sonnet-4.6",
+        "claude-sonnet-5",
+        "claude-sonnet-4",
+        "claude-sonnet-4.5",
+        "claude-haiku-4.5",
+        "gemini-3.1-pro-preview",
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro"
+      ],
       "endpoints": [
         "https://api.githubcopilot.com"
       ]
@@ -362,7 +529,9 @@
       "endpoint": "acp://copilot",
       "api_mode": "codex_responses",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "copilot-acp"
+      ],
       "endpoints": [
         "acp://copilot"
       ]
@@ -383,8 +552,16 @@
       "api_mode": "chat_completions",
       "headers": {},
       "fallback_models": [
-        "Qwen/Qwen3.5-72B-Instruct",
-        "deepseek-ai/DeepSeek-V3.2"
+        "moonshotai/Kimi-K2.5",
+        "Qwen/Qwen3.5-397B-A17B",
+        "Qwen/Qwen3.5-35B-A3B",
+        "deepseek-ai/DeepSeek-V3.2",
+        "MiniMaxAI/MiniMax-M2.5",
+        "zai-org/GLM-5",
+        "XiaomiMiMo/MiMo-V2-Flash",
+        "moonshotai/Kimi-K2-Thinking",
+        "moonshotai/Kimi-K2.6",
+        "Qwen/Qwen3.5-72B-Instruct"
       ],
       "endpoints": [
         "https://router.huggingface.co/v1"
@@ -406,7 +583,14 @@
       "endpoint": "https://generativelanguage.googleapis.com/v1beta",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3-pro-preview",
+        "gemini-3.6-flash",
+        "gemini-3.1-flash-lite-preview"
+      ],
       "endpoints": [
         "https://generativelanguage.googleapis.com/v1beta"
       ]
@@ -424,7 +608,18 @@
       "endpoint": "https://aiplatform.googleapis.com",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "google/gemini-3.8-flash",
+        "google/gemini-3.7-flash",
+        "google/gemini-3.1-pro-preview",
+        "google/gemini-3-pro-preview",
+        "google/gemini-3.6-flash",
+        "google/gemini-3.5-flash",
+        "google/gemini-3.5-flash-lite",
+        "google/gemini-3-flash-preview",
+        "google/gemini-3.1-flash-lite-preview",
+        "google/gemini-3.1-flash-lite"
+      ],
       "endpoints": [
         "https://aiplatform.googleapis.com"
       ]
@@ -445,8 +640,8 @@
       "api_mode": "chat_completions",
       "headers": {},
       "fallback_models": [
-        "deepseek-v4-pro",
-        "deepseek-flash"
+        "deepseek-flash",
+        "deepseek-v4-pro"
       ],
       "endpoints": [
         "https://api.deepseek.com/v1"
@@ -469,7 +664,16 @@
       "headers": {
         "User-Agent": "Hermes-Agent/0.21.5"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "grok-4.6",
+        "grok-composer-2.5-fast",
+        "grok-build-0.1",
+        "grok-4.5",
+        "grok-4.3",
+        "grok-4.20-0309-reasoning",
+        "grok-4.20-0309-non-reasoning",
+        "grok-4.20-multi-agent-0309"
+      ],
       "endpoints": [
         "https://api.x.ai/v1"
       ]
@@ -492,8 +696,16 @@
       "api_mode": "chat_completions",
       "headers": {},
       "fallback_models": [
+        "glm-5.3",
+        "glm-5.3-flash",
         "glm-5.2",
+        "glm-5.1",
         "glm-5",
+        "glm-5v-turbo",
+        "glm-5-turbo",
+        "glm-4.7",
+        "glm-4.5",
+        "glm-4.5-flash",
         "glm-4-9b"
       ],
       "endpoints": [
@@ -523,7 +735,18 @@
         "X-Title": "Hermes Agent",
         "User-Agent": "HermesAgent/0.21.5"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "kimi-k3",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "kimi-for-coding",
+        "kimi-for-coding-highspeed",
+        "kimi-k2-thinking",
+        "kimi-k2-thinking-turbo",
+        "kimi-k2-turbo-preview",
+        "kimi-k2-0905-preview"
+      ],
       "endpoints": [
         "https://api.moonshot.ai/v1",
         "https://api.kimi.com/coding"
@@ -548,7 +771,16 @@
         "X-Title": "Hermes Agent",
         "User-Agent": "HermesAgent/0.21.5"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "kimi-k3",
+        "kimi-k2.7-code",
+        "kimi-k2.7-code-highspeed",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "kimi-k2-thinking",
+        "kimi-k2-turbo-preview",
+        "kimi-k2-0905-preview"
+      ],
       "endpoints": [
         "https://api.moonshot.cn/v1",
         "https://api.kimi.com/coding"
@@ -569,7 +801,10 @@
       "endpoint": "https://api.stepfun.ai/step_plan/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "step-3.5-flash",
+        "step-3.5-flash-2603"
+      ],
       "endpoints": [
         "https://api.stepfun.ai/step_plan/v1"
       ]
@@ -589,7 +824,13 @@
       "endpoint": "https://api.minimax.io/anthropic",
       "api_mode": "anthropic_messages",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "MiniMax-M3",
+        "MiniMax-M2.7",
+        "MiniMax-M2.5",
+        "MiniMax-M2.1",
+        "MiniMax-M2"
+      ],
       "endpoints": [
         "https://api.minimax.io/anthropic"
       ]
@@ -607,7 +848,11 @@
       "endpoint": "https://api.minimax.io/anthropic",
       "api_mode": "anthropic_messages",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "MiniMax-M3",
+        "MiniMax-M2.7",
+        "MiniMax-M2.7-highspeed"
+      ],
       "endpoints": [
         "https://api.minimax.io/anthropic",
         "https://api.minimaxi.com/anthropic"
@@ -628,7 +873,13 @@
       "endpoint": "https://api.minimaxi.com/anthropic",
       "api_mode": "anthropic_messages",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "MiniMax-M3",
+        "MiniMax-M2.7",
+        "MiniMax-M2.5",
+        "MiniMax-M2.1",
+        "MiniMax-M2"
+      ],
       "endpoints": [
         "https://api.minimaxi.com/anthropic"
       ]
@@ -668,7 +919,11 @@
       "endpoint": "https://api.arcee.ai/api/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "trinity-large-thinking",
+        "trinity-large-preview",
+        "trinity-mini"
+      ],
       "endpoints": [
         "https://api.arcee.ai/api/v1"
       ]
@@ -718,7 +973,13 @@
       "endpoint": "https://api.kilo.ai/api/gateway",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "anthropic/claude-opus-4.6",
+        "anthropic/claude-sonnet-4.6",
+        "openai/gpt-5.4",
+        "google/gemini-3-pro-preview",
+        "google/gemini-3-flash-preview"
+      ],
       "endpoints": [
         "https://api.kilo.ai/api/gateway"
       ]
@@ -742,7 +1003,73 @@
         "X-Title": "Hermes Agent",
         "User-Agent": "HermesAgent/0.21.5"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "x-preview-f-free",
+        "kimi-k3",
+        "kimi-k2.5",
+        "kimi-k2.6",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "gpt-5.5-pro",
+        "gpt-5.4-pro",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.2",
+        "gpt-5.2-codex",
+        "gpt-5.1",
+        "gpt-5.1-codex",
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex-mini",
+        "gpt-5",
+        "gpt-5-codex",
+        "gpt-5-nano",
+        "claude-fable-5",
+        "claude-opus-5",
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-opus-4-5",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4",
+        "claude-haiku-4-5",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-pro",
+        "gemini-3-flash",
+        "grok-4.6",
+        "grok-4.5",
+        "grok-build-0.1",
+        "muse-spark-1.2",
+        "minimax-m3",
+        "minimax-m2.7",
+        "minimax-m2.5",
+        "glm-5.3",
+        "glm-5.3-flash",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5",
+        "kimi-k2.7-code",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "qwen3.6-plus",
+        "qwen3.5-plus",
+        "big-pickle",
+        "mimo-v2.5-free",
+        "nemotron-3-ultra-free",
+        "nemotron-3.5-lightning-free",
+        "muse-spark-1.2-contributor-free",
+        "muse-spark-1.3-contributor-free"
+      ],
       "endpoints": [
         "https://opencode.ai/zen/v1"
       ]
@@ -766,7 +1093,37 @@
         "X-Title": "Hermes Agent",
         "User-Agent": "HermesAgent/0.21.5"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "kimi-k3",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "gpt-5.6-luna",
+        "grok-4.5",
+        "glm-5.3",
+        "glm-5.3-flash",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5",
+        "mimo-v2.5-pro",
+        "mimo-v2.5",
+        "mimo-v2-pro",
+        "mimo-v2-omni",
+        "minimax-m3",
+        "minimax-m2.7",
+        "minimax-m2.5",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "qwen3.8-max",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.5-plus",
+        "hy3",
+        "hy3-preview",
+        "muse-spark-1.2-contributor",
+        "muse-spark-1.3-contributor"
+      ],
       "endpoints": [
         "https://opencode.ai/zen/go/v1"
       ]
@@ -784,7 +1141,23 @@
       "endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com",
       "api_mode": "bedrock_converse",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "us.anthropic.claude-sonnet-5",
+        "us.anthropic.claude-sonnet-4-6",
+        "us.anthropic.claude-opus-4-6-v1",
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "openai.gpt-5.5",
+        "openai.gpt-5.6-sol",
+        "openai.gpt-5.6-terra",
+        "openai.gpt-5.6-luna",
+        "us.amazon.nova-pro-v1:0",
+        "us.amazon.nova-lite-v1:0",
+        "us.amazon.nova-micro-v1:0",
+        "deepseek.v3.2",
+        "us.meta.llama4-maverick-17b-instruct-v1:0",
+        "us.meta.llama4-scout-17b-instruct-v1:0"
+      ],
       "endpoints": [
         "https://bedrock-runtime.us-east-1.amazonaws.com"
       ]
@@ -827,7 +1200,23 @@
         "HTTP-Referer": "https://hermes-agent.nousresearch.com",
         "X-Title": "Hermes Agent"
       },
-      "fallback_models": [],
+      "fallback_models": [
+        "moonshotai/kimi-k2.6",
+        "alibaba/qwen3.6-plus",
+        "zai/glm-5.1",
+        "minimax/minimax-m2.7",
+        "anthropic/claude-sonnet-4.6",
+        "anthropic/claude-opus-4.7",
+        "anthropic/claude-opus-4.6",
+        "anthropic/claude-haiku-4.5",
+        "openai/gpt-5.4",
+        "openai/gpt-5.4-mini",
+        "openai/gpt-5.3-codex",
+        "google/gemini-3.1-pro-preview",
+        "google/gemini-3-flash",
+        "google/gemini-3.1-flash-lite-preview",
+        "xai/grok-4.20-reasoning"
+      ],
       "endpoints": [
         "https://ai-gateway.vercel.sh/v1"
       ]
@@ -887,7 +1276,23 @@
       "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.8-max",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.6-flash",
+        "kimi-k2.5",
+        "qwen3.5-plus",
+        "qwen3-coder-plus",
+        "qwen3-coder-next",
+        "glm-5.2",
+        "glm-5",
+        "glm-4.7",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash-0731",
+        "MiniMax-M2.5"
+      ],
       "endpoints": [
         "https://dashscope.aliyuncs.com/compatible-mode/v1"
       ]
@@ -907,7 +1312,22 @@
       "endpoint": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.8-max-0902",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.6-flash",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "deepseek-v3.2",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5"
+      ],
       "endpoints": [
         "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
       ]
@@ -928,7 +1348,22 @@
       "endpoint": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.8-max-0902",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.6-flash",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "deepseek-v3.2",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5"
+      ],
       "endpoints": [
         "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
       ]
@@ -949,7 +1384,18 @@
       "endpoint": "https://coding-intl.dashscope.aliyuncs.com/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.5-plus",
+        "qwen3-max-2026-01-23",
+        "qwen3-coder-plus",
+        "qwen3-coder-next",
+        "kimi-k2.5",
+        "glm-5",
+        "glm-4.7",
+        "MiniMax-M2.5"
+      ],
       "endpoints": [
         "https://coding-intl.dashscope.aliyuncs.com/v1"
       ]
@@ -971,7 +1417,18 @@
       "endpoint": "https://coding.dashscope.aliyuncs.com/v1",
       "api_mode": "chat_completions",
       "headers": {},
-      "fallback_models": [],
+      "fallback_models": [
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.5-plus",
+        "qwen3-max-2026-01-23",
+        "qwen3-coder-plus",
+        "qwen3-coder-next",
+        "kimi-k2.5",
+        "glm-5",
+        "glm-4.7",
+        "MiniMax-M2.5"
+      ],
       "endpoints": [
         "https://coding.dashscope.aliyuncs.com/v1"
       ]
@@ -1194,5 +1651,57 @@
     "telegram",
     "wecom",
     "whatsapp"
-  ]
+  ],
+  "model_routing": {
+    "opencode": {
+      "opencode-go": [
+        [
+          [
+            "gpt-",
+            "grok-",
+            "muse-spark"
+          ],
+          "codex_responses"
+        ],
+        [
+          [
+            "minimax-",
+            "qwen",
+            "union-alpha"
+          ],
+          "anthropic_messages"
+        ]
+      ],
+      "opencode-zen": [
+        [
+          [
+            "claude-",
+            "union-alpha"
+          ],
+          "anthropic_messages"
+        ],
+        [
+          [
+            "gpt-",
+            "grok-",
+            "muse-spark"
+          ],
+          "codex_responses"
+        ],
+        [
+          [
+            "qwen"
+          ],
+          "anthropic_messages"
+        ]
+      ]
+    },
+    "azure_responses_prefixes": [
+      "codex",
+      "gpt-5",
+      "o1",
+      "o3",
+      "o4"
+    ]
+  }
 }

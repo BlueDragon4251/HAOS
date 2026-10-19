@@ -144,3 +144,33 @@ At source `0e564941`, the general CI (39230128220), services/kernel
 source, not this ACP continuation. Model-discovery UX and remaining
 provider-specific contracts are the next provider work. Gateways/mobile and
 installed ISO/HP/real-account acceptance remain open.
+
+## Private model discovery and route controls
+
+The physical setup can load/search/select model IDs through a fixed private
+provider process, including native Gemini and Messages pagination, the actual
+Codex account-catalog parser, signed boto3 control-plane discovery and isolated
+ACP session models. The root GUI never imports provider SDK/plugin code.
+Keys go to the private process on stdin, never argv or public model metadata.
+Catalog requests keep fixed endpoints/TLS, refuse redirects, pin custom public
+DNS addresses and bound response/cursor sizes. Vertex exposes no compatible
+model-list endpoint; its upstream suggestions remain explicitly offline.
+All offline suggestions are distinguished from API/SDK catalogs and none is
+reported as successful inference. A provider change clears previous key/URL
+input before a request can be made to the new service.
+
+Model-specific OpenCode/Go and Azure protocol rules and offline model catalogs
+are generated from pinned upstream constants. A real Codex catalog fixture and
+actual signed boto3 control-plane HTTP fixture pass; 109 generated routing
+cases match upstream's own functions. The native setup CI now clicks model
+loading/selection/configuration controls and checks credential clearing.
+The GUI also exposes existing route/default/removal/ordered-fallback controls;
+removal withdraws dependent MoA presets before republishing authority.
+
+All five ACP-source gates at `a3761767` passed, including the real separate-UID
+Unix socket, credential-read and route-withdrawal probe (services/kernel
+39268226372); provider contracts 39268226093 and graphical setup 39268226173
+also passed. These results belong to the prior ACP source. This catalog
+continuation repeats them separately. Remaining provider work includes
+advanced Bedrock/Mantle and native/profile contracts plus cloud SDK token-flow
+fixtures; real vendor inference/account/installed acceptance is outstanding.

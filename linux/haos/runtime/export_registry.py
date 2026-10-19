@@ -20,6 +20,8 @@ def inventory(root: Path):
     from hermes_cli.auth import PROVIDER_REGISTRY
     from hermes_cli.providers import determine_api_mode, get_provider
     from providers import get_provider_profile
+    from hermes_cli.models_catalog_static import _PROVIDER_MODELS, _AZURE_FOUNDRY_RESPONSES_PREFIXES
+    from hermes_cli.models import _OPENCODE_API_MODE_PREFIXES
 
     rows = []
     for descriptor in provider_catalog():
@@ -38,7 +40,8 @@ def inventory(root: Path):
         rows.append({**asdict(descriptor), "endpoint": endpoint,
                      "api_mode": mode,
                      "headers": dict(profile.default_headers) if profile else {},
-                     "fallback_models": list(profile.fallback_models) if profile else []})
+                     "fallback_models": list(dict.fromkeys([*_PROVIDER_MODELS.get(descriptor.slug, []),
+                         *(profile.fallback_models if profile else [])]))})
     # Endpoint variants declared by upstream authentication adapters, rather
     # than a second hand-maintained vendor URL table in HAOS.
     from hermes_cli.auth_zai_kimi import KIMI_CODE_BASE_URL, ZAI_ENDPOINTS
@@ -51,7 +54,9 @@ def inventory(root: Path):
     # Inventory bundled adapters without importing their listeners or installing dependencies.
     platforms = sorted(p.parent.name for p in (root / "plugins/platforms").glob("*/adapter.py"))
     return {"version": 1, "hermes_sha": (root / ".herald-os-upstream-sha").read_text().strip(),
-            "providers": rows, "platforms": platforms}
+            "providers": rows, "platforms": platforms,
+            "model_routing": {"opencode": _OPENCODE_API_MODE_PREFIXES,
+                              "azure_responses_prefixes": _AZURE_FOUNDRY_RESPONSES_PREFIXES}}
 
 
 def main():

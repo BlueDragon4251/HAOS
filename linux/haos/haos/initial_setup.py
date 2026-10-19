@@ -258,6 +258,44 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     return {"configured": True, "provider": provider, "model_turn_tested": False}
 
 
+def provider_models(provider, api_key="", endpoint="", api_mode=""):
+    require_root()
+    from .provider_setup import catalog_helper
+    data = {"version": 1, "provider": provider, "endpoint": endpoint or default_endpoint(provider),
+            "models": ["haos-discovery"], "default_model": "haos-discovery",
+            "api_mode": api_mode or default_mode(provider, "haos-discovery"),
+            "requests_per_day": 200, "requests_per_minute": 30}
+    return catalog_helper(data, api_key or None)
+
+
+def provider_state():
+    require_root()
+    from .provider_routes import ProviderRoutes
+    from .sandbox import trusted_json
+    path = Path("/etc/haos/provider.json")
+    if not path.exists() and not path.is_symlink():
+        return {"routes": [], "default": None, "fallbacks": {}}
+    current = ProviderRoutes(trusted_json(path))
+    return {"routes": [{"id": name, "provider": policy.provider, "model": policy.data["default_model"],
+                        "api_mode": policy.api_mode} for name, policy in current.routes.items()],
+            "default": current.default, "fallbacks": current.fallbacks}
+
+
+def manage_provider_route(route, action, fallbacks=()):
+    require_root()
+    if action not in {"default", "remove", "fallbacks"}:
+        raise ValueError("unsupported provider route action")
+    from .provider_setup import route_settings
+    from .owner import audit
+    quiesce_for_setup()
+    result = route_settings(route, make_default=action == "default", remove=action == "remove",
+                            fallbacks=fallbacks if action == "fallbacks" else None)
+    subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"],
+                   check=True, timeout=30, capture_output=True)
+    audit("setup.provider-routes", {"route": route, "action": action})
+    return result
+
+
 def provider_account(provider, action="login"):
     """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
     require_root()
