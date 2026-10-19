@@ -52,7 +52,8 @@ def main():
                 params["qwen_session_metadata"] = {"sessionId": "fixture-session", "promptId": "fixture-prompt"}
             native = {"chat_completions": ChatCompletionsTransport, "codex_responses": ResponsesApiTransport,
                 "anthropic_messages": AnthropicTransport}[mode]()
-            expected = native.build_kwargs(model, messages, tools, base_url=policy.endpoint,
+            context = None if provider == "bedrock" and mode == "anthropic_messages" else policy.endpoint
+            expected = native.build_kwargs(model, messages, tools, base_url=context,
                 provider=provider, provider_profile=original, **params)
             actual = get_transport(mode).build_kwargs(model, messages, tools,
                 base_url=policy.client_config()["model"]["base_url"], provider="custom", **params)
@@ -82,12 +83,27 @@ def main():
             base_url=policy.client_config()["model"]["base_url"])
         assert any(block.get("signature") == "fixture-signature" for message in kwargs["messages"]
             for block in message["content"] if isinstance(message["content"], list))
+        from haos.provider_bedrock_replay import carrier, TYPE
+        policy = ProviderPolicy({**policy.data, "provider": "bedrock", "endpoint": default_endpoint("bedrock"),
+            "models": ["fixture"], "default_model": "fixture", "api_mode": "chat_completions"})
+        detail = carrier([{"reasoningContent": {"text": "fixture", "signature": "fixture-signature"}}], "fixture", policy.endpoint)
+        messages = [{"role": "assistant", "content": "fixture", "reasoning_details": [detail]}]
+        register_profiles(policy.data)
+        actual = get_transport("chat_completions").build_kwargs("fixture", messages,
+            base_url=policy.client_config()["model"]["base_url"])
+        assert actual["messages"][0]["reasoning_details"] == [detail]
+        policy = ProviderPolicy({**policy.data, "provider": "openrouter", "endpoint": default_endpoint("openrouter")})
+        register_profiles(policy.data)
+        actual = get_transport("chat_completions").build_kwargs("fixture", messages,
+            base_url=policy.client_config()["model"]["base_url"])
+        assert not any(item.get("type") == TYPE for item in actual["messages"][0].get("reasoning_details", []))
     finally:
         socket.getaddrinfo, socket.socket.connect = old_dns, old_connect
     receipt = {"actual_pinned_provider_wire_cases": checks, "network_disabled_during_projection": True,
         "agent_profiles_have_only_broker_capability": True, "upstream_client_and_auth_hooks_not_delegated": True,
         "openrouter_reasoning_replay_through_broker": True, "live_provider_tested": False, "python": sys.version.split()[0],
         "native_anthropic_signed_thinking_replay_through_broker": True,
+        "bedrock_private_replay_excluded_from_other_provider_profiles": True,
         "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in (Path(__file__), root / "haos/provider_profiles.py", root / "haos/sandbox.py", root / "haos/serve.py")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")

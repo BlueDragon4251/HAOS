@@ -3,9 +3,11 @@ from copy import deepcopy
 
 
 def feature_headers(payload, headers, endpoint):
+    if payload.get("speed") != "fast":
+        return headers
     from agent.anthropic_adapter import _supports_fast_mode, _FAST_MODE_BETA
     from agent.anthropic_endpoints import _is_third_party_anthropic_endpoint
-    if payload.get("speed") == "fast" and not _is_third_party_anthropic_endpoint(endpoint) and _supports_fast_mode(payload.get("model", "")):
+    if not _is_third_party_anthropic_endpoint(endpoint) and _supports_fast_mode(payload.get("model", "")):
         headers = dict(headers)
         key = next((key for key in headers if key.lower() == "anthropic-beta"), "anthropic-beta")
         betas = headers.get(key, "").split(",")

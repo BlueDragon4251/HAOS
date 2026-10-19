@@ -48,7 +48,7 @@ def main():
     import boto3
     from botocore.config import Config
     results = []
-    for case in ("json-tools", "stream-tools", "truncated", "rate-limit"):
+    for case in ("json-tools", "stream-tools", "truncated", "rate-limit", "json-no-usage", "stream-no-usage"):
         received, release, final_sent = [], threading.Event(), threading.Event()
         capability, key = secrets.token_urlsafe(48), "fixture-access-id"
         secret, session = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
@@ -87,12 +87,12 @@ def main():
                         ("contentBlockDelta", {"contentBlockIndex": 1, "delta": {"toolUse": {"input": json.dumps({"value": session})}}}),
                         ("contentBlockStop", {"contentBlockIndex": 1}),
                         ("messageStop", {"stopReason": "tool_use"}),
-                        ("metadata", {"usage": {"inputTokens": 7, "outputTokens": 4, "totalTokens": 11}, "metrics": {"latencyMs": 1}})):
+                        ("metadata", {"usage": {} if case.endswith("no-usage") else {"inputTokens": 7, "outputTokens": 4, "totalTokens": 11}, "metrics": {"latencyMs": 1}})):
                         self.wfile.write(event_frame(kind, payload))
                 else:
                     body = json.dumps({"output": {"message": {"role": "assistant", "content": [
                         {"toolUse": {"toolUseId": "fixture-call", "name": "fixture", "input": {"value": session}}}]}},
-                        "stopReason": "tool_use", "usage": {"inputTokens": 7, "outputTokens": 4, "totalTokens": 11},
+                        "stopReason": "tool_use", "usage": {} if case.endswith("no-usage") else {"inputTokens": 7, "outputTokens": 4, "totalTokens": 11},
                         "metrics": {"latencyMs": 1}}).encode()
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
@@ -116,12 +116,12 @@ def main():
                 try:
                     with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": json.dumps(data)}), ledger)) as broker:
                         conn = http.client.HTTPConnection("127.0.0.1", broker, timeout=10)
-                        conn.request("POST", "/v1/chat/completions", json.dumps({"model": "fixture-model", "stream": case != "json-tools",
+                        conn.request("POST", "/v1/chat/completions", json.dumps({"model": "fixture-model", "stream": not case.startswith("json"),
                             "messages": [{"role": "user", "content": "local protocol fixture"}],
                             "tools": [{"type": "function", "function": {"name": "fixture", "parameters": {"type": "object"}}}]}),
                             {"Authorization": "Bearer " + capability})
                         response = conn.getresponse()
-                        if case == "stream-tools":
+                        if case.startswith("stream"):
                             line = response.readline()
                             assert b"signed fixture" in line and not release.is_set() and not final_sent.is_set()
                             release.set()
@@ -147,6 +147,8 @@ def main():
             assert received[0][1]["X-Amz-Security-Token"] == session
             assert received[0][2]["toolConfig"]["tools"][0]["toolSpec"]["name"] == "fixture"
             assert ledger.db.execute("SELECT status FROM requests").fetchone()[0] == (502 if case == "truncated" else 429 if case == "rate-limit" else 200)
+            if case.endswith("no-usage"):
+                assert ledger.db.execute("SELECT input_tokens,output_tokens FROM requests").fetchone() == (None, None)
             ledger.close()
             results.append(case)
     receipt = {"provider": "bedrock", "actual_boto3_signing_eventstream": True, "actual_loopback_http": True,

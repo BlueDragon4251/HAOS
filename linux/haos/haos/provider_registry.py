@@ -57,6 +57,12 @@ def default_endpoint(provider):
 
 def default_mode(provider, model=""):
     rules = registry_export().get("model_routing", {})
+    if provider == "bedrock":
+        if model.lower() in {item.lower() for item in rules.get("bedrock_responses_models", [])}:
+            return "codex_responses"
+        if model and re.match(rules.get("bedrock_anthropic_pattern", r"(?!)"), model, re.IGNORECASE):
+            return "anthropic_messages"
+        return "chat_completions"
     if provider in rules.get("opencode", {}):
         normalized = model.removeprefix(provider + "/").lower()
         for prefixes, mode in rules["opencode"][provider]:
@@ -68,7 +74,7 @@ def default_mode(provider, model=""):
     if provider == "copilot":
         match = re.match(r"^(?:openai/)?gpt-(\d+)", model)
         return "codex_responses" if match and int(match[1]) >= 5 and not model.removeprefix("openai/").startswith("gpt-5-mini") else "chat_completions"
-    if provider in {"local", "bedrock", "copilot-acp"}:
+    if provider in {"local", "copilot-acp"}:
         return "chat_completions"
     row = descriptor(provider)
     if row is None:

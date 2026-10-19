@@ -5,8 +5,8 @@ The snapshot contains 39 regular entries and 14 additional bundled profiles.
 The HTTP broker implements Chat Completions, Responses and native Anthropic
 Messages, with exact owner-selected endpoints and local function-tool admission.
 Account flows run upstream login/refresh under the separate provider identity.
-This is ongoing parity work; SDK, native Gemini, Copilot/ACP, MoA, discovery and
-full installed acceptance are tracked in [PROVIDER-PARITY.md](PROVIDER-PARITY.md).
+Native SDK, Gemini, Copilot/ACP, MoA, model discovery and wire-contract progress
+and remaining acceptance are tracked in [PROVIDER-PARITY.md](PROVIDER-PARITY.md).
 
 `haos-provider` is a separate unprivileged identity. Real API keys stay in
 root-private `/etc/haos/provider-credentials`, delivered by systemd credentials.
@@ -78,6 +78,15 @@ restart or uncertain dispatch does not erase consumed quota. There are two
 concurrent calls, bounded request/response/frame sizes and stream deadlines.
 Provider 401/403/429/5xx status reaches Hermes without leaking provider bodies.
 Incomplete streams never receive a fabricated successful terminal response.
+
+Bedrock accepts private JSON containing either `access_key_id` and
+`secret_access_key` (optional `session_token`), `profile`, or `bearer_token`.
+An empty field selects the private provider service's normal AWS SDK identity.
+Automatic protocol selection uses native Claude Messages, reviewed Mantle GPT
+Responses, and Converse for other models including GPT-OSS. Mantle's hostname
+is derived from the approved Bedrock runtime region. Control-plane discovery
+does not enumerate Mantle-only models; use a supported model ID explicitly.
+Discovery and protocol setup do not prove account access.
 
 ```sh
 sudo haos-owner provider status

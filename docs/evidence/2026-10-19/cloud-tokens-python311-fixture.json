@@ -17,11 +17,11 @@
     },
     {
       "path": "provider_cloud.py",
-      "sha256": "4cc49c1df3ba67603b4fa1fbc538bf5b82541c0f0fbe22af03f52f26ccd307c8"
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
     },
     {
       "path": "provider_proxy.py",
-      "sha256": "fe76ca124ccabf85f0e9f69834eb9c9544d5da352c5a25e5381532c66ec2f1e7"
+      "sha256": "88348f2a362a5258db2a42c084b35b31aa76606fee7de89aa0f5acb89115781d"
     }
   ]
 }

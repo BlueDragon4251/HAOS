@@ -31,6 +31,7 @@ def main():
     from haos.provider_registry import default_mode, registry
     from haos.redaction import Redactor
     from hermes_cli.models import opencode_model_api_mode, azure_foundry_model_api_mode
+    from agent.bedrock_adapter import is_openai_bedrock_model, is_anthropic_bedrock_model, BEDROCK_OPENAI_RESPONSES_MODEL_IDS
     checks = 0
     for provider in ("opencode-go", "opencode-zen", "azure-foundry"):
         for model in [*registry()[provider]["fallback_models"], "gpt-6-sol", "qwen-fixture", "claude-fixture", "kimi-fixture", "openai/gpt-5-mini"]:
@@ -38,6 +39,11 @@ def main():
                         opencode_model_api_mode(provider, model))
             assert default_mode(provider, model) == expected
             checks += 1
+    for model in [*registry()["bedrock"]["fallback_models"], *BEDROCK_OPENAI_RESPONSES_MODEL_IDS,
+            "openai.gpt-oss-120b-1:0", "global.anthropic.claude-opus-4-6-v1", "fixture"]:
+        expected = "codex_responses" if is_openai_bedrock_model(model) else "anthropic_messages" if is_anthropic_bedrock_model(model) else "chat_completions"
+        assert default_mode("bedrock", model) == expected
+        checks += 1
     received = []
     key, secret, session = "fixture-aws-access", secrets.token_urlsafe(40), secrets.token_urlsafe(40)
     class Fixture(BaseHTTPRequestHandler):

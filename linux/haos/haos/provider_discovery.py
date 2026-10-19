@@ -174,17 +174,14 @@ def discover(policy, credential):
     credentials = Credentials(policy, {"api_key": credential})
     try:
         if policy.provider == "bedrock":
-            import boto3
             from botocore.config import Config
-            from .provider_cloud import credential_data
+            from .provider_cloud import credential_data, aws_session
             from agent.bedrock_adapter import _list_foundation_models, _list_inference_profiles
             data = credential_data(policy.provider, credential)
-            options = {key: data[value] for key, value in (("aws_access_key_id", "access_key_id"),
-                ("aws_secret_access_key", "secret_access_key"), ("aws_session_token", "session_token"),
-                ("profile_name", "profile")) if value in data}
             region = urlsplit(policy.endpoint).hostname.split(".")[1]
-            client = boto3.Session(**options).client("bedrock", region_name=region,
-                config=Config(connect_timeout=5, read_timeout=8, retries={"total_max_attempts": 1}))
+            client = aws_session(data).client("bedrock", region_name=region,
+                config=Config(connect_timeout=5, read_timeout=8, retries={"total_max_attempts": 1},
+                    **({"signature_version": "bearer"} if "bearer_token" in data else {})))
             try:
                 models = []
                 class BoundedControl:

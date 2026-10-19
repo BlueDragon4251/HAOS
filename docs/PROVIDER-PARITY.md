@@ -15,10 +15,10 @@ authorized. Additional bundled HTTP profiles require a reviewed image/export.
 | --- | --- | --- |
 | HTTP API profiles | Registry-driven endpoint allowlists, setup/CLI, isolated credentials, three real native HTTP protocols | Provider-specific live/model/plan validation; complete per-provider quirks and dynamic discovery |
 | Account providers | Native private refresh, Qwen CLI import, Copilot device authorization, isolated ACP login/status/local logout; physical GUI account launcher | Real account flows, installed GUI acceptance and remote account revocation |
-| Multiple providers | Version 2 atomic migration, route-bound keys/models, default selection, removal, explicit same-protocol fallback, no replay after stream starts | GUI management of existing routes and mixed-protocol fallback conversion |
-| Native streaming | Messages, Responses and Chat Completions SSE, local tool definitions, token redaction, durable usage | Multiline SSE and full protocol stress matrix; additional provider-specific contracts |
+| Multiple providers | Version 2 atomic migration, route-bound keys/models, GUI default/removal/fallback controls, explicit same-protocol fallback, no replay after stream starts | Installed/live failover acceptance; mixed-protocol fallback conversion is not implemented |
+| Native streaming | Bounded multiline Messages, Responses and Chat Completions SSE, subscription tools, signed replay, token redaction, durable usage | External protocol/account stress and installed acceptance |
 | Native Gemini | Real upstream native codec, continuous SSE, tool/signature preservation, rate/error/truncation handling | External Google account and installed acceptance |
-| Cloud SDKs | boto3 Converse signing + continuous AWS EventStream; Vertex service-account/ADC token refresh; Azure API-key/service-principal/default-chain token handling and native Messages query/header handling | Bedrock Mantle/OpenAI path and advanced native reasoning replay; real SDK account entitlement and cloud live tests |
+| Cloud SDKs | IAM/bearer Converse, native Claude InvokeModel and Mantle Responses; continuous AWS EventStream and bound ordered replay; actual Google/Azure SDK token refresh/cache | Real cloud account entitlement, default-chain/role/SSO and installed live acceptance |
 | Custom API | Explicit HTTPS owner route, fixed capability/model admission, private-address refusal and pinned public DNS address with original TLS hostname | Real custom endpoint acceptance and full provider-specific extension contract |
 | External/virtual providers | Separate UID/Unix ACP process, secured official pinned CLI; actual upstream broker-only MoA fanout/aggregation | Real subscribed accounts, installed ACP isolation acceptance, complete reviewed external plugin admission |
 | Gateways | Existing Telegram/Discord paths retained | Remaining 20 adapter integrations; no new gateway support claimed |
@@ -238,3 +238,44 @@ paths from hashes. The kernel fixture now supplies that source and additionally
 checks that it is read-only, contains no credential fields and is absent without
 a model capability. No kernel gate is weakened or reported passed before rerun.
 Advanced Bedrock/Mantle and external account/installed acceptance remain open.
+
+## Three native Bedrock paths and bound Converse replay
+
+Bedrock defaults now derive from the pinned upstream's exact Mantle model IDs
+and Claude-family expression, exported as data for the root GUI. GPT-OSS stays
+on Converse; the four reviewed GPT models use Responses at Mantle's fixed host
+derived from the owner-approved runtime region. Claude defaults to the actual
+AnthropicBedrock SDK InvokeModel/CRC-checked binary EventStream codec. Explicit
+existing Claude Converse policies remain valid. A route cannot mix Mantle and
+other models under one protocol allowlist.
+
+Each route selects IAM access/secret/session keys, its private AWS profile/SDK
+chain, or explicit bearer-token JSON. Bearer sessions have a route-local token
+provider and an empty IAM resolver; they never consult another IAM identity or
+change process-global AWS variables. Mantle uses the actual botocore signer on
+the exact outbound bytes. Native Claude uses the actual SDK signer or an
+explicit per-client bearer hook. The GUI documents all credential choices.
+
+Converse JSON and streams now preserve ordered text, signed/redacted reasoning
+and tool blocks through a namespaced public Hermes replay carrier. The actual
+pinned ordered accumulator builds it after early deltas have already streamed.
+It is bound to model and approved endpoint, and excluded by other provider
+profiles. Unknown usage remains absent rather than becoming reported zero.
+Native Claude streaming also retains message_start usage when SDK delta models
+contain optional None fields.
+
+Actual local fixtures cover 16 Mantle/native Claude IAM/bearer JSON, early
+stream, truncation and rate-limit cases, with SigV4 verified cryptographically;
+eight further real HTTP requests replay interleaved signed/redacted/tool blocks
+on the next Converse turn under IAM and bearer auth. Six original Converse
+cases include absent-usage handling. Generated routing comparisons include
+Bedrock and all 53 wire profiles still match actual pinned kwargs. The broader
+minimal-dependency test suite passes 739 cases with 21 existing skips and the
+same two host-blocked files excluded. No external account or inference is used.
+
+At cbde7f2f, provider contracts, graphical setup and general CI passed. Services
+failed before the kernel probe because minimal unit fixtures do not install
+Hermes: a new native-helper import ran even on ordinary non-fast local Messages.
+The helper is now lazy and credential classification reuses the native client's
+already emitted identity headers. All 49 minimal-dependency routing cases pass;
+the real kernel test remains required and awaits the corrected-source CI.

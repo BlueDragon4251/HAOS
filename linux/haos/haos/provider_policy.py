@@ -86,8 +86,14 @@ class ProviderPolicy:
             raise ValueError("unsupported model transport")
         if self.provider == "openai-codex" and self.api_mode != "codex_responses":
             raise ValueError("Codex OAuth requires the native Responses transport")
-        if self.provider in {"bedrock", "vertex", "gemini", "copilot-acp"} and self.api_mode != "chat_completions":
+        if self.provider in {"vertex", "gemini", "copilot-acp"} and self.api_mode != "chat_completions":
             raise ValueError("this broker SDK adapter requires local Chat Completions ingress")
+        if self.provider == "bedrock":
+            modes = {default_mode("bedrock", model) for model in self.models}
+            if (self.api_mode == "codex_responses" and modes != {"codex_responses"}
+                    or self.api_mode == "anthropic_messages" and modes != {"anthropic_messages"}
+                    or self.api_mode == "chat_completions" and "codex_responses" in modes):
+                raise ValueError("Bedrock model allowlist must use its native protocol family")
         if self.provider == "copilot" and any(default_mode("copilot", model) != self.api_mode for model in self.models):
             raise ValueError("Copilot model allowlist must use the selected native protocol")
         for key, upper in (("requests_per_day", 10000), ("requests_per_minute", 120)):

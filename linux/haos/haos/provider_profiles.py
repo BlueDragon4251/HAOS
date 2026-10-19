@@ -37,8 +37,16 @@ def register_profiles(data):
             raise ValueError("broker wire profile is outside the reviewed registry")
         original = get_provider_profile(source) or get_provider_profile("custom")
         route = config["providers"][name]
+        endpoint = policy.endpoint
+        if source == "bedrock" and policy.api_mode == "codex_responses":
+            from .provider_cloud import mantle_endpoint
+            endpoint = mantle_endpoint(endpoint)
+        elif source == "bedrock" and policy.api_mode == "anthropic_messages":
+            # Native Claude InvokeModel accepts the same signed thinking as
+            # Anthropic; the generic third-party-host branch would discard it.
+            endpoint = None
         attributes = {}
-        def delegate(hook, original=original, endpoint=policy.endpoint):
+        def delegate(hook, original=original, endpoint=endpoint):
             def call(self, *args, **kwargs):
                 if "base_url" in kwargs:
                     kwargs["base_url"] = endpoint
@@ -55,14 +63,18 @@ def register_profiles(data):
             if getattr(type(original), hook) is not getattr(ProviderProfile, hook):
                 attributes[hook] = delegate(hook)
         profile_class = type("HAOSBrokerWireProfile", (ProviderProfile,), attributes)
+        flags = {field: getattr(original, field) for field in fields}
+        if source == "bedrock" and policy.api_mode == "chat_completions":
+            from .provider_bedrock_replay import TYPE
+            flags["native_reasoning_details_type"] = TYPE
         profile = profile_class(name="custom:" + name, aliases=(name,), api_mode=policy.api_mode,
             base_url=route["base_url"], env_vars=("HAOS_MODEL_TOKEN",), auth_type="api_key",
             default_aux_model=policy.data["default_model"], fallback_models=tuple(policy.models),
-            **{field: getattr(original, field) for field in fields})
+            **flags)
         # No source auth handler, refresh callback, client builder, CLI process,
         # extra credential header or catalog override crosses this boundary.
         register_provider(profile)
-        profiles[route["base_url"].rstrip("/")] = (profile, policy.endpoint, source)
+        profiles[route["base_url"].rstrip("/")] = (profile, endpoint, source)
 
     class BrokerChat(ChatCompletionsTransport):
         def convert_messages(self, messages, **kwargs):

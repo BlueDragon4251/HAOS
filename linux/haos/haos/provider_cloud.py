@@ -44,8 +44,12 @@ def credential_data(provider, value):
     if not isinstance(data, dict):
         raise ValueError("cloud credential must be a JSON object")
     if provider == "bedrock":
-        if set(data) - {"access_key_id", "secret_access_key", "session_token", "profile"}:
+        if set(data) - {"access_key_id", "secret_access_key", "session_token", "profile", "bearer_token"}:
             raise ValueError("unsupported AWS credential field")
+        if "bearer_token" in data and set(data) != {"bearer_token"}:
+            raise ValueError("choose either an AWS bearer token or IAM credentials")
+        if "bearer_token" in data and (not isinstance(data["bearer_token"], str) or any(ord(char) < 33 or ord(char) > 126 for char in data["bearer_token"])):
+            raise ValueError("invalid AWS bearer token")
         if bool(data.get("access_key_id")) != bool(data.get("secret_access_key")):
             raise ValueError("AWS credentials require the complete access/secret key pair")
     elif provider == "vertex":
@@ -65,6 +69,50 @@ def credential_data(provider, value):
     if any(not isinstance(item, str) or not item or len(item) > 8192 for item in data.values()):
         raise ValueError("invalid cloud credential value")
     return data
+
+
+def aws_session(data):
+    """Per-route SDK identity, without process-global AWS environment changes."""
+    import boto3
+    options = {key: data[value] for key, value in (("aws_access_key_id", "access_key_id"),
+        ("aws_secret_access_key", "secret_access_key"), ("aws_session_token", "session_token"),
+        ("profile_name", "profile")) if value in data}
+    if "bearer_token" in data:
+        from botocore.session import Session
+        from botocore.credentials import CredentialResolver
+        from botocore.tokens import FrozenAuthToken
+        session = Session()
+        token = FrozenAuthToken(data["bearer_token"])
+        class RouteToken:
+            def load_token(self, **kwargs):
+                return token if kwargs.get("signing_name") in {None, "bedrock"} else None
+        session.register_component("token_provider", RouteToken())
+        # Bearer-only routes must not probe another route's IAM/instance chain.
+        session.register_component("credential_provider", CredentialResolver([]))
+        options["botocore_session"] = session
+    return boto3.Session(**options)
+
+
+def mantle_endpoint(endpoint):
+    if not valid_endpoint("bedrock", endpoint):
+        raise PermissionError("Mantle region must derive from the approved Bedrock endpoint")
+    region = urlsplit(endpoint).hostname.split(".")[1]
+    return f"https://bedrock-mantle.{region}.api.aws/openai/v1"
+
+
+def mantle_headers(policy, data, body, headers):
+    """Use botocore's actual signer with this route's explicit credential chain."""
+    if "bearer_token" in data:
+        return {**headers, "Authorization": "Bearer " + data["bearer_token"]}
+    from botocore.auth import SigV4Auth
+    from botocore.awsrequest import AWSRequest
+    credentials = aws_session(data).get_credentials()
+    if credentials is None:
+        raise PermissionError("AWS IAM credentials are not available for this route")
+    region = urlsplit(policy.endpoint).hostname.split(".")[1]
+    request = AWSRequest(method="POST", url=mantle_endpoint(policy.endpoint) + "/responses", data=body, headers=headers)
+    SigV4Auth(credentials.get_frozen_credentials(), "bedrock", region).add_auth(request)
+    return dict(request.headers.items())
 
 
 def cloud_headers(policy, data, cache):
@@ -104,23 +152,22 @@ def cloud_headers(policy, data, cache):
 class BedrockClient:
     """Upstream Converse conversion plus actual botocore signing/EventStream."""
     def __init__(self, policy, data, *, client=None):
-        import boto3
         from botocore.config import Config
         region = urlsplit(policy.endpoint).hostname.split(".")[1]
-        options = {key: data[value] for key, value in (("aws_access_key_id", "access_key_id"),
-                   ("aws_secret_access_key", "secret_access_key"), ("aws_session_token", "session_token"),
-                   ("profile_name", "profile")) if value in data}
-        session = boto3.Session(**options)
+        session = aws_session(data)
         self.client = client or session.client("bedrock-runtime", region_name=region, endpoint_url=policy.endpoint,
-                                     config=Config(connect_timeout=15, read_timeout=180, retries={"total_max_attempts": 1}))
+            config=Config(connect_timeout=15, read_timeout=180, retries={"total_max_attempts": 1},
+                          **({"signature_version": "bearer"} if "bearer_token" in data else {})))
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+        self.endpoint = policy.endpoint
 
     def close(self):
         self.client.close()
 
     def create(self, *, model, messages=None, tools=None, stream=False, **kwargs):
         from agent.bedrock_adapter import build_converse_kwargs, normalize_converse_response
-        request = build_converse_kwargs(model, messages or [], tools, kwargs.get("max_tokens", 4096),
+        from .provider_bedrock_replay import restore, carrier
+        request = build_converse_kwargs(model, restore(messages or [], model, self.endpoint), tools, kwargs.get("max_tokens", 4096),
                                         kwargs.get("temperature"), kwargs.get("top_p"),
                                         [kwargs["stop"]] if isinstance(kwargs.get("stop"), str) else kwargs.get("stop"))
         for tool in request.get("toolConfig", {}).get("tools", []):
@@ -138,7 +185,13 @@ class BedrockClient:
             else:
                 raise ValueError("unsupported Bedrock tool choice")
         if not stream:
-            result = normalize_converse_response(self.client.converse(**request))
+            raw = self.client.converse(**request)
+            result = normalize_converse_response(raw)
+            if not all(type(raw.get("usage", {}).get(key)) is int for key in ("inputTokens", "outputTokens")):
+                result.usage = None
+            message = result.choices[0].message
+            if message.bedrock_content_blocks:
+                message.reasoning_details = [carrier(message.bedrock_content_blocks, model, self.endpoint)]
             result.id, result.object, result.created = "bedrock-" + uuid.uuid4().hex, "chat.completion", int(time.time())
             return result
         response = self.client.converse_stream(**request)
@@ -159,13 +212,19 @@ class BedrockClient:
             def close(self):
                 raw.close()
         responsive = EventStream(AvailableBody(), stream._output_shape, stream._parser, stream._operation_name)
-        return self.events(responsive, model)
+        return self.events(responsive, model, self.endpoint)
 
     @staticmethod
-    def events(stream, model):
+    def events(stream, model, endpoint):
         tools, terminal, identifier, created = {}, False, "bedrock-" + uuid.uuid4().hex, int(time.time())
+        recorded, size, final_reason = [], 0, None
         try:
             for event in stream:
+                import base64
+                size += len(json.dumps(event, default=lambda value: base64.b64encode(value).decode()).encode())
+                if size > 32 * 1024 * 1024:
+                    raise ValueError("Bedrock replay exceeds broker response bound")
+                recorded.append(event)
                 if any(key.endswith("Exception") for key in event):
                     raise ConnectionError("Bedrock stream failed")
                 delta, finish, usage = {}, None, None
@@ -187,18 +246,28 @@ class BedrockClient:
                         delta["tool_calls"] = [{"index": tools[index], "function": {"arguments": value["toolUse"]["input"]}}]
                 if stop := event.get("messageStop"):
                     from agent.bedrock_adapter import _STOP_REASON_TO_FINISH_REASON
-                    finish = _STOP_REASON_TO_FINISH_REASON.get(stop["stopReason"], "stop")
+                    final_reason = _STOP_REASON_TO_FINISH_REASON.get(stop["stopReason"], "stop")
                     terminal = True
                 if metadata := event.get("metadata"):
                     raw = metadata.get("usage", {})
-                    incoming = sum(raw.get(key, 0) for key in ("inputTokens", "cacheReadInputTokens", "cacheWriteInputTokens"))
-                    outgoing = raw.get("outputTokens", 0)
-                    usage = {"prompt_tokens": incoming, "completion_tokens": outgoing, "total_tokens": incoming + outgoing}
+                    if all(type(raw.get(key)) is int for key in ("inputTokens", "outputTokens")):
+                        incoming = sum(raw.get(key, 0) for key in ("inputTokens", "cacheReadInputTokens", "cacheWriteInputTokens"))
+                        outgoing = raw["outputTokens"]
+                        usage = {"prompt_tokens": incoming, "completion_tokens": outgoing, "total_tokens": incoming + outgoing}
                 if delta or finish or usage:
                     yield {"id": identifier, "created": created, "object": "chat.completion.chunk", "model": model,
                            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}] if delta or finish else [],
                            "usage": usage}
             if not terminal:
                 raise ConnectionError("Bedrock stream ended without messageStop")
+            # Reuse the native ordered accumulator after forwarding each early
+            # delta. Its signed/redacted/tool block ordering is authoritative.
+            from agent.bedrock_adapter import stream_converse_with_callbacks
+            from .provider_bedrock_replay import carrier
+            result = stream_converse_with_callbacks({"stream": recorded})
+            blocks = result.choices[0].message.bedrock_content_blocks
+            details = [carrier(blocks, model, endpoint)] if blocks else []
+            yield {"id": identifier, "created": created, "object": "chat.completion.chunk", "model": model,
+                   "choices": [{"index": 0, "delta": {"reasoning_details": details}, "finish_reason": final_reason}]}
         finally:
             stream.close()

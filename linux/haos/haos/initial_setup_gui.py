@@ -450,7 +450,7 @@ class Wizard:
                                 success="Modellkatalog geladen. Auswahl gibt noch keine Inferenz frei.", result_handler=show_models)
             self._button(self.content, "Modellliste laden", load_models).pack(anchor="w", pady=8)
             self._label(self.content,
-                "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key, optional session_token oder profile. "
+                "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key (optional session_token), profile oder bearer_token. "
                 "Vertex erwartet Service-Account-/Authorized-User-JSON und die vollständige OpenAPI-URL. "
                 "Azure akzeptiert einen API-Key oder JSON mit tenant_id / client_id / client_secret. "
                 "Ein leeres Cloud-Feld verwendet ausschließlich die SDK-Identität des getrennten Provider-Dienstes.",

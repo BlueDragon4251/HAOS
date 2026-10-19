@@ -127,6 +127,9 @@ class Credentials:
                 self.cloud_data = credential_data(self.policy.provider, self.credentials.get("api_key"))
                 headers, values = cloud_headers(self.policy, self.cloud_data, self.cloud_cache)
                 self.query = dict(self.cloud_cache.get("query", {}))
+                if self.policy.provider == "bedrock" and self.policy.api_mode == "codex_responses":
+                    from .provider_cloud import mantle_endpoint
+                    self.request_state.endpoint = mantle_endpoint(self.policy.endpoint)
             return headers, Redactor(values)
         if (self.policy.provider in oauth_providers() or
                 (self.policy.provider in {"anthropic", "openrouter"} and not self.credentials.get("api_key"))):
@@ -168,11 +171,13 @@ class Credentials:
                 # deliberately use different authentication headers. Let the
                 # pinned native client own that classification and its betas.
                 from agent.anthropic_adapter import build_anthropic_client
-                from agent.anthropic_credentials import anthropic_route_is_oauth
-                self.request_state.oauth_messages = anthropic_route_is_oauth(self.policy.endpoint, token)
                 with build_anthropic_client(token, self.policy.endpoint) as client:
                     headers.update({key: value for key, value in client.default_headers.items()
                                     if isinstance(value, str)})
+                    # The native constructor has already classified the private
+                    # token. Its CLI identity is emitted only for subscriptions.
+                    self.request_state.oauth_messages = (urlsplit(self.policy.endpoint).hostname == "api.anthropic.com"
+                        and any(key.lower() == "x-app" and value == "cli" for key, value in client.default_headers.items()))
                     self.query = dict(client.default_query)
             else:
                 headers["Authorization"] = "Bearer " + token
@@ -343,7 +348,10 @@ class Handler(BaseHTTPRequestHandler):
             self.server.turns.release()
 
     def forward(self, payload, headers, redactor, *, defer_errors=False):
-        if self.policy.provider in {"gemini", "bedrock", "copilot-acp"}:
+        if self.policy.provider == "bedrock" and self.policy.api_mode == "anthropic_messages":
+            from .provider_bedrock_messages import forward
+            return forward(self, payload, redactor)
+        if self.policy.provider in {"gemini", "copilot-acp"} or (self.policy.provider == "bedrock" and self.policy.api_mode != "codex_responses"):
             from .provider_native import forward_native
             return forward_native(self, payload, headers, redactor)
         endpoint = urlsplit(getattr(self.route_credentials, "effective_endpoint", self.policy.endpoint))
@@ -388,6 +396,9 @@ class Handler(BaseHTTPRequestHandler):
                     wire_headers.pop(previous)
                 wire_headers[key] = value
                 spelling[key.lower()] = key
+            if self.policy.provider == "bedrock":
+                from .provider_cloud import mantle_headers
+                wire_headers = mantle_headers(self.policy, self.route_credentials.cloud_data, body, wire_headers)
             conn.request("POST", path + route + suffix, body=body, headers=wire_headers)
             response = conn.getresponse()
             if not 200 <= response.status < 300:

@@ -22,6 +22,7 @@ def inventory(root: Path):
     from providers import get_provider_profile
     from hermes_cli.models_catalog_static import _PROVIDER_MODELS, _AZURE_FOUNDRY_RESPONSES_PREFIXES
     from hermes_cli.models import _OPENCODE_API_MODE_PREFIXES
+    from agent.bedrock_adapter import BEDROCK_OPENAI_RESPONSES_MODEL_IDS, _ANTHROPIC_BEDROCK_MODEL_RE
 
     rows = []
     for descriptor in provider_catalog():
@@ -56,6 +57,8 @@ def inventory(root: Path):
     return {"version": 1, "hermes_sha": (root / ".herald-os-upstream-sha").read_text().strip(),
             "providers": rows, "platforms": platforms,
             "model_routing": {"opencode": _OPENCODE_API_MODE_PREFIXES,
+                              "bedrock_responses_models": BEDROCK_OPENAI_RESPONSES_MODEL_IDS,
+                              "bedrock_anthropic_pattern": _ANTHROPIC_BEDROCK_MODEL_RE.pattern,
                               "azure_responses_prefixes": _AZURE_FOUNDRY_RESPONSES_PREFIXES}}
 
 
