@@ -78,6 +78,32 @@ root-only backup/UID gates remain separate CI requirements. Thirteen runtime
 probes pass on these exact source inputs, without an external account or release
 claim. Older 195-case receipts retain their original source hashes.
 
+## Azure endpoint selection and complete cloud HTTP fixtures (2026-10-20)
+
+Automatic setup now recognizes Azure's native `/anthropic` endpoint before
+applying model-family defaults, in both the graphical catalog/configuration and
+owner CLI. Explicit protocol selection remains available. Four setup-policy
+tests and twelve more comparisons with the pinned runtime URL/model functions
+cover endpoint precedence; the model-routing probe now checks 143 cases.
+
+The new required cloud-model HTTP probe retains actual Google authorized-user
+and Azure Identity/MSAL token clients, replacing only their network destinations
+with local fixtures. **49** cases cover Vertex OpenAPI plus Azure Chat, Responses
+and native Messages under both Entra and API-key authentication: tool JSON,
+early continuous streams, aborts, 401/429, short JSON and short terminal-SSE
+HTTP bodies. Native Azure version queries and cached token reuse are checked.
+The shared HTTP fixtures now also exercise actual Responses and Anthropic SDK
+stream accumulators, checking the final text and parsed local tool arguments
+after the first delta arrives before the withheld completion.
+
+Fresh local verification: 49 cloud cases, 273 HTTP-profile cases, 143 routing
+comparisons, and **813 passed/two existing skips** in each of the minimal and
+full pinned-runtime suites. The separate root-only backup/UID gates are not
+counted as local passes. All five GitHub gates for predecessor `bba61f7` are
+now successful, including services/kernel `39315028170`; new-source CI must
+still run. Receipts are in `docs/evidence/2026-10-20`. No external account,
+model inference, installed boot or final artifact acceptance is claimed.
+
 Base: `9e432326e2c7ef56a7d9c0899ced3f53debff0ce`.
 Hermes: `f97608f178d1ffeca59860195ab7da295f7c8e5f`.
 

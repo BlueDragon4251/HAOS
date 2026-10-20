@@ -237,7 +237,7 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     data = {"version": 1, "provider": provider,
             "endpoint": endpoint or default_endpoint(provider),
             "models": [model], "default_model": model,
-            "api_mode": api_mode or default_mode(provider, model),
+            "api_mode": api_mode or default_mode(provider, model, endpoint),
             "requests_per_day": 200, "requests_per_minute": 30}
     policy = ProviderPolicy(data)
     if provider not in {"local", "lmstudio", "custom", *account_providers(), *CLOUD} and not api_key:
@@ -263,7 +263,7 @@ def provider_models(provider, api_key="", endpoint="", api_mode=""):
     from .provider_setup import catalog_helper
     data = {"version": 1, "provider": provider, "endpoint": endpoint or default_endpoint(provider),
             "models": ["haos-discovery"], "default_model": "haos-discovery",
-            "api_mode": api_mode or default_mode(provider, "haos-discovery"),
+            "api_mode": api_mode or default_mode(provider, "haos-discovery", endpoint),
             "requests_per_day": 200, "requests_per_minute": 30}
     return catalog_helper(data, api_key or None)
 

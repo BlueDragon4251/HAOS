@@ -57,6 +57,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"
           "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"
           "$PYTHON" linux/haos/runtime/probe_cloud_tokens.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-tokens.json"
+          "$PYTHON" linux/haos/runtime/probe_cloud_inference.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-model-http.json"
           "$PYTHON" linux/haos/runtime/probe_provider_profiles.py linux/haos "$RUNNER_TEMP/provider-contracts/wire-profiles.json"
           "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
           "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"

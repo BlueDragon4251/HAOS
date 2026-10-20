@@ -147,3 +147,19 @@ def test_catalog_helper_sends_key_only_on_private_stdin_and_keeps_provider_ident
     ("opencode-go", "kimi-fixture", "chat_completions"), ("azure-foundry", "openai/gpt-5-mini", "codex_responses")])
 def test_generated_model_protocol_rules_are_applied_without_importing_plugins_in_root_setup(provider, model, mode):
     assert default_mode(provider, model) == mode
+
+
+@pytest.mark.parametrize("suffix,expected", [("/anthropic", "anthropic_messages"),
+    ("/anthropic/v1", "anthropic_messages"), ("/openai/v1", "chat_completions"),
+    ("/anthropic-other", "chat_completions")])
+def test_graphical_cloud_discovery_auto_mode_respects_native_endpoint(monkeypatch, suffix, expected):
+    from haos import initial_setup, provider_setup
+    captured = []
+    monkeypatch.setattr(initial_setup, "require_root", lambda: None)
+    monkeypatch.setattr(provider_setup, "catalog_helper", lambda policy, key: captured.append((policy, key)))
+    endpoint = "https://fixture.services.ai.azure.com" + suffix
+    initial_setup.provider_models("azure-foundry", endpoint=endpoint)
+    assert captured[0][0]["api_mode"] == expected and captured[0][1] is None
+    assert ProviderPolicy(captured[0][0]).endpoint == endpoint
+    with pytest.raises(PermissionError):
+        ProviderPolicy({**captured[0][0], "endpoint": "https://attacker.invalid/anthropic"})

@@ -25,6 +25,74 @@ def serving(server):
         thread.join(5)
 
 
+def fixture_response(mode, model, name, text):
+    """Native fixture messages shared by HTTP and actual cloud-SDK probes."""
+    if mode == "anthropic_messages":
+        result = {"id": "msg_fixture", "type": "message", "role": "assistant", "model": model,
+            "content": [{"type": "text", "text": text},
+                {"type": "tool_use", "id": "call_fixture", "name": name, "input": {"x": 1}}],
+            "stop_reason": "tool_use", "stop_sequence": None,
+            "usage": {"input_tokens": 8, "output_tokens": 5}}
+        early = [{"type": "message_start", "message": {**result, "content": [], "stop_reason": None,
+            "usage": {"input_tokens": 8, "output_tokens": 0}}},
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}}]
+        terminal = [{"type": "content_block_stop", "index": 0},
+            {"type": "content_block_start", "index": 1,
+                "content_block": {"type": "tool_use", "id": "call_fixture", "name": name, "input": {}}},
+            {"type": "content_block_delta", "index": 1,
+                "delta": {"type": "input_json_delta", "partial_json": '{"x":1}'}},
+            {"type": "content_block_stop", "index": 1},
+            {"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": None},
+                "usage": {"output_tokens": 5}}, {"type": "message_stop"}]
+    elif mode == "codex_responses":
+        message = {"type": "message", "id": "msg_fixture", "role": "assistant", "status": "completed",
+            "content": [{"type": "output_text", "text": text, "annotations": [], "logprobs": []}]}
+        tool = {"type": "function_call", "id": "fc_fixture", "call_id": "call_fixture",
+            "name": name, "arguments": '{"x":1}', "status": "completed"}
+        result = {"id": "resp_fixture", "object": "response", "created_at": 1, "model": model,
+            "status": "completed", "error": None, "incomplete_details": None,
+            "output": [message, tool],
+            "usage": {"input_tokens": 8, "output_tokens": 5, "total_tokens": 13}}
+        early = [{"type": "response.created", "response": {**result, "status": "in_progress", "output": [], "usage": None}},
+            {"type": "response.output_item.added", "output_index": 0, "item": {**message, "status": "in_progress", "content": []}},
+            {"type": "response.content_part.added", "item_id": "msg_fixture", "output_index": 0, "content_index": 0,
+                "part": {"type": "output_text", "text": "", "annotations": [], "logprobs": []}},
+            {"type": "response.output_text.delta", "item_id": "msg_fixture", "output_index": 0,
+                "content_index": 0, "delta": text, "logprobs": []}]
+        terminal = [{"type": "response.output_text.done", "item_id": "msg_fixture", "output_index": 0, "content_index": 0,
+                "text": text, "logprobs": []},
+            {"type": "response.content_part.done", "item_id": "msg_fixture", "output_index": 0, "content_index": 0, "part": message["content"][0]},
+            {"type": "response.output_item.done", "output_index": 0, "item": message},
+            {"type": "response.output_item.added", "output_index": 1, "item": {**tool, "arguments": "", "status": "in_progress"}},
+            {"type": "response.function_call_arguments.delta", "item_id": "fc_fixture", "output_index": 1, "delta": '{"x":1}'},
+            {"type": "response.function_call_arguments.done", "item_id": "fc_fixture", "output_index": 1, "arguments": '{"x":1}', "name": name},
+            {"type": "response.output_item.done", "output_index": 1, "item": tool},
+            {"type": "response.completed", "response": result}]
+        for sequence, value in enumerate([*early, *terminal]):
+            value["sequence_number"] = sequence
+    else:
+        result = {"id": "chat_fixture", "object": "chat.completion", "created": 1, "model": model,
+            "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {"role": "assistant",
+                "content": text, "tool_calls": [{"id": "call_fixture", "type": "function",
+                    "function": {"name": name, "arguments": '{"x":1}'}}]}}],
+            "usage": {"prompt_tokens": 8, "completion_tokens": 5, "total_tokens": 13}}
+        early = [{"id": "chat_fixture", "object": "chat.completion.chunk", "created": 1, "model": model,
+            "choices": [{"index": 0, "finish_reason": None, "delta": {"role": "assistant", "content": text}}]}]
+        terminal = [{**early[0], "choices": [{"index": 0, "finish_reason": "tool_calls",
+            "delta": {"tool_calls": [{"index": 0, **result["choices"][0]["message"]["tool_calls"][0]}]}}],
+            "usage": result["usage"]}, "[DONE]"]
+    return result, early, terminal
+
+
+@contextmanager
+def sdk_stream(client, mode, call, body, *, accumulate=False):
+    manager = (client.responses.stream(**body) if accumulate and mode == "codex_responses" else
+        client.messages.stream(**body) if accumulate and mode == "anthropic_messages" else call(**body, stream=True))
+    with manager as stream:
+        yield stream
+
+
 def main():
     root = Path(sys.argv[1]).resolve()
     sys.path.insert(0, str(root))
@@ -74,44 +142,7 @@ def main():
                     self.wfile.write(data)
                     return
                 text = "early fixture " + state["key"]
-                if mode == "anthropic_messages":
-                    result = {"id": "msg_fixture", "type": "message", "role": "assistant", "model": body["model"],
-                        "content": [{"type": "text", "text": text},
-                            {"type": "tool_use", "id": "call_fixture", "name": name, "input": {"x": 1}}],
-                        "stop_reason": "tool_use", "stop_sequence": None,
-                        "usage": {"input_tokens": 8, "output_tokens": 5}}
-                    early = [{"type": "message_start", "message": {**result, "content": [], "stop_reason": None,
-                        "usage": {"input_tokens": 8, "output_tokens": 0}}},
-                        {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
-                        {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}}]
-                    terminal = [{"type": "content_block_stop", "index": 0},
-                        {"type": "content_block_start", "index": 1,
-                            "content_block": {"type": "tool_use", "id": "call_fixture", "name": name, "input": {}}},
-                        {"type": "content_block_delta", "index": 1,
-                            "delta": {"type": "input_json_delta", "partial_json": '{"x":1}'}},
-                        {"type": "content_block_stop", "index": 1},
-                        {"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": None},
-                            "usage": {"output_tokens": 5}}, {"type": "message_stop"}]
-                elif mode == "codex_responses":
-                    result = {"id": "resp_fixture", "object": "response", "created_at": 1, "model": body["model"],
-                        "status": "completed", "error": None, "incomplete_details": None,
-                        "output": [{"type": "function_call", "id": "fc_fixture", "call_id": "call_fixture",
-                            "name": name, "arguments": '{"x":1}', "status": "completed"}],
-                        "usage": {"input_tokens": 8, "output_tokens": 5, "total_tokens": 13}}
-                    early = [{"type": "response.output_text.delta", "item_id": "msg_fixture", "output_index": 0,
-                        "content_index": 0, "sequence_number": 1, "delta": text}]
-                    terminal = [{"type": "response.completed", "sequence_number": 2, "response": result}]
-                else:
-                    result = {"id": "chat_fixture", "object": "chat.completion", "created": 1, "model": body["model"],
-                        "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {"role": "assistant",
-                            "content": text, "tool_calls": [{"id": "call_fixture", "type": "function",
-                                "function": {"name": name, "arguments": '{"x":1}'}}]}}],
-                        "usage": {"prompt_tokens": 8, "completion_tokens": 5, "total_tokens": 13}}
-                    early = [{"id": "chat_fixture", "object": "chat.completion.chunk", "created": 1, "model": body["model"],
-                        "choices": [{"index": 0, "finish_reason": None, "delta": {"role": "assistant", "content": text}}]}]
-                    terminal = [{**early[0], "choices": [{"index": 0, "finish_reason": "tool_calls",
-                        "delta": {"tool_calls": [{"index": 0, **result["choices"][0]["message"]["tool_calls"][0]}]}}],
-                        "usage": result["usage"]}, "[DONE]"]
+                result, early, terminal = fixture_response(mode, body["model"], name, text)
                 if case in {"json", "json-framing"}:
                     data = json.dumps(result).encode()
                     self.send_response(200)
@@ -208,23 +239,27 @@ def main():
                                     assert json.loads(normalized.tool_calls[0].arguments) == {"x": 1}
                                     assert key not in result.model_dump_json() and capability not in result.model_dump_json()
                                 else:
-                                    stream = call(**body, stream=True)
                                     first = False
                                     values = []
                                     interrupted = False
                                     try:
-                                        for value in stream:
-                                            values.append(value)
-                                            encoded = value.model_dump_json()
-                                            assert key not in encoded and capability not in encoded
-                                            if "early fixture " in encoded:
-                                                assert not release.is_set()
-                                                first = True
-                                                release.set()
+                                        with sdk_stream(client, mode, call, body, accumulate=case == "stream") as stream:
+                                            for value in stream:
+                                                values.append(value)
+                                                encoded = value.model_dump_json()
+                                                assert key not in encoded and capability not in encoded
+                                                if not first and "early fixture " in encoded:
+                                                    assert not release.is_set()
+                                                    first = True
+                                                    release.set()
+                                            if case == "stream" and mode in {"codex_responses", "anthropic_messages"}:
+                                                result = stream.get_final_response() if mode == "codex_responses" else stream.get_final_message()
+                                                normalized = transport.normalize_response(result)
+                                                assert normalized.tool_calls[0].name == "fixture"
+                                                assert json.loads(normalized.tool_calls[0].arguments) == {"x": 1}
+                                                assert normalized.content.startswith("early fixture ") and key not in normalized.content
                                     except httpx.RemoteProtocolError:
                                         interrupted = True
-                                    finally:
-                                        stream.close()
                                     assert first, "SDK lost early text delta"
                                     assert interrupted == (case in {"abort", "stream-framing"}), "incomplete stream certified successful"
                                     if case == "stream-framing":

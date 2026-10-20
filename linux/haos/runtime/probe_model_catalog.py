@@ -31,6 +31,7 @@ def main():
     from haos.provider_registry import default_mode, registry
     from haos.redaction import Redactor
     from hermes_cli.models import opencode_model_api_mode, azure_foundry_model_api_mode
+    from hermes_cli.runtime_provider import _detect_api_mode_for_url
     from agent.bedrock_adapter import is_openai_bedrock_model, is_anthropic_bedrock_model, BEDROCK_OPENAI_RESPONSES_MODEL_IDS
     checks = 0
     for provider in ("opencode-go", "opencode-zen", "azure-foundry"):
@@ -38,6 +39,13 @@ def main():
             expected = (azure_foundry_model_api_mode(model) or "chat_completions" if provider == "azure-foundry" else
                         opencode_model_api_mode(provider, model))
             assert default_mode(provider, model) == expected
+            checks += 1
+    for suffix in ("/anthropic", "/anthropic/v1", "/anthropic/v1/", "/ANTHROPIC", "/openai/v1", "/anthropic-other"):
+        endpoint = "https://fixture.services.ai.azure.com" + suffix
+        for model in ("claude-opus-4.6", "gpt-5.4"):
+            expected = ("anthropic_messages" if _detect_api_mode_for_url(endpoint) == "anthropic_messages"
+                else azure_foundry_model_api_mode(model) or "chat_completions")
+            assert default_mode("azure-foundry", model, endpoint) == expected
             checks += 1
     for model in [*registry()["bedrock"]["fallback_models"], *BEDROCK_OPENAI_RESPONSES_MODEL_IDS,
             "openai.gpt-oss-120b-1:0", "global.anthropic.claude-opus-4-6-v1", "fixture"]:
@@ -103,7 +111,7 @@ def main():
         "generated_routing_cases_match_upstream": checks, "static_catalog_is_not_entitlement": True,
         "live_provider_tested": False, "python": sys.version.split()[0], "source_sha256": {
             path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-            (Path(__file__), root / "haos/provider_discovery.py", root / "haos/hermes_registry.json")}}
+            (Path(__file__), root / "haos/provider_discovery.py", root / "haos/provider_registry.py", root / "haos/hermes_registry.json")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

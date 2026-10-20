@@ -343,7 +343,7 @@ def owner_provider(args):
         raise ValueError("unsupported owner provider action")
     data = {"version": 1, "provider": args.provider, "endpoint": args.endpoint or ENDPOINTS.get(args.provider, ""),
             "models": list(dict.fromkeys([args.model, *args.allow_model])), "default_model": args.model,
-            "api_mode": args.api_mode or default_mode(args.provider, args.model),
+            "api_mode": args.api_mode or default_mode(args.provider, args.model, args.endpoint or ""),
             "requests_per_day": args.requests_per_day, "requests_per_minute": args.requests_per_minute}
     policy = ProviderPolicy(data)
     credential = None

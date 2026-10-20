@@ -9,6 +9,7 @@ from functools import lru_cache
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 @lru_cache(maxsize=1)
@@ -55,7 +56,12 @@ def default_endpoint(provider):
     return endpoint
 
 
-def default_mode(provider, model=""):
+def default_mode(provider, model="", endpoint=""):
+    # Azure's native Claude endpoint takes precedence over GPT-family model
+    # rules, just as the pinned runtime resolver's endpoint detection does.
+    # Endpoint authority is still independently checked by ProviderPolicy.
+    if provider == "azure-foundry" and urlsplit(endpoint).path.lower().rstrip("/").endswith(("/anthropic", "/anthropic/v1")):
+        return "anthropic_messages"
     rules = registry_export().get("model_routing", {})
     if provider == "bedrock":
         if model.lower() in {item.lower() for item in rules.get("bedrock_responses_models", [])}:
