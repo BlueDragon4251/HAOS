@@ -1,0 +1,12 @@
+{
+  "provider": "moa",
+  "actual_upstream_fanout_and_aggregation": true,
+  "broker_bound_requests": 3,
+  "private_provider_keys_in_agent_config": false,
+  "live_provider_tested": false,
+  "delayed_reference_finalization_handoff": true,
+  "source_sha256": {
+    "probe_moa_provider.py": "3e39025126a759265da987a0737d2a8aeb45065dc0ac68bddca28d32af9d65d9",
+    "provider_proxy.py": "fcd72c6ff721bd2509213addf9137b534582d9c1fc9367f38512892896d962e5"
+  }
+}

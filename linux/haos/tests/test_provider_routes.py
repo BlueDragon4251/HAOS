@@ -34,6 +34,67 @@ def serving(server):
         thread.join(5)
 
 
+def test_two_active_upstreams_keep_a_third_admission_bounded_and_undispatched(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    release, two_active, finalized = threading.Event(), threading.Event(), threading.Event()
+    lock, received = threading.Lock(), []
+    capability = secrets.token_urlsafe(40)
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            with lock:
+                received.append(self.path)
+                if len(received) == 2:
+                    two_active.set()
+            assert release.wait(5), "concurrency fixture was not released"
+            body = json.dumps({"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    class FixtureLedger(UsageLedger):
+        commits = 0
+        def finish(self, *args):
+            super().finish(*args)
+            with lock:
+                self.commits += 1
+                if self.commits == 2:
+                    finalized.set()
+    ledger = FixtureLedger(tmp_path / "usage.db")
+    try:
+        with serving(ThreadingHTTPServer(("127.0.0.1", 0), Fixture)) as upstream:
+            policy = ProviderPolicy(route(endpoint=f"http://127.0.0.1:{upstream}/v1"))
+            with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": None}), ledger)) as port:
+                def call():
+                    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                    try:
+                        conn.request("POST", "/v1/chat/completions", json.dumps({"model": "fixture-model", "messages": []}),
+                            {"Authorization": "Bearer " + capability})
+                        response = conn.getresponse()
+                        return response.status, response.read()
+                    finally:
+                        conn.close()
+                with ThreadPoolExecutor(max_workers=3) as pool:
+                    first, second = pool.submit(call), pool.submit(call)
+                    try:
+                        assert two_active.wait(3)
+                        third = pool.submit(call)
+                        status, body = third.result(timeout=3)
+                        assert status == 429 and b"concurrent model limit" in body
+                        assert len(received) == 2, "waiting admission exceeded the two-call provider cap"
+                    finally:
+                        release.set()
+                    assert first.result(timeout=3)[0] == second.result(timeout=3)[0] == 200
+                    assert finalized.wait(3)
+        assert ledger.db.execute("SELECT COUNT(*) FROM requests").fetchone()[0] == 2
+    finally:
+        release.set()
+        ledger.close()
+
+
 @pytest.mark.parametrize("provider", sorted(http_providers()))
 def test_every_http_profile_has_real_policy_transport_and_no_endpoint_override(provider):
     policy = ProviderPolicy(route(provider))

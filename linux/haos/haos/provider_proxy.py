@@ -311,7 +311,10 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, PermissionError, UnicodeError):
             self.reply(403, "request refused by owner model policy")
             return
-        if not self.server.turns.acquire(blocking=False):
+        # A complete reference body can reach MoA before its handler finishes
+        # local ledger/connection cleanup. Bound the handoff wait while keeping
+        # the same two-call cap; no upstream dispatch or retry occurs here.
+        if not self.server.turns.acquire(timeout=1):
             self.reply(429, "concurrent model limit reached")
             return
         request_id, status, usage = None, 502, {}

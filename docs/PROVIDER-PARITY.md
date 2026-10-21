@@ -1,5 +1,24 @@
 # Hermes parity work — development, not release acceptance
 
+## MoA admission handoff under cleanup delay (2026-10-21)
+
+Push workflow `39574281627` at `ad1f2c4` exposed a genuine broker handoff race:
+the aggregator can arrive after receiving two complete reference bodies but
+before their handlers finish local finalization and release the two-call cap.
+It then received HTTP 429. The parallel PR run passed, so its success alone did
+not establish reliability. The actual pinned-engine probe now delays the first
+two finalizations deterministically; that probe reproduced 429 before the fix.
+
+Broker admission now waits at most one second for an existing slot, retaining
+the same two concurrent calls and dispatching no upstream request while it
+waits. This performs no retry. The delayed actual MoA probe now passes all three
+approved broker calls. A separate real-HTTP test holds two upstream calls open
+and confirms a third request is bounded, gets 429 and never reaches a provider.
+Both runtime variants pass **828 tests, two existing skips**; the 390-case HTTP
+matrix still passes. Root/GUI/general CI passed on predecessor `ad1f2c4`,
+including the new real-root legacy migration test; the handoff fix needs its
+own CI receipt. No live inference or installed/release acceptance is claimed.
+
 ## Graphical MoA model selection (2026-10-21)
 
 The owner now selects approved reference and aggregator models in native GUI

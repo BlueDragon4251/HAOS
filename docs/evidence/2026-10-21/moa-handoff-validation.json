@@ -1,0 +1,44 @@
+{
+  "source_base_commit": "ad1f2c4935eb044fd361ed4995dcd03a7c7d31d3",
+  "source_base_tree": "7131a53cd1b004479c3763c76d78f00bd154c4f6",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 828,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 828,
+    "skipped": 2
+  },
+  "http_profile_sdk_cases": 390,
+  "actual_pinned_moa_broker_calls": 3,
+  "concurrency_cap": 2,
+  "admission_wait_seconds": 1,
+  "third_waiting_call_reaches_upstream": false,
+  "regression_reproduced_before_fix": true,
+  "preceding_ci_push_failure": "https://github.com/BlueDragon4251/HAOS/actions/runs/39574281627",
+  "preceding_ci_root_success": "https://github.com/BlueDragon4251/HAOS/actions/runs/39574287827",
+  "preceding_pr_merge_commit": "66135c232825a31c1980b27f5b849d90acc3b19b",
+  "preceding_pr_merge_tree": "7131a53cd1b004479c3763c76d78f00bd154c4f6",
+  "live_inference_tested": false,
+  "installed_boot_tested": false,
+  "source_files": [
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "1f5ab2874d6a9b0ef8e2d059b0a3dc5c356132b6683af0ae1dcd24b998422801"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "fcd72c6ff721bd2509213addf9137b534582d9c1fc9367f38512892896d962e5"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_provider.py",
+      "sha256": "3e39025126a759265da987a0737d2a8aeb45065dc0ac68bddca28d32af9d65d9"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_routes.py",
+      "sha256": "f475376593be4f6479f454dea089772ae838d3a05d14746d5d8808ed9ca349a2"
+    }
+  ]
+}

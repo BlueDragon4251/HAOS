@@ -10,6 +10,8 @@ import secrets
 import sys
 import tempfile
 import threading
+import time
+import hashlib
 
 
 @contextmanager
@@ -29,6 +31,25 @@ def main():
     from haos.provider_routes import ProviderRoutes
     from haos.provider_proxy import Broker, Credentials, UsageLedger
     from haos import provider_policy, provider_routes
+    class FixtureLedger(UsageLedger):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.order_lock = threading.Lock()
+            self.started, self.committed = 0, 0
+            self.finished = threading.Event()
+        def finish(self, *args):
+            with self.order_lock:
+                self.started += 1
+                position = self.started
+            if position <= 2:
+                # Actual complete reference responses can precede local
+                # finalization. Exercise that real handoff deterministically.
+                time.sleep(0.1)
+            super().finish(*args)
+            with self.order_lock:
+                self.committed += 1
+                if self.committed == 3:
+                    self.finished.set()
     received = []
     keys = {name: secrets.token_urlsafe(40) for name in ("ref-one", "ref-two", "acting")}
     capability = secrets.token_urlsafe(48)
@@ -50,7 +71,7 @@ def main():
         os.environ["HERMES_HOME"] = str(Path(directory) / "hermes")
         os.environ["HAOS_MODEL_TOKEN"] = capability
         Path(os.environ["HERMES_HOME"]).mkdir()
-        ledger = UsageLedger(Path(directory) / "usage.db")
+        ledger = FixtureLedger(Path(directory) / "usage.db")
         with serving(ThreadingHTTPServer(("127.0.0.1", 0), Fixture)) as upstream:
             routes = ProviderRoutes({"version": 2, "default": "acting", "routes": {
                 name: {"version": 1, "provider": "local", "endpoint": f"http://127.0.0.1:{upstream}/v1", "api_mode": "chat_completions",
@@ -85,10 +106,14 @@ def main():
         acting = next(body for model, auth, body in received if model == "acting")
         assert "ref-one response fixture" in json.dumps(acting) and "ref-two response fixture" in json.dumps(acting)
         assert all(key not in json.dumps(config) for key in keys.values())
+        assert ledger.finished.wait(5), "MoA admissions were not durably finalized"
         assert ledger.db.execute("SELECT COUNT(*) FROM requests WHERE status=200").fetchone()[0] == 3
         ledger.close()
     receipt = {"provider": "moa", "actual_upstream_fanout_and_aggregation": True, "broker_bound_requests": 3,
-               "private_provider_keys_in_agent_config": False, "live_provider_tested": False}
+               "private_provider_keys_in_agent_config": False, "live_provider_tested": False,
+               "delayed_reference_finalization_handoff": True,
+               "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in (
+                   Path(__file__), Path(sys.argv[1]) / "haos/provider_proxy.py")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 
