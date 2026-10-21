@@ -140,6 +140,43 @@ jobs:
                   break
               time.sleep(0.02)
           assert account_calls == [("anthropic", "status")]
+          from tkinter import filedialog
+          cloud_calls = []
+          initial_setup.import_cloud_credential = lambda *args: cloud_calls.append(args) or '{"type":"authorized_user","refresh_token":"fixture-private-refresh"}'
+          original_dialog = filedialog.askopenfilename
+          filedialog.askopenfilename = lambda **kwargs: '/fixture-private-owner.json'
+          try:
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              wizard.root.update()
+              import_button = next(item for item in wizard.content.winfo_children()
+                  if isinstance(item, tkinter.Button) and item.cget('text') == 'Private Cloud-JSON-Datei auswählen')
+              assert import_button.cget('state') == 'normal'
+              import_button.invoke()
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running
+              assert cloud_calls == [('vertex', '/fixture-private-owner.json')]
+              assert secret.get().startswith('{"type":"authorized_user"') and secret.cget('show')
+              assert 'fixture-private-refresh' not in wizard.status.cget('text')
+              wizard.root.setvar(menus[0].cget("textvariable"), "openai-api")
+              wizard.root.update()
+              assert not secret.get() and import_button.cget('state') == 'disabled'
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              import_button.invoke()
+              # Even switching away and back must discard the previous read.
+              wizard.root.setvar(menus[0].cget("textvariable"), "openai-api")
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running and not secret.get()
+          finally:
+              filedialog.askopenfilename = original_dialog
           # MoA uses approved model pickers, including a non-default model,
           # instead of asking the owner to type routing JSON.
           initial_setup.provider_state = lambda: {"routes": [

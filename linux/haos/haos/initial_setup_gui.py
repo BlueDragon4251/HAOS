@@ -407,6 +407,7 @@ class Wizard:
             mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
                                 ["auto", "chat_completions", "codex_responses", "anthropic_messages"], "auto")
             secret = self._field(self.content, "API-Schlüssel · nicht gespeichert im GUI", secret=True)
+            selection_generation = 0
             model_rows = []
             catalog_status = self._label(self.content, "Modellkennung direkt eingeben oder den Provider-Katalog laden.",
                                          size=10, color=self.MUTED)
@@ -457,6 +458,26 @@ class Wizard:
                 "Azure akzeptiert einen API-Key oder JSON mit tenant_id / client_id / client_secret. "
                 "Ein leeres Cloud-Feld verwendet ausschließlich die SDK-Identität des getrennten Provider-Dienstes.",
                 size=10, color=self.MUTED).pack(anchor="w", pady=8)
+            def import_cloud_file():
+                if self.running:
+                    return
+                from tkinter import filedialog
+                selected, generation = provider.get(), selection_generation
+                filename = filedialog.askopenfilename(parent=self.root, title="Private Cloud-Zugangsdaten auswählen",
+                    filetypes=[("JSON-Zugangsdaten", "*.json")])
+                if not filename:
+                    return
+                secret.delete(0, tk.END)
+                def imported(value):
+                    if generation == selection_generation and provider.get() == selected and secret.winfo_exists():
+                        secret.insert(0, value)
+                    else:
+                        self.status.config(text="Provider-Auswahl geändert; importierte Zugangsdaten verworfen.")
+                self._run_async(lambda: initial_setup.import_cloud_credential(selected, filename),
+                    success="Private Cloud-Datei in das verdeckte Eingabefeld übernommen. Noch keine Konfiguration oder Inferenz.",
+                    result_handler=imported)
+            cloud_file_button = self._button(self.content, "Private Cloud-JSON-Datei auswählen", import_cloud_file)
+            cloud_file_button.pack(anchor="w", pady=6)
             def account(action):
                 if self.running:
                     return
@@ -478,6 +499,8 @@ class Wizard:
                 "Anmeldung, Status und Konfiguration verwenden dieselbe gewählte Region.",
                 size=10, color=self.MUTED).pack(anchor="w", pady=4)
             def update_provider(*_args):
+                nonlocal selection_generation
+                selection_generation += 1
                 # An old key must never follow a new provider selection.
                 secret.delete(0, tk.END)
                 endpoint.delete(0, tk.END)
@@ -487,6 +510,7 @@ class Wizard:
                 model_list.delete(0, tk.END)
                 catalog_status.config(text="Modellkennung direkt eingeben oder den Provider-Katalog laden.")
                 available = provider.get() in account_providers()
+                cloud_file_button.configure(state="normal" if provider.get() in CLOUD else "disabled")
                 for button in (login_button, logout_button, status_button):
                     button.configure(state="normal" if available else "disabled")
             provider.trace_add("write", update_provider)

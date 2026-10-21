@@ -12,6 +12,7 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.configure_update("dev", True),
         lambda: initial_setup.configure_ghcr("owner", "private"),
         lambda: initial_setup.configure_provider("openai", "gpt-model", "secret"),
+        lambda: initial_setup.import_cloud_credential("vertex", "/no-such-file"),
     ):
         with pytest.raises(PermissionError):
             call()

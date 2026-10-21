@@ -213,6 +213,35 @@ def test_service_credential_loader_refuses_unsafe_descriptors(location, kind):
     with pytest.raises((PermissionError, OSError)):
         private_credential(path)
 
+def test_cloud_file_import_checks_real_ownership_permissions_and_local_seat(location, monkeypatch):
+    from haos import initial_setup
+    for name in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "WAYLAND_DISPLAY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HAOS_TRUSTED_SETUP", "1")
+    monkeypatch.setenv("DISPLAY", ":8")
+    path = location / "cloud.json"
+    value = {"bearer_token": secrets.token_urlsafe(40)}
+    path.write_text(json.dumps(value))
+    path.chmod(0o600)
+    original = path.read_bytes()
+    assert path.stat().st_uid == os.geteuid() == 0
+    assert json.loads(initial_setup.import_cloud_credential("bedrock", path)) == value
+    path.chmod(0o644)
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    path.chmod(0o600)
+    owner_uids = {owner["uid"] for owner in initial_setup.owners()}
+    foreign = next(uid for uid in range(65000, 65010) if uid not in owner_uids)
+    os.chown(path, foreign, foreign)
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    os.chown(path, 0, 0)
+    monkeypatch.setenv("HAOS_TRUSTED_SETUP", "0")
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    assert path.read_bytes() == original
+
+
 def test_moa_legacy_migration_preserves_private_credentials_and_rejects_stale_gui_choices(location):
     from haos.provider_setup import publish, configure_ensemble
     from haos.provider_routes import ProviderRoutes

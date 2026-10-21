@@ -236,3 +236,15 @@ owner console. MiniMax status performs no token refresh: an expired access token
 with stored refresh credentials is marked pending until the next approved model
 request refreshes it. Region checks precede that refresh. A stored credential
 does not prove that the provider will still accept it.
+
+For cloud credential JSON, the graphical provider page also offers a private
+file picker. Select a regular JSON file belonging to the enrolled owner or root,
+with private permissions (for example mode 0600), no extra hard links and at
+most 16 KiB. AWS accepts its supported IAM/profile/bearer object, Google accepts
+its service-account or authorized-user document, and Azure accepts the service
+principal object described above. API keys can still be entered directly.
+The importer validates data and leaves the file unchanged. Imported content is
+masked and is published privately only when configuring the selected provider.
+Changing providers discards it, including an import still completing in the
+background. Empty-file import does not silently choose the SDK identity; leave
+the cloud field blank only when you intend to use that separately prepared identity.

@@ -1,5 +1,25 @@
 # Hermes parity work — development, not release acceptance
 
+## Private cloud credential-file import (2026-10-21)
+
+The native owner GUI now imports AWS, Google and Azure credential JSON from an
+explicitly selected private file. The root/physical-seat helper opens a regular
+file without following a symlink, requires owner/root ownership, no group/world
+rights, one link and at most 16 KiB, then applies the existing provider-specific
+data validator. No provider SDK runs in the root GUI and no source file changes.
+The content enters only the existing masked input, is cleared on configuration/
+provider change, and is discarded if provider selection changes while background
+reading completes. Import alone performs neither publication nor inference.
+
+Eleven ordinary-user data-file cases pass, including actual mode/link/size
+checks, fixed Google token endpoint and refusal of non-cloud/non-seat choices.
+Both runtime variants pass **839 tests, two existing skips**. Actual Tk workflow
+scripts pass at both display sizes, checking masked import and stale-selection
+discard. A new real-root CI case checks actual ownership/mode/seat denial; it is
+not counted as a local root pass. All five gates at predecessor `296ae00` passed,
+including both native provider runs with the MoA finalization regression.
+Live credentials, installed graphical onboarding and artifacts remain unaccepted.
+
 ## MoA admission handoff under cleanup delay (2026-10-21)
 
 Push workflow `39574281627` at `ad1f2c4` exposed a genuine broker handoff race:

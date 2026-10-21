@@ -269,6 +269,35 @@ def provider_models(provider, api_key="", endpoint="", api_mode=""):
     return catalog_helper(data, api_key or None)
 
 
+def import_cloud_credential(provider, filename):
+    """Read an explicitly selected private owner JSON file on the setup seat."""
+    require_root()
+    from .initial_setup_gui import session_allowed
+    from .provider_cloud import credential_data
+    import stat
+    import json
+    if not session_allowed() or provider not in CLOUD:
+        raise PermissionError("cloud credential import requires the trusted local setup seat")
+    descriptor = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(descriptor)
+        allowed = {0} | {owner["uid"] for owner in owners()}
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in allowed or info.st_mode & 0o077
+                or info.st_nlink != 1 or not 1 <= info.st_size <= 16384):
+            raise PermissionError("select one private regular JSON file owned by the enrolled owner or root")
+        value = os.read(descriptor, 16385)
+        if len(value) != info.st_size or len(value) > 16384:
+            raise ValueError("cloud credential file changed or exceeds its bound")
+    finally:
+        os.close(descriptor)
+    # Imports are data only. The native SDK still runs solely under its private
+    # provider identity, after independent endpoint/model policy validation.
+    data = json.loads(value)
+    if not isinstance(data, dict) or not data:
+        raise ValueError("select a cloud credential JSON object")
+    return json.dumps(credential_data(provider, json.dumps(data)))
+
+
 def provider_state():
     require_root()
     from .provider_routes import ProviderRoutes
