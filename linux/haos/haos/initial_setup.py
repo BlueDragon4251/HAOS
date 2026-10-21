@@ -278,7 +278,7 @@ def provider_state():
         return {"routes": [], "default": None, "fallbacks": {}}
     current = ProviderRoutes(trusted_json(path))
     return {"routes": [{"id": name, "provider": policy.provider, "model": policy.data["default_model"],
-                        "api_mode": policy.api_mode} for name, policy in current.routes.items()],
+                        "models": list(policy.models), "api_mode": policy.api_mode} for name, policy in current.routes.items()],
             "default": current.default, "fallbacks": current.fallbacks}
 
 

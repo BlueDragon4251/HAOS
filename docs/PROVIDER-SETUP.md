@@ -179,6 +179,14 @@ Only configured routes with the same native wire protocol can be fallbacks.
 Explicit fallback selection authorizes sending a prompt to those providers.
 Fallback runs on an upstream HTTP 429/502/503/504 before output starts. A lost
 connection or a partial stream is ambiguous and is never automatically replayed.
+
+In graphical provider management, a model team (MoA) combines one or two
+reference models with an aggregator. First configure its providers/models, then
+reload the saved provider selection and choose approved models from the team
+pickers. The optional second reference is initially off. Every selected provider
+receives the prompt; activating the team explicitly selects those providers.
+The aggregator combines their responses. No preset JSON or credential re-entry
+is needed. Choosing a normal route as default returns to that single provider.
 Each attempt is durably charged to the broker request quota before dispatch.
 `GET /v1/models` returns the owner-approved model list, not a live discovery claim.
 

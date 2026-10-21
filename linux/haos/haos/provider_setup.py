@@ -150,14 +150,19 @@ def configure_ensemble(name, references, aggregator, *, active=True, config=CONF
     if os.geteuid() != 0:
         raise PermissionError("MoA configuration requires authenticated owner authority")
     current = ProviderRoutes(trusted_json(config / "provider.json"))
-    if current.data["version"] != 2:
-        raise ValueError("configure named broker routes before creating a MoA preset")
-    data = current.data
+    if current.data["version"] == 1:
+        # The graphical selection calls this legacy route `default`. Preserve
+        # that identity and its private credential during atomic migration.
+        data = {"version": 2, "default": "default", "routes": {"default": current.primary.data}, "fallbacks": {}}
+        credentials = {"default": trusted_json(config / "provider-credentials")}
+    else:
+        data = current.data
+        credentials = trusted_json(config / "provider-credentials")["routes"]
     data.setdefault("ensembles", {})[name] = {"references": references, "aggregator": aggregator}
     data.setdefault("default_ensemble", None)
     if active:
         data["default_ensemble"] = name
-    publish(data, trusted_json(config / "provider-credentials")["routes"], config=config)
+    publish(data, credentials, config=config)
     return {"preset": name, "default_ensemble": data["default_ensemble"], "model_turn_tested": False}
 
 

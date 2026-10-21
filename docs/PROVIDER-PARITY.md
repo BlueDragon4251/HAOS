@@ -1,5 +1,29 @@
 # Hermes parity work — development, not release acceptance
 
+## Graphical MoA model selection (2026-10-21)
+
+The owner now selects approved reference and aggregator models in native GUI
+pickers instead of writing preset JSON. The complete owner-approved allowlist
+is available, including models other than a route's default. A second reference
+is optional and disabled by default; the interface states that every selected
+provider receives the message. The saved provider selection can be refreshed
+after configuring another provider. No team-activation button is offered before
+there is an approved model. Picker widths remain bounded on small screens.
+
+Creating the first team from legacy version-1 configuration now migrates that
+route and its private credential atomically, retaining the GUI's `default`
+identity. A new real-root authority case checks credential preservation,
+capability rotation and that stale/unapproved model choices leave protected
+files unchanged; it remains a required CI test, not a local root pass.
+
+The exact workflow's actual interactive Tk scripts passed locally on Xvfb at
+1280x800 and 640x480, including one/two-reference dispatch, a non-default model,
+empty configuration and a long model ID. This uses an extracted Debian Xvfb
+fixture as the ordinary user, with no installed owner/physical-seat claim.
+Both runtime suites still pass **827 tests, two existing skips**; the real
+pinned MoA engine also performs its three approved loopback broker calls.
+GUI fixtures do not certify live models, installed boot or final artifacts.
+
 ## Read-only account status and regional refresh admission (2026-10-21)
 
 MiniMax status now reads native private state without network access or token
@@ -278,7 +302,7 @@ Local verification of this development checkpoint:
   environment; the existing real mTLS/Unix observation test cannot bind.
   Two existing dropped-UID authority cases also cannot run here (`setuid` /
   foreign `chown` unavailable). These checks remain required in Linux CI.
-- This environment has no QEMU, container engine, Android SDK, Xvfb or Tk.
+- At that historical checkpoint, no QEMU, container engine, Android SDK, Xvfb or Tk was available.
   No installed boot, graphical OAuth, APK, hardware or remote-desktop acceptance
   is claimed. CI/image results must be recorded at their own exact source SHA.
 

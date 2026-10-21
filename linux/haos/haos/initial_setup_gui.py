@@ -83,13 +83,15 @@ class Wizard:
         entry.pack(fill="x", ipady=10)
         return entry
 
-    def _choice(self, parent, label, items, default):
+    def _choice(self, parent, label, items, default, *, width=None):
         self._label(parent, label, size=10, color=self.MUTED).pack(anchor="w", pady=(14, 4))
         value = self.tk.StringVar(value=default)
         control = self.tk.OptionMenu(parent, value, *items)
         control.configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
                           activeforeground=self.TEXT, highlightthickness=0,
                           relief="flat", bd=1, font=("DejaVu Sans", 11))
+        if width is not None:
+            control.configure(width=width, anchor="w")
         control["menu"].configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
                                    activeforeground=self.TEXT, font=("DejaVu Sans", 11))
         control.pack(anchor="w")
@@ -525,17 +527,41 @@ class Wizard:
                 [(label, status) for _slug, label, status in provider_rows()])
             self._label(self.content, "Mixture of Agents · freigegebene Provider kombinieren",
                         size=13, color=self.CYAN, bold=True).pack(anchor="w", pady=(18, 4))
+            self._button(self.content, "Gespeicherte Provider-Auswahl neu laden",
+                         lambda: self.show("provider")).pack(anchor="w", pady=6)
             self._label(self.content,
-                "Zuerst die beteiligten Provider und Modelle konfigurieren. Ein Preset verwendet ein oder zwei "
-                "Referenzmodelle und ein Aggregator-Modell. Alle Anfragen laufen über die bereits freigegebenen Broker-Routen.",
+                "Ein oder zwei Referenzmodelle liefern Vorschläge. Das Aggregator-Modell führt sie zur Antwort zusammen. "
+                "Alle ausgewählten Anbieter erhalten deine Nachricht. Wähle ausschließlich bereits eingerichtete und freigegebene Modelle.",
                 size=10, color=self.MUTED).pack(anchor="w")
-            moa_name = self._field(self.content, "MoA-Presetname", "personal")
-            moa_value = self._field(self.content, "Preset-JSON · references und aggregator, jeweils route / model")
-            def apply_moa():
-                selected_name, value = moa_name.get(), moa_value.get()
-                self._run_async(lambda: initial_setup.configure_moa(selected_name, value),
-                                success="MoA-Preset mit freigegebenen Broker-Routen als Standard gespeichert.")
-            self._button(self.content, "MoA-Preset sicher konfigurieren", apply_moa).pack(anchor="w", pady=10)
+            moa_options = {}
+            for row in (configured or {}).get("routes", []):
+                for approved in row.get("models", [row["model"]]):
+                    label = row["id"] + " · " + approved
+                    moa_options[label] = {"route": row["id"], "model": approved}
+            if moa_options:
+                moa_name = self._field(self.content, "Name des Modellteams", "personal")
+                choices = list(moa_options)
+                primary_model = next(row["model"] for row in configured["routes"] if row["id"] == configured["default"])
+                primary = next((label for label, slot in moa_options.items()
+                    if slot["route"] == configured["default"] and slot["model"] == primary_model), choices[0])
+                picker_width = 24 if self.compact else 56
+                reference_one = self._choice(self.content, "Referenzmodell 1", choices, choices[0], width=picker_width)
+                no_second = "Kein zweites Referenzmodell"
+                reference_two = self._choice(self.content, "Referenzmodell 2 · optional", [no_second, *choices], no_second, width=picker_width)
+                aggregator = self._choice(self.content, "Aggregator-Modell für die gemeinsame Antwort", choices, primary, width=picker_width)
+                def apply_moa():
+                    import json
+                    selected_name = moa_name.get()
+                    references = [moa_options[reference_one.get()]]
+                    if reference_two.get() != no_second:
+                        references.append(moa_options[reference_two.get()])
+                    value = json.dumps({"references": references, "aggregator": moa_options[aggregator.get()]})
+                    self._run_async(lambda: initial_setup.configure_moa(selected_name, value),
+                                    success="Modellteam als Standard gespeichert. Die ausgewählten Anbieter werden bei neuen Anfragen verwendet.")
+                self._button(self.content, "Modellteam als Standard aktivieren", apply_moa).pack(anchor="w", pady=10)
+            else:
+                self._label(self.content, "Richte zuerst mindestens einen Provider mit einem freigegebenen Modell ein. "
+                    "Danach kannst du hier dein Modellteam auswählen.", size=10, color=self.MUTED).pack(anchor="w", pady=10)
         elif name == "updates":
             self._head("HAOS Updates",
                        "Stabiler oder privater Entwicklungszweig. Der vorherige bootc-Stand bleibt für Rollback erhalten.")

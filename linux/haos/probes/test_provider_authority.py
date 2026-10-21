@@ -213,6 +213,30 @@ def test_service_credential_loader_refuses_unsafe_descriptors(location, kind):
     with pytest.raises((PermissionError, OSError)):
         private_credential(path)
 
+def test_moa_legacy_migration_preserves_private_credentials_and_rejects_stale_gui_choices(location):
+    from haos.provider_setup import publish, configure_ensemble
+    from haos.provider_routes import ProviderRoutes
+    key = secrets.token_urlsafe(40)
+    original = {**policy("openrouter"), "api_mode": "chat_completions", "models": ["fixture-model", "second-approved"]}
+    publish(original, key, config=location)
+    old_capability = (location / "provider-token").read_bytes()
+    configure_ensemble("team", [{"route": "default", "model": "second-approved"}],
+        {"route": "default", "model": "fixture-model"}, config=location)
+    current = ProviderRoutes(json.loads((location / "provider.json").read_text()))
+    assert current.data["version"] == 2 and current.routes["default"].data == original
+    assert current.default_ensemble == "team"
+    assert json.loads((location / "provider-credentials").read_text()) == {"routes": {"default": {"api_key": key}}}
+    assert (location / "provider-token").read_bytes() != old_capability
+    assert key not in (location / "provider-client.json").read_text()
+    protected = {p: p.read_bytes() for p in location.iterdir() if p.is_file()}
+    with pytest.raises(PermissionError):
+        configure_ensemble("stale", [{"route": "default", "model": "not-approved"}],
+            {"route": "default", "model": "fixture-model"}, config=location)
+    assert all(p.read_bytes() == value for p, value in protected.items())
+    assert (location / "provider-credentials").stat().st_mode & 0o777 == 0o600
+    assert (location / "provider-credentials").stat().st_uid == 0
+
+
 def test_atomic_route_migration_rotation_revocation_and_default_model_change(location):
     from haos.provider_routes import ProviderRoutes
     from haos.provider_registry import default_mode
