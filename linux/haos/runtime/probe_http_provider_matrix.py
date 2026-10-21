@@ -124,7 +124,7 @@ def main():
                 mode, case = state["mode"], state["case"]
                 assert self.path == state["path"]
                 assert body["model"] == state["wire_model"]
-                assert body.get("stream", False) == (case in {"stream", "abort", "stream-framing", "chunked-stream", "chunked-framing"})
+                assert body.get("stream", False) == (case in {"stream", "abort", "stream-framing", "chunked-stream", "chunked-framing", "chunked-trailer"})
                 assert len(body["tools"]) == 1
                 tool = body["tools"][0]
                 name = tool.get("name") or tool["function"]["name"]
@@ -164,13 +164,13 @@ def main():
                 self.send_header("Connection", "close")
                 if case == "stream-framing":
                     self.send_header("Content-Length", str(sum(len(frame(value)) for value in [*early, *terminal]) + 16))
-                if case in {"chunked-stream", "chunked-framing"}:
+                if case in {"chunked-stream", "chunked-framing", "chunked-trailer"}:
                     self.send_header("Transfer-Encoding", "chunked")
                 self.end_headers()
 
                 def event(value):
                     data = frame(value)
-                    if case in {"chunked-stream", "chunked-framing"}:
+                    if case in {"chunked-stream", "chunked-framing", "chunked-trailer"}:
                         data = f"{len(data):x}\r\n".encode() + data + b"\r\n"
                     self.wfile.write(data)
                     self.wfile.flush()
@@ -183,6 +183,9 @@ def main():
                         event(value)
                 if case == "chunked-stream":
                     self.wfile.write(b"0\r\n\r\n")
+                    self.wfile.flush()
+                elif case == "chunked-trailer":
+                    self.wfile.write(b"0\r\n")
                     self.wfile.flush()
                 self.close_connection = True
             except BaseException as error:
@@ -216,7 +219,7 @@ def main():
                     path += "/v1"
                 path += {"anthropic_messages": "/messages", "codex_responses": "/responses",
                     "chat_completions": "/chat/completions"}[mode]
-                for case in ("json", "stream", "abort", "401", "429", "json-framing", "stream-framing", "chunked-stream", "chunked-framing"):
+                for case in ("json", "stream", "abort", "401", "429", "json-framing", "stream-framing", "chunked-stream", "chunked-framing", "chunked-trailer"):
                     print(provider + ":" + case, flush=True)
                     release.clear()
                     finished.clear()
@@ -269,14 +272,14 @@ def main():
                                     except httpx.RemoteProtocolError:
                                         interrupted = True
                                     assert first, "SDK lost early text delta"
-                                    assert interrupted == (case in {"abort", "stream-framing", "chunked-framing"}), "incomplete stream certified successful"
-                                    if case in {"stream-framing", "chunked-framing"}:
+                                    assert interrupted == (case in {"abort", "stream-framing", "chunked-framing", "chunked-trailer"}), "incomplete stream certified successful"
+                                    if case in {"stream-framing", "chunked-framing", "chunked-trailer"}:
                                         assert not any(getattr(value, "type", None) in {"message_stop", "response.completed"}
                                             or any(choice.finish_reason is not None for choice in getattr(value, "choices", []))
                                             for value in values), "unverified terminal was forwarded"
                                     if case in {"stream", "chunked-stream"}:
                                         assert any("call_fixture" in value.model_dump_json() for value in values)
-                        expected = (502, None, None) if case in {"abort", "json-framing", "stream-framing", "chunked-framing"} else (
+                        expected = (502, None, None) if case in {"abort", "json-framing", "stream-framing", "chunked-framing", "chunked-trailer"} else (
                             (int(case), None, None) if case in {"401", "429"} else (200, 8, 5))
                         assert finished.wait(5), "broker did not durably finalize admission"
                         assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchall() == [expected]
@@ -286,7 +289,7 @@ def main():
             release.set()
             http.client.HTTPSConnection = original_https
     assert not failures, failures
-    assert len(received) == len(checks) == 351 and len(set(received)) == 351
+    assert len(received) == len(checks) == 390 and len(set(received)) == 390
     receipt = {"actual_pinned_builder_sdk_http_cases": checks, "http_profile_count": len(providers),
         "case_count": len(checks), "early_stream_before_withheld_terminal": True,
         "truncated_streams_rejected_without_retry": True, "native_tool_json_preserved": True,

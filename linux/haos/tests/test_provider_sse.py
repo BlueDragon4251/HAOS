@@ -4,17 +4,18 @@ import time
 
 import pytest
 
-from haos.provider_sse import events
+from haos.provider_sse import events, FramedHTTPResponse
 from haos.provider_messages import restore
 
 
-@pytest.mark.parametrize("tail,complete", [(b"0\r\n\r\n", True), (b"", False), (b"3\r\nab", False)])
+@pytest.mark.parametrize("tail,complete", [(b"0\r\n\r\n", True), (b"", False), (b"3\r\nab", False), (b"0\r\n", False),
+    (b"0\r\nX-Fixture: ok\r\n\r\n", True), (b"0\r\nX-Fixture: ok\r\n", False)])
 def test_actual_stdlib_chunked_readline_cannot_hide_missing_terminal_chunk(tail, complete):
     import http.client
     class Socket:
         def makefile(self, *_):
             return BufferedReader(BytesIO(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nC\r\ndata: done\n\n\r\n" + tail))
-    response = http.client.HTTPResponse(Socket())
+    response = FramedHTTPResponse(Socket())
     response.begin()
     frames = events(response, max_line=1024, max_output=4096, deadline=time.monotonic() + 5)
     assert next(frames) == ([], "done")

@@ -1,5 +1,21 @@
 """Bounded SSE event framing, including multiline JSON data fields."""
 import time
+import http.client
+
+
+class FramedHTTPResponse(http.client.HTTPResponse):
+    """Require the final trailer delimiter that stdlib otherwise treats as EOF."""
+    def _read_and_discard_trailer(self):
+        total = 0
+        while True:
+            line = self.fp.readline(65537)
+            total += len(line)
+            if not line:
+                raise http.client.IncompleteRead(b"")
+            if total > 65536:
+                raise http.client.LineTooLong("provider chunk trailer")
+            if line in {b"\r\n", b"\n"}:
+                return
 
 
 def require_complete(response):

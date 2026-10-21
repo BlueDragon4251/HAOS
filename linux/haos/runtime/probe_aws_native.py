@@ -35,6 +35,22 @@ def main():
     sys.path.insert(0, str(root))
     from haos.provider_policy import ProviderPolicy
     from haos.provider_proxy import Broker, Credentials, UsageLedger
+    class FixtureLedger(UsageLedger):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.finished = threading.Event()
+            self.admitted = threading.Event()
+        def admit(self, *args):
+            result = super().admit(*args)
+            self.admitted.set()
+            return result
+        def finish(self, *args):
+            super().finish(*args)
+            self.finished.set()
+        def close(self):
+            if self.admitted.is_set():
+                assert self.finished.wait(5), "native AWS writer was still active at fixture teardown"
+            super().close()
     from haos.provider_profiles import register_profiles
     from haos import provider_bedrock_messages as messages_bridge
     from agent.transports import get_transport
@@ -186,7 +202,7 @@ def main():
                         return client
                     messages_bridge.create_client = local_messages
                     with tempfile.TemporaryDirectory() as temp:
-                        ledger = UsageLedger(Path(temp) / "usage.db")
+                        ledger = FixtureLedger(Path(temp) / "usage.db")
                         try:
                             with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": json.dumps(private)}), ledger)) as port:
                                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
@@ -218,6 +234,7 @@ def main():
                                 if case in {"json", "stream"}:
                                     assert b"fixture-call" in body
                                 conn.close()
+                            assert ledger.finished.wait(5), "native AWS admission was not durably finalized"
                             status, incoming, outgoing = ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchone()
                             assert status == (502 if case in {"truncated", "terminal-framing"} else 429 if case == "rate-limit" else 200)
                             if case in {"json", "stream"}:

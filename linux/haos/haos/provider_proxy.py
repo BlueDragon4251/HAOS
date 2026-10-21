@@ -370,6 +370,8 @@ class Handler(BaseHTTPRequestHandler):
             conn._create_connection = lambda pair, timeout, source_address=None: socket.create_connection(
                 (address, endpoint.port or 443), timeout=timeout, source_address=source_address)
         try:
+            from .provider_sse import FramedHTTPResponse
+            conn.response_class = FramedHTTPResponse
             from .provider_messages import prepare, restore
             payload, wire_names = prepare(payload, oauth=getattr(getattr(self.route_credentials, "request_state", None), "oauth_messages", False))
             body = json.dumps(payload, ensure_ascii=False).encode()

@@ -84,6 +84,8 @@ def get_json(policy, endpoint, path, headers):
         connection._create_connection = lambda pair, timeout, source_address=None: socket.create_connection(
             (address, parsed.port or 443), timeout=timeout, source_address=source_address)
     try:
+        from .provider_sse import FramedHTTPResponse
+        connection.response_class = FramedHTTPResponse
         connection.request("GET", path, headers={"Accept": "application/json", "User-Agent": "HAOS/Hermes-model-catalog", **headers})
         response = connection.getresponse()
         body = response.read(MAX_BODY + 1)

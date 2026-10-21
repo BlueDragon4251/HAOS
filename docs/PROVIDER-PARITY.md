@@ -1,5 +1,19 @@
 # Hermes parity work — development, not release acceptance
 
+## Complete chunk trailers (2026-10-21)
+
+A further real stdlib regression at `88cea1e` reproduced acceptance of a zero
+chunk followed by EOF before the trailer's final blank line. The bounded HTTP
+response class now requires that delimiter and caps discarded trailers at
+64 KiB, for inference and private model discovery. Valid empty/nonempty trailers
+remain accepted; missing terminal chunks, partial chunks and partial trailers
+fail. The SDK/HTTP matrix now passes **390** cases across the same 39 profiles,
+including an incomplete-trailer case for every profile. Minimal and full suites
+each pass **825 tests, two existing skips**. The 20 native AWS, 49 cloud-model
+and six Messages SDK cases still pass. Earlier receipts retain their exact
+inputs; new source hashes and fixture receipts are archived separately. Root
+kernel/UID, live account, installed boot and release gates remain distinct.
+
 ## Native and chunked terminal-framing regressions (2026-10-21)
 
 New real HTTP regressions reproduced two completion defects at `f1bff80`.
