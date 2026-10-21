@@ -82,6 +82,9 @@ def forward(handler, payload, redactor):
         return 200, usage
     except Exception as error:
         status = getattr(error, "status_code", None)
+        if status in {429, 503}:
+            from .provider_retry import error_retry_seconds
+            handler.retry_after = error_retry_seconds(error, redactor)
         if not handler.forward_started and type(status) is int and 400 <= status <= 599:
             return status, {}
         raise

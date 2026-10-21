@@ -138,7 +138,7 @@ def test_actual_local_transport_authenticates_bounds_and_redacts_without_claimin
     assert key.encode() not in (tmp_path / "usage.db").read_bytes()
 
 
-@pytest.mark.parametrize("failure", ["rate-limit", "truncated-stream"])
+@pytest.mark.parametrize("failure", ["rate-limit", "unavailable", "truncated-stream"])
 def test_real_local_failure_preserves_status_and_never_completes_a_truncated_stream(tmp_path, failure):
     class FailingFixture(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -147,7 +147,9 @@ def test_real_local_failure_preserves_status_and_never_completes_a_truncated_str
         def do_POST(self):
             self.rfile.read(int(self.headers["Content-Length"]))
             body = b'data: {"choices":[{"delta":{"content":"unfinished fixture"}}]}\n\n'
-            self.send_response(429 if failure == "rate-limit" else 200)
+            self.send_response(429 if failure == "rate-limit" else 503 if failure == "unavailable" else 200)
+            if failure in {"rate-limit", "unavailable"}:
+                self.send_header("Retry-After", "17")
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -162,12 +164,13 @@ def test_real_local_failure_preserves_status_and_never_completes_a_truncated_str
             conn.request("POST", "/v1/chat/completions", json.dumps({"model": "fixture-model", "stream": True}),
                          {"Authorization": "Bearer " + token})
             response = conn.getresponse()
-            if failure == "rate-limit":
-                assert response.status == 429 and b"unfinished fixture" not in response.read()
+            if failure in {"rate-limit", "unavailable"}:
+                assert response.status == (429 if failure == "rate-limit" else 503) and b"unfinished fixture" not in response.read()
+                assert response.getheader("Retry-After") == "17"
             else:
                 assert response.status == 200
                 with pytest.raises(http.client.IncompleteRead):
                     response.read()
             conn.close()
-        assert ledger.db.execute("SELECT status FROM requests").fetchall() == [(429 if failure == "rate-limit" else 502,)]
+        assert ledger.db.execute("SELECT status FROM requests").fetchall() == [(429 if failure == "rate-limit" else 503 if failure == "unavailable" else 502,)]
         ledger.close()

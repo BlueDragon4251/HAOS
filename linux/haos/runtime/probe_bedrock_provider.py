@@ -64,6 +64,7 @@ def main():
                 if case == "rate-limit":
                     body = json.dumps({"message": session}).encode()
                     self.send_response(429)
+                    self.send_header("Retry-After", "17")
                     self.send_header("x-amzn-errortype", "ThrottlingException")
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
@@ -136,6 +137,7 @@ def main():
                             release.set()
                             body = response.read()
                         assert response.status == (429 if case == "rate-limit" else 200)
+                        assert response.getheader("Retry-After") == ("17" if case == "rate-limit" else None)
                         assert not any(value.encode() in body for value in (key, secret, session))
                         if case in {"json-tools", "stream-tools"}:
                             assert b"tool_calls" in body

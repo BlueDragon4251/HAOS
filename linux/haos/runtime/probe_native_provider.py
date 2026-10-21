@@ -55,6 +55,8 @@ def main():
                 if case == "rate-limit":
                     body = json.dumps({"error": {"code": 429, "message": key, "status": "RESOURCE_EXHAUSTED"}}).encode()
                 self.send_response(429 if case == "rate-limit" else 200)
+                if case == "rate-limit":
+                    self.send_header("Retry-After", "17")
                 self.send_header("Content-Type", "text/event-stream" if streaming and case != "rate-limit" else "application/json")
                 if not streaming or case == "rate-limit":
                     self.send_header("Content-Length", str(len(body) + (20 if case == "json-framing" else 0)))
@@ -110,6 +112,7 @@ def main():
                             release.set()
                             body = response.read()
                         assert response.status == (429 if case == "rate-limit" else 502 if case == "json-framing" else 200)
+                        assert response.getheader("Retry-After") == ("17" if case == "rate-limit" else None)
                         assert key.encode() not in body
                         if case in {"stream-tools", "json-tools"}:
                             assert b"tool_calls" in body and b"fixture-signature" in body

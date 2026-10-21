@@ -617,3 +617,24 @@ HTTP vendor profiles plus two local-service profiles. Both runtime variants pass
 **840 tests, two existing skips**. Exact source and separate fixture receipts:
 `docs/evidence/2026-10-21/account-model-http-validation.json`. Build/CI already
 require the extended probes. No live account, inference or installed acceptance.
+
+## Provider-directed retry timing (2026-10-21)
+
+The broker previously preserved HTTP error status but discarded `Retry-After`.
+It now emits sanitized public timing only on 429/503: decimal seconds or a
+timezone-qualified HTTP date become 0–86400 integer seconds. Invalid, oversized,
+control-character or reflected private-token values are discarded. Cookies and
+other upstream error headers are not relayed. Native Google, boto3 Converse and
+Anthropic-Bedrock error paths use the same timing sanitizer. This adds no retry
+or prompt replay; a started or uncertain stream retains its existing refusal.
+
+Timing resets before each approved fallback admission, including credential
+lookup failures. A real HTTP regression reproduced stale timing from the first
+provider leaking into the fallback's credential error during implementation;
+that now passes with exactly one upstream call and no inherited header. The
+410 SDK/HTTP matrix, six Gemini cases, six Converse cases and 20 native AWS
+IAM/Bearer cases now assert actual Retry-After forwarding. Real local 503 and
+public-date/header-negative checks pass. Both runtime suites: **860 passed, two
+existing skips**. Exact source and fixture receipts are archived in
+`docs/evidence/2026-10-21/provider-retry-after-validation.json` and
+`*-retry-after-fixture.json`; no live-provider or installed acceptance.

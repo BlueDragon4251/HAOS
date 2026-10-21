@@ -67,7 +67,7 @@ def test_custom_dns_is_checked_once_and_connection_is_pinned_with_original_tls_h
         def request(self, *args, **kwargs):
             self._create_connection(("fixture.example.com", 443), 180)
         def getresponse(self):
-            return SimpleNamespace(status=429)
+            return SimpleNamespace(status=429, getheader=lambda name: "17" if name == "Retry-After" else None)
         def close(self):
             pass
     monkeypatch.setattr("haos.provider_proxy.http.client.HTTPSConnection", Connection)
@@ -75,6 +75,7 @@ def test_custom_dns_is_checked_once_and_connection_is_pinned_with_original_tls_h
     monkeypatch.setattr(socket, "create_connection", lambda address, **kwargs: calls.append(address))
     handler = SimpleNamespace(policy=policy, route_credentials=SimpleNamespace(query={}))
     assert Handler.forward(handler, {"model": "fixture"}, {}, Redactor(), defer_errors=True) == (429, {})
+    assert handler.retry_after == 17
     assert calls == [("93.184.216.34", 443)]
     calls.clear()
     monkeypatch.setattr(socket, "getaddrinfo", lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))])

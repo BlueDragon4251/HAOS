@@ -139,6 +139,8 @@ def main():
                 if case in {"401", "429"}:
                     data = json.dumps({"error": {"message": state["key"] or "local-fixture-error", "type": "fixture_error"}}).encode()
                     self.send_response(int(case))
+                    self.send_header("Retry-After", "17")
+                    self.send_header("Set-Cookie", state["key"] or "local-fixture-cookie")
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
@@ -246,6 +248,8 @@ def main():
                                         call(**body)
                                     except (anthropic.APIStatusError, openai.APIStatusError) as error:
                                         assert error.status_code == (502 if case == "json-framing" else int(case))
+                                        assert error.response.headers.get("Retry-After") == ("17" if case == "429" else None)
+                                        assert error.response.headers.get("Set-Cookie") is None
                                         assert (not key or key not in str(error)) and capability not in str(error)
                                     else:
                                         raise AssertionError("SDK accepted rejected request")
@@ -300,10 +304,11 @@ def main():
         "case_count": len(checks), "early_stream_before_withheld_terminal": True,
         "truncated_streams_rejected_without_retry": True, "native_tool_json_preserved": True,
         "incomplete_http_framing_cannot_certify_json_or_terminal_sse": True,
+        "bounded_retry_after_preserved_without_other_error_headers": True,
         "private_credential_reflection_redacted": True, "live_provider_tested": False,
         "python": sys.version.split()[0], "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in (Path(__file__), root / "haos/provider_messages.py", root / "haos/provider_proxy.py", root / "haos/provider_sse.py",
-                root / "haos/provider_profiles.py", root / "haos/hermes_registry.json")}}
+                root / "haos/provider_profiles.py", root / "haos/provider_retry.py", root / "haos/hermes_registry.json")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps({"case_count": len(checks), "live_provider_tested": False}))
 

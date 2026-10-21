@@ -250,3 +250,33 @@ def test_owner_fallback_receives_only_its_own_key_and_model_and_never_replays_st
         assert ledger.db.execute("SELECT status FROM requests ORDER BY rowid").fetchall() == ([(502,)] if ambiguous else [(503,), (200,)])
         ledger.close()
 
+
+def test_failed_fallback_credentials_cannot_inherit_another_providers_retry_header(tmp_path):
+    received = []
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+        def do_POST(self):
+            received.append(self.rfile.read(int(self.headers['Content-Length'])))
+            self.send_response(503)
+            self.send_header('Retry-After', '17')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+    with serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port:
+        routes = ProviderRoutes({'version': 2, 'default': 'first', 'routes': {
+            'first': route(endpoint=f'http://127.0.0.1:{port}/v1'),
+            'second': route('deepseek')}, 'fallbacks': {'first': ['second']}})
+        credentials = {name: Credentials(policy, {'api_key': None}) for name, policy in routes.routes.items()}
+        ledger, capability = UsageLedger(tmp_path / 'usage.db'), secrets.token_urlsafe(48)
+        with serving(Broker(('127.0.0.1', 0), routes, capability, credentials, ledger)) as broker:
+            conn = http.client.HTTPConnection('127.0.0.1', broker, timeout=5)
+            conn.request('POST', '/v1/chat/completions', json.dumps({'model': 'fixture-model'}),
+                {'Authorization': 'Bearer ' + capability})
+            response = conn.getresponse()
+            assert response.status == 503
+            assert response.getheader('Retry-After') is None
+            response.read()
+            conn.close()
+        assert len(received) == 1
+        assert ledger.db.execute('SELECT status FROM requests ORDER BY rowid').fetchall() == [(503,), (503,)]
+        ledger.close()

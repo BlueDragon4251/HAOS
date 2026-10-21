@@ -240,6 +240,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Connection", "close")
+        if code in {429, 503} and getattr(self, "retry_after", None) is not None:
+            self.send_header("Retry-After", str(self.retry_after))
         self.end_headers()
         self.wfile.write(data)
         self.close_connection = True
@@ -322,6 +324,7 @@ class Handler(BaseHTTPRequestHandler):
             # Only explicitly owner-selected, same-protocol fallbacks may see
             # this prompt. No retry follows a started stream or ambiguous I/O.
             for target in [route, *self.server.routes.fallbacks.get(route, [])]:
+                self.retry_after = None
                 self.policy = self.server.routes.routes[target]
                 attempt = dict(payload)
                 if target != route:
@@ -355,6 +358,7 @@ class Handler(BaseHTTPRequestHandler):
             self.server.turns.release()
 
     def forward(self, payload, headers, redactor, *, defer_errors=False):
+        self.retry_after = None
         if self.policy.provider == "bedrock" and self.policy.api_mode == "anthropic_messages":
             from .provider_bedrock_messages import forward
             return forward(self, payload, redactor)
@@ -414,6 +418,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Keep the real provider status (including 401/403/429/5xx), but
                 # never expose its body or redirect location to the model/log.
                 status = response.status if 400 <= response.status <= 599 else 502
+                if status in {429, 503}:
+                    from .provider_retry import retry_seconds
+                    raw_retry = response.getheader("Retry-After")
+                    if raw_retry is not None and redactor.text(raw_retry) == raw_retry:
+                        self.retry_after = retry_seconds(raw_retry)
                 if not defer_errors:
                     self.reply(status, "provider rejected the request")
                 return status, {}
