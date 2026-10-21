@@ -1,0 +1,24 @@
+{
+  "model_fixture_source_sha256": {
+    "probe_account_providers.py": "8e40a70274a3bbd85c6f1898e0eb6ae636c503f3887a9a0cad5ac9e3a00e22ac",
+    "probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "actual_refreshed_account_broker_sdk_model_cases": [
+    "copilot:json",
+    "copilot:stream",
+    "copilot:abort",
+    "copilot:401",
+    "copilot:429",
+    "qwen-oauth:json",
+    "qwen-oauth:stream",
+    "qwen-oauth:abort",
+    "qwen-oauth:401",
+    "qwen-oauth:429"
+  ],
+  "model_case_count": 10,
+  "actual_upstream_copilot_exchange_refresh_cache": true,
+  "actual_upstream_qwen_refresh_private_persistence": true,
+  "actual_loopback_http": true,
+  "live_provider_tested": false
+}

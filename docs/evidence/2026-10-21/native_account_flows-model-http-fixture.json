@@ -1,0 +1,102 @@
+{
+  "model_fixture_source_sha256": {
+    "probe_native_account_flows.py": "d13cc131aeda4d948d55ba0b90db7a5d102204b74ad084982a943eba8cac06ec",
+    "probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "actual_pinned_native_account_cases": [
+    "nous:global:success",
+    "nous:global:pending",
+    "nous:global:denied",
+    "nous:global:invalid-device",
+    "nous:global:missing-token",
+    "xai-oauth:global:success",
+    "xai-oauth:global:pending",
+    "xai-oauth:global:denied",
+    "xai-oauth:global:invalid-device",
+    "xai-oauth:global:missing-token",
+    "minimax-oauth:global:success",
+    "minimax-oauth:global:pending",
+    "minimax-oauth:global:denied",
+    "minimax-oauth:global:invalid-device",
+    "minimax-oauth:global:missing-token",
+    "minimax-oauth:global:bad-state",
+    "minimax-oauth:cn:success",
+    "minimax-oauth:cn:pending",
+    "minimax-oauth:cn:denied",
+    "minimax-oauth:cn:invalid-device",
+    "minimax-oauth:cn:missing-token",
+    "minimax-oauth:cn:bad-state"
+  ],
+  "case_count": 22,
+  "http_requests": 55,
+  "actual_native_account_broker_sdk_model_cases": [
+    "nous:global:success:json",
+    "nous:global:success:stream",
+    "nous:global:success:abort",
+    "nous:global:success:401",
+    "nous:global:success:429",
+    "nous:global:pending:json",
+    "nous:global:pending:stream",
+    "nous:global:pending:abort",
+    "nous:global:pending:401",
+    "nous:global:pending:429",
+    "xai-oauth:global:success:json",
+    "xai-oauth:global:success:stream",
+    "xai-oauth:global:success:abort",
+    "xai-oauth:global:success:401",
+    "xai-oauth:global:success:429",
+    "xai-oauth:global:pending:json",
+    "xai-oauth:global:pending:stream",
+    "xai-oauth:global:pending:abort",
+    "xai-oauth:global:pending:401",
+    "xai-oauth:global:pending:429",
+    "minimax-oauth:global:success:json",
+    "minimax-oauth:global:success:stream",
+    "minimax-oauth:global:success:abort",
+    "minimax-oauth:global:success:401",
+    "minimax-oauth:global:success:429",
+    "minimax-oauth:global:pending:json",
+    "minimax-oauth:global:pending:stream",
+    "minimax-oauth:global:pending:abort",
+    "minimax-oauth:global:pending:401",
+    "minimax-oauth:global:pending:429",
+    "minimax-oauth:cn:success:json",
+    "minimax-oauth:cn:success:stream",
+    "minimax-oauth:cn:success:abort",
+    "minimax-oauth:cn:success:401",
+    "minimax-oauth:cn:success:429",
+    "minimax-oauth:cn:pending:json",
+    "minimax-oauth:cn:pending:stream",
+    "minimax-oauth:cn:pending:abort",
+    "minimax-oauth:cn:pending:401",
+    "minimax-oauth:cn:pending:429"
+  ],
+  "model_case_count": 40,
+  "native_device_pkce_login_refresh_private_storage_status_logout": true,
+  "native_minimax_global_and_china_regions": true,
+  "broker_uses_refreshed_native_credentials": true,
+  "minimax_status_read_only_and_expired_grant_region_checked_before_refresh": true,
+  "invalid_pending_denied_missing_token_and_csrf_checked": true,
+  "private_tokens_not_rendered": true,
+  "live_account_tested": false,
+  "python": "3.11.16",
+  "source_files": [
+    {
+      "path": "runtime/probe_native_account_flows.py",
+      "sha256": "d13cc131aeda4d948d55ba0b90db7a5d102204b74ad084982a943eba8cac06ec"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "fcd72c6ff721bd2509213addf9137b534582d9c1fc9367f38512892896d962e5"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    },
+    {
+      "path": "runtime/probe_account_model_http.py",
+      "sha256": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33"
+    }
+  ]
+}

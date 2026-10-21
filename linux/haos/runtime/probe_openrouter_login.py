@@ -14,9 +14,11 @@ import tempfile
 from urllib.parse import parse_qs, urlsplit
 
 from probe_http_provider_matrix import serving
+from probe_account_model_http import exercise
 
 
 def main():
+    model_checks = []
     root = Path(sys.argv[1]).resolve()
     sys.path.insert(0, str(root))
     import httpx
@@ -109,6 +111,8 @@ def main():
                     headers, redactor = Credentials(policy, {"api_key": None}).headers()
                     assert headers["Authorization"] == "Bearer " + state["key"]
                     assert state["key"] not in redactor.text(state["key"])
+                    import httpx
+                    model_checks.extend(exercise(policy, Credentials(policy, {"api_key": None}), state["key"], httpx.Client))
                     with redirect_stdout(output):
                         openrouter_logout()
                     assert not load_pool("openrouter").entries()
@@ -121,7 +125,11 @@ def main():
         finally:
             httpx.post, secret_prompt.masked_secret_prompt = original_post, original_prompt
     assert not failures, failures
-    receipt = {"actual_native_pkce_cases": cases, "case_count": len(cases),
+    assert len(model_checks) == 5
+    receipt = {"model_fixture_source_sha256": {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
+        Path(__file__).with_name("probe_account_model_http.py"),
+        Path(__file__).with_name("probe_http_provider_matrix.py"))},"actual_authorized_account_broker_sdk_model_cases": model_checks, "model_case_count": len(model_checks),"actual_native_pkce_cases": cases, "case_count": len(cases),
         "native_private_pool_status_broker_logout": True, "authorization_code_and_tokens_not_printed": True,
         "failed_login_preserves_existing_account": True,
         "live_account_tested": False, "source_files": [{"path": str(p.relative_to(root)),

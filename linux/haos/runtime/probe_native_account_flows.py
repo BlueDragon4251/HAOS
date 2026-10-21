@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs
 
 from probe_http_provider_matrix import serving
+from probe_account_model_http import exercise
 
 
 def main():
@@ -36,6 +37,7 @@ def main():
     from haos.provider_registry import default_mode
     from agent.credential_pool import load_pool
     state, calls, failures, checks = {}, [], [], []
+    model_checks = []
     signing_key = secrets.token_urlsafe(40)
     def token(nonce):
         return jwt.encode({"exp": int(time.time()) + 7200, "scope": "inference:invoke", "nonce": nonce}, signing_key, algorithm="HS256")
@@ -123,9 +125,12 @@ def main():
                 return self.transport.handle_request(rewritten)
             def close(self):
                 self.transport.close()
-        def client(**kwargs):
-            assert kwargs.get("verify", True) is not False
-            return original_client(**{**kwargs, "transport": Loopback(), "trust_env": False})
+        class client(original_client):
+            def __init__(self, **kwargs):
+                assert kwargs.get("verify", True) is not False
+                if "transport" not in kwargs:
+                    kwargs["transport"] = Loopback()
+                super().__init__(**{**kwargs, "trust_env": False})
         def get(url, **kwargs):
             with client() as connection:
                 return connection.get(url, **kwargs)
@@ -196,6 +201,8 @@ def main():
                                 else:
                                     raise AssertionError("regional account escaped its approved endpoint")
                                 assert len(calls) == before
+                            cases = exercise(policy, Credentials(policy, {"api_key": None}), state["second"], client)
+                            model_checks.extend(identifier + ":" + case for case in cases)
                             auth_logout_command(SimpleNamespace(provider=provider))
                             assert not auth.get_auth_status(provider)["logged_in"]
                     except (auth.AuthError, SignInCopyError, ValueError, KeyError):
@@ -212,15 +219,19 @@ def main():
             httpx.Client, httpx.get = original_client, original_get
             auth_device_flow.time, auth_minimax.time = old_device_time, old_minimax_time
     assert not failures, failures
-    assert len(checks) == 22
-    receipt = {"actual_pinned_native_account_cases": checks, "case_count": len(checks), "http_requests": len(calls),
+    assert len(checks) == 22 and len(model_checks) == 40
+    receipt = {"model_fixture_source_sha256": {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
+        Path(__file__).with_name("probe_account_model_http.py"),
+        Path(__file__).with_name("probe_http_provider_matrix.py"))},"actual_pinned_native_account_cases": checks, "case_count": len(checks), "http_requests": len(calls),
+        "actual_native_account_broker_sdk_model_cases": model_checks, "model_case_count": len(model_checks),
         "native_device_pkce_login_refresh_private_storage_status_logout": True,
         "native_minimax_global_and_china_regions": True, "broker_uses_refreshed_native_credentials": True,
         "minimax_status_read_only_and_expired_grant_region_checked_before_refresh": True,
         "invalid_pending_denied_missing_token_and_csrf_checked": True, "private_tokens_not_rendered": True,
         "live_account_tested": False, "python": sys.version.split()[0], "source_files": [
             {"path": str(path.relative_to(root)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-            for path in (Path(__file__).resolve(), root / "haos/provider_proxy.py", root / "haos/provider_auth.py")]}
+            for path in (Path(__file__).resolve(), root / "haos/provider_proxy.py", root / "haos/provider_auth.py", Path(__file__).with_name("probe_account_model_http.py"))]}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps({"case_count": len(checks), "live_account_tested": False}))
 

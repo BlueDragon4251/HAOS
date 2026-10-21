@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import hashlib
 import os
 from pathlib import Path
 import secrets
@@ -10,6 +11,8 @@ import sys
 import tempfile
 import threading
 import time
+
+from probe_account_model_http import exercise
 
 
 @contextmanager
@@ -32,6 +35,7 @@ def main():
     from haos.provider_registry import default_mode
     from urllib.parse import parse_qs
     received = []
+    model_checks = []
     raw = "ghu_" + secrets.token_urlsafe(40)
     first, second = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
     refresh, refreshed = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
@@ -92,11 +96,20 @@ def main():
                 assert json.loads(stored.read_text())["access_token"] == refreshed
                 assert received[-1][2]["refresh_token"] == [refresh]
                 assert received[-1][2]["grant_type"] == ["refresh_token"]
+                import httpx
+                approved_copilot = ProviderPolicy({**copilot.policy.data, "endpoint": "https://api.business.githubcopilot.com"})
+                model_checks.extend("copilot:" + case for case in exercise(approved_copilot,
+                    Credentials(approved_copilot, {"api_key": raw}), second, httpx.Client))
+                model_checks.extend("qwen-oauth:" + case for case in exercise(qwen.policy, qwen, refreshed, httpx.Client))
                 for model in ("gpt-6-sol", "gpt-5.4", "gpt-5-mini", "claude-sonnet-5"):
                     assert default_mode("copilot", model) == copilot_auth_mode(model)
             finally:
                 copilot_auth._TOKEN_EXCHANGE_URL, auth_qwen.QWEN_OAUTH_TOKEN_URL = old_exchange, old_refresh
-    receipt = {"actual_upstream_copilot_exchange_refresh_cache": True, "actual_upstream_qwen_refresh_private_persistence": True,
+    assert len(model_checks) == 10
+    receipt = {"model_fixture_source_sha256": {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
+        Path(__file__).with_name("probe_account_model_http.py"),
+        Path(__file__).with_name("probe_http_provider_matrix.py"))},"actual_refreshed_account_broker_sdk_model_cases": model_checks, "model_case_count": len(model_checks),"actual_upstream_copilot_exchange_refresh_cache": True, "actual_upstream_qwen_refresh_private_persistence": True,
                "actual_loopback_http": True, "live_provider_tested": False}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))

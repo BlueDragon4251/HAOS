@@ -595,3 +595,25 @@ verify replay and reject changed bindings or another protocol. These are local
 protocol contracts, not live inference or subscription acceptance. Exact input,
 derived source and test receipts: `docs/evidence/2026-10-21/moa-native-*.json` and
 `moa-stream-*-fixture.json`.
+
+## Native account-to-model and local-service continuation (2026-10-21)
+
+The existing native device/PKCE/refresh fixtures now continue through actual
+private `Credentials`, broker HTTP and pinned OpenAI/Anthropic SDK clients.
+Sixty-eight additional calls cover Nous, xAI, both MiniMax regions, Qwen, Copilot,
+Codex, Anthropic subscription and OpenRouter login credentials. They check local
+function tools, early SSE before withheld completion, interrupted streams with
+no resend, redacted 401/429 and durable ledger status/usage. Codex retains its
+streamed-only native contract; these fixtures do not claim Codex JSON support.
+The original login, denial, refresh, status, logout, storage and old-account
+preservation assertions remain required. Native account HTTP rewrites remain
+inside fixtures; SDK model clients use real loopback HTTP.
+
+The general matrix now also executes the actual local-service/LM Studio path
+without a provider key: neither Authorization nor x-api-key crosses to the local
+service, and the scoped agent capability stays at the broker. All ten existing
+JSON/SSE/error/framing cases apply to both profiles, for **410 cases** over 39
+HTTP vendor profiles plus two local-service profiles. Both runtime variants pass
+**840 tests, two existing skips**. Exact source and separate fixture receipts:
+`docs/evidence/2026-10-21/account-model-http-validation.json`. Build/CI already
+require the extended probes. No live account, inference or installed acceptance.

@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs
 
 from probe_http_provider_matrix import serving
+from probe_account_model_http import exercise
 
 
 def main():
@@ -29,6 +30,7 @@ def main():
     from haos.provider_policy import ProviderPolicy
     from haos.provider_proxy import Credentials
     state, failures, cases = {}, [], []
+    model_checks = []
     signing_key = secrets.token_urlsafe(40)
     class Fixture(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -95,8 +97,11 @@ def main():
                 return self.transport.handle_request(rewritten)
             def close(self):
                 self.transport.close()
-        def client(**kwargs):
-            return original_client(**{**kwargs, "transport": Loopback(), "trust_env": False})
+        class client(original_client):
+            def __init__(self, **kwargs):
+                if "transport" not in kwargs:
+                    kwargs["transport"] = Loopback()
+                super().__init__(**{**kwargs, "trust_env": False})
         httpx.Client = client
         try:
             for case in ("success", "pending", "invalid-device", "device-rate-limit", "denied", "missing-code", "missing-token", "refresh-denied", "refresh-rate-limit"):
@@ -133,6 +138,8 @@ def main():
                 assert all(state[name] not in output.getvalue() for name in ("access", "next_access", "refresh", "next_refresh", "device", "code", "verifier"))
                 assert all(p.stat().st_mode & 0o077 == 0 for p in home.rglob("*.json"))
                 if succeeded:
+                    model_checks.extend(case + ":" + model_case for model_case in exercise(
+                        policy, Credentials(policy, {"api_key": None}), state["next_access"], client))
                     stored = auth.get_provider_auth_state("openai-codex")["tokens"]
                     assert stored["refresh_token"] == state["next_refresh"]
                     with redirect_stdout(output):
@@ -142,7 +149,11 @@ def main():
         finally:
             httpx.Client, auth_codex.time = original_client, old_time
     assert not failures, failures
-    receipt = {"actual_codex_account_cases": cases, "case_count": len(cases), "actual_device_pkce_refresh_rotation": True,
+    assert len(model_checks) == 8
+    receipt = {"model_fixture_source_sha256": {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
+        Path(__file__).with_name("probe_account_model_http.py"),
+        Path(__file__).with_name("probe_http_provider_matrix.py"))},"actual_refreshed_codex_broker_sdk_model_cases": model_checks, "model_case_count": len(model_checks),"actual_codex_account_cases": cases, "case_count": len(cases), "actual_device_pkce_refresh_rotation": True,
         "native_private_storage_status_broker_logout": True, "live_account_tested": False,
         "source_files": [{"path": str(p.relative_to(root)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in (Path(__file__).resolve(), root / "haos/provider_proxy.py")]}

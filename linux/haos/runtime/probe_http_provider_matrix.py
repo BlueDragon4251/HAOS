@@ -129,19 +129,22 @@ def main():
                 tool = body["tools"][0]
                 name = tool.get("name") or tool["function"]["name"]
                 assert name == "fixture"
-                assert state["key"] in " ".join(self.headers.values())
+                if state["key"]:
+                    assert state["key"] in " ".join(self.headers.values())
+                else:
+                    assert not self.headers.get("Authorization") and not self.headers.get("x-api-key")
                 assert state["capability"] not in " ".join(self.headers.values())
                 assert not self.headers.get("Cookie")
                 received.append((state["provider"], case))
                 if case in {"401", "429"}:
-                    data = json.dumps({"error": {"message": state["key"], "type": "fixture_error"}}).encode()
+                    data = json.dumps({"error": {"message": state["key"] or "local-fixture-error", "type": "fixture_error"}}).encode()
                     self.send_response(int(case))
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)
                     return
-                text = "early fixture " + state["key"]
+                text = "early fixture " + (state["key"] or "no-local-credential")
                 result, early, terminal = fixture_response(mode, body["model"], name, text)
                 if case in {"json", "json-framing"}:
                     data = json.dumps(result).encode()
@@ -199,11 +202,14 @@ def main():
             return http.client.HTTPConnection("127.0.0.1", upstream_port, timeout=kwargs.get("timeout", 5))
         http.client.HTTPSConnection = fixture_https
         try:
-            providers = sorted(http_providers())
-            assert len(providers) == 39
+            providers = sorted(http_providers()) + ["lmstudio", "local"]
+            assert len(http_providers()) == 39 and len(providers) == 41
             for provider in providers:
-                model = next(iter(descriptor(provider)["fallback_models"]), "fixture-model")
+                row = descriptor(provider)
+                model = next(iter(row["fallback_models"]), "fixture-model") if row else "fixture-model"
                 mode, endpoint = default_mode(provider, model), default_endpoint(provider)
+                if provider in {"lmstudio", "local"}:
+                    endpoint = f"http://127.0.0.1:{upstream_port}/v1"
                 policy = ProviderPolicy({"version": 1, "provider": provider, "endpoint": endpoint,
                     "models": [model], "default_model": model, "api_mode": mode,
                     "requests_per_day": 200, "requests_per_minute": 120})
@@ -223,7 +229,7 @@ def main():
                     print(provider + ":" + case, flush=True)
                     release.clear()
                     finished.clear()
-                    key, capability = secrets.token_urlsafe(40), secrets.token_urlsafe(48)
+                    key, capability = (None if provider in {"local", "lmstudio"} else secrets.token_urlsafe(40)), secrets.token_urlsafe(48)
                     state.update(provider=provider, case=case, mode=mode, endpoint=endpoint,
                         path=path, wire_model=wire_model, key=key, capability=capability)
                     with tempfile.TemporaryDirectory() as temp:
@@ -240,7 +246,7 @@ def main():
                                         call(**body)
                                     except (anthropic.APIStatusError, openai.APIStatusError) as error:
                                         assert error.status_code == (502 if case == "json-framing" else int(case))
-                                        assert key not in str(error) and capability not in str(error)
+                                        assert (not key or key not in str(error)) and capability not in str(error)
                                     else:
                                         raise AssertionError("SDK accepted rejected request")
                                 elif case == "json":
@@ -248,7 +254,7 @@ def main():
                                     normalized = transport.normalize_response(result)
                                     assert normalized.tool_calls[0].name == "fixture"
                                     assert json.loads(normalized.tool_calls[0].arguments) == {"x": 1}
-                                    assert key not in result.model_dump_json() and capability not in result.model_dump_json()
+                                    assert (not key or key not in result.model_dump_json()) and capability not in result.model_dump_json()
                                 else:
                                     first = False
                                     values = []
@@ -258,7 +264,7 @@ def main():
                                             for value in stream:
                                                 values.append(value)
                                                 encoded = value.model_dump_json()
-                                                assert key not in encoded and capability not in encoded
+                                                assert (not key or key not in encoded) and capability not in encoded
                                                 if not first and "early fixture " in encoded:
                                                     assert not release.is_set()
                                                     first = True
@@ -268,7 +274,7 @@ def main():
                                                 normalized = transport.normalize_response(result)
                                                 assert normalized.tool_calls[0].name == "fixture"
                                                 assert json.loads(normalized.tool_calls[0].arguments) == {"x": 1}
-                                                assert normalized.content.startswith("early fixture ") and key not in normalized.content
+                                                assert normalized.content.startswith("early fixture ") and (not key or key not in normalized.content)
                                     except httpx.RemoteProtocolError:
                                         interrupted = True
                                     assert first, "SDK lost early text delta"
@@ -289,8 +295,8 @@ def main():
             release.set()
             http.client.HTTPSConnection = original_https
     assert not failures, failures
-    assert len(received) == len(checks) == 390 and len(set(received)) == 390
-    receipt = {"actual_pinned_builder_sdk_http_cases": checks, "http_profile_count": len(providers),
+    assert len(received) == len(checks) == 410 and len(set(received)) == 410
+    receipt = {"actual_pinned_builder_sdk_http_cases": checks, "http_profile_count": len(http_providers()), "local_service_profiles": ["lmstudio", "local"],
         "case_count": len(checks), "early_stream_before_withheld_terminal": True,
         "truncated_streams_rejected_without_retry": True, "native_tool_json_preserved": True,
         "incomplete_http_framing_cannot_certify_json_or_terminal_sse": True,

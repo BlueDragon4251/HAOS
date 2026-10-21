@@ -19,6 +19,7 @@ import urllib.request
 from urllib.parse import parse_qs, urlsplit
 
 from probe_http_provider_matrix import serving
+from probe_account_model_http import exercise
 
 
 def main():
@@ -32,6 +33,7 @@ def main():
     from haos.provider_policy import ProviderPolicy
     from haos.provider_proxy import Credentials
     state, cases, failures = {}, [], []
+    model_checks = []
     class Fixture(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass
@@ -131,6 +133,8 @@ def main():
                     entries = load_pool("anthropic").entries()
                     assert len(entries) == 1 and entries[0].refresh_token == state["next_refresh"]
                     assert auth.get_auth_status("anthropic")["logged_in"]
+                    import httpx
+                    model_checks.extend(exercise(policy, Credentials(policy, {"api_key": None}), state["next_access"], httpx.Client))
                     with redirect_stdout(output):
                         auth_logout_command(SimpleNamespace(provider="anthropic"))
                     assert not load_pool("anthropic").entries()
@@ -144,7 +148,11 @@ def main():
         finally:
             urllib.request.urlopen, builtins.input = old_open, old_input
     assert not failures, failures
-    receipt = {"actual_native_anthropic_account_cases": cases, "case_count": len(cases),
+    assert len(model_checks) == 5
+    receipt = {"model_fixture_source_sha256": {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
+        Path(__file__).with_name("probe_account_model_http.py"),
+        Path(__file__).with_name("probe_http_provider_matrix.py"))},"actual_authorized_account_broker_sdk_model_cases": model_checks, "model_case_count": len(model_checks),"actual_native_anthropic_account_cases": cases, "case_count": len(cases),
         "actual_pkce_state_private_pool_expiry_refresh_broker_status_logout": True,
         "live_account_tested": False, "source_files": [{"path": str(p.relative_to(root)),
         "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in (Path(__file__).resolve(), root / "haos/provider_proxy.py")]}
