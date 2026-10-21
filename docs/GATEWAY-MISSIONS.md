@@ -2,9 +2,37 @@
 
 HAOS now connects the **pinned Hermes Telegram and Discord adapters** to its durable controller.
 It uses their actual `register(ctx)`, `PlatformConfig`, `MessageEvent`, `SessionSource`,
-`set_message_handler`, `connect` and `send` interfaces. It never invokes the upstream gateway's
+`connect` and `send` interfaces, with a HAOS-owned durable dispatch bridge. It never invokes the upstream gateway's
 separate agent executor. Only the existing mission worker submits model turns. The image builds
 the real adapters and validates their API without connecting to a provider.
+
+## Native dispatch boundary
+
+The pinned generic adapter dispatcher intentionally schedules background agent
+work and debounces text. HAOS now inserts a cooperative subclass between each
+native transport and that generic base, retaining native transport overrides
+(such as Telegram update tracking) while admitting each message synchronously
+to the HAOS policy and SQLite spool. It does not alter the pinned source or
+monkey-patch upstream classes globally. A failed commit has no accepted receipt;
+changed replays fail and duplicates remain one durable record. Automatic plugin
+handler/action factories are disabled and the native `HERMES_SAFE_MODE` switch
+prevents discovery/import of arbitrary enabled user plugins.
+
+Telegram's native message/inline checks use exact HAOS sender/chat/thread
+bindings, without the native env/pairing fallback. Full scope authorization is
+still re-applied at spool admission. The legacy native authorization callback
+has no workspace field, so it cannot grant another platform's credentialed
+context actions on incomplete tenant information. No allow-all switch creates
+HAOS authorization.
+
+The required build/provider probe constructs both actual pinned adapters,
+verifies the original background/debounce behavior, durable dispatch/reopen,
+a real SQLite read-only failure, changed replay, the native Telegram SDK message
+and callback gates, and an enabled valid foreign plugin that is not imported.
+Both local runtime variants pass **869 tests, two existing skips**. This proves
+the native dispatch boundary, not network polling/socket acknowledgement order,
+external delivery, media/voice, installed service or the other 20 adapters.
+Platform-specific SDK network/reconnect acceptance remains required.
 
 ## Owner setup
 

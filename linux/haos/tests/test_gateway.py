@@ -277,3 +277,13 @@ def test_pause_resume_rolls_back_with_failed_delivery_receipt(tmp_path, policy_c
     assert store.events(mid) == events
     assert store.db.execute("SELECT COUNT(*) FROM gateway_inbox").fetchone()[0] == 1
     store.close()
+
+
+@pytest.mark.parametrize('platform,credentials', [
+    ('not-an-approved-platform', {}), ('telegram', None),
+    ('telegram', {'runtime_hook': 'unapproved code'}), ('telegram', {'extra': []}),
+])
+def test_unreviewed_gateway_code_and_invalid_credentials_fail_before_optional_native_import(platform, credentials):
+    from haos.gateway_runtime import build_adapter
+    with pytest.raises(ValueError):
+        build_adapter(platform, credentials)

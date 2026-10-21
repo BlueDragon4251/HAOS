@@ -14,6 +14,7 @@ from .gateway import GatewayPolicy, SUPPORTED
 from .gateway_relay import RelayInbox
 from .redaction import Redactor
 from .sandbox import trusted_json
+from .store import Conflict
 
 SOCKET = "/run/haos-gateway-control/gateway.sock"
 
@@ -49,11 +50,28 @@ def adapter_envelope(event, platform: str):
             "message_id": str(event.message_id), "is_bot": source.is_bot, "text": event.text}
 
 
+def native_authorization_prefilter(policy, connector, user_id, chat_id, *, thread_id=None, is_bot=False):
+    """Early Telegram gate; full scoped authorization still occurs on ingress.
+
+    The pinned callback has no workspace field. Never turn that incomplete
+    context into an authorization for another platform's credentialed actions.
+    """
+    row = policy.connectors.get(connector)
+    if not row or row["platform"] != "telegram" or is_bot is not False or not user_id or not chat_id:
+        return False
+    return any(binding["connector"] == connector and binding["sender"] == str(user_id)
+        and binding["chat"] == str(chat_id) and binding["thread"] == str(thread_id or "")
+        and binding["scope"] == "" for binding in policy.bindings.values())
+
+
 def build_adapter(platform: str, credentials: dict):
+    if (platform not in SUPPORTED or not isinstance(credentials, dict)
+            or set(credentials) - {"token", "extra"} or not isinstance(credentials.get("extra", {}), dict)):
+        raise ValueError("unsupported adapter configuration")
+    # Use the native hardening switch before importing any bundled adapter.
+    os.environ["HERMES_SAFE_MODE"] = "1"
     from gateway.config import PlatformConfig
     from gateway.platform_registry import PlatformEntry
-    if platform not in SUPPORTED or set(credentials) - {"token", "extra"}:
-        raise ValueError("unsupported adapter configuration")
     # These are immutable bundled upstream modules; no user/plugin directory is discovered.
     module = importlib.import_module(f"plugins.platforms.{platform}.adapter")
     entries = {}
@@ -73,7 +91,8 @@ def build_adapter(platform: str, credentials: dict):
     if entry.validate_config and not entry.validate_config(config):
         raise ValueError("adapter configuration rejected")
     # Avoid the registry's optional runtime installer: immutable images must never pip-install.
-    return entry.adapter_factory(config)
+    from .gateway_ingress import durable_adapter
+    return durable_adapter(entry.adapter_factory(config))
 
 
 class SafeFormatter(logging.Formatter):
@@ -105,16 +124,27 @@ async def serve():
     for connector in policy.connectors.values():
         adapter = build_adapter(connector["platform"], credentials["connectors"][connector["id"]])
         adapters[connector["id"]] = adapter
-        async def receive(event, connector=connector):
+        def receive(event, connector=connector):
             try:
                 envelope = adapter_envelope(event, connector["platform"])
                 current_policy = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
-                # Commit synchronously before returning control to the transport's acknowledgement.
+                # Commit before returning from native dispatch; transport-level
+                # acknowledgement ordering also needs platform-specific SDK proof.
                 inbox.admit(current_policy, connector["id"], envelope)
-            except (PermissionError, ValueError):
+                return True
+            except (PermissionError, ValueError, Conflict):
                 logging.warning("Gateway message refused")
-            return None
-        adapter.set_message_handler(receive)
+            return False
+        adapter.set_durable_message_handler(receive)
+        def authorize(user_id, chat_type=None, chat_id=None, *, is_bot=False, thread_id=None, connector=connector):
+            try:
+                current = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+                return native_authorization_prefilter(current, connector["id"], user_id, chat_id,
+                    thread_id=thread_id, is_bot=is_bot)
+            except Exception:
+                logging.warning("Gateway authorization policy unavailable")
+                return False
+        adapter.set_authorization_check(authorize)
         tasks.append(asyncio.create_task(maintain(adapter, stop)))
     try:
         while not stop.is_set():

@@ -25,7 +25,7 @@ def main():
             event = MessageEvent(text="Contract validation only", message_type=MessageType.TEXT, source=source, message_id="11")
             envelope = adapter_envelope(event, name)
             assert envelope["sender"] == "42" and envelope["message_id"] == "11"
-            assert callable(adapter.set_message_handler) and inspect.iscoroutinefunction(adapter.connect)
+            assert callable(adapter.set_durable_message_handler) and inspect.iscoroutinefunction(adapter.connect)
             assert {"chat_id", "content", "reply_to", "metadata"} <= set(inspect.signature(adapter.send).parameters)
             assert adapter.is_connected is False
             if name == "telegram":
