@@ -2,13 +2,14 @@
 from copy import deepcopy
 import hashlib
 
+from .provider_bedrock_replay import TYPE
+
 
 def messages_for_route(policy, payload):
     if policy.api_mode != 'chat_completions' or not isinstance(payload.get('messages'), list):
         return payload
     result = dict(payload)
     result['messages'] = deepcopy(payload['messages'])
-    from .provider_bedrock_replay import TYPE
     binding = hashlib.sha256(policy.endpoint.encode()).hexdigest()
     for message in result['messages']:
         if not isinstance(message, dict):
