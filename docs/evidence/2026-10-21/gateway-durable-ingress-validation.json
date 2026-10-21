@@ -3,7 +3,7 @@
   "source_sha256": {
     "linux/haos/haos/gateway_ingress.py": "65e2cf138ba5efc4a032fdc7a3083454965a094d98947c709f29d1ec16f477c1",
     "linux/haos/haos/gateway_runtime.py": "dc36cc4b67532d7e06c3fb32bb792dfb6c2dcb76e765a8d4af76b581b59af537",
-    "linux/haos/runtime/probe_gateway_ingress.py": "f590fcca42600716df2e037a00604bd6f9a291d4d259a04c18745ddaf9aad001",
+    "linux/haos/runtime/probe_gateway_ingress.py": "2235eaf7952e5e073756912ec9a628b9786a74364037e36302ea39d1f92e3a8c",
     "linux/haos/runtime/probe_gateway.py": "5475c281ef0f03b916dfcb7e94957ee4b29fabd63c68bc4f4adcd4db9f794e98",
     "linux/haos/tests/test_gateway.py": "a3df69841d8058edf9654233e8012e71a7b863ac645906ea11d673dd76106422",
     "linux/haos/build-runtime.sh": "595972818bb5501250763e019736dfa461d94035741b095eeeb19273fabdda85",
@@ -32,5 +32,10 @@
   "original_pinned_adapter_sources_modified": false,
   "network_acknowledgement_ordering_or_external_delivery_tested": false,
   "other_twenty_adapters_or_media_voice_support_claimed": false,
-  "ci_for_this_change": "pending push"
+  "ci_for_this_change": "pending push",
+  "secret_scan_followup": {
+    "historical_finding": "public pinned Discord source hash, freshly verified from upstream",
+    "exact_historical_fingerprint_only": true,
+    "current_native_receipt_module_and_hash_separate": true
+  }
 }

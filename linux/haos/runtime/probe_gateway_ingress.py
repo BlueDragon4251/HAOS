@@ -180,8 +180,8 @@ def main():
         'no_background_or_debounce_mission_dispatch': True, 'exact_sender_and_native_prefilter_revocation': True,
         'unknown_native_plugin_discovery_disabled': True, 'storage_failure_not_accepted': True, 'actual_readonly_sqlite_and_changed_replay_refused': True,
         'transport_connected_or_external_delivery_tested': False,
-        'native_source_sha256': {name: hashlib.sha256(Path(sys.modules[name].__file__).read_bytes()).hexdigest() for name in
-            ('gateway.platforms.base', 'plugins.platforms.telegram.adapter', 'plugins.platforms.discord.adapter')},
+        'native_source_sha256': [{'module': name, 'sha256': hashlib.sha256(Path(sys.modules[name].__file__).read_bytes()).hexdigest()} for name in
+            ('gateway.platforms.base', 'plugins.platforms.telegram.adapter', 'plugins.platforms.discord.adapter')],
         'source_sha256': {
             p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__), root / 'haos/gateway_ingress.py',
             root / 'haos/gateway_runtime.py', root / 'haos/gateway.py', root / 'haos/gateway_relay.py')}}
