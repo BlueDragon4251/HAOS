@@ -50,6 +50,7 @@ def forward(handler, payload, redactor):
         handler.end_headers()
         handler.forward_started = True
         total, terminal, usage, deadline = 0, False, {}, time.monotonic() + 600
+        pending = []
         from itertools import chain
         for raw in chain([first], iterator):
             event = redactor.clean(plain(raw))
@@ -66,10 +67,16 @@ def forward(handler, payload, redactor):
             total += len(body)
             if len(body) > MAX_LINE or total > MAX_OUTPUT or time.monotonic() > deadline:
                 raise ValueError("native Messages stream exceeds broker bounds")
+            finish = kind == "message_delta" and bool(event.get("delta", {}).get("stop_reason"))
+            if pending or terminal or finish:
+                pending.append(body)
+                continue
             handler.wfile.write(f"{len(body):x}\r\n".encode() + body + b"\r\n")
             handler.wfile.flush()
         if not terminal:
             raise ConnectionError("native Messages stream ended without message_stop")
+        for body in pending:
+            handler.wfile.write(f"{len(body):x}\r\n".encode() + body + b"\r\n")
         handler.wfile.write(b"0\r\n\r\n")
         handler.wfile.flush()
         return 200, usage

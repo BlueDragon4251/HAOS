@@ -5,11 +5,15 @@ import time
 def require_complete(response):
     """Bounded HTTPResponse.read/readline do not reject a short fixed body.
 
-    EOF alone is only sufficient for a close-delimited response. Chunked
-    decoding has its own stdlib framing checks; known lengths must reach zero.
+    EOF alone is only sufficient for a close-delimited response. The stdlib
+    chunked readline path uses peek(), which suppresses IncompleteRead. Only
+    consuming the terminal chunk clears chunk_left and closes that response;
+    known lengths must reach zero.
     """
     if getattr(response, "length", None) not in {None, 0}:
         raise ConnectionError("provider ended before completing its HTTP body")
+    if getattr(response, "chunked", False) and (response.chunk_left is not None or not response.isclosed()):
+        raise ConnectionError("provider ended before its terminal HTTP chunk")
 
 
 def events(response, *, max_line, max_output, deadline):

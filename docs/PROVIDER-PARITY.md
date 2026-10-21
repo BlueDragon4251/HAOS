@@ -1,5 +1,27 @@
 # Hermes parity work — development, not release acceptance
 
+## Native and chunked terminal-framing regressions (2026-10-21)
+
+New real HTTP regressions reproduced two completion defects at `f1bff80`.
+The native Gemini path forwarded a finish chunk before a short HTTP body failed;
+the stdlib chunked SSE path could accept a missing terminal HTTP chunk because
+`readline()` uses `peek()`, which suppresses an incomplete-read error. Checking
+fixed length alone was insufficient. HAOS now checks the completed chunk state
+and holds native Gemini/Bedrock finish events, including native Claude stop
+deltas, until the SDK iterator and HTTP framing finish successfully. Early text
+and tool deltas continue without waiting for completion; buffered frames retain
+ordering and the existing output/deadline limits. Failed streams are not retried.
+
+The required matrix now passes **351** actual builder/SDK/HTTP cases across all
+39 HTTP profiles, adding valid chunked streams and missing-terminal-chunk cases
+to the previous 273 cases. Native Gemini passes six HTTP cases, including short
+JSON/terminal bodies. Native AWS now passes 20 cryptographically checked IAM/
+Bearer Mantle/Claude cases, including absent terminal HTTP chunks. The six
+Converse cases and eight ordered-replay HTTP calls still pass. Minimal and full
+runtime suites each pass **822 tests, two existing skips**. Root-only gates remain
+required in CI. All results are local fixtures, with source hashes archived in
+`docs/evidence/2026-10-21`; no live inference or installed/release acceptance.
+
 ## Protected Anthropic native account login (2026-10-21)
 
 Anthropic subscription login now runs the pinned native OAuth-add flow with

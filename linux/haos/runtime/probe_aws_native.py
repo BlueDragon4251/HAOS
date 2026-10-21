@@ -46,7 +46,7 @@ def main():
     original_https, original_client = http.client.HTTPSConnection, messages_bridge.create_client
     for family in ("mantle", "claude"):
         for auth in ("iam", "bearer"):
-            for case in ("json", "stream", "truncated", "rate-limit"):
+            for case in ("json", "stream", "truncated", "rate-limit", "terminal-framing"):
                 release = threading.Event()
                 key, secret, session, bearer = "fixture-access-id", secrets.token_urlsafe(40), secrets.token_urlsafe(40), secrets.token_urlsafe(48)
                 private = {"access_key_id": key, "secret_access_key": secret, "session_token": session} if auth == "iam" else {"bearer_token": bearer}
@@ -121,6 +121,8 @@ def main():
                             self.send_header("Content-Type", "application/json" if case == "json" else
                                 "text/event-stream" if family == "mantle" else "application/vnd.amazon.eventstream")
                             self.send_header("Connection", "close")
+                            if case == "terminal-framing":
+                                self.send_header("Transfer-Encoding", "chunked")
                             self.end_headers()
                             if case == "json":
                                 self.wfile.write(json.dumps(final).encode())
@@ -131,6 +133,8 @@ def main():
                                     data = b"data: " + data + b"\n\n"
                                 else:
                                     data = event_frame("chunk", {"bytes": base64.b64encode(data).decode()})
+                                if case == "terminal-framing":
+                                    data = f"{len(data):x}\r\n".encode() + data + b"\r\n"
                                 self.wfile.write(data)
                                 self.wfile.flush()
                             if family == "mantle":
@@ -198,12 +202,15 @@ def main():
                                     assert not release.is_set()
                                     release.set()
                                     body = prefix + response.read()
-                                elif case == "truncated":
+                                elif case in {"truncated", "terminal-framing"}:
+                                    release.set()
                                     try:
                                         response.read()
                                         raise AssertionError("native AWS truncation was completed")
-                                    except http.client.IncompleteRead:
-                                        body = b""
+                                    except http.client.IncompleteRead as error:
+                                        body = error.partial
+                                    assert b'event: message_stop' not in body and b'response.completed' not in body
+                                    assert b'"stop_reason": "tool_use"' not in body
                                 else:
                                     body = response.read()
                                 assert response.status == (429 if case == "rate-limit" else 200)
@@ -212,7 +219,7 @@ def main():
                                     assert b"fixture-call" in body
                                 conn.close()
                             status, incoming, outgoing = ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchone()
-                            assert status == (502 if case == "truncated" else 429 if case == "rate-limit" else 200)
+                            assert status == (502 if case in {"truncated", "terminal-framing"} else 429 if case == "rate-limit" else 200)
                             if case in {"json", "stream"}:
                                 assert (incoming, outgoing) == (7, 4)
                         finally:
@@ -229,7 +236,8 @@ def main():
         "live_provider_tested": False, "python": sys.version.split()[0],
         "source_files": [{"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in
             (Path(__file__), root / "haos/provider_cloud.py", root / "haos/provider_bedrock_messages.py",
-             root / "haos/provider_profiles.py", root / "haos/provider_policy.py", root / "haos/provider_proxy.py")]}
+             root / "haos/provider_profiles.py", root / "haos/provider_policy.py", root / "haos/provider_proxy.py",
+             root / "haos/provider_sse.py")]}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

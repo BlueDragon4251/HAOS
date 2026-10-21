@@ -67,11 +67,13 @@ def forward_native(handler, payload, headers, redactor):
         handler.end_headers()
         handler.forward_started = True
         total, terminal, usage, deadline = 0, False, {}, time.monotonic() + 600
-        def write(data):
+        pending = []
+        def admit(data):
             nonlocal total
             total += len(data)
             if len(data) > MAX_LINE or total > MAX_OUTPUT or time.monotonic() > deadline:
                 raise ValueError("native provider stream exceeds broker bounds")
+        def write(data):
             handler.wfile.write(f"{len(data):x}\r\n".encode() + data + b"\r\n")
             handler.wfile.flush()
         from itertools import chain
@@ -80,10 +82,21 @@ def forward_native(handler, payload, headers, redactor):
             terminal = terminal or any(choice.get("finish_reason") for choice in event.get("choices", []))
             if isinstance(event.get("usage"), dict):
                 usage.update(event["usage"])
-            write(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n")
+            data = b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n"
+            admit(data)
+            # A native finish event may precede a failed HTTP/EventStream tail.
+            # Keep deltas live, but release completion only after SDK EOF.
+            if terminal or pending:
+                pending.append(data)
+            else:
+                write(data)
         if not terminal:
             raise ConnectionError("native provider ended without a terminal receipt")
-        write(b"data: [DONE]\n\n")
+        done = b"data: [DONE]\n\n"
+        admit(done)
+        for data in pending:
+            write(data)
+        write(done)
         handler.wfile.write(b"0\r\n\r\n")
         handler.wfile.flush()
         return 200, usage

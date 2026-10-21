@@ -34,7 +34,7 @@ def main():
     from haos import provider_native
     from agent.gemini_native_adapter import GeminiNativeClient
     checks = []
-    for case in ("json-tools", "stream-tools", "truncated", "rate-limit"):
+    for case in ("json-tools", "stream-tools", "truncated", "rate-limit", "json-framing", "terminal-framing"):
         received, release, final_sent = [], threading.Event(), threading.Event()
         key, capability = secrets.token_urlsafe(40), secrets.token_urlsafe(48)
 
@@ -44,27 +44,31 @@ def main():
 
             def do_POST(self):
                 received.append((self.path, dict(self.headers), json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
-                streaming = case != "json-tools"
+                streaming = case not in {"json-tools", "json-framing"}
                 first = {"candidates": [{"content": {"parts": [{"text": "native fixture"}]}}]}
                 final = {"candidates": [{"content": {"parts": [{"functionCall": {"name": "fixture", "args": {"value": key}},
                                                                "thoughtSignature": "fixture-signature"}]}, "finishReason": "STOP"}],
                          "usageMetadata": {"promptTokenCount": 7, "candidatesTokenCount": 4, "totalTokenCount": 11}}
                 body = json.dumps(final).encode()
+                first_frame = b"data: " + json.dumps(first).encode() + b"\n\n"
+                final_frame = b"data: " + json.dumps(final).encode() + b"\n\n"
                 if case == "rate-limit":
                     body = json.dumps({"error": {"code": 429, "message": key, "status": "RESOURCE_EXHAUSTED"}}).encode()
                 self.send_response(429 if case == "rate-limit" else 200)
                 self.send_header("Content-Type", "text/event-stream" if streaming and case != "rate-limit" else "application/json")
                 if not streaming or case == "rate-limit":
-                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Content-Length", str(len(body) + (20 if case == "json-framing" else 0)))
+                elif case == "terminal-framing":
+                    self.send_header("Content-Length", str(len(first_frame) + len(final_frame) + 20))
                 self.send_header("Connection", "close")
                 self.end_headers()
                 if streaming and case != "rate-limit":
-                    self.wfile.write(b"data: " + json.dumps(first).encode() + b"\n\n")
+                    self.wfile.write(first_frame)
                     self.wfile.flush()
                     if case != "truncated":
                         release.wait(5)
                         final_sent.set()
-                        self.wfile.write(b"data: " + json.dumps(final).encode() + b"\n\n")
+                        self.wfile.write(final_frame)
                 else:
                     self.wfile.write(body)
 
@@ -82,7 +86,7 @@ def main():
                 try:
                     with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": key}), ledger)) as broker:
                         connection = http.client.HTTPConnection("127.0.0.1", broker, timeout=10)
-                        connection.request("POST", "/v1/chat/completions", json.dumps({"model": "gemini-fixture", "stream": case != "json-tools",
+                        connection.request("POST", "/v1/chat/completions", json.dumps({"model": "gemini-fixture", "stream": case not in {"json-tools", "json-framing"},
                             "messages": [{"role": "user", "content": "Protocol fixture, no live model"}],
                             "tools": [{"type": "function", "function": {"name": "fixture", "parameters": {"type": "object"}}}]}),
                             {"Authorization": "Bearer " + capability})
@@ -93,16 +97,19 @@ def main():
                             assert not release.is_set() and not final_sent.is_set()
                             release.set()
                             body = line + response.read()
-                        elif case == "truncated":
+                        elif case in {"truncated", "terminal-framing"}:
+                            release.set()
                             try:
                                 response.read()
                                 raise AssertionError("truncated native stream was falsely completed")
-                            except http.client.IncompleteRead:
-                                body = b""
+                            except http.client.IncompleteRead as error:
+                                body = error.partial
+                            assert b'"finish_reason": "stop"' not in body and b'"finish_reason": "tool_calls"' not in body
+                            assert b"[DONE]" not in body
                         else:
                             release.set()
                             body = response.read()
-                        assert response.status == (429 if case == "rate-limit" else 200)
+                        assert response.status == (429 if case == "rate-limit" else 502 if case == "json-framing" else 200)
                         assert key.encode() not in body
                         if case in {"stream-tools", "json-tools"}:
                             assert b"tool_calls" in body and b"fixture-signature" in body
@@ -114,9 +121,9 @@ def main():
                     provider_native.create_client = original
             assert received[0][1]["x-goog-api-key"] == key
             assert "Authorization" not in received[0][1]
-            assert "generateContent" in received[0][0] if case == "json-tools" else "streamGenerateContent" in received[0][0]
+            assert "generateContent" in received[0][0] if case in {"json-tools", "json-framing"} else "streamGenerateContent" in received[0][0]
             assert received[0][2]["tools"][0]["functionDeclarations"][0]["name"] == "fixture"
-            assert ledger.db.execute("SELECT status FROM requests").fetchone()[0] == (502 if case == "truncated" else 429 if case == "rate-limit" else 200)
+            assert ledger.db.execute("SELECT status FROM requests").fetchone()[0] == (502 if case in {"truncated", "json-framing", "terminal-framing"} else 429 if case == "rate-limit" else 200)
             ledger.close()
             checks.append(case)
     receipt = {"provider": "gemini", "pinned_native_codec": True, "actual_loopback_http": True,
