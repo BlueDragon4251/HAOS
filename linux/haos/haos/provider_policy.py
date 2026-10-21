@@ -144,4 +144,5 @@ class ProviderPolicy:
             # unsupported retention field removed at its final request boundary.
             for key in ("max_output_tokens", "max_tokens", "max_completion_tokens", "temperature", "top_p", "prompt_cache_retention"):
                 payload.pop(key, None)
-        return payload
+        from .provider_replay import messages_for_route
+        return messages_for_route(self, payload)

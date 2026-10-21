@@ -638,3 +638,23 @@ public-date/header-negative checks pass. Both runtime suites: **860 passed, two
 existing skips**. Exact source and fixture receipts are archived in
 `docs/evidence/2026-10-21/provider-retry-after-validation.json` and
 `*-retry-after-fixture.json`; no live-provider or installed acceptance.
+
+## Broker admission of private native replay (2026-10-21)
+
+Native transport filtering alone did not cover a capability holder posting
+directly to the broker or re-admission to another fallback route. The real HTTP
+regression with `ce16609`'s original policy reproduced private native carriers
+and an unbound sidecar being forwarded to both ordinary HTTP targets.
+
+Every Chat admission now removes unbound native sidecar fields and private
+`*.native_assistant` carriers. Only the Bedrock Converse carrier survives on
+its exact approved model and endpoint; the native broker restores its ordered
+blocks after that admission. Each fallback re-applies the same policy without
+mutating history. Ordinary public reasoning details and content remain intact.
+The reproduced real two-target HTTP case now passes. Four actual IAM/Bearer
+JSON/stream replay scenarios still make eight boto3 HTTP calls preserving
+ordered signed/redacted reasoning and tools through the native accumulator.
+The 410-case SDK/HTTP matrix and both local suites (**862 passed, two existing
+skips**) pass. Exact source and fixtures:
+`docs/evidence/2026-10-21/broker-replay-admission-validation.json`.
+No live provider, installed system or release acceptance is implied.

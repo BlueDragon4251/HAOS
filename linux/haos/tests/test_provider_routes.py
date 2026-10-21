@@ -280,3 +280,61 @@ def test_failed_fallback_credentials_cannot_inherit_another_providers_retry_head
         assert len(received) == 1
         assert ledger.db.execute('SELECT status FROM requests ORDER BY rowid').fetchall() == [(503,), (503,)]
         ledger.close()
+
+def test_native_replay_is_admitted_only_to_its_bound_bedrock_route():
+    from haos.provider_bedrock_replay import carrier
+    bedrock = ProviderPolicy(route('bedrock', api_mode='chat_completions'))
+    native = carrier([{'reasoningContent': {'redactedContent': 'fixture'}}], 'fixture-model', bedrock.endpoint)
+    message = {'role': 'assistant', 'content': 'fixture', 'reasoning_details': [native],
+        'bedrock_content_blocks': [{'text': 'unbound bypass'}]}
+    payload = {'model': 'fixture-model', 'messages': [message]}
+    original = deepcopy(payload)
+    valid = bedrock.request('/v1/chat/completions', payload)
+    assert valid['messages'][0]['reasoning_details'] == [native]
+    assert 'bedrock_content_blocks' not in valid['messages'][0]
+    for policy in (ProviderPolicy(route()), ProviderPolicy(route('openrouter')), ProviderPolicy(route('bedrock',
+            endpoint='https://bedrock-runtime.eu-west-1.amazonaws.com', api_mode='chat_completions'))):
+        forwarded = policy.request('/v1/chat/completions', valid)
+        assert 'reasoning_details' not in forwarded['messages'][0]
+        assert 'bedrock_content_blocks' not in forwarded['messages'][0]
+    changed_model = ProviderPolicy({**bedrock.data, 'models': ['fixture-other'], 'default_model': 'fixture-other'})
+    changed = changed_model.request('/v1/chat/completions', {**valid, 'model': 'fixture-other'})
+    assert 'reasoning_details' not in changed['messages'][0]
+    assert payload == original
+
+
+def test_real_http_fallback_does_not_forward_private_native_replay(tmp_path):
+    received = []
+    private = {'type': 'haos.moa.native_assistant', 'binding': 'fixture', 'data': {'codex_reasoning_items': ['opaque fixture']}}
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+        def do_POST(self):
+            data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            received.append(data)
+            body = b'{"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}'
+            self.send_response(503 if len(received) == 1 else 200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    with serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port:
+        row = route(endpoint=f'http://127.0.0.1:{port}/v1')
+        routes = ProviderRoutes({'version': 2, 'default': 'first', 'routes': {'first': row, 'second': row},
+            'fallbacks': {'first': ['second']}})
+        credentials = {name: Credentials(policy, {'api_key': None}) for name, policy in routes.routes.items()}
+        ledger, capability = UsageLedger(tmp_path / 'usage.db'), secrets.token_urlsafe(48)
+        with serving(Broker(('127.0.0.1', 0), routes, capability, credentials, ledger)) as broker:
+            conn = http.client.HTTPConnection('127.0.0.1', broker, timeout=5)
+            conn.request('POST', '/v1/chat/completions', json.dumps({'model': 'fixture-model', 'messages': [
+                {'role': 'assistant', 'content': 'kept', 'reasoning_details': [private, {'type': 'reasoning.encrypted', 'data': 'public wire fixture'}],
+                 'codex_reasoning_items': ['unbound native fixture']}]}), {'Authorization': 'Bearer ' + capability})
+            response = conn.getresponse()
+            assert response.status == 200
+            response.read(); conn.close()
+        assert len(received) == 2
+        for data in received:
+            assert data['messages'] == [{'role': 'assistant', 'content': 'kept',
+                'reasoning_details': [{'type': 'reasoning.encrypted', 'data': 'public wire fixture'}]}]
+        assert ledger.db.execute('SELECT status FROM requests ORDER BY rowid').fetchall() == [(503,), (200,)]
+        ledger.close()

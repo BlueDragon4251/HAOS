@@ -1,0 +1,25 @@
+{
+  "base_commit": "ce16609",
+  "reproduction_source": "ce16609:linux/haos/haos/provider_policy.py",
+  "reproduction": "real HTTP test with original policy forwarded native private carrier and unbound sidecar to two ordinary HTTP targets; assertion failed",
+  "after_fix": "same real HTTP test passes; two owner-approved targets still receive ordinary content and public encrypted reasoning detail",
+  "source_sha256": {
+    "linux/haos/haos/provider_policy.py": "7399a32494e54aadf44addbe9cc8ebda47516002cbdb138b3c4f9c37b2aab913",
+    "linux/haos/haos/provider_replay.py": "0e745a499e4c6c70017f2f51bc8097dd204a017964b1bed92bb649f4d4724713",
+    "linux/haos/tests/test_provider_routes.py": "4e924fc1e97772eddb6285b625d6db202e63e567e7008e85b1c3a30c247f4c2b"
+  },
+  "minimal_suite": {
+    "passed": 862,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 862,
+    "existing_skips": 2
+  },
+  "actual_signed_or_bearer_boto3_replay_http_requests": 8,
+  "ordered_signed_redacted_blocks_tools_preserved": true,
+  "model_and_endpoint_mismatch_denied": true,
+  "http_sdk_matrix_cases": 410,
+  "live_inference_accounts_or_installed_tested": false,
+  "ci_for_this_change": "pending push"
+}
