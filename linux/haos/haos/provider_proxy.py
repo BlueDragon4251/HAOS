@@ -144,6 +144,9 @@ class Credentials:
                     from hermes_cli.auth_qwen import resolve_qwen_runtime_credentials
                     resolved = {**resolve_qwen_runtime_credentials(), "api_mode": "chat_completions"}
                 elif self.policy.provider == "minimax-oauth":
+                    from .provider_auth import minimax_status
+                    from .provider_registry import account_region
+                    minimax_status(account_region(self.policy.provider, self.policy.endpoint))
                     from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
                     resolved = {**resolve_minimax_oauth_runtime_credentials(), "api_mode": "anthropic_messages"}
                 else:

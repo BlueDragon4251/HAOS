@@ -222,3 +222,9 @@ an account authenticated for the other endpoint. CLI users select China with
 region is global. Configure the route with the matching `--endpoint`. Logout
 removes local account state; revoke the grant with the provider for remote
 revocation. Login does not prove model or subscription access.
+
+Account status is available without stopping missions, from the same protected
+owner console. MiniMax status performs no token refresh: an expired access token
+with stored refresh credentials is marked pending until the next approved model
+request refreshes it. Region checks precede that refresh. A stored credential
+does not prove that the provider will still accept it.

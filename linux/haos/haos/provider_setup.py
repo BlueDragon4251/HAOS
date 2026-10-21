@@ -298,6 +298,10 @@ def owner_provider(args):
     from .network import install
     if os.geteuid() != 0:
         raise PermissionError("provider changes require authenticated owner authority")
+    if args.provider_action in {"login", "logout", "auth-status"}:
+        region = getattr(args, "region", "global")
+        if args.provider not in account_providers() or region not in {"global", "cn"} or region != "global" and args.provider != "minimax-oauth":
+            raise ValueError("unsupported provider account or region")
     protected_directory(CONFIG)
     if args.provider_action == "status":
         exists = (CONFIG / "provider.json").exists()
@@ -311,6 +315,10 @@ def owner_provider(args):
         subprocess.run(["/usr/bin/systemctl", "stop", "haos-provider.socket", "haos-provider.service"], check=True, timeout=40)
         stopped_provider()
         return {"stopped": True}
+    if args.provider_action == "auth-status":
+        auth_helper("status", args.provider, region=getattr(args, "region", "global"))
+        audit("provider.auth-status", {"provider": args.provider})
+        return {"credential_action_completed": True, "model_turn_tested": False}
     stopped()
     stopped_gateway()
     stopped_provider()
@@ -330,9 +338,9 @@ def owner_provider(args):
                                 remove=args.provider_action == "remove")
         audit("provider.routes-changed", {"route": args.route, "action": args.provider_action})
         return result
-    if args.provider_action in {"login-codex", "logout-codex", "login", "logout", "auth-status"}:
+    if args.provider_action in {"login-codex", "logout-codex", "login", "logout"}:
         provider = "openai-codex" if args.provider_action.endswith("-codex") else args.provider
-        action = {"login-codex": "login", "logout-codex": "logout", "auth-status": "status"}.get(args.provider_action, args.provider_action)
+        action = {"login-codex": "login", "logout-codex": "logout"}.get(args.provider_action, args.provider_action)
         if action == "logout":
             revoke_account_routes(provider)
             install(pwd.getpwnam("haos-agent").pw_uid)

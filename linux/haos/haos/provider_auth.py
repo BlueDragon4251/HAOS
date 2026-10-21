@@ -90,6 +90,24 @@ def minimax_login(region):
     print("MiniMax " + region + " account saved privately. No inference tested.")
 
 
+def minimax_status(region):
+    """Read private account state without rotating tokens during a status read."""
+    if region not in {"global", "cn"}:
+        raise ValueError("unsupported MiniMax account region")
+    from hermes_cli.auth import PROVIDER_REGISTRY, get_provider_auth_state, get_auth_status
+    config = PROVIDER_REGISTRY["minimax-oauth"]
+    expected = config.extra["cn_inference_base_url"] if region == "cn" else config.inference_base_url
+    state = get_provider_auth_state("minimax-oauth") or {}
+    endpoint = state.get("inference_base_url")
+    if (not state.get("access_token") or not isinstance(endpoint, str)
+            or endpoint.rstrip("/") != expected.rstrip("/") or state.get("region", "global") != region):
+        raise PermissionError("MiniMax account is missing or authenticated in another region")
+    pending = not get_auth_status("minimax-oauth").get("logged_in", False)
+    if pending and not state.get("refresh_token"):
+        raise PermissionError("MiniMax authorization expired; sign in again")
+    return {"configured": True, "region": region, "refresh_pending": pending}
+
+
 def qwen_import(value):
     """Validate the exact upstream Qwen-CLI credential shape before private import."""
     if not isinstance(value, str) or len(value.encode()) > 32768:
@@ -161,13 +179,10 @@ def main():
             print("OpenRouter private credential pool is configured. No model turn tested.")
             return
         if provider == "minimax-oauth":
-            from hermes_cli.auth import PROVIDER_REGISTRY
-            from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
-            config = PROVIDER_REGISTRY[provider]
-            expected = config.extra["cn_inference_base_url"] if region == "cn" else config.inference_base_url
-            if resolve_minimax_oauth_runtime_credentials()["base_url"].rstrip("/") != expected.rstrip("/"):
-                raise PermissionError("MiniMax account is authenticated in another region")
+            status = minimax_status(region)
             print("MiniMax " + region + " credential store is configured. No model turn tested.")
+            if status["refresh_pending"]:
+                print("Access token expired; the next approved request must refresh it. Account access is not verified.")
             return
         from hermes_cli.auth import get_auth_status
         if not get_auth_status(provider).get("logged_in"):

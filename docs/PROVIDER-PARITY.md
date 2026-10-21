@@ -1,5 +1,21 @@
 # Hermes parity work — development, not release acceptance
 
+## Read-only account status and regional refresh admission (2026-10-21)
+
+MiniMax status now reads native private state without network access or token
+rotation. Expired access with a stored refresh grant is reported as refresh
+pending, not live account verification. The broker checks the stored region and
+approved inference endpoint before asking the pinned resolver to refresh.
+The actual native account probe verifies unchanged private JSON and zero HTTP
+requests during status, and refuses the other region even when the token has
+expired. The correct approved request then performs the actual native refresh.
+
+Owner CLI account status now works while missions run, retaining the protected
+console helper. Invalid regional account arguments fail before route withdrawal
+or owner-file changes. Both local runtime variants pass **827 tests, two existing
+skips**; the 22 native account cases and OpenRouter/Copilot/Anthropic account
+probes pass again. No account entitlement or live inference is claimed.
+
 ## Complete chunk trailers (2026-10-21)
 
 A further real stdlib regression at `88cea1e` reproduced acceptance of a zero

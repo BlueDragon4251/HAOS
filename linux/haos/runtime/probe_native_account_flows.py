@@ -32,7 +32,7 @@ def main():
     from hermes_cli.auth_error_copy import SignInCopyError
     from haos.provider_policy import ProviderPolicy
     from haos.provider_proxy import Credentials
-    from haos.provider_auth import minimax_login
+    from haos.provider_auth import minimax_login, minimax_status
     from haos.provider_registry import default_mode
     from agent.credential_pool import load_pool
     state, calls, failures, checks = {}, [], [], []
@@ -162,11 +162,26 @@ def main():
                                 assert len(entries) == 1, "fresh login duplicated the single-use refresh grant"
                                 assert entries[0].base_url == endpoint
                                 value = auth.get_provider_auth_state(provider)
-                                auth_minimax._refresh_minimax_oauth_state(value, force=True)
+                                value["expires_at"] = "1970-01-01T00:00:00+00:00"
+                                auth._save_active_provider_state(provider, value)
+                                before = len(calls)
+                                saved = {p: p.read_bytes() for p in home.rglob("*.json")}
+                                assert minimax_status(region) == {"configured": True, "region": region, "refresh_pending": True}
+                                assert len(calls) == before and all(p.read_bytes() == data for p, data in saved.items())
                             succeeded = True
                             policy = ProviderPolicy({"version": 1, "provider": provider, "endpoint": endpoint,
                                 "models": ["fixture-model"], "default_model": "fixture-model", "api_mode": default_mode(provider),
                                 "requests_per_day": 200, "requests_per_minute": 30})
+                            if provider == "minimax-oauth":
+                                wrong = ProviderPolicy({**policy.data, "endpoint": "https://api.minimax.io/anthropic" if region == "cn" else "https://api.minimaxi.com/anthropic"})
+                                before = len(calls)
+                                try:
+                                    Credentials(wrong, {"api_key": None}).headers()
+                                except PermissionError:
+                                    pass
+                                else:
+                                    raise AssertionError("expired regional grant refreshed before endpoint admission")
+                                assert len(calls) == before
                             headers, redactor = Credentials(policy, {"api_key": None}).headers()
                             assert headers["Authorization"] == "Bearer " + state["second"]
                             assert state["second"] not in redactor.text(state["second"])
@@ -201,6 +216,7 @@ def main():
     receipt = {"actual_pinned_native_account_cases": checks, "case_count": len(checks), "http_requests": len(calls),
         "native_device_pkce_login_refresh_private_storage_status_logout": True,
         "native_minimax_global_and_china_regions": True, "broker_uses_refreshed_native_credentials": True,
+        "minimax_status_read_only_and_expired_grant_region_checked_before_refresh": True,
         "invalid_pending_denied_missing_token_and_csrf_checked": True, "private_tokens_not_rendered": True,
         "live_account_tested": False, "python": sys.version.split()[0], "source_files": [
             {"path": str(path.relative_to(root)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}

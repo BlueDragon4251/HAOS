@@ -1,0 +1,49 @@
+{
+  "source_base_commit": "586907721a33308364bde0ec4ddc04ab320abb2c",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 827,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 827,
+    "skipped": 2
+  },
+  "native_account_cases": 22,
+  "openrouter_account_cases": 9,
+  "copilot_device_cases": 7,
+  "anthropic_account_cases": 7,
+  "root_uid_kernel_tests": "separate required CI gate",
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "3701cfb52f502d6b3d0465134ae662311318b700130a50ed770cb09b96405c94"
+    },
+    {
+      "path": "docs/PROVIDER-SETUP.md",
+      "sha256": "1aaad87e1af6fc1bcbda2d90bafc7064f21dbd70d5129101a46085abccab2d6b"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "de42a47018c66b6840b00b9757681d93f1665a6b1a6a6680cd4c20b89b46ac49"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "1dd96c92b44df95c5ee7f11450fa826b74776ac85bcb42148d0228935f3f3a48"
+    },
+    {
+      "path": "linux/haos/runtime/probe_native_account_flows.py",
+      "sha256": "e27d00075f825f56189aa9b2e59c25c6f146b07a1e38c098130be05af894fdec"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_accounts.py",
+      "sha256": "23e8ba8a30917105b95f9678c53d844de157e2e47bcaf6f09aeb681fc63fd067"
+    }
+  ]
+}
