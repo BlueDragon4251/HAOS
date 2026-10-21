@@ -1,5 +1,18 @@
 # Hermes parity work — development, not release acceptance
 
+## Protected Anthropic native account login (2026-10-21)
+
+Anthropic subscription login now runs the pinned native OAuth-add flow with
+terminal echo disabled while its authorization-code prompt is active. It
+requires a protected terminal and restores the original terminal state even
+on failure. Seven actual HTTP/PTY cases check PKCE/state, hidden code entry,
+terminal restoration, native private-pool persistence, automatic expiry refresh
+through the actual broker, status and native logout. State mismatch, empty code,
+denial, missing access token, malformed JSON and short HTTP bodies fail without
+publishing a credential. The build and provider workflow require this probe.
+These are local protocol/PTY fixtures, not a live Claude account, entitlement,
+installed physical setup or inference acceptance.
+
 ## Fresh Copilot device authorization (2026-10-21)
 
 The private account helper now validates a newly authorized Copilot token's

@@ -2,7 +2,7 @@
 import pytest
 
 from haos import initial_setup, initial_setup_gui, provider_setup
-from haos.provider_auth import minimax_login
+from haos.provider_auth import minimax_login, anthropic_login
 
 
 @pytest.mark.parametrize("endpoint,region", [("", "global"),
@@ -43,3 +43,11 @@ def test_unknown_regions_and_cross_provider_region_flags_fail_before_optional_im
         provider_setup.auth_helper("login", "qwen-oauth", region="cn")
     with pytest.raises(ValueError):
         provider_setup.auth_helper("login", "minimax-oauth", region="unreviewed")
+
+
+def test_anthropic_code_entry_requires_a_private_terminal_before_optional_imports(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(isatty=lambda: False))
+    with pytest.raises(PermissionError, match="protected owner terminal"):
+        anthropic_login()

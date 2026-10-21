@@ -5,6 +5,25 @@ import sys
 import json
 
 
+def anthropic_login():
+    """Keep the native PKCE flow while hiding its authorization-code input."""
+    if not sys.stdin.isatty():
+        raise PermissionError("Anthropic authorization requires the protected owner terminal")
+    import termios
+    from types import SimpleNamespace
+    from hermes_cli.auth_commands import auth_add_command
+    descriptor = sys.stdin.fileno()
+    previous = termios.tcgetattr(descriptor)
+    hidden = list(previous)
+    hidden[3] &= ~(termios.ECHO | termios.ECHONL)
+    try:
+        termios.tcsetattr(descriptor, termios.TCSANOW, hidden)
+        auth_add_command(SimpleNamespace(provider="anthropic", auth_type="oauth",
+            label="anthropic-owner-authorization", no_browser=True, timeout=600))
+    finally:
+        termios.tcsetattr(descriptor, termios.TCSANOW, previous)
+
+
 def copilot_login():
     from hermes_cli.copilot_auth import copilot_device_code_login, validate_copilot_token
     from hermes_cli.config import save_env_value
@@ -157,6 +176,9 @@ def main():
         return
     executable = "/usr/lib/haos/hermes/.venv/bin/hermes"
     if action == "login":
+        if provider == "anthropic":
+            anthropic_login()
+            return
         if provider == "openrouter":
             openrouter_login()
             return

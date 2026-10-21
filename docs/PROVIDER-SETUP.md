@@ -205,6 +205,13 @@ private native credential pool; status checks that pool and local logout
 clears it. OpenRouter returns an API key rather than a refresh token. Revoke
 the key in OpenRouter's account controls to invalidate it remotely.
 
+Anthropic subscription login retains Hermes's native PKCE flow. Open its
+displayed Claude authorization link, then paste the complete `code#state` into
+the protected terminal. Code entry is hidden; terminal echo is restored after
+success, denial or cancellation. A private terminal is required. Tokens stay
+in the native provider credential pool, with native expiry refresh. Local
+logout does not certify remote revocation or subscription/model entitlement.
+
 MiniMax accounts have separate global and China endpoints. Select
 `https://api.minimax.io/anthropic` or `https://api.minimaxi.com/anthropic`
 in the graphical provider form before account login/status. The protected
