@@ -1,10 +1,29 @@
 #!/usr/bin/env python3
-"""Apply the reviewed dependency overlay only to its exact upstream snapshot."""
+"""Apply reviewed dependency and local-stream overlays to one exact snapshot."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import re
+
+
+def patch_auxiliary(upstream, expected_sha256, *, check_only=False):
+    path = upstream / "agent/auxiliary_client.py"
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise ValueError("auxiliary stream overlay belongs to another Hermes source")
+    anchor = '        if task == "moa_aggregator" and isinstance(client, CodexAuxiliaryClient):\n'
+    addition = '''        if task == "moa_aggregator" and str(provider or "").startswith("custom:haos-"):
+            from haos.provider_moa_streams import create_stream
+            local_stream = create_stream(client, kwargs)
+            if local_stream is not None:
+                return local_stream
+'''
+    text = data.decode()
+    if text.count(anchor) != 1:
+        raise ValueError("pinned auxiliary stream dispatch changed")
+    if not check_only:
+        path.write_text(text.replace(anchor, addition + anchor))
 
 
 def prepare(upstream: Path, overlay: Path, *, check_only=False):
@@ -29,6 +48,7 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
     replacement = '"PyJWT[crypto]==' + source["security_versions"]["pyjwt"] + '"'
     if text.count(original) != 1:
         raise ValueError("upstream PyJWT constraint changed; review this overlay")
+    patch_auxiliary(upstream, source["auxiliary_client_sha256"], check_only=check_only)
     if not check_only:
         path.write_text(text.replace(original, replacement))
 

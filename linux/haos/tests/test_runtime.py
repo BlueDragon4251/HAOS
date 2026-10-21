@@ -18,11 +18,20 @@ def inputs(tmp_path):
     (upstream / ".herald-os-upstream-sha").write_text("a" * 40 + "\n")
     (upstream / "pyproject.toml").write_text('dependencies = ["PyJWT[crypto]==2.13.0"]\n')
     (upstream / "uv.lock").write_text("fixture upstream lock\n")
+    (upstream / "agent").mkdir()
+    (upstream / "agent/auxiliary_client.py").write_text('''class CodexAuxiliaryClient: pass
+def dispatch(task, provider, client, kwargs):
+    if True:
+        if task == "moa_aggregator" and isinstance(client, CodexAuxiliaryClient):
+            return "buffered"
+    return "standard"
+''')
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
     source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity"],
               "security_versions": {"pyjwt": "2.15.1"}}
     for filename, key, root in [("pyproject.toml", "pyproject_sha256", upstream),
                                 ("uv.lock", "uv_lock_sha256", upstream),
+                                ("agent/auxiliary_client.py", "auxiliary_client_sha256", upstream),
                                 ("requirements.txt", "requirements_sha256", overlay)]:
         source[key] = hashlib.sha256((root / filename).read_bytes()).hexdigest()
     (overlay / "source.json").write_text(json.dumps(source))
@@ -30,24 +39,31 @@ def inputs(tmp_path):
 
 
 def test_check_does_not_mutate_upstream(inputs):
+    before = (inputs[0] / "agent/auxiliary_client.py").read_bytes()
     runtime.prepare(*inputs, check_only=True)
     assert "2.13.0" in (inputs[0] / "pyproject.toml").read_text()
+    assert (inputs[0] / "agent/auxiliary_client.py").read_bytes() == before
 
 
 def test_reviewed_constraint_is_applied(inputs):
     runtime.prepare(*inputs)
+    namespace = {}
+    exec(compile((inputs[0] / "agent/auxiliary_client.py").read_bytes(), "fixture", "exec"), namespace)
+    assert namespace["dispatch"]("moa_aggregator", "custom:other", namespace["CodexAuxiliaryClient"](), {}) == "buffered"
     assert '"PyJWT[crypto]==2.15.1"' in (inputs[0] / "pyproject.toml").read_text()
 
 
 @pytest.mark.parametrize("file,root", [(".herald-os-upstream-sha", 0), ("pyproject.toml", 0),
-                                     ("uv.lock", 0), ("requirements.txt", 1)])
+                                     ("uv.lock", 0), ("requirements.txt", 1), ("agent/auxiliary_client.py", 0)])
 def test_changed_inputs_are_refused_before_modification(inputs, file, root):
     path = inputs[root] / file
     path.write_text(path.read_text() + "tampered")
     before = (inputs[0] / "pyproject.toml").read_bytes()
+    auxiliary = (inputs[0] / "agent/auxiliary_client.py").read_bytes()
     with pytest.raises(ValueError):
         runtime.prepare(*inputs)
     assert (inputs[0] / "pyproject.toml").read_bytes() == before
+    assert (inputs[0] / "agent/auxiliary_client.py").read_bytes() == auxiliary
 
 
 def test_mismatched_reviewed_security_version(inputs):

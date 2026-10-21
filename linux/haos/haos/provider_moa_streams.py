@@ -1,0 +1,160 @@
+"""Native auxiliary streaming over approved local capabilities, never vendor auth."""
+from collections import deque
+from copy import deepcopy
+import hashlib
+import hmac
+import json
+import re
+from types import SimpleNamespace
+from urllib.parse import urlsplit
+import uuid
+
+REPLAY_TYPE = "haos.moa.native_assistant"
+REPLAY_FIELDS = ("codex_reasoning_items", "codex_message_items", "anthropic_content_blocks")
+
+
+def _binding(transport, base, model):
+    context = getattr(transport, "haos_wire_context", lambda _: None)(base)
+    return hashlib.sha256(json.dumps([context or [transport.api_mode, base], model],
+        separators=(",", ":")).encode()).hexdigest()
+
+
+def _restore(messages, binding):
+    output = deepcopy(messages)
+    for message in output:
+        details = message.get("reasoning_details")
+        if not isinstance(details, list):
+            continue
+        carriers = [item for item in details if isinstance(item, dict) and item.get("type") == REPLAY_TYPE]
+        message["reasoning_details"] = [item for item in details if not isinstance(item, dict) or item.get("type") != REPLAY_TYPE]
+        for item in carriers:
+            if item.get("binding") == binding and isinstance(item.get("data"), dict):
+                message.update({key: deepcopy(value) for key, value in item["data"].items() if key in REPLAY_FIELDS})
+                break
+    return output
+
+
+def _route(client, mode):
+    from agent.secret_scope import get_secret
+    from hermes_cli.config import load_config_readonly
+    from .provider_policy import BASE
+    capability = get_secret("HAOS_MODEL_TOKEN", "")
+    if (not capability or not hmac.compare_digest(str(client.api_key), capability)
+            or not hmac.compare_digest(str(client._real_client.api_key), capability)):
+        raise PermissionError("MoA streaming requires its scoped local capability")
+    base = str(client.base_url).rstrip("/")
+    real = str(client._real_client.base_url).rstrip("/")
+    for row in load_config_readonly().get("providers", {}).values():
+        if not isinstance(row, dict) or row.get("key_env") != "HAOS_MODEL_TOKEN" or row.get("api_mode") != mode:
+            continue
+        candidate = str(row.get("base_url", "")).rstrip("/")
+        parsed = urlsplit(candidate)
+        actual_urls = {candidate, candidate.removesuffix("/v1")} if mode == "anthropic_messages" else {candidate}
+        if (candidate == base and parsed.scheme == "http" and parsed.hostname == "127.0.0.1"
+                and parsed.netloc == urlsplit(BASE).netloc and re.fullmatch(r"(?:/routes/[a-z0-9][a-z0-9-]{0,63})?/v1", parsed.path)
+                and parsed.port and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+                and real in actual_urls):
+            return candidate
+    raise PermissionError("MoA auxiliary client escaped the approved local route")
+
+
+def _kwargs(transport, supplied, base):
+    params = dict(supplied)
+    model, messages, tools = params.pop("model"), params.pop("messages"), params.pop("tools", None)
+    messages = _restore(messages, _binding(transport, base, model))
+    params["base_url"], params["provider"] = base, "custom"
+    params["reasoning_config"] = params.pop("_reasoning_config", params.get("reasoning_config"))
+    if params["reasoning_config"] is None and isinstance(params.get("extra_body"), dict):
+        params["reasoning_config"] = params["extra_body"].get("reasoning")
+    params["max_tokens"] = params.get("max_tokens") or params.get("max_completion_tokens")
+    choice = params.get("tool_choice")
+    if transport.api_mode == "anthropic_messages" and isinstance(choice, dict):
+        params["tool_choice"] = choice.get("function", {}).get("name") if choice.get("type") == "function" else choice.get("type")
+    wire = transport.build_kwargs(model, messages, tools, **params)
+    wire["stream"] = True
+    if supplied.get("timeout") is not None:
+        wire["timeout"] = supplied["timeout"]
+    return wire
+
+
+def _chunk(identifier, model, delta, finish=None, usage=None):
+    return SimpleNamespace(id=identifier, object="chat.completion.chunk", model=model,
+        choices=[SimpleNamespace(index=0, delta=SimpleNamespace(**delta), finish_reason=finish)], usage=usage)
+
+
+def _usage(value):
+    if value is None:
+        return None
+    incoming, outgoing = getattr(value, "input_tokens", None), getattr(value, "output_tokens", None)
+    return SimpleNamespace(prompt_tokens=incoming, completion_tokens=outgoing,
+        total_tokens=incoming + outgoing if type(incoming) is int and type(outgoing) is int else None)
+
+
+def _final_delta(normalized, transport, base, model):
+    delta = dict(normalized.provider_data or {})
+    replay = {key: delta[key] for key in REPLAY_FIELDS if key in delta}
+    if replay:
+        delta["reasoning_details"] = list(delta.get("reasoning_details") or []) + [{
+            "type": REPLAY_TYPE, "binding": _binding(transport, base, model), "data": replay}]
+    if normalized.tool_calls:
+        delta["tool_calls"] = [SimpleNamespace(index=index, id=call.id, type="function",
+            function=SimpleNamespace(name=call.name, arguments=call.arguments),
+            **(call.provider_data or {})) for index, call in enumerate(normalized.tool_calls)]
+    return delta
+
+
+def _responses(client, supplied, base):
+    from agent.transports import get_transport
+    from agent.codex_runtime import _CodexResponseAssembler
+    transport = get_transport("codex_responses")
+    wire = _kwargs(transport, supplied, base)
+    identifier, pending = "haos-moa-" + uuid.uuid4().hex, deque()
+    assembler = _CodexResponseAssembler(model=wire["model"],
+        on_text_delta=lambda text: pending.append({"content": text}),
+        on_reasoning_delta=lambda text: pending.append({"reasoning_content": text}),
+        on_commentary_message=None, on_first_delta=None)
+    terminal, usage = False, None
+    with client._real_client.with_options(max_retries=0).responses.create(**wire) as stream:
+        for event in stream:
+            assembler.feed(event)
+            if getattr(event, "type", None) == "response.completed":
+                terminal = True
+                usage = getattr(getattr(event, "response", None), "usage", None)
+            while pending:
+                yield _chunk(identifier, wire["model"], pending.popleft())
+        if not terminal:
+            raise ConnectionError("MoA Responses stream ended without completion")
+        final = assembler.result()
+        normalized = transport.normalize_response(final)
+        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"]), normalized.finish_reason, _usage(usage))
+
+
+def _messages(client, supplied, base):
+    from agent.transports import get_transport
+    transport = get_transport("anthropic_messages")
+    wire = _kwargs(transport, supplied, base)
+    wire.pop("stream", None)
+    identifier, terminal = "haos-moa-" + uuid.uuid4().hex, False
+    with client._real_client.with_options(max_retries=0).messages.stream(**wire) as stream:
+        for event in stream:
+            if event.type == "content_block_delta":
+                if event.delta.type == "text_delta":
+                    yield _chunk(identifier, wire["model"], {"content": event.delta.text})
+                elif event.delta.type == "thinking_delta":
+                    yield _chunk(identifier, wire["model"], {"reasoning_content": event.delta.thinking})
+            terminal = terminal or event.type == "message_stop"
+        if not terminal:
+            raise ConnectionError("MoA Messages stream ended without completion")
+        final = stream.get_final_message()
+        normalized = transport.normalize_response(final)
+        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"]), normalized.finish_reason, _usage(final.usage))
+
+
+def create_stream(client, supplied):
+    """Keep Hermes's own fanout/cache planning, replacing only buffered facades."""
+    from agent.auxiliary_client import CodexAuxiliaryClient, AnthropicAuxiliaryClient
+    if isinstance(client, CodexAuxiliaryClient):
+        return _responses(client, supplied, _route(client, "codex_responses"))
+    if isinstance(client, AnthropicAuxiliaryClient):
+        return _messages(client, supplied, _route(client, "anthropic_messages"))
+    return None

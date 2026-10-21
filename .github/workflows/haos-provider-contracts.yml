@@ -53,6 +53,11 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
           "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"
           "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa.json"
+          for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort; do
+            "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-$scenario.json" "$scenario"
+          done
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-scope.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
           "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
           "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"
           "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"

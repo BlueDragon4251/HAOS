@@ -26,6 +26,7 @@ def register_profiles(data):
     if data["version"] == 2:
         selected.update({"haos-" + key: policy for key, policy in routes.routes.items()})
     profiles = {}
+    bindings = {}
     fields = ("supports_vision", "supports_vision_tool_messages", "supports_prompt_cache_key",
               "native_reasoning_details_type", "fixed_temperature", "default_max_tokens",
               "unsupported_response_formats", "model_capabilities")
@@ -75,8 +76,13 @@ def register_profiles(data):
         # extra credential header or catalog override crosses this boundary.
         register_provider(profile)
         profiles[route["base_url"].rstrip("/")] = (profile, endpoint, source)
+        bindings[route["base_url"].rstrip("/")] = (source, policy.api_mode, policy.endpoint)
 
-    class BrokerChat(ChatCompletionsTransport):
+    class WireContext:
+        def haos_wire_context(self, base_url):
+            return bindings.get(str(base_url).rstrip("/"))
+
+    class BrokerChat(WireContext, ChatCompletionsTransport):
         def convert_messages(self, messages, **kwargs):
             selected = profiles.get(str(kwargs.get("base_url") or "").rstrip("/"))
             if selected:
@@ -89,8 +95,10 @@ def register_profiles(data):
                 params["provider_profile"] = selected[0]
             return super().build_kwargs(model, messages, tools, **params)
 
-    class BrokerResponses(ResponsesApiTransport):
+    class BrokerResponses(WireContext, ResponsesApiTransport):
         def build_kwargs(self, model, messages, tools=None, **params):
+            from .provider_moa_streams import _binding, _restore
+            messages = _restore(messages, _binding(self, params.get("base_url"), model))
             selected = profiles.get(str(params.get("base_url") or "").rstrip("/"))
             if selected:
                 params["provider_profile"] = selected[0]
@@ -100,13 +108,15 @@ def register_profiles(data):
                 params["base_url"] = selected[1]
             return super().build_kwargs(model, messages, tools, **params)
 
-    class BrokerMessages(AnthropicTransport):
+    class BrokerMessages(WireContext, AnthropicTransport):
         def convert_messages(self, messages, **kwargs):
             selected = profiles.get(str(kwargs.get("base_url") or "").rstrip("/"))
             if selected:
                 kwargs["base_url"] = selected[1]
             return super().convert_messages(messages, **kwargs)
         def build_kwargs(self, model, messages, tools=None, **params):
+            from .provider_moa_streams import _binding, _restore
+            messages = _restore(messages, _binding(self, params.get("base_url"), model))
             selected = profiles.get(str(params.get("base_url") or "").rstrip("/"))
             if selected:
                 params["base_url"] = selected[1]

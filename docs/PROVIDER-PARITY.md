@@ -576,3 +576,22 @@ Hermes: a new native-helper import ran even on ordinary non-fast local Messages.
 The helper is now lazy and credential classification reuses the native client's
 already emitted identity headers. All 49 minimal-dependency routing cases pass;
 the real kernel test remains required and awaits the corrected-source CI.
+
+The native MoA aggregator now streams Responses and Messages through the existing
+capability-only SDK clients. The pinned auxiliary facade previously buffered
+those protocols even when its caller requested streaming. A source-hash-checked
+`prepare.py` overlay changes only the HAOS MoA stream dispatch; other upstream
+providers retain their original dispatch. No vendor credential/client/process
+hook is delegated. SDK retry is disabled and completion requires the native
+terminal event plus a fully consumed HTTP body.
+
+Seven actual pinned MoA engine/broker fixtures cover ordinary and mixed native
+protocols, early output while completion is withheld, and both native stream
+abortions without replay or a successful finish. Scoped SDK A→B→A checks reject
+a foreign capability, unscoped access and a foreign endpoint before HTTP. Native
+ordered Messages blocks and encrypted Responses items cross Hermes's actual
+reasoning-detail accumulator in a model/endpoint-bound carrier; builder fixtures
+verify replay and reject changed bindings or another protocol. These are local
+protocol contracts, not live inference or subscription acceptance. Exact input,
+derived source and test receipts: `docs/evidence/2026-10-21/moa-native-*.json` and
+`moa-stream-*-fixture.json`.
