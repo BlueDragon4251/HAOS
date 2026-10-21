@@ -1,5 +1,29 @@
 # Hermes parity work — development, not release acceptance
 
+## Native account flows and MiniMax region selection (2026-10-21)
+
+The required build/CI probe now executes 22 actual pinned Nous, xAI and
+global/China MiniMax device-login, refresh, private-storage, broker, status and
+logout cases over loopback HTTP. It checks pending/denied authorization,
+malformed device/token replies and MiniMax PKCE/state rejection. Failed login
+publishes no pool credential; a fresh successful MiniMax login has exactly one
+native singleton-seeded pool entry, avoiding duplicate rotating refresh grants.
+Refreshed credentials reach only the approved broker endpoint; cross-region
+MiniMax routing fails before any network dispatch. These are fixtures, not live
+accounts or remote revocation evidence.
+
+Graphical login/status now uses the selected MiniMax endpoint to choose the
+fixed global/China region. CLI account actions accept `--region cn`; other
+providers reject that regional flag. Endpoint validation and trusted-seat gates
+run before execution, and status does not stop missions. Local minimal and
+full-runtime suites each pass 818 tests with two existing skips; root-only
+backup/UID gates remain separate CI requirements.
+
+Fresh verification of predecessor `c11baf5` found provider, GUI, services/kernel
+and Arch gates successful. General CI's Linux jobs and secret scan passed, but
+macOS jobs could not acquire a hosted runner (GitHub capacity annotation); the
+failed jobs were restarted. This does not count as a complete green CI run.
+
 ## Resumed native alias and HTTP matrix verification
 
 The broker now admits exact owner model IDs and only their wire equivalents

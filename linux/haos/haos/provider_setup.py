@@ -247,10 +247,12 @@ def private_command(provider, module, arguments=(), *, pipe=True):
     return command
 
 
-def auth_helper(action, provider="openai-codex", *, graphical_status=False):
+def auth_helper(action, provider="openai-codex", *, graphical_status=False, region="global"):
     # --pty keeps device codes and OAuth output off the journal.
     if action not in {"login", "status", "logout"} or provider not in account_providers():
         raise ValueError("unsupported provider credential action")
+    if region not in {"global", "cn"} or region != "global" and provider != "minimax-oauth":
+        raise ValueError("unsupported provider account region")
     from .owner_recovery import require_console
     if graphical_status:
         from .initial_setup_gui import session_allowed
@@ -258,9 +260,12 @@ def auth_helper(action, provider="openai-codex", *, graphical_status=False):
             raise PermissionError("graphical auth status requires the trusted local setup seat")
     else:
         require_console()
-    command = private_command(provider, "haos.provider_auth", (action, provider), pipe=graphical_status)
+    arguments = (action, provider, region) if provider == "minimax-oauth" else (action, provider)
+    command = private_command(provider, "haos.provider_auth", arguments, pipe=graphical_status)
     result = subprocess.run(command, env=ENV, timeout=740, capture_output=graphical_status)
     if result.returncode:
+        if provider == "minimax-oauth":
+            raise RuntimeError("MiniMax account or region did not match. Check the global/China endpoint and sign in through the trusted owner terminal.")
         raise RuntimeError("provider credential action failed; inspect the trusted owner console")
 
 
@@ -331,7 +336,7 @@ def owner_provider(args):
         if action == "logout":
             revoke_account_routes(provider)
             install(pwd.getpwnam("haos-agent").pw_uid)
-        auth_helper(action, provider)
+        auth_helper(action, provider, region=getattr(args, "region", "global"))
         audit("provider." + args.provider_action, {"provider": provider})
         return {"credential_action_completed": True, "model_turn_tested": False}
     if args.provider_action == "disable":
@@ -357,7 +362,8 @@ def owner_provider(args):
         require_console()
         credential = getpass.getpass("Cloud credential JSON (Azure also accepts an API key; blank = service UID SDK chain): ") or None
     if policy.provider in oauth_providers() or policy.provider == "copilot-acp":
-        auth_helper("status", policy.provider)
+        from .provider_registry import account_region
+        auth_helper("status", policy.provider, region=account_region(policy.provider, policy.endpoint))
     add_route(policy.data, credential)
     install(pwd.getpwnam("haos-agent").pw_uid)
     subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"], check=True, timeout=30)

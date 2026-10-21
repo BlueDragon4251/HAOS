@@ -1,0 +1,72 @@
+{
+  "source_base_commit": "c11baf5e571ecf7ce5f956f19fc0e6a069f4e0f8",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "python": "3.11.16",
+  "minimal_without_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "root_only_backup_file": "required separately in CI",
+  "native_account_fixture_cases": 22,
+  "live_account_tested": false,
+  "installed_boot_tested": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "db280fe8d80e05556be01b3ecc6770455d6772d15c0b9ed7877a365a6f1bf7c7"
+    },
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "2a2e46a639c547dd64d0e20fb3b410e74c7c7d14f616dd7e5919256fac322633"
+    },
+    {
+      "path": "docs/PROVIDER-SETUP.md",
+      "sha256": "bb330fba0ead3c5c591d7389c43ae4acd519f970cf9d3938eaeae2fd0a0ad34a"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "19b2c61affde94653addf060d9c6cb41f7341f8c6f2f529fe4ee6cf7c231d388"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "7f8543c2eea2053211f8bd5c16eaba02bda2acbe8e820d90819567916338c402"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "c0b9183047d6a4b0cd827dd73860dac1cc3047a867ef286aa1e0a0b01758e2fc"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "61f82378383f107bed89617527b46b892cd1097a173eefca7e3ff1f2ba9627d4"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "da936044a07071cb525e8167aca8f21211f5581d328effb5783657af78444d1e"
+    },
+    {
+      "path": "linux/haos/haos/provider_registry.py",
+      "sha256": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "df236e393c77022df99db3dca38584ab741099429517227df256a72315d85c64"
+    },
+    {
+      "path": "linux/haos/runtime/provider-login.py",
+      "sha256": "d27dd8e2bf21e9ee1cda3c77a5a6141cdb43273ee905bf3f711321475aea752a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_native_account_flows.py",
+      "sha256": "22526d5020e51e82196f13196ac4348727b4c8240d8ab39d196e24e8b00c17af"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_accounts.py",
+      "sha256": "0695e86339c26f540b0269201deb4cb56cb1d2dee80682d9a542187d77f5f086"
+    }
+  ]
+}

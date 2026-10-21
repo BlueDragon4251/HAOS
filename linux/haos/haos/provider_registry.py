@@ -94,3 +94,8 @@ def oauth_providers():
 
 def account_providers():
     return oauth_providers() | {"anthropic", "openrouter", "copilot", "copilot-acp"}
+
+
+def account_region(provider, endpoint=""):
+    """Public regional login selection; endpoint admission stays in policy."""
+    return "cn" if provider == "minimax-oauth" and urlsplit(endpoint).hostname == "api.minimaxi.com" else "global"

@@ -5,6 +5,20 @@ import sys
 import json
 
 
+def minimax_login(region):
+    if region not in {"global", "cn"}:
+        raise ValueError("unsupported MiniMax account region")
+    from hermes_cli.auth_minimax import _minimax_oauth_login
+    from agent.credential_pool import load_pool
+    from hermes_cli.auth import unsuppress_credential_source
+    _minimax_oauth_login(region=region, open_browser=False, timeout_seconds=20)
+    # The native singleton seeds its own `oauth` row, including expiry. A
+    # second manual row would duplicate the same rotating refresh grant.
+    unsuppress_credential_source("minimax-oauth", "oauth")
+    load_pool("minimax-oauth")
+    print("MiniMax " + region + " account saved privately. No inference tested.")
+
+
 def qwen_import(value):
     """Validate the exact upstream Qwen-CLI credential shape before private import."""
     if not isinstance(value, str) or len(value.encode()) > 32768:
@@ -25,8 +39,9 @@ def qwen_import(value):
 
 
 def main():
-    action = sys.argv[1] if len(sys.argv) in {2, 3} else ""
-    provider = sys.argv[2] if len(sys.argv) == 3 else "openai-codex"
+    action = sys.argv[1] if len(sys.argv) in {2, 3, 4} else ""
+    provider = sys.argv[2] if len(sys.argv) in {3, 4} else "openai-codex"
+    region = sys.argv[3] if len(sys.argv) == 4 else "global"
     identity = "haos-provider-acp" if provider == "copilot-acp" else "haos-provider"
     import pwd
     if (os.geteuid() == 0 or os.geteuid() != pwd.getpwnam(identity).pw_uid
@@ -35,6 +50,8 @@ def main():
     from .provider_registry import account_providers
     if provider not in account_providers():
         raise ValueError("unsupported provider account")
+    if region not in {"global", "cn"} or region != "global" and provider != "minimax-oauth":
+        raise ValueError("unsupported provider account region")
     if provider == "copilot-acp":
         from .provider_acp import COMMAND, HOME, isolated_client
         if os.environ.get("HOME") != HOME:
@@ -67,6 +84,15 @@ def main():
         from .provider_copilot import bind_transport
         bind_transport()
     if action == "status":
+        if provider == "minimax-oauth":
+            from hermes_cli.auth import PROVIDER_REGISTRY
+            from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
+            config = PROVIDER_REGISTRY[provider]
+            expected = config.extra["cn_inference_base_url"] if region == "cn" else config.inference_base_url
+            if resolve_minimax_oauth_runtime_credentials()["base_url"].rstrip("/") != expected.rstrip("/"):
+                raise PermissionError("MiniMax account is authenticated in another region")
+            print("MiniMax " + region + " credential store is configured. No model turn tested.")
+            return
         from hermes_cli.auth import get_auth_status
         if not get_auth_status(provider).get("logged_in"):
             raise PermissionError("provider credentials are not configured")
@@ -74,6 +100,9 @@ def main():
         return
     executable = "/usr/lib/haos/hermes/.venv/bin/hermes"
     if action == "login":
+        if provider == "minimax-oauth":
+            minimax_login(region)
+            return
         if provider == "qwen-oauth":
             from .provider_qwen import device_login
             from hermes_cli.auth_qwen import _save_qwen_cli_tokens

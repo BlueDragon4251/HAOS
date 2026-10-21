@@ -15,7 +15,7 @@ from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 from .region import CONSOLE_MAP, LOCALES
 from .provider_policy import ProviderPolicy, ENDPOINTS
 from .setup_errors import SetupStageError
-from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers, account_providers
+from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers, account_providers, account_region
 from .provider_cloud import CLOUD
 
 # Never store a plaintext password, recovery code, provider key or GHCR token
@@ -248,7 +248,8 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     quiesce_for_setup()
     if provider in oauth_providers() or provider == "copilot-acp" or (provider in {"anthropic", "openrouter", "copilot"} and not api_key):
         from .provider_setup import auth_helper
-        auth_helper("status", provider, graphical_status=True)
+        region = {"region": account_region(provider, policy.endpoint)} if provider == "minimax-oauth" else {}
+        auth_helper("status", provider, graphical_status=True, **region)
     # Only now does the vetted owner credential publisher replace trusted files.
     add_route(policy.data, api_key or None)
     install(pwd.getpwnam("haos-agent").pw_uid)
@@ -296,15 +297,22 @@ def manage_provider_route(route, action, fallbacks=()):
     return result
 
 
-def provider_account(provider, action="login"):
+def provider_account(provider, action="login", endpoint=""):
     """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
     require_root()
     from .initial_setup_gui import session_allowed
     if not session_allowed() or provider not in account_providers() or action not in {"login", "logout", "status"}:
         raise PermissionError("provider account login requires the trusted local setup seat")
+    region = {}
+    if provider == "minimax-oauth":
+        selected = endpoint or default_endpoint(provider)
+        ProviderPolicy({"version": 1, "provider": provider, "endpoint": selected,
+            "models": ["haos-account"], "default_model": "haos-account", "api_mode": default_mode(provider),
+            "requests_per_day": 200, "requests_per_minute": 30})
+        region = {"region": account_region(provider, selected)}
     if action == "status":
         from .provider_setup import auth_helper
-        auth_helper("status", provider, graphical_status=True)
+        auth_helper("status", provider, graphical_status=True, **region)
         return {"credential_action_completed": True, "model_turn_tested": False}
     quiesce_for_setup()
     if action == "logout":
@@ -313,7 +321,7 @@ def provider_account(provider, action="login"):
         revoke_account_routes(provider)
         install(pwd.getpwnam("haos-agent").pw_uid)
     subprocess.run(["/usr/bin/xterm", "-T", "HAOS Provider-Anmeldung", "-geometry", "110x32+20+20",
-                    "-e", "/usr/bin/python3", "-I", "/usr/lib/haos/provider-login.py", action, provider],
+                    "-e", "/usr/bin/python3", "-I", "/usr/lib/haos/provider-login.py", action, provider, *region.values()],
                    check=True, timeout=780, capture_output=True,
                    env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
                         "HAOS_TRUSTED_SETUP": "1", "PATH": "/usr/bin:/bin"})

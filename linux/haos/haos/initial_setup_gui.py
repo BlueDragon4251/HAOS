@@ -459,8 +459,9 @@ class Wizard:
                 if self.running:
                     return
                 selected_provider = provider.get()
+                account_options = {"endpoint": endpoint.get()} if selected_provider == "minimax-oauth" else {}
                 self.root.withdraw()
-                self._run_async(lambda: initial_setup.provider_account(selected_provider, action),
+                self._run_async(lambda: initial_setup.provider_account(selected_provider, action, **account_options),
                                 success=("Kontostatus bestätigt. Keine Inferenz geprüft." if action == "status" else
                                          "Konto-Aktion abgeschlossen. Provider anschließend konfigurieren."),
                                 completed=self.root.deiconify)
@@ -471,6 +472,9 @@ class Wizard:
             logout_button.pack(anchor="w", pady=4)
             status_button = self._button(self.content, "Anbieter-Kontostatus prüfen", lambda: account("status"))
             status_button.pack(anchor="w", pady=4)
+            self._label(self.content, "MiniMax-Konto: Für China zuerst URL https://api.minimaxi.com/anthropic eingeben; "
+                "Anmeldung, Status und Konfiguration verwenden dieselbe gewählte Region.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=4)
             def update_provider(*_args):
                 # An old key must never follow a new provider selection.
                 secret.delete(0, tk.END)

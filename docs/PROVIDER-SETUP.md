@@ -196,3 +196,14 @@ Successful credentials use Hermes's private Qwen storage and native refresh.
 The graphical account-status control checks the private credential helper
 without stopping missions or claiming model inference. Account login is not
 proof of account entitlement or a successful inference.
+
+MiniMax accounts have separate global and China endpoints. Select
+`https://api.minimax.io/anthropic` or `https://api.minimaxi.com/anthropic`
+in the graphical provider form before account login/status. The protected
+helper receives only the corresponding fixed region, and configuration refuses
+an account authenticated for the other endpoint. CLI users select China with
+`sudo haos-owner provider login minimax-oauth --region cn` and check it with
+`sudo haos-owner provider auth-status minimax-oauth --region cn`; the default
+region is global. Configure the route with the matching `--endpoint`. Logout
+removes local account state; revoke the grant with the provider for remote
+revocation. Login does not prove model or subscription access.

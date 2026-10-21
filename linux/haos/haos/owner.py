@@ -199,6 +199,8 @@ def main():
     for action in ("login", "logout", "auth-status"):
         auth_action = provider_sub.add_parser(action)
         auth_action.add_argument("provider", choices=sorted(account_providers()))
+        auth_action.add_argument("--region", choices=["global", "cn"], default="global",
+                                 help="MiniMax account region; other providers require global")
     for action in ("set-default", "fallbacks", "remove"):
         route_action = provider_sub.add_parser(action)
         route_action.add_argument("route")
