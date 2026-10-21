@@ -5,6 +5,18 @@ import sys
 import json
 
 
+def copilot_login():
+    from hermes_cli.copilot_auth import copilot_device_code_login, validate_copilot_token
+    from hermes_cli.config import save_env_value
+    token = copilot_device_code_login(timeout_seconds=600)
+    if (not isinstance(token, str) or not 16 <= len(token) <= 16384
+            or any(ord(c) < 33 or ord(c) > 126 for c in token)
+            or not validate_copilot_token(token)[0]):
+        raise PermissionError("Copilot device authorization did not return a supported token")
+    save_env_value("COPILOT_GITHUB_TOKEN", token)
+    print("Copilot account saved in the private provider identity. No inference tested.")
+
+
 def openrouter_status():
     from agent.credential_pool import load_pool
     return any(entry.access_token and entry.base_url == "https://openrouter.ai/api/v1"
@@ -156,13 +168,7 @@ def main():
             from hermes_cli.auth_qwen import _save_qwen_cli_tokens
             _save_qwen_cli_tokens(device_login())
         if provider == "copilot":
-            from hermes_cli.copilot_auth import copilot_device_code_login
-            from hermes_cli.config import save_env_value
-            token = copilot_device_code_login(timeout_seconds=600)
-            if not token:
-                raise PermissionError("Copilot device authorization did not complete")
-            save_env_value("COPILOT_GITHUB_TOKEN", token)
-            print("Copilot account saved in the private provider identity. No inference tested.")
+            copilot_login()
             return
         args = ["auth", "add", provider, "--type", "oauth", "--no-browser", "--timeout", "600"]
     elif action == "logout":

@@ -1,5 +1,18 @@
 # Hermes parity work — development, not release acceptance
 
+## Fresh Copilot device authorization (2026-10-21)
+
+The private account helper now validates a newly authorized Copilot token's
+format and supported GitHub token family before saving it. A failed or invalid
+reply retains the previous private owner account. Seven actual pinned
+device-code HTTP cases verify success, pending, RFC 8628 slow-down timing,
+denial, expiry, malformed device data and unsupported classic PAT replies.
+The existing private redirect-safe transport is used; only fixture destinations
+are replaced with loopback. Device/access secrets are not printed and the native
+environment file remains private. Both build and provider CI require this probe.
+Actual account entitlement, external authorization and installed UI acceptance
+remain separate; the earlier exchange/cache fixtures still cover API-token use.
+
 ## Native Codex account HTTP contracts (2026-10-21)
 
 Nine additional required build/CI cases execute the pinned Codex device-code

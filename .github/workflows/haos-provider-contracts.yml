@@ -61,6 +61,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_native_account_flows.py linux/haos "$RUNNER_TEMP/provider-contracts/native-accounts.json"
           "$PYTHON" linux/haos/runtime/probe_openrouter_login.py linux/haos "$RUNNER_TEMP/provider-contracts/openrouter-login.json"
           "$PYTHON" linux/haos/runtime/probe_codex_account.py linux/haos "$RUNNER_TEMP/provider-contracts/codex-account.json"
+          "$PYTHON" linux/haos/runtime/probe_copilot_device.py linux/haos "$RUNNER_TEMP/provider-contracts/copilot-device.json"
           "$PYTHON" linux/haos/runtime/probe_provider_profiles.py linux/haos "$RUNNER_TEMP/provider-contracts/wire-profiles.json"
           "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
           "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"
