@@ -1,5 +1,22 @@
 # Hermes parity work — development, not release acceptance
 
+## OpenRouter protected-terminal account flow (2026-10-21)
+
+HAOS now explicitly uses the pinned PKCE headless/code-entry functions for
+OpenRouter, which work from the isolated provider terminal without a browser
+callback. The returned key uses the native OAuth-add credential-pool format.
+The generic pinned status/logout dispatcher does not recognize OpenRouter's
+pool: HAOS now checks that private pool and clears its account/legacy env state
+through native storage functions. Root-side route withdrawal remains required
+before local logout. Remote key revocation remains an owner account action.
+
+Nine actual local HTTP cases check PKCE, private pool/status/broker/logout,
+denial, rate limits, missing/invalid keys, malformed/truncated responses,
+empty code and cancellation. Failed authorization preserves a pre-existing
+owner credential. No authorization code, verifier or returned key is printed.
+The probe is required by provider CI and image build; these fixtures do not
+certify real OpenRouter authorization, inference or remote revocation.
+
 ## Native account flows and MiniMax region selection (2026-10-21)
 
 The required build/CI probe now executes 22 actual pinned Nous, xAI and

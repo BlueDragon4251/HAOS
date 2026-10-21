@@ -197,6 +197,14 @@ The graphical account-status control checks the private credential helper
 without stopping missions or claiming model inference. Account login is not
 proof of account entitlement or a successful inference.
 
+OpenRouter account login always uses the pinned PKCE code-entry path in the
+protected owner terminal. Open its displayed authorization URL on your browser,
+approve it and paste the authorization code into the masked terminal prompt.
+No browser callback listener is needed. The returned API key stays in the
+private native credential pool; status checks that pool and local logout
+clears it. OpenRouter returns an API key rather than a refresh token. Revoke
+the key in OpenRouter's account controls to invalidate it remotely.
+
 MiniMax accounts have separate global and China endpoints. Select
 `https://api.minimax.io/anthropic` or `https://api.minimaxi.com/anthropic`
 in the graphical provider form before account login/status. The protected

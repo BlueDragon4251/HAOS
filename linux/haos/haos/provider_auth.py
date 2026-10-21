@@ -5,6 +5,46 @@ import sys
 import json
 
 
+def openrouter_status():
+    from agent.credential_pool import load_pool
+    return any(entry.access_token and entry.base_url == "https://openrouter.ai/api/v1"
+               for entry in load_pool("openrouter").entries())
+
+
+def openrouter_logout():
+    from hermes_cli.auth import clear_provider_auth
+    from hermes_cli.config import save_env_value
+    clear_provider_auth("openrouter")
+    save_env_value("OPENROUTER_API_KEY", "")
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    print("Local OpenRouter account removed. Revoke its API key at OpenRouter for remote revocation.")
+
+
+def openrouter_login():
+    """Use the pinned code-entry flow on HAOS's isolated owner terminal."""
+    from urllib.parse import urlencode
+    import uuid
+    from hermes_cli.auth_openrouter import (
+        OPENROUTER_AUTH_URL, _pkce_code_verifier, _pkce_code_challenge,
+        _openrouter_headless_code, _openrouter_exchange_code)
+    from agent.credential_pool import load_pool, PooledCredential, AUTH_TYPE_API_KEY, SOURCE_MANUAL
+    verifier = _pkce_code_verifier()
+    url = OPENROUTER_AUTH_URL + "?" + urlencode({"code_challenge": _pkce_code_challenge(verifier),
+        "code_challenge_method": "S256", "key_label": "hermes-agent"})
+    code = _openrouter_headless_code(url)
+    token = _openrouter_exchange_code(code, verifier)
+    if not 16 <= len(token) <= 16384 or any(ord(c) < 33 or ord(c) > 126 for c in token):
+        raise ValueError("OpenRouter returned an invalid credential")
+    # Match the native OAuth-add storage contract: this provider returns an
+    # API key, with no refresh token or callback listener required.
+    pool = load_pool("openrouter")
+    pool.add_entry(PooledCredential(provider="openrouter", id=uuid.uuid4().hex[:6],
+        label="openrouter-owner-authorization", auth_type=AUTH_TYPE_API_KEY, priority=0,
+        source=SOURCE_MANUAL + ":openrouter_pkce", access_token=token,
+        base_url="https://openrouter.ai/api/v1"))
+    print("OpenRouter account saved privately. No inference tested.")
+
+
 def minimax_login(region):
     if region not in {"global", "cn"}:
         raise ValueError("unsupported MiniMax account region")
@@ -84,6 +124,11 @@ def main():
         from .provider_copilot import bind_transport
         bind_transport()
     if action == "status":
+        if provider == "openrouter":
+            if not openrouter_status():
+                raise PermissionError("OpenRouter credentials are not configured")
+            print("OpenRouter private credential pool is configured. No model turn tested.")
+            return
         if provider == "minimax-oauth":
             from hermes_cli.auth import PROVIDER_REGISTRY
             from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
@@ -100,6 +145,9 @@ def main():
         return
     executable = "/usr/lib/haos/hermes/.venv/bin/hermes"
     if action == "login":
+        if provider == "openrouter":
+            openrouter_login()
+            return
         if provider == "minimax-oauth":
             minimax_login(region)
             return
@@ -118,6 +166,9 @@ def main():
             return
         args = ["auth", "add", provider, "--type", "oauth", "--no-browser", "--timeout", "600"]
     elif action == "logout":
+        if provider == "openrouter":
+            openrouter_logout()
+            return
         if provider == "qwen-oauth":
             from pathlib import Path
             (Path.home() / ".qwen/oauth_creds.json").unlink(missing_ok=True)
