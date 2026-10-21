@@ -13,6 +13,10 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.configure_ghcr("owner", "private"),
         lambda: initial_setup.configure_provider("openai", "gpt-model", "secret"),
         lambda: initial_setup.import_cloud_credential("vertex", "/no-such-file"),
+        lambda: initial_setup.gateway_configuration(),
+        lambda: initial_setup.manage_gateway("start"),
+        lambda: initial_setup.manage_gateway("revoke", "fixture"),
+        lambda: initial_setup.gateway_process_status(),
     ):
         with pytest.raises(PermissionError):
             call()
@@ -153,3 +157,60 @@ def test_finalize_requires_observer_name_even_after_tty2_enrollment(monkeypatch)
                         lambda: (_ for _ in ()).throw(PermissionError("missing display name")))
     with pytest.raises(PermissionError, match="missing display name"):
         initial_setup.finalize()
+
+
+def test_graphical_gateway_pairing_retains_exact_scope_thread_and_selected_rights(monkeypatch):
+    from copy import deepcopy
+    from haos import gateway_setup, owner
+    from haos.gateway import GatewayPolicy
+    policy = {'version': 1, 'connectors': [{'id': 'discord-main', 'platform': 'discord'}], 'bindings': []}
+    saved, actions = [], []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    monkeypatch.setattr(gateway_setup, 'load', lambda: (deepcopy(policy), {'connectors': {}}))
+    monkeypatch.setattr(gateway_setup, 'persist', lambda value, credentials: saved.append(value))
+    monkeypatch.setattr(initial_setup, 'quiesce_for_setup', lambda **kwargs: actions.append(kwargs))
+    monkeypatch.setattr(owner, 'audit', lambda *args: None)
+    initial_setup.pair_gateway_sender('owner-chat', 'discord-main', 'sender-1', 'channel-1', 'personal',
+        ('create', 'read', 'answer'), scope='guild-1', thread='thread-1')
+    assert actions == [{'gateway_only': True}] and len(saved) == 1
+    configured = GatewayPolicy(saved[0])
+    envelope = {'platform': 'discord', 'sender': 'sender-1', 'chat': 'channel-1', 'scope': 'guild-1',
+        'thread': 'thread-1', 'message_id': 'fixture-message', 'is_bot': False, 'text': 'fixture'}
+    assert configured.authorize('discord-main', envelope)['capabilities'] == ['create', 'read', 'answer']
+    for key, value in [('sender', 'other'), ('chat', 'other'), ('scope', ''), ('thread', ''), ('scope', 'other'), ('thread', 'other')]:
+        with pytest.raises(PermissionError):
+            configured.authorize('discord-main', {**envelope, key: value})
+    actions.clear(); saved.clear()
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('invalid', 'discord-main', 'sender-1', 'channel-1', 'personal', scope='bad\nscope')
+    assert not actions and not saved
+
+
+def test_gateway_management_exposes_metadata_and_rejects_unknown_selection_before_stopping(monkeypatch):
+    from haos import gateway_setup
+    policy = {'version': 1, 'connectors': [{'id': 'bot', 'platform': 'telegram'}], 'bindings': []}
+    actions = []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    monkeypatch.setattr(gateway_setup, 'load', lambda: (policy, {'connectors': {'bot': {'token': 'private-fixture-token'}}}))
+    monkeypatch.setattr(initial_setup, 'quiesce_for_setup', lambda **kwargs: actions.append(('stop', kwargs)))
+    monkeypatch.setattr(gateway_setup, 'owner_gateway', lambda args: actions.append((args.gateway_action, getattr(args, 'connector', None))))
+    assert initial_setup.gateway_configuration() == {'connectors': policy['connectors'], 'bindings': []}
+    assert 'private-fixture-token' not in repr(initial_setup.gateway_configuration())
+    for action, selected in [('setup', ''), ('revoke', 'missing'), ('remove', 'missing'), ('start', 'bot')]:
+        with pytest.raises(ValueError):
+            initial_setup.manage_gateway(action, selected)
+    assert not actions
+    initial_setup.manage_gateway('start')
+    initial_setup.manage_gateway('remove', 'bot')
+    assert actions == [('start', None), ('stop', {'gateway_only': True}), ('remove', 'bot')]
+
+
+def test_gateway_process_status_uses_only_fixed_service_and_public_fields(monkeypatch):
+    calls = []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    def status(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout='LoadState=loaded\nActiveState=active\nSubState=running\nResult=success\nExecMainStatus=0\n')
+    monkeypatch.setattr(initial_setup.subprocess, 'run', status)
+    assert initial_setup.gateway_process_status()['ActiveState'] == 'active'
+    assert calls == [['/usr/bin/systemctl', 'show', '--property=LoadState,ActiveState,SubState,Result,ExecMainStatus', 'haos-gateway.service']]

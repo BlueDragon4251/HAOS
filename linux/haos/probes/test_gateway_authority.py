@@ -53,3 +53,55 @@ def test_unsafe_authority_files_are_refused_without_overwriting_them(tmp_path, a
     with pytest.raises(PermissionError):
         persist(policy, copy.deepcopy(credentials), config=config, gid=0)
     assert (config / "gateway-credentials").read_bytes() == before
+
+
+def test_graphical_gateway_management_keeps_real_root_files_and_denies_another_uid(tmp_path, monkeypatch):
+    """Real UID/files; service lifecycle and audit are separate disposable CI checks."""
+    from haos import initial_setup, gateway_setup, owner
+    from haos.gateway import GatewayPolicy
+    assert os.geteuid() == 0
+    config = tmp_path / 'configuration'
+    config.mkdir(mode=0o700)
+    value = {'version': 1, 'connectors': [{'id': 'discord-main', 'platform': 'discord'}], 'bindings': []}
+    credentials = {'connectors': {'discord-main': {'token': 'disposable-gateway-fixture-credential'}}}
+    persist(value, credentials, config=config, gid=0)
+    original_load, original_persist = gateway_setup.load, gateway_setup.persist
+    monkeypatch.setattr(gateway_setup, 'load', lambda *args: original_load(config))
+    monkeypatch.setattr(gateway_setup, 'persist', lambda policy, secret: original_persist(policy, secret, config=config, gid=0))
+    monkeypatch.setattr(initial_setup, 'quiesce_for_setup', lambda **kwargs: None)
+    monkeypatch.setattr(gateway_setup, 'stopped_gateway', lambda: None)
+    audit = []
+    monkeypatch.setattr(owner, 'audit', lambda action, fields: audit.append(action))
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.setgroups([]); os.setgid(65534); os.setuid(65534)
+            for action in (initial_setup.gateway_configuration, lambda: initial_setup.manage_gateway('remove', 'discord-main')):
+                try:
+                    action()
+                except PermissionError:
+                    continue
+                raise AssertionError('unprivileged graphical gateway administration accepted')
+            os._exit(0)
+        except BaseException:
+            os._exit(3)
+    _, status = os.waitpid(pid, 0)
+    assert os.waitstatus_to_exitcode(status) == 0
+    initial_setup.pair_gateway_sender('paired', 'discord-main', 'sender', 'channel', 'principal',
+        ('create', 'read', 'answer'), scope='guild', thread='thread')
+    policy, secret = original_load(config)
+    assert policy['bindings'][0]['scope'] == 'guild' and policy['bindings'][0]['thread'] == 'thread'
+    assert policy['bindings'][0]['capabilities'] == ['create', 'read', 'answer']
+    assert secret == credentials
+    assert 'disposable-gateway-fixture-credential' not in repr(initial_setup.gateway_configuration())
+    initial_setup.manage_gateway('revoke', 'paired')
+    policy, secret = original_load(config)
+    assert not GatewayPolicy(policy).bindings and secret == credentials
+    initial_setup.manage_gateway('remove', 'discord-main')
+    policy, secret = original_load(config)
+    assert not policy['connectors'] and secret == {'connectors': {}}
+    assert audit == ['setup.gateway-pair', 'gateway.revoke', 'gateway.remove']
+    for name, expected_mode in [('gateways.json', 0o640), ('gateway-credentials', 0o600)]:
+        assert (config / name).stat().st_uid == 0
+        assert stat.S_IMODE((config / name).stat().st_mode) == expected_mode
+        assert 'disposable-gateway-fixture-credential' not in (config / name).read_text()

@@ -1,0 +1,45 @@
+{
+  "base_commit": "50af72a52e0aea20ecc4633d372896a8c3e3304f",
+  "source_sha256": {
+    "linux/haos/haos/initial_setup.py": "ad6cbfa4e9d3f44cb1715aca0edc510300198ff863cc3af7d13dbbef33d5a7e0",
+    "linux/haos/haos/initial_setup_gui.py": "f625bcd39742080dc9f19fd0bf30915a5ee374b149b9cc9a371d16dec805cba1",
+    "linux/haos/tests/test_initial_setup.py": "4c35bc75c70f0bec891a49a39bc91cea01a3a1a965f7db86a7be4f9b79dbb9ed",
+    "linux/haos/probes/test_gateway_authority.py": "43ee7209ab160c850bb31ea4f51adc5a7c48c815fd8afacc2aeb48c3b6e259b6",
+    ".github/workflows/haos-initial-setup.yml": "4c54b34b202ffc11d7e74daa88b297eab0d8345f89a4e03788b66e08b08321e4"
+  },
+  "minimal_suite": {
+    "passed": 865,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 865,
+    "existing_skips": 2
+  },
+  "native_tk_actual_workflow_scripts": [
+    {
+      "display": "1280x800",
+      "interactive_pairing_scope_thread_rights": true,
+      "interactive_start_stop_process_status_revoke_remove": true,
+      "private_token_cleared_on_platform_change": true
+    },
+    {
+      "display": "640x480",
+      "all_existing_pages_fit_scrolling_layout": true
+    }
+  ],
+  "backend_data_checks": [
+    "exact scoped/threaded binding admitted",
+    "neighbor sender/chat/scope/thread denied",
+    "invalid selection rejected before service stop",
+    "only public service properties and fixed systemctl argv",
+    "metadata excludes protected credential values"
+  ],
+  "new_real_root_file_uid_probe": "required by existing services CI; not executed locally as UID1000",
+  "native_adapters_still_supported": [
+    "telegram",
+    "discord"
+  ],
+  "additional_adapter_support_claimed": false,
+  "external_delivery_installed_or_hardware_tested": false,
+  "ci_for_this_change": "pending push"
+}

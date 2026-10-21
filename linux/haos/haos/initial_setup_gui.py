@@ -612,9 +612,22 @@ class Wizard:
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
+            configured_gateways = self._run(initial_setup.gateway_configuration, success="") or {"connectors": [], "bindings": []}
+            process_status = self._label(self.content, "Dienststatus noch nicht geprüft.", size=10, color=self.MUTED)
+            process_status.pack(anchor="w", pady=6)
+            def render_gateway_status(value):
+                process_status.configure(text="Gateway-Dienst: " + value["ActiveState"] + " / " + value["SubState"]
+                    + " · Ergebnis: " + value["Result"])
+            self._button(self.content, "Gateway-Dienststatus prüfen", lambda: self._run_async(initial_setup.gateway_process_status,
+                success="Lokaler Dienststatus aktualisiert. Externe Zustellung wird dadurch nicht bestätigt.",
+                result_handler=render_gateway_status)).pack(anchor="w", pady=4)
+            for action, label in (("start", "Gateway-Dienst starten"), ("stop", "Gateway-Dienst stoppen")):
+                self._button(self.content, label, lambda selected_action=action: self._run_async(
+                    lambda: initial_setup.manage_gateway(selected_action), success="Gateway-Dienstaktion abgeschlossen.")).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             platform = self._choice(self.content, "Plattform", ["telegram", "discord"], "telegram")
-            token = self._field(self.content, "Bot-Token (wird niemals im GUI gespeichert)", secret=True)
+            token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
+            platform.trace_add("write", lambda *_args: token.delete(0, tk.END))
             def configure():
                 secret = token.get()
                 token.delete(0, tk.END)
@@ -628,13 +641,54 @@ class Wizard:
             binding = self._field(self.content, "Freigabe-ID (z. B. mein-handy)", "my-device")
             sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
+            scope = self._field(self.content, "Bereich / Discord-Server-ID (leer für Direktnachrichten)")
+            thread = self._field(self.content, "Thread-ID (leer nur für Nachrichten ohne Thread)")
             identity = self._field(self.content, "HAOS-Identität", "personal")
+            self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
+                        size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            rights = {}
+            for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
+                    ("cancel", "Eigene Missionen abbrechen"), ("answer", "Rückfragen und Freigaben beantworten"),
+                    ("pause", "Wartende Missionen pausieren"), ("resume", "Pausierte Missionen fortsetzen")):
+                variable = tk.BooleanVar(value=capability in {"create", "read"})
+                rights[capability] = variable
+                tk.Checkbutton(self.content, text=label, variable=variable, bg=self.PANEL, fg=self.TEXT,
+                    selectcolor=self.BG, activebackground=self.PANEL).pack(anchor="w")
             def pair_sender():
-                selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get())
-                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected),
-                                success="Absender explizit freigegeben. Gateway-Neustart erforderlich.")
-            self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
+                selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
+                            tuple(key for key, value in rights.items() if value.get()))
+                selected_scope, selected_thread = scope.get(), thread.get()
+                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread),
+                                success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
+            self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
                          pair_sender, primary=True).pack(anchor="w", pady=(10, 0))
+            if configured_gateways["bindings"]:
+                binding_labels = {row["id"] + " · " + row["connector"] + " · " + row["scope"] + " / " + row["thread"]: row["id"]
+                    for row in configured_gateways["bindings"]}
+                revoked_binding = self._choice(self.content, "Bestehende Absenderfreigabe", list(binding_labels), next(iter(binding_labels)), width=24 if self.compact else 48)
+                binding_details = self._label(self.content, "", size=10, color=self.MUTED)
+                binding_details.pack(anchor="w", pady=4)
+                def show_binding_details(*_args):
+                    selected_id = binding_labels[revoked_binding.get()]
+                    row = next(row for row in configured_gateways["bindings"] if row["id"] == selected_id)
+                    binding_details.configure(text="Absender: " + row["sender"] + " · Chat: " + row["chat"]
+                        + " · Identität: " + row["identity"] + " · Rechte: " + ", ".join(row["capabilities"]))
+                revoked_binding.trace_add("write", show_binding_details)
+                show_binding_details()
+                def revoke_binding():
+                    selected_id = binding_labels[revoked_binding.get()]
+                    self._run_async(lambda: initial_setup.manage_gateway("revoke", selected_id),
+                        success="Absenderfreigabe entzogen; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
+                self._button(self.content, "Ausgewählte Absenderfreigabe entziehen", revoke_binding).pack(anchor="w", pady=6)
+            if configured_gateways["connectors"]:
+                connector_labels = {row["id"] + " · " + row["platform"]: row["id"] for row in configured_gateways["connectors"]}
+                removed_connector = self._choice(self.content, "Bestehender Konnektor", list(connector_labels), next(iter(connector_labels)), width=24 if self.compact else 48)
+                def remove_connector():
+                    selected_id = connector_labels[removed_connector.get()]
+                    self._run_async(lambda: initial_setup.manage_gateway("remove", selected_id),
+                        success="Konnektor, zugehörige Freigaben und Zugangsdaten entfernt; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
+                self._button(self.content, "Konnektor und Zugangsdaten entfernen", remove_connector).pack(anchor="w", pady=6)
+            self._button(self.content, "Gateway-Konfiguration neu laden", lambda: self.show("gateways")).pack(anchor="w", pady=6)
             self._label(self.content,
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",

@@ -402,8 +402,8 @@ def configure_gateway(connector: str, platform: str, token: str):
 
 
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
-                        identity: str, capabilities: tuple[str, ...] = ("create", "read")):
-    """Grant one exact sender+chat on an already provisioned platform."""
+                        identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = ""):
+    """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
         raise ValueError("unsupported gateway permissions")
@@ -411,15 +411,55 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     from .gateway import GatewayPolicy
     from .owner import audit
     policy, credentials = load()
-    quiesce_for_setup(gateway_only=True)
     item = {"id": binding_id, "connector": connector, "sender": sender, "chat": chat,
-            "scope": "", "thread": "", "identity": identity,
+            "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     policy["bindings"] = [b for b in policy["bindings"] if b["id"] != binding_id] + [item]
     GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
     persist(policy, credentials)
     audit("setup.gateway-pair", {"binding": binding_id, "connector": connector})
     return {"paired": True, "binding": binding_id}
+
+
+def gateway_configuration():
+    """Return pairing metadata to the trusted owner window, never credentials."""
+    require_root()
+    from .gateway_setup import load
+    policy, _credentials = load()
+    return {"connectors": policy["connectors"], "bindings": policy["bindings"]}
+
+
+def manage_gateway(action: str, identifier: str = ""):
+    require_root()
+    if action not in {"start", "stop", "revoke", "remove"}:
+        raise ValueError("unsupported graphical gateway action")
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    if action in {"start", "stop"}:
+        if identifier:
+            raise ValueError("service actions do not select a gateway identity")
+        return owner_gateway(SimpleNamespace(gateway_action=action))
+    configured = gateway_configuration()
+    rows = configured["bindings"] if action == "revoke" else configured["connectors"]
+    if not isinstance(identifier, str) or not any(row["id"] == identifier for row in rows):
+        raise ValueError("unknown gateway selection")
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action=action, binding=identifier if action == "revoke" else None,
+        connector=identifier if action == "remove" else None))
+
+
+def gateway_process_status():
+    require_root()
+    result = subprocess.run(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,SubState,Result,ExecMainStatus",
+        "haos-gateway.service"], check=True, capture_output=True, text=True, timeout=15)
+    allowed = {"LoadState", "ActiveState", "SubState", "Result", "ExecMainStatus"}
+    if len(result.stdout) > 4096:
+        raise ValueError("invalid gateway service status")
+    values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    if set(values) != allowed or any(not value or len(value) > 128 or any(ord(c) < 32 or ord(c) > 126 for c in value) for value in values.values()):
+        raise ValueError("invalid gateway service status")
+    return values
 
 
 def acknowledge_recovery(username: str):

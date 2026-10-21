@@ -65,6 +65,7 @@ jobs:
           initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True, "pending": False}
           initial_setup.normal_user_ready=lambda: True
           initial_setup.setup_in_progress=lambda: False
+          initial_setup.gateway_configuration=lambda: {"connectors": [], "bindings": []}
           initial_setup.provider_state=lambda: {"routes": [], "default": None, "fallbacks": {}}
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
@@ -224,6 +225,52 @@ jobs:
           wizard.root.update()
           assert not any(isinstance(item, tkinter.Button) and item.cget("text") == "Modellteam als Standard aktivieren"
                          for item in wizard.content.winfo_children())
+          # Exact scoped/threaded gateway pairing and explicit rights, using actual Tk controls.
+          initial_setup.gateway_configuration = lambda: {"connectors": [{"id": "discord-main", "platform": "discord"}],
+              "bindings": [{"id": "bound-fixture", "connector": "discord-main", "sender": "sender-fixture", "chat": "channel-fixture",
+                  "scope": "guild-fixture", "thread": "thread-fixture", "identity": "personal", "capabilities": ["create", "read"]}]}
+          wizard.show("gateways")
+          wizard.root.update()
+          gateway_secret = field("Bot-Token")
+          assert gateway_secret.cget("show")
+          gateway_secret.insert(0, "fixture-only-previous-gateway-token")
+          gateway_menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "discord")
+          wizard.root.update()
+          assert not gateway_secret.get(), "gateway platform changes must clear private input"
+          pair_calls = []
+          initial_setup.pair_gateway_sender = lambda *args, **kwargs: pair_calls.append((args, kwargs))
+          for prefix, value in (("Konnektor-ID", "discord-main"), ("Absender-ID", "sender-fixture"),
+                  ("Chat-ID", "channel-fixture"), ("Bereich /", "guild-fixture"), ("Thread-ID", "thread-fixture")):
+              entry = field(prefix)
+              entry.delete(0, tkinter.END)
+              entry.insert(0, value)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Checkbutton) and item.cget("text") == "Rückfragen und Freigaben beantworten").invoke()
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Absender mit ausgewählten Rechten freigeben").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running and len(pair_calls) == 1
+          assert pair_calls[0] == (("my-device", "discord-main", "sender-fixture", "channel-fixture", "personal",
+              ("create", "read", "answer")), {"scope": "guild-fixture", "thread": "thread-fixture"})
+          gateway_actions = []
+          initial_setup.manage_gateway = lambda action, identifier="": gateway_actions.append((action, identifier))
+          initial_setup.gateway_process_status = lambda: {"ActiveState": "active", "SubState": "running", "Result": "success"}
+          for label in ("Gateway-Dienststatus prüfen", "Gateway-Dienst starten", "Gateway-Dienst stoppen",
+                  "Ausgewählte Absenderfreigabe entziehen", "Konnektor und Zugangsdaten entfernen"):
+              next(item for item in wizard.content.winfo_children()
+                   if isinstance(item, tkinter.Button) and item.cget("text") == label).invoke()
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running
+          assert gateway_actions == [("start", ""), ("stop", ""), ("revoke", "bound-fixture"), ("remove", "discord-main")]
           wizard._run_async(lambda: time.sleep(0.05), success="Async operation complete")
           assert wizard.running
           for _ in range(80):
@@ -272,6 +319,7 @@ jobs:
           initial_setup.account_status = lambda: {'owner': True, 'recovery': True, 'complete': True, 'pending': False}
           initial_setup.normal_user_ready = lambda: True
           initial_setup.setup_in_progress = lambda: False
+          initial_setup.gateway_configuration = lambda: {"connectors": [], "bindings": []}
           initial_setup.provider_state = lambda: {"routes": [], "default": None, "fallbacks": {}}
           wizard = Wizard(tkinter)
           wizard.root.update()

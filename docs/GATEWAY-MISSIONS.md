@@ -50,6 +50,31 @@ A principal can control only its own gateway missions, including through another
 paired channel with the same principal. Herald displays these through its existing mission API.
 No gateway command changes volume/owner policy or grants permanent tool permission.
 
+## Trusted graphical administration
+
+The local owner setup window can now save exact sender/chat/scope/thread
+bindings. Supply the Discord server ID as scope and the actual thread ID when
+applicable; an empty scope/thread matches only that empty route, never all
+servers or threads. Select each right explicitly. The graphical default remains
+`create/read`; existing identities gain no right automatically. Invalid binding
+input is rejected before services are stopped.
+
+The same window displays existing binding identities/rights, revokes a selected
+binding and removes a connector together with its private credential and dependent
+bindings. It uses the same root-protected policy, stopped-service check and owner
+audit as CLI administration. Start/stop and a bounded process-status check call
+the real fixed systemd unit. A running process is not proof of platform connection
+or external delivery. After editing configuration, explicitly start the service.
+Provider tokens are masked, cleared after submission and cleared when changing
+platform. Configuration/status displays expose no credential values.
+
+Actual Tk fixtures exercise pairing, selected rights, process controls and
+revocation at 1280x800 and the scrolling 640x480 layout. A required root CI case
+checks real root-owned policy/credential files, a denied alternate UID and
+credential removal; local nonroot rendering is not that root/installed proof.
+Only Telegram/Discord remain admitted adapters at this increment; the other
+20 native integrations, including their media/voice paths, remain open.
+
 ## Persistence and revocation
 
 Admission, inbox receipt, route and initial reply commit together. Stable transport message IDs
