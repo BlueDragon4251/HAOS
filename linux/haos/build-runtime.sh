@@ -42,6 +42,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_cloud_inference.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/cloud-model-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_native_account_flows.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/native-accounts-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_openrouter_login.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/openrouter-login-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_codex_account.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/codex-account-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_profiles.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-wire-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_messages_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-messages-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_http_provider_matrix.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-http-matrix-build-probe.json

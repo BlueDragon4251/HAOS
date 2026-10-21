@@ -1,5 +1,16 @@
 # Hermes parity work — development, not release acceptance
 
+## Native Codex account HTTP contracts (2026-10-21)
+
+Nine additional required build/CI cases execute the pinned Codex device-code
+client, authorization-code/verifier exchange, rotating refresh, private native
+storage, broker resolution, status and logout against real loopback HTTP.
+Pending authorization, device rate limits, invalid device/exchange/token replies,
+refresh denial and refresh rate limits are checked. The broker receives the
+refreshed access token; the rotating refresh grant stays out of model headers.
+Private files retain mode 0600 and tokens/verifiers are not printed. No real
+OpenAI account, subscription, inference or remote revocation is tested.
+
 ## OpenRouter protected-terminal account flow (2026-10-21)
 
 HAOS now explicitly uses the pinned PKCE headless/code-entry functions for

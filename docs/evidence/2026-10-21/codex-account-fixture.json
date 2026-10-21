@@ -1,0 +1,27 @@
+{
+  "actual_codex_account_cases": [
+    "success",
+    "pending",
+    "invalid-device",
+    "device-rate-limit",
+    "denied",
+    "missing-code",
+    "missing-token",
+    "refresh-denied",
+    "refresh-rate-limit"
+  ],
+  "case_count": 9,
+  "actual_device_pkce_refresh_rotation": true,
+  "native_private_storage_status_broker_logout": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_codex_account.py",
+      "sha256": "d92260638427b8318c8b261e024f5236575f865871282010b030147752dfee81"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "e9b85b8cc3bc805c5c056bc016d4762b4f790638241e32a20ba24d74b0934151"
+    }
+  ]
+}
