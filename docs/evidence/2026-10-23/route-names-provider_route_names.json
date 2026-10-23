@@ -1,0 +1,15 @@
+{
+  "actual_pinned_runtime_resolutions": 2,
+  "actual_sdk_http_dispatches": [
+    "alpha",
+    "model"
+  ],
+  "owner_default_alias_preserved": true,
+  "named_model_route_distinct": true,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_provider_route_names.py": "0a4ae75c73085c240e3a5c26ca2bfe938871efbc836f31cd6416621e30e447d4",
+    "provider_routes.py": "c8289aefcd4e630ba5d938bbfe478e7da417155317876e971de2404b261c3f35",
+    "provider_profiles.py": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+  }
+}

@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .provider_registry import descriptor
-from .provider_routes import ProviderRoutes
+from .provider_routes import ProviderRoutes, profile_name
 
 
 def register_profiles(data):
@@ -25,7 +25,7 @@ def register_profiles(data):
     config = routes.client_config()
     selected = {"haos-model": routes.primary}
     if data["version"] == 2:
-        selected.update({"haos-" + key: policy for key, policy in routes.routes.items()})
+        selected.update({profile_name(key): policy for key, policy in routes.routes.items()})
     profiles = {}
     bindings = {}
     fields = ("supports_vision", "supports_vision_tool_messages", "supports_prompt_cache_key",
@@ -132,7 +132,7 @@ def register_profiles(data):
                 params["is_oauth"] = False
             return super().build_kwargs(model, messages, tools, **params)
 
-    fallback_bases = {config["providers"]["haos-" + key]["base_url"].rstrip("/") for key in routes.fallbacks}
+    fallback_bases = {config["providers"][profile_name(key)]["base_url"].rstrip("/") for key in routes.fallbacks}
     if routes.default in routes.fallbacks:
         fallback_bases.add(config["providers"]["haos-model"]["base_url"].rstrip("/"))
     from functools import wraps

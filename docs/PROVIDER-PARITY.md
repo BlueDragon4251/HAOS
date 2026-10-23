@@ -1067,3 +1067,30 @@ specific carrier's previous model/endpoint admission remains a separate path;
 these new same-route/generation assertions concern the managed native carrier.
 All five CI gates for predecessor `e280abc` passed. None of these local fixtures
 claims external account, live inference, installed boot or release acceptance.
+
+## Default alias collision and read-only legacy repair (2026-10-23)
+
+A valid version-2 route ID `model` shadowed the established `haos-model` default
+alias. The actual pinned runtime resolver selected `/routes/model/v1` even when
+the owner default was another route. Named `model` now uses the collision-free
+internal `haos--model` profile; other names remain unchanged. MoA slots and
+fallback profile lookup use the same mapping. No route ID, private credential
+assignment or owner default changes.
+
+The sandbox still accepts only exact projections of the trusted owner policy.
+For this known collision it also recognizes the exact old generated projection,
+with or without the previous missing-agent section, and derives the corrected
+current config into the existing sealed read-only memfd. Protected owner files
+are not rewritten. Substituted URLs, explicit weaker retry settings and unknown
+fields remain refused. Three required root-authority cases now compare the
+entire derived config through actual foreign-UID reads and bubblewrap mounts;
+these are CI requirements, not local root passes.
+
+The required native runtime/SDK probe resolves the default and named route,
+performs two real loopback Responses calls and checks the correct private key
+for each. Three additional ordinary-user cases verify default/MoA mapping and
+sealed legacy repair without input mutation. Full and minimal suites pass
+**953 tests, two existing skips**. The 53 strict projections, 6,476 builder
+comparisons, actual mixed-stream MoA, replay-generation restart and private
+Router reasoning probes pass. No installed owner/boot or live inference
+acceptance is inferred from this development result.

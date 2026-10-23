@@ -1,0 +1,86 @@
+{
+  "actual_router_sdk_cases": [
+    {
+      "route": "alpha",
+      "stream": false,
+      "fields": {
+        "include": []
+      }
+    },
+    {
+      "route": "beta",
+      "stream": false,
+      "fields": {
+        "reasoning": {
+          "effort": "low",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      }
+    },
+    {
+      "route": "alpha",
+      "stream": false,
+      "fields": {
+        "include": []
+      }
+    },
+    {
+      "route": "alpha",
+      "stream": true,
+      "fields": {
+        "include": []
+      }
+    },
+    {
+      "route": "beta",
+      "stream": true,
+      "fields": {
+        "reasoning": {
+          "effort": "low",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      }
+    },
+    {
+      "route": "alpha",
+      "stream": true,
+      "fields": {
+        "include": []
+      }
+    },
+    {
+      "route": "alpha",
+      "stream": false,
+      "fields": {
+        "reasoning": {
+          "effort": "medium",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      }
+    }
+  ],
+  "catalogue_fetches": [
+    "alpha",
+    "beta",
+    "alpha"
+  ],
+  "native_parser_and_reasoning_math_compared": true,
+  "same_model_different_accounts_do_not_borrow_caps": true,
+  "private_key_rotation_invalidates_caps": true,
+  "live_account_tested": false,
+  "source_sha256": {
+    "probe_router_reasoning.py": "c5330a0179b018e12b6a67711e0bb69c55337fc342ca01e76210954970ffc623",
+    "provider_proxy.py": "63512bb2ef6c45b3e389dc5e5e042411cd9206677c54be89a58db38138cebdc1",
+    "provider_profiles.py": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff",
+    "provider_router.py": "73497b0ae476fbbc0ab2ebfb41d4ec572097a2f3e628211680e1a778e07198dd"
+  }
+}

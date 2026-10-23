@@ -46,6 +46,7 @@ for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_chat_tool_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/chat-tools-$mode.json" "$mode"
 done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_agent_replay_generation.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/agent-replay-generation-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_route_names.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-route-names-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_router_reasoning.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/router-reasoning-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_native_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/native-provider-build-probe.json

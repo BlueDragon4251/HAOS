@@ -65,6 +65,7 @@ jobs:
             "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
           done
           "$PYTHON" linux/haos/runtime/probe_agent_replay_generation.py linux/haos "$RUNNER_TEMP/provider-contracts/agent-replay-generation.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_route_names.py linux/haos "$RUNNER_TEMP/provider-contracts/provider-route-names.json"
           "$PYTHON" linux/haos/runtime/probe_router_reasoning.py linux/haos "$RUNNER_TEMP/provider-contracts/router-reasoning.json"
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"

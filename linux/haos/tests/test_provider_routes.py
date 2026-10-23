@@ -395,3 +395,20 @@ def test_ambiguous_fallback_network_failure_cannot_inherit_previous_provider_sta
         assert ledger.db.execute('SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid').fetchall() == [
             (503, None, None), (502, None, None)]
         ledger.close()
+
+
+@pytest.mark.parametrize('default', ['alpha', 'model'])
+def test_named_model_route_cannot_shadow_the_main_alias_or_moa_slots(default):
+    from haos.provider_routes import profile_name
+    first = route('openai-api', models=['gpt-5.4'], default_model='gpt-5.4', api_mode='codex_responses')
+    second = {**first, 'models': ['gpt-6-sol'], 'default_model': 'gpt-6-sol'}
+    routes = ProviderRoutes({'version': 2, 'default': default, 'routes': {'alpha': first, 'model': second},
+        'fallbacks': {}, 'ensembles': {'owner': {'references': [{'route': 'model', 'model': 'gpt-6-sol'}],
+            'aggregator': {'route': 'alpha', 'model': 'gpt-5.4'}}}, 'default_ensemble': None})
+    config = routes.client_config()
+    assert config['providers']['haos-model']['default_model'] == routes.primary.data['default_model']
+    assert config['providers'][profile_name('model')]['default_model'] == 'gpt-6-sol'
+    assert config['providers'][profile_name('model')]['base_url'].endswith('/routes/model/v1')
+    assert config['providers']['haos-model']['base_url'].endswith(':9120/v1')
+    assert config['moa']['presets']['owner']['reference_models'][0]['provider'] == 'custom:haos--model'
+    assert len({profile_name(name) for name in ('model', 'alpha', 'haos-model', 'haos--model', 'route-model')}) == 5

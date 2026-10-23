@@ -309,17 +309,25 @@ def test_account_logout_withdraws_routes_keys_fallbacks_and_dependent_moa_before
     assert first not in (location / "provider-credentials").read_text()
 
 
-def test_legacy_owner_model_config_is_derived_read_only_without_changing_authority(location):
+@pytest.mark.parametrize("variant", ["version-one", "model-collision", "model-collision-no-agent"])
+def test_legacy_owner_model_config_is_derived_read_only_without_changing_authority(location, variant):
     """Real root files, foreign UID, seals and bubblewrap; no kernel replacement."""
     import fcntl
     import subprocess
     from haos.provider_routes import ProviderRoutes
     from haos.sandbox import runtime_provider_config, trusted_json
     data = policy()
-    provider_setup.publish(data, 'disposable-provider-fixture-credential', config=location)
+    credential = 'disposable-provider-fixture-credential'
+    if variant != 'version-one':
+        data = {'version': 2, 'default': 'alpha', 'routes': {'alpha': data, 'model': {
+            **data, 'models': ['fixture-secondary'], 'default_model': 'fixture-secondary'}}, 'fallbacks': {}}
+        credential = {key: {'api_key': credential + '-' + key} for key in data['routes']}
+    provider_setup.publish(data, credential, config=location)
     routes = ProviderRoutes(data)
     expected = routes.client_config()
-    legacy = {key: value for key, value in expected.items() if key != 'agent'}
+    legacy = routes.client_config(legacy_names=True) if variant != 'version-one' else expected
+    if variant != 'model-collision':
+        legacy = {key: value for key, value in legacy.items() if key != 'agent'}
     from haos.policy import atomic_json
     atomic_json(location / 'provider-client.json', legacy, mode=0o644)
     before = {path.name: path.read_bytes() for path in location.iterdir() if path.is_file()}
@@ -329,7 +337,7 @@ def test_legacy_owner_model_config_is_derived_read_only_without_changing_authori
         if pid == 0:
             try:
                 os.setgroups([]); os.setgid(65534); os.setuid(65534)
-                assert json.loads(os.pread(descriptor, 65536, 0))['agent'] == {'api_max_retries': 1, 'auto_recovery_cycles': 0}
+                assert json.loads(os.pread(descriptor, 65536, 0)) == expected
                 try: os.write(descriptor, b'changed')
                 except OSError: pass
                 else: raise AssertionError('foreign UID changed sealed model configuration')
@@ -338,9 +346,7 @@ def test_legacy_owner_model_config_is_derived_read_only_without_changing_authori
         _, status = os.waitpid(pid, 0)
         assert os.waitstatus_to_exitcode(status) == 0
         assert fcntl.fcntl(descriptor, getattr(fcntl, "F_GET_SEALS", 1034)) & getattr(fcntl, "F_SEAL_WRITE", 8)
-        code = """import json
-assert json.load(open('/client.json'))['agent'] == {'api_max_retries': 1, 'auto_recovery_cycles': 0}
-try:
+        code = "import json\nassert json.load(open('/client.json')) == " + repr(expected) + "\n" + """try:
  open('/client.json', 'w')
 except OSError:
  pass

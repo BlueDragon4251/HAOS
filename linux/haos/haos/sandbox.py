@@ -95,7 +95,12 @@ def runtime_provider_config(policy, client):
     import fcntl
     expected = policy.client_config()
     legacy = {key: value for key, value in expected.items() if key != "agent"}
-    if client != expected and client != legacy:
+    admitted = [expected, legacy]
+    from .provider_routes import ProviderRoutes
+    if isinstance(policy, ProviderRoutes) and "model" in policy.routes:
+        old_names = policy.client_config(legacy_names=True)
+        admitted.extend([old_names, {key: value for key, value in old_names.items() if key != "agent"}])
+    if not any(client == projection for projection in admitted):
         raise PermissionError("model client configuration differs from owner policy")
     descriptor = os.memfd_create("haos-model-configuration", os.MFD_ALLOW_SEALING)
     try:

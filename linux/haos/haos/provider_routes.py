@@ -11,6 +11,12 @@ from .provider_policy import BASE, ProviderPolicy
 _ID = re.compile(r"[a-z0-9][a-z0-9-]{0,63}\Z")
 
 
+def profile_name(route_id):
+    # No valid route ID starts with '-', so this escaped name cannot collide
+    # with another named route or the established main alias.
+    return "haos--model" if route_id == "model" else "haos-" + route_id
+
+
 class ProviderRoutes:
     def __init__(self, data):
         if not isinstance(data, dict):
@@ -69,17 +75,18 @@ class ProviderRoutes:
             return parts[2], "/" + parts[3]
         return self.default, path
 
-    def client_config(self):
+    def client_config(self, *, legacy_names=False):
         if self.data["version"] == 1:
             return self.primary.client_config()
         config = self.primary.client_config()
+        name_for = (lambda key: "haos-" + key) if legacy_names else profile_name
         for key, policy in self.routes.items():
             route = dict(policy.client_config()["providers"]["haos-model"])
             route["base_url"] = BASE.removesuffix("/v1") + "/routes/" + key + "/v1"
-            config["providers"]["haos-" + key] = route
+            config["providers"][name_for(key)] = route
         if self.ensembles:
             def slot(value):
-                return {"provider": "custom:haos-" + value["route"], "model": value["model"], "enabled": True}
+                return {"provider": "custom:" + name_for(value["route"]), "model": value["model"], "enabled": True}
             presets = {name: {"reference_models": [slot(item) for item in value["references"]],
                               "aggregator": slot(value["aggregator"]), "enabled": True,
                               "reference_timeout": 180, "fanout": "user_turn"}

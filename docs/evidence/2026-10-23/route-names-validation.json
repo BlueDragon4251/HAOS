@@ -1,0 +1,81 @@
+{
+  "base_commit": "e5fbc34de1eddc5fcc0dc6e9fb8d193a692ea293",
+  "before": "actual pinned custom:haos-model resolver selected named model route instead of owner default",
+  "actual_native_resolutions_and_sdk_calls": 2,
+  "legacy_owner_data_preserved": true,
+  "new_root_uid_bubblewrap_cases": "required in CI, not run locally",
+  "full_tests": {
+    "passed": 953,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 953,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; real root/UID/kernel CI required",
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_routes.py",
+      "sha256": "c8289aefcd4e630ba5d938bbfe478e7da417155317876e971de2404b261c3f35"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+    },
+    {
+      "path": "linux/haos/haos/sandbox.py",
+      "sha256": "cc4fda025bab29f9b5dcb2a096a2dd5a2c9489039b042697e40aab6e271e1214"
+    },
+    {
+      "path": "linux/haos/runtime/probe_provider_route_names.py",
+      "sha256": "0a4ae75c73085c240e3a5c26ca2bfe938871efbc836f31cd6416621e30e447d4"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_routes.py",
+      "sha256": "d63eb3ef24d5b23000d1e2f84400ba44e8400d61d1016557b4bf2cc9a170c3f6"
+    },
+    {
+      "path": "linux/haos/tests/test_credential.py",
+      "sha256": "fff4ef9b52d99c0f84729b175eba12f2194fc5d25ae2aef1884d5f9f68ff731e"
+    },
+    {
+      "path": "linux/haos/probes/test_provider_authority.py",
+      "sha256": "e5bb2fffce4c3cfb6af9488881c0d48c03f90b6a231eaea849034b60c8d5d315"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "61a418401f76a6fe0c190822005b45adac3a7e5df82766fb8096f60799caeeff"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "3853e427c30cc551b0133e6bc36894da83ca01c162644cff99423db939d28091"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "route-names-provider_route_names.json",
+      "sha256": "a9beb77bfcc7838191c5373ab85c60a06d3f574e74cdd1aeeedd8045d2bfa23c"
+    },
+    {
+      "file": "route-names-provider_profiles.json",
+      "sha256": "e78500fd696f5d4206d43bfaad8c762606f635267c0ca72742ae5c8ddc373a06"
+    },
+    {
+      "file": "route-names-provider_fallback_matrix.json",
+      "sha256": "aac30ba4ae466877aef25b5ee827c35546ef930109c14fe3526cb2ed992617bc"
+    },
+    {
+      "file": "route-names-moa_provider-mixed-stream.json",
+      "sha256": "05049be7f32682549c4d8f71932b11d9a45d1be900497b7ce5d26a708deef749"
+    },
+    {
+      "file": "route-names-agent_replay_generation.json",
+      "sha256": "8e995cf256db5a458dd9df44550d2ec40b65036e50ac4cb07c0cd3b079724ec6"
+    },
+    {
+      "file": "route-names-router_reasoning.json",
+      "sha256": "c1bf6fc29c2ca41d2c958b2fe4dc07b1222c909033def6d302be812f7fa7d416"
+    }
+  ]
+}
