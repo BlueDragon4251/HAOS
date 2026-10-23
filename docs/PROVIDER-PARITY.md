@@ -860,3 +860,32 @@ This verifies the reproduced ordinary main-agent retry/recovery paths for the
 three native protocols. It is not live provider, installed owner/boot, hardware
 or release acceptance; other provider-specific recovery/replay paths still
 require their own evidence.
+
+## Main-agent native fallback replay provenance (2026-10-23)
+
+The actual pinned `AIAgent.run_conversation` reproduced a Responses defect at
+`7dd0d9b`: after the fallback produced encrypted reasoning, the following turn
+sent it to the primary model and omitted it from the fallback. The MoA-only
+header consumer did not cover the main agent's native stream assemblers.
+
+The broker now removes upstream-supplied provenance and attaches its own exact
+provider/protocol/endpoint/model binding to native response blocks, in JSON and
+SSE, including Claude's Bedrock binary-event bridge. Public transport response
+normalization consumes SDK-preserved block metadata and stores native state in
+the existing bound carrier. Signed Messages thinking is retained even for a
+text-only final answer. A foreign carrier also removes stale raw duplicates;
+local metadata never enters subsequent provider requests. Alias bindings use
+the same pinned wire-model normalizer as admission, without broadening the
+owner allowlist. Transformed outputs retain the broker's size limits.
+
+Four required build/CI cases run three real tool-free main-agent turns each:
+Responses and Messages, with exact model names and with owner aliases. Across
+20 loopback provider calls they verify fallback success, exact issuer-only
+replay on the next turn, then a primary success without fallback-native state.
+Synthetic upstream provenance is overwritten. Six ordinary-user negative cases
+also cover malformed/mixed provenance and foreign model/endpoint bindings.
+Both runtime variants pass **909 tests, two existing skips**. Existing SDK/HTTP,
+cloud and MoA probes retain separate source-hashed receipts. All five CI gates
+for predecessor `7dd0d9b` passed, including the real root/UID/bubblewrap case.
+This new source still requires its own CI run. No live inference, installed
+boot, hardware, gateway delivery or final release acceptance is claimed.

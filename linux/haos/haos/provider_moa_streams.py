@@ -26,6 +26,13 @@ def _restore(messages, binding):
             continue
         carriers = [item for item in details if isinstance(item, dict) and item.get("type") == REPLAY_TYPE]
         message["reasoning_details"] = [item for item in details if not isinstance(item, dict) or item.get("type") != REPLAY_TYPE]
+        if carriers:
+            # A bound carrier exclusively owns native replay. Legacy/raw
+            # duplicates must not survive when targeting another issuer.
+            for key in REPLAY_FIELDS:
+                message.pop(key, None)
+            message["reasoning_details"] = [item for item in message["reasoning_details"]
+                if not isinstance(item, dict) or item.get("type") not in {"thinking", "redacted_thinking"}]
         for item in carriers:
             if item.get("binding") == binding and isinstance(item.get("data"), dict):
                 restored = {key: deepcopy(value) for key, value in item["data"].items() if key in REPLAY_FIELDS}

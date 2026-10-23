@@ -1,0 +1,133 @@
+{
+  "base_commit": "7dd0d9b6ef42b57a33817187af0179dde7f7468d",
+  "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "reproduced_before": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      true
+    ],
+    [
+      2,
+      "fallback",
+      false
+    ]
+  ],
+  "actual_main_agent_cases": 4,
+  "actual_main_agent_turns": 12,
+  "http_dispatches": 20,
+  "local_full_tests": {
+    "passed": 909,
+    "existing_skips": 2
+  },
+  "local_minimal_tests": {
+    "passed": 909,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; root authority/kernel tests required in CI",
+  "predecessor_all_five_gates": "success",
+  "predecessor_services_kernel_run": 39965555685,
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_response_replay.py",
+      "sha256": "dd5030cfba409198c50918f2ee7b5695ba5006386d42318b9aa39320b4f9dc00"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "637ddcc2b4c5b7bb8011d5d2f08dad1bdf941107c40e3098c9e0f7cedc94d948"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "733af9ae4c75f1cb49d7b866e8531737ced3da804a73829d8e63a53c07e7ed24"
+    },
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "1d76379407caee9bd0d87a08be295a0e6ae3f545204a2289911c981ff1b327ed"
+    },
+    {
+      "path": "linux/haos/haos/provider_messages.py",
+      "sha256": "02fd41c41f4e6cca72408d60f012b78e901bb047886dd1b10259ae1b8c83abb5"
+    },
+    {
+      "path": "linux/haos/haos/provider_replay.py",
+      "sha256": "2fe7a6092b09429576af55ca45f5cda4997fefdc717b41a9f27c4db37f0016fd"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_messages.py",
+      "sha256": "b3f71b2f96393ba4f10d8eafcc17ec2f83d5da8dc8267a095161e250b46c79a6"
+    },
+    {
+      "path": "linux/haos/runtime/probe_agent_fallback_replay.py",
+      "sha256": "d7ac0e44295eec5263262c4824edabf7372b348d3a323271fb2460bd66e9751f"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "b66b54ab49cf50ba154707831bb274c72b2658475eef873ca69581d7d5ad4818"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "89cb63b2b1b85421e9853017965ca2de4accde1e43348cef6f5e31e2579d9685"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "9c789b0d51f07d9df3cd8ed2264993cf7359f51f81722375fd5d4aa7a84712e3"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "main-fallback-responses.json",
+      "sha256": "cc162acbdf9451d83c1a2dc6b761007148a0fcb405f97d3026d8e2a28897af70"
+    },
+    {
+      "file": "main-fallback-messages.json",
+      "sha256": "c4bee246e594da4ce461cfbc87e1cadf3d94b7a2aff6b949c41dc56330718620"
+    },
+    {
+      "file": "main-fallback-responses-aliases.json",
+      "sha256": "42740bd659ffe5eaaa791e15be9d528cf3da3f1619df56fc48f8b6dc50c12ecf"
+    },
+    {
+      "file": "main-fallback-messages-aliases.json",
+      "sha256": "253f889845be9155215b7e24bf28874cdbf0104d830d52ae4649604147409506"
+    },
+    {
+      "file": "main-replay-http_provider_matrix.json",
+      "sha256": "517d967ec2d373e459abfd5433655e0ae0c42609d1d054227d5854b5d46e0ead"
+    },
+    {
+      "file": "main-replay-cloud_inference.json",
+      "sha256": "b50ec0e0c857b809594dca3584e37a17e3ebe42b3fc91d325652e3d0b29cb4bd"
+    },
+    {
+      "file": "main-replay-provider_fallback_matrix.json",
+      "sha256": "999d536596a99510812702302bcb4a2d34556e00ad0c217de7bfe0a93079a396"
+    },
+    {
+      "file": "main-replay-moa_fallback_replay.json",
+      "sha256": "b6bd11f2921f922ed7b9a7d0e2918a5c5f86b4096ded079614b6a5584d128c31"
+    },
+    {
+      "file": "main-replay-moa_fallback_replay-json.json",
+      "sha256": "b769b040b03c367d55ae323a620db153930e58c6632d7ec2b2b55ca902bf98be"
+    },
+    {
+      "file": "main-replay-messages_provider.json",
+      "sha256": "6b87fa4548cd6646aacdeedac0bacd8546181acf643689f00637a6db35c59033"
+    },
+    {
+      "file": "main-replay-aws-native.json",
+      "sha256": "d17b1651928804177c67849c273019a35f2d5e0a7e500342032bcce90699011a"
+    }
+  ]
+}

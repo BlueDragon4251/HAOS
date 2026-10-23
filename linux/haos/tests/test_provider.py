@@ -249,3 +249,39 @@ def test_native_moa_carrier_keeps_opaque_thinking_inside_exact_binding():
     assert "fixture-signature" not in json.dumps(_restore(messages, "b" * 64))
     assert _restore(messages, "a" * 64)[0]["anthropic_content_blocks"] == [block]
     assert normalized.provider_data["reasoning_details"] == [block]
+
+
+@pytest.mark.parametrize('mode,container', [('codex_responses', 'output'), ('anthropic_messages', 'content')])
+def test_native_response_provenance_is_broker_owned_and_cannot_cross_routes(mode, container):
+    from types import SimpleNamespace
+    from haos.provider_response_replay import annotate, normalize, FIELD
+    from haos.provider_replay import route_binding
+    from haos.provider_moa_streams import _restore, REPLAY_TYPE
+    policy = SimpleNamespace(provider='local', api_mode=mode, endpoint='http://127.0.0.1:9119/v1')
+    source = {container: [{'type': 'reasoning', FIELD: '0' * 64}], FIELD: '0' * 64}
+    stamped = annotate(source, policy, 'model-a')
+    binding = route_binding(policy, 'model-a')
+    assert stamped == {container: [{'type': 'reasoning', FIELD: binding}]}
+    assert source[FIELD] == '0' * 64
+    native = {'type': 'reasoning', 'encrypted_content': 'opaque-fixture'}
+    normalized = SimpleNamespace(provider_data={'codex_reasoning_items': [native]})
+    response = SimpleNamespace(**{container: stamped[container]})
+    normalize(response, normalized, mode)
+    assert normalized.provider_data == {'reasoning_details': [{'type': REPLAY_TYPE, 'binding': binding,
+        'data': {'codex_reasoning_items': [native]}}]}
+    # Stale raw duplicates never bypass the bound carrier on a foreign route.
+    history = [{'role': 'assistant', 'codex_reasoning_items': [native], **normalized.provider_data}]
+    for foreign in (route_binding(policy, 'model-b'), route_binding(
+            SimpleNamespace(provider='local', api_mode=mode, endpoint='http://127.0.0.1:9121/v1'), 'model-a')):
+        assert 'opaque-fixture' not in json.dumps(_restore(history, foreign))
+    assert _restore(history, binding)[0]['codex_reasoning_items'] == [native]
+    assert history[0]['codex_reasoning_items'] == [native]
+
+
+@pytest.mark.parametrize('values', [['f' * 63], ['G' * 64], ['a' * 64, 'b' * 64], ['a' * 64 + '\n']])
+def test_native_response_rejects_malformed_or_mixed_local_provenance(values):
+    from types import SimpleNamespace
+    from haos.provider_response_replay import normalize, FIELD
+    response = SimpleNamespace(output=[{FIELD: value} for value in values])
+    with pytest.raises(PermissionError):
+        normalize(response, SimpleNamespace(provider_data={}), 'codex_responses')

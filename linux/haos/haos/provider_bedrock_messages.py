@@ -23,13 +23,14 @@ def create_client(policy, data):
 
 def forward(handler, payload, redactor):
     from .provider_native import plain
+    from .provider_response_replay import annotate
     from .provider_proxy import MAX_LINE, MAX_OUTPUT
     client = create_client(handler.policy, handler.route_credentials.cloud_data)
     result = None
     try:
         result = client.messages.create(**payload)
         if not payload.get("stream"):
-            data = redactor.clean(plain(result))
+            data = annotate(redactor.clean(plain(result)), handler.policy, handler.native_response_model)
             body = json.dumps(data, ensure_ascii=False).encode()
             if len(body) > MAX_OUTPUT:
                 raise ValueError("native Messages response exceeds broker bound")
@@ -53,7 +54,7 @@ def forward(handler, payload, redactor):
         pending = []
         from itertools import chain
         for raw in chain([first], iterator):
-            event = redactor.clean(plain(raw))
+            event = annotate(redactor.clean(plain(raw)), handler.policy, handler.native_response_model)
             kind = event.get("type")
             if kind == "error":
                 raise ConnectionError("native Messages stream failed")

@@ -79,6 +79,10 @@ def register_profiles(data):
         bindings[route["base_url"].rstrip("/")] = (source, policy.api_mode, policy.endpoint)
 
     class WireContext:
+        def normalize_response(self, response, **kwargs):
+            from .provider_response_replay import normalize
+            return normalize(response, super().normalize_response(response, **kwargs), self.api_mode)
+
         def haos_wire_context(self, base_url):
             return bindings.get(str(base_url).rstrip("/"))
 

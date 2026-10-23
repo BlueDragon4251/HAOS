@@ -360,6 +360,7 @@ class Handler(BaseHTTPRequestHandler):
                     attempt = retarget(self.policy, attempt, None)
                 headers = merge_features(headers, features)
                 self.fallback_tool_names = features.get("tool_names", {})
+                self.native_response_model = (context["model"] if context is not None else original["model"]) if target == route else self.policy.data["default_model"]
                 self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"])
                     if target != route else None)
                 redactor.secrets = (*redactor.secrets, self.server.token)
@@ -467,10 +468,13 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("model response exceeds owner broker bound")
                 from .provider_sse import require_complete
                 require_complete(response)
-                decoded = redactor.clean(restore(json.loads(data), wire_names))
+                from .provider_response_replay import annotate
+                decoded = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model)
+                clean = json.dumps(decoded).encode()
+                if len(clean) > MAX_OUTPUT:
+                    raise ValueError("local model response exceeds broker bound")
                 self.send_response(response.status)
                 self.send_header("Content-Type", content_type)
-                clean = json.dumps(decoded).encode()
                 self.send_header("Content-Length", str(len(clean)))
                 self.send_header("Connection", "close")
                 self.end_headers()
@@ -483,12 +487,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.forward_started = True
-            usage, terminal, pending = {}, False, []
+            usage, terminal, pending, emitted = {}, False, [], 0
             from .provider_sse import events
             for fields, data in events(response, max_line=MAX_LINE, max_output=MAX_OUTPUT, deadline=time.monotonic() + 600):
                 finish = False
                 if data is not None and data != "[DONE]":
-                    event = redactor.clean(restore(json.loads(data), wire_names))
+                    from .provider_response_replay import annotate
+                    event = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model)
                     if isinstance(event, dict):
                         kind = event.get("type")
                         if kind in {"response.failed", "response.incomplete", "error"}:
@@ -511,6 +516,9 @@ class Handler(BaseHTTPRequestHandler):
                 if data is not None:
                     lines.append("data: " + data)
                 line = ("\n".join(lines) + "\n\n").encode()
+                emitted += len(line)
+                if len(line) > MAX_LINE or emitted > MAX_OUTPUT:
+                    raise ValueError("local model stream exceeds broker bounds")
                 # Forward deltas continuously, but do not certify completion
                 # before the upstream HTTP framing has itself completed. All
                 # trailing frames remain ordered and within the parser budget.

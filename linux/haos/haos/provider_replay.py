@@ -36,6 +36,10 @@ def messages_for_route(policy, payload):
 
 
 def issuer_binding(context, model):
+    if isinstance(context, (list, tuple)) and len(context) == 3:
+        from types import SimpleNamespace
+        from .provider_messages import native_model
+        model = native_model(SimpleNamespace(provider=context[0], api_mode=context[1], endpoint=context[2]), model)
     return hashlib.sha256(json.dumps([context, model], separators=(",", ":")).encode()).hexdigest()
 
 

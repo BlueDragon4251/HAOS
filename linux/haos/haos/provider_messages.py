@@ -12,28 +12,31 @@ def admit(policy, path, payload):
     if policy.api_mode not in {"anthropic_messages", "codex_responses"} or not isinstance(payload, dict):
         return policy.request(path, payload)
 
-    def wire(model):
-        if policy.api_mode == "codex_responses":
-            if not model.lower().endswith("-900k"):
-                return model
-            from agent.model_metadata import strip_codex_context_variant_suffix
-            return strip_codex_context_variant_suffix(model)
-        # Keep ordinary/minimal broker fixtures independent of optional Hermes
-        # imports. Only the native Claude/prefixed aliases need its normalizer.
-        if not model.lower().startswith(("claude-", "anthropic/")):
-            return model
-        from agent.anthropic_adapter import normalize_model_name
-        from agent.anthropic_endpoints import _is_nous_portal_endpoint
-        return model if _is_nous_portal_endpoint(policy.endpoint) else normalize_model_name(model)
-
     requested = payload.get("model")
     owner = requested if isinstance(requested, str) and requested in policy.models else next(
-        (model for model in policy.models if wire(model) == requested), None)
+        (model for model in policy.models if native_model(policy, model) == requested), None)
     if owner is None:
         raise PermissionError("model or API route is outside owner policy")
     admitted = policy.request(path, {**payload, "model": owner})
-    admitted["model"] = wire(owner)
+    admitted["model"] = native_model(policy, owner)
     return admitted
+
+
+def native_model(policy, model):
+    if policy.api_mode == "codex_responses":
+        if not model.lower().endswith("-900k"):
+            return model
+        from agent.model_metadata import strip_codex_context_variant_suffix
+        return strip_codex_context_variant_suffix(model)
+    if policy.api_mode != "anthropic_messages":
+        return model
+    # Keep ordinary/minimal broker fixtures independent of optional Hermes
+    # imports. Only the native Claude/prefixed aliases need its normalizer.
+    if not model.lower().startswith(("claude-", "anthropic/")):
+        return model
+    from agent.anthropic_adapter import normalize_model_name
+    from agent.anthropic_endpoints import _is_nous_portal_endpoint
+    return model if _is_nous_portal_endpoint(policy.endpoint) else normalize_model_name(model)
 
 
 def feature_headers(payload, headers, endpoint):
