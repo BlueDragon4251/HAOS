@@ -5,6 +5,7 @@ import hashlib
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import secrets
 import sys
@@ -27,6 +28,8 @@ def main():
     from agent.reasoning_summaries import append_streamed_reasoning_detail
     from botocore.config import Config
     original = provider_native.create_client
+    scoped = len(sys.argv) == 4 and sys.argv[3] == "route-scope"
+    if len(sys.argv) == 4: assert scoped
     results, failures = [], []
     opaque = base64.b64encode(b"fixture-opaque-thinking").decode()
     blocks = [{"text": "early fixture"}, {"reasoningContent": {"reasoningText": {"text": "fixture thought", "signature": "fixture-signature"}}},
@@ -40,17 +43,34 @@ def main():
             policy = ProviderPolicy({"version": 1, "provider": "bedrock", "endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com",
                 "models": ["fixture-model"], "default_model": "fixture-model", "api_mode": "chat_completions",
                 "requests_per_day": 200, "requests_per_minute": 30})
-            register_profiles(policy.data)
+            from haos.provider_routes import ProviderRoutes
+            routes = ProviderRoutes({"version": 2, "default": "primary", "routes": {
+                name: policy.data for name in ("primary", "fallback")},
+                "fallbacks": {"primary": ["fallback"]}}) if scoped else policy
+            fallback_bearer = secrets.token_urlsafe(48)
+            fallback_key = "fallback-fixture-access"
+            fallback_data = {"access_key_id": fallback_key, "secret_access_key": secret} if auth == "iam" else {"bearer_token": fallback_bearer}
+            observed = []
+            register_profiles(routes.data)
             class Fixture(BaseHTTPRequestHandler):
                 def log_message(self, *_):
                     pass
                 def do_POST(self):
                     try:
                         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                        if auth == "bearer":
-                            assert self.headers["Authorization"] == "Bearer " + bearer
-                        else:
-                            assert self.headers["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=" + key + "/")
+                        authorization = self.headers["Authorization"]
+                        target = "fallback" if (authorization == "Bearer " + fallback_bearer if auth == "bearer"
+                            else authorization.startswith("AWS4-HMAC-SHA256 Credential=" + fallback_key + "/")) else "primary"
+                        if target == "primary":
+                            assert (authorization == "Bearer " + bearer if auth == "bearer" else
+                                authorization.startswith("AWS4-HMAC-SHA256 Credential=" + key + "/"))
+                        observed.append((target, "fixture-signature" in json.dumps(body)))
+                        if scoped and target == "primary":
+                            wire = b'{"message":"fixture unavailable"}'
+                            self.send_response(503)
+                            self.send_header("x-amzn-ErrorType", "ServiceUnavailableException")
+                            self.send_header("Content-Length", str(len(wire)))
+                            self.end_headers(); self.wfile.write(wire); return
                         if seen:
                             assistant = next(message for message in body["messages"] if message["role"] == "assistant")
                             assert assistant["content"] == blocks, "next turn lost native reasoning/tool block order"
@@ -102,8 +122,16 @@ def main():
                     ledger = UsageLedger(Path(temp) / "usage.db")
                     capability = secrets.token_urlsafe(48)
                     try:
-                        with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": json.dumps(data)}), ledger)) as port:
+                        previous_capability = os.environ.get("HAOS_MODEL_TOKEN")
+                        os.environ["HAOS_MODEL_TOKEN"] = capability
+                        credentials = {"primary": Credentials(policy, {"api_key": json.dumps(data)}),
+                            "fallback": Credentials(policy, {"api_key": json.dumps(fallback_data)})} if scoped else Credentials(policy, {"api_key": json.dumps(data)})
+                        server = Broker(("127.0.0.1", 0), routes, capability, credentials, ledger)
+                        server.daemon_threads = False
+                        with serving(server) as port:
                             def request(payload):
+                                payload = dict(payload)
+                                payload.update(payload.pop("extra_body", {}))
                                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
                                 conn.request("POST", "/v1/chat/completions", json.dumps(payload), {"Authorization": "Bearer " + capability})
                                 response = conn.getresponse()
@@ -114,7 +142,8 @@ def main():
                                     body = line + response.read()
                                 else:
                                     body = response.read()
-                                assert response.status == 200 and not any(value.encode() in body for value in (key, secret, bearer))
+                                assert response.status == 200, (response.status, body)
+                                assert not any(value.encode() in body for value in (key, secret, bearer))
                                 conn.close()
                                 return body
                             body = request({"model": "fixture-model", "stream": streaming, "messages": [{"role": "user", "content": "fixture"}]})
@@ -135,18 +164,26 @@ def main():
                                 base_url=policy.client_config()["model"]["base_url"])
                             request(payload)
                         assert len(seen) == 2
-                        assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchall() == [(200, 7, 4), (200, 7, 4)]
+                        if scoped:
+                            assert observed == [("primary", False), ("fallback", False), ("primary", False), ("fallback", True)], observed
+                            assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid").fetchall() == [(503, None, None), (200, 7, 4), (503, None, None), (200, 7, 4)]
+                        else:
+                            assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchall() == [(200, 7, 4), (200, 7, 4)]
                     finally:
                         release.set()
+                        if previous_capability is None: os.environ.pop("HAOS_MODEL_TOKEN", None)
+                        else: os.environ["HAOS_MODEL_TOKEN"] = previous_capability
                         provider_native.create_client = original
                         ledger.close()
             results.append(auth + (":stream-replay" if streaming else ":json-replay"))
     assert not failures
-    receipt = {"actual_signed_or_bearer_boto3_replay_cases": results, "actual_http_requests": 8,
+    receipt = {"actual_signed_or_bearer_boto3_replay_cases": results, "actual_http_requests": 16 if scoped else 8,
+        "distinct_private_routes_same_provider_endpoint_model": scoped,
         "ordered_signed_redacted_text_tool_next_turn_replay": True, "actual_hermes_stream_detail_accumulator": True,
         "early_delta_before_upstream_terminal": True, "live_provider_tested": False, "python": sys.version.split()[0],
         "source_files": [{"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in
-            (Path(__file__), root / "haos/provider_cloud.py", root / "haos/provider_profiles.py", root / "haos/provider_bedrock_replay.py")]}
+            (Path(__file__), root / "haos/provider_cloud.py", root / "haos/provider_profiles.py", root / "haos/provider_bedrock_replay.py",
+             root / "haos/provider_response_replay.py", root / "haos/provider_moa_streams.py", root / "haos/provider_proxy.py")]}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

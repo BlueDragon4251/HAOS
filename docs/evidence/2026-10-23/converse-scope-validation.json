@@ -1,0 +1,84 @@
+{
+  "base_commit": "c962fbc8b37cb3bb8e5aa5922ae7667675165665",
+  "before_actual_boto3_route_signature_presence": [
+    [
+      "primary",
+      false
+    ],
+    [
+      "fallback",
+      false
+    ],
+    [
+      "primary",
+      true
+    ],
+    [
+      "fallback",
+      true
+    ]
+  ],
+  "after_actual_boto3_route_signature_presence": [
+    [
+      "primary",
+      false
+    ],
+    [
+      "fallback",
+      false
+    ],
+    [
+      "primary",
+      false
+    ],
+    [
+      "fallback",
+      true
+    ]
+  ],
+  "actual_converse_calls": 24,
+  "main_agent_or_auxiliary_fallback_cases": 17,
+  "tool_signature_cases": 12,
+  "generation_restart_pairs": 3,
+  "full_tests": {
+    "passed": 962,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 962,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; required root/UID/kernel CI not counted as local pass",
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "6977373e0586eb1836b825d73b8c45605eca8936fe27a059130d4878f2dc6560"
+    },
+    {
+      "path": "linux/haos/haos/provider_response_replay.py",
+      "sha256": "b17fff8db45b8088d201d30e7e180bedff1607c28c61536caae258ec5136eef4"
+    },
+    {
+      "path": "linux/haos/runtime/probe_converse_replay.py",
+      "sha256": "892a6e2655d43b13d5dd0e381ae71fd5d5f84fd2143c5786838636d12cc4c2f2"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "f5f281f718f6f5d37c00ef305bd22929cab4f25b1d46d1489b7b01c98f0c8909"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_cloud.py",
+      "sha256": "79c9d5ea9c35880e7dc688f6371ee48301560d4d37fd37b8787eaf8150dd48be"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "27692dc3a8ec661ba8ec065c99ca8f6dc0d7f31ae130823f1a6039d4eb71ab21"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "cdb6d04291770c0e3fc9f673e108694589ae5420837782cd7f4410efee396940"
+    }
+  ],
+  "contracts_sha256": "427ff66c83efa855f5f5f51250585be9be3c2ff9546dd066754fd0c294fedaaf"
+}

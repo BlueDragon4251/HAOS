@@ -1112,3 +1112,26 @@ minimal suites pass **959 tests, two existing skips**. The 410 actual SDK/HTTP
 cases, twenty native AWS cases and actual MoA fallback replay pass on this
 source. Receipts bind exact source hashes in `tool-arguments-validation.json`.
 These are local contract checks, without live inference or installed acceptance.
+
+## Converse signed replay also obeys managed route scope (2026-10-23)
+
+The previous scope extension explicitly excluded the Converse-specific carrier.
+Four new actual boto3/broker fixtures reproduce the gap with identical provider,
+endpoint and model but distinct IAM/bearer identities: after primary failure,
+signed/redacted fallback blocks reached both routes on the next turn. Converse
+details now enter the same broker-owned managed carrier as other native Chat
+details, and the final private Chat dispatch checks route/capability scope.
+This last boundary also handles SDK callers that retain raw response details.
+Matching fallback replay retains the exact ordered native text, signed/redacted
+reasoning and tool blocks. Private credentials remain outside the agent.
+
+Required build/CI now run IAM and bearer JSON/EventStream route cases (16 HTTP
+calls), alongside the existing same-route eight-call replay fixture. Three
+ordinary-user cases check matching scope, different route and changed capability
+generation without deleting persisted history. Full/minimal suites pass
+**962 tests, two existing skips**. The 410 HTTP matrix, seventeen actual main/
+auxiliary fallback scenarios, twelve OpenRouter/native Gemini tool-signature
+scenarios and three fresh broker/main-agent generation pairs also pass. Exact
+source hashes and all 33 contract receipts are in `converse-scope-validation.json`
+and `converse-scope-contracts.json`. No live account or installed acceptance
+is inferred. Root/UID/kernel CI remains a separate mandatory check.

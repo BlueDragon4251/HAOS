@@ -98,6 +98,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"
           "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-native.json"
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
       - uses: actions/upload-artifact@v4

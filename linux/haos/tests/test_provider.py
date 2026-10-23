@@ -475,3 +475,21 @@ def test_subscription_tool_name_restore_never_interprets_tool_argument_objects()
         'input': {'type': 'function_call', 'name': 'WireMemory'}}
     value = {'type': 'tool_use', 'name': 'WireMemory', 'input': user}
     assert restore(value, {'WireMemory': 'memory'}) == {**value, 'name': 'memory'}
+
+
+@pytest.mark.parametrize('route,generation', [('fallback', 'old'), ('primary', 'old'), ('fallback', 'new')])
+def test_converse_carrier_obeys_managed_route_and_generation_scope(route, generation):
+    from types import SimpleNamespace
+    from haos.provider_response_replay import annotate
+    from haos.provider_moa_streams import _restore
+    from haos.provider_replay import route_binding
+    from haos.provider_bedrock_replay import carrier, restore
+    p = SimpleNamespace(provider='bedrock', api_mode='chat_completions',
+        endpoint='https://bedrock-runtime.us-east-1.amazonaws.com')
+    blocks = [{'reasoningContent': {'reasoningText': {'text': 'fixture', 'signature': 'fixture-signature'}}}]
+    message = annotate({'choices': [{'message': {'role': 'assistant', 'content': 'fixture',
+        'reasoning_details': [carrier(blocks, 'same-model', p.endpoint)]}}]}, p, 'same-model', ['fallback', 'old'])['choices'][0]['message']
+    restored = restore(_restore([message], route_binding(p, 'same-model', [route, generation])), 'same-model', p.endpoint)
+    assert ('bedrock_content_blocks' in restored[0]) == (route == 'fallback' and generation == 'old')
+    if route == 'fallback' and generation == 'old': assert restored[0]['bedrock_content_blocks'] == blocks
+    assert 'fixture-signature' in json.dumps(message)

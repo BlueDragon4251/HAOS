@@ -398,6 +398,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def forward(self, payload, headers, redactor, *, defer_errors=False):
         self.retry_after = None
+        if self.policy.api_mode == "chat_completions":
+            from .provider_moa_streams import _restore
+            from .provider_replay import route_binding
+            payload = {**payload, "messages": _restore(payload.get("messages", []),
+                route_binding(self.policy, payload["model"], self.replay_scope))}
         if self.policy.provider == "bedrock" and self.policy.api_mode == "anthropic_messages":
             from .provider_bedrock_messages import forward
             return forward(self, payload, redactor)

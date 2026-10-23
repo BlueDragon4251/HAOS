@@ -21,6 +21,7 @@ def clean(value):
 
 
 def annotate(value, policy, model, scope=None):
+    from .provider_moa_streams import REPLAY_TYPE
     result = clean(value)
     if policy.api_mode not in {'chat_completions', 'codex_responses', 'anthropic_messages'} or not isinstance(result, dict):
         return result
@@ -42,7 +43,7 @@ def annotate(value, policy, model, scope=None):
                     if isinstance(call, dict) and isinstance(call.get('extra_content'), dict):
                         call['extra_content'][FIELD] = binding
                 for detail in message.get('reasoning_details') or []:
-                    if isinstance(detail, dict) and not str(detail.get('type', '')).endswith('.native_assistant'):
+                    if isinstance(detail, dict) and detail.get('type') != REPLAY_TYPE:
                         detail[FIELD] = binding
     blocks(result)
     for key in ('response', 'message'):
@@ -62,8 +63,8 @@ def bind_chat_details(details):
     if any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value) for value in values) or len(set(values)) != 1:
         raise PermissionError('invalid or mixed local chat replay provenance')
     native = [clean(item) for item in details
-        if not isinstance(item, dict) or not str(item.get('type', '')).endswith('.native_assistant')]
-    kept = [item for item in details if isinstance(item, dict) and str(item.get('type', '')).endswith('.native_assistant')]
+        if not isinstance(item, dict) or item.get('type') != REPLAY_TYPE]
+    kept = [item for item in details if isinstance(item, dict) and item.get('type') == REPLAY_TYPE]
     return _merge_carrier(kept, values[0], 'chat_reasoning_details', native)
 
 
