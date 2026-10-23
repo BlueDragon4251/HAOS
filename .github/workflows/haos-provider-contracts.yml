@@ -81,6 +81,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
           "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
           "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"
+          "$PYTHON" linux/haos/runtime/probe_vertex_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/vertex-catalog.json"
           "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"
           "$PYTHON" linux/haos/runtime/probe_cloud_tokens.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-tokens.json"
           "$PYTHON" linux/haos/runtime/probe_cloud_inference.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-model-http.json"

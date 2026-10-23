@@ -24,7 +24,7 @@ from .redaction import Redactor
 MAX_BODY = 4 * 1024 * 1024
 MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_./:-]{0,511}\Z")
 SOURCES = {"provider-api", "sdk-catalog", "upstream-offline", "unavailable"}
-DIAGNOSTICS = {"none", "account-required", "catalog-unavailable", "catalog-not-exposed"}
+DIAGNOSTICS = {"none", "account-required", "catalog-unavailable", "catalog-not-exposed", "publisher-catalog"}
 
 
 def validate_catalog(data, provider):
@@ -147,19 +147,64 @@ def http_catalog(policy, credentials):
                 break
             else:
                 ids.append(item.get("id"))
+        if isinstance(data, dict) and "has_more" in data and type(data["has_more"]) is not bool:
+            raise ValueError("invalid provider pagination flag")
         cursor = (data.get("nextPageToken") if policy.provider == "gemini" else
                   data.get("last_id") if isinstance(data, dict) and data.get("has_more") is True else None)
+        if isinstance(data, dict) and data.get("has_more") is True and not cursor:
+            raise ValueError("provider catalog omitted its required cursor")
         if not cursor:
             break
         if not isinstance(cursor, str) or not 1 <= len(cursor) <= 1024 or cursor in cursors:
             raise ValueError("invalid/repeated model catalog cursor")
         cursors.add(cursor)
         query["pageToken" if policy.provider == "gemini" else "after_id"] = cursor
+    else:
+        raise ValueError("provider catalog exceeds its page bound")
     dynamic = policy.provider in {"copilot", "opencode-go", "opencode-zen", "azure-foundry"}
     mode = None if dynamic else policy.api_mode
     if policy.provider == "azure-foundry" and policy.api_mode == "anthropic_messages":
         mode = "anthropic_messages"
     return receipt(policy.provider, ids, "provider-api", redactor=redactor, mode=mode)
+
+
+def vertex_catalog(policy, credentials):
+    """Model Garden's published beta list contract, on the approved region host.
+
+    This lists one publisher's catalogue, not project entitlement or a successful
+    OpenAI-compatible inference. No endpoint or resource URL from the response
+    controls a follow-up destination.
+    """
+    model = policy.data['default_model']
+    publisher = model.split('/', 1)[0] if '/' in model else 'google'
+    if not re.fullmatch('[a-z][a-z0-9-]{0,62}', publisher):
+        raise ValueError('unsupported Vertex publisher identity')
+    headers, redactor = credentials.headers()
+    endpoint = credentials.effective_endpoint
+    query = {'pageSize': '1000', 'view': 'PUBLISHER_MODEL_VIEW_BASIC'}
+    prefix = 'publishers/' + publisher + '/models/'
+    ids, cursors = [], set()
+    for _ in range(5):
+        data = get_json(policy, endpoint, '/v1beta1/publishers/' + publisher + '/models?' + urlencode(query), headers)
+        if not isinstance(data, dict) or not isinstance(data.get('publisherModels', []), list):
+            raise ValueError('invalid Vertex publisher catalogue')
+        for item in data.get('publisherModels', []):
+            name = item.get('name') if isinstance(item, dict) else None
+            if isinstance(name, str) and name.startswith(prefix):
+                suffix = name[len(prefix):]
+                if re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}', suffix):
+                    ids.append(publisher + '/' + suffix)
+        if len(ids) > 4096:
+            raise ValueError('Vertex catalogue exceeds its model bound')
+        cursor = data.get('nextPageToken')
+        if cursor is None or cursor == '':
+            break
+        if not isinstance(cursor, str) or len(cursor) > 1024 or cursor in cursors:
+            raise ValueError('invalid/repeated Vertex catalogue cursor')
+        cursors.add(cursor); query['pageToken'] = cursor
+    else:
+        raise ValueError('Vertex catalogue exceeds its page bound')
+    return receipt(policy.provider, ids, 'provider-api', diagnostic='publisher-catalog', redactor=redactor, mode=policy.api_mode)
 
 
 def discover(policy, credential):
@@ -172,11 +217,11 @@ def discover(policy, credential):
                 return receipt(policy.provider, client.list_models(timeout_seconds=30), "provider-api")
             finally:
                 client.close()
-    if policy.provider == "vertex":
-        return fallback(policy.provider, "catalog-not-exposed")
     from .provider_proxy import Credentials
     credentials = Credentials(policy, {"api_key": credential})
     try:
+        if policy.provider == "vertex":
+            return vertex_catalog(policy, credentials)
         if policy.provider == "bedrock":
             from botocore.config import Config
             from .provider_cloud import credential_data, aws_session

@@ -1,0 +1,97 @@
+{
+  "source_url": "https://aiplatform.googleapis.com/$discovery/rest?version=v1beta1",
+  "retrieved_date": "2026-10-23",
+  "source_sha256": "8d958151a89dcd2ff75a41d45368510e279977d0dad63800d877202c97b57935",
+  "list_method": {
+    "path": "v1beta1/{+parent}/models",
+    "parameterOrder": [
+      "parent"
+    ],
+    "httpMethod": "GET",
+    "description": "Lists publisher models in Model Garden.",
+    "id": "aiplatform.publishers.models.list",
+    "parameters": {
+      "pageToken": {
+        "description": "Optional. The standard list page token. Typically obtained via ListPublisherModelsResponse.next_page_token of the previous ModelGardenService.ListPublisherModels call.",
+        "location": "query",
+        "type": "string"
+      },
+      "languageCode": {
+        "location": "query",
+        "type": "string",
+        "description": "Optional. The IETF BCP-47 language code representing the language in which the publisher models' text information should be written in. If not set, by default English (en)."
+      },
+      "listAllVersions": {
+        "type": "boolean",
+        "location": "query",
+        "description": "Optional. List all publisher model versions if the flag is set to true."
+      },
+      "view": {
+        "enumDescriptions": [
+          "The default / unset value. The API will default to the BASIC view.",
+          "Include basic metadata about the publisher model, but not the full contents.",
+          "Include everything.",
+          "Include: VersionId, ModelVersionExternalName, and SupportedActions."
+        ],
+        "enum": [
+          "PUBLISHER_MODEL_VIEW_UNSPECIFIED",
+          "PUBLISHER_MODEL_VIEW_BASIC",
+          "PUBLISHER_MODEL_VIEW_FULL",
+          "PUBLISHER_MODEL_VERSION_VIEW_BASIC"
+        ],
+        "type": "string",
+        "description": "Optional. PublisherModel view specifying which fields to read.",
+        "location": "query"
+      },
+      "parent": {
+        "description": "Required. The name of the Publisher from which to list the PublisherModels. Format: `publishers/{publisher}`",
+        "location": "path",
+        "required": true,
+        "type": "string",
+        "pattern": "^publishers/[^/]+$"
+      },
+      "pageSize": {
+        "type": "integer",
+        "description": "Optional. The standard list page size.",
+        "location": "query",
+        "format": "int32"
+      },
+      "orderBy": {
+        "location": "query",
+        "type": "string",
+        "description": "Optional. A comma-separated list of fields to order by, sorted in ascending order. Use \"desc\" after a field name for descending."
+      },
+      "filter": {
+        "type": "string",
+        "location": "query",
+        "description": "Optional. The standard list filter."
+      }
+    },
+    "flatPath": "v1beta1/publishers/{publishersId}/models",
+    "response": {
+      "$ref": "GoogleCloudAiplatformV1beta1ListPublisherModelsResponse"
+    },
+    "scopes": [
+      "https://www.googleapis.com/auth/aiplatform",
+      "https://www.googleapis.com/auth/cloud-platform"
+    ]
+  },
+  "response_schema": {
+    "id": "GoogleCloudAiplatformV1beta1ListPublisherModelsResponse",
+    "description": "Response message for ModelGardenService.ListPublisherModels.",
+    "type": "object",
+    "properties": {
+      "publisherModels": {
+        "description": "List of PublisherModels in the requested page.",
+        "items": {
+          "$ref": "GoogleCloudAiplatformV1beta1PublisherModel"
+        },
+        "type": "array"
+      },
+      "nextPageToken": {
+        "description": "A token to retrieve next page of results. Pass to ListPublisherModels.page_token to obtain that page.",
+        "type": "string"
+      }
+    }
+  }
+}

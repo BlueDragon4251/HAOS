@@ -1,0 +1,76 @@
+{
+  "base_commit": "94fa7203ad4b6a157e9a36293ff173a10412f0c0",
+  "actual_google_sdk_refresh_and_model_garden_cases": 15,
+  "full_tests": {
+    "passed": 928,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 928,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; real root/UID/kernel CI remains required",
+  "native_tk_cases": [
+    {
+      "display": "1280x800",
+      "required_workflow_script": "passed"
+    },
+    {
+      "display": "640x480",
+      "required_workflow_script": "passed"
+    }
+  ],
+  "installed_owner_seat_tested": false,
+  "live_account_tested": false,
+  "model_inference_tested": false,
+  "predecessor_all_five_gates": "success",
+  "predecessor_services_kernel_run": 40001774877,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_discovery.py",
+      "sha256": "9d4ffaeaebb8361ad3a6c34d7abc0c9e1cecd52374fee13560aab06ab8c542c0"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "d437aa1ddcb18285ff597418de4c26ad6953b3d6087d0ea6bd11bd0f6b839625"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "deebf64341f12a18846e371f4418c6b99db6fd82fbea77c7c3dd7302f0b27005"
+    },
+    {
+      "path": "linux/haos/runtime/probe_vertex_catalog.py",
+      "sha256": "a850f89d18b7dfbb42d94d463e6975d4a00850e98a21f94c231fd8b37a4a8f1d"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_discovery.py",
+      "sha256": "42ae7d74e13648d85d35d4241444c8195f3cbb1739b70d857f1ab464737ccd0f"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "bee3711c49ec16b94b6b348c829fd1726c7d879338103221f75ed8f20cec5b12"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "a75c194bd5aeccd08dce36a023502099c7eb394483615aa3ef84cae8796c23ac"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "72df86835cd0e474a8f071968ecd01f027551adaabaf9907546b74c115efc3d0"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "vertex-vertex_catalog.json",
+      "sha256": "0da97f3a68090dbf1708a9feb1865703bac5a3f14c490c48f78a7b1daddc1807"
+    },
+    {
+      "file": "vertex-model_catalog.json",
+      "sha256": "daadcbea60024e9dcc9f36640278f52cd07d8da5942cbed0a222a78b05d007e0"
+    },
+    {
+      "file": "vertex-cloud_inference.json",
+      "sha256": "c29be3850563ab49ae309ffe8e52dd6715e16212ece0d5e157f3ee872c611d0a"
+    }
+  ]
+}

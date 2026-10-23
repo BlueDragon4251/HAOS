@@ -440,17 +440,25 @@ class Wizard:
                 from .provider_discovery import validate_catalog
                 validate_catalog(value, provider.get())
                 model_rows[:] = value["models"]
-                source = ("Provider-Katalog · Inferenz noch nicht geprüft" if value["source"] in {"provider-api", "sdk-catalog"}
+                source = ("Model Garden · Projektfreigabe und Inferenz nicht geprüft" if value["diagnostic"] == "publisher-catalog" else "Provider-Katalog · Inferenz noch nicht geprüft" if value["source"] in {"provider-api", "sdk-catalog"}
                           else "Upstream-Vorschläge · Konto und Verfügbarkeit nicht bestätigt" if value["source"] == "upstream-offline"
                           else "Kein Katalog verfügbar · Konto/URL prüfen oder Modellkennung direkt eingeben")
                 catalog_status.config(text=source + " · " + str(len(model_rows)) + " Modelle")
                 filter_models()
             def load_models():
-                selected, key, url, wire = provider.get(), secret.get(), endpoint.get(), mode.get()
+                snapshot = provider.get(), secret.get(), endpoint.get(), mode.get(), model.get()
+                selected, key, url, wire, chosen_model = snapshot
+                def receive(value):
+                    if self.page != "provider":
+                        return
+                    if (provider.get(), secret.get(), endpoint.get(), mode.get(), model.get()) == snapshot:
+                        show_models(value)
+                    else:
+                        self.status.config(text="Konfiguration geändert · Modellliste erneut laden.", fg=self.MUTED)
                 if selected == "local" and not url:
                     url = "http://127.0.0.1:11434/v1"
-                self._run_async(lambda: initial_setup.provider_models(selected, key, url, "" if wire == "auto" else wire),
-                                success="Modellkatalog geladen. Auswahl gibt noch keine Inferenz frei.", result_handler=show_models)
+                self._run_async(lambda: initial_setup.provider_models(selected, key, url, "" if wire == "auto" else wire, chosen_model),
+                                success="Modellkatalog geladen. Auswahl gibt noch keine Inferenz frei.", result_handler=receive)
             self._button(self.content, "Modellliste laden", load_models).pack(anchor="w", pady=8)
             self._label(self.content,
                 "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key (optional session_token), profile oder bearer_token. "

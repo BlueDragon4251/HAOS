@@ -248,3 +248,12 @@ masked and is published privately only when configuring the selected provider.
 Changing providers discards it, including an import still completing in the
 background. Empty-file import does not silently choose the SDK identity; leave
 the cloud field blank only when you intend to use that separately prepared identity.
+
+Vertex's **Modellliste laden** reads the Model Garden publisher catalogue using
+the private Google identity and configured regional endpoint. With an empty
+model field it selects Google; enter a publisher prefix such as `meta/...` before
+loading to request that publisher. Selecting a catalogue ID does not prove
+project access or OpenAI-endpoint compatibility. The GUI marks this distinction;
+publication still requires explicit provider/model configuration. Changed input
+discards an in-flight result. API errors retain clearly identified offline
+suggestions rather than claiming a successful catalogue or inference.

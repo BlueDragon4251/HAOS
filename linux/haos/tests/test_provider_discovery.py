@@ -163,3 +163,51 @@ def test_graphical_cloud_discovery_auto_mode_respects_native_endpoint(monkeypatc
     assert ProviderPolicy(captured[0][0]).endpoint == endpoint
     with pytest.raises(PermissionError):
         ProviderPolicy({**captured[0][0], "endpoint": "https://attacker.invalid/anthropic"})
+
+
+def test_http_catalog_does_not_certify_a_silently_truncated_page_series():
+    pages = [{'data': [{'id': f'fixture-{number}'}], 'has_more': True, 'last_id': str(number)} for number in range(6)]
+    with fixture(pages) as (endpoint, calls):
+        result = discovery.discover(local(endpoint), None)
+    assert len(calls) == 5 and result['diagnostic'] == 'catalog-unavailable'
+    assert result['source'] == 'unavailable' and result['models'] == []
+
+
+def test_http_catalog_requires_cursor_when_provider_reports_more_pages():
+    with fixture([{'data': [{'id': 'fixture'}], 'has_more': True}]) as (endpoint, calls):
+        result = discovery.discover(local(endpoint), None)
+    assert len(calls) == 1 and result['diagnostic'] == 'catalog-unavailable'
+    assert result['models'] == []
+
+
+def test_vertex_publisher_catalog_uses_only_owner_publisher_and_fixed_host_paths():
+    with fixture([{'publisherModels': [{'name': value} for value in (
+            'publishers/google/models/gemini-fixture', 'publishers/google/models/gemini-fixture',
+            'publishers/foreign/models/unapproved', 'publishers/google/models/../admin')], 'nextPageToken': 'page/2'},
+            {'publisherModels': [{'name': 'publishers/google/models/gemini-next'}]}]) as (endpoint, calls):
+        policy = SimpleNamespace(provider='vertex', data={'default_model': 'google/gemini-fixture'}, api_mode='chat_completions')
+        credentials = SimpleNamespace(headers=lambda: ({'Authorization': 'Bearer fixture-only-token'}, Redactor()), effective_endpoint=endpoint)
+        result = discovery.vertex_catalog(policy, credentials)
+    assert result['models'] == [{'id': name, 'api_mode': 'chat_completions'} for name in ('google/gemini-fixture', 'google/gemini-next')]
+    assert result['source'] == 'provider-api' and not result['inference_tested']
+    assert calls[0][0].startswith('/v1beta1/publishers/google/models?') and 'pageToken=page%2F2' in calls[1][0]
+    assert all(call[1]['Authorization'] == 'Bearer fixture-only-token' for call in calls)
+
+
+def test_graphical_vertex_discovery_retains_owner_selected_publisher_without_publishing_a_route(monkeypatch):
+    from haos import initial_setup, provider_setup
+    captured = []
+    monkeypatch.setattr(initial_setup, 'require_root', lambda: None)
+    monkeypatch.setattr(provider_setup, 'catalog_helper', lambda policy, key: captured.append((policy, key)))
+    initial_setup.provider_models('vertex', endpoint='https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi', model='meta/llama-fixture')
+    policy = ProviderPolicy(captured[0][0])
+    assert policy.data['default_model'] == 'meta/llama-fixture' and policy.models == ['meta/llama-fixture']
+    assert captured[0][1] is None and policy.api_mode == 'chat_completions'
+
+
+@pytest.mark.parametrize('flag', ['true', 1, None])
+def test_catalog_rejects_ambiguous_non_boolean_pagination_flags(flag):
+    with fixture([{'data': [{'id': 'fixture'}], 'has_more': flag, 'last_id': 'one'}]) as (endpoint, calls):
+        result = discovery.discover(local(endpoint), None)
+    assert len(calls) == 1 and result['diagnostic'] == 'catalog-unavailable'
+    assert result['models'] == []

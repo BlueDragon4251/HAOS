@@ -305,6 +305,57 @@ jobs:
           labels = [child.cget("text") for child in wizard.error_panel.winfo_children()
                     if "text" in child.keys()]
           assert any("Fehlercode:" in value for value in labels)
+          # Model Garden is catalogue discovery, not project entitlement.
+          wizard.show("provider")
+          wizard.root.update()
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+          wizard.root.update()
+          endpoint = field("URL")
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi")
+          field("Modellkennung").insert(0, "meta/llama-fixture")
+          from haos.provider_discovery import receipt
+          selected_models = []
+          def vertex_models(*args):
+              selected_models.append(args)
+              return receipt("vertex", ["meta/llama-fixture"], "provider-api", diagnostic="publisher-catalog")
+          initial_setup.provider_models = vertex_models
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(0.02)
+          assert not wizard.running and selected_models[0][4] == "meta/llama-fixture"
+          assert any(isinstance(item, tkinter.Label) and "Model Garden · Projektfreigabe und Inferenz nicht geprüft" in item.cget("text")
+                     for item in wizard.content.winfo_children())
+          # A late catalogue must not apply to subsequently changed input.
+          import threading
+          release_catalog = threading.Event()
+          def delayed_models(*args):
+              assert release_catalog.wait(5)
+              return vertex_models(*args)
+          initial_setup.provider_models = delayed_models
+          wizard.show("provider")
+          wizard.root.update()
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+          wizard.root.update()
+          endpoint = field("URL")
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi")
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden").invoke()
+          endpoint.delete(0, tkinter.END)
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/another-project/locations/us-central1/endpoints/openapi")
+          release_catalog.set()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(0.02)
+          picker = next(item for parent in wizard.content.winfo_children() for item in parent.winfo_children()
+                        if isinstance(item, tkinter.Listbox))
+          assert not wizard.running and picker.size() == 0
+          assert "Konfiguration geändert" in wizard.status.cget("text")
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY

@@ -259,12 +259,13 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     return {"configured": True, "provider": provider, "model_turn_tested": False}
 
 
-def provider_models(provider, api_key="", endpoint="", api_mode=""):
+def provider_models(provider, api_key="", endpoint="", api_mode="", model=""):
     require_root()
     from .provider_setup import catalog_helper
+    selected_model = model or "haos-discovery"
     data = {"version": 1, "provider": provider, "endpoint": endpoint or default_endpoint(provider),
-            "models": ["haos-discovery"], "default_model": "haos-discovery",
-            "api_mode": api_mode or default_mode(provider, "haos-discovery", endpoint),
+            "models": [selected_model], "default_model": selected_model,
+            "api_mode": api_mode or default_mode(provider, selected_model, endpoint),
             "requests_per_day": 200, "requests_per_minute": 30}
     return catalog_helper(data, api_key or None)
 

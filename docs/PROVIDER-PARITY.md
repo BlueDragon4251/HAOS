@@ -943,3 +943,33 @@ cases, 6,476 native builder comparisons, native MoA replay and the previous eigh
 main-agent/auxiliary fallback cases pass on the new source. Source-hashed
 receipts are recorded separately; live accounts, installed boot and artifacts
 remain outside these fixture results.
+
+## Private Vertex publisher discovery and graphical selection (2026-10-23)
+
+Vertex model discovery now executes the published beta Model Garden
+`publishers.models.list` contract rather than immediately returning static
+suggestions. It uses the actual private Google SDK credential/refresh path and
+the already approved regional host. The publisher comes from the explicitly
+entered model prefix, defaulting to Google; no response URL controls another
+request. Pages, cursors, model count, body framing and public identifiers are
+bounded. The API catalogue does not establish project entitlement or whether a
+particular Model Garden entry supports the OpenAI-compatible endpoint.
+
+The existing owner GUI picker calls this backend, retains the chosen publisher
+and labels the result "Model Garden · Projektfreigabe und Inferenz nicht
+geprüft". A response arriving after provider/credential/URL/protocol/model input
+changes is discarded. No route is published by catalogue discovery. Other HTTP
+catalogues now refuse a missing required cursor, non-boolean `has_more`, or a
+page series exceeding the five-page bound instead of certifying a partial list.
+
+Fifteen required build/CI fixtures use actual Google authorized-user refresh
+and real loopback Model Garden HTTP, covering pages, selected publisher, empty
+catalogue, 401/429, redirect refusal, incomplete/invalid replies, cursor loops,
+page/model limits and refresh denial. Reflected credential strings and foreign
+publisher names are excluded. The actual required Tk workflow passes locally
+at 1280x800 and 640x480, including publisher forwarding, the catalogue label and
+late-response discard. Both runtime variants pass **928 tests, two existing
+skips**; 143 pinned routing comparisons and 49 cloud inference contracts pass.
+All five CI gates at predecessor `94fa720` passed; this new source needs its own
+CI. Google account access, entitlement, live inference, installed graphical
+setup, hardware and release artifacts remain separate acceptance work.
