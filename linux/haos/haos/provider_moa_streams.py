@@ -1,9 +1,7 @@
 """Native auxiliary streaming over approved local capabilities, never vendor auth."""
 from collections import deque
 from copy import deepcopy
-import hashlib
 import hmac
-import json
 import re
 from types import SimpleNamespace
 from urllib.parse import urlsplit
@@ -49,11 +47,12 @@ def _route(client, mode):
     from hermes_cli.config import load_config_readonly
     from .provider_policy import BASE
     capability = get_secret("HAOS_MODEL_TOKEN", "")
+    real_client = getattr(client, "_real_client", client)
     if (not capability or not hmac.compare_digest(str(client.api_key), capability)
-            or not hmac.compare_digest(str(client._real_client.api_key), capability)):
+            or not hmac.compare_digest(str(real_client.api_key), capability)):
         raise PermissionError("MoA streaming requires its scoped local capability")
     base = str(client.base_url).rstrip("/")
-    real = str(client._real_client.base_url).rstrip("/")
+    real = str(real_client.base_url).rstrip("/")
     for row in load_config_readonly().get("providers", {}).values():
         if not isinstance(row, dict) or row.get("key_env") != "HAOS_MODEL_TOKEN" or row.get("api_mode") != mode:
             continue
@@ -182,3 +181,31 @@ def create_stream(client, supplied):
     if isinstance(client, AnthropicAuxiliaryClient):
         return _messages(client, supplied, _route(client, "anthropic_messages"))
     return None
+
+
+def _chat(client, supplied, base):
+    from agent.transports import get_transport
+    wire = _kwargs(get_transport("chat_completions"), supplied, base)
+    wire.setdefault("stream_options", {"include_usage": True})
+    terminal = False
+    with client.with_options(max_retries=0).chat.completions.create(**wire) as stream:
+        for event in stream:
+            terminal = terminal or any(choice.finish_reason is not None for choice in event.choices)
+            yield event
+    if not terminal:
+        raise ConnectionError("MoA Chat stream ended without completion")
+
+
+def create_once(client, supplied, *, stream=False, task=None):
+    """One scoped broker call; no secondary SDK/auxiliary retry ladder."""
+    from agent.auxiliary_client import _aggregate_chat_stream, _validate_llm_response, _aux_stream_total_ceiling
+    chunks = create_stream(client, supplied)
+    if chunks is None:
+        import openai
+        if not isinstance(client, openai.OpenAI):
+            raise PermissionError("unsupported scoped MoA SDK client")
+        chunks = _chat(client, supplied, _route(client, "chat_completions"))
+    if stream:
+        return chunks
+    result = _aggregate_chat_stream(chunks, model=supplied.get("model", ""), total_ceiling=min(600, _aux_stream_total_ceiling(supplied.get("timeout"))))
+    return _validate_llm_response(result, task)

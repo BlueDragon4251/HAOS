@@ -40,11 +40,16 @@ done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_native_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/native-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_bedrock_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/bedrock-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-provider-build-probe.json
-for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort; do
+for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort reference-disconnect; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_provider.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/moa-$scenario-build-probe.json" "$scenario"
 done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_stream_scope.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-stream-scope-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_fallback_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-fallback-replay-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_fallback_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-fallback-json-replay-build-probe.json json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_stream_scope.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-chat-scope-build-probe.json chat
+for task in moa_reference moa_aggregator; do
+    .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_no_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/$task-no-replay.json" "$task"
+done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_stream_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-stream-replay-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_account_providers.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/account-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_qwen_device.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/qwen-device-build-probe.json

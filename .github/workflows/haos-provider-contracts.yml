@@ -59,11 +59,16 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
           "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"
           "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa.json"
-          for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort; do
+          for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort reference-disconnect; do
             "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-$scenario.json" "$scenario"
           done
           "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-scope.json"
           "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-json-replay.json" json
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-chat-scope.json" chat
+          for task in moa_reference moa_aggregator; do
+            "$PYTHON" linux/haos/runtime/probe_moa_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/$task-no-replay.json" "$task"
+          done
           "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
           "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
           "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"

@@ -787,3 +787,40 @@ MoA engine scenarios, the scope and replay probes, 16 native fallback SDK/HTTP
 cases, 6,476 builder comparisons and the 410-case HTTP matrix pass. This change
 covers native auxiliary streams; it does not establish every JSON/main-agent
 replay path, live signatures/accounts, installed boot or final artifacts.
+
+
+## One scoped MoA auxiliary dispatch, including completed facades (2026-10-23)
+
+At `bc35264`, one actual `call_llm(task="moa_reference")` caused three broker
+and upstream dispatches after an ambiguous connection close: the pinned
+auxiliary retry ladder remained active above the broker. The reviewed overlay
+now intercepts only explicitly named HAOS MoA reference/aggregator routes before
+that ladder. Capability, native SDK key and literal approved local URL are
+checked; SDK retries are disabled. Explicit owner fallbacks remain exclusively
+inside the broker. Other upstream tasks/providers retain their original flow.
+
+Both completed and streamed MoA outputs now use the registered pinned native
+transport and continuous SDK stream. Completed facades use Hermes's actual
+stream accumulator and validator, retaining tools, bound private replay and
+unknown usage without a second call. The absolute ceiling is bounded by the
+pinned timeout calculation and the broker's 600-second maximum. Chat requests
+retain native include-usage stream options. This also avoids native JSON
+wrappers bypassing the projected provider builder.
+
+The actual reference and aggregator no-replay probes each prove one ambiguous
+upstream dispatch, one durable 502 and no success. The actual MoA engine's new
+reference-disconnect case makes exactly three calls total: failed reference,
+healthy reference and aggregator; it does not silently resend the failed one.
+All eight engine scenarios pass. Both JSON-facade and streamed multi-turn
+native replay probes pass (six actual SDK streams/ten HTTP calls each). Chat
+and Responses A→B→A scope probes each make three real SDK calls and refuse five
+cross-scope/unscoped/foreign-endpoint cases.
+
+Freshly downloaded pinned auxiliary input matches the original SHA-256;
+check-only preserves it and applying the three-line scoped overlay produces
+`4d2aee9ceb4f0274705f55ec8374251d1382018f96345d9290d2817e32f44c40`,
+exactly matching the tested runtime. No dependency version changed. Full and
+minimal suites each pass **901 tests, two existing skips**. The new probes are
+required by build and CI. This closes the reproduced MoA auxiliary retry path;
+main-agent and other auxiliary retry/replay paths remain separate software
+verification work. No live inference, installed-system or release acceptance.

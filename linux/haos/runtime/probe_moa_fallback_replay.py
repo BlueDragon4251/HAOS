@@ -23,8 +23,10 @@ def main():
     from haos.provider_routes import ProviderRoutes
     from haos.provider_profiles import register_profiles
     from haos.provider_proxy import Broker, Credentials, UsageLedger
-    from haos.provider_moa_streams import create_stream, _binding
+    from haos.provider_moa_streams import create_stream, create_once, _binding
     from agent.transports import get_transport
+    outer_json = len(sys.argv) == 4 and sys.argv[3] == "json"
+    if len(sys.argv) == 4: assert sys.argv[3] == "json"
     checks = []
     for mode in ('codex_responses', 'anthropic_messages'):
         provider = 'openai-api' if mode == 'codex_responses' else 'anthropic'
@@ -112,12 +114,18 @@ def main():
                     try:
                         for turn in (1, 2, 3):
                             state['turn'] = turn
-                            chunks = list(create_stream(client, {'model': models['primary'], 'messages': messages,
-                                'tools': [{'type': 'function', 'function': {'name': 'fixture', 'parameters': {'type': 'object'}}}], 'max_tokens': 4096}))
+                            supplied = {'model': models['primary'], 'messages': messages,
+                                'tools': [{'type': 'function', 'function': {'name': 'fixture', 'parameters': {'type': 'object'}}}], 'max_tokens': 4096}
                             details = []
-                            for chunk in chunks:
-                                for item in getattr(chunk.choices[0].delta, 'reasoning_details', []) or []:
-                                    append_streamed_reasoning_detail(details, item)
+                            if outer_json:
+                                completed = create_once(client, supplied, task='moa_aggregator')
+                                assert completed.choices[0].message.tool_calls[0].function.name == 'fixture'
+                                details = completed.choices[0].message.reasoning_details
+                            else:
+                                chunks = list(create_stream(client, supplied))
+                                for chunk in chunks:
+                                    for item in getattr(chunk.choices[0].delta, 'reasoning_details', []) or []:
+                                        append_streamed_reasoning_detail(details, item)
                             carrier = next(item for item in details if item['type'] == 'haos.moa.native_assistant')
                             expected = _binding(get_transport(mode), config['providers']['haos-' + ('fallback' if turn < 3 else 'primary')]['base_url'],
                                 models['fallback' if turn < 3 else 'primary'])
@@ -138,7 +146,7 @@ def main():
                     if value is None: os.environ.pop(key, None)
                     else: os.environ[key] = value
                 ledger.close()
-    result = {'cases': checks, 'live_provider_tested': False, 'source_sha256': {
+    result = {'outer_completion_style': 'json' if outer_json else 'stream', 'native_wire_style': 'SSE', 'cases': checks, 'live_provider_tested': False, 'source_sha256': {
         p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__), root/'haos/provider_moa_streams.py', root/'haos/provider_proxy.py', root/'haos/provider_fallback.py')}}
     Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps({'protocols': len(checks), 'native_streams': 6, 'http_dispatches': 10}))
 

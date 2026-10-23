@@ -20,7 +20,8 @@ def inputs(tmp_path):
     (upstream / "uv.lock").write_text("fixture upstream lock\n")
     (upstream / "agent").mkdir()
     (upstream / "agent/auxiliary_client.py").write_text('''class CodexAuxiliaryClient: pass
-def dispatch(task, provider, client, kwargs):
+def dispatch(task, provider, client, kwargs, stream=False):
+    # Streaming path (MoA aggregator): return the raw SDK stream, skipping validation and
     if True:
         if task == "moa_aggregator" and isinstance(client, CodexAuxiliaryClient):
             return "buffered"

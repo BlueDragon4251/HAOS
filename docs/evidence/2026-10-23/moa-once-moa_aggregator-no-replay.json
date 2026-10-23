@@ -1,0 +1,14 @@
+{
+  "task": "moa_aggregator",
+  "actual_pinned_auxiliary_calls": 1,
+  "ambiguous_upstream_dispatches": 1,
+  "successful_receipt": false,
+  "non_loopback_connections_allowed": false,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_moa_no_replay.py": "9b4f39663f68bf60c4aa1fb67898c1b67eca5c023e3f75b30025694c2299ce51",
+    "provider_moa_streams.py": "827abed56fb97b01954050270232b22b525e1db5dd2b2e0eea23c63fb4ae1327",
+    "provider_proxy.py": "ad3d736ebaf09dd1867ce777e3b8015e9d70d74e89756bdd3b8e9288e9291caf",
+    "auxiliary_client.py": "4d2aee9ceb4f0274705f55ec8374251d1382018f96345d9290d2817e32f44c40"
+  }
+}
