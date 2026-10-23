@@ -307,3 +307,50 @@ def test_account_logout_withdraws_routes_keys_fallbacks_and_dependent_moa_before
     assert revoke_account_routes("openrouter", config=location)["withdrawn_routes"] == 1
     assert not (location / "provider.json").exists()
     assert first not in (location / "provider-credentials").read_text()
+
+
+def test_legacy_owner_model_config_is_derived_read_only_without_changing_authority(location):
+    """Real root files, foreign UID, seals and bubblewrap; no kernel replacement."""
+    import fcntl
+    import subprocess
+    from haos.provider_routes import ProviderRoutes
+    from haos.sandbox import runtime_provider_config, trusted_json
+    data = policy()
+    provider_setup.publish(data, 'disposable-provider-fixture-credential', config=location)
+    routes = ProviderRoutes(data)
+    expected = routes.client_config()
+    legacy = {key: value for key, value in expected.items() if key != 'agent'}
+    from haos.policy import atomic_json
+    atomic_json(location / 'provider-client.json', legacy, mode=0o644)
+    before = {path.name: path.read_bytes() for path in location.iterdir() if path.is_file()}
+    descriptor = runtime_provider_config(routes, trusted_json(location / 'provider-client.json'))
+    try:
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setgroups([]); os.setgid(65534); os.setuid(65534)
+                assert json.loads(os.pread(descriptor, 65536, 0))['agent'] == {'api_max_retries': 1, 'auto_recovery_cycles': 0}
+                try: os.write(descriptor, b'changed')
+                except OSError: pass
+                else: raise AssertionError('foreign UID changed sealed model configuration')
+                os._exit(0)
+            except BaseException: os._exit(3)
+        _, status = os.waitpid(pid, 0)
+        assert os.waitstatus_to_exitcode(status) == 0
+        assert fcntl.fcntl(descriptor, getattr(fcntl, "F_GET_SEALS", 1034)) & getattr(fcntl, "F_SEAL_WRITE", 8)
+        code = """import json
+assert json.load(open('/client.json'))['agent'] == {'api_max_retries': 1, 'auto_recovery_cycles': 0}
+try:
+ open('/client.json', 'w')
+except OSError:
+ pass
+else:
+ raise AssertionError('model configuration mount was writable')
+"""
+        result = subprocess.run(['/usr/bin/bwrap', '--unshare-all', '--ro-bind', '/usr', '/usr',
+            '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib64', '/lib64', '--proc', '/proc', '--dev', '/dev',
+            '--perms', '0400', '--ro-bind-data', str(descriptor), '/client.json', '--', '/usr/bin/python3', '-c', code],
+            pass_fds=(descriptor,), capture_output=True, text=True, timeout=20, check=False)
+        assert result.returncode == 0, result.stderr
+    finally: os.close(descriptor)
+    assert {path.name: path.read_bytes() for path in location.iterdir() if path.is_file()} == before

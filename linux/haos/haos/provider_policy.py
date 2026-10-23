@@ -106,7 +106,8 @@ class ProviderPolicy:
                  "default_model": self.data["default_model"]}
         # Pinned Hermes deliberately ignores Responses for a bare custom URL.
         # Its documented named custom provider supports an explicit transport.
-        return {"_config_version": 46, "providers": {"haos-model": route},
+        return {"_config_version": 46, "agent": {"api_max_retries": 1, "auto_recovery_cycles": 0},
+                "providers": {"haos-model": route},
                 "model": {"provider": "custom:haos-model", "default": self.data["default_model"], "base_url": BASE,
                           "api_mode": self.api_mode, "key_env": "HAOS_MODEL_TOKEN", "openai_runtime": "auto"}}
 

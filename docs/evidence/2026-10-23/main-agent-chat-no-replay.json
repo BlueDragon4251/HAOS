@@ -1,0 +1,19 @@
+{
+  "native_api_mode": "chat_completions",
+  "legacy_runtime_derivation": false,
+  "owner_config_preserved": true,
+  "actual_pinned_main_agent_turns": 1,
+  "configured_api_attempts": 1,
+  "configured_auto_recovery_cycles": 0,
+  "host_tools_granted": false,
+  "ambiguous_upstream_dispatches": 1,
+  "successful_receipt": false,
+  "non_loopback_connections_allowed": false,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_agent_no_replay.py": "7429307a53d16f6c3b050bab15ad095b6f14efef802047a9f07ce6008fa06829",
+    "provider_policy.py": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285",
+    "provider_proxy.py": "ad3d736ebaf09dd1867ce777e3b8015e9d70d74e89756bdd3b8e9288e9291caf",
+    "sandbox.py": "c0fd91570b3af2168cc614e6ef4cd650a226a5e997a9968adff4e337bc0cf9f0"
+  }
+}

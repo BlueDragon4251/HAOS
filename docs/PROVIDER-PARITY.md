@@ -824,3 +824,39 @@ minimal suites each pass **901 tests, two existing skips**. The new probes are
 required by build and CI. This closes the reproduced MoA auxiliary retry path;
 main-agent and other auxiliary retry/replay paths remain separate software
 verification work. No live inference, installed-system or release acceptance.
+
+
+## Main-agent request retry limits and immutable legacy runtime config (2026-10-23)
+
+An actual pinned `AIAgent.run_conversation` reproduced three dispatches after
+an ambiguous HTTP close, even after the MoA auxiliary fix. The before-fix
+fixture disabled extra post-exhaustion recovery cycles to bound that regression;
+the ordinary retry loop alone still repeated the request. HAOS now generates
+`agent.api_max_retries=1` and `agent.auto_recovery_cycles=0`. The broker remains
+the only place that tries explicit approved provider fallbacks.
+
+Existing exact legacy owner client JSON remains usable. The sandbox checks it
+against the full current projection or precisely that projection without the
+new agent section, then derives the current runtime config into a sealed memfd.
+Bubblewrap mounts that descriptor read-only at the native config path. The
+protected owner policy/client files, provider credentials, capabilities and
+recovery data are not rewritten. Other changes, including explicit weaker retry
+settings or substituted endpoints, remain refused. Linux kernel seals are
+required; portable Python builds lacking GNU constant exports use their fixed
+Linux UAPI values, with no unsealed fallback.
+
+Six actual tool-free main-agent conversation fixtures cover Chat Completions,
+Responses and Messages, each with current and exact legacy config. Every case
+reads the native retry settings as 1/0, makes one ambiguous upstream call and
+records one durable 502 with unknown tokens and no success. The local suites
+pass **903 tests, two existing skips**; real unprivileged seals reject writes,
+growth and truncation. A new required root-authority CI case checks unchanged
+protected files, a foreign UID and an actual read-only bubblewrap mount. That
+root case is not counted as a local pass. Required build/CI also run all six
+native main-agent cases. 53 wire-profile and 6,476 builder comparisons still
+pass; the actual MoA reference-disconnect case remains single-dispatch.
+
+This verifies the reproduced ordinary main-agent retry/recovery paths for the
+three native protocols. It is not live provider, installed owner/boot, hardware
+or release acceptance; other provider-specific recovery/replay paths still
+require their own evidence.

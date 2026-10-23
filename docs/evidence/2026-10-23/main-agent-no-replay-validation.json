@@ -1,0 +1,78 @@
+{
+  "base_commit": "05cd16669d93e4494b92ea894959c3de3252f05c",
+  "ambiguous_dispatches_before": 3,
+  "before_fixture_bounds": "extra auto-recovery cycles disabled; ordinary native retry loop retained",
+  "native_main_agent_cases": 6,
+  "full_runtime_tests": {
+    "passed": 903,
+    "existing_skips": 2
+  },
+  "minimal_runtime_tests": {
+    "passed": 903,
+    "existing_skips": 2
+  },
+  "root_legacy_uid_mount_case": "required in CI; not run locally",
+  "predecessor_all_five_gates": "success",
+  "predecessor_services_kernel_run": 39962134706,
+  "live_provider_tested": false,
+  "source_sha256": [
+    {
+      "path": "linux/haos/haos/provider_policy.py",
+      "sha256": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285"
+    },
+    {
+      "path": "linux/haos/haos/sandbox.py",
+      "sha256": "c0fd91570b3af2168cc614e6ef4cd650a226a5e997a9968adff4e337bc0cf9f0"
+    },
+    {
+      "path": "linux/haos/runtime/probe_agent_no_replay.py",
+      "sha256": "7429307a53d16f6c3b050bab15ad095b6f14efef802047a9f07ce6008fa06829"
+    },
+    {
+      "path": "linux/haos/tests/test_credential.py",
+      "sha256": "f4e857ab6e87bc7f86277b15e6626412eab49b43c613f72bcda6733d0a451b25"
+    },
+    {
+      "path": "linux/haos/probes/test_provider_authority.py",
+      "sha256": "f744ce71bb9966bf24cb32e24f3d86c08ca8992ccccbd12e813f77b90dcf63d8"
+    }
+  ],
+  "fixture_receipts": [
+    {
+      "file": "main-agent-chat-no-replay.json",
+      "sha256": "f8818662a62da5297cfcef82e0d109aafc731f1e77e544b0d3e3aff42d4af15c"
+    },
+    {
+      "file": "main-agent-responses-no-replay.json",
+      "sha256": "79ac68f46a2226e4016a27cd218f68f586523ea701cae50e64831aebbdf42e71"
+    },
+    {
+      "file": "main-agent-messages-no-replay.json",
+      "sha256": "3dd67530f3afa33428c3262b4047beb5ab4757c537431348c90213f78b9bed68"
+    },
+    {
+      "file": "main-agent-chat-legacy-no-replay.json",
+      "sha256": "c74e4d184ca5c3d26ee020a7f2e4bc8f08d292c6b5f386e2221868a958549cbe"
+    },
+    {
+      "file": "main-agent-responses-legacy-no-replay.json",
+      "sha256": "5fab19a03708c7508d9459513fc0e3ddab0fef79fec677ba23ec67268e48de27"
+    },
+    {
+      "file": "main-agent-messages-legacy-no-replay.json",
+      "sha256": "02533525de9e99bf3536c0c76f58a19de3e3d09aef96ed05ea5f3cf5716bbfbf"
+    },
+    {
+      "file": "main-agent-wire-profiles.json",
+      "sha256": "fb057027190b9b926127487f15edfc48dce4d2b2044f10582bf4a759accffc8c"
+    },
+    {
+      "file": "main-agent-moa-reference.json",
+      "sha256": "cf98d1d2380f13f3a8c1084c8dc18912a0788e80cf622a54fb4adaede46f5024"
+    },
+    {
+      "file": "main-agent-fallback-builders.json",
+      "sha256": "3365ffa24d0b56f9e24f23c053a49a19c94043c659873012b06771d004e45a4d"
+    }
+  ]
+}
