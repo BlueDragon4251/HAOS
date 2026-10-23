@@ -1,0 +1,19 @@
+{
+  "scenario": "vertex",
+  "actual_pinned_source_and_target_request_codecs": true,
+  "approved_broker_http_hops": [
+    "source",
+    "target"
+  ],
+  "target_uses_its_own_key_and_model": true,
+  "early_stream_before_terminal_tested": false,
+  "opaque_source_only_reasoning_not_forwarded": true,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_provider_fallback_wire.py": "af382ca08c65139fa9d993b63892bafce997817b1c5f05a3808b8a918900a3e1",
+    "provider_proxy.py": "610c929e8ba556119023cc19d67dea10bbd0afd49f8774c8407b2ba3bf214b47",
+    "provider_policy.py": "afbb3125c8e749a660985fad58ae8f32392b4b83c080a088ec6c80149174e59a",
+    "provider_fallback.py": "3299d84693e7d5f210cb6074165ab96f8d7bdec24a96790e43281be9c855db1a",
+    "provider_profiles.py": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed"
+  }
+}

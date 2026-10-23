@@ -334,15 +334,19 @@ class Handler(BaseHTTPRequestHandler):
                 attempt = dict(payload)
                 if target != route:
                     attempt["model"] = self.policy.data["default_model"]
-                attempt = admit(self.policy, path, attempt)
+                features = {}
+                if target != route and context is not None:
+                    # A source-native body can be invalid for the target (for
+                    # example Vertex thinking). Rebuild first, then admit the
+                    # target-native result before quota or credential access.
+                    attempt = retarget(self.policy, attempt, context, features)
+                else:
+                    attempt = admit(self.policy, path, attempt)
                 request_id = self.server.ledger.admit(self.policy, attempt["model"])
                 credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
                 self.route_credentials = credentials
-                features = {}
                 if target == route:
                     source_features(self.policy, context, features)
-                if target != route and context is not None:
-                    attempt = retarget(self.policy, attempt, context, features)
                 headers, redactor = credentials.headers()
                 if target != route and context is None:
                     attempt = retarget(self.policy, attempt, None)

@@ -695,3 +695,17 @@ unknown)` followed by `(200, 8, 5)`. Messages checks the native Anthropic API-ke
 to MiniMax bearer-header change. All eight are mandatory in build and CI.
 Receipts use the probe's own exact source hashes; this does not extend acceptance
 to real provider infrastructure or cross-protocol fallback.
+
+
+## Vertex fallback admission order (2026-10-23)
+
+A further actual HTTP regression at `a3ac723` reproduced refusal of a configured
+Vertex-to-OpenAI fallback: the source-only thinking body was admitted against
+the target policy before rebuilding. The broker now builds and admits the
+native target request first, before target quota or credential resolution.
+Primary requests and legacy direct callers retain their own admission path.
+Both JSON and withheld-terminal streaming cases now pass with the actual
+OpenAI client and a real Google SDK credential object containing a fixture
+access token. These two cases do not test Google token issuance (the separate
+49-case cloud fixture covers token HTTP). The required native fallback probe
+now has ten cases. Both runtime suites still pass 892 tests, two existing skips.

@@ -1,47 +1,67 @@
 {
-  "probe_sha256": "16b6873733e006784f303b5231e5cd485edf01310eed85dfdc760a55f8a3f3ad",
+  "probe_sha256": "af382ca08c65139fa9d993b63892bafce997817b1c5f05a3808b8a918900a3e1",
+  "base_commit": "a3ac7234cd8f1dcf36b40e9ebead36c4a58f6245",
   "cases": [
     {
       "scenario": "reasoning",
       "receipt": "provider-fallback-reasoning-http.json",
-      "sha256": "a89a65eb9fe05e94e7efbb59eaebda8f2e14d9aeeb42ff3e05200985bcd3ba7d"
+      "sha256": "759226c8609bc7575c6c1513224220ae4f7e74eb716e744014537bcad27e9210"
     },
     {
       "scenario": "developer",
       "receipt": "provider-fallback-developer-http.json",
-      "sha256": "fabc992438722e6ba4bfc8ab4133613d4c4237c83af19109ea2399459f419c1e"
+      "sha256": "8e87785ddf4d26078bc9dd4ff20fa01c80fb09c4c333bb8d87a3e43d3aa6e97f"
     },
     {
       "scenario": "responses",
       "receipt": "provider-fallback-responses-http.json",
-      "sha256": "5cd811f0945853c4042f99c990b3634603f9394cc86a4b55c0a18b0fb02e3b58"
+      "sha256": "241741cb80a30cb074a8529f98645194f974db2df2b457d7a07a4a46e30cde30"
     },
     {
       "scenario": "messages",
       "receipt": "provider-fallback-messages-http.json",
-      "sha256": "9dd4fefc4baaf389e457a7c82847fc0f65d29d0d6e448f9c54d8066ca92131b6"
+      "sha256": "9831da1830232b33043a842513b77418d08f230985970dc772a66cac08a673a2"
     },
     {
       "scenario": "reasoning-stream",
       "receipt": "provider-fallback-reasoning-stream-http.json",
-      "sha256": "f9675bb63fad172dd86843476800d681040522be2d1650f7120b2fd735d43156"
+      "sha256": "30c6d5fae46336a5043b827d03c4631c0e9133927723ccacfbb0d0ae0281a4c2"
     },
     {
       "scenario": "developer-stream",
       "receipt": "provider-fallback-developer-stream-http.json",
-      "sha256": "6efc2c1dc0705a4e5a8503c40a822d29d6f0b1f221f91c084b97dfe774940f0e"
+      "sha256": "f5255661240c547d75965813a512be10dc2b99f8f1c1645a4e9403a5d78d0e9d"
     },
     {
       "scenario": "responses-stream",
       "receipt": "provider-fallback-responses-stream-http.json",
-      "sha256": "ffd9a6db7494b9dedbf212930171d8abf89690c33f35e349a1d2e4f0ed1fde3f"
+      "sha256": "fc9833c9128e1b3e65589997f5b08bea49b862a868e68dd05f0e68e37e80a3ba"
     },
     {
       "scenario": "messages-stream",
       "receipt": "provider-fallback-messages-stream-http.json",
-      "sha256": "8f6fbcef8ef5848494d5b0111cc5c278e97b26ebde0b26766aa3305c0ac992e7"
+      "sha256": "25d9525556908e6a2ba9db73b4c10bb8be89b0ff859da9adc8fa687f1849ea0a"
+    },
+    {
+      "scenario": "vertex",
+      "receipt": "provider-fallback-vertex-http.json",
+      "sha256": "878ebf9a2c8ee60b245fd70f5a7023c90fb3ac55a0ac23c17161d721bf08d335"
+    },
+    {
+      "scenario": "vertex-stream",
+      "receipt": "provider-fallback-vertex-stream-http.json",
+      "sha256": "4306c646f72735522a39f249f0740a5980120747cf2746e87038e59af0a4d3ca"
     }
   ],
-  "product_source_commit": "b5cc103493acab31bd1b948fb1bd85ce2df92352",
-  "live_provider_tested": false
+  "live_provider_tested": false,
+  "reproduced_at_base": "Vertex fallback raises 429 before target dispatch because source-native extra_body is rejected by target policy",
+  "full_runtime_tests": {
+    "passed": 892,
+    "existing_skips": 2
+  },
+  "minimal_runtime_tests": {
+    "passed": 892,
+    "existing_skips": 2
+  },
+  "root_and_kernel_ci": "required; no local root pass claimed"
 }

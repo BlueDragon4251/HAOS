@@ -26,14 +26,16 @@ def main():
     scenario = sys.argv[3] if len(sys.argv) == 4 else 'reasoning'
     streaming = scenario.endswith('-stream')
     name = scenario.removesuffix('-stream')
-    assert name in {'reasoning', 'developer', 'responses', 'messages'}
+    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex'}
     mode = {'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
     providers = {'reasoning': ('openrouter', 'openai-api'), 'developer': ('openai-api', 'deepseek'),
-        'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
+        'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
     models = {'source': 'gpt-5', 'target': 'deepseek-chat'} if name == 'developer' else (
         {'source': 'claude-opus-4-6', 'target': 'MiniMax-M2.7'} if name == 'messages' else {'source': 'model-source', 'target': 'model-target'})
+    if name == 'vertex': models = {'source': 'gemini-3-flash-preview', 'target': 'gpt-4.1'}
     routes = ProviderRoutes({'version': 2, 'default': 'source', 'routes': {
-        key: {'version': 1, 'provider': provider, 'endpoint': default_endpoint(provider),
+        key: {'version': 1, 'provider': provider, 'endpoint': ('https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi'
+                if provider == 'vertex' else default_endpoint(provider)),
             'models': [models[key]], 'default_model': models[key], 'api_mode': mode,
             'requests_per_day': 200, 'requests_per_minute': 120} for key, provider in zip(('source', 'target'), providers)},
         'fallbacks': {'source': ['target']}})
@@ -46,7 +48,8 @@ def main():
     config = routes.client_config()
     def wire(key):
         return get_transport(mode).build_kwargs(models[key], messages, tools,
-            base_url=config['providers']['haos-' + key]['base_url'], max_tokens=64)
+            base_url=config['providers']['haos-' + key]['base_url'], max_tokens=64,
+            reasoning_config={'enabled': True, 'effort': 'high'} if name == 'vertex' else None)
     source_body, target_body = wire('source'), wire('target')
     if name == 'reasoning':
         assert 'reasoning_details' in source_body['messages'][0]
@@ -112,7 +115,10 @@ def main():
         http.client.HTTPSConnection = local
         ledger = Ledger(Path(directory) / 'usage.db'); capability = secrets.token_urlsafe(48)
         try:
-            credentials = {key: Credentials(row, {'api_key': keys[key]}) for key, row in routes.routes.items()}
+            credentials = {key: Credentials(row, {'api_key': None if row.provider == 'vertex' else keys[key]}) for key, row in routes.routes.items()}
+            if name == 'vertex':
+                from google.oauth2.credentials import Credentials as GoogleCredentials
+                credentials['source'].cloud_cache['credential'] = GoogleCredentials(token=keys['source'])
             with serving(Broker(('127.0.0.1', 0), routes, capability, credentials, ledger)) as broker:
                 cls = anthropic.Anthropic if mode == 'anthropic_messages' else openai.OpenAI
                 base = f'http://127.0.0.1:{broker}/routes/source' + ('' if mode == 'anthropic_messages' else '/v1')
