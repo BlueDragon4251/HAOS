@@ -30,7 +30,7 @@ def forward(handler, payload, redactor):
     try:
         result = client.messages.create(**payload)
         if not payload.get("stream"):
-            data = annotate(redactor.clean(plain(result)), handler.policy, handler.native_response_model)
+            data = annotate(redactor.clean(plain(result)), handler.policy, handler.native_response_model, handler.replay_scope)
             body = json.dumps(data, ensure_ascii=False).encode()
             if len(body) > MAX_OUTPUT:
                 raise ValueError("native Messages response exceeds broker bound")
@@ -54,7 +54,7 @@ def forward(handler, payload, redactor):
         pending = []
         from itertools import chain
         for raw in chain([first], iterator):
-            event = annotate(redactor.clean(plain(raw)), handler.policy, handler.native_response_model)
+            event = annotate(redactor.clean(plain(raw)), handler.policy, handler.native_response_model, handler.replay_scope)
             kind = event.get("type")
             if kind == "error":
                 raise ConnectionError("native Messages stream failed")

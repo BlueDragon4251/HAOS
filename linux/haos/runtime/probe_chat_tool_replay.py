@@ -23,12 +23,15 @@ def main():
     from haos.provider_routes import ProviderRoutes
     from haos.provider_profiles import register_profiles
     from haos.provider_proxy import Broker, Credentials, UsageLedger
-    native = sys.argv[3].startswith('native-')
-    option = sys.argv[3].removeprefix('native-')
+    same_model = sys.argv[3].endswith('-same-model')
+    requested = sys.argv[3].removesuffix('-same-model')
+    native = requested.startswith('native-')
+    option = requested.removeprefix('native-')
     assert option in {'sdk-json', 'moa-json', 'moa-stream'}
     mode = 'chat_completions'; models = {'primary': 'google/gemini-3-pro-preview', 'fallback': 'google/gemini-3-flash-preview'}
     endpoint = 'https://generativelanguage.googleapis.com/v1beta' if native else 'https://openrouter.ai/api/v1'
     if native: models = {key: value.removeprefix('google/') for key, value in models.items()}
+    if same_model: models['fallback'] = models['primary']
     routes = ProviderRoutes({'version': 2, 'default': 'primary', 'routes': {
         name: {'version': 1, 'provider': 'gemini' if native else 'openrouter', 'endpoint': endpoint, 'models': [model],
             'default_model': model, 'api_mode': mode, 'requests_per_day': 200, 'requests_per_minute': 120}
@@ -42,7 +45,8 @@ def main():
             try:
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 model = self.path.split('/models/', 1)[1].split(':', 1)[0] if native else body['model']
-                name = next(name for name, value in models.items() if value == model)
+                name = next(name for name, value in keys.items() if (self.headers.get('x-goog-api-key') == value if native else self.headers.get('Authorization') == 'Bearer ' + value))
+                assert model == models[name]
                 if native:
                     assert self.path == '/v1beta/models/' + model + (':streamGenerateContent?alt=sse' if option.startswith('moa-') else ':generateContent')
                     assert self.headers['x-goog-api-key'] == keys[name]
@@ -141,7 +145,7 @@ def main():
                 if value is None: os.environ.pop(key, None)
                 else: os.environ[key] = value
             ledger.close()
-    result = {'case': option, 'native_gemini_codec': native, 'sdk_completions': 3, 'actual_main_agent_storage_calls': 3,
+    result = {'case': option, 'native_gemini_codec': native, 'same_model_distinct_private_keys': same_model, 'sdk_completions': 3, 'actual_main_agent_storage_calls': 3,
         'actual_main_agent_conversation_turns': 0, 'actual_moa_auxiliary_calls': 0 if option == 'sdk-json' else 3,
         'http_dispatches': observed, 'host_tools_granted': False, 'tools_executed': False, 'live_provider_tested': False,
         'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),

@@ -44,7 +44,7 @@ def forward_native(handler, payload, headers, redactor):
         request["timeout"] = 180
         result = client.chat.completions.create(**request)
         if payload.get("stream") is not True:
-            data = annotate(redactor.clean(plain(result)), handler.policy, handler.native_response_model)
+            data = annotate(redactor.clean(plain(result)), handler.policy, handler.native_response_model, handler.replay_scope)
             body = json.dumps(data).encode()
             if len(body) > MAX_OUTPUT:
                 raise ValueError("native provider response exceeds broker bound")
@@ -79,7 +79,7 @@ def forward_native(handler, payload, headers, redactor):
             handler.wfile.flush()
         from itertools import chain
         for raw in chain([first], iterator):
-            event = annotate(redactor.clean(plain(raw)), handler.policy, handler.native_response_model)
+            event = annotate(redactor.clean(plain(raw)), handler.policy, handler.native_response_model, handler.replay_scope)
             terminal = terminal or any(choice.get("finish_reason") for choice in event.get("choices", []))
             if isinstance(event.get("usage"), dict):
                 usage.update(event["usage"])

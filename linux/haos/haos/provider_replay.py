@@ -36,13 +36,18 @@ def messages_for_route(policy, payload):
 
 
 def issuer_binding(context, model):
-    if isinstance(context, (list, tuple)) and len(context) == 3:
+    if isinstance(context, (list, tuple)) and len(context) >= 3:
         from types import SimpleNamespace
         from .provider_messages import native_model
         model = native_model(SimpleNamespace(provider=context[0], api_mode=context[1], endpoint=context[2]), model)
     return hashlib.sha256(json.dumps([context, model], separators=(",", ":")).encode()).hexdigest()
 
 
-def route_binding(policy, model):
+def route_binding(policy, model, scope=None):
     provider = "openai-api" if policy.provider == "openai" else policy.provider
-    return issuer_binding([provider, policy.api_mode, policy.endpoint], model)
+    return issuer_binding([provider, policy.api_mode, policy.endpoint, *(scope or [])], model)
+
+
+def capability_generation(token):
+    """Public one-way scope of the existing limited local capability."""
+    return hashlib.sha256(token.encode()).hexdigest()

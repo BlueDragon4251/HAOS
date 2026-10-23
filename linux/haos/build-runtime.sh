@@ -39,12 +39,13 @@ done
 for mode in chat responses messages chat-legacy responses-legacy messages-legacy; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_agent_no_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/main-agent-$mode-no-replay.json" "$mode"
 done
-for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
+for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases chat-same-model responses-same-model messages-same-model opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_agent_fallback_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/main-agent-$mode-fallback-replay.json" "$mode"
 done
-for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream; do
+for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream sdk-json-same-model moa-json-same-model moa-stream-same-model native-sdk-json-same-model native-moa-json-same-model native-moa-stream-same-model; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_chat_tool_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/chat-tools-$mode.json" "$mode"
 done
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_agent_replay_generation.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/agent-replay-generation-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_router_reasoning.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/router-reasoning-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_native_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/native-provider-build-probe.json

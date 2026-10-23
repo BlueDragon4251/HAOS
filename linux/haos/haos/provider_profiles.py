@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .provider_registry import descriptor
 from .provider_routes import ProviderRoutes
@@ -76,7 +77,8 @@ def register_profiles(data):
         # extra credential header or catalog override crosses this boundary.
         register_provider(profile)
         profiles[route["base_url"].rstrip("/")] = (profile, endpoint, source)
-        bindings[route["base_url"].rstrip("/")] = (source, policy.api_mode, policy.endpoint)
+        bindings[route["base_url"].rstrip("/")] = (source, policy.api_mode, policy.endpoint,
+            routes.resolve(urlsplit(route["base_url"]).path + "/models")[0])
 
     class WireContext:
         def normalize_response(self, response, **kwargs):

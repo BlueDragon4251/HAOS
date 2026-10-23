@@ -15,6 +15,11 @@ REPLAY_FIELDS = ("codex_reasoning_items", "codex_message_items", "anthropic_cont
 
 def _binding(transport, base, model):
     context = getattr(transport, "haos_wire_context", lambda _: None)(base)
+    if context and len(context) == 4:
+        from agent.secret_scope import get_secret
+        from .provider_replay import capability_generation
+        capability = get_secret("HAOS_MODEL_TOKEN", "")
+        context = [*context, capability_generation(capability) if capability else None]
     return issuer_binding(context or [transport.api_mode, base], model)
 
 

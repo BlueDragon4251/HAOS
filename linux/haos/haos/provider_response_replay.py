@@ -16,11 +16,11 @@ def clean(value):
     return value
 
 
-def annotate(value, policy, model):
+def annotate(value, policy, model, scope=None):
     result = clean(value)
     if policy.api_mode not in {'chat_completions', 'codex_responses', 'anthropic_messages'} or not isinstance(result, dict):
         return result
-    binding = route_binding(policy, model)
+    binding = route_binding(policy, model, scope)
     def blocks(container):
         if not isinstance(container, dict):
             return

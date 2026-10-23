@@ -20,7 +20,7 @@ import uuid
 import ipaddress
 
 from .provider_policy import PORT, ProviderPolicy
-from .provider_replay import route_binding
+from .provider_replay import route_binding, capability_generation
 from .provider_fallback import extract as fallback_context, retarget, source_features, merge_features
 from .redaction import Redactor
 from .sandbox import trusted_json
@@ -200,6 +200,7 @@ class Broker(ThreadingHTTPServer):
         self.routes = policy if isinstance(policy, ProviderRoutes) else ProviderRoutes(policy.data)
         self.policy, self.token, self.ledger = self.routes.primary, token, ledger
         self.credentials = credentials
+        self.replay_generation = capability_generation(token)
         self.workers = threading.BoundedSemaphore(16)
         self.turns = threading.BoundedSemaphore(2)
         super().__init__(address, Handler, bind_and_activate=bind_and_activate)
@@ -343,7 +344,8 @@ class Handler(BaseHTTPRequestHandler):
                 attempt = dict(payload)
                 if target != route:
                     attempt["model"] = self.policy.data["default_model"]
-                features = {}
+                features = {"replay_scope": [target, self.server.replay_generation]}
+                self.replay_scope = features["replay_scope"]
                 if target != route and context is not None:
                     # A source-native body can be invalid for the target (for
                     # example Vertex thinking). Rebuild first, then admit the
@@ -362,7 +364,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers = merge_features(headers, features)
                 self.fallback_tool_names = features.get("tool_names", {})
                 self.native_response_model = (context["model"] if context is not None else original["model"]) if target == route else self.policy.data["default_model"]
-                self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"])
+                self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"], self.replay_scope)
                     if target != route else None)
                 redactor.secrets = (*redactor.secrets, self.server.token)
                 from .provider_affinity import headers as affinity_headers
@@ -477,7 +479,7 @@ class Handler(BaseHTTPRequestHandler):
                 from .provider_sse import require_complete
                 require_complete(response)
                 from .provider_response_replay import annotate
-                decoded = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model)
+                decoded = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model, self.replay_scope)
                 clean = json.dumps(decoded).encode()
                 if len(clean) > MAX_OUTPUT:
                     raise ValueError("local model response exceeds broker bound")
@@ -501,7 +503,7 @@ class Handler(BaseHTTPRequestHandler):
                 finish = False
                 if data is not None and data != "[DONE]":
                     from .provider_response_replay import annotate
-                    event = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model)
+                    event = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model, self.replay_scope)
                     if isinstance(event, dict):
                         kind = event.get("type")
                         if kind in {"response.failed", "response.incomplete", "error"}:

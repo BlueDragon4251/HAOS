@@ -1036,3 +1036,34 @@ suites pass **948 tests, two existing skips**. The 53 strict body projections,
 cases pass on this source. Router's required generic HTTP fixture now explicitly
 provides an unknown/empty catalogue; the account-specific probe supplies the
 actual capability cases. No live account, entitlement or inference is claimed.
+
+## Managed native replay is scoped to route and capability generation (2026-10-23)
+
+Three actual main-agent cases now cover distinct private routes using the same
+provider, endpoint and model. The Responses case reproduced encrypted fallback
+state reaching the primary because the previous binding identified only
+provider/protocol/endpoint/model. The managed native carrier now additionally
+binds the resolved route ID and a one-way generation of the existing limited
+local capability. Agent code reads only that local capability; no vendor key
+or private account identifier is added to its profile. The broker generates
+matching scope metadata independently. Route identity derives from the actual
+bound local URL, including the default alias, rather than a display name.
+
+The owner publication path already rotates this capability. A new required
+actual-main-agent test creates three fresh broker/agent pairs: initial state,
+restart with unchanged capability/key (native replay must remain), then a
+changed capability/key (old native replay must be absent). Original persisted
+carriers are not deleted. Ordinary token refresh without owner publication
+does not change this local generation.
+
+Required build/CI now include 17 main-agent/auxiliary fallback cases (the prior
+14 plus same-model Chat/Responses/Messages), twelve tool-signature cases
+(OpenRouter/native Gemini, direct SDK/MoA facades, now also same-model routes),
+and the three-pair generation test. Two ordinary-user cases check independent
+route/generation rejection. Both suites pass **950 tests, two existing skips**.
+The native MoA scope/replay, AWS, Gemini, existing Converse, 53 profile,
+6,476 builder, 410 HTTP and private Router metadata probes pass. The Converse
+specific carrier's previous model/endpoint admission remains a separate path;
+these new same-route/generation assertions concern the managed native carrier.
+All five CI gates for predecessor `e280abc` passed. None of these local fixtures
+claims external account, live inference, installed boot or release acceptance.

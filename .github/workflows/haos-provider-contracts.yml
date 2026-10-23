@@ -58,12 +58,13 @@ jobs:
           for mode in chat responses messages chat-legacy responses-legacy messages-legacy; do
             "$PYTHON" linux/haos/runtime/probe_agent_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-no-replay.json" "$mode"
           done
-          for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
+          for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases chat-same-model responses-same-model messages-same-model opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
             "$PYTHON" linux/haos/runtime/probe_agent_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-fallback-replay.json" "$mode"
           done
-          for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream; do
+          for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream sdk-json-same-model moa-json-same-model moa-stream-same-model native-sdk-json-same-model native-moa-json-same-model native-moa-stream-same-model; do
             "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
           done
+          "$PYTHON" linux/haos/runtime/probe_agent_replay_generation.py linux/haos "$RUNNER_TEMP/provider-contracts/agent-replay-generation.json"
           "$PYTHON" linux/haos/runtime/probe_router_reasoning.py linux/haos "$RUNNER_TEMP/provider-contracts/router-reasoning.json"
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"

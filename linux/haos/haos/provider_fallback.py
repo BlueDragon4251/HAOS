@@ -94,7 +94,7 @@ def retarget(policy, payload, context, features=None, *, model=None):
         params['qwen_session_metadata'] = {'sessionId': params.get('session_id') or 'hermes', 'promptId': str(uuid.uuid4())}
     from .provider_moa_streams import _restore
     from .provider_replay import route_binding
-    messages = _restore(context['messages'], route_binding(policy, model))
+    messages = _restore(context['messages'], route_binding(policy, model, (features or {}).get('replay_scope')))
     wire = transport.build_kwargs(model, messages, deepcopy(context['tools']), **params)
     extra = wire.pop('extra_body', None)
     if extra:

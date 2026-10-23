@@ -428,3 +428,17 @@ def test_non_router_inference_does_not_load_or_fetch_optional_router_metadata():
     from haos.provider_router import adapt
     payload = {'model': 'fixture-model', 'reasoning': {'effort': 'high'}}
     assert adapt(SimpleNamespace(provider='local', api_mode='chat_completions'), payload, None, None, None) is payload
+
+
+@pytest.mark.parametrize('route,generation', [('other', 'generation-a'), ('route', 'generation-b')])
+def test_native_replay_scope_cannot_cross_route_or_local_capability_generation(route, generation):
+    from types import SimpleNamespace
+    from haos.provider_replay import route_binding, capability_generation
+    from haos.provider_moa_streams import _restore, REPLAY_TYPE
+    policy = SimpleNamespace(provider='local', api_mode='chat_completions', endpoint='http://127.0.0.1:11434/v1')
+    binding = route_binding(policy, 'same-model', ['route', capability_generation('generation-a')])
+    history = [{'role': 'assistant', 'reasoning_details': [{'type': REPLAY_TYPE, 'binding': binding,
+        'data': {'chat_reasoning_details': [{'type': 'reasoning.encrypted', 'data': 'private-fixture'}]}}]}]
+    assert 'private-fixture' not in json.dumps(_restore(history, route_binding(policy, 'same-model', [route, capability_generation(generation)])))
+    assert 'private-fixture' in json.dumps(_restore(history, binding))
+    assert 'private-fixture' in json.dumps(history)

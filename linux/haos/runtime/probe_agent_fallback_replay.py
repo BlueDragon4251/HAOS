@@ -25,6 +25,8 @@ def main():
     option = requested.removesuffix('-stream')
     auxiliary = option.endswith('-moa')
     option = option.removesuffix('-moa')
+    same_model = option.endswith('-same-model')
+    option = option.removesuffix('-same-model')
     aliases = option.endswith('-aliases')
     mode = {'chat': 'chat_completions', 'responses': 'codex_responses', 'messages': 'anthropic_messages'}[option.removesuffix('-aliases')]
     provider = 'openrouter' if mode == 'chat_completions' else 'openai-api' if mode == 'codex_responses' else 'anthropic'
@@ -39,6 +41,7 @@ def main():
     if opencode:
         provider, endpoint = 'opencode-go', 'https://opencode.ai/zen/go/v1'
         if mode == 'chat_completions': models = {'primary': 'kimi-k2.5', 'fallback': 'glm-5.2'}
+    if same_model: models['fallback'] = models['primary']
     keys = {name: secrets.token_urlsafe(40) for name in models}
     routes = ProviderRoutes({'version': 2, 'default': 'primary', 'routes': {
         name: {'version': 1, 'provider': ('opencode-zen' if opencode and name == 'fallback' else provider), 'endpoint': ('https://opencode.ai/zen/v1' if opencode and name == 'fallback' else endpoint), 'models': [model],
@@ -56,7 +59,8 @@ def main():
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 if mode == 'chat_completions':
                     assert body.get('stream', False) == (stream or auxiliary)
-                name = next(key for key in models if wire_models[key] == body['model'])
+                name = next(key for key in models if (self.headers.get('x-api-key') == keys[key] if mode == 'anthropic_messages' else self.headers.get('Authorization') == 'Bearer ' + keys[key]))
+                assert body['model'] == wire_models[name]
                 expected_path = ('/api/v1/chat/completions' if mode == 'chat_completions' else '/v1/responses' if mode == 'codex_responses' else '/v1/messages')
                 if opencode:
                     expected_path = ('/zen/go/v1' if name == 'primary' else '/zen/v1') + {'chat_completions': '/chat/completions', 'codex_responses': '/responses', 'anthropic_messages': '/messages'}[mode]
@@ -204,7 +208,7 @@ def main():
                 if value is None: os.environ.pop(key, None)
                 else: os.environ[key] = value
             ledger.close()
-    result = {'mode': mode, 'opencode_affinity': opencode, 'affinity_header_count': len(affinities), 'native_affinity_stable': len(set(affinities)) == 1 if opencode else None, 'owner_aliases': aliases, 'chat_stream': stream, 'actual_main_agent_turns': 0 if auxiliary else 3, 'actual_moa_auxiliary_calls': 3 if auxiliary else 0, 'http_dispatches': observed, 'host_tools_granted': False,
+    result = {'mode': mode, 'same_model_distinct_private_keys': same_model, 'opencode_affinity': opencode, 'affinity_header_count': len(affinities), 'native_affinity_stable': len(set(affinities)) == 1 if opencode else None, 'owner_aliases': aliases, 'chat_stream': stream, 'actual_main_agent_turns': 0 if auxiliary else 3, 'actual_moa_auxiliary_calls': 3 if auxiliary else 0, 'http_dispatches': observed, 'host_tools_granted': False,
         'live_provider_tested': False, 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (
             Path(__file__), root/'haos/provider_profiles.py', root/'haos/provider_proxy.py', root/'haos/provider_affinity.py', root/'haos/provider_response_replay.py',
             root/'haos/provider_replay.py', root/'haos/provider_messages.py', root/'haos/provider_moa_streams.py')}}
