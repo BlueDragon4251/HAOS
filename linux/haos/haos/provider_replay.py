@@ -1,6 +1,7 @@
 """Keep private native replay on its approved model/endpoint at broker admission."""
 from copy import deepcopy
 import hashlib
+import json
 
 from .provider_bedrock_replay import TYPE
 
@@ -32,3 +33,12 @@ def messages_for_route(policy, payload):
         else:
             message.pop('reasoning_details', None)
     return result
+
+
+def issuer_binding(context, model):
+    return hashlib.sha256(json.dumps([context, model], separators=(",", ":")).encode()).hexdigest()
+
+
+def route_binding(policy, model):
+    provider = "openai-api" if policy.provider == "openai" else policy.provider
+    return issuer_binding([provider, policy.api_mode, policy.endpoint], model)

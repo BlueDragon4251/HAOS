@@ -44,6 +44,7 @@ for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abo
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_provider.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/moa-$scenario-build-probe.json" "$scenario"
 done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_stream_scope.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-stream-scope-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_fallback_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-fallback-replay-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_moa_stream_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/moa-stream-replay-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_account_providers.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/account-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_qwen_device.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/qwen-device-build-probe.json

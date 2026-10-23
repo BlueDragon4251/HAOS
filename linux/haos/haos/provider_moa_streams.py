@@ -9,14 +9,15 @@ from types import SimpleNamespace
 from urllib.parse import urlsplit
 import uuid
 
+from .provider_replay import issuer_binding
+
 REPLAY_TYPE = "haos.moa.native_assistant"
 REPLAY_FIELDS = ("codex_reasoning_items", "codex_message_items", "anthropic_content_blocks")
 
 
 def _binding(transport, base, model):
     context = getattr(transport, "haos_wire_context", lambda _: None)(base)
-    return hashlib.sha256(json.dumps([context or [transport.api_mode, base], model],
-        separators=(",", ":")).encode()).hexdigest()
+    return issuer_binding(context or [transport.api_mode, base], model)
 
 
 def _restore(messages, binding):
@@ -29,7 +30,16 @@ def _restore(messages, binding):
         message["reasoning_details"] = [item for item in details if not isinstance(item, dict) or item.get("type") != REPLAY_TYPE]
         for item in carriers:
             if item.get("binding") == binding and isinstance(item.get("data"), dict):
-                message.update({key: deepcopy(value) for key, value in item["data"].items() if key in REPLAY_FIELDS})
+                restored = {key: deepcopy(value) for key, value in item["data"].items() if key in REPLAY_FIELDS}
+                # The exact broker binding owns provenance. The source SDK may
+                # have stamped its own model while normalizing a fallback's
+                # output; do not let that stale internal stamp defeat the
+                # stronger matching model/endpoint binding on replay.
+                for key in ("codex_reasoning_items", "codex_message_items"):
+                    if isinstance(restored.get(key), list):
+                        restored[key] = [{k: v for k, v in block.items() if k not in {"_issuer_kind", "_issuer_model"}}
+                            if isinstance(block, dict) else block for block in restored[key]]
+                message.update(restored)
                 break
     return output
 
@@ -61,7 +71,10 @@ def _route(client, mode):
 def _kwargs(transport, supplied, base):
     params = dict(supplied)
     model, messages, tools = params.pop("model"), params.pop("messages"), params.pop("tools", None)
-    messages = _restore(messages, _binding(transport, base, model))
+    # Broker transports capture the original carrier before their own restore
+    # so an approved fallback can admit its matching target carrier later.
+    if not hasattr(transport, "haos_wire_context"):
+        messages = _restore(messages, _binding(transport, base, model))
     params["base_url"], params["provider"] = base, "custom"
     params["reasoning_config"] = params.pop("_reasoning_config", params.get("reasoning_config"))
     if params["reasoning_config"] is None and isinstance(params.get("extra_body"), dict):
@@ -90,17 +103,26 @@ def _usage(value):
         total_tokens=incoming + outgoing if type(incoming) is int and type(outgoing) is int else None)
 
 
-def _final_delta(normalized, transport, base, model):
+def _final_delta(normalized, transport, base, model, issuer=None):
     delta = dict(normalized.provider_data or {})
     replay = {key: delta[key] for key in REPLAY_FIELDS if key in delta}
     if replay:
-        delta["reasoning_details"] = list(delta.get("reasoning_details") or []) + [{
-            "type": REPLAY_TYPE, "binding": _binding(transport, base, model), "data": replay}]
+        public_details = [item for item in delta.get("reasoning_details") or []
+            if not isinstance(item, dict) or item.get("type") not in {"thinking", "redacted_thinking"}]
+        delta["reasoning_details"] = public_details + [{
+            "type": REPLAY_TYPE, "binding": issuer or _binding(transport, base, model), "data": replay}]
     if normalized.tool_calls:
         delta["tool_calls"] = [SimpleNamespace(index=index, id=call.id, type="function",
             function=SimpleNamespace(name=call.name, arguments=call.arguments),
             **(call.provider_data or {})) for index, call in enumerate(normalized.tool_calls)]
     return delta
+
+
+def _stream_issuer(stream):
+    value = stream.response.headers.get("X-HAOS-Replay-Binding")
+    if value is not None and not re.fullmatch(r"[a-f0-9]{64}", value):
+        raise PermissionError("invalid local broker replay provenance")
+    return value
 
 
 def _responses(client, supplied, base):
@@ -115,6 +137,7 @@ def _responses(client, supplied, base):
         on_commentary_message=None, on_first_delta=None)
     terminal, usage = False, None
     with client._real_client.with_options(max_retries=0).responses.create(**wire) as stream:
+        issuer = _stream_issuer(stream)
         for event in stream:
             assembler.feed(event)
             if getattr(event, "type", None) == "response.completed":
@@ -126,7 +149,7 @@ def _responses(client, supplied, base):
             raise ConnectionError("MoA Responses stream ended without completion")
         final = assembler.result()
         normalized = transport.normalize_response(final)
-        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"]), normalized.finish_reason, _usage(usage))
+        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"], issuer), normalized.finish_reason, _usage(usage))
 
 
 def _messages(client, supplied, base):
@@ -136,6 +159,7 @@ def _messages(client, supplied, base):
     wire.pop("stream", None)
     identifier, terminal = "haos-moa-" + uuid.uuid4().hex, False
     with client._real_client.with_options(max_retries=0).messages.stream(**wire) as stream:
+        issuer = _stream_issuer(stream)
         for event in stream:
             if event.type == "content_block_delta":
                 if event.delta.type == "text_delta":
@@ -147,7 +171,7 @@ def _messages(client, supplied, base):
             raise ConnectionError("MoA Messages stream ended without completion")
         final = stream.get_final_message()
         normalized = transport.normalize_response(final)
-        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"]), normalized.finish_reason, _usage(final.usage))
+        yield _chunk(identifier, wire["model"], _final_delta(normalized, transport, base, supplied["model"], issuer), normalized.finish_reason, _usage(final.usage))
 
 
 def create_stream(client, supplied):

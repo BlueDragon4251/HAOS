@@ -63,6 +63,7 @@ jobs:
             "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-$scenario.json" "$scenario"
           done
           "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-scope.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-replay.json"
           "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
           "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
           "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"

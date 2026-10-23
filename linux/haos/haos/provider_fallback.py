@@ -89,7 +89,10 @@ def retarget(policy, payload, context, features=None, *, model=None):
     params.update(provider=source, provider_profile=profile, base_url=endpoint, is_oauth=False)
     if source == 'qwen-oauth' and not params.get('qwen_session_metadata'):
         params['qwen_session_metadata'] = {'sessionId': params.get('session_id') or 'hermes', 'promptId': str(uuid.uuid4())}
-    wire = transport.build_kwargs(model, deepcopy(context['messages']), deepcopy(context['tools']), **params)
+    from .provider_moa_streams import _restore
+    from .provider_replay import route_binding
+    messages = _restore(context['messages'], route_binding(policy, model))
+    wire = transport.build_kwargs(model, messages, deepcopy(context['tools']), **params)
     extra = wire.pop('extra_body', None)
     if extra:
         if not isinstance(extra, dict):

@@ -20,6 +20,7 @@ import uuid
 import ipaddress
 
 from .provider_policy import PORT, ProviderPolicy
+from .provider_replay import route_binding
 from .provider_fallback import extract as fallback_context, retarget, source_features, merge_features
 from .redaction import Redactor
 from .sandbox import trusted_json
@@ -224,6 +225,13 @@ class Broker(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def send_response(self, code, message=None):
+        super().send_response(code, message)
+        binding = getattr(self, "native_fallback_binding", None)
+        if 200 <= code < 300 and binding:
+            # Generated locally, never copied from an upstream response header.
+            self.send_header("X-HAOS-Replay-Binding", binding)
+
     protocol_version = "HTTP/1.1"
     server_version = "HAOSModelBroker"
     sys_version = ""
@@ -352,6 +360,8 @@ class Handler(BaseHTTPRequestHandler):
                     attempt = retarget(self.policy, attempt, None)
                 headers = merge_features(headers, features)
                 self.fallback_tool_names = features.get("tool_names", {})
+                self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"])
+                    if target != route else None)
                 redactor.secrets = (*redactor.secrets, self.server.token)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
                 if status not in {429, 502, 503, 504} or self.forward_started:

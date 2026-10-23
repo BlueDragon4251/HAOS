@@ -753,3 +753,37 @@ Both runtime suites pass 895 tests, two existing skips; the six native Anthropic
 SDK fixtures still pass with their 32 alias checks. Native fallback HTTP now
 has 16 required cases. This is local protocol/allowlist evidence, not acceptance
 of 900K account context capacity, entitlement or real inference.
+
+
+## Actual issuer binding for native MoA fallback streams (2026-10-23)
+
+The actual scoped SDK/broker regression at `5dc1e91` reproduced fallback
+reasoning attributed to the primary model. Successful fallback responses now
+carry a locally generated replay-binding header for the actual approved model
+and endpoint. Remote response headers are not copied. Both native auxiliary
+stream codecs consume that public SDK response header and place opaque replay
+inside the matching carrier. Signed Anthropic thinking is no longer duplicated
+in unbound public reasoning details. The broker's target builder restores only
+its exact matching carrier; the primary request cannot replay it.
+
+The auxiliary pre-builder no longer discards a target carrier before the broker
+transport can capture the original logical fallback context. Once an exact
+binding is matched, stale internal issuer stamps from source-SDK normalization
+are removed before the pinned target codec validates replay; signed/encrypted
+bytes remain unchanged. Public reasoning text remains available.
+
+The required probe runs six actual native SDK streams over ten real broker/HTTP
+requests: primary 503, fallback success; the next turn excludes opaque replay
+at primary and preserves it at the same fallback; the third turn succeeds at
+primary without that fallback's opaque data. Both Responses encrypted items
+and Messages signed thinking pass. A forged upstream binding header has no
+effect. Every request has an exact durable status/usage receipt. Fixture server
+teardown joins request finalizers before closing their SQLite connection,
+including assertion failures; an earlier failing fixture had a teardown
+segmentation fault, which is not claimed as a production diagnosis.
+
+Both runtime suites pass **901 tests, two existing skips**. Seven actual pinned
+MoA engine scenarios, the scope and replay probes, 16 native fallback SDK/HTTP
+cases, 6,476 builder comparisons and the 410-case HTTP matrix pass. This change
+covers native auxiliary streams; it does not establish every JSON/main-agent
+replay path, live signatures/accounts, installed boot or final artifacts.

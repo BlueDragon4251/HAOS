@@ -227,3 +227,25 @@ def test_request_owned_native_tool_aliases_restore_only_dispatch_names(kind):
     assert restore(collision, names) == collision
     assert restore({"type": "text", "name": "hermes_tool_search_2"}, names) == {
         "type": "text", "name": "hermes_tool_search_2"}
+
+
+@pytest.mark.parametrize("bad", ["", "f" * 63, "G" * 64, "a" * 65, "a" * 64 + "\n"])
+def test_native_moa_stream_refuses_malformed_local_replay_provenance(bad):
+    from types import SimpleNamespace
+    from haos.provider_moa_streams import _stream_issuer
+    with pytest.raises(PermissionError):
+        _stream_issuer(SimpleNamespace(response=SimpleNamespace(headers={"X-HAOS-Replay-Binding": bad})))
+
+
+def test_native_moa_carrier_keeps_opaque_thinking_inside_exact_binding():
+    from types import SimpleNamespace
+    from haos.provider_moa_streams import _final_delta, _restore, REPLAY_TYPE
+    transport = SimpleNamespace(api_mode="anthropic_messages", haos_wire_context=lambda base: ("anthropic", "anthropic_messages", "https://api.anthropic.com"))
+    block = {"type": "thinking", "thinking": "public thought", "signature": "fixture-signature"}
+    normalized = SimpleNamespace(tool_calls=None, provider_data={"reasoning_details": [block], "anthropic_content_blocks": [block]})
+    delta = _final_delta(normalized, transport, "http://127.0.0.1:9120/v1", "primary", "a" * 64)
+    assert delta["reasoning_details"] == [{"type": REPLAY_TYPE, "binding": "a" * 64, "data": {"anthropic_content_blocks": [block]}}]
+    messages = [{"role": "assistant", "reasoning_details": delta["reasoning_details"]}]
+    assert "fixture-signature" not in json.dumps(_restore(messages, "b" * 64))
+    assert _restore(messages, "a" * 64)[0]["anthropic_content_blocks"] == [block]
+    assert normalized.provider_data["reasoning_details"] == [block]
