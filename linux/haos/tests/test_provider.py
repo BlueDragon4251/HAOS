@@ -174,3 +174,42 @@ def test_real_local_failure_preserves_status_and_never_completes_a_truncated_str
             conn.close()
         assert ledger.db.execute("SELECT status FROM requests").fetchall() == [(429 if failure == "rate-limit" else 503 if failure == "unavailable" else 502,)]
         ledger.close()
+
+
+@pytest.mark.parametrize('field,value', [('models', ['unapproved-model']), ('route', 'fallback'),
+    ('fallbacks', ['unapproved-provider']), ('model_fallbacks', ['unapproved-model'])])
+def test_provider_side_model_routing_cannot_bypass_owner_fallback_authority(field, value):
+    with pytest.raises(PermissionError):
+        ProviderPolicy(policy('openai', api_mode='chat_completions')).request('/v1/chat/completions',
+            {'model': 'fixture-model', field: value})
+
+
+@pytest.mark.parametrize("thinking", [
+    {"include_thoughts": True}, {"include_thoughts": False, "thinking_budget": 0},
+    {"include_thoughts": True, "thinking_level": "high"},
+])
+def test_vertex_native_thinking_body_is_admitted(thinking):
+    vertex = ProviderPolicy(policy("vertex", api_mode="chat_completions", endpoint=
+        "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi"))
+    body = {"model": "fixture-model", "messages": [], "extra_body": {"google": {"thinking_config": thinking}}}
+    assert vertex.request("/v1/chat/completions", body)["extra_body"] == body["extra_body"]
+
+
+@pytest.mark.parametrize("extra", [
+    {}, {"google": {"thinking_config": {}}},
+    {"google": {"thinking_config": {"include_thoughts": 1}}},
+    {"google": {"thinking_config": {"thinking_budget": True}}},
+    {"google": {"thinking_config": {"thinking_budget": -1}}},
+    {"google": {"thinking_config": {"thinking_level": "arbitrary"}}},
+    {"google": {"thinking_config": {"extra_headers": {"Authorization": "foreign"}}}},
+    {"google": {"thinking_config": {"include_thoughts": True}, "url": "https://foreign.invalid"}},
+    {"google": {"thinking_config": {"include_thoughts": True}}, "extra_headers": {}},
+])
+def test_vertex_cannot_turn_native_thinking_into_an_sdk_override(extra):
+    vertex = ProviderPolicy(policy("vertex", api_mode="chat_completions", endpoint=
+        "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi"))
+    with pytest.raises(PermissionError):
+        vertex.request("/v1/chat/completions", {"model": "fixture-model", "extra_body": extra})
+    with pytest.raises(PermissionError):
+        ProviderPolicy(policy("openai", api_mode="chat_completions")).request(
+            "/v1/chat/completions", {"model": "fixture-model", "extra_body": extra})

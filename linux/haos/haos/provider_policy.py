@@ -130,7 +130,25 @@ class ProviderPolicy:
         if not isinstance(tools, list) or len(tools) > 256 or not all(map(local_function, tools)):
             raise PermissionError("only local Hermes function tools are authorized")
         forbidden = {"background", "webhook", "previous_response_id", "conversation", "file_ids",
-                     "mcp_servers", "container", "betas", "extra_headers", "extra_query", "extra_body"}
+                     "mcp_servers", "container", "betas", "extra_headers", "extra_query", "extra_body",
+                     "models", "route", "fallbacks", "model_fallbacks"}
+        if "extra_body" in data and self.provider == "vertex" and self.api_mode == "chat_completions":
+            # Vertex's OpenAI compatibility API nests native thinking settings
+            # in the JSON body. This is not an arbitrary SDK override.
+            body = data["extra_body"]
+            google = body.get("google") if isinstance(body, dict) else None
+            thinking = google.get("thinking_config") if isinstance(google, dict) else None
+            if (not isinstance(body, dict) or set(body) != {"google"}
+                    or not isinstance(google, dict) or set(google) != {"thinking_config"}
+                    or not isinstance(thinking, dict) or not thinking
+                    or set(thinking) - {"include_thoughts", "thinking_level", "thinking_budget"}
+                    or ("include_thoughts" in thinking and type(thinking["include_thoughts"]) is not bool)
+                    or ("thinking_level" in thinking and (not isinstance(thinking["thinking_level"], str)
+                        or thinking["thinking_level"] not in {"low", "medium", "high"}))
+                    or ("thinking_budget" in thinking and (type(thinking["thinking_budget"]) is not int
+                        or not 0 <= thinking["thinking_budget"] <= 32768))):
+                raise PermissionError("only native Vertex thinking settings are authorized")
+            forbidden.remove("extra_body")
         if forbidden & set(data):
             raise PermissionError("remote state and asynchronous provider execution are not authorized")
         payload = dict(data)

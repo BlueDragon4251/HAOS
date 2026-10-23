@@ -73,6 +73,9 @@ def main():
                 assert self.headers["Authorization"] == "Bearer " + state["token"]
                 assert not self.headers.get("x-api-key") and not self.headers.get("Cookie")
                 assert state["capability"] not in " ".join(self.headers.values())
+                if state["id"].startswith("vertex:"):
+                    assert body["extra_body"] == {"google": {"thinking_config": {
+                        "include_thoughts": True, "thinking_level": "high"}}}
                 observed.append(state["id"] + ":" + case)
                 if case in {"401", "429"}:
                     self.reply(int(case), {"error": {"message": state["token"], "type": "fixture_error"}})
@@ -134,6 +137,7 @@ def main():
                     for mode in ("chat_completions", "codex_responses", "anthropic_messages")]]:
                 model = {"chat_completions": "phi-fixture", "codex_responses": "gpt-5.4",
                     "anthropic_messages": "anthropic/claude-opus-4.6"}[mode]
+                if provider == "vertex": model = "gemini-3-flash-preview"
                 endpoint = ("https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi"
                     if provider == "vertex" else "https://fixture.services.ai.azure.com/" + ("anthropic" if mode == "anthropic_messages" else "openai/v1"))
                 assert default_mode(provider, model, endpoint) == mode
@@ -145,7 +149,7 @@ def main():
                 body = transport.build_kwargs(model, [{"role": "user", "content": "fixture"}],
                     [{"type": "function", "function": {"name": "fixture", "description": "local tool",
                         "parameters": {"type": "object", "properties": {"x": {"type": "integer"}}}}}],
-                    base_url=policy.client_config()["model"]["base_url"], max_tokens=1024, reasoning_config=None)
+                    base_url=policy.client_config()["model"]["base_url"], max_tokens=1024, reasoning_config={"enabled": True, "effort": "high"} if provider == "vertex" else None)
                 token = secrets.token_urlsafe(40)
                 data = ({"type": "authorized_user", "client_id": "fixture-google-client",
                     "client_secret": secrets.token_urlsafe(40), "refresh_token": secrets.token_urlsafe(40)} if provider == "vertex" else

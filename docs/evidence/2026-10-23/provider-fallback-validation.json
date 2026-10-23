@@ -1,0 +1,144 @@
+{
+  "base_commit": "fd99c252aab0ef9d0c6ca1d54be03775d8ff84b5",
+  "hermes_upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "python": "3.11.16",
+  "full_runtime_tests": {
+    "passed": 892,
+    "existing_skips": 2
+  },
+  "minimal_runtime_tests": {
+    "passed": 892,
+    "existing_skips": 2
+  },
+  "local_exclusion": "test_backup.py requires real root; unchanged mandatory services/kernel CI remains required",
+  "fixtures": {
+    "native_builder_comparisons": 3238,
+    "physical_profiles": 53,
+    "http_sdk_cases": 410,
+    "cloud_sdk_http_cases": 49,
+    "wire_profile_cases": 53,
+    "approved_fallback_http_cases": 2
+  },
+  "predecessor_ci": {
+    "source": "fd99c252aab0ef9d0c6ca1d54be03775d8ff84b5",
+    "all_five_gates": "success",
+    "services_run": 39596503059
+  },
+  "current_commit_root_ci": "pending after push; no local root claim",
+  "live_provider_tested": false,
+  "installed_boot_tested": false,
+  "source_sha256": [
+    {
+      "path": "linux/haos/haos/provider_usage.py",
+      "sha256": "d983971816de42a99d6860a38a7242162f003787ba9cb989155d58501e7203cd"
+    },
+    {
+      "path": "linux/haos/haos/provider_launch.py",
+      "sha256": "229ac1e8628691528eb578f9e0445ab2aef31b1ca55c8b0d195a8065934a5cae"
+    },
+    {
+      "path": "linux/haos/haos/provider_sse.py",
+      "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+    },
+    {
+      "path": "linux/haos/haos/provider_policy.py",
+      "sha256": "afbb3125c8e749a660985fad58ae8f32392b4b83c080a088ec6c80149174e59a"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp_launch.py",
+      "sha256": "98e7e4daa16c565841cf43c19ffd8f3260915fd18d0acfb715f0077674378b32"
+    },
+    {
+      "path": "linux/haos/haos/provider_discovery.py",
+      "sha256": "ba68bd7ee35cb6e2b9e9ca283019ed9ada4158f0f56bd62c4adfdee56ce9a96e"
+    },
+    {
+      "path": "linux/haos/haos/provider_copilot.py",
+      "sha256": "0cc8f51b880986500aef7353aee6937d3a00e978bc89698f1ccf800300c880fb"
+    },
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "5c766efaf4efa9a85dadfa8e556e18c4765c1d63b5a007875c5fb4b0fce2a88b"
+    },
+    {
+      "path": "linux/haos/haos/provider_qwen.py",
+      "sha256": "069a89f215038e8fb8c95b00ee66e7e79a6345a21cf240ac7e646e15c7f6ec6d"
+    },
+    {
+      "path": "linux/haos/haos/provider_native.py",
+      "sha256": "3b93c700fd9b2293a224731d73aac278a2872dc9a003612cf2ca003e0095be13"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_replay.py",
+      "sha256": "f477d468782aa42c2ce14ec6caa71eb688fd58fc68104a93d7d188c7a8a1c705"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    },
+    {
+      "path": "linux/haos/haos/provider_registry.py",
+      "sha256": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "769a697550df481848ea2757ea96e3cdc9aad5ba48397e0d5f875dfa4a6a7ffc"
+    },
+    {
+      "path": "linux/haos/haos/provider_cloud.py",
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed"
+    },
+    {
+      "path": "linux/haos/haos/provider_retry.py",
+      "sha256": "29e6902a3da435a5a407b269fa402eef7d6ca4a2dece87c27c6681556b138b69"
+    },
+    {
+      "path": "linux/haos/haos/provider_fallback.py",
+      "sha256": "3299d84693e7d5f210cb6074165ab96f8d7bdec24a96790e43281be9c855db1a"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp_network.py",
+      "sha256": "0a1b1180c611f59f65ddae7d66663bd553eb13b4ee7cd64b11357d6a4777c7e4"
+    },
+    {
+      "path": "linux/haos/haos/provider_replay.py",
+      "sha256": "f42cd02da5e95a6f2de7a2cad121e855994d53042bd139505414359bfd9ca724"
+    },
+    {
+      "path": "linux/haos/haos/provider_routes.py",
+      "sha256": "547b58386430878e5b335119c4cb5e4db680a3cf91c676d548f8f0851c7a01a0"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_messages.py",
+      "sha256": "87b6361205b9d9c179b110e8f8de2eb99f975cb8e75eec133c56225230e3110b"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "5ac1f44c346cfd5d93dd8fb1f16b2137bbb727414e57312c511df9922d414bb8"
+    },
+    {
+      "path": "linux/haos/haos/provider_messages.py",
+      "sha256": "23d6f5b7419271e59eb63d466e9bea2023f5c95baec87eb5075e338ceeb89459"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp.py",
+      "sha256": "55b0ad88d8088e993f5e0d3b972dc7fc98f050e1848a32c5887daeb38bf3f944"
+    },
+    {
+      "path": "linux/haos/runtime/probe_cloud_inference.py",
+      "sha256": "996e0ec1b0ec33bdd1e39169d7da2ee0f6986e3e7321d30c852cdcf101fa5816"
+    },
+    {
+      "path": "linux/haos/runtime/probe_provider_fallback_matrix.py",
+      "sha256": "b501d15ea47bbae045fbcbf52c80fe6bfe501d08010fa07fd2f02bbd32530a6b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_provider_fallback_wire.py",
+      "sha256": "2217f7a3cf0871e6bd76460be2260898e5b8a0ccc821b702aaf9e3a9a75a33d9"
+    }
+  ]
+}

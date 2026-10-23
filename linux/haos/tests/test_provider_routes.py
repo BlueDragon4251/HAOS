@@ -338,3 +338,60 @@ def test_real_http_fallback_does_not_forward_private_native_replay(tmp_path):
                 'reasoning_details': [{'type': 'reasoning.encrypted', 'data': 'public wire fixture'}]}]
         assert ledger.db.execute('SELECT status FROM requests ORDER BY rowid').fetchall() == [(503,), (200,)]
         ledger.close()
+
+
+@pytest.mark.parametrize('changed', [ {'version': 2}, {'mode': 'anthropic_messages'},
+    {'model': 'unapproved-model'}, {'params': {'base_url': 'https://unapproved.invalid'}},
+    {'tools': [{'type': 'mcp', 'server_url': 'https://unapproved.invalid'}]},
+    {'tools': [{'type': 'function', 'function': {'name': 'fixture', 'parameters': 'invalid'}}]} ])
+def test_forged_fallback_context_is_rejected_before_any_provider_dispatch(tmp_path, changed):
+    from haos.provider_fallback import FIELD
+    calls = []
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_): pass
+        def do_POST(self):
+            calls.append(True)
+            self.send_response(500); self.send_header('Content-Length', '0'); self.end_headers()
+    with serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port:
+        policy = ProviderPolicy(route(endpoint=f'http://127.0.0.1:{port}/v1'))
+        ledger, capability = UsageLedger(tmp_path / 'usage.db'), secrets.token_urlsafe(48)
+        with serving(Broker(('127.0.0.1', 0), policy, capability, Credentials(policy, {'api_key': None}), ledger)) as broker:
+            context = {'version': 1, 'mode': 'chat_completions', 'model': 'fixture-model',
+                'messages': [{'role': 'user', 'content': 'fixture'}], 'tools': None, 'params': {}, **changed}
+            conn = http.client.HTTPConnection('127.0.0.1', broker, timeout=5)
+            conn.request('POST', '/v1/chat/completions', json.dumps({'model': 'fixture-model',
+                'messages': [{'role': 'user', 'content': 'fixture'}], FIELD: context}), {'Authorization': 'Bearer ' + capability})
+            response = conn.getresponse()
+            assert response.status == 403
+            response.read(); conn.close()
+        assert not calls and ledger.db.execute('SELECT COUNT(*) FROM requests').fetchone()[0] == 0
+        ledger.close()
+
+
+def test_ambiguous_fallback_network_failure_cannot_inherit_previous_provider_status(tmp_path):
+    calls = []
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_): pass
+        def do_POST(self):
+            model = json.loads(self.rfile.read(int(self.headers['Content-Length'])))['model']
+            calls.append(model)
+            if model == 'first-model':
+                self.send_response(503); self.send_header('Content-Length', '0'); self.end_headers()
+            else:
+                self.close_connection = True
+    with serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port:
+        routes = ProviderRoutes({'version': 2, 'default': 'first', 'routes': {name: route(
+            endpoint=f'http://127.0.0.1:{port}/v1', models=[name + '-model'], default_model=name + '-model')
+            for name in ('first', 'second')}, 'fallbacks': {'first': ['second']}})
+        ledger, capability = UsageLedger(tmp_path / 'usage.db'), secrets.token_urlsafe(48)
+        credentials = {name: Credentials(policy, {'api_key': None}) for name, policy in routes.routes.items()}
+        with serving(Broker(('127.0.0.1', 0), routes, capability, credentials, ledger)) as broker:
+            conn = http.client.HTTPConnection('127.0.0.1', broker, timeout=5)
+            conn.request('POST', '/v1/chat/completions', json.dumps({'model': 'first-model'}), {'Authorization': 'Bearer ' + capability})
+            response = conn.getresponse()
+            assert response.status == 502
+            response.read(); conn.close()
+        assert calls == ['first-model', 'second-model']
+        assert ledger.db.execute('SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid').fetchall() == [
+            (503, None, None), (502, None, None)]
+        ledger.close()

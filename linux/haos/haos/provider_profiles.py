@@ -124,6 +124,22 @@ def register_profiles(data):
                 params["is_oauth"] = False
             return super().build_kwargs(model, messages, tools, **params)
 
+    fallback_bases = {config["providers"]["haos-" + key]["base_url"].rstrip("/") for key in routes.fallbacks}
+    if routes.default in routes.fallbacks:
+        fallback_bases.add(config["providers"]["haos-model"]["base_url"].rstrip("/"))
+    from functools import wraps
+    from .provider_fallback import capture, attach
+    def contextual_build(method):
+        @wraps(method)
+        def build(self, model, messages, tools=None, **params):
+            base = str(params.get("base_url") or "").rstrip("/")
+            needs_context = base in fallback_bases or any(params.get(key) for key in ("fast_mode", "context_length", "drop_context_1m_beta"))
+            context = capture(self.api_mode, model, messages, tools, params) if needs_context else None
+            return attach(method(self, model, messages, tools, **params), context)
+        return build
+    for cls in (BrokerChat, BrokerResponses, BrokerMessages):
+        cls.build_kwargs = contextual_build(cls.build_kwargs)
+
     # Complete normal discovery first so it cannot overwrite these adapters.
     get_transport("chat_completions")
     get_transport("codex_responses")

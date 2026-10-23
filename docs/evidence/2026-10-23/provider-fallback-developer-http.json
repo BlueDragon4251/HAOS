@@ -1,0 +1,18 @@
+{
+  "scenario": "developer",
+  "actual_pinned_source_and_target_request_codecs": true,
+  "approved_broker_http_hops": [
+    "source",
+    "target"
+  ],
+  "target_uses_its_own_key_and_model": true,
+  "opaque_source_only_reasoning_not_forwarded": true,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_provider_fallback_wire.py": "2217f7a3cf0871e6bd76460be2260898e5b8a0ccc821b702aaf9e3a9a75a33d9",
+    "provider_proxy.py": "769a697550df481848ea2757ea96e3cdc9aad5ba48397e0d5f875dfa4a6a7ffc",
+    "provider_policy.py": "afbb3125c8e749a660985fad58ae8f32392b4b83c080a088ec6c80149174e59a",
+    "provider_fallback.py": "3299d84693e7d5f210cb6074165ab96f8d7bdec24a96790e43281be9c855db1a",
+    "provider_profiles.py": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed"
+  }
+}

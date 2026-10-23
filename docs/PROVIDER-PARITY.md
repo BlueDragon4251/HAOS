@@ -658,3 +658,29 @@ The 410-case SDK/HTTP matrix and both local suites (**862 passed, two existing
 skips**) pass. Exact source and fixtures:
 `docs/evidence/2026-10-21/broker-replay-admission-validation.json`.
 No live provider, installed system or release acceptance is implied.
+
+
+## Target-native approved fallbacks and Vertex thinking (2026-10-23)
+
+An approved fallback now rebuilds its request with the pinned target transport
+and provider profile from a local JSON-only logical context. This restores the
+original system message when leaving GPT-5 Chat and removes OpenRouter-only
+reasoning on an OpenAI target. The context never reaches the remote provider;
+owner model, endpoint, credentials, protocol and local-function restrictions
+remain independently enforced. Native Anthropic beta headers are reconstructed
+from the reviewed builder without accepting caller authentication overrides.
+Provider-side model-routing fields are refused. An uncertain fallback failure
+records its own 502 and unknown usage rather than inheriting the first status.
+
+Vertex's OpenAI compatibility API legitimately uses a nested JSON
+`extra_body.google.thinking_config`. Admission now permits only that exact
+shape with bounded native thinking fields, while other SDK overrides remain
+refused. The actual cloud SDK/HTTP fixture exercises Gemini thinking on Vertex.
+
+Required build/CI probes compare 3,238 same-protocol source/target combinations
+across 53 physical profiles and two corpora against independent pinned target
+builders. These are network-disabled builder comparisons, not inference. Two
+additional real loopback SDK/broker fallback fixtures check whole target bodies,
+route-specific credentials and exact two-call ledgers. Final validation and
+source hashes are archived under `docs/evidence/2026-10-23/`. Live provider,
+account entitlement, installed-system and release acceptance remain separate.

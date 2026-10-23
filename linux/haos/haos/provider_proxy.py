@@ -20,6 +20,7 @@ import uuid
 import ipaddress
 
 from .provider_policy import PORT, ProviderPolicy
+from .provider_fallback import extract as fallback_context, retarget, source_features, merge_features
 from .redaction import Redactor
 from .sandbox import trusted_json
 from .credentials import private_credential
@@ -309,7 +310,10 @@ class Handler(BaseHTTPRequestHandler):
             route, path = self.server.routes.resolve(self.path)
             self.policy = self.server.routes.routes[route]
             from .provider_messages import admit
-            payload = admit(self.policy, path, json.loads(raw))
+            original, context = fallback_context(json.loads(raw), self.policy.api_mode)
+            payload = admit(self.policy, path, original)
+            if context is not None and admit(self.policy, path, {**original, "model": context["model"]})["model"] != payload["model"]:
+                raise PermissionError("fallback context belongs to another owner model")
         except (ValueError, TypeError, PermissionError, UnicodeError):
             self.reply(403, "request refused by owner model policy")
             return
@@ -325,6 +329,7 @@ class Handler(BaseHTTPRequestHandler):
             # this prompt. No retry follows a started stream or ambiguous I/O.
             for target in [route, *self.server.routes.fallbacks.get(route, [])]:
                 self.retry_after = None
+                status, usage = 502, {}
                 self.policy = self.server.routes.routes[target]
                 attempt = dict(payload)
                 if target != route:
@@ -333,7 +338,15 @@ class Handler(BaseHTTPRequestHandler):
                 request_id = self.server.ledger.admit(self.policy, attempt["model"])
                 credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
                 self.route_credentials = credentials
+                features = {}
+                if target == route:
+                    source_features(self.policy, context, features)
+                if target != route and context is not None:
+                    attempt = retarget(self.policy, attempt, context, features)
                 headers, redactor = credentials.headers()
+                if target != route and context is None:
+                    attempt = retarget(self.policy, attempt, None)
+                headers = merge_features(headers, features)
                 redactor.secrets = (*redactor.secrets, self.server.token)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
                 if status not in {429, 502, 503, 504} or self.forward_started:
