@@ -94,6 +94,8 @@ def register_profiles(data):
                 kwargs = {**kwargs, "provider_profile": profile, "base_url": endpoint}
             return super().convert_messages(messages, **kwargs)
         def build_kwargs(self, model, messages, tools=None, **params):
+            from .provider_moa_streams import _binding, _restore
+            messages = _restore(messages, _binding(self, params.get("base_url"), model))
             selected = profiles.get(str(params.get("base_url") or "").rstrip("/"))
             if selected:
                 params["provider_profile"] = selected[0]

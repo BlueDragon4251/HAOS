@@ -889,3 +889,27 @@ cloud and MoA probes retain separate source-hashed receipts. All five CI gates
 for predecessor `7dd0d9b` passed, including the real root/UID/bubblewrap case.
 This new source still requires its own CI run. No live inference, installed
 boot, hardware, gateway delivery or final release acceptance is claimed.
+
+## Chat encrypted reasoning and raw MoA facade replay (2026-10-23)
+
+The same actual main-agent fixture then reproduced OpenRouter encrypted
+`reasoning_details` reaching the primary model after a fallback. Chat's native
+state lives inside that array rather than the Responses/Messages sidecars.
+The broker now stamps those native details and the Chat transport wraps them
+in an issuer-bound carrier. The raw streaming/JSON MoA facade path consumes the
+same provenance before building another request; carrier restoration preserves
+the exact native detail array only for its model/endpoint. Existing Bedrock
+native carriers remain under their independent admission rules.
+
+Required build/CI now run eight cases: six main-agent cases (Chat JSON/stream,
+Responses/Messages and their aliases), plus actual pinned `call_llm` MoA
+aggregator JSON/stream facades. They cover 18 main-agent turns, six actual
+auxiliary calls and 40 loopback provider dispatches. Chat JSON deliberately uses
+the native agent's streaming-disabled path; its default preferred-stream path
+is checked separately. The MoA JSON facade retains continuous upstream SSE.
+Both local suites pass **914 tests, two existing skips**. Five additional
+ordinary-user cases check bound/foreign Chat history, raw facade details and
+invalid/mixed provenance. The 410 HTTP cases, 6,476 builder comparisons, native
+MoA fallback replay, Chat scope, actual mixed-stream MoA engine and Bedrock
+fixtures pass. Receipts retain exact source hashes. No live account/inference,
+external delivery, installed boot or release acceptance is claimed.

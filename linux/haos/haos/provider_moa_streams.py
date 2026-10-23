@@ -24,6 +24,8 @@ def _restore(messages, binding):
         details = message.get("reasoning_details")
         if not isinstance(details, list):
             continue
+        from .provider_response_replay import bind_chat_details
+        details = bind_chat_details(details)
         carriers = [item for item in details if isinstance(item, dict) and item.get("type") == REPLAY_TYPE]
         message["reasoning_details"] = [item for item in details if not isinstance(item, dict) or item.get("type") != REPLAY_TYPE]
         if carriers:
@@ -45,6 +47,9 @@ def _restore(messages, binding):
                         restored[key] = [{k: v for k, v in block.items() if k not in {"_issuer_kind", "_issuer_model"}}
                             if isinstance(block, dict) else block for block in restored[key]]
                 message.update(restored)
+                chat_details = item["data"].get("chat_reasoning_details")
+                if isinstance(chat_details, list):
+                    message["reasoning_details"].extend(deepcopy(chat_details))
                 break
     return output
 

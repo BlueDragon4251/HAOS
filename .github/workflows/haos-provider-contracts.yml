@@ -58,7 +58,7 @@ jobs:
           for mode in chat responses messages chat-legacy responses-legacy messages-legacy; do
             "$PYTHON" linux/haos/runtime/probe_agent_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-no-replay.json" "$mode"
           done
-          for mode in responses messages responses-aliases messages-aliases; do
+          for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases; do
             "$PYTHON" linux/haos/runtime/probe_agent_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-fallback-replay.json" "$mode"
           done
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"

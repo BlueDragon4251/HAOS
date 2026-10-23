@@ -285,3 +285,37 @@ def test_native_response_rejects_malformed_or_mixed_local_provenance(values):
     response = SimpleNamespace(output=[{FIELD: value} for value in values])
     with pytest.raises(PermissionError):
         normalize(response, SimpleNamespace(provider_data={}), 'codex_responses')
+
+
+@pytest.mark.parametrize('raw_stream_details', [False, True])
+def test_chat_encrypted_replay_is_bound_for_normalized_and_raw_moa_history(raw_stream_details):
+    from copy import deepcopy
+    from types import SimpleNamespace
+    from haos.provider_response_replay import annotate, normalize, FIELD
+    from haos.provider_replay import route_binding
+    from haos.provider_moa_streams import _restore, REPLAY_TYPE
+    route = SimpleNamespace(provider='local', api_mode='chat_completions', endpoint='http://127.0.0.1:9119/v1')
+    native = [{'type': 'reasoning.encrypted', 'data': 'private-fixture', 'id': 'fixture-block'}]
+    data = annotate({'choices': [{'message': {'reasoning_details': native}}]}, route, 'fallback-model')
+    details = data['choices'][0]['message']['reasoning_details']
+    assert details[0][FIELD] == route_binding(route, 'fallback-model')
+    if not raw_stream_details:
+        response = SimpleNamespace(provider_data={'reasoning_details': details})
+        normalize(None, response, 'chat_completions')
+        details = response.provider_data['reasoning_details']
+        assert details[0]['type'] == REPLAY_TYPE
+    history = [{'role': 'assistant', 'content': 'fixture', 'reasoning_details': details}]
+    original = deepcopy(history)
+    assert 'private-fixture' not in json.dumps(_restore(history, route_binding(route, 'primary-model')))
+    correct = _restore(history, route_binding(route, 'fallback-model'))
+    assert correct[0]['reasoning_details'] == native
+    assert FIELD not in json.dumps(correct)
+    assert history == original
+
+
+@pytest.mark.parametrize('values', [['a' * 63], [False], ['a' * 64, 'b' * 64]])
+def test_chat_moa_raw_stream_provenance_must_be_valid_and_single_issuer(values):
+    from haos.provider_moa_streams import _restore
+    from haos.provider_response_replay import FIELD
+    with pytest.raises(PermissionError):
+        _restore([{'role': 'assistant', 'reasoning_details': [{FIELD: value, 'type': 'reasoning.encrypted'} for value in values]}], 'a' * 64)
