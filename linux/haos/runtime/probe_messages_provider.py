@@ -64,6 +64,9 @@ def main():
             alias_checks += 1
         else:
             raise AssertionError("native alias changed the permitted protocol")
+    tool_input = {"x": 1, "haos_replay_binding": "user-parameter-fixture",
+        "input": {"haos_replay_binding": "nested-user-fixture"},
+        "arguments": {"haos_replay_binding": "nested-arguments-fixture"}}
     received, failures = [], []
     state = {}
     release = threading.Event()
@@ -90,7 +93,7 @@ def main():
                 usage = {"input_tokens": 8, "output_tokens": 5}
                 message = {"id": "msg_fixture", "type": "message", "role": "assistant", "model": body["model"],
                     "content": [{"type": "text", "text": "fixture " + state["key"]},
-                                {"type": "tool_use", "id": "tool_fixture", "name": name, "input": {"x": 1}}],
+                                {"type": "tool_use", "id": "tool_fixture", "name": name, "input": state["tool_input"]}],
                     "stop_reason": "tool_use", "stop_sequence": None, "usage": usage}
                 if not body.get("stream"):
                     data = json.dumps(message).encode()
@@ -120,7 +123,7 @@ def main():
                 event({"type": "content_block_stop", "index": 0})
                 event({"type": "content_block_start", "index": 1,
                     "content_block": {"type": "tool_use", "id": "tool_fixture", "name": name, "input": {}}})
-                event({"type": "content_block_delta", "index": 1, "delta": {"type": "input_json_delta", "partial_json": '{"x":1}'}})
+                event({"type": "content_block_delta", "index": 1, "delta": {"type": "input_json_delta", "partial_json": json.dumps(state["tool_input"])}})
                 event({"type": "content_block_stop", "index": 1})
                 event({"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": None},
                     "usage": {"output_tokens": 5}})
@@ -150,7 +153,7 @@ def main():
                     # Alias collision and MCP prefix handling use the exact
                     # native helper; the broker restores this request's names.
                     tools = [{"type": "function", "function": {"name": name, "description": "session_search in Hermes Agent",
-                        "parameters": {"type": "object", "properties": {"x": {"type": "integer"}}}}}
+                        "parameters": {"type": "object", "properties": {"x": {"type": "integer"}, "haos_replay_binding": {"type": "string"}, "input": {"type": "object"}, "arguments": {"type": "object"}, "user_record": {"type": "object"}}}}}
                         for name in ("memory", "context_notes", "session_search", "mcp_linear_lookup")]
                     options = {"max_tokens": 2048, "reasoning_config": None, "tool_choice": "memory", "fast_mode": fast}
                     body = get_transport("anthropic_messages").build_kwargs(model, messages, tools,
@@ -161,13 +164,16 @@ def main():
                     expected.update(expected.pop("extra_body", {}))
                     if streaming:
                         expected["stream"] = True
-                    state.update(expected=expected, key=key, oauth=oauth, fast=fast)
+                    state.update(expected=expected, key=key, oauth=oauth, fast=fast, tool_input={**tool_input,
+                        "user_record": {"type": "tool_use", "name": expected["tools"][0]["name"]}})
                     release.clear()
                     with tempfile.TemporaryDirectory() as temp:
                         ledger = UsageLedger(Path(temp) / "usage.db")
                         capability = secrets.token_urlsafe(48)
                         credentials = Credentials(policy, {"api_key": key})
-                        with serving(Broker(("127.0.0.1", 0), policy, capability, credentials, ledger)) as port:
+                        server = Broker(("127.0.0.1", 0), policy, capability, credentials, ledger)
+                        server.daemon_threads = False
+                        with serving(server) as port:
                             with build_anthropic_client(capability, f"http://127.0.0.1:{port}/v1", timeout=10) as client:
                                 if streaming:
                                     with client.messages.stream(**body) as stream:
@@ -178,9 +184,10 @@ def main():
                                 else:
                                     result = client.messages.create(**body)
                                 assert key not in result.model_dump_json() and capability not in result.model_dump_json()
-                                assert result.content[1].name == "memory" and result.content[1].input == {"x": 1}
+                                assert result.content[1].name == "memory" and result.content[1].input == state["tool_input"]
                                 normalized = get_transport("anthropic_messages").normalize_response(result)
                                 assert normalized.tool_calls[0].name == "memory" and normalized.finish_reason == "tool_calls"
+                                assert json.loads(normalized.tool_calls[0].arguments) == state["tool_input"]
                         assert ledger.db.execute("SELECT status,input_tokens,output_tokens FROM requests").fetchall() == [(200, 8, 5)]
                         ledger.close()
         finally:
@@ -224,7 +231,9 @@ def main():
             capability = secrets.token_urlsafe(48)
             credentials = {name: Credentials(policy, {"api_key": key})
                 for name, policy, key in zip(("first", "second"), policies, fallback_keys)}
-            with serving(Broker(("127.0.0.1", 0), routes, capability, credentials, ledger)) as port:
+            server = Broker(("127.0.0.1", 0), routes, capability, credentials, ledger)
+            server.daemon_threads = False
+            with serving(server) as port:
                 with build_anthropic_client(capability, f"http://127.0.0.1:{port}/v1", timeout=10) as client:
                     result = client.messages.create(model="claude-opus-4-6", max_tokens=20,
                         messages=[{"role": "user", "content": "fallback fixture"}])
@@ -237,6 +246,8 @@ def main():
     receipt = {"actual_anthropic_sdk_api_key_and_subscription_json_sse": True,
         "actual_pinned_subscription_body_and_header_contract": True, "signed_thinking_replay_preserved": True,
         "forced_tool_alias_collision_mcp_names_restored": True, "multiline_sse_and_early_delta_before_terminal": True,
+        "arbitrary_tool_arguments_preserved_in_json_and_sse": True,
+        "protocol_shaped_user_data_not_renamed": True,
         "native_fast_mode_body_beta_preserved": True,
         "actual_native_alias_positive_negative_checks": alias_checks,
         "actual_native_alias_fallback_http_requests": len(fallback_calls),
@@ -244,7 +255,7 @@ def main():
         "live_provider_tested": False, "python": sys.version.split()[0],
         "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
             (Path(__file__), root / "haos/provider_profiles.py", root / "haos/provider_messages.py",
-             root / "haos/provider_sse.py", root / "haos/provider_proxy.py")}}
+             root / "haos/provider_sse.py", root / "haos/provider_proxy.py", root / "haos/provider_response_replay.py")}}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

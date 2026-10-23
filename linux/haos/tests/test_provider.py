@@ -442,3 +442,36 @@ def test_native_replay_scope_cannot_cross_route_or_local_capability_generation(r
     assert 'private-fixture' not in json.dumps(_restore(history, route_binding(policy, 'same-model', [route, capability_generation(generation)])))
     assert 'private-fixture' in json.dumps(_restore(history, binding))
     assert 'private-fixture' in json.dumps(history)
+
+
+@pytest.mark.parametrize('shape', ['anthropic', 'responses', 'bedrock', 'gemini'])
+def test_replay_metadata_cleanup_preserves_arbitrary_tool_argument_keys(shape):
+    from copy import deepcopy
+    from haos.provider_response_replay import FIELD, clean
+    user = {FIELD: 'user-value', 'nested': {FIELD: 'nested-user-value'}}
+    payloads = {'anthropic': {'type': 'tool_use', 'name': 'fixture', 'input': user},
+        'responses': {'type': 'function_call', 'name': 'fixture', 'arguments': json.dumps(user)},
+        'bedrock': {'toolUse': {'toolUseId': 'fixture-call', 'name': 'fixture', 'input': user}},
+        'gemini': {'functionCall': {'name': 'fixture', 'args': user}}}
+    value = payloads[shape]; before = deepcopy(value)
+    assert clean({**value, FIELD: 'untrusted-protocol-marker'}) == value
+    assert value == before
+
+
+def test_native_block_metadata_is_overwritten_without_promoting_user_argument_values():
+    from types import SimpleNamespace
+    from haos.provider_response_replay import FIELD, annotate
+    from haos.provider_replay import route_binding
+    policy = SimpleNamespace(provider='local', api_mode='anthropic_messages', endpoint='http://127.0.0.1:11434/v1')
+    user = {FIELD: 'not-provenance', 'nested': {FIELD: 'still-user-data'}}
+    value = annotate({'content': [{'type': 'tool_use', 'name': 'fixture', 'input': user, FIELD: 'forged'}]}, policy, 'model')
+    assert value['content'][0][FIELD] == route_binding(policy, 'model')
+    assert value['content'][0]['input'] == user
+
+
+def test_subscription_tool_name_restore_never_interprets_tool_argument_objects():
+    from haos.provider_messages import restore
+    user = {'type': 'tool_use', 'name': 'WireMemory',
+        'input': {'type': 'function_call', 'name': 'WireMemory'}}
+    value = {'type': 'tool_use', 'name': 'WireMemory', 'input': user}
+    assert restore(value, {'WireMemory': 'memory'}) == {**value, 'name': 'memory'}

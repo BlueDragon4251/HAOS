@@ -74,7 +74,8 @@ def restore(value, names):
     if isinstance(value, list):
         return [restore(item, names) for item in value]
     if isinstance(value, dict):
-        return {key: names.get(item, item) if key == "name" and value.get("type") in {
+        return {key: deepcopy(item) if key in {"input", "args", "arguments"}
+                else names.get(item, item) if key == "name" and value.get("type") in {
                     "tool_use", "function_call", "response.function_call_arguments.done"} and isinstance(item, str)
                 else restore(item, names) for key, item in value.items()}
     return value

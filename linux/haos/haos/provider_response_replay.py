@@ -8,9 +8,13 @@ FIELD = 'haos_replay_binding'
 
 
 def clean(value):
-    """An upstream server cannot supply local replay provenance."""
+    """Strip protocol metadata without interpreting tool argument payloads."""
     if isinstance(value, dict):
-        return {key: clean(item) for key, item in value.items() if key != FIELD}
+        # These are application payloads, including nested arbitrary JSON.
+        # Provenance is consumed only on protocol blocks/details/sidecars,
+        # never from inside a tool's input, args or arguments.
+        return {key: deepcopy(item) if key in {"input", "args", "arguments"} else clean(item)
+                for key, item in value.items() if key != FIELD}
     if isinstance(value, list):
         return [clean(item) for item in value]
     return value

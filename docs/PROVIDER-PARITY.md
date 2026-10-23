@@ -1094,3 +1094,21 @@ sealed legacy repair without input mutation. Full and minimal suites pass
 comparisons, actual mixed-stream MoA, replay-generation restart and private
 Router reasoning probes pass. No installed owner/boot or live inference
 acceptance is inferred from this development result.
+
+## Tool argument payloads remain opaque (2026-10-23)
+
+The actual Anthropic SDK fixture reproduced two JSON-only mutations: replay
+metadata cleanup removed legitimate `haos_replay_binding` argument keys, and
+subscription tool-name restoration renamed a nested user object whose type/name
+looked like a protocol tool call. Streaming partial JSON preserved those same
+values. Both transformations now stop at `input`, `args` and `arguments` payloads;
+protocol block provenance and actual tool names remain checked/restored.
+
+The six required API-key/subscription JSON/early-SSE SDK fixtures now compare
+the complete raw and normalized argument objects, including nested reserved
+keys and protocol-shaped user data. Six ordinary-user cases check four native
+payload shapes, metadata replacement and exact tool-name boundaries. Full and
+minimal suites pass **959 tests, two existing skips**. The 410 actual SDK/HTTP
+cases, twenty native AWS cases and actual MoA fallback replay pass on this
+source. Receipts bind exact source hashes in `tool-arguments-validation.json`.
+These are local contract checks, without live inference or installed acceptance.
