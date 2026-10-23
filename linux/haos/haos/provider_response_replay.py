@@ -34,6 +34,9 @@ def annotate(value, policy, model):
                 message = choice.get(key)
                 if not isinstance(message, dict):
                     continue
+                for call in message.get('tool_calls') or []:
+                    if isinstance(call, dict) and isinstance(call.get('extra_content'), dict):
+                        call['extra_content'][FIELD] = binding
                 for detail in message.get('reasoning_details') or []:
                     if isinstance(detail, dict) and not str(detail.get('type', '')).endswith('.native_assistant'):
                         detail[FIELD] = binding
@@ -57,7 +60,40 @@ def bind_chat_details(details):
     native = [clean(item) for item in details
         if not isinstance(item, dict) or not str(item.get('type', '')).endswith('.native_assistant')]
     kept = [item for item in details if isinstance(item, dict) and str(item.get('type', '')).endswith('.native_assistant')]
-    return kept + [{'type': REPLAY_TYPE, 'binding': values[0], 'data': {'chat_reasoning_details': native}}]
+    return _merge_carrier(kept, values[0], 'chat_reasoning_details', native)
+
+
+def _merge_carrier(details, binding, key, value):
+    from .provider_moa_streams import REPLAY_TYPE
+    result = deepcopy(details)
+    carriers = [item for item in result if isinstance(item, dict) and item.get('type') == REPLAY_TYPE]
+    if len(carriers) > 1 or any(item.get('binding') != binding or not isinstance(item.get('data'), dict) for item in carriers):
+        raise PermissionError('mixed local chat replay carriers')
+    carrier = carriers[0] if carriers else {'type': REPLAY_TYPE, 'binding': binding, 'data': {}}
+    carrier['data'][key] = deepcopy(value)
+    if not carriers: result.append(carrier)
+    return result
+
+
+def bind_chat_tools(details, calls):
+    """Remove marked signatures from tool calls and bind their exact identity."""
+    values, extras = [], []
+    for index, call in enumerate(calls):
+        if not isinstance(call, dict) or not isinstance(call.get('extra_content'), dict) or FIELD not in call['extra_content']:
+            continue
+        value = call['extra_content'][FIELD]
+        if (not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value)
+                or not isinstance(call.get('id'), str) or not call['id']):
+            raise PermissionError('invalid local tool replay provenance')
+        values.append(value)
+        extras.append({'index': index, 'id': call['id'], 'value': clean(call['extra_content'])})
+    if not values:
+        return details
+    if len(set(values)) != 1:
+        raise PermissionError('mixed local tool replay provenance')
+    result = _merge_carrier(details, values[0], 'chat_tool_extra_content', extras)
+    for extra in extras: calls[extra['index']].pop('extra_content')
+    return result
 
 
 def normalize(response, normalized, mode):
@@ -66,10 +102,15 @@ def normalize(response, normalized, mode):
     blocks = getattr(response, 'output' if mode == 'codex_responses' else 'content', None) or []
     if mode == 'chat_completions':
         data = deepcopy(normalized.provider_data or {})
-        details = data.get('reasoning_details')
+        details = data.get('reasoning_details') or []
+        calls = [{'id': call.id, 'extra_content': deepcopy(call.extra_content)} for call in normalized.tool_calls or []]
         if isinstance(details, list):
-            data['reasoning_details'] = bind_chat_details(details)
-            normalized.provider_data = data
+            data['reasoning_details'] = bind_chat_tools(bind_chat_details(details), calls)
+            for call in normalized.tool_calls or []:
+                if isinstance(call.extra_content, dict) and FIELD in call.extra_content:
+                    call.provider_data = {key: value for key, value in (call.provider_data or {}).items() if key != 'extra_content'} or None
+            if not data['reasoning_details']: data.pop('reasoning_details')
+            normalized.provider_data = data or None
         return normalized
     markers = []
     for block in blocks:

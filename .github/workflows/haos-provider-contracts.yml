@@ -61,6 +61,9 @@ jobs:
           for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases; do
             "$PYTHON" linux/haos/runtime/probe_agent_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-fallback-replay.json" "$mode"
           done
+          for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream; do
+            "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
+          done
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
           "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"

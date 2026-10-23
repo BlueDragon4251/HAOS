@@ -300,7 +300,7 @@ def test_chat_encrypted_replay_is_bound_for_normalized_and_raw_moa_history(raw_s
     details = data['choices'][0]['message']['reasoning_details']
     assert details[0][FIELD] == route_binding(route, 'fallback-model')
     if not raw_stream_details:
-        response = SimpleNamespace(provider_data={'reasoning_details': details})
+        response = SimpleNamespace(provider_data={'reasoning_details': details}, tool_calls=None)
         normalize(None, response, 'chat_completions')
         details = response.provider_data['reasoning_details']
         assert details[0]['type'] == REPLAY_TYPE
@@ -319,3 +319,41 @@ def test_chat_moa_raw_stream_provenance_must_be_valid_and_single_issuer(values):
     from haos.provider_response_replay import FIELD
     with pytest.raises(PermissionError):
         _restore([{'role': 'assistant', 'reasoning_details': [{FIELD: value, 'type': 'reasoning.encrypted'} for value in values]}], 'a' * 64)
+
+
+def test_native_tool_signature_replay_preserves_identity_and_merges_reasoning():
+    from copy import deepcopy
+    from haos.provider_response_replay import FIELD, bind_chat_details, bind_chat_tools
+    from haos.provider_moa_streams import _restore, REPLAY_TYPE
+    binding = 'a' * 64
+    signature = {'google': {'thought_signature': 'tool-signature-fixture'}}
+    calls = [{'id': 'first', 'function': {'name': 'fixture', 'arguments': '{}'},
+        'extra_content': {**signature, FIELD: binding}}, {'id': 'second', 'function': {'name': 'fixture', 'arguments': '{}'}}]
+    details = bind_chat_details([{'type': 'reasoning.encrypted', 'data': 'encrypted-fixture', FIELD: binding}])
+    details = bind_chat_tools(details, calls)
+    assert len(details) == 1 and details[0]['type'] == REPLAY_TYPE
+    assert 'extra_content' not in calls[0]
+    history = [{'role': 'assistant', 'tool_calls': calls, 'reasoning_details': details}]
+    original = deepcopy(history)
+    restored = _restore(history, binding)
+    assert restored[0]['tool_calls'][0]['extra_content'] == signature
+    assert 'extra_content' not in restored[0]['tool_calls'][1]
+    assert restored[0]['reasoning_details'] == [{'type': 'reasoning.encrypted', 'data': 'encrypted-fixture'}]
+    assert 'tool-signature-fixture' not in json.dumps(_restore(history, 'b' * 64))
+    changed = deepcopy(history); changed[0]['tool_calls'].reverse()
+    assert 'tool-signature-fixture' not in json.dumps(_restore(changed, binding))
+    assert history == original
+
+
+@pytest.mark.parametrize('marker,identity', [('a' * 63, 'call'), ('G' * 64, 'call'), (False, 'call'), ('a' * 64, ''), ('a' * 64, None)])
+def test_native_tool_signature_requires_valid_local_provenance_and_call_identity(marker, identity):
+    from haos.provider_response_replay import FIELD, bind_chat_tools
+    with pytest.raises(PermissionError):
+        bind_chat_tools([], [{'id': identity, 'extra_content': {FIELD: marker, 'google': {'thought_signature': 'fixture'}}}])
+
+
+def test_native_tool_signatures_cannot_merge_different_issuers():
+    from haos.provider_response_replay import FIELD, bind_chat_details, bind_chat_tools
+    details = bind_chat_details([{'type': 'reasoning.encrypted', 'data': 'fixture', FIELD: 'a' * 64}])
+    with pytest.raises(PermissionError):
+        bind_chat_tools(details, [{'id': 'call', 'extra_content': {FIELD: 'b' * 64, 'google': {'thought_signature': 'fixture'}}}])

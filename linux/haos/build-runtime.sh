@@ -42,6 +42,9 @@ done
 for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_agent_fallback_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/main-agent-$mode-fallback-replay.json" "$mode"
 done
+for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream; do
+    .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_chat_tool_replay.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/chat-tools-$mode.json" "$mode"
+done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_native_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/native-provider-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_bedrock_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/bedrock-provider-build-probe.json

@@ -22,10 +22,14 @@ def _restore(messages, binding):
     output = deepcopy(messages)
     for message in output:
         details = message.get("reasoning_details")
+        if details is None: details = []
         if not isinstance(details, list):
             continue
-        from .provider_response_replay import bind_chat_details
-        details = bind_chat_details(details)
+        from .provider_response_replay import bind_chat_details, bind_chat_tools
+        calls = message.get("tool_calls") or []
+        details = bind_chat_tools(bind_chat_details(details), calls)
+        if not details and "reasoning_details" not in message:
+            continue
         carriers = [item for item in details if isinstance(item, dict) and item.get("type") == REPLAY_TYPE]
         message["reasoning_details"] = [item for item in details if not isinstance(item, dict) or item.get("type") != REPLAY_TYPE]
         if carriers:
@@ -33,6 +37,8 @@ def _restore(messages, binding):
             # duplicates must not survive when targeting another issuer.
             for key in REPLAY_FIELDS:
                 message.pop(key, None)
+            for call in calls:
+                if isinstance(call, dict): call.pop("extra_content", None)
             message["reasoning_details"] = [item for item in message["reasoning_details"]
                 if not isinstance(item, dict) or item.get("type") not in {"thinking", "redacted_thinking"}]
         for item in carriers:
@@ -50,6 +56,12 @@ def _restore(messages, binding):
                 chat_details = item["data"].get("chat_reasoning_details")
                 if isinstance(chat_details, list):
                     message["reasoning_details"].extend(deepcopy(chat_details))
+                for extra in item["data"].get("chat_tool_extra_content", []):
+                    if not isinstance(extra, dict): continue
+                    index = extra.get("index")
+                    if (type(index) is int and 0 <= index < len(calls) and isinstance(calls[index], dict)
+                            and calls[index].get("id") == extra.get("id") and isinstance(extra.get("value"), dict)):
+                        calls[index]["extra_content"] = deepcopy(extra["value"])
                 break
     return output
 
@@ -199,10 +211,21 @@ def _chat(client, supplied, base):
     from agent.transports import get_transport
     wire = _kwargs(get_transport("chat_completions"), supplied, base)
     wire.setdefault("stream_options", {"include_usage": True})
-    terminal = False
+    terminal, tools = False, {}
     with client.with_options(max_retries=0).chat.completions.create(**wire) as stream:
         for event in stream:
             terminal = terminal or any(choice.finish_reason is not None for choice in event.choices)
+            for choice in event.choices:
+                for call in getattr(choice.delta, "tool_calls", None) or []:
+                    entry = tools.setdefault(call.index, {})
+                    if call.id: entry["id"] = call.id
+                    extra = getattr(call, "extra_content", None)
+                    if isinstance(extra, dict): entry["extra_content"] = extra
+                if choice.finish_reason is not None:
+                    from .provider_response_replay import bind_chat_tools
+                    details = bind_chat_tools([], [dict(tools[key]) for key in sorted(tools)])
+                    if details:
+                        choice.delta.reasoning_details = [*(getattr(choice.delta, "reasoning_details", None) or []), *details]
             yield event
     if not terminal:
         raise ConnectionError("MoA Chat stream ended without completion")

@@ -913,3 +913,33 @@ invalid/mixed provenance. The 410 HTTP cases, 6,476 builder comparisons, native
 MoA fallback replay, Chat scope, actual mixed-stream MoA engine and Bedrock
 fixtures pass. Receipts retain exact source hashes. No live account/inference,
 external delivery, installed boot or release acceptance is claimed.
+
+## Gemini tool-signature provenance and MoA retention (2026-10-23)
+
+Actual OpenAI SDK normalization plus the pinned main-agent history writer
+reproduced Gemini `tool_calls.extra_content` signatures reaching a foreign
+primary model after fallback. The actual MoA facades separately lost those
+signatures: the pinned generic stream accumulator preserves tool names/arguments
+but drops `extra_content`. Neither result was a live provider test.
+
+Both HTTP Chat and the native Gemini bridge now stamp tool sidecars with the
+broker's binding. Normalization moves them into a bound carrier recording the
+exact tool-call ID and position. Restoration checks both before attaching a
+signature, removes foreign/stale duplicates and never emits local metadata to
+providers. Chat reasoning and tool sidecars merge into one issuer carrier;
+mixed provenance fails closed. The scoped MoA stream bridge emits its bound
+sidecar before completion so the actual upstream JSON/stream accumulator can
+retain it without replacing that accumulator or changing unscoped providers.
+
+Six required build/CI cases cover OpenRouter Chat and the actual native Gemini
+codec, each with direct SDK JSON and actual MoA JSON/stream facades. They perform
+18 SDK completions, 18 actual main-agent history-writer calls and 30 loopback
+provider dispatches. Synthetic tool results are supplied explicitly: no tool
+executes, no host tool is granted, and these are not full main-agent turns.
+Seven additional ordinary-user tests verify exact call identity, foreign-model
+refusal, merged reasoning/signatures and invalid/mixed provenance. Both suites
+pass **921 tests, two existing skips**. Native Gemini, Bedrock, all 410 HTTP
+cases, 6,476 native builder comparisons, native MoA replay and the previous eight
+main-agent/auxiliary fallback cases pass on the new source. Source-hashed
+receipts are recorded separately; live accounts, installed boot and artifacts
+remain outside these fixture results.

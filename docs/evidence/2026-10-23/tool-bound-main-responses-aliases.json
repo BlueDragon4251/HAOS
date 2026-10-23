@@ -1,0 +1,45 @@
+{
+  "mode": "codex_responses",
+  "owner_aliases": true,
+  "chat_stream": false,
+  "actual_main_agent_turns": 3,
+  "actual_moa_auxiliary_calls": 0,
+  "http_dispatches": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      false
+    ],
+    [
+      2,
+      "fallback",
+      true
+    ],
+    [
+      3,
+      "primary",
+      false
+    ]
+  ],
+  "host_tools_granted": false,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_agent_fallback_replay.py": "fb1b266d01506263e5cba2d7d58b04828006a4b083ecb1f6d7aa510122e1351d",
+    "provider_profiles.py": "2193a2a2bd5efe287cbb7b00acbd98081e22692f165216564e6f0151ded8437e",
+    "provider_proxy.py": "637ddcc2b4c5b7bb8011d5d2f08dad1bdf941107c40e3098c9e0f7cedc94d948",
+    "provider_response_replay.py": "c2b51f4ad13efec77758625506d9dfc5acb301bcdca1bbb50476d8a17fac506e",
+    "provider_replay.py": "2fe7a6092b09429576af55ca45f5cda4997fefdc717b41a9f27c4db37f0016fd",
+    "provider_messages.py": "02fd41c41f4e6cca72408d60f012b78e901bb047886dd1b10259ae1b8c83abb5",
+    "provider_moa_streams.py": "ca17a9e46e6c1ed1b64841366477ae2d892e0aaa65f79382433597ded8720475"
+  }
+}
