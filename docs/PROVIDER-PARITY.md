@@ -734,3 +734,22 @@ network-disabled comparison covers 6,476 compatible combinations over 53
 physical profiles and four parameter/tool corpora. Both runtime variants pass
 895 tests, two existing skips; six native Messages and 410 generic HTTP cases
 also pass. These remain fixtures, not live provider or installed acceptance.
+
+
+## Native Responses context aliases (2026-10-23)
+
+At `fb5decb`, the actual SDK/broker fixture reproduced HTTP 403 for an exact
+owner-approved `gpt-5.4-900k` picker alias after the native builder removed the
+suffix. Admission now derives Responses wire equivalents only from the route's
+exact owner IDs using the pinned `strip_codex_context_variant_suffix` function.
+Unrecognized variants remain unchanged; they never authorize their stripped
+base. Ordinary non-alias requests need no optional Hermes import in minimal CI.
+
+The required JSON and early-stream HTTP cases use distinct approved aliases
+on both primary and fallback routes. Each executes 78 real-normalizer admission
+checks covering eligible bases, vendor prefixes, dated snapshots, invalid
+variants, denied models, protocol changes, SDK overrides and remote tools.
+Both runtime suites pass 895 tests, two existing skips; the six native Anthropic
+SDK fixtures still pass with their 32 alias checks. Native fallback HTTP now
+has 16 required cases. This is local protocol/allowlist evidence, not acceptance
+of 900K account context capacity, entitlement or real inference.

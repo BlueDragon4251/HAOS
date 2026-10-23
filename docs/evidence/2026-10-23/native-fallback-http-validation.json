@@ -1,79 +1,89 @@
 {
-  "probe_sha256": "15b98332bd970945e15b2e9beee1bc7c14cc7cbe52946ce5d6604c1b29fe059e",
-  "base_commit": "4fe81c3ce012829474ace9cff481a5c04bf273f4",
+  "probe_sha256": "5f7db5452d48f81400fc16af3c963bb114ba7d4fa62c3db8a9eb1a3e0a8baa29",
+  "base_commit": "fb5decb",
   "cases": [
     {
       "scenario": "reasoning",
       "receipt": "provider-fallback-reasoning-http.json",
-      "sha256": "001fee7cfa272aca7ac41031ad89d4db7040ccf46b57132593d9101740eb1d56"
+      "sha256": "e131e5638e3157a1b9412fe9ebf2a770b3a79d07f8d4072b2fa33a04dfb65701"
     },
     {
       "scenario": "developer",
       "receipt": "provider-fallback-developer-http.json",
-      "sha256": "262bd9dcf0af0001d32de0905abc0b40f7bd15bd8ad50b7559229c5b9676ae63"
+      "sha256": "4da5340593cce2af4cb1c265462903e568d73416230297c9abb34d330c10a599"
     },
     {
       "scenario": "responses",
       "receipt": "provider-fallback-responses-http.json",
-      "sha256": "8fcf444073e9f4a4bb13b51bafcc4748f61d51bd9ee77f5a186d78c9fb6d2974"
+      "sha256": "c2351b730b0bf831784e7f547d61ff158c29b67d968c84b5bb9ee572335dbce3"
     },
     {
       "scenario": "messages",
       "receipt": "provider-fallback-messages-http.json",
-      "sha256": "57a80d26824fc5fe04ef823d66ebca6899925dfbe3d865f5b3bd717ef62a5c37"
+      "sha256": "f10d283acac4b31b60fa4ec63c5d83de1012227b8c54e9aadc6328a731d5d6b4"
     },
     {
       "scenario": "reasoning-stream",
       "receipt": "provider-fallback-reasoning-stream-http.json",
-      "sha256": "432145b525c430ee843449072f019a86e6d115a9e350a942f2759096dd0f7c72"
+      "sha256": "e57fc607e4f134743f2db7fa8799b1ae53ee8c2f86ad051bae8d0baa6631925c"
     },
     {
       "scenario": "developer-stream",
       "receipt": "provider-fallback-developer-stream-http.json",
-      "sha256": "428ac1c68f57f54ab37323e3db906b18f835272cdb61990d344526c8da431b24"
+      "sha256": "2a664158ffae1aa17ce0a91cdd7fa144f82b368008ca9e01423e3e2680f9e33f"
     },
     {
       "scenario": "responses-stream",
       "receipt": "provider-fallback-responses-stream-http.json",
-      "sha256": "db0ac28964101c1597376db18f455970addb914423a0ee9150ea4b81b34adfee"
+      "sha256": "313b08c201a11709ea454e05d5ccda7183be47f2187a7dd72a4bb3ed2c45d082"
     },
     {
       "scenario": "messages-stream",
       "receipt": "provider-fallback-messages-stream-http.json",
-      "sha256": "e302a109fcbfbc6bd27d3658cc458b835cd8d7d9118ddc6e91b8f8876212289a"
+      "sha256": "20dd343290286ad5ddcb76f0c25a6ce274e73aff36db4f3d65af516c0c44dd08"
     },
     {
       "scenario": "vertex",
       "receipt": "provider-fallback-vertex-http.json",
-      "sha256": "7570ecb488b87cad64949dd1ef22cbb5f3a026efba65225af41ecc8356debbdc"
+      "sha256": "f0e0df8f41b95ab3fc287097f5f0afd9e6c9130c41b29122dc479f545c7b76c0"
     },
     {
       "scenario": "vertex-stream",
       "receipt": "provider-fallback-vertex-stream-http.json",
-      "sha256": "50e35d337f0f6f3a1feaba243c1c5db5a5e081a797c0dbfb6b5bb0624dabf9f9"
+      "sha256": "02de84f66e53b146d4631a6f311d94e0dfe1c5b5bf18497ea91e5e24df0f353d"
     },
     {
       "scenario": "reserved-tools",
       "receipt": "provider-fallback-reserved-tools-http.json",
-      "sha256": "fafaa1fe794b07f90005a531ea23ca0f2f0306ba0aea3b9798bfd52d004da6d6"
+      "sha256": "b74f63cc2b0f8b0339cdd2c821bc4eb542a288c14e8bb973b9465784b9195480"
     },
     {
       "scenario": "reserved-tools-stream",
       "receipt": "provider-fallback-reserved-tools-stream-http.json",
-      "sha256": "9723f3bddd835055dd91d3ba257be43276f23a2e8da4a9d749b9d90dc80bfb89"
+      "sha256": "246a35d79c9c262adf1871f5e35b956559bb1af37aa39369e306e6f4bda9f19d"
     },
     {
       "scenario": "reserved-tools-reverse",
       "receipt": "provider-fallback-reserved-tools-reverse-http.json",
-      "sha256": "b70c7db51942ecf704504fae1e471b22d32a21b5979516d7bd3587628c2f9b26"
+      "sha256": "4f284aedb848e05de7c49bc78aada5bf232401aff28a6948c40d35e9ed22c1c5"
     },
     {
       "scenario": "reserved-tools-reverse-stream",
       "receipt": "provider-fallback-reserved-tools-reverse-stream-http.json",
-      "sha256": "00ea9b58df809af419d236ce6176676de4c3e4afdbebfb58e6a370d4364237ac"
+      "sha256": "7b4fef1fb6e73556790443b3af6fbe51ff29b9da3e0329cc3a41937296756739"
+    },
+    {
+      "scenario": "context-aliases",
+      "receipt": "provider-fallback-context-aliases-http.json",
+      "sha256": "2b2e7f1504ac75adf374f0932ed133dbc36a8d895364951da8db1871c009f43d"
+    },
+    {
+      "scenario": "context-aliases-stream",
+      "receipt": "provider-fallback-context-aliases-stream-http.json",
+      "sha256": "f2d065074600effdec7915a8a3514ca86aa0b58d09dac26838d6e3c4d9a875b4"
     }
   ],
-  "builder_comparisons": 6476,
+  "distinct_native_responses_alias_checks": 78,
   "live_provider_tested": false,
   "full_runtime_tests": {
     "passed": 895,
@@ -83,8 +93,6 @@
     "passed": 895,
     "existing_skips": 2
   },
-  "predecessor_services_kernel_run": 39956507838,
-  "predecessor_services_kernel_result": "success",
   "current_patch_root_ci": "pending after push; no local root pass claimed",
   "source_sha256": [
     {
@@ -181,7 +189,7 @@
     },
     {
       "path": "linux/haos/haos/provider_messages.py",
-      "sha256": "3406b5fadd88dcf3c13e9122a9f7ba9b4cbf5c116096283a62420610d2f72421"
+      "sha256": "b901770747be1ee2addc028cffe4f9997379d595505b82fc12c22ca8f7fb4952"
     },
     {
       "path": "linux/haos/haos/provider_acp.py",

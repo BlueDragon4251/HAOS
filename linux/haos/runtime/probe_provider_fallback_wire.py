@@ -26,13 +26,43 @@ def main():
     scenario = sys.argv[3] if len(sys.argv) == 4 else 'reasoning'
     streaming = scenario.endswith('-stream')
     name = scenario.removesuffix('-stream')
-    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex', 'reserved-tools', 'reserved-tools-reverse'}
-    mode = {'reserved-tools-reverse': 'codex_responses', 'reserved-tools': 'codex_responses', 'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
+    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex', 'reserved-tools', 'reserved-tools-reverse', 'context-aliases'}
+    mode = {'context-aliases': 'codex_responses', 'reserved-tools-reverse': 'codex_responses', 'reserved-tools': 'codex_responses', 'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
     providers = {'reasoning': ('openrouter', 'openai-api'), 'developer': ('openai-api', 'deepseek'),
-        'reserved-tools-reverse': ('openai-api', 'openrouter'), 'reserved-tools': ('openrouter', 'openai-api'), 'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
+        'context-aliases': ('openai-api', 'openrouter'), 'reserved-tools-reverse': ('openai-api', 'openrouter'), 'reserved-tools': ('openrouter', 'openai-api'), 'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
     models = {'source': 'gpt-5', 'target': 'deepseek-chat'} if name == 'developer' else (
         {'source': 'claude-opus-4-6', 'target': 'MiniMax-M2.7'} if name == 'messages' else {'source': 'model-source', 'target': 'model-target'})
+    if name == 'context-aliases': models = {'source': 'gpt-5.4-900k', 'target': 'gpt-6-sol-900k'}
     if name == 'vertex': models = {'source': 'gemini-3-flash-preview', 'target': 'gpt-4.1'}
+    alias_checks = 0
+    if name == 'context-aliases':
+        from agent.model_metadata import strip_codex_context_variant_suffix
+        from haos.provider_messages import admit
+        from haos.provider_policy import ProviderPolicy
+        for owner in ('gpt-5.4-900k', 'gpt-5.6-sol-900k', 'gpt-5.6-terra-900k', 'gpt-5.6-luna-900k',
+                'gpt-6-sol-900k', 'gpt-6-luna-900k', 'gpt-6-astra-900k', 'gpt-daybreak-blue-latest-900k',
+                'openai/gpt-5.6-sol-2026-07-09-900k', 'gpt-6-sol-2026-09-22-900k', 'gpt-5.5-900k'):
+            policy = ProviderPolicy({'version': 1, 'provider': 'openai-api', 'endpoint': default_endpoint('openai-api'),
+                'models': [owner], 'default_model': owner, 'api_mode': 'codex_responses',
+                'requests_per_day': 200, 'requests_per_minute': 120})
+            native = strip_codex_context_variant_suffix(owner)
+            for model in (owner, native):
+                request = {'model': model, 'input': []}
+                assert admit(policy, '/v1/responses', request)['model'] == native
+                assert request['model'] == model
+                alias_checks += 1
+            for change in ({'model': 'unapproved-model'}, {'model': [native]},
+                    {'tools': [{'type': 'web_search'}]}, {'extra_headers': {'Authorization': 'untrusted'}}):
+                try: admit(policy, '/v1/responses', {'model': native, 'input': [], **change})
+                except (PermissionError, ValueError): alias_checks += 1
+                else: raise AssertionError('Responses alias broadened owner authority')
+            try: admit(policy, '/v1/messages', {'model': native, 'input': []})
+            except PermissionError: alias_checks += 1
+            else: raise AssertionError('Responses alias broadened the approved protocol')
+            if native == owner:
+                try: admit(policy, '/v1/responses', {'model': owner.removesuffix('-900k'), 'input': []})
+                except PermissionError: alias_checks += 1
+                else: raise AssertionError('unsupported picker alias admitted another model')
     routes = ProviderRoutes({'version': 2, 'default': 'source', 'routes': {
         key: {'version': 1, 'provider': provider, 'endpoint': ('https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi'
                 if provider == 'vertex' else default_endpoint(provider)),
@@ -58,6 +88,7 @@ def main():
     normalizer = get_transport(mode)
     source_body = wire('source', normalizer)
     target_body = wire('target')
+    wire_models = {'source': source_body['model'], 'target': target_body['model']}
     if name == 'reasoning':
         assert 'reasoning_details' in source_body['messages'][0]
         assert 'reasoning_details' not in target_body['messages'][0]
@@ -77,7 +108,7 @@ def main():
         def do_POST(self):
             try:
                 data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                key = next(key for key, model in models.items() if model == data['model']); calls.append(key)
+                key = next(key for key, model in wire_models.items() if model == data['model']); calls.append(key)
                 assert 'haos_fallback_context' not in json.dumps(data)
                 if mode == 'anthropic_messages' and key == 'source':
                     assert self.headers['x-api-key'] == keys[key]
@@ -97,7 +128,7 @@ def main():
                     assert data == expected, 'fallback did not use the pinned target request codec'
                     wire_tool = data['tools'][0]
                     tool_name = wire_tool.get('name') or wire_tool['function']['name']
-                    result, early, terminal = fixture_response(mode, models['target'], tool_name, 'target fixture')
+                    result, early, terminal = fixture_response(mode, wire_models['target'], tool_name, 'target fixture')
                     if streaming:
                         self.send_response(200); self.send_header('Content-Type', 'text/event-stream')
                         self.send_header('Connection', 'close'); self.end_headers()
@@ -161,7 +192,8 @@ def main():
             http.client.HTTPSConnection = original
             ledger.close()
     result = {'scenario': scenario, 'actual_pinned_source_and_target_request_codecs': True, 'approved_broker_http_hops': calls,
-        'target_uses_its_own_key_and_model': True, 'early_stream_before_terminal_tested': streaming, 'opaque_source_only_reasoning_not_forwarded': True,
+        'target_uses_its_own_key_and_model': True, 'early_stream_before_terminal_tested': streaming, 'opaque_source_only_reasoning_not_forwarded': True if name == 'reasoning' else None,
+        'actual_native_model_alias_positive_negative_checks': alias_checks,
         'live_provider_tested': False, 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (
             Path(__file__), root / 'haos/provider_proxy.py', root / 'haos/provider_policy.py', root / 'haos/provider_fallback.py', root / 'haos/provider_profiles.py', root / 'haos/provider_messages.py')}}
     Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps(result))

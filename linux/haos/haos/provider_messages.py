@@ -9,10 +9,15 @@ def admit(policy, path, payload):
     derived from this route's exact allowlist are equivalent; normalizing an
     arbitrary caller model must never broaden that allowlist.
     """
-    if policy.api_mode != "anthropic_messages" or not isinstance(payload, dict):
+    if policy.api_mode not in {"anthropic_messages", "codex_responses"} or not isinstance(payload, dict):
         return policy.request(path, payload)
 
     def wire(model):
+        if policy.api_mode == "codex_responses":
+            if not model.lower().endswith("-900k"):
+                return model
+            from agent.model_metadata import strip_codex_context_variant_suffix
+            return strip_codex_context_variant_suffix(model)
         # Keep ordinary/minimal broker fixtures independent of optional Hermes
         # imports. Only the native Claude/prefixed aliases need its normalizer.
         if not model.lower().startswith(("claude-", "anthropic/")):
