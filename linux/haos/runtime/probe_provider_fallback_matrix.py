@@ -52,16 +52,21 @@ def main():
     socket.getaddrinfo, socket.socket.connect = no_network, no_network
     checks = []
     try:
-        for corpus in ('reasoning', 'native-features'):
+        for corpus in ('reasoning', 'native-features', 'forced-tool-no-reasoning', 'reserved-tool-identities'):
             params = {'reasoning_config': {'enabled': True, 'effort': 'high'}, 'supports_reasoning': True,
                 'max_tokens': 4096, 'temperature': 0.2, 'session_id': 'fixture-session', 'cache_scope_id': 'fixture-cache'}
             if corpus == 'native-features': params.update(fast_mode=True, context_length=1_000_000)
+            if corpus == 'forced-tool-no-reasoning':
+                params.update(reasoning_config={'enabled': False, 'effort': 'none'}, tool_choice='fixture', parallel_tool_calls=False)
+            active_tools = tools if corpus != 'reserved-tool-identities' else [
+                {'type': 'function', 'function': {'name': value, 'parameters': {'type': 'object'}}}
+                for value in ('tool_search', 'hermes_tool_search', 'search_files')]
             source = {}; expected = {}; expected_features = {}
             for name, policy in policies.items():
                 register_profiles({'version': 2, 'default': 'source', 'routes': {'source': policy.data, 'standby': policy.data},
                     'fallbacks': {'source': ['standby']}})
                 base = 'http://127.0.0.1:9120/routes/source/v1'
-                wire = get_transport(policy.api_mode).build_kwargs(policy.data['default_model'], deepcopy(messages), deepcopy(tools),
+                wire = get_transport(policy.api_mode).build_kwargs(policy.data['default_model'], deepcopy(messages), deepcopy(active_tools),
                     base_url=base, provider='custom', **params)
                 payload, context = extract(flatten(wire), policy.api_mode)
                 assert context is not None
@@ -71,7 +76,7 @@ def main():
                     raise AssertionError(name + ' source wire rejected; fields=' + ','.join(sorted(payload))) from error
                 source[name] = (admitted, context)
                 register_profiles(policy.data)
-                wire = get_transport(policy.api_mode).build_kwargs(policy.data['default_model'], deepcopy(messages), deepcopy(tools),
+                wire = get_transport(policy.api_mode).build_kwargs(policy.data['default_model'], deepcopy(messages), deepcopy(active_tools),
                     base_url=policy.client_config()['model']['base_url'], provider='custom', **params)
                 payload, _unused = extract(flatten(wire), policy.api_mode)
                 expected[name] = canonical(admit(policy, path_for[policy.api_mode], payload), name)
@@ -92,7 +97,7 @@ def main():
     finally:
         socket.getaddrinfo, socket.socket.connect = old_dns, old_connect
     result = {'physical_profiles': len(policies), 'mode_counts': dict(Counter(p.api_mode for p in policies.values())),
-        'compatible_native_builder_comparisons': len(checks), 'cases': checks, 'corpora': ['reasoning', 'native-features'],
+        'compatible_native_builder_comparisons': len(checks), 'cases': checks, 'corpora': ['reasoning', 'native-features', 'forced-tool-no-reasoning', 'reserved-tool-identities'],
         'network_and_live_inference_tested': False, 'actual_pinned_target_codecs': True,
         'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),
             root / 'haos/provider_fallback.py', root / 'haos/provider_profiles.py', root / 'haos/provider_policy.py')}}

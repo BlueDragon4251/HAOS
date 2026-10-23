@@ -213,3 +213,17 @@ def test_vertex_cannot_turn_native_thinking_into_an_sdk_override(extra):
     with pytest.raises(PermissionError):
         ProviderPolicy(policy("openai", api_mode="chat_completions")).request(
             "/v1/chat/completions", {"model": "fixture-model", "extra_body": extra})
+
+
+@pytest.mark.parametrize("kind", ["tool_use", "function_call", "response.function_call_arguments.done"])
+def test_request_owned_native_tool_aliases_restore_only_dispatch_names(kind):
+    from haos.provider_messages import restore
+    names = {"hermes_tool_search_2": "tool_search"}
+    value = {"type": kind, "name": "hermes_tool_search_2", "arguments": "hermes_tool_search_2",
+        "content": {"name": "hermes_tool_search_2"}}
+    assert restore(value, names) == {**value, "name": "tool_search"}
+    assert value["name"] == "hermes_tool_search_2"
+    collision = {"type": kind, "name": "hermes_tool_search"}
+    assert restore(collision, names) == collision
+    assert restore({"type": "text", "name": "hermes_tool_search_2"}, names) == {
+        "type": "text", "name": "hermes_tool_search_2"}

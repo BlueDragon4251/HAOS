@@ -52,7 +52,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
           "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_provider_fallback_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-builder-matrix.json"
-          for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream vertex vertex-stream; do
+          for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream vertex vertex-stream reserved-tools reserved-tools-stream reserved-tools-reverse reserved-tools-reverse-stream; do
             "$PYTHON" linux/haos/runtime/probe_provider_fallback_wire.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-$scenario.json" "$scenario"
           done
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"

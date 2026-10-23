@@ -62,10 +62,11 @@ def prepare(payload, *, oauth=False):
 
 
 def restore(value, names):
-    """Restore only exact request-owned names in native tool-use blocks."""
+    """Restore exact request-owned tool identities, never prose or arbitrary names."""
     if isinstance(value, list):
         return [restore(item, names) for item in value]
     if isinstance(value, dict):
-        return {key: names.get(item, item) if key == "name" and value.get("type") == "tool_use" and isinstance(item, str)
+        return {key: names.get(item, item) if key == "name" and value.get("type") in {
+                    "tool_use", "function_call", "response.function_call_arguments.done"} and isinstance(item, str)
                 else restore(item, names) for key, item in value.items()}
     return value

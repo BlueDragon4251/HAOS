@@ -101,8 +101,21 @@ def retarget(policy, payload, context, features=None, *, model=None):
     wire['stream'] = payload.get('stream', False)
     # Preserve the caller's native tool identity for its response normalizer.
     # A future codec changing it must supply a reviewed reversible mapping.
-    if _names(policy.api_mode, wire.get('tools')) != _names(policy.api_mode, payload.get('tools')):
-        raise PermissionError('fallback changed local function wire identities')
+    target_names = _names(policy.api_mode, wire.get('tools'))
+    source_names = _names(policy.api_mode, payload.get('tools'))
+    if target_names != source_names:
+        # Responses backends reserve different local-function names. Preserve
+        # the source SDK's request-local identity when returning target results.
+        if (policy.api_mode != 'codex_responses' or features is None
+                or len(target_names) != len(source_names)
+                or not all(isinstance(name, str) and name for name in [*target_names, *source_names])
+                or len(set(target_names)) != len(target_names) or len(set(source_names)) != len(source_names)):
+            raise PermissionError('fallback changed local function wire identities')
+        native_aliases = getattr(transport, '_last_wire_aliases', None) or {}
+        logical_names = [tool['function']['name'] for tool in context['tools'] or []]
+        if [native_aliases.get(name, name) for name in target_names] != logical_names:
+            raise PermissionError('target codec changed logical local function identities')
+        features['tool_names'] = {target: source for target, source in zip(target_names, source_names) if target != source}
     from .provider_messages import admit
     path = {'chat_completions': '/v1/chat/completions', 'codex_responses': '/v1/responses',
         'anthropic_messages': '/v1/messages'}[policy.api_mode]

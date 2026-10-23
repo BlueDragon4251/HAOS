@@ -10,7 +10,7 @@ import sys
 import tempfile
 import threading
 from urllib.parse import urlsplit
-from probe_http_provider_matrix import serving, fixture_response
+from probe_http_provider_matrix import serving, fixture_response, sdk_stream
 
 
 def main():
@@ -26,10 +26,10 @@ def main():
     scenario = sys.argv[3] if len(sys.argv) == 4 else 'reasoning'
     streaming = scenario.endswith('-stream')
     name = scenario.removesuffix('-stream')
-    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex'}
-    mode = {'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
+    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex', 'reserved-tools', 'reserved-tools-reverse'}
+    mode = {'reserved-tools-reverse': 'codex_responses', 'reserved-tools': 'codex_responses', 'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
     providers = {'reasoning': ('openrouter', 'openai-api'), 'developer': ('openai-api', 'deepseek'),
-        'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
+        'reserved-tools-reverse': ('openai-api', 'openrouter'), 'reserved-tools': ('openrouter', 'openai-api'), 'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
     models = {'source': 'gpt-5', 'target': 'deepseek-chat'} if name == 'developer' else (
         {'source': 'claude-opus-4-6', 'target': 'MiniMax-M2.7'} if name == 'messages' else {'source': 'model-source', 'target': 'model-target'})
     if name == 'vertex': models = {'source': 'gemini-3-flash-preview', 'target': 'gpt-4.1'}
@@ -45,12 +45,19 @@ def main():
     if name == 'developer':
         messages = [{'role': 'system', 'content': 'system fixture'}, {'role': 'user', 'content': 'continue fixture'}]
     tools = [{'type': 'function', 'function': {'name': 'fixture', 'parameters': {'type': 'object'}}}]
+    if name.startswith('reserved-tools'):
+        tools = [{'type': 'function', 'function': {'name': value, 'parameters': {'type': 'object'}}}
+            for value in ('tool_search', 'hermes_tool_search')]
     config = routes.client_config()
-    def wire(key):
-        return get_transport(mode).build_kwargs(models[key], messages, tools,
+    def wire(key, transport=None):
+        return (transport or get_transport(mode)).build_kwargs(models[key], messages, tools,
             base_url=config['providers']['haos-' + key]['base_url'], max_tokens=64,
             reasoning_config={'enabled': True, 'effort': 'high'} if name == 'vertex' else None)
-    source_body, target_body = wire('source'), wire('target')
+    # Normalize on the exact native instance that built the source request;
+    # collision suffixes live in its request-local reverse alias map.
+    normalizer = get_transport(mode)
+    source_body = wire('source', normalizer)
+    target_body = wire('target')
     if name == 'reasoning':
         assert 'reasoning_details' in source_body['messages'][0]
         assert 'reasoning_details' not in target_body['messages'][0]
@@ -88,7 +95,9 @@ def main():
                     expected.update(stream=streaming)
                     if mode != 'anthropic_messages': expected['store'] = False
                     assert data == expected, 'fallback did not use the pinned target request codec'
-                    result, early, terminal = fixture_response(mode, models['target'], 'fixture', 'target fixture')
+                    wire_tool = data['tools'][0]
+                    tool_name = wire_tool.get('name') or wire_tool['function']['name']
+                    result, early, terminal = fixture_response(mode, models['target'], tool_name, 'target fixture')
                     if streaming:
                         self.send_response(200); self.send_header('Content-Type', 'text/event-stream')
                         self.send_header('Connection', 'close'); self.end_headers()
@@ -128,18 +137,23 @@ def main():
                         client.responses.create if mode == 'codex_responses' else client.chat.completions.create)
                     if streaming:
                         events = []; first = False
-                        with call(**source_body, stream=True) as stream:
+                        with sdk_stream(client, mode, call, source_body, accumulate=mode != 'chat_completions') as stream:
                             for event in stream:
                                 encoded = event.model_dump_json(); events.append(encoded)
                                 if not first and 'target fixture' in encoded:
                                     assert not release.is_set()
                                     first = True; release.set()
+                            if mode != 'chat_completions':
+                                response = stream.get_final_response() if mode == 'codex_responses' else stream.get_final_message()
+                                normalized = normalizer.normalize_response(response)
+                                assert normalized.content == 'target fixture'
+                                assert normalized.tool_calls[0].name == tools[0]['function']['name']
                         assert first and 'fixture' in ''.join(events) and 'call_fixture' in ''.join(events)
                     else:
                         response = call(**source_body)
-                        normalized = get_transport(mode).normalize_response(response)
+                        normalized = normalizer.normalize_response(response)
                         assert normalized.content == 'target fixture'
-                        assert normalized.tool_calls[0].name == 'fixture'
+                        assert normalized.tool_calls[0].name == tools[0]['function']['name']
             assert finished.wait(5)
             assert ledger.db.execute('SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid').fetchall() == [(503, None, None), (200, 8, 5)]
             assert calls == ['source', 'target'] and not failures
@@ -149,7 +163,7 @@ def main():
     result = {'scenario': scenario, 'actual_pinned_source_and_target_request_codecs': True, 'approved_broker_http_hops': calls,
         'target_uses_its_own_key_and_model': True, 'early_stream_before_terminal_tested': streaming, 'opaque_source_only_reasoning_not_forwarded': True,
         'live_provider_tested': False, 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (
-            Path(__file__), root / 'haos/provider_proxy.py', root / 'haos/provider_policy.py', root / 'haos/provider_fallback.py', root / 'haos/provider_profiles.py')}}
+            Path(__file__), root / 'haos/provider_proxy.py', root / 'haos/provider_policy.py', root / 'haos/provider_fallback.py', root / 'haos/provider_profiles.py', root / 'haos/provider_messages.py')}}
     Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps(result))
 
 

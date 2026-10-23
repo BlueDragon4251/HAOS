@@ -351,6 +351,7 @@ class Handler(BaseHTTPRequestHandler):
                 if target != route and context is None:
                     attempt = retarget(self.policy, attempt, None)
                 headers = merge_features(headers, features)
+                self.fallback_tool_names = features.get("tool_names", {})
                 redactor.secrets = (*redactor.secrets, self.server.token)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
                 if status not in {429, 502, 503, 504} or self.forward_started:
@@ -401,6 +402,9 @@ class Handler(BaseHTTPRequestHandler):
             conn.response_class = FramedHTTPResponse
             from .provider_messages import prepare, restore
             payload, wire_names = prepare(payload, oauth=getattr(getattr(self.route_credentials, "request_state", None), "oauth_messages", False))
+            fallback_names = getattr(self, "fallback_tool_names", {})
+            wire_names = {**fallback_names, **{name: fallback_names.get(original, original)
+                for name, original in wire_names.items()}}
             body = json.dumps(payload, ensure_ascii=False).encode()
             route = {"codex_responses": "/responses", "chat_completions": "/chat/completions",
                      "anthropic_messages": "/messages"}[self.policy.api_mode]

@@ -709,3 +709,28 @@ OpenAI client and a real Google SDK credential object containing a fixture
 access token. These two cases do not test Google token issuance (the separate
 49-case cloud fixture covers token HTTP). The required native fallback probe
 now has ten cases. Both runtime suites still pass 892 tests, two existing skips.
+
+
+## Native function identity across approved fallbacks (2026-10-23)
+
+A real Responses HTTP case at `4fe81c3` reproduced refusal when the target
+reserved `tool_search` and the source did not. Approved Responses fallbacks
+now retain a request-local target-to-source wire-name map, checked against the
+actual pinned target builder's reverse aliases and logical function identities.
+The response rewriter changes names only in native function-call/tool-use
+objects and argument-completion events. Prose, argument strings, unrelated
+`name` fields and a real function named `hermes_tool_search` remain unchanged.
+Existing private Anthropic subscription aliases compose with that mapping.
+
+Four collision cases use the real SDK in both source/target directions, with
+JSON and early streaming. Native stream accumulation and the same transport
+instance that built the source request verify the original local dispatch name.
+During fixture development a fresh normalize-only instance lacked its native
+request-local collision map; retaining the actual build instance fixes that
+fixture without weakening assertions or changing upstream code.
+
+The mandatory probe now has 14 actual local SDK/Broker/HTTP cases. The required
+network-disabled comparison covers 6,476 compatible combinations over 53
+physical profiles and four parameter/tool corpora. Both runtime variants pass
+895 tests, two existing skips; six native Messages and 410 generic HTTP cases
+also pass. These remain fixtures, not live provider or installed acceptance.

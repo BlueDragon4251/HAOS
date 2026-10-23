@@ -1,67 +1,191 @@
 {
-  "probe_sha256": "af382ca08c65139fa9d993b63892bafce997817b1c5f05a3808b8a918900a3e1",
-  "base_commit": "a3ac7234cd8f1dcf36b40e9ebead36c4a58f6245",
+  "probe_sha256": "15b98332bd970945e15b2e9beee1bc7c14cc7cbe52946ce5d6604c1b29fe059e",
+  "base_commit": "4fe81c3ce012829474ace9cff481a5c04bf273f4",
   "cases": [
     {
       "scenario": "reasoning",
       "receipt": "provider-fallback-reasoning-http.json",
-      "sha256": "759226c8609bc7575c6c1513224220ae4f7e74eb716e744014537bcad27e9210"
+      "sha256": "001fee7cfa272aca7ac41031ad89d4db7040ccf46b57132593d9101740eb1d56"
     },
     {
       "scenario": "developer",
       "receipt": "provider-fallback-developer-http.json",
-      "sha256": "8e87785ddf4d26078bc9dd4ff20fa01c80fb09c4c333bb8d87a3e43d3aa6e97f"
+      "sha256": "262bd9dcf0af0001d32de0905abc0b40f7bd15bd8ad50b7559229c5b9676ae63"
     },
     {
       "scenario": "responses",
       "receipt": "provider-fallback-responses-http.json",
-      "sha256": "241741cb80a30cb074a8529f98645194f974db2df2b457d7a07a4a46e30cde30"
+      "sha256": "8fcf444073e9f4a4bb13b51bafcc4748f61d51bd9ee77f5a186d78c9fb6d2974"
     },
     {
       "scenario": "messages",
       "receipt": "provider-fallback-messages-http.json",
-      "sha256": "9831da1830232b33043a842513b77418d08f230985970dc772a66cac08a673a2"
+      "sha256": "57a80d26824fc5fe04ef823d66ebca6899925dfbe3d865f5b3bd717ef62a5c37"
     },
     {
       "scenario": "reasoning-stream",
       "receipt": "provider-fallback-reasoning-stream-http.json",
-      "sha256": "30c6d5fae46336a5043b827d03c4631c0e9133927723ccacfbb0d0ae0281a4c2"
+      "sha256": "432145b525c430ee843449072f019a86e6d115a9e350a942f2759096dd0f7c72"
     },
     {
       "scenario": "developer-stream",
       "receipt": "provider-fallback-developer-stream-http.json",
-      "sha256": "f5255661240c547d75965813a512be10dc2b99f8f1c1645a4e9403a5d78d0e9d"
+      "sha256": "428ac1c68f57f54ab37323e3db906b18f835272cdb61990d344526c8da431b24"
     },
     {
       "scenario": "responses-stream",
       "receipt": "provider-fallback-responses-stream-http.json",
-      "sha256": "fc9833c9128e1b3e65589997f5b08bea49b862a868e68dd05f0e68e37e80a3ba"
+      "sha256": "db0ac28964101c1597376db18f455970addb914423a0ee9150ea4b81b34adfee"
     },
     {
       "scenario": "messages-stream",
       "receipt": "provider-fallback-messages-stream-http.json",
-      "sha256": "25d9525556908e6a2ba9db73b4c10bb8be89b0ff859da9adc8fa687f1849ea0a"
+      "sha256": "e302a109fcbfbc6bd27d3658cc458b835cd8d7d9118ddc6e91b8f8876212289a"
     },
     {
       "scenario": "vertex",
       "receipt": "provider-fallback-vertex-http.json",
-      "sha256": "878ebf9a2c8ee60b245fd70f5a7023c90fb3ac55a0ac23c17161d721bf08d335"
+      "sha256": "7570ecb488b87cad64949dd1ef22cbb5f3a026efba65225af41ecc8356debbdc"
     },
     {
       "scenario": "vertex-stream",
       "receipt": "provider-fallback-vertex-stream-http.json",
-      "sha256": "4306c646f72735522a39f249f0740a5980120747cf2746e87038e59af0a4d3ca"
+      "sha256": "50e35d337f0f6f3a1feaba243c1c5db5a5e081a797c0dbfb6b5bb0624dabf9f9"
+    },
+    {
+      "scenario": "reserved-tools",
+      "receipt": "provider-fallback-reserved-tools-http.json",
+      "sha256": "fafaa1fe794b07f90005a531ea23ca0f2f0306ba0aea3b9798bfd52d004da6d6"
+    },
+    {
+      "scenario": "reserved-tools-stream",
+      "receipt": "provider-fallback-reserved-tools-stream-http.json",
+      "sha256": "9723f3bddd835055dd91d3ba257be43276f23a2e8da4a9d749b9d90dc80bfb89"
+    },
+    {
+      "scenario": "reserved-tools-reverse",
+      "receipt": "provider-fallback-reserved-tools-reverse-http.json",
+      "sha256": "b70c7db51942ecf704504fae1e471b22d32a21b5979516d7bd3587628c2f9b26"
+    },
+    {
+      "scenario": "reserved-tools-reverse-stream",
+      "receipt": "provider-fallback-reserved-tools-reverse-stream-http.json",
+      "sha256": "00ea9b58df809af419d236ce6176676de4c3e4afdbebfb58e6a370d4364237ac"
     }
   ],
+  "builder_comparisons": 6476,
   "live_provider_tested": false,
-  "reproduced_at_base": "Vertex fallback raises 429 before target dispatch because source-native extra_body is rejected by target policy",
   "full_runtime_tests": {
-    "passed": 892,
+    "passed": 895,
     "existing_skips": 2
   },
   "minimal_runtime_tests": {
-    "passed": 892,
+    "passed": 895,
     "existing_skips": 2
   },
-  "root_and_kernel_ci": "required; no local root pass claimed"
+  "predecessor_services_kernel_run": 39956507838,
+  "predecessor_services_kernel_result": "success",
+  "current_patch_root_ci": "pending after push; no local root pass claimed",
+  "source_sha256": [
+    {
+      "path": "linux/haos/haos/provider_usage.py",
+      "sha256": "d983971816de42a99d6860a38a7242162f003787ba9cb989155d58501e7203cd"
+    },
+    {
+      "path": "linux/haos/haos/provider_launch.py",
+      "sha256": "229ac1e8628691528eb578f9e0445ab2aef31b1ca55c8b0d195a8065934a5cae"
+    },
+    {
+      "path": "linux/haos/haos/provider_sse.py",
+      "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+    },
+    {
+      "path": "linux/haos/haos/provider_policy.py",
+      "sha256": "afbb3125c8e749a660985fad58ae8f32392b4b83c080a088ec6c80149174e59a"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp_launch.py",
+      "sha256": "98e7e4daa16c565841cf43c19ffd8f3260915fd18d0acfb715f0077674378b32"
+    },
+    {
+      "path": "linux/haos/haos/provider_discovery.py",
+      "sha256": "ba68bd7ee35cb6e2b9e9ca283019ed9ada4158f0f56bd62c4adfdee56ce9a96e"
+    },
+    {
+      "path": "linux/haos/haos/provider_copilot.py",
+      "sha256": "0cc8f51b880986500aef7353aee6937d3a00e978bc89698f1ccf800300c880fb"
+    },
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "5c766efaf4efa9a85dadfa8e556e18c4765c1d63b5a007875c5fb4b0fce2a88b"
+    },
+    {
+      "path": "linux/haos/haos/provider_qwen.py",
+      "sha256": "069a89f215038e8fb8c95b00ee66e7e79a6345a21cf240ac7e646e15c7f6ec6d"
+    },
+    {
+      "path": "linux/haos/haos/provider_native.py",
+      "sha256": "3b93c700fd9b2293a224731d73aac278a2872dc9a003612cf2ca003e0095be13"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_replay.py",
+      "sha256": "f477d468782aa42c2ce14ec6caa71eb688fd58fc68104a93d7d188c7a8a1c705"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    },
+    {
+      "path": "linux/haos/haos/provider_registry.py",
+      "sha256": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "926d6489fb9a3ad2dcea93d95b626ec1e93ed099f85f5c51172fe74f50231962"
+    },
+    {
+      "path": "linux/haos/haos/provider_cloud.py",
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed"
+    },
+    {
+      "path": "linux/haos/haos/provider_retry.py",
+      "sha256": "29e6902a3da435a5a407b269fa402eef7d6ca4a2dece87c27c6681556b138b69"
+    },
+    {
+      "path": "linux/haos/haos/provider_fallback.py",
+      "sha256": "92f6f520b77d6321426164333d4283ccad5145f154046f4fb989ebe343c0ed30"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp_network.py",
+      "sha256": "0a1b1180c611f59f65ddae7d66663bd553eb13b4ee7cd64b11357d6a4777c7e4"
+    },
+    {
+      "path": "linux/haos/haos/provider_replay.py",
+      "sha256": "f42cd02da5e95a6f2de7a2cad121e855994d53042bd139505414359bfd9ca724"
+    },
+    {
+      "path": "linux/haos/haos/provider_routes.py",
+      "sha256": "547b58386430878e5b335119c4cb5e4db680a3cf91c676d548f8f0851c7a01a0"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_messages.py",
+      "sha256": "87b6361205b9d9c179b110e8f8de2eb99f975cb8e75eec133c56225230e3110b"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "5ac1f44c346cfd5d93dd8fb1f16b2137bbb727414e57312c511df9922d414bb8"
+    },
+    {
+      "path": "linux/haos/haos/provider_messages.py",
+      "sha256": "3406b5fadd88dcf3c13e9122a9f7ba9b4cbf5c116096283a62420610d2f72421"
+    },
+    {
+      "path": "linux/haos/haos/provider_acp.py",
+      "sha256": "55b0ad88d8088e993f5e0d3b972dc7fc98f050e1848a32c5887daeb38bf3f944"
+    }
+  ]
 }
