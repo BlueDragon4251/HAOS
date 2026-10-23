@@ -135,6 +135,8 @@ def main():
                     assert not self.headers.get("Authorization") and not self.headers.get("x-api-key")
                 assert state["capability"] not in " ".join(self.headers.values())
                 assert not self.headers.get("Cookie")
+                if state["provider"] in {"opencode-go", "opencode-zen"}:
+                    assert self.headers.get("x-opencode-session"), "native OpenCode session header missing"
                 received.append((state["provider"], case))
                 if case in {"401", "429"}:
                     data = json.dumps({"error": {"message": state["key"] or "local-fixture-error", "type": "fixture_error"}}).encode()

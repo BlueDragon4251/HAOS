@@ -19,8 +19,10 @@ def main():
     from haos.provider_routes import ProviderRoutes
     from haos.provider_profiles import register_profiles
     from haos.provider_proxy import Broker, Credentials, UsageLedger
-    stream = sys.argv[3].endswith('-stream')
-    option = sys.argv[3].removesuffix('-stream')
+    opencode = sys.argv[3].startswith('opencode-')
+    requested = sys.argv[3].removeprefix('opencode-')
+    stream = requested.endswith('-stream')
+    option = requested.removesuffix('-stream')
     auxiliary = option.endswith('-moa')
     option = option.removesuffix('-moa')
     aliases = option.endswith('-aliases')
@@ -34,14 +36,18 @@ def main():
     if aliases:
         models = {key: value + '-900k' for key, value in models.items()} if mode == 'codex_responses' else {
             'primary': 'anthropic/claude-sonnet-4.6', 'fallback': 'claude-opus-4.6'}
+    if opencode:
+        provider, endpoint = 'opencode-go', 'https://opencode.ai/zen/go/v1'
+        if mode == 'chat_completions': models = {'primary': 'kimi-k2.5', 'fallback': 'glm-5.2'}
     keys = {name: secrets.token_urlsafe(40) for name in models}
     routes = ProviderRoutes({'version': 2, 'default': 'primary', 'routes': {
-        name: {'version': 1, 'provider': provider, 'endpoint': endpoint, 'models': [model],
+        name: {'version': 1, 'provider': ('opencode-zen' if opencode and name == 'fallback' else provider), 'endpoint': ('https://opencode.ai/zen/v1' if opencode and name == 'fallback' else endpoint), 'models': [model],
             'default_model': model, 'api_mode': mode, 'requests_per_day': 200, 'requests_per_minute': 120}
         for name, model in models.items()}, 'fallbacks': {'primary': ['fallback']}})
     from haos.provider_messages import native_model
     wire_models = {name: native_model(routes.routes[name], model) for name, model in models.items()}
     state = {'turn': 1}; observed, failures = [], []
+    affinities = []
     opaque = 'encrypted-fixture' if mode == 'codex_responses' else 'signed-fixture'
     class Fixture(BaseHTTPRequestHandler):
         def log_message(self, *_): pass
@@ -51,7 +57,12 @@ def main():
                 if mode == 'chat_completions':
                     assert body.get('stream', False) == (stream or auxiliary)
                 name = next(key for key in models if wire_models[key] == body['model'])
-                assert self.path == ('/api/v1/chat/completions' if mode == 'chat_completions' else '/v1/responses' if mode == 'codex_responses' else '/v1/messages')
+                expected_path = ('/api/v1/chat/completions' if mode == 'chat_completions' else '/v1/responses' if mode == 'codex_responses' else '/v1/messages')
+                if opencode:
+                    expected_path = ('/zen/go/v1' if name == 'primary' else '/zen/v1') + {'chat_completions': '/chat/completions', 'codex_responses': '/responses', 'anthropic_messages': '/messages'}[mode]
+                    assert self.headers.get('x-opencode-session'), 'missing pinned OpenCode session header'
+                    affinities.append(self.headers['x-opencode-session'])
+                assert self.path == expected_path
                 assert (self.headers['Authorization'] == 'Bearer ' + keys[name] if mode != 'anthropic_messages'
                     else self.headers['x-api-key'] == keys[name])
                 present = opaque in json.dumps(body)
@@ -64,11 +75,12 @@ def main():
                     message = result['choices'][0]['message']
                     message.pop('tool_calls'); result['choices'][0]['finish_reason'] = 'stop'
                     message['reasoning_details'] = [{'type': 'reasoning.encrypted', 'data': opaque, 'id': 'reasoning-fixture', 'format': 'anthropic-claude-v1', 'index': 0, 'haos_replay_binding': '0' * 64}]
+                    if opencode: message.pop('reasoning_details', None)
                     if not body.get('stream'):
                         encoded = json.dumps(result).encode()
                         self.send_response(200); self.send_header('Content-Type', 'application/json')
                         self.send_header('Content-Length', str(len(encoded))); self.end_headers(); self.wfile.write(encoded); return
-                    early[0]['choices'][0]['delta']['reasoning_details'] = message['reasoning_details']
+                    early[0]['choices'][0]['delta']['reasoning_details'] = message.get('reasoning_details', [])
                     terminal[0]['choices'][0] = {'index': 0, 'delta': {}, 'finish_reason': 'stop'}
                 elif mode == 'codex_responses':
                     # A final text answer: no host or fixture tool execution.
@@ -94,6 +106,22 @@ def main():
                         {'type': 'content_block_delta', 'index': 0, 'delta': {'type': 'thinking_delta', 'thinking': 'native thought'}},
                         {'type': 'content_block_delta', 'index': 0, 'delta': {'type': 'signature_delta', 'signature': opaque}},
                         {'type': 'content_block_stop', 'index': 0}]
+                if opencode:
+                    if mode == 'chat_completions':
+                        result['choices'][0]['message'].pop('reasoning_details', None)
+                        early[0]['choices'][0]['delta'].pop('reasoning_details', None)
+                    elif mode == 'codex_responses':
+                        result['output'] = [item for item in result['output'] if item['type'] != 'reasoning']
+                        early = [event for event in early if event.get('item', {}).get('type') != 'reasoning']
+                        terminal = [event for event in terminal if event.get('item', {}).get('type') != 'reasoning']
+                        for event in [*early, *terminal]:
+                            if 'output_index' in event: event['output_index'] -= 1
+                    else:
+                        result['content'] = [item for item in result['content'] if item['type'] != 'thinking']
+                        early = [event for event in early if event.get('index') != 0]
+                        terminal = [event for event in terminal if event.get('index') != 0]
+                        for event in [*early, *terminal]:
+                            if 'index' in event: event['index'] -= 1
                 self.send_response(200); self.send_header('Content-Type', 'text/event-stream')
                 self.send_header('Connection', 'close'); self.end_headers()
                 for index, event in enumerate([*early, *terminal]):
@@ -110,7 +138,7 @@ def main():
         return old_dns(host, *args, **kwargs)
     with tempfile.TemporaryDirectory() as directory, serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port:
         def local(host, port_number=443, **kwargs):
-            assert host in {'api.openai.com', 'api.anthropic.com', 'openrouter.ai'} and port_number == 443
+            assert host in {'api.openai.com', 'api.anthropic.com', 'openrouter.ai', 'opencode.ai'} and port_number == 443
             return http.client.HTTPConnection('127.0.0.1', port, timeout=kwargs.get('timeout', 10))
         http.client.HTTPSConnection = local
         ledger = UsageLedger(Path(directory) / 'usage.db'); capability = secrets.token_urlsafe(48)
@@ -130,6 +158,10 @@ def main():
                 assert not agent.tools
                 if mode == "chat_completions":
                     agent._disable_streaming = not stream
+                affinity_token = None
+                if opencode and auxiliary:
+                    from agent.portal_tags import set_affinity_scope
+                    affinity_token = set_affinity_scope('fixture-ambient-conversation')
                 history = None
                 for turn in (1, 2, 3):
                     state['turn'] = turn
@@ -156,9 +188,13 @@ def main():
                     else:
                         result = agent.run_conversation('native fixture' if turn == 1 else 'continue fixture', conversation_history=history, stream_callback=(lambda text: None) if stream else None)
                         history = result['messages']
-                    assert 'native fixture' in json.dumps(history), 'actual main-agent answer missing'
+                    assert any(message.get('role') == 'assistant' and message.get('content') == 'native fixture' for message in history), 'actual assistant answer missing'
+                if affinity_token is not None:
+                    from agent.portal_tags import reset_affinity_scope
+                    reset_affinity_scope(affinity_token)
             assert not failures
-            assert observed == [(1, 'primary', False), (1, 'fallback', False), (2, 'primary', False), (2, 'fallback', True), (3, 'primary', False)], observed
+            if opencode: assert len(set(affinities)) == 1, 'native conversation affinity changed across fallback/turns'
+            assert observed == [(1, 'primary', False), (1, 'fallback', False), (2, 'primary', False), (2, 'fallback', not opencode), (3, 'primary', False)], observed
             assert ledger.db.execute('SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid').fetchall() == [
                 (503, None, None), (200, 8, 5), (503, None, None), (200, 8, 5), (200, 8, 5)]
         finally:
@@ -168,9 +204,9 @@ def main():
                 if value is None: os.environ.pop(key, None)
                 else: os.environ[key] = value
             ledger.close()
-    result = {'mode': mode, 'owner_aliases': aliases, 'chat_stream': stream, 'actual_main_agent_turns': 0 if auxiliary else 3, 'actual_moa_auxiliary_calls': 3 if auxiliary else 0, 'http_dispatches': observed, 'host_tools_granted': False,
+    result = {'mode': mode, 'opencode_affinity': opencode, 'affinity_header_count': len(affinities), 'native_affinity_stable': len(set(affinities)) == 1 if opencode else None, 'owner_aliases': aliases, 'chat_stream': stream, 'actual_main_agent_turns': 0 if auxiliary else 3, 'actual_moa_auxiliary_calls': 3 if auxiliary else 0, 'http_dispatches': observed, 'host_tools_granted': False,
         'live_provider_tested': False, 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (
-            Path(__file__), root/'haos/provider_profiles.py', root/'haos/provider_proxy.py', root/'haos/provider_response_replay.py',
+            Path(__file__), root/'haos/provider_profiles.py', root/'haos/provider_proxy.py', root/'haos/provider_affinity.py', root/'haos/provider_response_replay.py',
             root/'haos/provider_replay.py', root/'haos/provider_messages.py', root/'haos/provider_moa_streams.py')}}
     Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps(result))
 

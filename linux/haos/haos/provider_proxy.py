@@ -364,6 +364,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"])
                     if target != route else None)
                 redactor.secrets = (*redactor.secrets, self.server.token)
+                from .provider_affinity import headers as affinity_headers
+                affinity = affinity_headers(self.policy, context)
+                if any(redactor.text(value) != value for value in affinity.values()):
+                    raise PermissionError("conversation affinity cannot contain a credential")
+                headers.update(affinity)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
                 if status not in {429, 502, 503, 504} or self.forward_started:
                     break

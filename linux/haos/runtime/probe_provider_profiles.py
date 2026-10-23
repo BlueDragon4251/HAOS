@@ -57,6 +57,14 @@ def main():
                 provider=provider, provider_profile=original, **params)
             actual = get_transport(mode).build_kwargs(model, messages, tools,
                 base_url=policy.client_config()["model"]["base_url"], provider="custom", **params)
+            from haos.provider_affinity import is_opencode, headers as affinity_headers
+            if is_opencode(policy):
+                from agent.opencode_affinity import opencode_session_headers
+                from haos.provider_fallback import FIELD
+                local = actual['extra_body'].pop(FIELD)
+                assert local['model'] == model and local['messages'] == messages
+                assert affinity_headers(policy, local) == opencode_session_headers(provider, policy.endpoint, params['session_id'])
+                if not actual['extra_body']: actual.pop('extra_body')
             if actual != expected:
                 changed = sorted(key for key in set(actual) | set(expected) if actual.get(key) != expected.get(key))
                 raise AssertionError(provider + " broker lost wire fields: " + ",".join(changed))

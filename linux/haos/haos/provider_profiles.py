@@ -139,8 +139,16 @@ def register_profiles(data):
         @wraps(method)
         def build(self, model, messages, tools=None, **params):
             base = str(params.get("base_url") or "").rstrip("/")
-            needs_context = base in fallback_bases or any(params.get(key) for key in ("fast_mode", "context_length", "drop_context_1m_beta"))
+            from types import SimpleNamespace
+            from .provider_affinity import KEY, capture as capture_affinity, is_opencode
+            selected = profiles.get(base)
+            policy = SimpleNamespace(provider=selected[2], endpoint=selected[1]) if selected else None
+            opencode = policy is not None and is_opencode(policy)
+            needs_context = opencode or base in fallback_bases or any(params.get(key) for key in ("fast_mode", "context_length", "drop_context_1m_beta"))
             context = capture(self.api_mode, model, messages, tools, params) if needs_context else None
+            if context is not None and policy is not None:
+                affinity = capture_affinity(policy, params)
+                if affinity is not None: context["params"][KEY] = affinity
             return attach(method(self, model, messages, tools, **params), context)
         return build
     for cls in (BrokerChat, BrokerResponses, BrokerMessages):

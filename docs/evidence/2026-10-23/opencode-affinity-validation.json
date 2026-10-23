@@ -1,0 +1,143 @@
+{
+  "base_commit": "e81bcba58358af9326d7af7ce2b032c9bec05da1",
+  "before": "actual main-agent request reached strict loopback Go fixture without x-opencode-session",
+  "actual_main_agent_cases": 4,
+  "actual_main_agent_turns": 12,
+  "actual_moa_auxiliary_calls": 6,
+  "opencode_http_dispatches": 30,
+  "native_affinity_function_used": true,
+  "ambient_auxiliary_scope_explicit": true,
+  "opencode_cases_use_plain_responses": true,
+  "full_tests": {
+    "passed": 940,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 940,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; real root/UID/kernel CI required",
+  "predecessor_all_five_gates": "success",
+  "predecessor_services_kernel_run": 40003119369,
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_affinity.py",
+      "sha256": "e75128210337f1e1b49b2d1dea72d80a666b81c6a311276b052745e6a9c71902"
+    },
+    {
+      "path": "linux/haos/haos/provider_fallback.py",
+      "sha256": "11a2944df4b0a1bc4890a291ea09a71815cfff7d959893bb745d9990c446f28e"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "a8a4c0038bc57e52d64fb5cea36c4ffa2e261708db80695add9e0b39de457e45"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "3c4bbe39f7d62a92a8c328477f64b26fa8ef5e5d6c2d805aab449beaf7294dff"
+    },
+    {
+      "path": "linux/haos/runtime/probe_agent_fallback_replay.py",
+      "sha256": "0ae1fbfb2a8e6f0aa599b81fe2b7ebe5a06ba3a994fc9b183a39432d27e4fc8d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_http_provider_matrix.py",
+      "sha256": "0720e80e64d0987dae6ce5ff7d4ad1eef77b9753899ea42c04f8a00d34d8e8d1"
+    },
+    {
+      "path": "linux/haos/runtime/probe_provider_profiles.py",
+      "sha256": "1b99da8c539984c60ebb4be65c42825a3e3311e4783a25c94787bb529b571af0"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "7567a699e61e54901a1a6534c676f624bf640dabef47b8f388ea7cd526ec245b"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "e39c71d30bf4f6b60c3f9e6bf04e56692e46bad9686bd4639422ddfc5764dedb"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "a62324f49bf39db861b813d2032656fa2da07c496c7fe7721d1ebcce018b2032"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "affinity-opencode-chat.json",
+      "sha256": "3c50495ca8de5710eca1a78c6e50f4e1e608ca6d1edd92bbcc3f2774fea02f5c"
+    },
+    {
+      "file": "affinity-opencode-chat-stream.json",
+      "sha256": "1f2918d81f17241504f33c815a966421aa70646392104e6e17aac0c44804effb"
+    },
+    {
+      "file": "affinity-opencode-responses.json",
+      "sha256": "8315e2539a01505337368ad962bf546ce5c8d44f4c3a8f7eca635c73ef140786"
+    },
+    {
+      "file": "affinity-opencode-messages.json",
+      "sha256": "bca2b97c38960e14f0528b3d4d1c72b27c57ef689eda6276d0b271b426bf7d61"
+    },
+    {
+      "file": "affinity-opencode-chat-moa.json",
+      "sha256": "e82594d645d65ed993cc597b329f1cb7e987bd41711879495db62093166b2593"
+    },
+    {
+      "file": "affinity-opencode-chat-moa-stream.json",
+      "sha256": "d37e15a1f6a9ac7950c2e242e09f38960c4e054ece27a7107918bf2828b6034a"
+    },
+    {
+      "file": "affinity-main-chat.json",
+      "sha256": "23546cf8b4dc18c9e65127e4a07cdcd01c19f8bf343f61068f69215d0fa2ddb7"
+    },
+    {
+      "file": "affinity-main-chat-stream.json",
+      "sha256": "1953a142c048101541d6a4cfeb0e4f93c60a134257e5d97878ec975733c02ff0"
+    },
+    {
+      "file": "affinity-main-chat-moa.json",
+      "sha256": "3b2d38a188184d16354c77e68eafe32591e8e6ee6cabe480ff9092cd3cc88a26"
+    },
+    {
+      "file": "affinity-main-chat-moa-stream.json",
+      "sha256": "41859a6eb667250eba9369e1b1c24bf376430c65f53d907e99889cf695fc2b58"
+    },
+    {
+      "file": "affinity-main-responses.json",
+      "sha256": "0c17cdaca19d42ae790632f0d89fe935ffb76b423a4e28d7b0602229871d0b09"
+    },
+    {
+      "file": "affinity-main-messages.json",
+      "sha256": "68a353607a0492101e38c982f523377ebe8fe86906965ca4f1a67d8a8c8abb6d"
+    },
+    {
+      "file": "affinity-main-responses-aliases.json",
+      "sha256": "dbb66013e46322cafb67a70dfe5dc8dbb12c56affd45431b97141e825a0b6405"
+    },
+    {
+      "file": "affinity-main-messages-aliases.json",
+      "sha256": "c3e9e735386a3a45094f71a5bdef490ce8d0db2e073d2c2758ea1ebd59af017d"
+    },
+    {
+      "file": "affinity-provider_profiles.json",
+      "sha256": "5e7fe58c3d1a7b1198f3361d6964e7a4813433c002631f126dc29fb043bdd017"
+    },
+    {
+      "file": "affinity-provider_fallback_matrix.json",
+      "sha256": "3b98b359137b0e700fe23b51b765434a62fdcb843c1b8676f300ffb42927c43c"
+    },
+    {
+      "file": "affinity-http_provider_matrix.json",
+      "sha256": "d197ae7d8a771e8818242cdd25ce9e9ddc2775ca1f02178762a5fd9140f9b8bb"
+    },
+    {
+      "file": "affinity-cloud_inference.json",
+      "sha256": "5a944cabf3dbad2b7a7d60f9b69f9c3e0b656f73025b4047e074482ba8268edc"
+    },
+    {
+      "file": "affinity-vertex_catalog.json",
+      "sha256": "0da97f3a68090dbf1708a9feb1865703bac5a3f14c490c48f78a7b1daddc1807"
+    }
+  ]
+}

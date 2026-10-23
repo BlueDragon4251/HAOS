@@ -973,3 +973,35 @@ skips**; 143 pinned routing comparisons and 49 cloud inference contracts pass.
 All five CI gates at predecessor `94fa720` passed; this new source needs its own
 CI. Google account access, entitlement, live inference, installed graphical
 setup, hardware and release artifacts remain separate acceptance work.
+
+## OpenCode conversation affinity through the private broker (2026-10-23)
+
+The actual main-agent loop reproduced a missing `x-opencode-session` header
+behind HAOS's local URL. The pinned Hermes core adds this outside its wire
+builders, where the projected custom provider/local endpoint hides OpenCode's
+identity. The pinned Go contract requires this header; ordinary body-only SDK
+fixtures had not checked it.
+
+The public transport now captures the actual pinned conversation-affinity key
+as bounded local context. The broker independently recognizes only the reviewed
+OpenCode providers/host and calls the actual pinned header function for its
+fixed `x-opencode-session` name. A missing ambient conversation receives the
+native one-shot key. No caller header name, auth/client hook or credential is
+forwarded; credential-valued affinity is refused. Local context is removed
+before model dispatch. Control characters, whitespace, non-ASCII, wrong types
+and overlong values fail admission before credentials/quota.
+
+Six new required native cases cover main-agent Chat JSON/stream, Responses and
+Messages plus actual MoA Chat JSON/stream facades, with an explicit native
+ambient conversation scope for auxiliary calls. Thirty loopback dispatches
+verify stable primary/fallback/next-turn affinity and each route's own key.
+These OpenCode cases use plain responses; they do not assume OpenRouter opaque
+replay support on OpenCode. Twelve ordinary-user cases cover malformed context,
+pre-credential HTTP refusal and an unrelated provider without optional imports.
+Both suites pass **940 tests, two existing skips**. All 53 native wire cases
+still compare strict model bodies, with an additional actual-native header
+comparison for OpenCode; the 410 HTTP cases now require OpenCode session headers.
+The 6,476 builder comparisons, 49 cloud cases, 15 Vertex catalogue cases and
+previous eight native main-agent/MoA replay cases pass. All five predecessor
+`e81bcba` CI gates passed. Live OpenCode accounts, installed boot and artifacts
+are not covered by these fixtures.

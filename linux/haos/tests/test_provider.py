@@ -357,3 +357,39 @@ def test_native_tool_signatures_cannot_merge_different_issuers():
     details = bind_chat_details([{'type': 'reasoning.encrypted', 'data': 'fixture', FIELD: 'a' * 64}])
     with pytest.raises(PermissionError):
         bind_chat_tools(details, [{'id': 'call', 'extra_content': {FIELD: 'b' * 64, 'google': {'thought_signature': 'fixture'}}}])
+
+
+@pytest.mark.parametrize('value', ['', 'a' * 513, 'bad\r\nAuthorization: leaked', 'bad\nheader', 'bad\x00key', 'bad key', 'ö', None, False, 42])
+def test_local_conversation_affinity_rejects_header_injection_and_unbounded_values(value):
+    from haos.provider_fallback import extract, FIELD
+    from haos.provider_affinity import KEY
+    context = {'version': 1, 'mode': 'chat_completions', 'model': 'fixture-model',
+        'messages': [], 'tools': None, 'params': {KEY: value}}
+    with pytest.raises(PermissionError):
+        extract({'model': 'fixture-model', 'messages': [], FIELD: context}, 'chat_completions')
+
+
+def test_unrelated_provider_cannot_select_an_affinity_header_without_optional_runtime():
+    from types import SimpleNamespace
+    from haos.provider_affinity import headers
+    assert headers(SimpleNamespace(provider='local', endpoint='http://127.0.0.1:11434/v1'),
+        {'params': {'session_affinity_key': 'fixture-scope'}}) == {}
+
+
+def test_invalid_local_affinity_is_refused_before_quota_or_private_provider_access(tmp_path):
+    from haos.provider_fallback import FIELD
+    capability = secrets.token_urlsafe(48)
+    p = ProviderPolicy(policy('opencode-go', api_mode='chat_completions'))
+    ledger = UsageLedger(tmp_path/'usage.db')
+    context = {'version': 1, 'mode': 'chat_completions', 'model': 'fixture-model',
+        'messages': [], 'tools': None, 'params': {'session_affinity_key': 'bad\r\nheader'}}
+    try:
+        with serving(Broker(('127.0.0.1', 0), p, capability, Credentials(p, {'api_key': None}), ledger)) as port:
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('POST', '/v1/chat/completions', json.dumps({'model': 'fixture-model', 'messages': [], FIELD: context}),
+                {'Authorization': 'Bearer ' + capability})
+            response = connection.getresponse()
+            assert response.status == 403 and b'refused' in response.read()
+            connection.close()
+        assert ledger.db.execute('SELECT COUNT(*) FROM requests').fetchone()[0] == 0
+    finally: ledger.close()

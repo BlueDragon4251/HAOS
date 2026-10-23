@@ -9,7 +9,7 @@ PARAMS = frozenset({'max_tokens', 'max_completion_tokens', 'temperature', 'top_p
     'frequency_penalty', 'presence_penalty', 'logprobs', 'top_logprobs', 'reasoning_config',
     'response_format', 'tool_choice', 'parallel_tool_calls', 'verbosity', 'service_tier', 'fast_mode',
     'drop_context_1m_beta', 'context_length', 'session_id', 'cache_scope_id', 'prompt_cache_key', 'supports_reasoning',
-    'provider_preferences', 'openrouter_min_coding_score', 'qwen_session_metadata', 'ollama_num_ctx'})
+    'provider_preferences', 'session_affinity_key', 'openrouter_min_coding_score', 'qwen_session_metadata', 'ollama_num_ctx'})
 
 
 def capture(mode, model, messages, tools, params):
@@ -45,6 +45,8 @@ def extract(payload, mode):
                     and isinstance(item['function'].get('parameters', {}), dict) for item in context['tools']))
             or not isinstance(context['params'], dict) or set(context['params']) - PARAMS):
         raise PermissionError('invalid local fallback context')
+    from .provider_affinity import KEY, validate_key
+    if KEY in context['params']: validate_key(context['params'][KEY])
     return output, context
 
 
@@ -86,6 +88,7 @@ def retarget(policy, payload, context, features=None, *, model=None):
         return output
     model = model or policy.data['default_model']
     params = deepcopy(context['params'])
+    params.pop('session_affinity_key', None)
     params.update(provider=source, provider_profile=profile, base_url=endpoint, is_oauth=False)
     if source == 'qwen-oauth' and not params.get('qwen_session_metadata'):
         params['qwen_session_metadata'] = {'sessionId': params.get('session_id') or 'hermes', 'promptId': str(uuid.uuid4())}
