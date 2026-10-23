@@ -1005,3 +1005,34 @@ The 6,476 builder comparisons, 49 cloud cases, 15 Vertex catalogue cases and
 previous eight native main-agent/MoA replay cases pass. All five predecessor
 `e81bcba` CI gates passed. Live OpenCode accounts, installed boot and artifacts
 are not covered by these fixtures.
+
+## Private account-scoped Router reasoning vocabularies (2026-10-23)
+
+Actual Router SDK requests reproduced an account-catalogue gap: the source
+wire builder's cold, credential-free profile emitted `reasoning: high` even
+when that account's `/models` metadata declared no reasoning fields. Provider
+credentials and their native catalogue cache cannot be copied into the agent.
+
+Router requests now retain their original logical reasoning choice locally.
+The private broker reads bounded model metadata with that route's own key and
+Hermes User-Agent. Only approved wire model IDs and reviewed public effort
+levels reach the actual pinned Router parser; unknown/reflected secret values
+never enter its logging path. The actual pinned clamp and Responses field
+builder then apply each model's vocabulary or omit unsupported reasoning.
+Caches belong to individual credential objects and bind endpoint, credential
+identity and approved models. A key change invalidates them. Successful reads
+are cached for five minutes; failed reads are bounded and retried only after
+30 seconds, retaining only the same identity's existing metadata or native
+unknown-capability behaviour. No model request is retried by this mechanism.
+
+Seven required SDK/HTTP cases compare exact fields with the pinned parser/math,
+cover account A/B/A using the same model ID in JSON and early streaming, and
+then change A's key and catalogue. Each route fetches its own metadata once;
+rotation performs a new authenticated fetch. Eight ordinary-user cases verify
+metadata redaction/shape/count bounds, native disabled/implicit vocabulary
+semantics and no optional Router import for other providers. Both full/minimal
+suites pass **948 tests, two existing skips**. The 53 strict body projections,
+6,476 builder comparisons, 410 HTTP cases, 49 cloud and 15 Vertex catalogue
+cases pass on this source. Router's required generic HTTP fixture now explicitly
+provides an unknown/empty catalogue; the account-specific probe supplies the
+actual capability cases. No live account, entitlement or inference is claimed.

@@ -393,3 +393,38 @@ def test_invalid_local_affinity_is_refused_before_quota_or_private_provider_acce
             connection.close()
         assert ledger.db.execute('SELECT COUNT(*) FROM requests').fetchone()[0] == 0
     finally: ledger.close()
+
+
+def test_router_catalogue_sanitization_keeps_only_approved_public_reasoning_metadata():
+    from haos.provider_router import safe_items
+    private = 'reflected-private-fixture'
+    items = [{'id': 'approved', 'secret': private, 'router': {'capabilities': {'reasoning': {'supported': True,
+        'efforts': [{'value': 'low'}, {'value': private}, {'value': []}], 'private': private}}}},
+        {'id': private, 'router': {'capabilities': {'reasoning': {'supported': False}}}},
+        {'id': 'approved', 'router': 'invalid'}, {'id': ['unhashable']}]
+    result = safe_items(items, {'approved'}, ('none', 'low', 'high'))
+    assert result == [{'id': 'approved', 'router': {'capabilities': {'reasoning': {'supported': True, 'efforts': [{'value': 'low'}]}}}}]
+    assert private not in json.dumps(result)
+
+
+@pytest.mark.parametrize('reasoning,expected', [
+    ({'supported': False, 'efforts': 'irrelevant'}, {'supported': False}),
+    ({'efforts': [{'value': 'low'}]}, {'efforts': [{'value': 'low'}]}),
+    ({'supported': 'false'}, None), ({'supported': True, 'efforts': 'invalid'}, None)])
+def test_router_catalogue_preserves_native_disabled_and_implicit_effort_semantics(reasoning, expected):
+    from haos.provider_router import safe_items
+    result = safe_items([{'id': 'approved', 'router': {'capabilities': {'reasoning': reasoning}}}], {'approved'}, ('low',))
+    assert result == ([] if expected is None else [{'id': 'approved', 'router': {'capabilities': {'reasoning': expected}}}])
+
+
+@pytest.mark.parametrize('items', [{}, [None] * 4097])
+def test_router_catalogue_shape_and_count_are_bounded(items):
+    from haos.provider_router import safe_items
+    with pytest.raises(ValueError): safe_items(items, {'approved'}, ('low',))
+
+
+def test_non_router_inference_does_not_load_or_fetch_optional_router_metadata():
+    from types import SimpleNamespace
+    from haos.provider_router import adapt
+    payload = {'model': 'fixture-model', 'reasoning': {'effort': 'high'}}
+    assert adapt(SimpleNamespace(provider='local', api_mode='chat_completions'), payload, None, None, None) is payload

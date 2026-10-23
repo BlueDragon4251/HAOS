@@ -95,6 +95,7 @@ class Credentials:
         self.policy, self.credentials = policy, credentials
         self.lock = threading.Lock()
         self.cloud_data, self.cloud_cache = None, {}
+        self.router_cache = {}
         self.query = {}
         self.request_state = threading.local()
 
@@ -369,6 +370,8 @@ class Handler(BaseHTTPRequestHandler):
                 if any(redactor.text(value) != value for value in affinity.values()):
                     raise PermissionError("conversation affinity cannot contain a credential")
                 headers.update(affinity)
+                from .provider_router import adapt as router_reasoning
+                attempt = router_reasoning(self.policy, attempt, context, credentials, headers)
                 status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
                 if status not in {429, 502, 503, 504} or self.forward_started:
                     break

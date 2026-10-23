@@ -64,6 +64,7 @@ jobs:
           for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream; do
             "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
           done
+          "$PYTHON" linux/haos/runtime/probe_router_reasoning.py linux/haos "$RUNNER_TEMP/provider-contracts/router-reasoning.json"
           "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
           "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
           "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"

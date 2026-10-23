@@ -118,6 +118,13 @@ def main():
         def log_message(self, *_):
             pass
 
+        def do_GET(self):
+            assert state["provider"] == "router" and self.path == "/v1/models"
+            assert self.headers["Authorization"] == "Bearer " + state["key"]
+            data = b'{"data":[]}'
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+
         def do_POST(self):
             try:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
