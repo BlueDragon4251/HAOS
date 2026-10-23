@@ -1,0 +1,47 @@
+{
+  "probe_sha256": "16b6873733e006784f303b5231e5cd485edf01310eed85dfdc760a55f8a3f3ad",
+  "cases": [
+    {
+      "scenario": "reasoning",
+      "receipt": "provider-fallback-reasoning-http.json",
+      "sha256": "a89a65eb9fe05e94e7efbb59eaebda8f2e14d9aeeb42ff3e05200985bcd3ba7d"
+    },
+    {
+      "scenario": "developer",
+      "receipt": "provider-fallback-developer-http.json",
+      "sha256": "fabc992438722e6ba4bfc8ab4133613d4c4237c83af19109ea2399459f419c1e"
+    },
+    {
+      "scenario": "responses",
+      "receipt": "provider-fallback-responses-http.json",
+      "sha256": "5cd811f0945853c4042f99c990b3634603f9394cc86a4b55c0a18b0fb02e3b58"
+    },
+    {
+      "scenario": "messages",
+      "receipt": "provider-fallback-messages-http.json",
+      "sha256": "9dd4fefc4baaf389e457a7c82847fc0f65d29d0d6e448f9c54d8066ca92131b6"
+    },
+    {
+      "scenario": "reasoning-stream",
+      "receipt": "provider-fallback-reasoning-stream-http.json",
+      "sha256": "f9675bb63fad172dd86843476800d681040522be2d1650f7120b2fd735d43156"
+    },
+    {
+      "scenario": "developer-stream",
+      "receipt": "provider-fallback-developer-stream-http.json",
+      "sha256": "6efc2c1dc0705a4e5a8503c40a822d29d6f0b1f221f91c084b97dfe774940f0e"
+    },
+    {
+      "scenario": "responses-stream",
+      "receipt": "provider-fallback-responses-stream-http.json",
+      "sha256": "ffd9a6db7494b9dedbf212930171d8abf89690c33f35e349a1d2e4f0ed1fde3f"
+    },
+    {
+      "scenario": "messages-stream",
+      "receipt": "provider-fallback-messages-stream-http.json",
+      "sha256": "8f6fbcef8ef5848494d5b0111cc5c278e97b26ebde0b26766aa3305c0ac992e7"
+    }
+  ],
+  "product_source_commit": "b5cc103493acab31bd1b948fb1bd85ce2df92352",
+  "live_provider_tested": false
+}

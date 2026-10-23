@@ -684,3 +684,14 @@ additional real loopback SDK/broker fallback fixtures check whole target bodies,
 route-specific credentials and exact two-call ledgers. Final validation and
 source hashes are archived under `docs/evidence/2026-10-23/`. Live provider,
 account entitlement, installed-system and release acceptance remain separate.
+
+
+The subsequent native fallback probe extension covers eight actual SDK/HTTP
+cases: the two Chat scenarios plus Responses and Messages, each in JSON and
+streaming form. Every stream delivers early text while the fixture withholds
+its terminal event. All cases assert exact source/target dispatch, native local
+tool response, route-specific authentication and ledger `(503, unknown,
+unknown)` followed by `(200, 8, 5)`. Messages checks the native Anthropic API-key
+to MiniMax bearer-header change. All eight are mandatory in build and CI.
+Receipts use the probe's own exact source hashes; this does not extend acceptance
+to real provider infrastructure or cross-protocol fallback.

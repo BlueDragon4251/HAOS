@@ -33,7 +33,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_fallback_matrix.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-fallback-builder-matrix.json
-for scenario in reasoning developer; do
+for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_fallback_wire.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/provider-fallback-$scenario.json" "$scenario"
 done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-build-probe.json
