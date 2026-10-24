@@ -614,3 +614,27 @@ systemd or external-delivery acceptance. Source-bound receipt:
 `docs/evidence/2026-10-24/gateway-outbox-gui-validation.json`. Fresh GitHub CI
 verification was unavailable because the API rejected the configured credentials
 with HTTP 401; no successful CI result is inferred for this change.
+
+## Mattermost private transport foundation — not enabled (2026-10-24)
+
+The next adapter now has a private REST boundary exercised through the actual
+pinned Mattermost formatter/chunker and aiohttp client. Owner server validation
+requires HTTPS, rejects ambiguous paths and embedded credentials, and permits
+explicit private-network deployments. Credentials do not travel through redirects.
+Reads require a current-authority callback; only a private outgoing context can
+create posts. Channel/thread identity and returned receipts must agree exactly.
+Native thread-root resolution and notify fallback cannot move a reply into a
+different thread or the channel. Media, typing, arbitrary paths and edits are
+refused. API bodies are bounded, untrusted provider errors are not logged, and
+malformed or wrong-route successful responses retain uncertainty.
+
+Sixteen actual native/HTTP cases cover authenticated read, refused reads/writes,
+flat/thread posts, 400/401/403/404/429/500, redirects, wrong-route receipts, native
+chunking, malformed and oversized JSON. The probe runs in build and provider CI.
+Full/minimal suites pass 1057 tests with two existing skips. Receipts:
+`docs/evidence/2026-10-24/mattermost-transport-validation.json`.
+
+Mattermost remains unavailable in the public registry and GUI. This transport
+foundation does not establish incoming authorization, durable WebSocket capture,
+reconnect/history recovery, owner publication, outbox integration or live delivery.
+These remain required before enabling it; the supported gateway count stays three.

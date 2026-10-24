@@ -1,0 +1,23 @@
+{
+  "cases": [
+    "actual_native_authenticated_read",
+    "unapproved_reads_refused_before_http",
+    "writes_require_private_send_context",
+    "exact_native_flat",
+    "exact_native_thread",
+    "native_single_post_status_400",
+    "native_single_post_status_401",
+    "native_single_post_status_403",
+    "native_single_post_status_404",
+    "native_single_post_status_429",
+    "native_single_post_status_500",
+    "native_single_post_status_302",
+    "wrong_route_success_receipt_uncertain",
+    "actual_native_multichunk_preserves_exact_route",
+    "malformed_json_uncertain",
+    "oversized_json_uncertain"
+  ],
+  "passed": 16,
+  "external_connections": false,
+  "public_gateway_enabled": false
+}
