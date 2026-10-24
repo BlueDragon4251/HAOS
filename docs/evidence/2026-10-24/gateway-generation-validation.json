@@ -1,0 +1,47 @@
+{
+  "base_commit": "1682f67653db1e239d3a618c5f514561a1ac8306",
+  "full_tests": {
+    "passed": 972,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 972,
+    "existing_skips": 2
+  },
+  "actual_local_sqlite_checks": [
+    "offline identical repair rejects old outbox and cached mission response",
+    "edit reversal and stale policy cannot recover an earlier grant",
+    "unchanged publication preserves current grant",
+    "relay restart refuses old-generation replay and admits fresh message",
+    "legacy schema migration preserves all inbox and mission rows without reexecution"
+  ],
+  "required_root_file_publication_probe": "added; not run locally; mandatory existing CI step",
+  "no_external_transport_connected_or_messages_sent": true,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "6d82316fb476313db56f137d84251cbc2ca3d1f2757619e2cd4415aa561cab17"
+    },
+    {
+      "path": "linux/haos/haos/gateway_relay.py",
+      "sha256": "abb29abeb5349ccaa2b6b592002241377edbcce5764d141d1a0bc57b0e94557f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "81686ba7ec09287af04af84152b52a09c45a3088a6350a0f384900df99727709"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway.py",
+      "sha256": "1405a48f071ac82e9c5977da9a3f25755ad13afac9b9b5502695b24f0eebf86a"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_relay.py",
+      "sha256": "5c89a8b55d492cc393ab41ab1f89e73bbf64d8b261e6f8b94befb1013e42b1e1"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "1a5c63c7c68032bc142db11087330964611169d8863e5a645abba0f74d586783"
+    }
+  ],
+  "native_adapter_receipt_sha256": "b4df5911552756339b0344d480ed48267460f71e6603128f6da7501ae513ee92"
+}

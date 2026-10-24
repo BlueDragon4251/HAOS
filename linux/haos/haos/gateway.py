@@ -41,8 +41,12 @@ class GatewayPolicy:
             self.connectors[name] = connector
         routes = set()
         for binding in config["bindings"]:
-            if set(binding) != {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}:
+            fields = {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}
+            if set(binding) not in (fields, fields | {"generation"}):
                 raise ValueError("invalid gateway identity binding")
+            if "generation" in binding and (not isinstance(binding["generation"], str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", binding["generation"])):
+                raise ValueError("invalid gateway binding generation")
             for key in ("id", "identity"):
                 if not isinstance(binding[key], str) or not _NAME.fullmatch(binding[key]):
                     raise ValueError("invalid HAOS identity")
@@ -108,8 +112,15 @@ class GatewayEngine:
             COMMIT;
         """)
         versions = store.db.execute("SELECT version FROM gateway_schema").fetchall()
-        if len(versions) != 1 or versions[0][0] != 1:
+        if len(versions) != 1 or versions[0][0] not in {1, 2}:
             raise RuntimeError("unsupported gateway schema")
+        if versions[0][0] == 1:
+            with store.transaction():
+                # Preserve legacy rows. Their original grant cannot be proved
+                # after an owner publishes a fresh generation, so replay fails
+                # closed rather than executing an old message again.
+                store.db.execute("ALTER TABLE gateway_inbox ADD COLUMN binding_digest TEXT")
+                store.db.execute("UPDATE gateway_schema SET version=2")
 
     def _queue(self, route_id: str, key: str, content: str):
         content = self.store.redactor.text(content)
@@ -130,7 +141,8 @@ class GatewayEngine:
         with self.store.transaction():
             old = self.store.db.execute("SELECT * FROM gateway_inbox WHERE key=?", (key,)).fetchone()
             if old:
-                if old["fingerprint"] != fingerprint or old["identity"] != binding["identity"]:
+                if (old["fingerprint"] != fingerprint or old["identity"] != binding["identity"]
+                        or old["binding_id"] != binding["id"] or old["binding_digest"] != digest(binding)):
                     raise Conflict("gateway replay changed its content or identity")
                 return json.loads(old["response"])
             recent = self.store.db.execute(
@@ -183,8 +195,10 @@ class GatewayEngine:
                                               binding["chat"], binding["thread"], binding["scope"], envelope["message_id"]))
             state = "paused" if mission["state"] == "blocked" and mission["phase"] == PAUSED_PHASE else mission["state"]
             reply = {"mission_id": mid, "state": state}
-            self.store.db.execute("INSERT INTO gateway_inbox VALUES(?,?,?,?,?,?,?)",
-                                  (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply)))
+            self.store.db.execute("""INSERT INTO gateway_inbox
+                (key,fingerprint,binding_id,identity,received_at,mission_id,response,binding_digest)
+                VALUES(?,?,?,?,?,?,?,?)""",
+                (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply), digest(binding)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
             self._queue(route_id, key, content)
         # Commit admission BEFORE a network response to Hermes. A replay never repeats that side effect.

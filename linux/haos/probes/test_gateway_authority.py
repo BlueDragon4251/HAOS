@@ -105,3 +105,33 @@ def test_graphical_gateway_management_keeps_real_root_files_and_denies_another_u
         assert (config / name).stat().st_uid == 0
         assert stat.S_IMODE((config / name).stat().st_mode) == expected_mode
         assert 'disposable-gateway-fixture-credential' not in (config / name).read_text()
+
+
+def test_real_owner_publication_renews_pairing_epochs_and_preserves_unchanged_grants(tmp_path):
+    from haos.gateway import GatewayPolicy, digest
+    assert os.geteuid() == 0, 'actual owner UID/files required'
+    policy = {'version': 1, 'connectors': [{'id': 'first', 'platform': 'telegram'}], 'bindings': [
+        {'id': 'paired', 'connector': 'first', 'sender': '42', 'chat': '42', 'scope': '', 'thread': '',
+         'identity': 'principal', 'capabilities': ['create', 'read']}]}
+    secret = {'connectors': {'first': {'token': 'disposable-epoch-fixture-credential'}}}
+    persist(policy, secret, config=tmp_path, gid=0)
+    first, _ = load(tmp_path)
+    epoch = first['bindings'][0]['generation']
+    persist(first, secret, config=tmp_path, gid=0)
+    assert load(tmp_path)[0] == first
+    changed = copy.deepcopy(first); changed['bindings'][0]['capabilities'] = ['create']
+    persist(changed, secret, config=tmp_path, gid=0)
+    edited, _ = load(tmp_path)
+    assert edited['bindings'][0]['generation'] != epoch
+    persist(first, secret, config=tmp_path, gid=0)
+    reversed_policy, _ = load(tmp_path)
+    assert reversed_policy['bindings'][0]['generation'] not in {epoch, edited['bindings'][0]['generation']}
+    persist({**first, 'bindings': []}, secret, config=tmp_path, gid=0)
+    persist(first, secret, config=tmp_path, gid=0)
+    repaired, stored_secret = load(tmp_path)
+    assert stored_secret == secret
+    assert repaired['bindings'][0]['generation'] not in {
+        epoch, edited['bindings'][0]['generation'], reversed_policy['bindings'][0]['generation']}
+    with pytest.raises(PermissionError):
+        GatewayPolicy(repaired).current_binding({'binding_id': 'paired', 'binding_digest': digest(first['bindings'][0])})
+    assert 'generation' not in policy['bindings'][0]

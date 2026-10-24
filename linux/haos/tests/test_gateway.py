@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from haos.controller import Controller
-from haos.gateway import GatewayEngine, GatewayPolicy
+from haos.gateway import GatewayEngine, GatewayPolicy, digest
 from haos.gateway_runtime import adapter_envelope
 from haos.store import Conflict, MissionStore
 
@@ -287,3 +287,58 @@ def test_unreviewed_gateway_code_and_invalid_credentials_fail_before_optional_na
     from haos.gateway_runtime import build_adapter
     with pytest.raises(ValueError):
         build_adapter(platform, credentials)
+
+
+def test_identical_repair_and_edit_reversal_never_revive_old_outbox(tmp_path, policy_config):
+    from haos.gateway_setup import renewed_policy
+    empty = {**policy_config, 'bindings': []}
+    first = renewed_policy(policy_config, empty)
+    store = MissionStore(tmp_path/'missions.db')
+    admitted(store, GatewayPolicy(first))
+    # Revoke and repair while the controller is offline: no delivery loop has
+    # had a chance to mark the old pending obligation revoked yet.
+    repaired = renewed_policy(policy_config, empty)
+    with pytest.raises(Conflict):
+        admitted(store, GatewayPolicy(repaired))
+    assert GatewayEngine(store).next_delivery(GatewayPolicy(repaired)) is None
+    assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0] == 'revoked'
+    assert len(store.list()) == 1
+    store.close()
+    changed = copy.deepcopy(first)
+    changed['bindings'][0]['capabilities'] = ['create']
+    changed = renewed_policy(changed, first)
+    reverted = renewed_policy(first, changed)
+    assert len({p['bindings'][0]['generation'] for p in (first, changed, reverted)}) == 3
+    with pytest.raises(PermissionError):
+        GatewayPolicy(reverted).current_binding({'binding_id': first['bindings'][0]['id'],
+            'binding_digest': digest(first['bindings'][0])})
+    assert renewed_policy(first, first) == first
+    assert 'generation' not in policy_config['bindings'][0]
+
+
+@pytest.mark.parametrize('value', ['', '0'*63, 'G'*64, None, 1])
+def test_gateway_binding_generation_has_strict_public_shape(policy_config, value):
+    policy_config['bindings'][0]['generation'] = value
+    with pytest.raises(ValueError): GatewayPolicy(policy_config)
+
+
+def test_legacy_gateway_inbox_migration_keeps_history_and_never_reexecutes_old_messages(tmp_path, policy_config):
+    path = tmp_path/'missions.db'
+    store = MissionStore(path)
+    original = admitted(store, GatewayPolicy(policy_config))
+    before = dict(store.db.execute('SELECT * FROM gateway_inbox').fetchone())
+    # Reconstruct the exact earlier additive schema in the disposable fixture.
+    store.db.execute('ALTER TABLE gateway_inbox DROP COLUMN binding_digest')
+    store.db.execute('UPDATE gateway_schema SET version=1')
+    store.close()
+    store = MissionStore(path)
+    GatewayEngine(store)
+    migrated = dict(store.db.execute('SELECT * FROM gateway_inbox').fetchone())
+    assert migrated['binding_digest'] is None
+    assert {key: value for key, value in migrated.items() if key != 'binding_digest'} == {
+        key: value for key, value in before.items() if key != 'binding_digest'}
+    with pytest.raises(Conflict): admitted(store, GatewayPolicy(policy_config))
+    assert len(store.list()) == 1 and store.get(original['mission_id'])['state'] == 'queued'
+    fresh = admitted(store, GatewayPolicy(policy_config), envelope(message_id='new-after-migration'))
+    assert fresh['mission_id'] != original['mission_id'] and len(store.list()) == 2
+    store.close()

@@ -8,6 +8,8 @@ import os
 import pwd
 import stat
 import subprocess
+import secrets
+from copy import deepcopy
 from pathlib import Path
 
 from .gateway import GatewayPolicy
@@ -77,11 +79,29 @@ def load(config=CONFIG):
     return policy, credentials
 
 
+def renewed_policy(policy, previous):
+    """Preserve exact grants; newly paired or edited grants get a fresh epoch.
+
+    Legacy grants acquire an epoch on their next owner publication. Old mission
+    and relay records remain stored but cannot regain delivery authority through
+    an identical later pairing, route edit reversal or stale policy submission.
+    """
+    GatewayPolicy(policy)
+    old = GatewayPolicy(previous).bindings
+    output = deepcopy(policy)
+    for binding in output["bindings"]:
+        before = old.get(binding["id"])
+        if (before is None or "generation" not in before or binding != before):
+            binding["generation"] = secrets.token_hex(32)
+    return output
+
+
 def persist(policy, credentials, *, config=CONFIG, gid=None):
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
-    load(config)
+    previous, _ = load(config)
     GatewayPolicy(policy)
+    policy = renewed_policy(policy, previous)
     if set(credentials["connectors"]) != {c["id"] for c in policy["connectors"]}:
         raise ValueError("transport credentials and connector policy disagree")
     gid = grp.getgrnam("haos-gateway").gr_gid if gid is None else gid

@@ -184,3 +184,29 @@ Attachments, voice transcription, live-job pause/resume, WhatsApp's separate bri
 app credentials and other official adapters need additional isolated integration. Unsupported
 media is refused explicitly; HAOS does not pretend it was delivered to the agent. Full remote
 viewer, credential encryption/retention and owner graphical setup remain separate open gates.
+
+## Pairing generations survive offline revocation (2026-10-24)
+
+Every newly published, re-paired or edited sender grant now receives a fresh
+public random generation. An exact unchanged publication preserves its current
+generation. Legacy grants acquire one at their next owner publication. Existing
+mission and relay records retain their original binding digest, so revocation
+followed by identical re-pairing while the controller is offline cannot revive
+old replies or relay admissions. Reversing an edit or submitting a stale policy
+also creates a new generation. Pairing metadata is not a transport credential.
+
+The additive gateway inbox schema advances to version 2 with the exact original
+binding digest per admission. Cached responses cannot bypass a newer grant.
+Migration preserves old rows and missions; old admissions whose original grant
+cannot be established fail closed on replay, without running the message again.
+The owner can still inspect existing missions. Public policy keeps its version-1
+format with an optional validated generation field, preserving legacy reads.
+
+Full/minimal local suites pass **972 tests, two existing skips**, including actual
+SQLite outage/reopen, repair, edit reversal and legacy migration cases. Actual
+pinned Telegram/Discord durable dispatch fixtures also pass without connecting
+transports or sending messages. A new mandatory root-file publication case
+checks actual owner files in CI; it has not run locally. Source hashes and receipts
+are in `docs/evidence/2026-10-24/gateway-generation-validation.json`. This change
+does not yet solve crash-atomic credential/account rotation or transport-level
+acknowledgement ordering; those remain separate work before adapter expansion.
