@@ -1,0 +1,43 @@
+{
+  "base_commit": "3af3af908133aef84ce7b0d0926faf7926564bbb",
+  "full_tests": {
+    "passed": 1038,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1038,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 26,
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "external_messages_sent": false,
+  "installed_systemd_acceptance": false,
+  "github_ci_freshly_verified": false,
+  "github_api_observation": "HTTP 401 Bad credentials during fresh workflow query",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "a2c7b90cd00761324ca748365d556acb594727450a40efc350576dce2c0c0be7"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "c20ff25bc1afbef548e3ab2a16f3276dc5044e04231e9e3e480985aba37569a0"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "54e8dec2e2dd52b202b2968a6ae1736dcdbbff795c4a5ea23d7ce83a3bf81312"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "1eba218302af3575db4286e65d2c876763561921d7cbd03fac7d8075215a5024"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "1f678cfd70322eb5e6b682f933c6aad174841108a94afe8511080a7eabbe8d5b"
+    }
+  ]
+}

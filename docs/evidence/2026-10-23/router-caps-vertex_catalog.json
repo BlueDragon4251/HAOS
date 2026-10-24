@@ -1,0 +1,118 @@
+{
+  "cases": [
+    {
+      "case": "pages",
+      "catalogue_http_calls": 2,
+      "actual_google_token_refreshes": 1,
+      "source": "provider-api",
+      "diagnostic": "publisher-catalog"
+    },
+    {
+      "case": "selected-publisher",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "provider-api",
+      "diagnostic": "publisher-catalog"
+    },
+    {
+      "case": "empty",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "provider-api",
+      "diagnostic": "publisher-catalog"
+    },
+    {
+      "case": "401",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "account-required"
+    },
+    {
+      "case": "429",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "redirect",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "short-body",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "invalid-json",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "wrong-shape",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "repeated-cursor",
+      "catalogue_http_calls": 2,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "page-limit",
+      "catalogue_http_calls": 5,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "overlong-cursor",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "wrong-cursor-type",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "oversized",
+      "catalogue_http_calls": 1,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    },
+    {
+      "case": "token-denied",
+      "catalogue_http_calls": 0,
+      "actual_google_token_refreshes": 1,
+      "source": "upstream-offline",
+      "diagnostic": "catalog-unavailable"
+    }
+  ],
+  "live_account_tested": false,
+  "model_inference_tested": false,
+  "api_contract": "Google published v1beta1 ModelGardenService.ListPublisherModels",
+  "source_sha256": {
+    "probe_vertex_catalog.py": "a850f89d18b7dfbb42d94d463e6975d4a00850e98a21f94c231fd8b37a4a8f1d",
+    "provider_discovery.py": "9d4ffaeaebb8361ad3a6c34d7abc0c9e1cecd52374fee13560aab06ab8c542c0",
+    "provider_cloud.py": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423",
+    "initial_setup_gui.py": "deebf64341f12a18846e371f4418c6b99db6fd82fbea77c7c3dd7302f0b27005"
+  }
+}

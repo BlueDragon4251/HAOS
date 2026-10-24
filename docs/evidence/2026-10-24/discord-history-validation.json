@@ -1,0 +1,108 @@
+{
+  "base_commit": "5db5665f619fb1e426b27d005a05e76aaa60331c",
+  "all_five_predecessor_ci_gates_successful": "5db5665f619fb1e426b27d005a05e76aaa60331c",
+  "full_tests": {
+    "passed": 1021,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1021,
+    "existing_skips": 2
+  },
+  "actual_sdk_http_history_cases": 11,
+  "actual_root_uid_socket_gateway_tests": 19,
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "actual_tk_permission_status_and_recovery_handoff": true,
+  "regression_probes": [
+    "gateway",
+    "gateway_ingress",
+    "discord_ingress",
+    "discord_transport",
+    "discord_delivery",
+    "telegram_delivery",
+    "telegram_polling"
+  ],
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "external_discord_connected": false,
+  "deleted_remote_messages_recoverable": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_discord_history.py",
+      "sha256": "71ebf3843d3f98fefcac7ca2cf4005905cf15859a68481a883a184f2819104e0"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "d7bb9d10b8d1257cb6d87f38f03495cea2049fdadf586d1be577077977ce1a6a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "2099e491607a612af0b148ad83aa11ddc39056f2b437ebb682d06f0bdeda4a1e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw.py",
+      "sha256": "fa35713de053315843f32ba71e25b890ed9683533cabd435cebf60da56658cc7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "50bfa8c639358cce997460469b2cbff6be1ca9002817380b6a310f5d6eebc4db"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "afd3bd07a90418518185e766b0a5d8f557a668ed07708357c244b4e468ae38c0"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "7ad5812c738ea9ad993a4ad69fa43b6926cffcccf76d5c2fd004acb7fb30a0b3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_discord_history.py",
+      "sha256": "744eadd9d48a4a780ff6e7b7530451e3c6aaa0c12d8ea6d4c0d428c653159765"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway.py",
+      "sha256": "ad009b5185cb0f43cd8a594f4e227727b6fe18791bcd34cc47b95ba40d8208e6"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_raw.py",
+      "sha256": "98e657c758a88b2548288249debce53062281ce690fd877350d4a0fa09588e04"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "da73ef6e37ce6ddd49915e494b99553443ce97f742a08ecadb531afcc6ecb172"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "34513e3061c7741f9be62f0c7bdf52fc8c58ed2f1f7b7a63f07a1512a3c0c675"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "c34a615f0c7624176f8704229fe4630028d29e6e6dedee706c48757449c1aeae"
+    }
+  ],
+  "contracts_sha256": "818a2653711a248b7fd0a50b61a02f0612401d2417dd8d63425e4a1e7584dc19",
+  "logs": [
+    {
+      "path": "discord-history-full.log",
+      "sha256": "2c15ce85a6ddcd68d92db040bf860a640dfd304e765e7a31d84bf9c64fdc4d92"
+    },
+    {
+      "path": "discord-history-minimal.log",
+      "sha256": "99d4df00d88c690c99d17aaceefb193618b062b81d33effce885c6e0ed1bfbce"
+    },
+    {
+      "path": "discord-history-root.log",
+      "sha256": "6491fcbf61ef5b5b975e11e41be764a93a6de1941f7bb4edbe664f792fd05900"
+    },
+    {
+      "path": "discord-history-gui-normal.log",
+      "sha256": "75dc357619beff979f09bdf8e69360661d814dc4c6fb28a696b0b06f44065a63"
+    },
+    {
+      "path": "discord-history-gui-compact.log",
+      "sha256": "f9115ff388087d1070dac84eb1d087579737190d2c61d129516572b4c011acb8"
+    }
+  ]
+}

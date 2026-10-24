@@ -1,0 +1,59 @@
+{
+  "source_base_commit": "296ae00d15afd3a2216f13bd5f46ae3aa2ab3d48",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 839,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 839,
+    "skipped": 2
+  },
+  "ordinary_data_file_cases": 11,
+  "actual_tk_display_sizes": [
+    "1280x800",
+    "640x480"
+  ],
+  "masked_import_and_stale_provider_generation_discard": true,
+  "source_file_changed": false,
+  "native_sdk_in_root_gui": false,
+  "new_real_root_ownership_mode_seat_probe": "required separately in CI; not run as root locally",
+  "predecessor_ci_all_five_gates": "296ae00d15afd3a2216f13bd5f46ae3aa2ab3d48",
+  "live_account_tested": false,
+  "installed_owner_setup_tested": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "d221855c0e59c57f1fa322bc69b29a7826f48ee4025d66ff13fe5f7aaed6ece1"
+    },
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "2cca40ae517a183feb77bbf767b6472b9a89cdbe69bdb0eeaed13044ea7af8f9"
+    },
+    {
+      "path": "docs/PROVIDER-SETUP.md",
+      "sha256": "bf27c0fd6672a767303334e7dceda99a4ae0c95ed91938add36d827e373ebdbf"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "e9dff859f07a7f92f8984caf761a08889e452bde85092867d01c40ca8fb5e3b3"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "07c3e481855849fb0fad0fa48891ae98cf3c2c3abe570e279958c2ee46c397d1"
+    },
+    {
+      "path": "linux/haos/probes/test_provider_authority.py",
+      "sha256": "5fceb062d3e0d4d981bb48fae1099da810d224b6d030e34b33ce7d71fb445090"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "2c3c142c68ed8cd6b0c65071d8e58a608064e6ecb2f8dae72c0859ae3f718dc3"
+    },
+    {
+      "path": "linux/haos/tests/test_cloud_credential_import.py",
+      "sha256": "babaf837a4b331b33c4149aaa7c10bd3e5cbf5d9bd7d97878fd136dcdbf6eb59"
+    }
+  ]
+}

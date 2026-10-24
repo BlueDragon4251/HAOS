@@ -1,0 +1,41 @@
+{
+  "base_commit": "cd98d6492f4e29a17d0c0d08f19f88418efc2c62",
+  "source_sha256": {
+    "linux/haos/haos/gateway_ingress.py": "65e2cf138ba5efc4a032fdc7a3083454965a094d98947c709f29d1ec16f477c1",
+    "linux/haos/haos/gateway_runtime.py": "dc36cc4b67532d7e06c3fb32bb792dfb6c2dcb76e765a8d4af76b581b59af537",
+    "linux/haos/runtime/probe_gateway_ingress.py": "2235eaf7952e5e073756912ec9a628b9786a74364037e36302ea39d1f92e3a8c",
+    "linux/haos/runtime/probe_gateway.py": "5475c281ef0f03b916dfcb7e94957ee4b29fabd63c68bc4f4adcd4db9f794e98",
+    "linux/haos/tests/test_gateway.py": "a3df69841d8058edf9654233e8012e71a7b863ac645906ea11d673dd76106422",
+    "linux/haos/build-runtime.sh": "595972818bb5501250763e019736dfa461d94035741b095eeeb19273fabdda85",
+    ".github/workflows/haos-provider-contracts.yml": "71b08842452a2eacbbcb03f593ba25990d2431799501082418eac06203d682bc"
+  },
+  "minimal_suite": {
+    "passed": 869,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 869,
+    "existing_skips": 2
+  },
+  "actual_pinned_adapters": [
+    "telegram",
+    "discord"
+  ],
+  "native_background_and_debounce_baseline_verified": true,
+  "actual_dispatch_after_sqlite_commit_and_reopen": true,
+  "actual_readonly_sqlite_failure_refused": true,
+  "changed_replay_and_unknown_sender_refused": true,
+  "native_telegram_message_and_inline_prefilter_despite_allow_all": true,
+  "enabled_valid_unknown_plugin_manifest_not_imported_in_native_safe_mode": true,
+  "arbitrary_native_plugin_handler_factories_disabled": true,
+  "native_core_transport_overrides_preserved_by_cooperative_subclass": true,
+  "original_pinned_adapter_sources_modified": false,
+  "network_acknowledgement_ordering_or_external_delivery_tested": false,
+  "other_twenty_adapters_or_media_voice_support_claimed": false,
+  "ci_for_this_change": "pending push",
+  "secret_scan_followup": {
+    "historical_finding": "public pinned Discord source hash, freshly verified from upstream",
+    "exact_historical_fingerprint_only": true,
+    "current_native_receipt_module_and_hash_separate": true
+  }
+}

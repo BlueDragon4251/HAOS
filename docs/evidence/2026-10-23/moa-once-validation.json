@@ -1,0 +1,117 @@
+{
+  "base_commit": "bc35264be9ac35218a835eef57e38f8f57dcfc6f",
+  "reproduced_ambiguous_dispatches_before": 3,
+  "ambiguous_dispatches_after_per_auxiliary_task": 1,
+  "predecessor_all_five_ci_gates": "success",
+  "predecessor_services_kernel_run": 39959840031,
+  "current_patch_root_ci": "pending after push; no local root pass claimed",
+  "full_runtime_tests": {
+    "passed": 901,
+    "existing_skips": 2
+  },
+  "minimal_runtime_tests": {
+    "passed": 901,
+    "existing_skips": 2
+  },
+  "live_provider_tested": false,
+  "source_sha256": [
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "827abed56fb97b01954050270232b22b525e1db5dd2b2e0eea23c63fb4ae1327"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_no_replay.py",
+      "sha256": "9b4f39663f68bf60c4aa1fb67898c1b67eca5c023e3f75b30025694c2299ce51"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_provider.py",
+      "sha256": "5114fa2710beed21694e1d90c3d5e042cbea3f36dc846e9cc5ea34e58b9a7189"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_fallback_replay.py",
+      "sha256": "1aeb050084b186a42813cc922bef780f20c411a99475d6c8012008dbaa7d1998"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_stream_replay.py",
+      "sha256": "9b29901904817ae55700f44a5a3a79aa1e09ddd8d76adfec9e47e1babf987e97"
+    },
+    {
+      "path": "linux/haos/runtime/probe_moa_stream_scope.py",
+      "sha256": "65dcf31fb7c2db919b1bfb482b8f59cf097412be11e0e5ec6220318cee1b0848"
+    },
+    {
+      "path": "linux/haos/runtime/prepare.py",
+      "sha256": "24ae84af83815dea88b07e93cc094ecde0093538287d0fb50a1d4ac404173111"
+    },
+    {
+      "path": "linux/haos/tests/test_runtime.py",
+      "sha256": "4ef704849cac9d09dbdef0170337c73b945bec6483990197d5263cd985f3b8e1"
+    }
+  ],
+  "fixture_receipts": [
+    {
+      "file": "moa-once-chat.json",
+      "sha256": "9abcd14505653430f06f1f2df068afdfe7001fa75206b31e208c78212a659531"
+    },
+    {
+      "file": "moa-once-mixed.json",
+      "sha256": "cdb0cd5c938f5d7e52ab6b259240c354bff56269cf38de46102ff3b0e47be648"
+    },
+    {
+      "file": "moa-once-stream.json",
+      "sha256": "7d6b39b57835e673e31b8d336fc2d38e016d6f61b57f28402e92f90217115253"
+    },
+    {
+      "file": "moa-once-mixed-stream.json",
+      "sha256": "b8f6c70aa98342616f1e9b8c04537da69d42d23e51979057d7b894e69328beff"
+    },
+    {
+      "file": "moa-once-mixed-messages-stream.json",
+      "sha256": "cc3fc44d72580ce920a0ee60fbceb9cd590888afdf8160653b0d90e0124d9753"
+    },
+    {
+      "file": "moa-once-mixed-stream-abort.json",
+      "sha256": "d1471edda781be67548831daf7f30dbc9ca8cc277156f9bf729379febfb284c5"
+    },
+    {
+      "file": "moa-once-mixed-messages-stream-abort.json",
+      "sha256": "a69a379ef145f9011573fa4ff1d297716fcd9fb5291551aabe323393816beff8"
+    },
+    {
+      "file": "moa-once-reference-disconnect.json",
+      "sha256": "cf98d1d2380f13f3a8c1084c8dc18912a0788e80cf622a54fb4adaede46f5024"
+    },
+    {
+      "file": "moa-once-json-replay.json",
+      "sha256": "1375da6df5a4916a7607bb0a65933ebc72ecaf34ef29107e0f965cff1f82d56c"
+    },
+    {
+      "file": "moa-once-stream-replay.json",
+      "sha256": "4622efcc0ea6af085a8d8ec2f500454cc281af7fd39622d324c28c0f0a523ff4"
+    },
+    {
+      "file": "moa-once-replay-builders.json",
+      "sha256": "72c9cb7f3c1a2ef54f4e8be9ce16afb2fa84833177b745d3c320c3027815333a"
+    },
+    {
+      "file": "moa-once-chat-scope.json",
+      "sha256": "ad76da465a8e4b4ba9ac3cfa0acecb4eb3403b83b58d50b576bd47fcd5837eae"
+    },
+    {
+      "file": "moa-once-responses-scope.json",
+      "sha256": "473f38aeb548cce8d3de1003795f943ab93035203cdb3a0ef791c786be960596"
+    },
+    {
+      "file": "moa-once-moa_reference-no-replay.json",
+      "sha256": "ecbd31999c205d4e54f3af78efb89e9991685c8feab4536d93cf79578b57e2ae"
+    },
+    {
+      "file": "moa-once-moa_aggregator-no-replay.json",
+      "sha256": "f886f0af256b12b082ac515c9e166136cc325e4a1f0e117d40242839f438ff09"
+    },
+    {
+      "file": "moa-once-fresh-overlay.json",
+      "sha256": "bd8abbfa2ad40e2ff1d37432f2a416e6ba8b47a5b6d3ced1fa0eabc4d2d94bbe"
+    }
+  ]
+}

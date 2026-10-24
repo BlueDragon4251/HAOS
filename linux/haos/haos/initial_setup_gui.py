@@ -12,6 +12,8 @@ from pathlib import Path
 from . import initial_setup
 from .setup_errors import describe_error
 from .hermes_capabilities import provider_rows, gateway_rows
+from .provider_registry import http_providers, default_mode, oauth_providers, descriptor, account_providers
+from .provider_cloud import CLOUD
 
 
 def session_allowed(env=None, uid=None):
@@ -81,13 +83,15 @@ class Wizard:
         entry.pack(fill="x", ipady=10)
         return entry
 
-    def _choice(self, parent, label, items, default):
+    def _choice(self, parent, label, items, default, *, width=None):
         self._label(parent, label, size=10, color=self.MUTED).pack(anchor="w", pady=(14, 4))
         value = self.tk.StringVar(value=default)
         control = self.tk.OptionMenu(parent, value, *items)
         control.configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
                           activeforeground=self.TEXT, highlightthickness=0,
                           relief="flat", bd=1, font=("DejaVu Sans", 11))
+        if width is not None:
+            control.configure(width=width, anchor="w")
         control["menu"].configure(bg=self.PANEL2, fg=self.TEXT, activebackground=self.BORDER,
                                    activeforeground=self.TEXT, font=("DejaVu Sans", 11))
         control.pack(anchor="w")
@@ -223,7 +227,7 @@ class Wizard:
         self.status.config(text=success, fg=self.CYAN)
         return result
 
-    def _run_async(self, action, *, success="Gespeichert."):
+    def _run_async(self, action, *, success="Gespeichert.", completed=None, result_handler=None):
         """Keep Tk's event loop responsive during authenticated slow system actions.
 
         Exactly one privileged mutation can be underway. No worker thread
@@ -242,8 +246,8 @@ class Wizard:
 
         def worker():
             try:
-                action()
-                results.put((True, None))
+                result = action()
+                results.put((True, result if result_handler is not None else None))
             except Exception as error:
                 results.put((False, describe_error(error, area=self.page)))
 
@@ -256,14 +260,24 @@ class Wizard:
                 self.root.after(150, poll)
                 return
             self.running = False
+            if completed is not None:
+                completed()
             if ok:
                 self.status.config(text=success, fg=self.CYAN)
+                if result_handler is not None:
+                    try:
+                        result_handler(report)
+                    except Exception as error:
+                        self._show_error(describe_error(error, area=self.page))
             else:
                 self._show_error(report)
         self.root.after(150, poll)
 
     def show(self, name):
         tk = self.tk
+        if self.running:
+            self.status.config(text="Bitte warte, bis die aktuelle Systemaktion abgeschlossen ist.")
+            return
         self.page = name
         self.viewport.yview_moveto(0)
         for child in self.content.winfo_children():
@@ -386,18 +400,155 @@ class Wizard:
                          primary=True).pack(anchor="w", pady=24)
         elif name == "provider":
             self._head("Hermes · Provider & Modell",
-                       "Authentifizierte Konfiguration eines Providers. Mehrere aktive Provider/automatische Verteilung folgen nach Broker-Integration.")
-            provider = self._choice(self.content, "Provider", ["openai", "openrouter", "local"], "openai")
+                       "Zugangsdaten bleiben im getrennten Provider-Dienst. Wähle anschließend ein Modell deines Anbieters.")
+            provider = self._choice(self.content, "Provider", sorted(http_providers() | oauth_providers() | CLOUD | {"local", "lmstudio", "gemini", "custom", "copilot", "copilot-acp"}), "openai-api")
             model = self._field(self.content, "Modellkennung, vom Provider unterstützt")
-            endpoint = self._field(self.content, "Lokale URL nur für local", "http://127.0.0.1:11434/v1")
+            endpoint = self._field(self.content, "URL · leer = Standard des Anbieters")
+            mode = self._choice(self.content, "Protokoll · automatisch oder explizit für Modell-/Abo-Varianten",
+                                ["auto", "chat_completions", "codex_responses", "anthropic_messages"], "auto")
             secret = self._field(self.content, "API-Schlüssel · nicht gespeichert im GUI", secret=True)
+            selection_generation = 0
+            model_rows = []
+            catalog_status = self._label(self.content, "Modellkennung direkt eingeben oder den Provider-Katalog laden.",
+                                         size=10, color=self.MUTED)
+            catalog_status.pack(anchor="w", pady=(12, 0))
+            model_filter = self._field(self.content, "Modellliste filtern")
+            model_frame = tk.Frame(self.content, bg=self.PANEL)
+            model_frame.pack(fill="x", pady=5)
+            model_list = tk.Listbox(model_frame, height=6, bg=self.PANEL2, fg=self.TEXT,
+                selectbackground=self.CYAN, selectforeground=self.BG, relief="flat", exportselection=False,
+                font=("DejaVu Sans", 11))
+            model_scroll = tk.Scrollbar(model_frame, orient="vertical", command=model_list.yview)
+            model_list.configure(yscrollcommand=model_scroll.set)
+            model_scroll.pack(side="right", fill="y")
+            model_list.pack(side="left", fill="both", expand=True)
+            def filter_models(_event=None):
+                query = model_filter.get().casefold()
+                model_list.delete(0, tk.END)
+                for row in model_rows:
+                    if query in row["id"].casefold():
+                        model_list.insert(tk.END, row["id"])
+            model_filter.bind("<KeyRelease>", filter_models)
+            def choose_model(_event=None):
+                if model_list.curselection():
+                    selected = model_list.get(model_list.curselection()[0])
+                    model.delete(0, tk.END)
+                    model.insert(0, selected)
+                    mode.set(next(row["api_mode"] for row in model_rows if row["id"] == selected))
+            model_list.bind("<<ListboxSelect>>", choose_model)
+            def show_models(value):
+                from .provider_discovery import validate_catalog
+                validate_catalog(value, provider.get())
+                model_rows[:] = value["models"]
+                source = ("Model Garden · Projektfreigabe und Inferenz nicht geprüft" if value["diagnostic"] == "publisher-catalog" else "Provider-Katalog · Inferenz noch nicht geprüft" if value["source"] in {"provider-api", "sdk-catalog"}
+                          else "Upstream-Vorschläge · Konto und Verfügbarkeit nicht bestätigt" if value["source"] == "upstream-offline"
+                          else "Kein Katalog verfügbar · Konto/URL prüfen oder Modellkennung direkt eingeben")
+                catalog_status.config(text=source + " · " + str(len(model_rows)) + " Modelle")
+                filter_models()
+            def load_models():
+                snapshot = provider.get(), secret.get(), endpoint.get(), mode.get(), model.get()
+                selected, key, url, wire, chosen_model = snapshot
+                def receive(value):
+                    if self.page != "provider":
+                        return
+                    if (provider.get(), secret.get(), endpoint.get(), mode.get(), model.get()) == snapshot:
+                        show_models(value)
+                    else:
+                        self.status.config(text="Konfiguration geändert · Modellliste erneut laden.", fg=self.MUTED)
+                if selected == "local" and not url:
+                    url = "http://127.0.0.1:11434/v1"
+                self._run_async(lambda: initial_setup.provider_models(selected, key, url, "" if wire == "auto" else wire, chosen_model),
+                                success="Modellkatalog geladen. Auswahl gibt noch keine Inferenz frei.", result_handler=receive)
+            self._button(self.content, "Modellliste laden", load_models).pack(anchor="w", pady=8)
+            self._label(self.content,
+                "Cloud-SDKs: AWS erwartet JSON mit access_key_id / secret_access_key (optional session_token), profile oder bearer_token. "
+                "Vertex erwartet Service-Account-/Authorized-User-JSON und die vollständige OpenAPI-URL. "
+                "Azure akzeptiert einen API-Key oder JSON mit tenant_id / client_id / client_secret. "
+                "Ein leeres Cloud-Feld verwendet ausschließlich die SDK-Identität des getrennten Provider-Dienstes.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=8)
+            def import_cloud_file():
+                if self.running:
+                    return
+                from tkinter import filedialog
+                selected, generation = provider.get(), selection_generation
+                filename = filedialog.askopenfilename(parent=self.root, title="Private Cloud-Zugangsdaten auswählen",
+                    filetypes=[("JSON-Zugangsdaten", "*.json")])
+                if not filename:
+                    return
+                secret.delete(0, tk.END)
+                def imported(value):
+                    if generation == selection_generation and provider.get() == selected and secret.winfo_exists():
+                        secret.insert(0, value)
+                    else:
+                        self.status.config(text="Provider-Auswahl geändert; importierte Zugangsdaten verworfen.")
+                self._run_async(lambda: initial_setup.import_cloud_credential(selected, filename),
+                    success="Private Cloud-Datei in das verdeckte Eingabefeld übernommen. Noch keine Konfiguration oder Inferenz.",
+                    result_handler=imported)
+            cloud_file_button = self._button(self.content, "Private Cloud-JSON-Datei auswählen", import_cloud_file)
+            cloud_file_button.pack(anchor="w", pady=6)
+            def account(action):
+                if self.running:
+                    return
+                selected_provider = provider.get()
+                account_options = {"endpoint": endpoint.get()} if selected_provider == "minimax-oauth" else {}
+                self.root.withdraw()
+                self._run_async(lambda: initial_setup.provider_account(selected_provider, action, **account_options),
+                                success=("Kontostatus bestätigt. Keine Inferenz geprüft." if action == "status" else
+                                         "Konto-Aktion abgeschlossen. Provider anschließend konfigurieren."),
+                                completed=self.root.deiconify)
+            login_button = self._button(self.content, "Mit Anbieter-Konto anmelden (OAuth / Device-Code)",
+                                        lambda: account("login"))
+            login_button.pack(anchor="w", pady=8)
+            logout_button = self._button(self.content, "Anbieter-Konto abmelden", lambda: account("logout"))
+            logout_button.pack(anchor="w", pady=4)
+            status_button = self._button(self.content, "Anbieter-Kontostatus prüfen", lambda: account("status"))
+            status_button.pack(anchor="w", pady=4)
+            self._label(self.content, "MiniMax-Konto: Für China zuerst URL https://api.minimaxi.com/anthropic eingeben; "
+                "Anmeldung, Status und Konfiguration verwenden dieselbe gewählte Region.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=4)
+            def update_provider(*_args):
+                nonlocal selection_generation
+                selection_generation += 1
+                # An old key must never follow a new provider selection.
+                secret.delete(0, tk.END)
+                endpoint.delete(0, tk.END)
+                model.delete(0, tk.END)
+                mode.set("auto")
+                model_rows.clear()
+                model_list.delete(0, tk.END)
+                catalog_status.config(text="Modellkennung direkt eingeben oder den Provider-Katalog laden.")
+                available = provider.get() in account_providers()
+                cloud_file_button.configure(state="normal" if provider.get() in CLOUD else "disabled")
+                for button in (login_button, logout_button, status_button):
+                    button.configure(state="normal" if available else "disabled")
+            provider.trace_add("write", update_provider)
+            update_provider()
             def apply():
                 key=secret.get()
                 secret.delete(0, tk.END)
-                selected_provider, selected_model, selected_endpoint = provider.get(), model.get(), endpoint.get()
+                selected_provider, selected_model, selected_endpoint, selected_mode = provider.get(), model.get(), endpoint.get(), mode.get()
+                if selected_provider == "local" and not selected_endpoint:
+                    selected_endpoint = "http://127.0.0.1:11434/v1"
                 self._run_async(lambda: initial_setup.configure_provider(
-                    selected_provider, selected_model, key, selected_endpoint))
+                    selected_provider, selected_model, key, selected_endpoint,
+                    "" if selected_mode == "auto" else selected_mode))
             self._button(self.content, "Provider konfigurieren", apply, primary=True).pack(anchor="w", pady=22)
+            configured = self._run(initial_setup.provider_state, success="")
+            if configured and configured["routes"]:
+                route_ids = [row["id"] for row in configured["routes"]]
+                selected_route = self._choice(self.content, "Konfigurierte Route · Standard: " + configured["default"],
+                                               route_ids, configured["default"])
+                fallbacks = self._field(self.content, "Fallback-Routen in Reihenfolge · IDs durch Komma trennen")
+                self._label(self.content, ", ".join(row["id"] + ": " + row["model"] for row in configured["routes"]),
+                            size=10, color=self.MUTED).pack(anchor="w", pady=6)
+                def route_action(action):
+                    route = selected_route.get()
+                    targets = [item.strip() for item in fallbacks.get().split(",") if item.strip()]
+                    self._run_async(lambda: initial_setup.manage_provider_route(route, action, targets),
+                                    success="Provider-Routen aktualisiert.", result_handler=lambda _: self.show("provider"))
+                for label, action in (("Als Standard wählen", "default"), ("Fallbacks speichern", "fallbacks"),
+                                      ("Route entfernen", "remove")):
+                    self._button(self.content, label, lambda action=action: route_action(action)).pack(anchor="w", pady=4)
             self._label(self.content,
                         "Der Hermes-Katalog enthält weitere Anbieter. Ein Katalogeintrag "
                         "ist keine HAOS-Integration: Ungetestete Transport- und OAuth-Verfahren "
@@ -406,6 +557,43 @@ class Wizard:
             self._catalogue(
                 "Alle Provider des eingebundenen Hermes-Stands anzeigen",
                 [(label, status) for _slug, label, status in provider_rows()])
+            self._label(self.content, "Mixture of Agents · freigegebene Provider kombinieren",
+                        size=13, color=self.CYAN, bold=True).pack(anchor="w", pady=(18, 4))
+            self._button(self.content, "Gespeicherte Provider-Auswahl neu laden",
+                         lambda: self.show("provider")).pack(anchor="w", pady=6)
+            self._label(self.content,
+                "Ein oder zwei Referenzmodelle liefern Vorschläge. Das Aggregator-Modell führt sie zur Antwort zusammen. "
+                "Alle ausgewählten Anbieter erhalten deine Nachricht. Wähle ausschließlich bereits eingerichtete und freigegebene Modelle.",
+                size=10, color=self.MUTED).pack(anchor="w")
+            moa_options = {}
+            for row in (configured or {}).get("routes", []):
+                for approved in row.get("models", [row["model"]]):
+                    label = row["id"] + " · " + approved
+                    moa_options[label] = {"route": row["id"], "model": approved}
+            if moa_options:
+                moa_name = self._field(self.content, "Name des Modellteams", "personal")
+                choices = list(moa_options)
+                primary_model = next(row["model"] for row in configured["routes"] if row["id"] == configured["default"])
+                primary = next((label for label, slot in moa_options.items()
+                    if slot["route"] == configured["default"] and slot["model"] == primary_model), choices[0])
+                picker_width = 24 if self.compact else 56
+                reference_one = self._choice(self.content, "Referenzmodell 1", choices, choices[0], width=picker_width)
+                no_second = "Kein zweites Referenzmodell"
+                reference_two = self._choice(self.content, "Referenzmodell 2 · optional", [no_second, *choices], no_second, width=picker_width)
+                aggregator = self._choice(self.content, "Aggregator-Modell für die gemeinsame Antwort", choices, primary, width=picker_width)
+                def apply_moa():
+                    import json
+                    selected_name = moa_name.get()
+                    references = [moa_options[reference_one.get()]]
+                    if reference_two.get() != no_second:
+                        references.append(moa_options[reference_two.get()])
+                    value = json.dumps({"references": references, "aggregator": moa_options[aggregator.get()]})
+                    self._run_async(lambda: initial_setup.configure_moa(selected_name, value),
+                                    success="Modellteam als Standard gespeichert. Die ausgewählten Anbieter werden bei neuen Anfragen verwendet.")
+                self._button(self.content, "Modellteam als Standard aktivieren", apply_moa).pack(anchor="w", pady=10)
+            else:
+                self._label(self.content, "Richte zuerst mindestens einen Provider mit einem freigegebenen Modell ein. "
+                    "Danach kannst du hier dein Modellteam auswählen.", size=10, color=self.MUTED).pack(anchor="w", pady=10)
         elif name == "updates":
             self._head("HAOS Updates",
                        "Stabiler oder privater Entwicklungszweig. Der vorherige bootc-Stand bleibt für Rollback erhalten.")
@@ -432,29 +620,222 @@ class Wizard:
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
+            configured_gateways = self._run(initial_setup.gateway_configuration, success="") or {"connectors": [], "bindings": []}
+            process_status = self._label(self.content, "Dienststatus noch nicht geprüft.", size=10, color=self.MUTED)
+            process_status.pack(anchor="w", pady=6)
+            def render_gateway_status(value):
+                process_status.configure(text="Gateway-Dienst: " + value["ActiveState"] + " / " + value["SubState"]
+                    + " · Ergebnis: " + value["Result"])
+            self._button(self.content, "Gateway-Dienststatus prüfen", lambda: self._run_async(initial_setup.gateway_process_status,
+                success="Lokaler Dienststatus aktualisiert. Externe Zustellung wird dadurch nicht bestätigt.",
+                result_handler=render_gateway_status)).pack(anchor="w", pady=4)
+            for action, label in (("start", "Gateway-Dienst starten"), ("stop", "Gateway-Dienst stoppen")):
+                self._button(self.content, label, lambda selected_action=action: self._run_async(
+                    lambda: initial_setup.manage_gateway(selected_action), success="Gateway-Dienstaktion abgeschlossen.")).pack(anchor="w", pady=4)
+            self._button(self.content, "Unterbrochene Gateway-Konfiguration wiederherstellen", lambda: self._run_async(
+                lambda: initial_setup.manage_gateway("recover-configuration"),
+                success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
+                result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord"], "telegram")
-            token = self._field(self.content, "Bot-Token (wird niemals im GUI gespeichert)", secret=True)
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost"], "telegram")
+            token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
+            slack_credentials = tk.Frame(self.content,bg=self.PANEL)
+            app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
+            self._label(slack_credentials, "In deiner Slack-App Socket Mode aktivieren und einen App-Token mit connections:write erstellen. "
+                "Den Bot mit chat:write, users:read, app_mentions:read und den Verlaufsrechten der verwendeten Gespräche installieren "
+                "(channels:history, groups:history, im:history bzw. mpim:history). Events app_mention sowie message.channels, "
+                "message.groups, message.im und message.mpim passend abonnieren und den Bot in die freigegebenen Kanäle einladen. "
+                "Nach Ausfällen wird genehmigter Verlauf seitenweise ab der Freigabe nachgeladen. Anbieterlimits können das verlangsamen; "
+                "über 24 Stunden alte Eingänge werden nur erhalten. Gelöschte Slack-Nachrichten sind nicht wiederherstellbar. "
+                "Socket Mode benötigt keinen öffentlichen Webhook oder Signing-Secret. Tokens bleiben im privaten Gateway-Dienst.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
+            mattermost_credentials = tk.Frame(self.content,bg=self.PANEL)
+            mm_server = self._field(mattermost_credentials,'Mattermost HTTPS-Server · optional mit Installationspfad')
+            self._label(mattermost_credentials,'Im Mattermost-Server einen Bot mit Token-Zugriff einrichten und in die vorgesehenen Kanäle aufnehmen. '
+                'Alternativ einen getrennten Dienstbenutzer mit Personal Access Token verwenden. Der HTTPS-Server muss erreichbar sein und ein '
+                'vom System vertrautes Zertifikat verwenden. REST API v4 und WebSocket müssen zugänglich sein; ein öffentlicher HAOS-Webhook ist nicht nötig. '
+                'Benutzer-, Kanal-, Team- und optionale Root-Post-ID exakt koppeln. In Kanälen den Bot erwähnen. '
+                'Verlauf wird nur innerhalb aktueller Owner-Freigaben nachgeladen; gelöschte Nachrichten und fehlende Leserechte sind echte Grenzen. '
+                'Token oder Serverwechsel entzieht bisherige Absenderfreigaben. Medien/Voice und beliebige Plugins sind nicht freigegeben.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
             def configure():
-                secret = token.get()
+                secret, app_secret = token.get(), app_token.get()
                 token.delete(0, tk.END)
-                selected_connector, selected_platform = connector.get(), platform.get()
-                self._run_async(lambda: initial_setup.configure_gateway(
-                    selected_connector, selected_platform, secret),
-                    success="Gateway gespeichert. Neustart des Gateway-Dienstes erforderlich.")
-            self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
+                app_token.delete(0, tk.END)
+                selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
+                self._run_async(lambda: (initial_setup.configure_gateway(
+                    selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
+                    else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
+                    success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
+            configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
+            configure_button.pack(anchor="w", pady=10)
+            def platform_changed(*_args):
+                token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main'}:
+                    connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
+                if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
+                else:slack_credentials.pack_forget()
+                if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
+                else:mattermost_credentials.pack_forget()
+            platform.trace_add("write",platform_changed)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
             binding = self._field(self.content, "Freigabe-ID (z. B. mein-handy)", "my-device")
             sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
+            scope = self._field(self.content, "Bereich · Discord-Server / Slack-Workspace / Mattermost-Team")
+            thread = self._field(self.content, "Thread-ID (leer nur für Nachrichten ohne Thread)")
             identity = self._field(self.content, "HAOS-Identität", "personal")
+            self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
+                        size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            self._label(self.content, "Discord: Server-ID als Bereich angeben. Für einen Thread dessen ID sowohl als Chat-ID "
+                "als auch als Thread-ID eintragen. In Server-Kanälen den Bot direkt erwähnen. "
+                "Für Wiederherstellung nach Ausfällen benötigt der Bot Kanalansicht und Nachrichtenverlauf. "
+                "Neue Freigaben lesen nur Nachrichten nach ihrer Zeitgrenze nach; alte Freigaben ohne Zeitgrenze "
+                "müssen dafür ausdrücklich erneut gekoppelt werden. Automatische neue Threads und native Slash-Menüs sind nicht freigegeben.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            self._label(self.content, "Slack: Benutzer-ID U…/W…, Gesprächs-ID C…/G…/D… und Workspace-ID T… angeben, "
+                "auch für Direktnachrichten. Für vorhandene Threads den vollständigen thread_ts-Zeitstempel angeben. "
+                "In Kanälen und Gruppen den Bot erwähnen. Leerer Thread bedeutet nur Nachrichten außerhalb eines Threads; "
+                "Antworten erzeugen keinen neuen Thread. Medien, native Slash-Menüs und interaktive Slack-Schaltflächen sind nicht freigegeben.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
+            rights = {}
+            for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
+                    ("cancel", "Eigene Missionen abbrechen"), ("answer", "Rückfragen und Freigaben beantworten"),
+                    ("pause", "Wartende Missionen pausieren"), ("resume", "Pausierte Missionen fortsetzen")):
+                variable = tk.BooleanVar(value=capability in {"create", "read"})
+                rights[capability] = variable
+                tk.Checkbutton(self.content, text=label, variable=variable, bg=self.PANEL, fg=self.TEXT,
+                    selectcolor=self.BG, activebackground=self.PANEL).pack(anchor="w")
             def pair_sender():
-                selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get())
-                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected),
-                                success="Absender explizit freigegeben. Gateway-Neustart erforderlich.")
-            self._button(self.content, "Absender mit Lesen/Erstellen freigeben",
+                selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
+                            tuple(key for key, value in rights.items() if value.get()))
+                selected_scope, selected_thread = scope.get(), thread.get()
+                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread),
+                                success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
+            self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
                          pair_sender, primary=True).pack(anchor="w", pady=(10, 0))
+            if configured_gateways["bindings"]:
+                binding_labels = {row["id"] + " · " + row["connector"] + " · " + row["scope"] + " / " + row["thread"]: row["id"]
+                    for row in configured_gateways["bindings"]}
+                revoked_binding = self._choice(self.content, "Bestehende Absenderfreigabe", list(binding_labels), next(iter(binding_labels)), width=24 if self.compact else 48)
+                binding_details = self._label(self.content, "", size=10, color=self.MUTED)
+                binding_details.pack(anchor="w", pady=4)
+                def show_binding_details(*_args):
+                    selected_id = binding_labels[revoked_binding.get()]
+                    row = next(row for row in configured_gateways["bindings"] if row["id"] == selected_id)
+                    binding_details.configure(text="Absender: " + row["sender"] + " · Chat: " + row["chat"]
+                        + " · Identität: " + row["identity"] + " · Rechte: " + ", ".join(row["capabilities"]))
+                revoked_binding.trace_add("write", show_binding_details)
+                show_binding_details()
+                def revoke_binding():
+                    selected_id = binding_labels[revoked_binding.get()]
+                    self._run_async(lambda: initial_setup.manage_gateway("revoke", selected_id),
+                        success="Absenderfreigabe entzogen; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
+                self._button(self.content, "Ausgewählte Absenderfreigabe entziehen", revoke_binding).pack(anchor="w", pady=6)
+            if configured_gateways["connectors"]:
+                connector_labels = {row["id"] + " · " + row["platform"]: row["id"] for row in configured_gateways["connectors"]}
+                removed_connector = self._choice(self.content, "Bestehender Konnektor", list(connector_labels), next(iter(connector_labels)), width=24 if self.compact else 48)
+                def remove_connector():
+                    selected_id = connector_labels[removed_connector.get()]
+                    self._run_async(lambda: initial_setup.manage_gateway("remove", selected_id),
+                        success="Konnektor, zugehörige Freigaben und Zugangsdaten entfernt; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
+                self._button(self.content, "Konnektor und Zugangsdaten entfernen", remove_connector).pack(anchor="w", pady=6)
+            self._button(self.content, "Gateway-Konfiguration neu laden", lambda: self.show("gateways")).pack(anchor="w", pady=6)
+            self._label(self.content, "Gateways · gespeicherte Eingänge wiederherstellen",
+                color=self.CYAN, size=13, bold=True).pack(anchor="w", pady=(14, 0))
+            self._label(self.content, "Die Prüfung stoppt den Gateway-Dienst. Nur fehlgeschlagene Dekodierung innerhalb von 24 Stunden "
+                "und mit unveränderter Absenderfreigabe kann erneut versucht werden. Verwerfen erhält die gespeicherten Daten, "
+                "führt sie aber nicht aus. Anschließend den Dienst oben manuell starten.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            recovery_frame = tk.Frame(self.content, bg=self.PANEL)
+            recovery_frame.pack(fill="x", pady=4)
+            def show_ingress(value):
+                for child in recovery_frame.winfo_children(): child.destroy()
+                history_labels = {'ready':'Verlaufabruf erfolgreich; keine externe Zustellung bestätigt',
+                    'permission-denied':'Zugriff verweigert: Kanal-/Thread-ID, Kanalansicht und Nachrichtenverlauf prüfen',
+                    'rate-limited':'Anbieter begrenzt Abrufe; Wiederholung erfolgt nach Neustart',
+                    'transport-unavailable':'Verbindung zum Verlauf derzeit nicht verfügbar',
+                    'storage-unavailable':'Privates Journal nicht beschreibbar; Datenträger prüfen',
+                    'invalid-source':'Verlaufantwort passt nicht zur freigegebenen Quelle'}
+                transport_labels={'connecting':'Verbindungsaufbau; noch keine bestätigte WebSocket-Anmeldung',
+                    'connected':'WebSocket-Anmeldung bestätigt; keine externe Zustellung abgeleitet',
+                    'disconnected':'Verbindung getrennt; Gateway-Dienst nach Prüfung neu starten',
+                    'authentication-refused':'Anmeldung abgelehnt: privaten Token und Bot-/Dienstkonto prüfen',
+                    'transport-unavailable':'Server/TLS/WebSocket nicht verfügbar; Adresse, Zertifikat und Netzwerk prüfen'}
+                for item in value.get('transport',[]):
+                    self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+transport_labels[item['status']]
+                        +' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
+                for history in value.get('history',[]):
+                    self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
+                        size=10, color=self.MUTED).pack(anchor="w", pady=3)
+                rows = value["ingress"]
+                if not rows:
+                    self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
+                    return
+                choices = {row.get('platform','') + " · " + row["ingress_id"] + " · " + row["state"] + " · Versuch " + str(row["attempt"]): row for row in rows}
+                selected = self._choice(recovery_frame, "Gespeicherter Eingang", list(choices), next(iter(choices)), width=24 if self.compact else 48)
+                note = self._field(recovery_frame, "Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")
+                def decide(decision):
+                    from tkinter import messagebox
+                    row, evidence = choices[selected.get()], note.get()
+                    prompt = "Gespeicherte Nachricht erneut dekodieren und bei gültiger Freigabe ausführen?" if decision == "retry" else "Diesen Eingang von der Ausführung ausschließen und seine Daten erhalten?"
+                    if messagebox.askyesno("Gespeicherter Gateway-Eingang", prompt):
+                        self._run_async(lambda: initial_setup.reconcile_gateway_ingress(row, decision, evidence),
+                            success="Owner-Entscheidung gespeichert. Gateway-Dienst bleibt gestoppt.",
+                            result_handler=lambda _: load_ingress())
+                self._button(recovery_frame, "Fehlgeschlagene Dekodierung erneut versuchen", lambda: decide("retry")).pack(anchor="w", pady=4)
+                self._button(recovery_frame, "Eingang verwerfen · Daten erhalten", lambda: decide("discard")).pack(anchor="w", pady=4)
+                self._button(recovery_frame, "Nächste Eingänge anzeigen", lambda: load_ingress(value["next_cursor"])).pack(anchor="w", pady=4)
+            def load_ingress(after=0):
+                self._run_async(lambda: initial_setup.gateway_ingress(after),
+                    success="Private Eingangsmetadaten geladen. Gateway-Dienst bleibt gestoppt.", result_handler=show_ingress)
+            self._button(self.content, "Gateway-Dienst stoppen und gespeicherte Eingänge prüfen", load_ingress).pack(anchor="w", pady=6)
+            self._label(self.content,"Ausgehende Antworten · ungeklärte Zustellung",color=self.CYAN,
+                size=13,bold=True).pack(anchor="w",pady=(14,0))
+            self._label(self.content,"Diese Prüfung stoppt Gateway, Controller, Hermes und Provider. Prüfe den tatsächlichen "
+                "Empfang in der Plattform. Erneutes Senden ist nur nach bestätigter Nichtzustellung erlaubt. "
+                "Verwerfen führt keine weitere Zustellung aus und erhält die gespeicherten Daten.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
+            delivery_frame=tk.Frame(self.content,bg=self.PANEL);delivery_frame.pack(fill="x",pady=4)
+            def show_deliveries(value):
+                for child in delivery_frame.winfo_children():child.destroy()
+                rows=value['deliveries']
+                if not rows:
+                    self._label(delivery_frame,"Keine weiteren ungeklärten Zustellungen.",size=10,color=self.MUTED).pack(anchor="w")
+                    return
+                choices={row['delivery_id']+' · '+row['state']+' · Versuch '+str(row['attempt']):row for row in rows}
+                selected=self._choice(delivery_frame,"Gespeicherte Zustellung",list(choices),next(iter(choices)),width=24 if self.compact else 48)
+                details=self._label(delivery_frame,"",size=10,color=self.MUTED);details.pack(anchor="w",pady=4)
+                def delivery_details(*_args):
+                    details.configure(text='Mission: '+choices[selected.get()]['mission_id'])
+                selected.trace_add('write',delivery_details);delivery_details()
+                receipt=self._field(delivery_frame,"Nur für bestätigt zugestellt · tatsächliche Plattform-Nachrichten-ID")
+                note=self._field(delivery_frame,"Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")
+                not_delivered=tk.BooleanVar(value=False)
+                tk.Checkbutton(delivery_frame,text="Ich habe geprüft: Der vorige Versuch wurde nicht zugestellt",
+                    variable=not_delivered,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,
+                    activebackground=self.PANEL,wraplength=self.label_wrap,justify='left').pack(anchor="w",pady=4)
+                def decide_delivery(decision):
+                    from tkinter import messagebox
+                    row,evidence,remote_id,confirmation=choices[selected.get()],note.get(),receipt.get(),not_delivered.get()
+                    prompts={'delivered':'Zustellung anhand der angegebenen Plattform-ID als bestätigt erfassen?',
+                        'retry':'Nach geprüfter Nichtzustellung einen weiteren begrenzten Sendeversuch freigeben?',
+                        'discard':'Weitere Zustellung ausschließen und die gespeicherten Daten erhalten?'}
+                    if messagebox.askyesno('Ausgehende Gateway-Antwort',prompts[decision]):
+                        self._run_async(lambda:initial_setup.reconcile_gateway_delivery(row,decision,evidence,remote_id or None,confirmation),
+                            success="Owner-Entscheidung gespeichert. Dienste bleiben gestoppt.",
+                            result_handler=lambda _:load_deliveries())
+                for decision,label in (('delivered','Anhand Plattform-ID als zugestellt erfassen'),
+                        ('retry','Nach bestätigter Nichtzustellung erneut versuchen'),('discard','Weitere Zustellung verwerfen · Daten erhalten')):
+                    self._button(delivery_frame,label,lambda selected_decision=decision:decide_delivery(selected_decision)).pack(anchor="w",pady=4)
+                self._button(delivery_frame,'Nächste Zustellungen anzeigen',lambda:load_deliveries(value['next_cursor'])).pack(anchor="w",pady=4)
+            def load_deliveries(after=0):
+                self._run_async(lambda:initial_setup.gateway_deliveries(after),
+                    success="Private Zustellmetadaten geladen. Alle Missionsdienste bleiben gestoppt.",result_handler=show_deliveries)
+            self._button(self.content,'Missionsdienste stoppen und ungeklärte Zustellungen prüfen',load_deliveries).pack(anchor="w",pady=6)
+            self._button(self.content,'Missionsdienste nach Wiederherstellung starten',lambda:self._run_async(initial_setup.resume_runtime,
+                success="Dienststart angefordert. Aktuellen Status prüfen; dies bestätigt keine externe Zustellung.")).pack(anchor="w",pady=6)
             self._label(self.content,
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",

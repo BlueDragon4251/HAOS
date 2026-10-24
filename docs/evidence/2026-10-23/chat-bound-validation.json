@@ -1,0 +1,140 @@
+{
+  "base_commit": "cc43ebf350f4cae132494713bb701ab7649ed567",
+  "before_chat_encrypted_replay": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      true
+    ],
+    [
+      2,
+      "fallback",
+      true
+    ],
+    [
+      3,
+      "primary",
+      true
+    ]
+  ],
+  "main_agent_cases": 6,
+  "actual_main_agent_turns": 18,
+  "actual_moa_auxiliary_calls": 6,
+  "http_dispatches": 40,
+  "full_tests": {
+    "passed": 914,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 914,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; root/UID/kernel CI remains required",
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_response_replay.py",
+      "sha256": "b95b3c14e5212b5ba7fb821791c32d493c65ce31d618a9937d177cb578bdf27f"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "2193a2a2bd5efe287cbb7b00acbd98081e22692f165216564e6f0151ded8437e"
+    },
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "d9ca09fe0926f4621082e09feaa265fdffe98dda4b13182f94e6f137105d8912"
+    },
+    {
+      "path": "linux/haos/runtime/probe_agent_fallback_replay.py",
+      "sha256": "fb1b266d01506263e5cba2d7d58b04828006a4b083ecb1f6d7aa510122e1351d"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "d50caf48a980938a8ea06efc08aa4e997966406234c99b2252b902dacc8bb3fe"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "984c92dbd6c3cfd342db23db9698ea04a0e07397899720a2c335a947c960305d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "cd258c5952d0e3216cc32187a9400fada632950712ecec2e7ecd6e5ee1269c01"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "chat-bound-chat.json",
+      "sha256": "4e42dcf929ee0780abbb7eae486c726ae455eb7987de3e34f685f5ec965e8141"
+    },
+    {
+      "file": "chat-bound-chat-stream.json",
+      "sha256": "3ca8a0bb0a89b1a8a706a01562101a0f3c6882b8fb9ab31c81f0e98cd5094471"
+    },
+    {
+      "file": "chat-bound-chat-moa.json",
+      "sha256": "96f68fa908c6e0c2c1fe910c02968bafc61da96bbd8ef2285f62bf1826d372fb"
+    },
+    {
+      "file": "chat-bound-chat-moa-stream.json",
+      "sha256": "c73f2bf0c5756af41a8c8c7730fd42c293edeb6626cc542828e59d91e4082368"
+    },
+    {
+      "file": "chat-bound-responses.json",
+      "sha256": "887ffc48c951af59399afdb784ca59f79e16c9eb692c740a44b1e88a49890cf1"
+    },
+    {
+      "file": "chat-bound-messages.json",
+      "sha256": "4dcf74e9c656f06d6f0aba941d0f959ff8c0ed7de65055b837489d0326de9559"
+    },
+    {
+      "file": "chat-bound-responses-aliases.json",
+      "sha256": "bebea945ca802fcee34782d3da063989e065926cce14f896a2d81cb6c7dea33c"
+    },
+    {
+      "file": "chat-bound-messages-aliases.json",
+      "sha256": "a9c1b74182d576a890f9290c6e44cedc6a189906d6f9277789a20d8dca7ce81e"
+    },
+    {
+      "file": "chat-bound-moa_fallback_replay.json",
+      "sha256": "6aa762833bf7c295483cd27a2b2803204aa5213abd90075e4a5592f60eee10f7"
+    },
+    {
+      "file": "chat-bound-moa_fallback_replay-json.json",
+      "sha256": "0f18ddae8b4c086fb9f9772e2bf2e84c02cc09d4756907f90e23631aa5792a5a"
+    },
+    {
+      "file": "chat-bound-moa_stream_replay.json",
+      "sha256": "7556d7cbcde5147a406cb8e99e447606a039c7994ba53e9af4bbf8772c7250ee"
+    },
+    {
+      "file": "chat-bound-moa_stream_scope-chat.json",
+      "sha256": "7baa626bcb6956215e9609c79b9c5234157887ccf5649be2aedcdc8b01ddc1ed"
+    },
+    {
+      "file": "chat-bound-provider_fallback_matrix.json",
+      "sha256": "4d3aeabb8b1d9b36061120b594ef8c328b418b592579eca722a8cfbb5c84fc4c"
+    },
+    {
+      "file": "chat-bound-http_provider_matrix.json",
+      "sha256": "63280326c70665fc156d03ee302542f61dc149da4860d34e7cb98e133809ce50"
+    },
+    {
+      "file": "chat-bound-moa_provider-mixed-stream.json",
+      "sha256": "b2c5c3e11259a7f776892a1b9c7ea40c96a9c01e33a4e5b0d51df24fdf770f49"
+    },
+    {
+      "file": "chat-bound-bedrock_provider.json",
+      "sha256": "ea077c2d878e619d4f04eec16df7e92ef88c212da5919a7dd99091705142f568"
+    }
+  ]
+}

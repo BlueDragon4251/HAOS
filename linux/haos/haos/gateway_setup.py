@@ -8,13 +8,52 @@ import os
 import pwd
 import stat
 import subprocess
+import secrets
+import time
+from copy import deepcopy
 from pathlib import Path
 
 from .gateway import GatewayPolicy
-from .policy import atomic_json
 from .sandbox import trusted_json
 
 CONFIG = Path("/etc/haos")
+
+
+def owner_ingress(args, policy):
+    """Owner authenticates; only the gateway UID opens its private native journal."""
+    from .owner import audit
+    if os.geteuid() != 0:
+        raise PermissionError('native ingress recovery requires authenticated owner authority')
+    stopped_gateway()
+    GatewayPolicy(policy)
+    params = {'after':args.after} if args.gateway_action == 'ingress' else None
+    if params is None:
+        if not isinstance(args.note,str) or not 1 <= len(args.note.strip()) <= 2000:
+            raise ValueError('bounded non-secret owner inspection evidence required')
+        params = {'ingress_id':args.ingress_id,'attempt':args.attempt,'state':args.state,
+            'decision':args.decision,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+            'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest()}
+    directory = Path('/usr/lib/haos').lstat()
+    if not stat.S_ISDIR(directory.st_mode) or directory.st_uid != 0 or directory.st_mode & 0o022:
+        raise PermissionError('untrusted installed recovery code')
+    account = pwd.getpwnam('haos-gateway')
+    if account.pw_uid == 0 or account.pw_gid == 0:
+        raise PermissionError('gateway recovery may not retain root')
+    result = subprocess.run(['/usr/bin/python3','-E','-s','-m','haos.gateway_raw_recovery'],
+        input=json.dumps({'action':args.gateway_action,'policy':policy,'params':params}),
+        text=True,capture_output=True,check=False,timeout=15,user=account.pw_uid,group=account.pw_gid,
+        extra_groups=[],umask=0o077,cwd='/usr/lib/haos',
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'})
+    if result.returncode or len(result.stdout) > 256*1024:
+        raise RuntimeError('offline native ingress recovery failed; check selected state, attempt, grant and 24-hour expiry')
+    value = json.loads(result.stdout)
+    from .gateway import digest
+    names = {digest(row):row['id'] for row in policy['bindings']}
+    for row in value.get('history',[]):
+        row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
+    if args.gateway_action == 'reconcile-ingress':
+        audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
+    return value
 
 
 def owner_delivery(args, policy):
@@ -62,6 +101,9 @@ def stopped_gateway():
 
 
 def load(config=CONFIG):
+    from .gateway_publication import pending, validate_snapshot
+    if pending(config):
+        raise PermissionError("interrupted gateway publication; stop the gateway and recover-configuration")
     metadata = config.lstat()
     if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o022:
         raise PermissionError("untrusted gateway configuration directory")
@@ -72,28 +114,61 @@ def load(config=CONFIG):
     if secret_path.exists() and stat.S_IMODE(secret_path.lstat().st_mode) & 0o077:
         raise PermissionError("transport credential store must be root-private")
     credentials = trusted_json(secret_path) if secret_path.exists() else {"connectors": {}}
-    if set(credentials) != {"connectors"} or not isinstance(credentials["connectors"], dict):
-        raise ValueError("invalid protected transport credentials")
-    return policy, credentials
+    validate_snapshot(policy, credentials)
+    if pending(config):
+        raise PermissionError("gateway publication changed during inspection")
+    return ({key: value for key, value in policy.items() if key != "publication"},
+            {key: value for key, value in credentials.items() if key != "publication"})
+
+
+def renewed_policy(policy, previous):
+    """Preserve exact grants; newly paired or edited grants get a fresh epoch.
+
+    Legacy grants acquire an epoch on their next owner publication. Old mission
+    and relay records remain stored but cannot regain delivery authority through
+    an identical later pairing, route edit reversal or stale policy submission.
+    """
+    GatewayPolicy(policy)
+    old = GatewayPolicy(previous).bindings
+    output = deepcopy(policy)
+    for binding in output["bindings"]:
+        before = old.get(binding["id"])
+        if (before is None or "generation" not in before or binding != before):
+            binding["generation"] = secrets.token_hex(32)
+            binding['since'] = time.time_ns() // 1_000_000
+    return output
 
 
 def persist(policy, credentials, *, config=CONFIG, gid=None):
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
-    load(config)
-    GatewayPolicy(policy)
-    if set(credentials["connectors"]) != {c["id"] for c in policy["connectors"]}:
-        raise ValueError("transport credentials and connector policy disagree")
-    gid = grp.getgrnam("haos-gateway").gr_gid if gid is None else gid
-    # Service is stopped. A crash between writes cannot introduce an authorized new sender.
-    atomic_json(config / "gateway-credentials", credentials)
-    atomic_json(config / "gateways.json", policy, mode=0o640, gid=gid)
+    from .gateway_publication import writer, publish
+    with writer(config):
+        previous, old_credentials = load(config)
+        policy = deepcopy(policy)
+        # A credential/account replacement requires fresh sender approval.
+        # Preserve old records, but withdraw all bindings on that connector.
+        changed = {key for key in credentials.get("connectors", {})
+            if key in old_credentials["connectors"] and credentials["connectors"][key] != old_credentials["connectors"][key]}
+        old_platforms = {row["id"]: row["platform"] for row in previous["connectors"]}
+        changed.update(row["id"] for row in policy["connectors"] if row["id"] in old_platforms
+            and row["platform"] != old_platforms[row["id"]])
+        policy["bindings"] = [binding for binding in policy["bindings"] if binding["connector"] not in changed]
+        policy = renewed_policy(policy, previous)
+        gid = grp.getgrnam("haos-gateway").gr_gid if gid is None else gid
+        publish(config, policy, credentials, previous, gid)
 
 
 def owner_gateway(args):
     from .owner import audit
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
+    if args.gateway_action == "recover-configuration":
+        from .gateway_publication import recover
+        stopped_gateway()
+        value = recover(CONFIG, grp.getgrnam("haos-gateway").gr_gid)
+        audit("gateway.configuration-recovered", {})
+        return value
     if args.gateway_action in {"start", "stop"}:
         subprocess.run(["/usr/bin/systemctl", args.gateway_action, "haos-gateway.service"], check=True, timeout=30)
         audit("gateway." + args.gateway_action, {})
@@ -103,10 +178,12 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
+    if args.gateway_action in {'ingress','reconcile-ingress'}:
+        return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord"}:
-            raise ValueError("currently provisioned transports: telegram, discord")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         # Validate the proposed connector before asking for a credential.
@@ -116,6 +193,15 @@ def owner_gateway(args):
         if not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
+        if args.platform=='slack':
+            from .gateway_slack import validate_credentials
+            app_token=getpass.getpass('Slack Socket Mode app token (private): ')
+            validate_credentials(token,app_token)
+            credentials['connectors'][args.connector]['app_token']=app_token
+        if args.platform=='mattermost':
+            from .gateway_mattermost import validate_credentials
+            url=input('Mattermost HTTPS server URL (no token or credentials in URL): ')
+            credentials['connectors'][args.connector]['server_url']=validate_credentials(token,url)
     elif args.gateway_action == "pair":
         binding = {"id": args.binding, "connector": args.connector, "sender": args.sender, "chat": args.chat,
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,

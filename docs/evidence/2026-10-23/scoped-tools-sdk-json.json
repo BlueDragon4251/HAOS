@@ -1,0 +1,47 @@
+{
+  "case": "sdk-json",
+  "native_gemini_codec": false,
+  "same_model_distinct_private_keys": false,
+  "sdk_completions": 3,
+  "actual_main_agent_storage_calls": 3,
+  "actual_main_agent_conversation_turns": 0,
+  "actual_moa_auxiliary_calls": 0,
+  "http_dispatches": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      false
+    ],
+    [
+      2,
+      "fallback",
+      true
+    ],
+    [
+      3,
+      "primary",
+      false
+    ]
+  ],
+  "host_tools_granted": false,
+  "tools_executed": false,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_chat_tool_replay.py": "941dc2a17f53d9b7dac1702c346ba48eb1b0391455f00b946b32b315cc4d8d38",
+    "provider_response_replay.py": "1955d16ad7ab42920098d2534409295650307373654fc7ad34e72b45ec9a1a7b",
+    "provider_profiles.py": "9c4a8115a464e5695f1d3fbe2469a4303a6b492902f3ebdbc1d4c1b475b49f32",
+    "provider_moa_streams.py": "c296ef974fb67da1d39076a652be6a139f88cab0fcabbbb9ce8ed7ba7bd71e5d",
+    "provider_proxy.py": "63512bb2ef6c45b3e389dc5e5e042411cd9206677c54be89a58db38138cebdc1",
+    "provider_native.py": "39a7d6e321bfca66bcc85eacc0cb06e7ac48f601c3cfd8e37c85af29a51b0d92"
+  }
+}

@@ -17,11 +17,16 @@ import threading
 import time
 from urllib.parse import urlsplit
 import uuid
+import ipaddress
 
 from .provider_policy import PORT, ProviderPolicy
+from .provider_replay import route_binding, capability_generation
+from .provider_fallback import extract as fallback_context, retarget, source_features, merge_features
 from .redaction import Redactor
 from .sandbox import trusted_json
 from .credentials import private_credential
+from .provider_registry import descriptor, oauth_providers
+from .provider_routes import ProviderRoutes
 
 MAX_INPUT = 4 * 1024 * 1024
 MAX_LINE = 1024 * 1024
@@ -89,25 +94,110 @@ class Credentials:
     def __init__(self, policy, credentials):
         self.policy, self.credentials = policy, credentials
         self.lock = threading.Lock()
+        self.cloud_cache = {}
+        self.router_cache = {}
+        self.query = {}
+        self.request_state = threading.local()
+
+    @property
+    def cloud_data(self):
+        return getattr(self.request_state, "cloud_data", None)
+
+    @cloud_data.setter
+    def cloud_data(self, value):
+        self.request_state.cloud_data = value
+
+    @property
+    def effective_endpoint(self):
+        return getattr(self.request_state, "endpoint", self.policy.endpoint)
 
     def headers(self):
-        if self.policy.provider == "openai-codex":
+        self.request_state.oauth_messages = False
+        if self.policy.provider == "copilot-acp":
+            if self.credentials.get("api_key") is not None:
+                raise PermissionError("ACP credentials belong only to its isolated identity")
+            return {}, Redactor()
+        if self.policy.provider == "copilot":
+            from .provider_copilot import bind_transport
+            bind_transport()
+            from hermes_cli.copilot_auth import resolve_copilot_token, exchange_copilot_token, copilot_request_headers
+            with self.lock:
+                raw = self.credentials.get("api_key") or resolve_copilot_token()[0]
+                if not raw:
+                    raise PermissionError("Copilot device login or an authorized GitHub token is required")
+                token, expiry, endpoint = exchange_copilot_token(raw)
+                selected = endpoint or self.policy.endpoint
+                ProviderPolicy({**self.policy.data, "endpoint": selected})
+                self.request_state.endpoint = selected
+            if not isinstance(token, str) or not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
+                raise PermissionError("invalid exchanged Copilot credential")
+            return {**copilot_request_headers(), "Authorization": "Bearer " + token}, Redactor([raw, token])
+        from .provider_cloud import CLOUD, cloud_headers, credential_data
+        if self.policy.provider in CLOUD:
+            with self.lock:
+                self.cloud_data = credential_data(self.policy.provider, self.credentials.get("api_key"))
+                if self.policy.provider == "bedrock":
+                    from .provider_cloud import aws_identity
+                    self.cloud_data = aws_identity(self.cloud_data, self.cloud_cache)
+                headers, values = cloud_headers(self.policy, self.cloud_data, self.cloud_cache)
+                self.query = dict(self.cloud_cache.get("query", {}))
+                if self.policy.provider == "bedrock" and self.policy.api_mode == "codex_responses":
+                    from .provider_cloud import mantle_endpoint
+                    self.request_state.endpoint = mantle_endpoint(self.policy.endpoint)
+            return headers, Redactor(values)
+        if (self.policy.provider in oauth_providers() or
+                (self.policy.provider in {"anthropic", "openrouter"} and not self.credentials.get("api_key"))):
             # The pinned upstream owns OAuth validation, locking and refresh. It
             # runs under the separate provider UID and its own private HOME.
             with self.lock:
-                from hermes_cli.auth_codex import resolve_codex_runtime_credentials
-                from agent.codex_headers import codex_cloudflare_headers
-                token = resolve_codex_runtime_credentials()["api_key"]
-                headers = codex_cloudflare_headers(token)
+                from hermes_cli.runtime_provider import resolve_runtime_provider
+                if self.policy.provider == "qwen-oauth":
+                    # The generic pinned pool can return a stale CLI seed.
+                    # Qwen's own resolver owns its actual expiry/refresh/write
+                    # boundary; do not mistake pool visibility for valid auth.
+                    from hermes_cli.auth_qwen import resolve_qwen_runtime_credentials
+                    resolved = {**resolve_qwen_runtime_credentials(), "api_mode": "chat_completions"}
+                elif self.policy.provider == "minimax-oauth":
+                    from .provider_auth import minimax_status
+                    from .provider_registry import account_region
+                    minimax_status(account_region(self.policy.provider, self.policy.endpoint))
+                    from hermes_cli.auth_minimax import resolve_minimax_oauth_runtime_credentials
+                    resolved = {**resolve_minimax_oauth_runtime_credentials(), "api_mode": "anthropic_messages"}
+                else:
+                    resolved = resolve_runtime_provider(requested=self.policy.provider,
+                                                         target_model=self.policy.data["default_model"])
+                if (resolved["base_url"].rstrip("/") != self.policy.endpoint.rstrip("/")
+                        or resolved["api_mode"] != self.policy.api_mode):
+                    raise PermissionError("OAuth route changed; owner must approve its endpoint and transport")
+                token = resolved["api_key"]
+                headers = dict(resolved.get("extra_headers") or {})
+                if self.policy.provider == "openai-codex":
+                    from agent.codex_headers import codex_cloudflare_headers
+                    headers.update(codex_cloudflare_headers(token))
         else:
             token = self.credentials.get("api_key")
-            if self.policy.provider != "local" and not token:
+            if self.policy.provider not in {"local", "lmstudio", "custom"} and not token:
                 raise PermissionError("provider credentials are not configured")
-            headers = {}
+            row = descriptor(self.policy.provider)
+            headers = dict(row["headers"]) if row else {}
         if token:
             if not isinstance(token, str) or not 1 <= len(token) <= 16384 or any(ord(c) < 33 or ord(c) > 126 for c in token):
                 raise PermissionError("invalid provider credential")
-            headers["Authorization"] = "Bearer " + token
+            if self.policy.api_mode == "anthropic_messages":
+                # MiniMax/TokenPlan, Claude subscription tokens and API keys
+                # deliberately use different authentication headers. Let the
+                # pinned native client own that classification and its betas.
+                from agent.anthropic_adapter import build_anthropic_client
+                with build_anthropic_client(token, self.policy.endpoint) as client:
+                    headers.update({key: value for key, value in client.default_headers.items()
+                                    if isinstance(value, str)})
+                    # The native constructor has already classified the private
+                    # token. Its CLI identity is emitted only for subscriptions.
+                    self.request_state.oauth_messages = (urlsplit(self.policy.endpoint).hostname == "api.anthropic.com"
+                        and any(key.lower() == "x-app" and value == "cli" for key, value in client.default_headers.items()))
+                    self.query = dict(client.default_query)
+            else:
+                headers["Authorization"] = "Bearer " + token
         return headers, Redactor([token] if token else [])
 
 
@@ -118,7 +208,10 @@ class Broker(ThreadingHTTPServer):
     def __init__(self, address, policy, token, credentials, ledger, *, bind_and_activate=True):
         if not re.fullmatch(r"[A-Za-z0-9_-]{43,128}", token):
             raise ValueError("invalid scoped model capability")
-        self.policy, self.token, self.credentials, self.ledger = policy, token, credentials, ledger
+        self.routes = policy if isinstance(policy, ProviderRoutes) else ProviderRoutes(policy.data)
+        self.policy, self.token, self.ledger = self.routes.primary, token, ledger
+        self.credentials = credentials
+        self.replay_generation = capability_generation(token)
         self.workers = threading.BoundedSemaphore(16)
         self.turns = threading.BoundedSemaphore(2)
         super().__init__(address, Handler, bind_and_activate=bind_and_activate)
@@ -145,6 +238,13 @@ class Broker(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def send_response(self, code, message=None):
+        super().send_response(code, message)
+        binding = getattr(self, "native_fallback_binding", None)
+        if 200 <= code < 300 and binding:
+            # Generated locally, never copied from an upstream response header.
+            self.send_header("X-HAOS-Replay-Binding", binding)
+
     protocol_version = "HTTP/1.1"
     server_version = "HAOSModelBroker"
     sys_version = ""
@@ -162,6 +262,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Connection", "close")
+        if code in {429, 503} and getattr(self, "retry_after", None) is not None:
+            self.send_header("Retry-After", str(self.retry_after))
         self.end_headers()
         self.wfile.write(data)
         self.close_connection = True
@@ -170,7 +272,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.reply(401, "model capability required")
             return
-        if self.path != "/v1/haos/usage":
+        try:
+            route, path = self.server.routes.resolve(self.path)
+            policy = self.server.routes.routes[route]
+        except PermissionError:
+            self.reply(403, "provider route is outside owner policy")
+            return
+        if path not in {"/v1/haos/usage", "/v1/models"}:
             self.reply(405, "only fixed model and aggregate usage routes are supported")
             return
         sizes = self.headers.get_all("Content-Length", [])
@@ -178,8 +286,13 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(400, "usage requests cannot carry a body")
             return
         try:
-            from .provider_usage import validate_snapshot
-            data = json.dumps(validate_snapshot(self.server.ledger.snapshot(self.server.policy))).encode()
+            if path == "/v1/models":
+                data = json.dumps({"object": "list", "data": [
+                    {"id": model, "object": "model", "owned_by": policy.provider}
+                    for model in policy.models]}).encode()
+            else:
+                from .provider_usage import validate_snapshot
+                data = json.dumps(validate_snapshot(self.server.ledger.snapshot(self.server.policy))).encode()
         except Exception:
             self.reply(503, "provider usage unavailable")
             return
@@ -195,10 +308,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def authorized(self):
         supplied = self.headers.get_all("Authorization", [])
-        return len(supplied) == 1 and hmac.compare_digest(supplied[0].encode(), ("Bearer " + self.server.token).encode())
+        native = self.headers.get_all("x-api-key", [])
+        if len(supplied) + len(native) != 1:
+            return False
+        value, expected = (supplied[0], "Bearer " + self.server.token) if supplied else (native[0], self.server.token)
+        return hmac.compare_digest(value.encode(), expected.encode())
 
     def do_POST(self):
         self.close_connection = True
+        self.forward_started = False
         if not self.authorized():
             self.reply(401, "model capability required")
             return
@@ -210,19 +328,70 @@ class Handler(BaseHTTPRequestHandler):
             raw = self.rfile.read(int(sizes[0]))
             if len(raw) != int(sizes[0]):
                 raise ValueError("incomplete model request")
-            payload = self.server.policy.request(self.path, json.loads(raw))
+            route, path = self.server.routes.resolve(self.path)
+            self.policy = self.server.routes.routes[route]
+            from .provider_messages import admit
+            original, context = fallback_context(json.loads(raw), self.policy.api_mode)
+            payload = admit(self.policy, path, original)
+            if context is not None and admit(self.policy, path, {**original, "model": context["model"]})["model"] != payload["model"]:
+                raise PermissionError("fallback context belongs to another owner model")
         except (ValueError, TypeError, PermissionError, UnicodeError):
             self.reply(403, "request refused by owner model policy")
             return
-        if not self.server.turns.acquire(blocking=False):
+        # A complete reference body can reach MoA before its handler finishes
+        # local ledger/connection cleanup. Bound the handoff wait while keeping
+        # the same two-call cap; no upstream dispatch or retry occurs here.
+        if not self.server.turns.acquire(timeout=1):
             self.reply(429, "concurrent model limit reached")
             return
         request_id, status, usage = None, 502, {}
         try:
-            request_id = self.server.ledger.admit(self.server.policy, payload["model"])
-            headers, redactor = self.server.credentials.headers()
-            redactor.secrets = (*redactor.secrets, self.server.token)
-            status, usage = self.forward(payload, headers, redactor)
+            # Only explicitly owner-selected, same-protocol fallbacks may see
+            # this prompt. No retry follows a started stream or ambiguous I/O.
+            for target in [route, *self.server.routes.fallbacks.get(route, [])]:
+                self.retry_after = None
+                status, usage = 502, {}
+                self.policy = self.server.routes.routes[target]
+                attempt = dict(payload)
+                if target != route:
+                    attempt["model"] = self.policy.data["default_model"]
+                features = {"replay_scope": [target, self.server.replay_generation]}
+                self.replay_scope = features["replay_scope"]
+                if target != route and context is not None:
+                    # A source-native body can be invalid for the target (for
+                    # example Vertex thinking). Rebuild first, then admit the
+                    # target-native result before quota or credential access.
+                    attempt = retarget(self.policy, attempt, context, features)
+                else:
+                    attempt = admit(self.policy, path, attempt)
+                request_id = self.server.ledger.admit(self.policy, attempt["model"])
+                credentials = self.server.credentials[target] if isinstance(self.server.credentials, dict) else self.server.credentials
+                self.route_credentials = credentials
+                if target == route:
+                    source_features(self.policy, context, features)
+                headers, redactor = credentials.headers()
+                if target != route and context is None:
+                    attempt = retarget(self.policy, attempt, None)
+                headers = merge_features(headers, features)
+                self.fallback_tool_names = features.get("tool_names", {})
+                self.native_response_model = (context["model"] if context is not None else original["model"]) if target == route else self.policy.data["default_model"]
+                self.native_fallback_binding = (route_binding(self.policy, self.policy.data["default_model"], self.replay_scope)
+                    if target != route else None)
+                redactor.secrets = (*redactor.secrets, self.server.token)
+                from .provider_affinity import headers as affinity_headers
+                affinity = affinity_headers(self.policy, context)
+                if any(redactor.text(value) != value for value in affinity.values()):
+                    raise PermissionError("conversation affinity cannot contain a credential")
+                headers.update(affinity)
+                from .provider_router import adapt as router_reasoning
+                attempt = router_reasoning(self.policy, attempt, context, credentials, headers)
+                status, usage = self.forward(attempt, headers, redactor, defer_errors=True)
+                if status not in {429, 502, 503, 504} or self.forward_started:
+                    break
+                self.server.ledger.finish(request_id, status, usage)
+                request_id = None
+            if not getattr(self, "forward_started", False):
+                self.reply(status, "provider rejected the request")
         except PermissionError:
             status = 429 if request_id is None else 503
             self.reply(status, "provider admission or credential setup requires owner attention")
@@ -238,24 +407,83 @@ class Handler(BaseHTTPRequestHandler):
                 print(json.dumps({"event": "provider.request-finished", "id": request_id, "status": status}), flush=True)
             self.server.turns.release()
 
-    def forward(self, payload, headers, redactor):
-        endpoint = urlsplit(self.server.policy.endpoint)
+    def forward(self, payload, headers, redactor, *, defer_errors=False):
+        self.retry_after = None
+        if self.policy.api_mode == "chat_completions":
+            from .provider_moa_streams import _restore
+            from .provider_replay import route_binding
+            payload = {**payload, "messages": _restore(payload.get("messages", []),
+                route_binding(self.policy, payload["model"], self.replay_scope))}
+        if self.policy.provider == "bedrock" and self.policy.api_mode == "anthropic_messages":
+            from .provider_bedrock_messages import forward
+            return forward(self, payload, redactor)
+        if self.policy.provider in {"gemini", "copilot-acp"} or (self.policy.provider == "bedrock" and self.policy.api_mode != "codex_responses"):
+            from .provider_native import forward_native
+            return forward_native(self, payload, headers, redactor)
+        endpoint = urlsplit(getattr(self.route_credentials, "effective_endpoint", self.policy.endpoint))
         conn = (http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443, timeout=180,
                                             context=ssl.create_default_context()) if endpoint.scheme == "https"
                 else http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=180))
+        if self.policy.provider == "custom":
+            addresses = socket.getaddrinfo(endpoint.hostname, endpoint.port or 443, type=socket.SOCK_STREAM)
+            if not addresses or any(not ipaddress.ip_address(row[4][0]).is_global for row in addresses):
+                raise PermissionError("custom API DNS resolves outside its public network scope")
+            # Pin the checked address for this connection. HTTPSConnection
+            # retains the original hostname for SNI/certificate verification;
+            # a second DNS lookup must not rebind it to a private service.
+            address = addresses[0][4][0]
+            conn._create_connection = lambda pair, timeout, source_address=None: socket.create_connection(
+                (address, endpoint.port or 443), timeout=timeout, source_address=source_address)
         try:
+            from .provider_sse import FramedHTTPResponse
+            conn.response_class = FramedHTTPResponse
+            from .provider_messages import prepare, restore
+            payload, wire_names = prepare(payload, oauth=getattr(getattr(self.route_credentials, "request_state", None), "oauth_messages", False))
+            fallback_names = getattr(self, "fallback_tool_names", {})
+            wire_names = {**fallback_names, **{name: fallback_names.get(original, original)
+                for name, original in wire_names.items()}}
             body = json.dumps(payload, ensure_ascii=False).encode()
-            route = "/responses" if self.server.policy.api_mode == "codex_responses" else "/chat/completions"
+            route = {"codex_responses": "/responses", "chat_completions": "/chat/completions",
+                     "anthropic_messages": "/messages"}[self.policy.api_mode]
+            path = endpoint.path.rstrip("/")
+            if self.policy.api_mode == "anthropic_messages" and not path.endswith("/v1"):
+                path += "/v1"
+            from urllib.parse import urlencode
+            query = getattr(self.route_credentials, "query", {})
+            if set(query) - {"api-version"} or any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,40}", value) for value in query.values()):
+                raise PermissionError("unsupported SDK query parameter")
+            suffix = "?" + urlencode(query) if query else ""
             # Never forward caller URLs, Host/Authorization, cookies, user IDs,
             # arbitrary headers, redirects or SDK credential overrides.
-            conn.request("POST", endpoint.path + route, body=body,
-                         headers={**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"})
+            # Match the native SDK's case-insensitive header merge. Otherwise
+            # User-Agent and user-agent would emit conflicting identities.
+            if self.policy.api_mode == "anthropic_messages":
+                from .provider_messages import feature_headers
+                headers = feature_headers(payload, headers, self.policy.endpoint)
+            wire_headers, spelling = {}, {}
+            for key, value in {**headers, "Content-Type": "application/json", "Accept": "text/event-stream, application/json"}.items():
+                previous = spelling.get(key.lower())
+                if previous is not None:
+                    wire_headers.pop(previous)
+                wire_headers[key] = value
+                spelling[key.lower()] = key
+            if self.policy.provider == "bedrock":
+                from .provider_cloud import mantle_headers
+                wire_headers = mantle_headers(self.policy, self.route_credentials.cloud_data, body, wire_headers)
+            conn.request("POST", path + route + suffix, body=body, headers=wire_headers)
             response = conn.getresponse()
             if not 200 <= response.status < 300:
                 # Keep the real provider status (including 401/403/429/5xx), but
                 # never expose its body or redirect location to the model/log.
-                self.reply(response.status if 400 <= response.status <= 599 else 502, "provider rejected the request")
-                return response.status, {}
+                status = response.status if 400 <= response.status <= 599 else 502
+                if status in {429, 503}:
+                    from .provider_retry import retry_seconds
+                    raw_retry = response.getheader("Retry-After")
+                    if raw_retry is not None and redactor.text(raw_retry) == raw_retry:
+                        self.retry_after = retry_seconds(raw_retry)
+                if not defer_errors:
+                    self.reply(status, "provider rejected the request")
+                return status, {}
             streaming = payload.get("stream") is True
             content_type = response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type != ("text/event-stream" if streaming else "application/json") or response.getheader("Content-Encoding", "identity") != "identity":
@@ -264,10 +492,15 @@ class Handler(BaseHTTPRequestHandler):
                 data = response.read(MAX_OUTPUT + 1)
                 if len(data) > MAX_OUTPUT:
                     raise ValueError("model response exceeds owner broker bound")
-                decoded = redactor.clean(json.loads(data))
+                from .provider_sse import require_complete
+                require_complete(response)
+                from .provider_response_replay import annotate
+                decoded = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model, self.replay_scope)
+                clean = json.dumps(decoded).encode()
+                if len(clean) > MAX_OUTPUT:
+                    raise ValueError("local model response exceeds broker bound")
                 self.send_response(response.status)
                 self.send_header("Content-Type", content_type)
-                clean = json.dumps(decoded).encode()
                 self.send_header("Content-Length", str(len(clean)))
                 self.send_header("Connection", "close")
                 self.end_headers()
@@ -280,33 +513,50 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.forward_started = True
-            total, usage, deadline, terminal = 0, {}, time.monotonic() + 600, False
-            while True:
-                if time.monotonic() > deadline:
-                    raise TimeoutError("model stream exceeded broker deadline")
-                line = response.readline(MAX_LINE + 1)
-                if not line:
-                    break
-                total += len(line)
-                if len(line) > MAX_LINE or total > MAX_OUTPUT:
-                    raise ValueError("model stream exceeded broker bounds")
-                # SSE is framed by lines. Buffer complete lines so credentials
-                # split across TCP chunks cannot bypass exact-value redaction.
-                if line.startswith(b"data:") and line.strip() != b"data: [DONE]":
-                    event = redactor.clean(json.loads(line[5:]))
+            usage, terminal, pending, emitted = {}, False, [], 0
+            from .provider_sse import events
+            for fields, data in events(response, max_line=MAX_LINE, max_output=MAX_OUTPUT, deadline=time.monotonic() + 600):
+                finish = False
+                if data is not None and data != "[DONE]":
+                    from .provider_response_replay import annotate
+                    event = annotate(redactor.clean(restore(json.loads(data), wire_names)), self.policy, self.native_response_model, self.replay_scope)
                     if isinstance(event, dict):
-                        terminal = terminal or event.get("type") in {"response.completed", "response.failed", "response.incomplete"}
+                        kind = event.get("type")
+                        if kind in {"response.failed", "response.incomplete", "error"}:
+                            raise ConnectionError("provider did not complete the model turn")
+                        expected = {"codex_responses": "response.completed", "anthropic_messages": "message_stop"}.get(self.policy.api_mode)
+                        terminal = terminal or (expected is not None and kind == expected)
+                        finish = ((self.policy.api_mode == "chat_completions" and
+                            any(isinstance(choice, dict) and choice.get("finish_reason") is not None for choice in event.get("choices", [])))
+                            or (self.policy.api_mode == "anthropic_messages" and kind == "message_delta"
+                                and isinstance(event.get("delta"), dict) and event["delta"].get("stop_reason") is not None))
                         candidate = event.get("response", event)
+                        if kind == "message_start":
+                            candidate = event.get("message", {})
                         if isinstance(candidate, dict) and isinstance(candidate.get("usage"), dict):
-                            usage = candidate["usage"]
-                    line = b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n"
+                            usage.update(candidate["usage"])
+                    data = json.dumps(event, ensure_ascii=False)
                 else:
-                    terminal = terminal or line.strip() == b"data: [DONE]"
-                    line = redactor.text(line.decode()).encode()
+                    terminal = terminal or (data == "[DONE]" and self.policy.api_mode == "chat_completions")
+                lines = [redactor.text(field) for field in fields]
+                if data is not None:
+                    lines.append("data: " + data)
+                line = ("\n".join(lines) + "\n\n").encode()
+                emitted += len(line)
+                if len(line) > MAX_LINE or emitted > MAX_OUTPUT:
+                    raise ValueError("local model stream exceeds broker bounds")
+                # Forward deltas continuously, but do not certify completion
+                # before the upstream HTTP framing has itself completed. All
+                # trailing frames remain ordered and within the parser budget.
+                if pending or terminal or finish:
+                    pending.append(line)
+                    continue
                 self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n")
                 self.wfile.flush()
             if not terminal:
                 raise ConnectionError("provider stream ended without a terminal receipt")
+            for line in pending:
+                self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n")
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
             return response.status, usage
@@ -319,14 +569,20 @@ def main():
         raise PermissionError("model broker requires its separate unprivileged UID")
     if os.environ.get("LISTEN_PID") != str(os.getpid()) or os.environ.get("LISTEN_FDS") != "1":
         raise PermissionError("model broker requires its root-bound activation socket")
-    policy = ProviderPolicy(trusted_json(Path("/etc/haos/provider.json")))
+    policy = ProviderRoutes(trusted_json(Path("/etc/haos/provider.json")))
     directory = Path(os.environ["CREDENTIALS_DIRECTORY"])
     token = json.loads(private_credential(directory / "provider-token"))["token"]
     secrets = json.loads(private_credential(directory / "provider-credentials"))
-    if set(secrets) != {"api_key"}:
-        raise ValueError("invalid provider credential envelope")
+    if policy.data["version"] == 1:
+        if set(secrets) != {"api_key"}:
+            raise ValueError("invalid provider credential envelope")
+        credentials = Credentials(policy.primary, secrets)
+    else:
+        if set(secrets) != {"routes"} or set(secrets["routes"]) != set(policy.routes):
+            raise ValueError("provider credential routes disagree with owner policy")
+        credentials = {key: Credentials(route, secrets["routes"][key]) for key, route in policy.routes.items()}
     ledger = UsageLedger("/var/lib/haos-provider/usage.db")
-    server = Broker(("127.0.0.1", PORT), policy, token, Credentials(policy, secrets), ledger, bind_and_activate=False)
+    server = Broker(("127.0.0.1", PORT), policy, token, credentials, ledger, bind_and_activate=False)
     server.socket.close()
     server.socket = socket.socket(fileno=3)
     if server.socket.getsockname() != ("127.0.0.1", PORT) or not server.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN):

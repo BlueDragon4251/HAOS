@@ -1,0 +1,42 @@
+{
+  "source_base_commit": "f5d954798bed24f758ee1a3e9f8d733533e4089f",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "native_openrouter_fixture_cases": 9,
+  "root_backup_uid_tests": "separate required CI gate",
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "05673a43c2fd825ca91d9b1cd80928b8d0341e9f170b080faee96fbdb0a9170f"
+    },
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "0d4c6d9fed298c46bda5c367b12b50009619baf09edc3ced62db5ff2924417ee"
+    },
+    {
+      "path": "docs/PROVIDER-SETUP.md",
+      "sha256": "71cb5addb89d4cec1597e0648906f065aa8fb042385ab9b570043f6dedc1aae9"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "af8dc96b1fef9d0d25db6544c53b67e55c91640cdc9c3414b35330d5f9d08413"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "5153e82b404ab4df5feb484d1310858971e93ac65308f0db5fa3ed8aab79506a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_openrouter_login.py",
+      "sha256": "02f6c83a29f3628213f16e83b03b8bc4604a91e4dfee2f9ec68afc73b51b3152"
+    }
+  ]
+}

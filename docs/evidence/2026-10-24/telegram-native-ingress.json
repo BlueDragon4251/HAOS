@@ -1,0 +1,35 @@
+{
+  "actual_native_adapter_dispatch_cases": [
+    "telegram",
+    "discord"
+  ],
+  "synchronous_durable_admission_and_reopen": true,
+  "native_background_and_debounce_baseline_verified": true,
+  "no_background_or_debounce_mission_dispatch": true,
+  "exact_sender_and_native_prefilter_revocation": true,
+  "unknown_native_plugin_discovery_disabled": true,
+  "storage_failure_not_accepted": true,
+  "actual_readonly_sqlite_and_changed_replay_refused": true,
+  "transport_connected_or_external_delivery_tested": false,
+  "native_source_sha256": [
+    {
+      "module": "gateway.platforms.base",
+      "sha256": "502a8371735acfb016968d6df5bac3394b21d292f1b64b5a988df3dafeb7549f"
+    },
+    {
+      "module": "plugins.platforms.telegram.adapter",
+      "sha256": "2e18f91d2abeaa70e23b2b7e6e9d469a372f11f243dc161c158206d0e413bd79"
+    },
+    {
+      "module": "plugins.platforms.discord.adapter",
+      "sha256": "fbf2a368995b2165c159acff66926b87244ef6aa8dde8eabe5a596b46077acd3"
+    }
+  ],
+  "source_sha256": {
+    "probe_gateway_ingress.py": "c5aecaf447c6c6b78779c82802e5d45a53ec28824d1bcd527e09ec3a760d4ef2",
+    "gateway_ingress.py": "1d239ccfb5900c9ee89fe249f9a01c19e761b9416937edd60a9f9f6180859846",
+    "gateway_runtime.py": "f26c927c5f3db2b4fa4b3d57d0b14294b3abb07b31344c516c1e12a7d6eaeae3",
+    "gateway.py": "b5e26ec7fbb982c27202046f9c7c65a173ce797091cf873fc896cbbcf85c6fec",
+    "gateway_relay.py": "abb29abeb5349ccaa2b6b592002241377edbcce5764d141d1a0bc57b0e94557f"
+  }
+}

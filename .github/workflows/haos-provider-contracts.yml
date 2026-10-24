@@ -1,0 +1,126 @@
+name: HAOS pinned provider protocol contracts
+on:
+  pull_request:
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: provider-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pinned-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Prepare the exact immutable Hermes runtime and frozen SDK dependencies
+        run: |
+          python -m pip install uv
+          bash scripts/sync-upstream.sh
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+      - name: Compare the generated registry and execute real local protocol probes
+        env:
+          PYTHONPATH: upstream/hermes-agent
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/provider-contracts" "$RUNNER_TEMP/provider-home"
+          export HERMES_HOME="$RUNNER_TEMP/provider-home"
+          PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
+          "$PYTHON" linux/haos/runtime/export_registry.py upstream/hermes-agent "$RUNNER_TEMP/provider-contracts/registry.json"
+          cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
+          "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
+          "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_history.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_history.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_history.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
+          "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
+          "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_fallback_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-builder-matrix.json"
+          for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream vertex vertex-stream reserved-tools reserved-tools-stream reserved-tools-reverse reserved-tools-reverse-stream context-aliases context-aliases-stream; do
+            "$PYTHON" linux/haos/runtime/probe_provider_fallback_wire.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-$scenario.json" "$scenario"
+          done
+          for mode in chat responses messages chat-legacy responses-legacy messages-legacy; do
+            "$PYTHON" linux/haos/runtime/probe_agent_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-no-replay.json" "$mode"
+          done
+          for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases chat-same-model responses-same-model messages-same-model opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
+            "$PYTHON" linux/haos/runtime/probe_agent_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-fallback-replay.json" "$mode"
+          done
+          for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream sdk-json-same-model moa-json-same-model moa-stream-same-model native-sdk-json-same-model native-moa-json-same-model native-moa-stream-same-model; do
+            "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
+          done
+          "$PYTHON" linux/haos/runtime/probe_agent_replay_generation.py linux/haos "$RUNNER_TEMP/provider-contracts/agent-replay-generation.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_route_names.py linux/haos "$RUNNER_TEMP/provider-contracts/provider-route-names.json"
+          "$PYTHON" linux/haos/runtime/probe_router_reasoning.py linux/haos "$RUNNER_TEMP/provider-contracts/router-reasoning.json"
+          "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
+          "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
+          "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa.json"
+          for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort reference-disconnect; do
+            "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-$scenario.json" "$scenario"
+          done
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-scope.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-json-replay.json" json
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-chat-scope.json" chat
+          for task in moa_reference moa_aggregator; do
+            "$PYTHON" linux/haos/runtime/probe_moa_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/$task-no-replay.json" "$task"
+          done
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
+          "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"
+          "$PYTHON" linux/haos/runtime/probe_vertex_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/vertex-catalog.json"
+          "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"
+          "$PYTHON" linux/haos/runtime/probe_cloud_tokens.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-tokens.json"
+          "$PYTHON" linux/haos/runtime/probe_cloud_inference.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-model-http.json"
+          "$PYTHON" linux/haos/runtime/probe_native_account_flows.py linux/haos "$RUNNER_TEMP/provider-contracts/native-accounts.json"
+          "$PYTHON" linux/haos/runtime/probe_openrouter_login.py linux/haos "$RUNNER_TEMP/provider-contracts/openrouter-login.json"
+          "$PYTHON" linux/haos/runtime/probe_codex_account.py linux/haos "$RUNNER_TEMP/provider-contracts/codex-account.json"
+          "$PYTHON" linux/haos/runtime/probe_copilot_device.py linux/haos "$RUNNER_TEMP/provider-contracts/copilot-device.json"
+          "$PYTHON" linux/haos/runtime/probe_anthropic_account.py linux/haos "$RUNNER_TEMP/provider-contracts/anthropic-account.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_profiles.py linux/haos "$RUNNER_TEMP/provider-contracts/wire-profiles.json"
+          "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
+          "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-native.json"
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-profile.json" profile
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-default-chain.json" default-chain
+          "$PYTHON" linux/haos/runtime/probe_aws_identity.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-identity.json"
+          "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
+          "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
+          "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: provider-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/provider-contracts/*.json
+          if-no-files-found: error
+          retention-days: 14

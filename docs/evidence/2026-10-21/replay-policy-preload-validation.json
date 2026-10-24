@@ -1,0 +1,22 @@
+{
+  "base_commit": "f476174fd848217add2cd7ac9829bf9bc83fab20",
+  "failed_ci_run": 39589256800,
+  "failed_real_root_case": "test_acp_actual_socket_activation_peer_uids_private_credentials_and_immediate_revocation",
+  "observed": "58 root-authority cases passed, permitted ACP child exited 3; child suppresses exception detail",
+  "change": "preload pure replay policy and Bedrock carrier constant when trusted policy source is loaded, before UID is dropped; no optional Hermes/SDK import",
+  "isolated_worktree_validation": "base plus exactly the two changed runtime files, preserving unrelated GUI work",
+  "minimal_suite": {
+    "passed": 862,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 862,
+    "existing_skips": 2
+  },
+  "source_sha256": {
+    "linux/haos/haos/provider_policy.py": "54f559b626673c08252f31d1bc628f3ab97be7d7e59014f32b013e2a7bcb8599",
+    "linux/haos/haos/provider_replay.py": "f42cd02da5e95a6f2de7a2cad121e855994d53042bd139505414359bfd9ca724"
+  },
+  "real_uid_socket_recheck": "required in following CI; not executed locally as nonroot",
+  "additional_root_skips_or_mocks": false
+}

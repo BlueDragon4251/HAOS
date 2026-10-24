@@ -1,0 +1,91 @@
+{
+  "actual_cloud_token_sdk_broker_model_http_cases": [
+    "vertex:sdk:chat_completions:json",
+    "vertex:sdk:chat_completions:stream",
+    "vertex:sdk:chat_completions:abort",
+    "vertex:sdk:chat_completions:401",
+    "vertex:sdk:chat_completions:429",
+    "vertex:sdk:chat_completions:json-framing",
+    "vertex:sdk:chat_completions:stream-framing",
+    "azure-foundry:sdk:chat_completions:json",
+    "azure-foundry:sdk:chat_completions:stream",
+    "azure-foundry:sdk:chat_completions:abort",
+    "azure-foundry:sdk:chat_completions:401",
+    "azure-foundry:sdk:chat_completions:429",
+    "azure-foundry:sdk:chat_completions:json-framing",
+    "azure-foundry:sdk:chat_completions:stream-framing",
+    "azure-foundry:sdk:codex_responses:json",
+    "azure-foundry:sdk:codex_responses:stream",
+    "azure-foundry:sdk:codex_responses:abort",
+    "azure-foundry:sdk:codex_responses:401",
+    "azure-foundry:sdk:codex_responses:429",
+    "azure-foundry:sdk:codex_responses:json-framing",
+    "azure-foundry:sdk:codex_responses:stream-framing",
+    "azure-foundry:sdk:anthropic_messages:json",
+    "azure-foundry:sdk:anthropic_messages:stream",
+    "azure-foundry:sdk:anthropic_messages:abort",
+    "azure-foundry:sdk:anthropic_messages:401",
+    "azure-foundry:sdk:anthropic_messages:429",
+    "azure-foundry:sdk:anthropic_messages:json-framing",
+    "azure-foundry:sdk:anthropic_messages:stream-framing",
+    "azure-foundry:api-key:chat_completions:json",
+    "azure-foundry:api-key:chat_completions:stream",
+    "azure-foundry:api-key:chat_completions:abort",
+    "azure-foundry:api-key:chat_completions:401",
+    "azure-foundry:api-key:chat_completions:429",
+    "azure-foundry:api-key:chat_completions:json-framing",
+    "azure-foundry:api-key:chat_completions:stream-framing",
+    "azure-foundry:api-key:codex_responses:json",
+    "azure-foundry:api-key:codex_responses:stream",
+    "azure-foundry:api-key:codex_responses:abort",
+    "azure-foundry:api-key:codex_responses:401",
+    "azure-foundry:api-key:codex_responses:429",
+    "azure-foundry:api-key:codex_responses:json-framing",
+    "azure-foundry:api-key:codex_responses:stream-framing",
+    "azure-foundry:api-key:anthropic_messages:json",
+    "azure-foundry:api-key:anthropic_messages:stream",
+    "azure-foundry:api-key:anthropic_messages:abort",
+    "azure-foundry:api-key:anthropic_messages:401",
+    "azure-foundry:api-key:anthropic_messages:429",
+    "azure-foundry:api-key:anthropic_messages:json-framing",
+    "azure-foundry:api-key:anthropic_messages:stream-framing"
+  ],
+  "case_count": 49,
+  "native_google_authorized_user_and_azure_msal_tokens": true,
+  "azure_chat_responses_messages_api_key_and_entra": true,
+  "azure_native_api_version_query": true,
+  "continuous_early_stream_and_incomplete_http_rejection": true,
+  "token_cache_reused": true,
+  "live_provider_tested": false,
+  "python": "3.11.16",
+  "source_files": [
+    {
+      "path": "runtime/probe_cloud_inference.py",
+      "sha256": "996e0ec1b0ec33bdd1e39169d7da2ee0f6986e3e7321d30c852cdcf101fa5816"
+    },
+    {
+      "path": "runtime/probe_http_provider_matrix.py",
+      "sha256": "803734f31be411b33d0a77ba689c93395ea80767a2cd404024629f86ea96592b"
+    },
+    {
+      "path": "haos/provider_cloud.py",
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+    },
+    {
+      "path": "haos/provider_registry.py",
+      "sha256": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b"
+    },
+    {
+      "path": "haos/provider_profiles.py",
+      "sha256": "79dcdc32d8aa8b8a50b26bf31d67bff54efce9ed066a579b3dd701fb527a1c3b"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "797f00b45a02894fe7edb13c8c8f752159fff7deabf21720e0766f2ee2fb7950"
+    },
+    {
+      "path": "haos/provider_sse.py",
+      "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+    }
+  ]
+}

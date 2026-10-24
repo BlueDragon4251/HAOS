@@ -1,0 +1,49 @@
+{
+  "mode": "anthropic_messages",
+  "opencode_affinity": true,
+  "affinity_header_count": 5,
+  "native_affinity_stable": true,
+  "owner_aliases": false,
+  "chat_stream": false,
+  "actual_main_agent_turns": 3,
+  "actual_moa_auxiliary_calls": 0,
+  "http_dispatches": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      false
+    ],
+    [
+      2,
+      "fallback",
+      false
+    ],
+    [
+      3,
+      "primary",
+      false
+    ]
+  ],
+  "host_tools_granted": false,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_agent_fallback_replay.py": "0ae1fbfb2a8e6f0aa599b81fe2b7ebe5a06ba3a994fc9b183a39432d27e4fc8d",
+    "provider_profiles.py": "a8a4c0038bc57e52d64fb5cea36c4ffa2e261708db80695add9e0b39de457e45",
+    "provider_proxy.py": "3c4bbe39f7d62a92a8c328477f64b26fa8ef5e5d6c2d805aab449beaf7294dff",
+    "provider_affinity.py": "e75128210337f1e1b49b2d1dea72d80a666b81c6a311276b052745e6a9c71902",
+    "provider_response_replay.py": "c2b51f4ad13efec77758625506d9dfc5acb301bcdca1bbb50476d8a17fac506e",
+    "provider_replay.py": "2fe7a6092b09429576af55ca45f5cda4997fefdc717b41a9f27c4db37f0016fd",
+    "provider_messages.py": "02fd41c41f4e6cca72408d60f012b78e901bb047886dd1b10259ae1b8c83abb5",
+    "provider_moa_streams.py": "ca17a9e46e6c1ed1b64841366477ae2d892e0aaa65f79382433597ded8720475"
+  }
+}

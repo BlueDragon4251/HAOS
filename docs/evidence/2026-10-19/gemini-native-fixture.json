@@ -1,0 +1,22 @@
+{
+  "provider": "gemini",
+  "pinned_native_codec": true,
+  "actual_loopback_http": true,
+  "checks": [
+    "json-tools",
+    "stream-tools",
+    "truncated",
+    "rate-limit"
+  ],
+  "live_provider_tested": false,
+  "python": "3.12.14",
+  "sdk_versions": {
+    "httpx": "0.28.1"
+  },
+  "source_sha256": {
+    "probe_native_provider.py": "fc2cc59b6466beecdbf4c920d1939f3f26402529113b49400e8e9cf9e7275979",
+    "provider_native.py": "4548d13c89d4abc01bec37e0b290b6b3e0fca13232fd8b4ea0e866bb7b7d565b",
+    "provider_proxy.py": "998fa789d871697a3d437b33c3a12c87eae65114723b31775b20ece0739c94a4",
+    "provider_policy.py": "8b2a0bcb19c6d8f2b990a8253e15752cc955489154a3936539ec9cdfe21253c2"
+  }
+}

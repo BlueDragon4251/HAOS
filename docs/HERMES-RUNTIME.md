@@ -19,3 +19,11 @@ Downloaded evidence for image `9e0d4a3` from acceptance `37842665549` shows succ
 Provider setup remains upstream configuration inside agent state. A validated HAOS credential wizard/vault is incomplete. Do not copy a human's credential/session directories. No provider-less probe is a real model mission. Bounded restarts do not prove unknown background work stopped; use [recovery](RECOVERY.md).
 
 The replacement reuse `37878610539` completed with the exact cause: Hermes could not traverse the root-created runtime policy directory because systemd `UMask=0077` masked its requested group bits. The broker now explicitly applies root:agent-group 0750 to verified runtime directory inodes, retaining root:agent-group 0640 on the compiled policy. Mounted, writable, foreign-owned and symlinked directories are rejected. The real diagnostic/poweroff path worked; a rebuilt installed guest must still validate the correction.
+
+The frozen runtime also carries one narrow functional overlay: `prepare.py`
+verifies the exact pinned `agent/auxiliary_client.py` SHA-256 before inserting
+HAOS-only MoA native streaming dispatch. All original dependency/input checks
+run before writes. Build and provider-contract CI execute the actual pinned
+MoA engine over Chat, Responses and Messages, including early deltas, native
+stream abortions and scoped local SDK capabilities. Provenance distinguishes
+the immutable Hermes base from the derived auxiliary source hash.

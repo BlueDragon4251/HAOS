@@ -1,0 +1,27 @@
+{
+  "base_commit": "36ef12841a61c6d9839a048932a72880d78360c7",
+  "observed_ci_failure": {
+    "run_id": 40122310731,
+    "platform": "macos-latest",
+    "test": "reports an image replaced elsewhere through a rename",
+    "other_four_gates_successful": true
+  },
+  "actual_local_canvas_tests_passed": 9,
+  "before_actual_filesystem_regression": "archived watcher missed image changes after actual watched directories were renamed and package recreated at original path",
+  "before_log_sha256": "006c13417fc9a5aba0848eab56e00af8046513c625ee6aa8a3c0d10d0c3dd94d",
+  "after_log_sha256": "5960c09f37bf581304fe4f44ac83eb0889369825bdc58f8072a2b58dde97b5cb",
+  "filesystem_events_mocked": false,
+  "assertion_deadlines_increased": false,
+  "local_platform": "Linux",
+  "macos_rerun_pending": true,
+  "source_files": [
+    {
+      "path": "apps/desktop/electron/canvas/package-io.ts",
+      "sha256": "2140766be5c69e56405fde703967c66840ec01a9f827f4b0f7b897d7f37c15ca"
+    },
+    {
+      "path": "apps/desktop/electron/canvas/package-io.test.ts",
+      "sha256": "64ce5e949b3432b580a9980ee279e7c37b76b1bbc156820b2570605e78c3421b"
+    }
+  ]
+}

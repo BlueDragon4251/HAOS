@@ -26,6 +26,13 @@ def run(backend, observer, *, port=9119, isolated=False):
 
 
 def canonical_run(backend,observer,port,isolated,diagnosis):
+    if __package__:
+        from .provider_profiles import install as install_provider_profiles
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from haos.provider_profiles import install as install_provider_profiles
+    diagnosis.mark('provider-wire-registration')
+    install_provider_profiles()
     diagnosis.mark('web-import')
     from hermes_cli.web_server import app
     # HAOS supplies a scoped tool through the public registry; upstream is unmodified.

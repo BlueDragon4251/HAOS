@@ -1,5 +1,10 @@
 name: HAOS Graphical Initial Setup Security
 on:
+  pull_request:
+    paths:
+      - 'linux/haos/**'
+      - 'linux/image/packages.txt'
+      - '.github/workflows/haos-initial-setup.yml'
   push:
     branches: [agent/haos-foundation]
     paths:
@@ -60,6 +65,8 @@ jobs:
           initial_setup.account_status=lambda: {"owner": True, "recovery": True, "complete": True, "pending": False}
           initial_setup.normal_user_ready=lambda: True
           initial_setup.setup_in_progress=lambda: False
+          initial_setup.gateway_configuration=lambda: {"connectors": [], "bindings": []}
+          initial_setup.provider_state=lambda: {"routes": [], "default": None, "fallbacks": {}}
           from haos.initial_setup_gui import Wizard
           wizard=Wizard(tkinter)
           # Xvfb has no window manager: EWMH -fullscreen alone previously left
@@ -75,6 +82,196 @@ jobs:
               wizard.root.update_idletasks()
               assert wizard.content.winfo_children(), page
           import time
+          # Native interactive provider controls: a changed provider must never
+          # inherit a key or endpoint entered for the previous service.
+          wizard.show("provider")
+          wizard.root.update()
+          def field(prefix):
+              children = wizard.content.winfo_children()
+              for i, widget in enumerate(children):
+                  if isinstance(widget, tkinter.Label) and widget.cget("text").startswith(prefix):
+                      return next(item for item in children[i+1:] if isinstance(item, tkinter.Entry))
+              raise AssertionError("missing native setup field")
+          secret = field("API-Schlüssel")
+          endpoint = field("URL")
+          secret.insert(0, "fixture-only-previous-provider-key")
+          endpoint.insert(0, "https://previous-provider.invalid/v1")
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "anthropic")
+          wizard.root.update()
+          assert not secret.get() and not endpoint.get(), "provider changes must clear private input"
+          initial_setup.provider_models = lambda *args: {"version": 1, "provider": "anthropic", "source": "provider-api",
+              "diagnostic": "none", "inference_tested": False,
+              "models": [{"id": "claude-fixture", "api_mode": "anthropic_messages"}]}
+          button = next(item for item in wizard.content.winfo_children()
+                        if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden")
+          button.invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running
+          picker = next(item for parent in wizard.content.winfo_children() for item in parent.winfo_children()
+                        if isinstance(item, tkinter.Listbox))
+          assert picker.get(0) == "claude-fixture"
+          picker.selection_set(0)
+          picker.event_generate("<<ListboxSelect>>")
+          wizard.root.update()
+          assert field("Modellkennung").get() == "claude-fixture"
+          assert wizard.root.getvar(menus[1].cget("textvariable")) == "anthropic_messages"
+          calls = []
+          initial_setup.configure_provider = lambda *args: calls.append(args)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Provider konfigurieren").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert len(calls) == 1 and calls[0][:2] == ("anthropic", "claude-fixture")
+          assert calls[0][4] == "anthropic_messages"
+          account_calls = []
+          initial_setup.provider_account = lambda *args: account_calls.append(args)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Anbieter-Kontostatus prüfen").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert account_calls == [("anthropic", "status")]
+          from tkinter import filedialog
+          cloud_calls = []
+          initial_setup.import_cloud_credential = lambda *args: cloud_calls.append(args) or '{"type":"authorized_user","refresh_token":"fixture-private-refresh"}'
+          original_dialog = filedialog.askopenfilename
+          filedialog.askopenfilename = lambda **kwargs: '/fixture-private-owner.json'
+          try:
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              wizard.root.update()
+              import_button = next(item for item in wizard.content.winfo_children()
+                  if isinstance(item, tkinter.Button) and item.cget('text') == 'Private Cloud-JSON-Datei auswählen')
+              assert import_button.cget('state') == 'normal'
+              import_button.invoke()
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running
+              assert cloud_calls == [('vertex', '/fixture-private-owner.json')]
+              assert secret.get().startswith('{"type":"authorized_user"') and secret.cget('show')
+              assert 'fixture-private-refresh' not in wizard.status.cget('text')
+              wizard.root.setvar(menus[0].cget("textvariable"), "openai-api")
+              wizard.root.update()
+              assert not secret.get() and import_button.cget('state') == 'disabled'
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              import_button.invoke()
+              # Even switching away and back must discard the previous read.
+              wizard.root.setvar(menus[0].cget("textvariable"), "openai-api")
+              wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running and not secret.get()
+          finally:
+              filedialog.askopenfilename = original_dialog
+          # MoA uses approved model pickers, including a non-default model,
+          # instead of asking the owner to type routing JSON.
+          initial_setup.provider_state = lambda: {"routes": [
+              {"id": "route-a", "provider": "openrouter", "model": "primary", "models": ["alternate", "primary"], "api_mode": "chat_completions"},
+              {"id": "route-b", "provider": "anthropic", "model": "second", "models": ["second"], "api_mode": "anthropic_messages"}],
+              "default": "route-a", "fallbacks": {}}
+          wizard.show("provider")
+          wizard.root.update()
+          def choice(prefix):
+              children = wizard.content.winfo_children()
+              for i, widget in enumerate(children):
+                  if isinstance(widget, tkinter.Label) and widget.cget("text").startswith(prefix):
+                      return next(item for item in children[i+1:] if isinstance(item, tkinter.OptionMenu))
+              raise AssertionError("missing approved-model picker")
+          first = choice("Referenzmodell 1")
+          second = choice("Referenzmodell 2")
+          aggregate = choice("Aggregator-Modell")
+          assert wizard.root.getvar(first.cget("textvariable")) == "route-a · alternate"
+          assert wizard.root.getvar(second.cget("textvariable")) == "Kein zweites Referenzmodell"
+          assert wizard.root.getvar(aggregate.cget("textvariable")) == "route-a · primary"
+          assert not any(isinstance(item, tkinter.Label) and "Preset-JSON" in item.cget("text")
+                         for item in wizard.content.winfo_children())
+          moa_calls = []
+          initial_setup.configure_moa = lambda *args: moa_calls.append(args)
+          def apply_team():
+              next(item for item in wizard.content.winfo_children()
+                   if isinstance(item, tkinter.Button) and item.cget("text") == "Modellteam als Standard aktivieren").invoke()
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running
+          apply_team()
+          import json
+          assert moa_calls[0][0] == "personal"
+          assert json.loads(moa_calls[0][1]) == {"references": [{"route": "route-a", "model": "alternate"}],
+              "aggregator": {"route": "route-a", "model": "primary"}}
+          wizard.root.setvar(second.cget("textvariable"), "route-b · second")
+          apply_team()
+          assert json.loads(moa_calls[1][1])["references"] == [
+              {"route": "route-a", "model": "alternate"}, {"route": "route-b", "model": "second"}]
+          initial_setup.provider_state = lambda: {"routes": [], "default": None, "fallbacks": {}}
+          wizard.show("provider")
+          wizard.root.update()
+          assert not any(isinstance(item, tkinter.Button) and item.cget("text") == "Modellteam als Standard aktivieren"
+                         for item in wizard.content.winfo_children())
+          # Exact scoped/threaded gateway pairing and explicit rights, using actual Tk controls.
+          initial_setup.gateway_configuration = lambda: {"connectors": [{"id": "discord-main", "platform": "discord"}],
+              "bindings": [{"id": "bound-fixture", "connector": "discord-main", "sender": "sender-fixture", "chat": "channel-fixture",
+                  "scope": "guild-fixture", "thread": "thread-fixture", "identity": "personal", "capabilities": ["create", "read"]}]}
+          wizard.show("gateways")
+          wizard.root.update()
+          gateway_secret = field("Bot-Token")
+          assert gateway_secret.cget("show")
+          gateway_secret.insert(0, "fixture-only-previous-gateway-token")
+          gateway_menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "discord")
+          wizard.root.update()
+          assert not gateway_secret.get(), "gateway platform changes must clear private input"
+          pair_calls = []
+          initial_setup.pair_gateway_sender = lambda *args, **kwargs: pair_calls.append((args, kwargs))
+          for prefix, value in (("Konnektor-ID", "discord-main"), ("Absender-ID", "sender-fixture"),
+                  ("Chat-ID", "channel-fixture"), ("Bereich ·", "guild-fixture"), ("Thread-ID", "thread-fixture")):
+              entry = field(prefix)
+              entry.delete(0, tkinter.END)
+              entry.insert(0, value)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Checkbutton) and item.cget("text") == "Rückfragen und Freigaben beantworten").invoke()
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Absender mit ausgewählten Rechten freigeben").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running:
+                  break
+              time.sleep(0.02)
+          assert not wizard.running and len(pair_calls) == 1
+          assert pair_calls[0] == (("my-device", "discord-main", "sender-fixture", "channel-fixture", "personal",
+              ("create", "read", "answer")), {"scope": "guild-fixture", "thread": "thread-fixture"})
+          gateway_actions = []
+          initial_setup.manage_gateway = lambda action, identifier="": gateway_actions.append((action, identifier))
+          initial_setup.gateway_process_status = lambda: {"ActiveState": "active", "SubState": "running", "Result": "success"}
+          for label in ("Gateway-Dienststatus prüfen", "Gateway-Dienst starten", "Gateway-Dienst stoppen",
+                  "Unterbrochene Gateway-Konfiguration wiederherstellen",
+                  "Ausgewählte Absenderfreigabe entziehen", "Konnektor und Zugangsdaten entfernen"):
+              next(item for item in wizard.content.winfo_children()
+                   if isinstance(item, tkinter.Button) and item.cget("text") == label).invoke()
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running:
+                      break
+                  time.sleep(0.02)
+              assert not wizard.running
+          assert gateway_actions == [("start", ""), ("stop", ""), ("recover-configuration", ""), ("revoke", "bound-fixture"), ("remove", "discord-main")]
           wizard._run_async(lambda: time.sleep(0.05), success="Async operation complete")
           assert wizard.running
           for _ in range(80):
@@ -109,6 +306,148 @@ jobs:
           labels = [child.cget("text") for child in wizard.error_panel.winfo_children()
                     if "text" in child.keys()]
           assert any("Fehlercode:" in value for value in labels)
+          # Model Garden is catalogue discovery, not project entitlement.
+          wizard.show("provider")
+          wizard.root.update()
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+          wizard.root.update()
+          endpoint = field("URL")
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi")
+          field("Modellkennung").insert(0, "meta/llama-fixture")
+          from haos.provider_discovery import receipt
+          selected_models = []
+          def vertex_models(*args):
+              selected_models.append(args)
+              return receipt("vertex", ["meta/llama-fixture"], "provider-api", diagnostic="publisher-catalog")
+          initial_setup.provider_models = vertex_models
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(0.02)
+          assert not wizard.running and selected_models[0][4] == "meta/llama-fixture"
+          assert any(isinstance(item, tkinter.Label) and "Model Garden · Projektfreigabe und Inferenz nicht geprüft" in item.cget("text")
+                     for item in wizard.content.winfo_children())
+          # A late catalogue must not apply to subsequently changed input.
+          import threading
+          release_catalog = threading.Event()
+          def delayed_models(*args):
+              assert release_catalog.wait(5)
+              return vertex_models(*args)
+          initial_setup.provider_models = delayed_models
+          wizard.show("provider")
+          wizard.root.update()
+          menus = [item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu)]
+          wizard.root.setvar(menus[0].cget("textvariable"), "vertex")
+          wizard.root.update()
+          endpoint = field("URL")
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi")
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Modellliste laden").invoke()
+          endpoint.delete(0, tkinter.END)
+          endpoint.insert(0, "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/another-project/locations/us-central1/endpoints/openapi")
+          release_catalog.set()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(0.02)
+          picker = next(item for parent in wizard.content.winfo_children() for item in parent.winfo_children()
+                        if isinstance(item, tkinter.Listbox))
+          assert not wizard.running and picker.size() == 0
+          assert "Konfiguration geändert" in wizard.status.cget("text")
+          # Native owner recovery UI carries the selected durable receipt to its backend.
+          from tkinter import messagebox
+          messagebox.askyesno = lambda *args, **kwargs: True
+          ingress_calls = []
+          recovery_row = {"ingress_id": "a" * 64, "state": "failed", "attempt": 8}
+          initial_setup.gateway_ingress = lambda after=0: {"ingress": [recovery_row], "history": [{"binding_digest": "b" * 64, "binding_id": "my-device", "status": "permission-denied"}], "transport": [{"connector":"mattermost-main","status":"authentication-refused","updated_at":1792872000.0}], "next_cursor": 1}
+          initial_setup.reconcile_gateway_ingress = lambda *args: ingress_calls.append(args)
+          wizard.show("gateways")
+          def settle_owner_operation():
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running: break
+                  time.sleep(0.02)
+              assert not wizard.running
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway-Dienst stoppen und gespeicherte Eingänge prüfen").invoke()
+          settle_owner_operation()
+          frame = next(parent for parent in wizard.content.winfo_children()
+                       if any(isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen"
+                              for item in parent.winfo_children()))
+          assert any(isinstance(item, tkinter.Label) and "my-device" in item.cget("text")
+                     and "Nachrichtenverlauf prüfen" in item.cget("text") for item in frame.winfo_children())
+          assert any(isinstance(item, tkinter.Label) and 'Anmeldung abgelehnt' in item.cget('text') for item in frame.winfo_children())
+          next(item for item in frame.winfo_children() if isinstance(item, tkinter.Entry)).insert(0, "Fixture geprüft")
+          next(item for item in frame.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen").invoke()
+          settle_owner_operation()
+          assert ingress_calls == [(recovery_row, "retry", "Fixture geprüft")]
+          # Two private Slack inputs must reach the real owner setup interface
+          # and be cleared when changing platform or submitting an operation.
+          setup_calls = []
+          initial_setup.configure_gateway = lambda *args: setup_calls.append(args)
+          wizard.show("gateways")
+          gateway_menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "slack")
+          wizard.root.update()
+          slack_frame = next(parent for parent in wizard.content.winfo_children()
+                             if any(isinstance(item, tkinter.Label) and item.cget("text").startswith("Slack App-Token")
+                                    for item in parent.winfo_children()))
+          app_entry = next(item for item in slack_frame.winfo_children() if isinstance(item, tkinter.Entry))
+          assert slack_frame.winfo_manager() == "pack" and app_entry.cget("show")
+          bot_entry = field("Bot-Token")
+          bot_entry.insert(0, "xoxb-" + "x" * 24); app_entry.insert(0, "xapp-" + "y" * 24)
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "telegram")
+          wizard.root.update()
+          assert not bot_entry.get() and not app_entry.get() and not slack_frame.winfo_manager()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "slack")
+          wizard.root.update()
+          bot_entry.insert(0, "xoxb-" + "x" * 24); app_entry.insert(0, "xapp-" + "y" * 24)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway sicher anlegen").invoke()
+          settle_owner_operation()
+          assert setup_calls == [("slack-main", "slack", "xoxb-" + "x" * 24, "xapp-" + "y" * 24)]
+          assert not bot_entry.get() and not app_entry.get()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "mattermost")
+          wizard.root.update()
+          mm_frame = next(parent for parent in wizard.content.winfo_children()
+                          if any(isinstance(item, tkinter.Label) and item.cget("text").startswith("Mattermost HTTPS-Server")
+                                 for item in parent.winfo_children()))
+          server_entry = next(item for item in mm_frame.winfo_children() if isinstance(item, tkinter.Entry))
+          assert mm_frame.winfo_manager() == "pack" and not slack_frame.winfo_manager()
+          server_entry.insert(0, "https://owner.invalid")
+          bot_entry.insert(0, "m" * 26)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway sicher anlegen").invoke()
+          settle_owner_operation()
+          assert setup_calls[-1] == ("mattermost-main", "mattermost", "m" * 26, "", "https://owner.invalid")
+          assert not bot_entry.get()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "telegram")
+          wizard.root.update()
+          assert not server_entry.get() and not mm_frame.winfo_manager()
+          # Outgoing reconciliation carries an exact saved attempt and explicit
+          # non-delivery evidence; it never infers success from local UI state.
+          delivery_calls = []
+          delivery_row = {"delivery_id": "c" * 64, "attempt": 1, "state": "uncertain", "mission_id": "00000000-0000-4000-8000-000000000001"}
+          initial_setup.gateway_deliveries = lambda after=0: {"deliveries": [delivery_row], "next_cursor": 1}
+          initial_setup.reconcile_gateway_delivery = lambda *args: delivery_calls.append(args)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Missionsdienste stoppen und ungeklärte Zustellungen prüfen").invoke()
+          settle_owner_operation()
+          outbox_frame = next(parent for parent in wizard.content.winfo_children()
+                              if any(isinstance(item, tkinter.Button) and item.cget("text") == "Nach bestätigter Nichtzustellung erneut versuchen"
+                                     for item in parent.winfo_children()))
+          entries = [item for item in outbox_frame.winfo_children() if isinstance(item, tkinter.Entry)]
+          assert len(entries) == 2
+          entries[1].insert(0, "Remote Empfang geprüft")
+          next(item for item in outbox_frame.winfo_children() if isinstance(item, tkinter.Checkbutton)).invoke()
+          next(item for item in outbox_frame.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Nach bestätigter Nichtzustellung erneut versuchen").invoke()
+          settle_owner_operation()
+          assert delivery_calls == [(delivery_row, "retry", "Remote Empfang geprüft", None, True)]
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY
@@ -123,6 +462,8 @@ jobs:
           initial_setup.account_status = lambda: {'owner': True, 'recovery': True, 'complete': True, 'pending': False}
           initial_setup.normal_user_ready = lambda: True
           initial_setup.setup_in_progress = lambda: False
+          initial_setup.gateway_configuration = lambda: {"connectors": [], "bindings": []}
+          initial_setup.provider_state = lambda: {"routes": [], "default": None, "fallbacks": {}}
           wizard = Wizard(tkinter)
           wizard.root.update()
           assert wizard.compact
@@ -135,6 +476,33 @@ jobs:
               assert wizard.content.winfo_children(), page
           assert wizard.viewport.winfo_width() > 100
           assert wizard.root.winfo_reqwidth() <= 640
+          long_model = "fixture-model-" + "a" * 180
+          initial_setup.provider_state = lambda: {"routes": [{"id": "local", "provider": "local", "model": long_model,
+              "models": [long_model], "api_mode": "chat_completions"}], "default": "local", "fallbacks": {}}
+          wizard.show('provider')
+          wizard.root.update()
+          assert wizard.root.winfo_reqwidth() <= 640, "approved-model pickers overflow the small setup screen"
+          assert any(isinstance(item, tkinter.Button) and item.cget('text') == 'Modellteam als Standard aktivieren'
+                     for item in wizard.content.winfo_children())
+          wizard.show('gateways')
+          wizard.root.update()
+          menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(menu.cget('textvariable'), 'mattermost')
+          wizard.root.update()
+          assert wizard.root.winfo_reqwidth() <= 640, 'Mattermost setup overflows the compact screen'
+          wizard.root.setvar(menu.cget('textvariable'), 'slack')
+          wizard.root.update()
+          assert wizard.root.winfo_reqwidth() <= 640, 'Slack credentials overflow the small setup screen'
+          import time
+          initial_setup.gateway_deliveries = lambda after=0: {"deliveries": [{"delivery_id": "c" * 64, "attempt": 1,
+              "state": "uncertain", "mission_id": "00000000-0000-4000-8000-000000000001"}], "next_cursor": 1}
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Missionsdienste stoppen und ungeklärte Zustellungen prüfen").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(.02)
+          assert not wizard.running and wizard.root.winfo_reqwidth() <= 640, 'outbox recovery overflows the compact screen'
           wizard.root.destroy()
           print('All seven setup pages render within a 640x480 X screen')
           PY

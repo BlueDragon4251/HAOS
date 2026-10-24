@@ -1,0 +1,6 @@
+{
+  "actual_upstream_copilot_exchange_refresh_cache": true,
+  "actual_upstream_qwen_refresh_private_persistence": true,
+  "actual_loopback_http": true,
+  "live_provider_tested": false
+}

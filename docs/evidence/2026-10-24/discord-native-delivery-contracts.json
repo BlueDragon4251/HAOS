@@ -1,0 +1,104 @@
+{
+  "actual_native_sdk_http_outbox_cases": [
+    {
+      "case": "success",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "nonce-retry",
+      "actual_http_requests": 2,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "ambiguous-forbidden",
+      "actual_http_requests": 2,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "server-fake-reply",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "rate-limit",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "pending"
+    },
+    {
+      "case": "forbidden",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "reply-refused",
+      "actual_http_requests": 2,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "malformed",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "invalid-id",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "disconnect",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "wrong-guild",
+      "actual_http_requests": 0,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "forum",
+      "actual_http_requests": 0,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "partial-rate-limit",
+      "actual_http_requests": 2,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "thread-success",
+      "actual_http_requests": 1,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "wrong-thread",
+      "actual_http_requests": 0,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "connect-refused",
+      "actual_http_requests": 0,
+      "reopened_outbox_state": "pending"
+    }
+  ],
+  "external_discord_connected": false,
+  "remote_server_nonce_dedup_live_tested": false,
+  "source_files": [
+    {
+      "path": "probe_discord_delivery.py",
+      "sha256": "7bd27ab8b9e39987de6a02f6ac70ca8d0629c0dda52070d04b740be0183d14fc"
+    },
+    {
+      "path": "gateway_discord.py",
+      "sha256": "2258d741f47878b0ae91f557f143c64491c407e391f30a3629938f847f9412d6"
+    },
+    {
+      "path": "gateway_ingress.py",
+      "sha256": "62875aad6110aa391531791fa913ad9f27b53f6824b759b16d1d9fdb92e16d27"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "ea72dd351d1cf804bbec6d7101ddfe2ff0fcf82ecfa4b113fc94fe1dafe7a3ac"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "scenario": "reserved-tools-reverse",
+  "actual_pinned_source_and_target_request_codecs": true,
+  "approved_broker_http_hops": [
+    "source",
+    "target"
+  ],
+  "target_uses_its_own_key_and_model": true,
+  "early_stream_before_terminal_tested": false,
+  "opaque_source_only_reasoning_not_forwarded": null,
+  "actual_native_model_alias_positive_negative_checks": 0,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_provider_fallback_wire.py": "5f7db5452d48f81400fc16af3c963bb114ba7d4fa62c3db8a9eb1a3e0a8baa29",
+    "provider_proxy.py": "ad3d736ebaf09dd1867ce777e3b8015e9d70d74e89756bdd3b8e9288e9291caf",
+    "provider_policy.py": "afbb3125c8e749a660985fad58ae8f32392b4b83c080a088ec6c80149174e59a",
+    "provider_fallback.py": "93eae06ad67e656d897b62b344f30c87e602f89dce9f3d46880ebe4007db621b",
+    "provider_profiles.py": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed",
+    "provider_messages.py": "b901770747be1ee2addc028cffe4f9997379d595505b82fc12c22ca8f7fb4952"
+  }
+}

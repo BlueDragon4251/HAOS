@@ -1,0 +1,21 @@
+{
+  "passed": 15,
+  "cases": [
+    "three_actual_http_pages_retain_every_original",
+    "inclusive_overlap_is_idempotent",
+    "history_uses_actual_native_decoder_and_relay",
+    "crash_after_raw_commit_reopens_without_duplicate",
+    "crash_before_cursor_commit_repeats_safely",
+    "deleted_remote_anchor_restarts_same_floor_without_duplicate",
+    "actual_http_rate-limited_is_persisted",
+    "actual_http_permission-denied_is_persisted",
+    "malformed_page_never_advances_cursor",
+    "future_history_rejected_before_raw_admission",
+    "revoke_during_http_has_no_raw_authority",
+    "repaired_grant_starts_at_new_owner_boundary",
+    "legacy_grant_without_time_has_no_history_read",
+    "original_age_retains_expired_input_without_execution",
+    "only_exact_owner_thread_is_retained"
+  ],
+  "external_connections": false
+}

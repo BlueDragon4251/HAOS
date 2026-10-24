@@ -1,0 +1,33 @@
+{
+  "actual_sdk_local_websocket_cases": [
+    "actual WebSocket storage failure preserves SDK resume and heartbeat sequence",
+    "concurrent heartbeat stays old during insert; independent reader sees commit before sequence advances",
+    "reopened raw journal decodes actual SDK message exactly once into HAOS relay",
+    "crash after relay commit before raw completion replays without duplicate relay admission",
+    "revocation prevents pending raw input from entering relay"
+  ],
+  "external_discord_connected": false,
+  "long_outage_history_recovery_tested": false,
+  "source_files": [
+    {
+      "path": "probe_discord_transport.py",
+      "sha256": "019623cddaac06c3d16076e2069626436b3dfd4c3ff618f84b152400cbca0f62"
+    },
+    {
+      "path": "gateway_raw.py",
+      "sha256": "d68e80924fd4a31c3c70bac9a7d14f6787b0ab9a59da14e1f219c2c83a12a882"
+    },
+    {
+      "path": "gateway_discord.py",
+      "sha256": "ccdb4f5c42767e622e71ff5e591e299f0f0bf24b63a7d556cd58c46222ee45d7"
+    },
+    {
+      "path": "gateway_ingress.py",
+      "sha256": "0f06b70c50891c9b162396b209836634cc76e21a04acb4814f17c3dd311d6b11"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "c14dc7187cc43114577d8a995dd67a30abcf7a3bf3642565c40ae0fffdd732ea"
+    }
+  ]
+}

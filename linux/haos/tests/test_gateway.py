@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from haos.controller import Controller
-from haos.gateway import GatewayEngine, GatewayPolicy
+from haos.gateway import GatewayEngine, GatewayPolicy, digest
 from haos.gateway_runtime import adapter_envelope
 from haos.store import Conflict, MissionStore
 
@@ -277,3 +277,98 @@ def test_pause_resume_rolls_back_with_failed_delivery_receipt(tmp_path, policy_c
     assert store.events(mid) == events
     assert store.db.execute("SELECT COUNT(*) FROM gateway_inbox").fetchone()[0] == 1
     store.close()
+
+
+@pytest.mark.parametrize('platform,credentials', [
+    ('not-an-approved-platform', {}), ('telegram', None),
+    ('telegram', {'runtime_hook': 'unapproved code'}), ('telegram', {'extra': []}),
+])
+def test_unreviewed_gateway_code_and_invalid_credentials_fail_before_optional_native_import(platform, credentials):
+    from haos.gateway_runtime import build_adapter
+    with pytest.raises(ValueError):
+        build_adapter(platform, credentials)
+
+
+def test_identical_repair_and_edit_reversal_never_revive_old_outbox(tmp_path, policy_config):
+    from haos.gateway_setup import renewed_policy
+    empty = {**policy_config, 'bindings': []}
+    first = renewed_policy(policy_config, empty)
+    store = MissionStore(tmp_path/'missions.db')
+    admitted(store, GatewayPolicy(first))
+    # Revoke and repair while the controller is offline: no delivery loop has
+    # had a chance to mark the old pending obligation revoked yet.
+    repaired = renewed_policy(policy_config, empty)
+    with pytest.raises(Conflict):
+        admitted(store, GatewayPolicy(repaired))
+    assert GatewayEngine(store).next_delivery(GatewayPolicy(repaired)) is None
+    assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0] == 'revoked'
+    assert len(store.list()) == 1
+    store.close()
+    changed = copy.deepcopy(first)
+    changed['bindings'][0]['capabilities'] = ['create']
+    changed = renewed_policy(changed, first)
+    reverted = renewed_policy(first, changed)
+    assert len({p['bindings'][0]['generation'] for p in (first, changed, reverted)}) == 3
+    with pytest.raises(PermissionError):
+        GatewayPolicy(reverted).current_binding({'binding_id': first['bindings'][0]['id'],
+            'binding_digest': digest(first['bindings'][0])})
+    assert renewed_policy(first, first) == first
+    assert 'generation' not in policy_config['bindings'][0]
+
+
+@pytest.mark.parametrize('value', ['', '0'*63, 'G'*64, None, 1])
+def test_gateway_binding_generation_has_strict_public_shape(policy_config, value):
+    policy_config['bindings'][0]['generation'] = value
+    with pytest.raises(ValueError): GatewayPolicy(policy_config)
+
+
+def test_legacy_gateway_inbox_migration_keeps_history_and_never_reexecutes_old_messages(tmp_path, policy_config):
+    path = tmp_path/'missions.db'
+    store = MissionStore(path)
+    original = admitted(store, GatewayPolicy(policy_config))
+    before = dict(store.db.execute('SELECT * FROM gateway_inbox').fetchone())
+    # Reconstruct the exact earlier additive schema in the disposable fixture.
+    store.db.execute('ALTER TABLE gateway_inbox DROP COLUMN binding_digest')
+    store.db.execute('UPDATE gateway_schema SET version=1')
+    store.close()
+
+    store = MissionStore(path)
+    GatewayEngine(store)
+    migrated = dict(store.db.execute('SELECT * FROM gateway_inbox').fetchone())
+    assert migrated['binding_digest'] is None
+    assert {key: value for key, value in migrated.items() if key != 'binding_digest'} == {
+        key: value for key, value in before.items() if key != 'binding_digest'}
+    with pytest.raises(Conflict): admitted(store, GatewayPolicy(policy_config))
+    assert len(store.list()) == 1 and store.get(original['mission_id'])['state'] == 'queued'
+    fresh = admitted(store, GatewayPolicy(policy_config), envelope(message_id='new-after-migration'))
+    assert fresh['mission_id'] != original['mission_id'] and len(store.list()) == 2
+    store.close()
+
+
+@pytest.mark.parametrize('value',[True,0,-1,1.5,'1792800000000',2**53])
+def test_gateway_grant_since_boundary_is_strict_integer(policy_config,value):
+    policy_config['bindings'][0]['since']=value
+    with pytest.raises(ValueError):GatewayPolicy(policy_config)
+
+
+def test_new_grant_records_owner_time_but_keeps_unchanged_legacy_binding(policy_config):
+    from haos.gateway_setup import renewed_policy
+    import time
+    previous={**policy_config,'bindings':[]}
+    before=time.time_ns()//1_000_000
+    published=renewed_policy(policy_config,previous)
+    assert before<=published['bindings'][0]['since']<=time.time_ns()//1_000_000
+    assert renewed_policy(published,published)==published
+    legacy={**policy_config,'bindings':[{**policy_config['bindings'][0],'generation':'a'*64}]}
+    assert renewed_policy(legacy,legacy)==legacy
+    # An edit cannot smuggle a backdated history boundary through publication.
+    edited={**published,'bindings':[{**published['bindings'][0],'since':1}]}
+    assert renewed_policy(edited,published)['bindings'][0]['since']>=before
+
+
+@pytest.mark.parametrize('field,value',[('sender','42'),('chat','U42'),('scope',''),('scope','T*'),('thread','1792800000'),('thread','0.000001')])
+def test_slack_grant_requires_exact_native_ids(field,value):
+    row={'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
+        'identity':'principal','capabilities':['create','read']}
+    row[field]=value
+    with pytest.raises(ValueError):GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[row]})

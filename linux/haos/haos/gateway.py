@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -26,8 +26,13 @@ def identifier(value, *, empty=False):
 
 class GatewayPolicy:
     def __init__(self, config: dict):
-        if config.get("version") != 1 or set(config) != {"version", "connectors", "bindings"}:
+        fields = {"version", "connectors", "bindings"}
+        if config.get("version") != 1 or set(config) not in (fields, fields | {"publication"}):
             raise ValueError("unsupported gateway policy")
+        self.publication = config.get("publication")
+        if "publication" in config and (not isinstance(self.publication, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", self.publication)):
+            raise ValueError("invalid gateway publication")
         self.connectors, self.bindings = {}, {}
         if (not isinstance(config["connectors"], list) or not isinstance(config["bindings"], list)
                 or len(config["connectors"]) > 16 or len(config["bindings"]) > 512):
@@ -41,13 +46,30 @@ class GatewayPolicy:
             self.connectors[name] = connector
         routes = set()
         for binding in config["bindings"]:
-            if set(binding) != {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}:
+            fields = {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}
+            if not fields <= set(binding) <= fields | {"generation", "since"}:
                 raise ValueError("invalid gateway identity binding")
+            if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
+                raise ValueError('invalid gateway grant time boundary')
+            if "generation" in binding and (not isinstance(binding["generation"], str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", binding["generation"])):
+                raise ValueError("invalid gateway binding generation")
             for key in ("id", "identity"):
                 if not isinstance(binding[key], str) or not _NAME.fullmatch(binding[key]):
                     raise ValueError("invalid HAOS identity")
             for key in ("sender", "chat", "scope", "thread"):
                 identifier(binding[key], empty=key in {"scope", "thread"})
+            connector = self.connectors.get(binding['connector'])
+            if connector and connector['platform']=='slack':
+                if (not re.fullmatch('[UW][A-Z0-9]+',binding['sender'])
+                        or not re.fullmatch('[CDG][A-Z0-9]+',binding['chat'])
+                        or not re.fullmatch('T[A-Z0-9]+',binding['scope'])
+                        or binding['thread'] and not re.fullmatch(r'[1-9][0-9]{0,15}\.[0-9]{6}',binding['thread'])):
+                    raise ValueError('Slack requires exact user, conversation, workspace and optional thread timestamp IDs')
+            if connector and connector['platform']=='mattermost':
+                if any(not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('sender','chat')) or any(
+                        binding[key] and not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('scope','thread')):
+                    raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
             capabilities = binding["capabilities"]
             if (not isinstance(capabilities, list) or not capabilities or not set(capabilities) <= CAPABILITIES
                     or len(set(capabilities)) != len(capabilities)):
@@ -108,8 +130,15 @@ class GatewayEngine:
             COMMIT;
         """)
         versions = store.db.execute("SELECT version FROM gateway_schema").fetchall()
-        if len(versions) != 1 or versions[0][0] != 1:
+        if len(versions) != 1 or versions[0][0] not in {1, 2}:
             raise RuntimeError("unsupported gateway schema")
+        if versions[0][0] == 1:
+            with store.transaction():
+                # Preserve legacy rows. Their original grant cannot be proved
+                # after an owner publishes a fresh generation, so replay fails
+                # closed rather than executing an old message again.
+                store.db.execute("ALTER TABLE gateway_inbox ADD COLUMN binding_digest TEXT")
+                store.db.execute("UPDATE gateway_schema SET version=2")
 
     def _queue(self, route_id: str, key: str, content: str):
         content = self.store.redactor.text(content)
@@ -130,7 +159,8 @@ class GatewayEngine:
         with self.store.transaction():
             old = self.store.db.execute("SELECT * FROM gateway_inbox WHERE key=?", (key,)).fetchone()
             if old:
-                if old["fingerprint"] != fingerprint or old["identity"] != binding["identity"]:
+                if (old["fingerprint"] != fingerprint or old["identity"] != binding["identity"]
+                        or old["binding_id"] != binding["id"] or old["binding_digest"] != digest(binding)):
                     raise Conflict("gateway replay changed its content or identity")
                 return json.loads(old["response"])
             recent = self.store.db.execute(
@@ -183,8 +213,10 @@ class GatewayEngine:
                                               binding["chat"], binding["thread"], binding["scope"], envelope["message_id"]))
             state = "paused" if mission["state"] == "blocked" and mission["phase"] == PAUSED_PHASE else mission["state"]
             reply = {"mission_id": mid, "state": state}
-            self.store.db.execute("INSERT INTO gateway_inbox VALUES(?,?,?,?,?,?,?)",
-                                  (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply)))
+            self.store.db.execute("""INSERT INTO gateway_inbox
+                (key,fingerprint,binding_id,identity,received_at,mission_id,response,binding_digest)
+                VALUES(?,?,?,?,?,?,?,?)""",
+                (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply), digest(binding)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
             self._queue(route_id, key, content)
         # Commit admission BEFORE a network response to Hermes. A replay never repeats that side effect.
@@ -231,7 +263,7 @@ class GatewayEngine:
         with self.store.transaction():
             # No transport idempotency contract: crashed sends are uncertain, never blindly repeated.
             self.store.db.execute("UPDATE gateway_outbox SET state='uncertain',error='sender lost before delivery receipt' WHERE state='sending' AND lease_until<=?", (now,))
-            row = self.store.db.execute("""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to
+            row = self.store.db.execute("""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to,r.binding_id,r.binding_digest
                 FROM gateway_outbox o JOIN gateway_routes r ON o.route_id=r.id
                 WHERE o.state='pending' AND o.next_attempt<=? ORDER BY o.rowid LIMIT 1""", (now,)).fetchone()
             if row is None:

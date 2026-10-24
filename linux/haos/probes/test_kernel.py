@@ -53,7 +53,10 @@ def run_agent_filesystem_probe(tmp_path, launcher=None, *, provider=False):
             "requests_per_day": 20, "requests_per_minute": 10})
         client_config = tmp_path / "provider-client.json"
         client_config.write_text(json.dumps(policy.client_config()))
-        args = [str(client_config) if arg == "/etc/haos/provider-client.json" else arg for arg in args]
+        public_policy = tmp_path / "provider.json"
+        public_policy.write_text(json.dumps(policy.data))
+        sources = {"/etc/haos/provider-client.json": str(client_config), "/etc/haos/provider.json": str(public_policy)}
+        args = [sources.get(arg, arg) for arg in args]
     probe = """
 import ctypes, errno, hashlib, json, os, pathlib, pwd, sys
 ro, rw, secret = map(pathlib.Path, sys.argv[1:4])
@@ -71,16 +74,22 @@ if sys.argv[5]:
     assert hashlib.sha256(model_capability.read_bytes()).hexdigest() == sys.argv[5]
     config = pathlib.Path('/home/agent/.hermes/config.yaml')
     assert json.loads(config.read_text())['model']['provider'] == 'custom:haos-model'
-    try:
-        config.write_text('{}')
-    except OSError as error:
-        assert error.errno == errno.EROFS
-    else:
-        raise AssertionError('agent modified owner model routing')
+    public_policy = pathlib.Path('/run/haos-credentials/provider-policy.json')
+    policy_data = json.loads(public_policy.read_text())
+    assert policy_data['provider'] == 'openai-codex' and policy_data['models'] == ['fixture-model']
+    assert not {'api_key', 'credentials', 'token'} & set(policy_data)
+    for owned in (config, public_policy):
+        try:
+            owned.write_text('{}')
+        except OSError as error:
+            assert error.errno == errno.EROFS
+        else:
+            raise AssertionError('agent modified owner model routing')
     assert not pathlib.Path('/etc/haos/provider-credentials').exists()
     assert not pathlib.Path('/var/lib/haos-provider/.hermes/auth.json').exists()
 else:
     assert not model_capability.exists()
+    assert not pathlib.Path('/run/haos-credentials/provider-policy.json').exists()
 status = pathlib.Path('/proc/self/status').read_text().splitlines()
 assert 'NoNewPrivs:\t1' in status
 assert 'CapEff:\t0000000000000000' in status

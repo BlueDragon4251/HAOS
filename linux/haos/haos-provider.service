@@ -3,6 +3,7 @@ Description=HAOS credential-isolated model provider broker
 Requires=haos-owner-ready.service
 After=haos-owner-ready.service network-online.target
 Wants=network-online.target
+Wants=haos-provider-acp.socket
 ConditionPathExists=/etc/haos/provider.json
 
 [Service]
@@ -40,7 +41,7 @@ RestrictSUIDSGID=yes
 RestrictNamespaces=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LockPersonality=yes
-InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace
+InaccessiblePaths=-/var/lib/haos-provider-acp -/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace
 InaccessiblePaths=-/run/haos-control -/run/haos-volumes -/run/haos-policy -/etc/haos/backend-token
 TasksMax=64
 MemoryMax=1G

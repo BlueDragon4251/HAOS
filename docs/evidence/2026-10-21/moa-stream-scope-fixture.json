@@ -1,0 +1,20 @@
+{
+  "actual_sdk_profile_sequence": [
+    "a",
+    "b",
+    "a"
+  ],
+  "negative_checks": [
+    "cross-scope-refused",
+    "cross-scope-refused",
+    "cross-scope-refused",
+    "unscoped-refused",
+    "foreign-endpoint-refused"
+  ],
+  "actual_native_tool_id_and_arguments_preserved": true,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_moa_stream_scope.py": "7fec0e4b444af246cbfde36b4c960f421d937b103a2760ac2d7c47ef55fa1ed5",
+    "provider_moa_streams.py": "5c766efaf4efa9a85dadfa8e556e18c4765c1d63b5a007875c5fb4b0fce2a88b"
+  }
+}

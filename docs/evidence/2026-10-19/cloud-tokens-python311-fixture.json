@@ -1,0 +1,27 @@
+{
+  "actual_google_service_account_jwt_signing_refresh_cache": true,
+  "actual_google_authorized_user_refresh_cache": true,
+  "actual_azure_msal_client_credentials_refresh_cache": true,
+  "actual_loopback_http": true,
+  "live_provider_tested": false,
+  "python": "3.11.17",
+  "sdk_versions": {
+    "google-auth": "2.55.1",
+    "azure-identity": "1.25.3",
+    "msal": "1.39.0"
+  },
+  "source_files": [
+    {
+      "path": "probe_cloud_tokens.py",
+      "sha256": "c3f61fc81e799b471640d5e7d06914704db909654ac3950dc16eadea312b1415"
+    },
+    {
+      "path": "provider_cloud.py",
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+    },
+    {
+      "path": "provider_proxy.py",
+      "sha256": "88348f2a362a5258db2a42c084b35b31aa76606fee7de89aa0f5acb89115781d"
+    }
+  ]
+}

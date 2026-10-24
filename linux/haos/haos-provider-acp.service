@@ -1,0 +1,45 @@
+[Unit]
+Description=HAOS isolated Copilot ACP model transport
+Requires=haos-provider-acp-network.service
+After=haos-provider-acp-network.service network-online.target
+PartOf=haos-provider.service
+ConditionPathExists=/etc/haos/provider.json
+
+[Service]
+Type=simple
+User=haos-provider-acp
+Group=haos-provider-acp
+WorkingDirectory=/usr/lib/haos/hermes
+Environment=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/haos-provider-acp
+Environment=HERMES_HOME=/var/lib/haos-provider-acp/.hermes
+Environment=PATH=/usr/lib/haos/copilot:/usr/bin
+Environment=COPILOT_AUTO_UPDATE=false
+Environment=DO_NOT_TRACK=1
+ExecStart=/usr/bin/python3 -m haos.provider_acp_launch
+Sockets=haos-provider-acp.socket
+StateDirectory=haos-provider-acp
+StateDirectoryMode=0700
+UMask=0077
+KillMode=control-group
+TimeoutStopSec=15
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+InaccessiblePaths=-/var/lib/haos-provider -/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner -/var/lib/haos-workspace -/var/lib/haos-gateway
+InaccessiblePaths=-/run/haos-control -/run/haos-volumes -/run/haos-policy -/run/haos-applications-control -/run/haos-gui-agent -/run/credentials -/run/dbus -/run/user -/etc/haos/backend-token -/etc/haos/provider-credentials -/etc/haos/provider-token
+TasksMax=128
+MemoryMax=1G

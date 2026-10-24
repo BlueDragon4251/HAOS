@@ -1041,6 +1041,10 @@ mdurl==0.1.2 \
     # via
     #   -r evidence/runtime-input.txt
     #   markdown-it-py
+msal==1.39.0 \
+    --hash=sha256:2d2577886906cd7293850dffa2da29119966c213bfc6ec0cecf8bf7621e1ca77 \
+    --hash=sha256:6ab7de335e6d7f5717e2c7e1dbf86e4dda2f6acf3c56773b78dc53ebc6395b5f
+    # via HAOS Azure SDK compatibility overlay
 multidict==6.9.1 \
     --hash=sha256:006c4478de0a1876f4834e14255776286f09b9846b505fe63f67f9d173a9487c \
     --hash=sha256:024123f0ab402ab33828e24eb80fa8f25167d0d3783ba5f287e39ed741e6abf9 \

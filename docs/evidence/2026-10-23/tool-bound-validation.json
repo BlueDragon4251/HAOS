@@ -1,0 +1,195 @@
+{
+  "base_commit": "509d46d5930388c2e6197d8fe5f8ee7d18eb0d59",
+  "before_sdk_tool_replay": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      true
+    ],
+    [
+      2,
+      "fallback",
+      true
+    ],
+    [
+      3,
+      "primary",
+      true
+    ]
+  ],
+  "before_moa_tool_replay": [
+    [
+      1,
+      "primary",
+      false
+    ],
+    [
+      1,
+      "fallback",
+      false
+    ],
+    [
+      2,
+      "primary",
+      false
+    ],
+    [
+      2,
+      "fallback",
+      false
+    ],
+    [
+      3,
+      "primary",
+      false
+    ]
+  ],
+  "cases": 6,
+  "sdk_completions": 18,
+  "actual_main_agent_history_writer_calls": 18,
+  "actual_main_agent_conversation_turns": 0,
+  "actual_moa_auxiliary_calls": 12,
+  "http_dispatches": 30,
+  "full_tests": {
+    "passed": 921,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 921,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; real root/UID/kernel CI required",
+  "host_tools_granted": false,
+  "tools_executed": false,
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_response_replay.py",
+      "sha256": "c2b51f4ad13efec77758625506d9dfc5acb301bcdca1bbb50476d8a17fac506e"
+    },
+    {
+      "path": "linux/haos/haos/provider_native.py",
+      "sha256": "74c12aace37d336252af89c84da67ec6cd0e6da9c0ee522c9065e0a87b031955"
+    },
+    {
+      "path": "linux/haos/haos/provider_moa_streams.py",
+      "sha256": "ca17a9e46e6c1ed1b64841366477ae2d892e0aaa65f79382433597ded8720475"
+    },
+    {
+      "path": "linux/haos/runtime/probe_chat_tool_replay.py",
+      "sha256": "b350babe3c6d8f0e3593cdfbf809718993e437852e6b1700cd8a20d391cc6333"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "ae4f40e635dd05a23ce0621b037173eaf509a43a8208b5dd1e546986d6800186"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "f9ec90609473bb6d6b6577e27701999cec5f56a236a57b52187d9a4ad8f63223"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "defba19f70ee5e771392c5b320eb77bc9c2a619e107ea653a6ce05bce0f75b88"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "chat-tools-sdk-json.json",
+      "sha256": "29602b4d8ff8be52d955c1616548bf71837d1ba7d89e7856a66be4c5af0146f3"
+    },
+    {
+      "file": "chat-tools-moa-json.json",
+      "sha256": "44413481f581464f98178cc50c327ad11c357217e111028eeb02f63cfac5f53d"
+    },
+    {
+      "file": "chat-tools-moa-stream.json",
+      "sha256": "6c6210aaf30d124e176e8b1f2bde855aaa44d35666b7b3da57d807ad853fa552"
+    },
+    {
+      "file": "chat-tools-native-sdk-json.json",
+      "sha256": "8bd0429a442cb998a29a5676d8779afe5cde7e4b2609c74a636bacbe946f687c"
+    },
+    {
+      "file": "chat-tools-native-moa-json.json",
+      "sha256": "205559b0daf09d57b4cfa42691df0daf1cf60192b2d5a1234cd9d8e9673f539c"
+    },
+    {
+      "file": "chat-tools-native-moa-stream.json",
+      "sha256": "fb12c9a1ca6eb763bfdb6328dd326420d7f4bcdd45b8dd2a06835ccbda9cebe8"
+    },
+    {
+      "file": "tool-bound-main-chat.json",
+      "sha256": "b9e29996e166aeaa4b779bd4d173e84fe7701584100e55f739fa0d7b5583efea"
+    },
+    {
+      "file": "tool-bound-main-chat-stream.json",
+      "sha256": "b334d2e57c7e091834d44b09fef7584c8c3124da0d14696ef8747f36a4f16455"
+    },
+    {
+      "file": "tool-bound-main-chat-moa.json",
+      "sha256": "dc38bd0970083181e739174e75470a6c53c36aa6bd6e3135f24df910f543149b"
+    },
+    {
+      "file": "tool-bound-main-chat-moa-stream.json",
+      "sha256": "82e49f095dba020a60ade3b85753b96e6a86331e2ab6a8b6b8b04f60966dbd32"
+    },
+    {
+      "file": "tool-bound-main-responses.json",
+      "sha256": "39b0b1af74b937c2d8e517ec2c52c8d511e6144e193edbf1ad44715da20c20c1"
+    },
+    {
+      "file": "tool-bound-main-messages.json",
+      "sha256": "c3fefd8fc829cf387c0ef10e59f7d124243a4065bb611bf7ed465703df9dd735"
+    },
+    {
+      "file": "tool-bound-main-responses-aliases.json",
+      "sha256": "b81f2bf1cd6d13a36170759e2417d8d85456947223e7f6f88242ef65b39e8556"
+    },
+    {
+      "file": "tool-bound-main-messages-aliases.json",
+      "sha256": "b98f6785c45e70dfd87bd55dcb9dd89804d173d33046daa2a82537b5a527072a"
+    },
+    {
+      "file": "tool-bound-native_provider.json",
+      "sha256": "30981aefbda4ba5dc4b5c291d5ef05c47ee4349f1efc3bf09581c05c54d664b6"
+    },
+    {
+      "file": "tool-bound-bedrock_provider.json",
+      "sha256": "ea077c2d878e619d4f04eec16df7e92ef88c212da5919a7dd99091705142f568"
+    },
+    {
+      "file": "tool-bound-http_provider_matrix.json",
+      "sha256": "63280326c70665fc156d03ee302542f61dc149da4860d34e7cb98e133809ce50"
+    },
+    {
+      "file": "tool-bound-provider_fallback_matrix.json",
+      "sha256": "4d3aeabb8b1d9b36061120b594ef8c328b418b592579eca722a8cfbb5c84fc4c"
+    },
+    {
+      "file": "tool-bound-moa_provider-mixed-stream.json",
+      "sha256": "9d30f12c365c067af5373551e3fa74e081d042e1c1099c6ad926952b7654f6b5"
+    },
+    {
+      "file": "tool-bound-moa_fallback_replay.json",
+      "sha256": "762adb801421371f83ab7fe0424f14675a23e3b0109bcdf1b776cf7bd3178b6a"
+    },
+    {
+      "file": "tool-bound-moa_fallback_replay-json.json",
+      "sha256": "90b6a63fd12f96f50be3270130ea2bce751c201a009d8ecc67f0fa7c99b9d741"
+    },
+    {
+      "file": "tool-bound-moa_stream_scope-chat.json",
+      "sha256": "4a301511f87c2d99d376b4a05e0d783194f788d7b6c1f91f08629d9660f5ae52"
+    }
+  ]
+}

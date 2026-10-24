@@ -15,6 +15,8 @@ from .owner_recovery import RecoveryCodes, enrolled_owner, owners
 from .region import CONSOLE_MAP, LOCALES
 from .provider_policy import ProviderPolicy, ENDPOINTS
 from .setup_errors import SetupStageError
+from .provider_registry import default_endpoint, default_mode, http_providers, oauth_providers, account_providers, account_region
+from .provider_cloud import CLOUD
 
 # Never store a plaintext password, recovery code, provider key or GHCR token
 # in setup state, IPC, temporary files, shell argv, or the audit log.
@@ -223,31 +225,33 @@ def configure_update(channel: str, automatic: bool):
     return result
 
 
-def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = ""):
-    """Cloud API or local model; OAuth flow is not yet supported in this GUI."""
+def configure_provider(provider: str, model: str, api_key: str = "", endpoint: str = "", api_mode: str = ""):
+    """Provision a vetted HTTP or account route from the trusted local seat."""
     require_root()
-    if provider not in {"openai", "openrouter", "local"}:
+    if provider not in {*http_providers(), *oauth_providers(), *CLOUD, "openai", "local", "lmstudio", "gemini", "custom", "copilot", "copilot-acp"}:
         raise ValueError("use a provider with an implemented graphical credential flow")
-    from .provider_setup import publish, stopped_provider
+    from .provider_setup import add_route, stopped_provider
     from .gateway_setup import stopped_gateway
     from .network import install
     from .owner import stopped, audit
     data = {"version": 1, "provider": provider,
-            "endpoint": endpoint if provider == "local" else ENDPOINTS[provider],
+            "endpoint": endpoint or default_endpoint(provider),
             "models": [model], "default_model": model,
-            "api_mode": "chat_completions" if provider in {"openrouter", "local"} else "codex_responses",
+            "api_mode": api_mode or default_mode(provider, model, endpoint),
             "requests_per_day": 200, "requests_per_minute": 30}
     policy = ProviderPolicy(data)
-    if provider == "local" and api_key:
-        raise ValueError("a local endpoint does not use a cloud credential")
-    if provider != "local" and not api_key:
+    if provider not in {"local", "lmstudio", "custom", *account_providers(), *CLOUD} and not api_key:
         raise ValueError("cloud API key required")
-    if provider != "local" and (not 16 <= len(api_key) <= 16384 or
+    if provider not in CLOUD and api_key and (not 16 <= len(api_key) <= 16384 or
                                    any(ord(c) < 33 or ord(c) > 126 for c in api_key)):
         raise ValueError("invalid provider credential")
     quiesce_for_setup()
+    if provider in oauth_providers() or provider == "copilot-acp" or (provider in {"anthropic", "openrouter", "copilot"} and not api_key):
+        from .provider_setup import auth_helper
+        region = {"region": account_region(provider, policy.endpoint)} if provider == "minimax-oauth" else {}
+        auth_helper("status", provider, graphical_status=True, **region)
     # Only now does the vetted owner credential publisher replace trusted files.
-    publish(policy.data, api_key if provider != "local" else None)
+    add_route(policy.data, api_key or None)
     install(pwd.getpwnam("haos-agent").pw_uid)
     subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"],
                    check=True, timeout=30, capture_output=True)
@@ -255,18 +259,138 @@ def configure_provider(provider: str, model: str, api_key: str = "", endpoint: s
     return {"configured": True, "provider": provider, "model_turn_tested": False}
 
 
-def configure_gateway(connector: str, platform: str, token: str):
-    """Graphical root-seat setup for HAOS's TWO authorized message adapters.
-
-    Upstream Hermes lists more platform plugins, but HAOS's ingress authorization
-    currently supports only these two. Never auto-authorize upstream modules.
-    """
+def provider_models(provider, api_key="", endpoint="", api_mode="", model=""):
     require_root()
-    if platform not in {"telegram", "discord"}:
+    from .provider_setup import catalog_helper
+    selected_model = model or "haos-discovery"
+    data = {"version": 1, "provider": provider, "endpoint": endpoint or default_endpoint(provider),
+            "models": [selected_model], "default_model": selected_model,
+            "api_mode": api_mode or default_mode(provider, selected_model, endpoint),
+            "requests_per_day": 200, "requests_per_minute": 30}
+    return catalog_helper(data, api_key or None)
+
+
+def import_cloud_credential(provider, filename):
+    """Read an explicitly selected private owner JSON file on the setup seat."""
+    require_root()
+    from .initial_setup_gui import session_allowed
+    from .provider_cloud import credential_data
+    import stat
+    import json
+    if not session_allowed() or provider not in CLOUD:
+        raise PermissionError("cloud credential import requires the trusted local setup seat")
+    descriptor = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(descriptor)
+        allowed = {0} | {owner["uid"] for owner in owners()}
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in allowed or info.st_mode & 0o077
+                or info.st_nlink != 1 or not 1 <= info.st_size <= 16384):
+            raise PermissionError("select one private regular JSON file owned by the enrolled owner or root")
+        value = os.read(descriptor, 16385)
+        if len(value) != info.st_size or len(value) > 16384:
+            raise ValueError("cloud credential file changed or exceeds its bound")
+    finally:
+        os.close(descriptor)
+    # Imports are data only. The native SDK still runs solely under its private
+    # provider identity, after independent endpoint/model policy validation.
+    data = json.loads(value)
+    if not isinstance(data, dict) or not data:
+        raise ValueError("select a cloud credential JSON object")
+    return json.dumps(credential_data(provider, json.dumps(data)))
+
+
+def provider_state():
+    require_root()
+    from .provider_routes import ProviderRoutes
+    from .sandbox import trusted_json
+    path = Path("/etc/haos/provider.json")
+    if not path.exists() and not path.is_symlink():
+        return {"routes": [], "default": None, "fallbacks": {}}
+    current = ProviderRoutes(trusted_json(path))
+    return {"routes": [{"id": name, "provider": policy.provider, "model": policy.data["default_model"],
+                        "models": list(policy.models), "api_mode": policy.api_mode} for name, policy in current.routes.items()],
+            "default": current.default, "fallbacks": current.fallbacks}
+
+
+def manage_provider_route(route, action, fallbacks=()):
+    require_root()
+    if action not in {"default", "remove", "fallbacks"}:
+        raise ValueError("unsupported provider route action")
+    from .provider_setup import route_settings
+    from .owner import audit
+    quiesce_for_setup()
+    result = route_settings(route, make_default=action == "default", remove=action == "remove",
+                            fallbacks=fallbacks if action == "fallbacks" else None)
+    subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"],
+                   check=True, timeout=30, capture_output=True)
+    audit("setup.provider-routes", {"route": route, "action": action})
+    return result
+
+
+def provider_account(provider, action="login", endpoint=""):
+    """Native trusted-seat account flow; OAuth runs in the separate provider UID."""
+    require_root()
+    from .initial_setup_gui import session_allowed
+    if not session_allowed() or provider not in account_providers() or action not in {"login", "logout", "status"}:
+        raise PermissionError("provider account login requires the trusted local setup seat")
+    region = {}
+    if provider == "minimax-oauth":
+        selected = endpoint or default_endpoint(provider)
+        ProviderPolicy({"version": 1, "provider": provider, "endpoint": selected,
+            "models": ["haos-account"], "default_model": "haos-account", "api_mode": default_mode(provider),
+            "requests_per_day": 200, "requests_per_minute": 30})
+        region = {"region": account_region(provider, selected)}
+    if action == "status":
+        from .provider_setup import auth_helper
+        auth_helper("status", provider, graphical_status=True, **region)
+        return {"credential_action_completed": True, "model_turn_tested": False}
+    quiesce_for_setup()
+    if action == "logout":
+        from .provider_setup import revoke_account_routes
+        from .network import install
+        revoke_account_routes(provider)
+        install(pwd.getpwnam("haos-agent").pw_uid)
+    subprocess.run(["/usr/bin/xterm", "-T", "HAOS Provider-Anmeldung", "-geometry", "110x32+20+20",
+                    "-e", "/usr/bin/python3", "-I", "/usr/lib/haos/provider-login.py", action, provider, *region.values()],
+                   check=True, timeout=780, capture_output=True,
+                   env={"DISPLAY": ":8", "XAUTHORITY": "/run/haos-setup-display/Xauthority",
+                        "HAOS_TRUSTED_SETUP": "1", "PATH": "/usr/bin:/bin"})
+    return {"credential_action_completed": True, "model_turn_tested": False}
+
+
+def configure_moa(name, value):
+    require_root()
+    import json
+    if not isinstance(value, str) or len(value) > 16384:
+        raise ValueError("invalid MoA configuration")
+    preset = json.loads(value)
+    if not isinstance(preset, dict) or set(preset) != {"references", "aggregator"}:
+        raise ValueError("MoA expects references and aggregator")
+    quiesce_for_setup()
+    from .provider_setup import configure_ensemble
+    from .owner import audit
+    result = configure_ensemble(name, preset["references"], preset["aggregator"])
+    audit("setup.moa", {"name": name})
+    return result
+
+
+def configure_gateway(connector: str, platform: str, token: str, app_token: str = '', server_url: str = ''):
+    """Graphical root-seat setup for explicitly integrated native adapters."""
+    require_root()
+    if platform not in {"telegram", "discord", "slack", "mattermost"}:
         raise ValueError("HAOS has not approved this platform for gateway execution")
     if (not isinstance(token, str) or not 16 <= len(token) <= 4096
             or any(c.isspace() or ord(c) < 32 for c in token)):
         raise ValueError("invalid protected gateway credential")
+    if platform=='slack':
+        from .gateway_slack import validate_credentials
+        validate_credentials(token,app_token)
+    elif app_token:
+        raise ValueError('an app token applies only to Slack')
+    if platform=='mattermost':
+        from .gateway_mattermost import validate_credentials
+        server_url=validate_credentials(token,server_url)
+    elif server_url:raise ValueError('a server URL applies only to Mattermost')
     from .gateway_setup import load, persist, stopped_gateway
     from .gateway import GatewayPolicy
     from .owner import audit
@@ -278,14 +402,16 @@ def configure_gateway(connector: str, platform: str, token: str):
         {"id": connector, "platform": platform}]
     GatewayPolicy(policy)
     credentials["connectors"][connector] = {"token": token}
+    if platform=='slack':credentials['connectors'][connector]['app_token']=app_token
+    if platform=='mattermost':credentials['connectors'][connector]['server_url']=server_url
     persist(policy, credentials)
     audit("setup.gateway", {"connector": connector, "platform": platform})
-    return {"configured": True, "platform": platform, "restart_required": True}
+    return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}
 
 
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
-                        identity: str, capabilities: tuple[str, ...] = ("create", "read")):
-    """Grant one exact sender+chat on an already provisioned platform."""
+                        identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = ""):
+    """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
         raise ValueError("unsupported gateway permissions")
@@ -293,15 +419,128 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     from .gateway import GatewayPolicy
     from .owner import audit
     policy, credentials = load()
-    quiesce_for_setup(gateway_only=True)
     item = {"id": binding_id, "connector": connector, "sender": sender, "chat": chat,
-            "scope": "", "thread": "", "identity": identity,
+            "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     policy["bindings"] = [b for b in policy["bindings"] if b["id"] != binding_id] + [item]
     GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
     persist(policy, credentials)
     audit("setup.gateway-pair", {"binding": binding_id, "connector": connector})
     return {"paired": True, "binding": binding_id}
+
+
+def gateway_configuration():
+    """Return pairing metadata to the trusted owner window, never credentials."""
+    require_root()
+    from .gateway_setup import load
+    policy, _credentials = load()
+    return {"connectors": policy["connectors"], "bindings": policy["bindings"]}
+
+
+def manage_gateway(action: str, identifier: str = ""):
+    require_root()
+    if action not in {"start", "stop", "revoke", "remove", "recover-configuration"}:
+        raise ValueError("unsupported graphical gateway action")
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    if action in {"start", "stop", "recover-configuration"}:
+        if identifier:
+            raise ValueError("service actions do not select a gateway identity")
+        if action == "recover-configuration":
+            quiesce_for_setup(gateway_only=True)
+        return owner_gateway(SimpleNamespace(gateway_action=action))
+    configured = gateway_configuration()
+    rows = configured["bindings"] if action == "revoke" else configured["connectors"]
+    if not isinstance(identifier, str) or not any(row["id"] == identifier for row in rows):
+        raise ValueError("unknown gateway selection")
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action=action, binding=identifier if action == "revoke" else None,
+        connector=identifier if action == "remove" else None))
+
+
+def gateway_ingress(after=0):
+    require_root()
+    if type(after) is not int or after < 0:
+        raise ValueError('invalid ingress cursor')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='ingress',after=after))
+
+
+def reconcile_gateway_ingress(row, decision, note):
+    require_root()
+    import re
+    if (not isinstance(row,dict) or not isinstance(row.get('ingress_id'),str)
+            or not re.fullmatch('[0-9a-f]{64}',row['ingress_id'])
+            or type(row.get('attempt')) is not int or not 0 <= row['attempt'] <= 8
+            or row.get('state') not in {'pending','processing','failed','expired','revoked'}
+            or decision not in {'retry','discard'} or not isinstance(note,str) or not 1 <= len(note.strip()) <= 2000):
+        raise ValueError('select an unresolved ingress and provide bounded non-secret inspection evidence')
+    if decision == 'retry' and row['state'] != 'failed':
+        raise ValueError('only failed native decoding may be retried')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='reconcile-ingress',ingress_id=row['ingress_id'],
+        attempt=row['attempt'],state=row['state'],decision=decision,note=note))
+
+
+def gateway_process_status():
+    require_root()
+    result = subprocess.run(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,SubState,Result,ExecMainStatus",
+        "haos-gateway.service"], check=True, capture_output=True, text=True, timeout=15)
+    allowed = {"LoadState", "ActiveState", "SubState", "Result", "ExecMainStatus"}
+    if len(result.stdout) > 4096:
+        raise ValueError("invalid gateway service status")
+    values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    if set(values) != allowed or any(not value or len(value) > 128 or any(ord(c) < 32 or ord(c) > 126 for c in value) for value in values.values()):
+        raise ValueError("invalid gateway service status")
+    return values
+
+
+def gateway_deliveries(after=0):
+    require_root()
+    if type(after) is not int or after<0:raise ValueError('invalid delivery cursor')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup()
+    return owner_gateway(SimpleNamespace(gateway_action='deliveries',after=after))
+
+
+def reconcile_gateway_delivery(row,decision,note,receipt=None,confirmed_not_delivered=False):
+    require_root()
+    import re
+    if (not isinstance(row,dict) or not isinstance(row.get('delivery_id'),str)
+            or not re.fullmatch('[0-9a-f]{64}',row['delivery_id'])
+            or type(row.get('attempt')) is not int or not 1<=row['attempt']<=5
+            or row.get('state') not in {'sending','uncertain','failed'}
+            or decision not in {'delivered','retry','discard'} or not isinstance(note,str)
+            or not 1<=len(note.strip())<=2000 or type(confirmed_not_delivered) is not bool):
+        raise ValueError('select an unresolved delivery and provide bounded non-secret inspection evidence')
+    if decision=='delivered':
+        if not isinstance(receipt,str) or not 1<=len(receipt)<=64 or any(ord(c)<33 or ord(c)>126 for c in receipt):
+            raise ValueError('record the inspected platform message identity')
+    elif receipt is not None and receipt!='':raise ValueError('only confirmed delivery accepts a receipt')
+    if decision=='retry' and not confirmed_not_delivered:
+        raise PermissionError('retry requires explicit evidence that the previous attempt was not delivered')
+    if decision!='retry' and confirmed_not_delivered:raise ValueError('non-delivery confirmation applies only to retry')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup()
+    return owner_gateway(SimpleNamespace(gateway_action='reconcile-delivery',delivery_id=row['delivery_id'],attempt=row['attempt'],
+        decision=decision,note=note,receipt=receipt if decision=='delivered' else None,
+        confirm_not_delivered=confirmed_not_delivered))
+
+
+def resume_runtime():
+    require_root()
+    if not account_status()['complete'] or not normal_user_ready() or setup_in_progress():
+        raise PermissionError('complete administrator, recovery and normal-user setup before starting mission services')
+    from .owner import runtime_action
+    runtime_action('start')
+    return {'started':True}
 
 
 def acknowledge_recovery(username: str):

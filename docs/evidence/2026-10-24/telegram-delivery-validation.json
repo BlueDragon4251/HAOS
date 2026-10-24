@@ -1,0 +1,53 @@
+{
+  "base_commit": "4fdc7e72573e5725f6ee08dbc20605ec1b659727",
+  "before": "same actual SDK read-disconnect fixture on archived predecessor repeated the send; assertion failed before any successful receipt",
+  "before_fixture_sha256": "0fcfb599dfa1b40cdf123664c1195bef681d67c95eeb403f120475d8be7a5227",
+  "before_log_sha256": "fceb9cf59f20722a85a78a4d53fd10f5af5c1236f157e1ad75c0776b8db7e63b",
+  "native_sdk_sqlite_delivery_cases": 10,
+  "full_tests": {
+    "passed": 993,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 993,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "external_messages_sent": false,
+  "all_five_predecessor_ci_gates_successful": "4fdc7e72573e5725f6ee08dbc20605ec1b659727",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_telegram.py",
+      "sha256": "f0f12e16c028d53a54a3e476c38a1ef6a42393824f5f3099e16d29b8421b2877"
+    },
+    {
+      "path": "linux/haos/haos/gateway_delivery.py",
+      "sha256": "26600594611c839a7b6f175b8e2f26e67aad6e2e16b348e7bb4399c864a5b158"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "1082ee8e75d6bb769334a958445e98dadbfa563627223d73b192df19aa4b5d7b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "5b91296d3958c836810ae4a62cee4d78b75f89282a7a8cd40b1542570013f585"
+    },
+    {
+      "path": "linux/haos/runtime/probe_telegram_delivery.py",
+      "sha256": "0fcfb599dfa1b40cdf123664c1195bef681d67c95eeb403f120475d8be7a5227"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_delivery.py",
+      "sha256": "7decd4083114342bf798cb5d0d6b70a4ec7bac83fc42d5dc116f8680718237f6"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "7b9ce546d5549776cb5f970780047a8f4db7ff9a0e6560794d573cea3d5dc1bf"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "891779e141a0b894daf45054b5d55d900ecc6ec9d58c8ba9d0045bada7664bd7"
+    }
+  ],
+  "contracts_sha256": "d53603702c3c517c3720f8ec9db7707dd25347d849a6f19086024cdd97a654b9"
+}

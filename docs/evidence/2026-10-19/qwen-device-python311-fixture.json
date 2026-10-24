@@ -1,0 +1,82 @@
+{
+  "actual_local_device_pkce_http_cases": [
+    "success",
+    "pending-slow",
+    "cancel",
+    "redirect",
+    "http-redirect",
+    "truncated-http",
+    "short-expiry",
+    "access_denied",
+    "expired_token",
+    "unknown-error",
+    "invalid-resource",
+    "missing-refresh",
+    "bad-expiry",
+    "oversized"
+  ],
+  "http_requests": 26,
+  "pinned_hermes_private_storage_and_resolver": true,
+  "pending_slowdown_denial_expiry_cancellation": true,
+  "untrusted_uri_and_resource_refused": true,
+  "secrets_absent_from_owner_output_and_errors": true,
+  "failed_login_preserves_existing_credentials": true,
+  "live_account_tested": false,
+  "actual_pinned_auth_add_status_logout_pool_lifecycle": true,
+  "official_protocol_reference": "QwenLM/qwen-code@c08007668ce01d9282ea702e95ddbc1f5adf57c9:packages/core/src/qwen/qwenOAuth2.ts",
+  "python": "3.11.16",
+  "source_files": [
+    {
+      "path": "haos/provider_qwen.py",
+      "sha256": "069a89f215038e8fb8c95b00ee66e7e79a6345a21cf240ac7e646e15c7f6ec6d"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "a6c00636c28d96b922088508b54acc4ffd916f7680b1505ad36f19a9297ce305"
+    },
+    {
+      "path": "runtime/probe_qwen_device.py",
+      "sha256": "64a3d45687202c02cdd210e0810a2298e7eaf4a98994b1cd95128fb1a0b7655f"
+    }
+  ],
+  "source_base_commit": "6dffa5a23a981c5cf9ba8a707ca4c072664583fe",
+  "source_working_tree_dirty": true,
+  "ordinary_regressions": {
+    "minimal_without_hermes": {
+      "passed": 808,
+      "skipped": 2
+    },
+    "full_pinned_with_hermes": {
+      "passed": 808,
+      "skipped": 2
+    },
+    "root_only_backup_file": "required separately in CI"
+  },
+  "integration_sources": [
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "198827196cd8de32432844418f99d11cf1e8be54bc7b7fb6754c717a9b3d6355"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "0658ff357c36dfe8096063d0a89d2dd3c4885f7797f6a7f1a3c20347cc6415e1"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_qwen_device.py",
+      "sha256": "3c79d3a394ccf60d2325445743edcf796e616e67022a10f750dc73864c1986b9"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "695b53997c6a3705fda038466f1fe54440a7bb4c958d83d164ea1903b82bed91"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "c1b808b83f7015a304750ab1a2bad5bdb6671710bd7bdbe4a508941a9ca1acd8"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "7b2604c56a4a3cbe72ca104322f2c65876c0125cf95387178b799a71e8fd8064"
+    }
+  ],
+  "official_protocol_source_sha256": "a4aa835e2dc13bf06e47a3be72d82a2ebde09f356d32151758d2e3f8b2e499fe"
+}

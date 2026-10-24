@@ -1,0 +1,38 @@
+{
+  "source_base_commit": "fda645c6c37b129c2ae5868a413fa335d9f38ad0",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 818,
+    "skipped": 2
+  },
+  "native_copilot_device_cases": 7,
+  "root_backup_uid_tests": "separate required CI gate",
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "bfb3d2ec74349c609b3b88f5bdf16d6bed1c793a96fdb686a7eb43dd55e78a54"
+    },
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "20fecca8b8534c1a0b72f219acc3b3be8214d22f31a5d70366e9dcf97bab3d88"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "60cf649be3ce2db8e58398dfc031c46794682bed4fe5bf164dca798a4a41e76a"
+    },
+    {
+      "path": "linux/haos/haos/provider_auth.py",
+      "sha256": "5d1460c9a2eba10706cd71e65c20777bd5b619a10051c920a7f910529e7c69db"
+    },
+    {
+      "path": "linux/haos/runtime/probe_copilot_device.py",
+      "sha256": "2ca0069fffbc192458c9f1738138f1b68aa0346e6741a10748fecfb50a7df581"
+    }
+  ]
+}

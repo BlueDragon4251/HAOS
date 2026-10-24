@@ -1,0 +1,26 @@
+{
+  "provider": "moa",
+  "actual_upstream_fanout_and_aggregation": true,
+  "broker_bound_requests": 3,
+  "private_provider_keys_in_agent_config": false,
+  "live_provider_tested": false,
+  "derived_auxiliary_client_sha256": "4d2aee9ceb4f0274705f55ec8374251d1382018f96345d9290d2817e32f44c40",
+  "delayed_reference_finalization_handoff": true,
+  "native_protocols_by_route": {
+    "ref-one": "anthropic_messages",
+    "ref-two": "chat_completions",
+    "acting": "codex_responses"
+  },
+  "ambiguous_reference_not_replayed": false,
+  "outer_stream": true,
+  "aborted_native_stream_refused": true,
+  "first_aggregator_delta_before_terminal": true,
+  "source_sha256": {
+    "probe_moa_provider.py": "5114fa2710beed21694e1d90c3d5e042cbea3f36dc846e9cc5ea34e58b9a7189",
+    "provider_proxy.py": "ad3d736ebaf09dd1867ce777e3b8015e9d70d74e89756bdd3b8e9288e9291caf",
+    "provider_moa_streams.py": "827abed56fb97b01954050270232b22b525e1db5dd2b2e0eea23c63fb4ae1327",
+    "provider_profiles.py": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed",
+    "prepare.py": "24ae84af83815dea88b07e93cc094ecde0093538287d0fb50a1d4ac404173111",
+    "source.json": "fbcdc3f424ff17aa3272843d01df9fbb444cfe6950b96a015bcbe621cedbd078"
+  }
+}

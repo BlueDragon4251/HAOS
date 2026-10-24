@@ -1,0 +1,82 @@
+{
+  "base_commit": "34d6c8dc81466b3d1e5b9c7018cff04299658cf1",
+  "before": "actual Router SDK sent high reasoning for an account catalogue declaring no reasoning fields",
+  "actual_sdk_cases": 7,
+  "same_model_two_private_account_catalogues": true,
+  "private_key_rotation_invalidates_cache": true,
+  "native_parser_clamp_and_field_builder_compared": true,
+  "full_tests": {
+    "passed": 948,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 948,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; real root/UID/kernel CI required",
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_router.py",
+      "sha256": "73497b0ae476fbbc0ab2ebfb41d4ec572097a2f3e628211680e1a778e07198dd"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "797f00b45a02894fe7edb13c8c8f752159fff7deabf21720e0766f2ee2fb7950"
+    },
+    {
+      "path": "linux/haos/haos/provider_profiles.py",
+      "sha256": "79dcdc32d8aa8b8a50b26bf31d67bff54efce9ed066a579b3dd701fb527a1c3b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_router_reasoning.py",
+      "sha256": "c5330a0179b018e12b6a67711e0bb69c55337fc342ca01e76210954970ffc623"
+    },
+    {
+      "path": "linux/haos/runtime/probe_provider_profiles.py",
+      "sha256": "e256ba23e5c436243e21e17936bd1a0cc28934471f307f7aeef32fd5ca7a6d0f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_http_provider_matrix.py",
+      "sha256": "803734f31be411b33d0a77ba689c93395ea80767a2cd404024629f86ea96592b"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "f4b814c4b51dac8615ae2ab7c2a08e1b71f4a9447510e12dc02e9445bde63d66"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "eb1f44efddd7126d64416dc5f4756d47070defb07ac36687a8192a4298adc065"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "549305d40eb824c720da7cd3f0ae90aa0dddc0e1a52d57754c6aa802353cd5f5"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "router-caps-router_reasoning.json",
+      "sha256": "3b6f6d8061f78ce164ba960d5c461ee48634e9dba1e4bb055f137701de334c8f"
+    },
+    {
+      "file": "router-caps-provider_profiles.json",
+      "sha256": "04de18b525f5dc21288318f055982393265758b8759583a10ccfb733ce6edcea"
+    },
+    {
+      "file": "router-caps-provider_fallback_matrix.json",
+      "sha256": "c33e19c57cf55644f399d3267f19aaf424cb92843a02a58fde4cf7cf6da10a9a"
+    },
+    {
+      "file": "router-caps-http_provider_matrix.json",
+      "sha256": "f3c82914e2bf6bd11968f2aa8d4de5608277d19d6af88e2dfd8f45faeeab6060"
+    },
+    {
+      "file": "router-caps-cloud_inference.json",
+      "sha256": "9e6abeb5cf3e2f91ad75abcbfea4d429273c6a8f0c99913acff7aec01747c8a6"
+    },
+    {
+      "file": "router-caps-vertex_catalog.json",
+      "sha256": "0da97f3a68090dbf1708a9feb1865703bac5a3f14c490c48f78a7b1daddc1807"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "actual_anthropic_sdk_api_key_and_subscription_json_sse": true,
+  "actual_pinned_subscription_body_and_header_contract": true,
+  "signed_thinking_replay_preserved": true,
+  "forced_tool_alias_collision_mcp_names_restored": true,
+  "multiline_sse_and_early_delta_before_terminal": true,
+  "native_fast_mode_body_beta_preserved": true,
+  "reflected_private_tokens_redacted": true,
+  "actual_loopback_http_cases": 6,
+  "live_provider_tested": false,
+  "python": "3.11.17",
+  "source_sha256": {
+    "probe_messages_provider.py": "46e9ff2ae3f9cf1f30198926ec998d74720fbaf1d50003bab04a21feaae9dc54",
+    "provider_profiles.py": "b67abae232adc1ae2a9925e66821733a838cf101d444041b3c0b0dcf04aa5306",
+    "provider_messages.py": "0e3acb02231918c7b3516bc7fa1edc196caec34f8defdbcb4aae0dc620b2b8d5",
+    "provider_sse.py": "adab83ff6b38662482e7d78142a383210ac21dbc251c22da19757ceb8d6e4b2f",
+    "provider_proxy.py": "88348f2a362a5258db2a42c084b35b31aa76606fee7de89aa0f5acb89115781d"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "source_base_commit": "38c91ce3ba8139cd4e00e483c52588d3452abd31",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 827,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 827,
+    "skipped": 2
+  },
+  "actual_tk_workflow_scripts": {
+    "display_sizes": [
+      "1280x800",
+      "640x480"
+    ],
+    "nonprivileged_virtual_display": true,
+    "one_and_two_reference_selections": true,
+    "nondefault_approved_model": true,
+    "long_model_small_screen": true,
+    "no_activation_before_configuration": true
+  },
+  "xvfb_fixture": {
+    "url": "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.16-1.3+deb13u3_amd64.deb",
+    "sha256": "365da2b6c93339f34337c434a9489bb6411a240fa47b9f49693d3091745f28c2",
+    "system_install_performed": false
+  },
+  "actual_pinned_moa_broker_calls": 3,
+  "new_real_root_migration_test": "required separately in CI; not run as root locally",
+  "predecessor_ci_all_five_gates": "38c91ce3ba8139cd4e00e483c52588d3452abd31",
+  "installed_owner_setup_tested": false,
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "dc94cc25374584fa36c2118c11b3df8aeeb1bbfb8830c0702f44bc95cda8df5d"
+    },
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "dd5d07e8caa2c7e1482d2d36f4ceab4fe3fc7eec6719fd341c2c2c905284404c"
+    },
+    {
+      "path": "docs/PROVIDER-SETUP.md",
+      "sha256": "9e99cdc968bf363656e1874f408616ab9f1166616c0c8f38f3dd89978ad9627f"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "4ce5cdceb52e372e921c8c554f446a61ad3e6ea82fa8d5ee358afa69978c84b0"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "0223b25b3dc5723c9dbb8868bcb0803733b3fb00d2e1262f3e52c6c2241a837c"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "5ac1f44c346cfd5d93dd8fb1f16b2137bbb727414e57312c511df9922d414bb8"
+    },
+    {
+      "path": "linux/haos/probes/test_provider_authority.py",
+      "sha256": "1811564a39525daa7b9e7b90f1b5c9f22daee2209c3996306438e4c21e54f9e3"
+    }
+  ]
+}

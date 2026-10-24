@@ -32,7 +32,7 @@ def trusted_json(path: Path) -> dict:
     return config
 
 
-def command(grants: list[dict], credential_fd: int, *, certificates: list[str], provider_fd=None, ui_fd=None, gui=False) -> list[str]:
+def command(grants: list[dict], credential_fd: int, *, certificates: list[str], provider_fd=None, provider_config_fd=None, ui_fd=None, gui=False) -> list[str]:
     if type(credential_fd) is not int or credential_fd < 3:
         raise ValueError("a private credential descriptor is required")
     args = ["/usr/bin/bwrap", "--unshare-all", "--unshare-user", "--share-net", "--die-with-parent", "--new-session",
@@ -59,7 +59,16 @@ def command(grants: list[dict], credential_fd: int, *, certificates: list[str], 
         if type(provider_fd) is not int or provider_fd < 3 or provider_fd == credential_fd:
             raise ValueError("separate scoped model credential descriptor required")
         args.extend(["--perms", "0400", "--ro-bind-data", str(provider_fd), "/run/haos-credentials/provider-token",
-                     "--ro-bind", "/etc/haos/provider-client.json", "/home/agent/.hermes/config.yaml"])
+                     "--ro-bind", "/etc/haos/provider.json", "/run/haos-credentials/provider-policy.json"])
+        if provider_config_fd is None:
+            args.extend(["--ro-bind", "/etc/haos/provider-client.json", "/home/agent/.hermes/config.yaml"])
+        else:
+            if (type(provider_config_fd) is not int or provider_config_fd < 3
+                    or provider_config_fd in {credential_fd, provider_fd, ui_fd}):
+                raise ValueError("separate immutable provider configuration descriptor required")
+            args.extend(["--perms", "0400", "--ro-bind-data", str(provider_config_fd), "/home/agent/.hermes/config.yaml"])
+    elif provider_config_fd is not None:
+        raise ValueError("provider configuration requires its scoped credential")
     seen = set()
     for grant in grants:
         key, mode = grant.get("key"), grant.get("mode")
@@ -80,12 +89,43 @@ def command(grants: list[dict], credential_fd: int, *, certificates: list[str], 
     return args + ["--chdir", "/workspace", "--", "/usr/bin/python3", "/usr/lib/haos/haos/launch.py"]
 
 
+
+def runtime_provider_config(policy, client):
+    """Admit exact protected current/legacy data and seal the derived runtime copy."""
+    import fcntl
+    expected = policy.client_config()
+    legacy = {key: value for key, value in expected.items() if key != "agent"}
+    admitted = [expected, legacy]
+    from .provider_routes import ProviderRoutes
+    if isinstance(policy, ProviderRoutes) and "model" in policy.routes:
+        old_names = policy.client_config(legacy_names=True)
+        admitted.extend([old_names, {key: value for key, value in old_names.items() if key != "agent"}])
+    if not any(client == projection for projection in admitted):
+        raise PermissionError("model client configuration differs from owner policy")
+    descriptor = os.memfd_create("haos-model-configuration", os.MFD_ALLOW_SEALING)
+    try:
+        data = json.dumps(expected, ensure_ascii=False).encode()
+        with os.fdopen(os.dup(descriptor), "wb") as output:
+            output.write(data)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        # Linux UAPI values also cover portable Python builds compiled without
+        # GNU fcntl constant exports. Unsupported kernels still fail closed.
+        fcntl.fcntl(descriptor, getattr(fcntl, "F_ADD_SEALS", 1033),
+            getattr(fcntl, "F_SEAL_WRITE", 8) | getattr(fcntl, "F_SEAL_GROW", 4)
+            | getattr(fcntl, "F_SEAL_SHRINK", 2) | getattr(fcntl, "F_SEAL_SEAL", 1))
+        os.set_inheritable(descriptor, True)
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
 def main():
     config = trusted_json(Path("/run/haos-policy/sandbox.json"))
     credential = Path(os.environ["CREDENTIALS_DIRECTORY"]) / "backend-token"
     certs = [str(p) for p in map(Path, ["/etc/ssl", "/etc/pki", "/etc/hosts", "/etc/resolv.conf", "/etc/nsswitch.conf", "/etc/localtime"]) if p.exists()]
     fd = os.open(credential, os.O_RDONLY | os.O_NOFOLLOW)
     provider_fd = None
+    provider_config_fd = None
     ui_fd = None
     try:
         # The credential value must never appear in the long-lived bwrap argv.
@@ -94,14 +134,13 @@ def main():
         os.set_inheritable(ui_fd, True)
         provider = Path("/etc/haos/provider.json")
         if provider.exists() or provider.is_symlink():
-            from .provider_policy import ProviderPolicy
-            policy = ProviderPolicy(trusted_json(provider))
+            from .provider_routes import ProviderRoutes
+            policy = ProviderRoutes(trusted_json(provider))
             client = trusted_json(Path("/etc/haos/provider-client.json"))
-            if client != policy.client_config():
-                raise PermissionError("model client configuration differs from owner policy")
+            provider_config_fd = runtime_provider_config(policy, client)
             provider_fd = os.open(Path(os.environ["CREDENTIALS_DIRECTORY"]) / "provider-token", os.O_RDONLY | os.O_NOFOLLOW)
             os.set_inheritable(provider_fd, True)
-        args = command(config["grants"], fd, certificates=certs, provider_fd=provider_fd, ui_fd=ui_fd, gui=True)
+        args = command(config["grants"], fd, certificates=certs, provider_fd=provider_fd, provider_config_fd=provider_config_fd, ui_fd=ui_fd, gui=True)
         os.execv(args[0], args)
     finally:
         os.close(fd)
@@ -109,6 +148,8 @@ def main():
             os.close(ui_fd)
         if provider_fd is not None:
             os.close(provider_fd)
+        if provider_config_fd is not None:
+            os.close(provider_config_fd)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
-"""Apply the reviewed dependency overlay only to its exact upstream snapshot."""
+"""Apply reviewed dependency and scoped auxiliary overlays to one exact snapshot."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import re
+
+
+def patch_auxiliary(upstream, expected_sha256, *, check_only=False):
+    path = upstream / "agent/auxiliary_client.py"
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise ValueError("auxiliary overlay belongs to another Hermes source")
+    anchor = '    # Streaming path (MoA aggregator): return the raw SDK stream, skipping validation and\n'
+    addition = '    if task in {"moa_reference", "moa_aggregator"} and str(provider or "").startswith("custom:haos-"):\n        from haos.provider_moa_streams import create_once\n        return create_once(client, kwargs, stream=stream, task=task)\n'
+    text = data.decode()
+    if text.count(anchor) != 1:
+        raise ValueError("pinned auxiliary dispatch changed")
+    if not check_only:
+        path.write_text(text.replace(anchor, addition + anchor))
 
 
 def prepare(upstream: Path, overlay: Path, *, check_only=False):
@@ -17,9 +31,9 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
     requirements = (overlay / "requirements.txt").read_bytes()
     if hashlib.sha256(requirements).hexdigest() != source["requirements_sha256"]:
         raise ValueError("hashed runtime requirements changed without review")
-    if source["python"] != "3.11" or source["extras"] != ["web", "messaging"]:
+    if source["python"] != "3.11" or source["extras"] != ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity"]:
         raise ValueError("runtime target changed")
-    for name, version in source["security_versions"].items():
+    for name, version in {**source["security_versions"], **source.get("provider_versions", {})}.items():
         versions = re.findall(rf"^{re.escape(name)}==([^\s;]+)", requirements.decode(), re.M)
         if versions != [version]:
             raise ValueError("security version mismatch: " + name)
@@ -29,6 +43,7 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
     replacement = '"PyJWT[crypto]==' + source["security_versions"]["pyjwt"] + '"'
     if text.count(original) != 1:
         raise ValueError("upstream PyJWT constraint changed; review this overlay")
+    patch_auxiliary(upstream, source["auxiliary_client_sha256"], check_only=check_only)
     if not check_only:
         path.write_text(text.replace(original, replacement))
 

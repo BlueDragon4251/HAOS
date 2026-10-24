@@ -1,0 +1,84 @@
+{
+  "base_commit": "a76e90a6aba7ce6d9dbc7aa334fa0da96f88a495",
+  "full_tests": {
+    "passed": 1008,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1008,
+    "existing_skips": 2
+  },
+  "root_uid_unix_socket_gateway_probes": {
+    "passed": 19,
+    "kernel_mocked": false,
+    "native_recovery_actual_uid": 65534,
+    "root_only_canary_denied": true
+  },
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "actual_tk_recovery_button_selection_handoff": true,
+  "external_messages_sent": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "a0cc8a1c7fc92914b56da787e563dced9eb05e6ac52d316c61387cc0342d43da"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "45fbb3e865a0b033a1c6a0cb9b57f8f5a9ca9e103b9af67893d082b3aadab867"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "40af913d47611bda29c3452efed2eac2ed687c0e5b979e810aa4bd95be10d2da"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "d18545ab7ddbb3a1b8ad0a932c845d63ad0e0ac643fbf174eeae92af21015f71"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "a7899a77c6bd0e1aba53c56dc760f597136d7caf9339b86ef354142ccebeabf4"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_raw_recovery.py",
+      "sha256": "2ae597d95e8a8a0024cf2f3b351bbccf5b3a5182fb68df254c776584e271e3f6"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "f85ecd9f59c80911e9afbbf300afbfe451cfe58d2586fab37e68bf1a39b0c0c3"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "bbd7a9873bf8fe4953ea8b625a1826107fc83a7564dfa23a687831b8f07f4066"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "ace1a382dd9f92df15b51e208cda414e4ff197da4842b4c3241d547b6e736b0b"
+    }
+  ],
+  "logs": [
+    {
+      "path": "raw-recovery-full.log",
+      "sha256": "21073a928116da47139e54accb514b492c3e466d4ecc317d96418a2c3c09c1f8"
+    },
+    {
+      "path": "raw-recovery-minimal.log",
+      "sha256": "c7a8696811857b6966c0872bce52d3a442feb38c1f7e5e29dff5aa68ad1592d8"
+    },
+    {
+      "path": "raw-recovery-root.log",
+      "sha256": "3dc995c54fd1b08801a859bc2ea3ce1f79fbb2e3aae1e6cc0194e59db6c77cbd"
+    },
+    {
+      "path": "raw-recovery-gui-normal.log",
+      "sha256": "75dc357619beff979f09bdf8e69360661d814dc4c6fb28a696b0b06f44065a63"
+    },
+    {
+      "path": "raw-recovery-gui-compact.log",
+      "sha256": "f9115ff388087d1070dac84eb1d087579737190d2c61d129516572b4c011acb8"
+    }
+  ]
+}

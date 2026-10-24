@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""Actual pinned target codec parity on an approved HTTP fallback, not inference."""
+import hashlib
+import http.client
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+from pathlib import Path
+import secrets
+import sys
+import tempfile
+import threading
+from urllib.parse import urlsplit
+from probe_http_provider_matrix import serving, fixture_response, sdk_stream
+
+
+def main():
+    root = Path(sys.argv[1]).resolve(); sys.path.insert(0, str(root))
+    import httpx
+    import openai
+    import anthropic
+    from agent.transports import get_transport
+    from haos.provider_profiles import register_profiles
+    from haos.provider_routes import ProviderRoutes
+    from haos.provider_proxy import Broker, Credentials, UsageLedger
+    from haos.provider_registry import default_endpoint
+    scenario = sys.argv[3] if len(sys.argv) == 4 else 'reasoning'
+    streaming = scenario.endswith('-stream')
+    name = scenario.removesuffix('-stream')
+    assert name in {'reasoning', 'developer', 'responses', 'messages', 'vertex', 'reserved-tools', 'reserved-tools-reverse', 'context-aliases'}
+    mode = {'context-aliases': 'codex_responses', 'reserved-tools-reverse': 'codex_responses', 'reserved-tools': 'codex_responses', 'responses': 'codex_responses', 'messages': 'anthropic_messages'}.get(name, 'chat_completions')
+    providers = {'reasoning': ('openrouter', 'openai-api'), 'developer': ('openai-api', 'deepseek'),
+        'context-aliases': ('openai-api', 'openrouter'), 'reserved-tools-reverse': ('openai-api', 'openrouter'), 'reserved-tools': ('openrouter', 'openai-api'), 'vertex': ('vertex', 'openai-api'), 'responses': ('openai-api', 'openrouter'), 'messages': ('anthropic', 'minimax') }[name]
+    models = {'source': 'gpt-5', 'target': 'deepseek-chat'} if name == 'developer' else (
+        {'source': 'claude-opus-4-6', 'target': 'MiniMax-M2.7'} if name == 'messages' else {'source': 'model-source', 'target': 'model-target'})
+    if name == 'context-aliases': models = {'source': 'gpt-5.4-900k', 'target': 'gpt-6-sol-900k'}
+    if name == 'vertex': models = {'source': 'gemini-3-flash-preview', 'target': 'gpt-4.1'}
+    alias_checks = 0
+    if name == 'context-aliases':
+        from agent.model_metadata import strip_codex_context_variant_suffix
+        from haos.provider_messages import admit
+        from haos.provider_policy import ProviderPolicy
+        for owner in ('gpt-5.4-900k', 'gpt-5.6-sol-900k', 'gpt-5.6-terra-900k', 'gpt-5.6-luna-900k',
+                'gpt-6-sol-900k', 'gpt-6-luna-900k', 'gpt-6-astra-900k', 'gpt-daybreak-blue-latest-900k',
+                'openai/gpt-5.6-sol-2026-07-09-900k', 'gpt-6-sol-2026-09-22-900k', 'gpt-5.5-900k'):
+            policy = ProviderPolicy({'version': 1, 'provider': 'openai-api', 'endpoint': default_endpoint('openai-api'),
+                'models': [owner], 'default_model': owner, 'api_mode': 'codex_responses',
+                'requests_per_day': 200, 'requests_per_minute': 120})
+            native = strip_codex_context_variant_suffix(owner)
+            for model in (owner, native):
+                request = {'model': model, 'input': []}
+                assert admit(policy, '/v1/responses', request)['model'] == native
+                assert request['model'] == model
+                alias_checks += 1
+            for change in ({'model': 'unapproved-model'}, {'model': [native]},
+                    {'tools': [{'type': 'web_search'}]}, {'extra_headers': {'Authorization': 'untrusted'}}):
+                try: admit(policy, '/v1/responses', {'model': native, 'input': [], **change})
+                except (PermissionError, ValueError): alias_checks += 1
+                else: raise AssertionError('Responses alias broadened owner authority')
+            try: admit(policy, '/v1/messages', {'model': native, 'input': []})
+            except PermissionError: alias_checks += 1
+            else: raise AssertionError('Responses alias broadened the approved protocol')
+            if native == owner:
+                try: admit(policy, '/v1/responses', {'model': owner.removesuffix('-900k'), 'input': []})
+                except PermissionError: alias_checks += 1
+                else: raise AssertionError('unsupported picker alias admitted another model')
+    routes = ProviderRoutes({'version': 2, 'default': 'source', 'routes': {
+        key: {'version': 1, 'provider': provider, 'endpoint': ('https://us-central1-aiplatform.googleapis.com/v1beta1/projects/fixture-project/locations/us-central1/endpoints/openapi'
+                if provider == 'vertex' else default_endpoint(provider)),
+            'models': [models[key]], 'default_model': models[key], 'api_mode': mode,
+            'requests_per_day': 200, 'requests_per_minute': 120} for key, provider in zip(('source', 'target'), providers)},
+        'fallbacks': {'source': ['target']}})
+    register_profiles(routes.data)
+    messages = [{'role': 'assistant', 'content': 'prior fixture', 'reasoning_details': [
+        {'type': 'reasoning.encrypted', 'data': 'opaque source fixture'}]}, {'role': 'user', 'content': 'continue fixture'}]
+    if name == 'developer':
+        messages = [{'role': 'system', 'content': 'system fixture'}, {'role': 'user', 'content': 'continue fixture'}]
+    tools = [{'type': 'function', 'function': {'name': 'fixture', 'parameters': {'type': 'object'}}}]
+    if name.startswith('reserved-tools'):
+        tools = [{'type': 'function', 'function': {'name': value, 'parameters': {'type': 'object'}}}
+            for value in ('tool_search', 'hermes_tool_search')]
+    config = routes.client_config()
+    def wire(key, transport=None):
+        return (transport or get_transport(mode)).build_kwargs(models[key], messages, tools,
+            base_url=config['providers']['haos-' + key]['base_url'], max_tokens=64,
+            reasoning_config={'enabled': True, 'effort': 'high'} if name == 'vertex' else None)
+    # Normalize on the exact native instance that built the source request;
+    # collision suffixes live in its request-local reverse alias map.
+    normalizer = get_transport(mode)
+    source_body = wire('source', normalizer)
+    target_body = wire('target')
+    wire_models = {'source': source_body['model'], 'target': target_body['model']}
+    if name == 'reasoning':
+        assert 'reasoning_details' in source_body['messages'][0]
+        assert 'reasoning_details' not in target_body['messages'][0]
+    elif name == 'developer':
+        assert source_body['messages'][0]['role'] == 'developer' and target_body['messages'][0]['role'] == 'system'
+    keys = {key: secrets.token_urlsafe(40) for key in routes.routes}
+    calls, failures = [], []
+    finished = threading.Event()
+    release = threading.Event()
+    class Ledger(UsageLedger):
+        def finish(self, *args):
+            super().finish(*args)
+            if self.db.execute('SELECT COUNT(status) FROM requests').fetchone()[0] == 2:
+                finished.set()
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_): pass
+        def do_POST(self):
+            try:
+                data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                key = next(key for key, model in wire_models.items() if model == data['model']); calls.append(key)
+                assert 'haos_fallback_context' not in json.dumps(data)
+                if mode == 'anthropic_messages' and key == 'source':
+                    assert self.headers['x-api-key'] == keys[key]
+                else:
+                    assert self.headers['Authorization'] == 'Bearer ' + keys[key]
+                if key == 'source':
+                    field = 'input' if mode == 'codex_responses' else 'messages'
+                    assert data[field] == source_body[field]
+                    assert data.get('stream', False) == streaming
+                    encoded = b'{}'; status = 503
+                else:
+                    expected = dict(target_body); expected.update(expected.pop('extra_body', {}) or {})
+                    expected.pop('extra_headers', None)
+                    expected.pop('timeout', None)
+                    expected.update(stream=streaming)
+                    if mode != 'anthropic_messages': expected['store'] = False
+                    assert data == expected, 'fallback did not use the pinned target request codec'
+                    wire_tool = data['tools'][0]
+                    tool_name = wire_tool.get('name') or wire_tool['function']['name']
+                    result, early, terminal = fixture_response(mode, wire_models['target'], tool_name, 'target fixture')
+                    if streaming:
+                        self.send_response(200); self.send_header('Content-Type', 'text/event-stream')
+                        self.send_header('Connection', 'close'); self.end_headers()
+                        def frame(value):
+                            event = ('event: ' + value['type'] + '\n') if mode != 'chat_completions' and isinstance(value, dict) else ''
+                            data = value if isinstance(value, str) else json.dumps(value)
+                            self.wfile.write((event + 'data: ' + data + '\n\n').encode()); self.wfile.flush()
+                        for value in early: frame(value)
+                        assert release.wait(5), 'fallback SDK buffered early text until completion'
+                        for value in terminal: frame(value)
+                        self.close_connection = True
+                        return
+                    encoded = json.dumps(result).encode(); status = 200
+                self.send_response(status); self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(encoded))); self.end_headers(); self.wfile.write(encoded)
+            except BaseException as error:
+                failures.append(type(error).__name__)
+                raise
+    original = http.client.HTTPSConnection
+    with serving(ThreadingHTTPServer(('127.0.0.1', 0), Fixture)) as port, tempfile.TemporaryDirectory() as directory:
+        def local(host, port_number=443, **kwargs):
+            assert port_number == 443 and host in {urlsplit(row.endpoint).hostname for row in routes.routes.values()}
+            return http.client.HTTPConnection('127.0.0.1', port, timeout=kwargs.get('timeout', 5))
+        http.client.HTTPSConnection = local
+        ledger = Ledger(Path(directory) / 'usage.db'); capability = secrets.token_urlsafe(48)
+        try:
+            credentials = {key: Credentials(row, {'api_key': None if row.provider == 'vertex' else keys[key]}) for key, row in routes.routes.items()}
+            if name == 'vertex':
+                from google.oauth2.credentials import Credentials as GoogleCredentials
+                credentials['source'].cloud_cache['credential'] = GoogleCredentials(token=keys['source'])
+            with serving(Broker(('127.0.0.1', 0), routes, capability, credentials, ledger)) as broker:
+                cls = anthropic.Anthropic if mode == 'anthropic_messages' else openai.OpenAI
+                base = f'http://127.0.0.1:{broker}/routes/source' + ('' if mode == 'anthropic_messages' else '/v1')
+                with cls(api_key=capability, base_url=base,
+                        max_retries=0, timeout=10, http_client=httpx.Client(trust_env=False)) as client:
+                    call = (client.messages.create if mode == 'anthropic_messages' else
+                        client.responses.create if mode == 'codex_responses' else client.chat.completions.create)
+                    if streaming:
+                        events = []; first = False
+                        with sdk_stream(client, mode, call, source_body, accumulate=mode != 'chat_completions') as stream:
+                            for event in stream:
+                                encoded = event.model_dump_json(); events.append(encoded)
+                                if not first and 'target fixture' in encoded:
+                                    assert not release.is_set()
+                                    first = True; release.set()
+                            if mode != 'chat_completions':
+                                response = stream.get_final_response() if mode == 'codex_responses' else stream.get_final_message()
+                                normalized = normalizer.normalize_response(response)
+                                assert normalized.content == 'target fixture'
+                                assert normalized.tool_calls[0].name == tools[0]['function']['name']
+                        assert first and 'fixture' in ''.join(events) and 'call_fixture' in ''.join(events)
+                    else:
+                        response = call(**source_body)
+                        normalized = normalizer.normalize_response(response)
+                        assert normalized.content == 'target fixture'
+                        assert normalized.tool_calls[0].name == tools[0]['function']['name']
+            assert finished.wait(5)
+            assert ledger.db.execute('SELECT status,input_tokens,output_tokens FROM requests ORDER BY rowid').fetchall() == [(503, None, None), (200, 8, 5)]
+            assert calls == ['source', 'target'] and not failures
+        finally:
+            http.client.HTTPSConnection = original
+            ledger.close()
+    result = {'scenario': scenario, 'actual_pinned_source_and_target_request_codecs': True, 'approved_broker_http_hops': calls,
+        'target_uses_its_own_key_and_model': True, 'early_stream_before_terminal_tested': streaming, 'opaque_source_only_reasoning_not_forwarded': True if name == 'reasoning' else None,
+        'actual_native_model_alias_positive_negative_checks': alias_checks,
+        'live_provider_tested': False, 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (
+            Path(__file__), root / 'haos/provider_proxy.py', root / 'haos/provider_policy.py', root / 'haos/provider_fallback.py', root / 'haos/provider_profiles.py', root / 'haos/provider_messages.py')}}
+    Path(sys.argv[2]).write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps(result))
+
+
+if __name__ == '__main__': main()

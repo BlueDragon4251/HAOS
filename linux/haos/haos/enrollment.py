@@ -45,7 +45,7 @@ def protected_directory(path):
 def validate_name(user, observer):
     if not isinstance(user, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", user):
         raise ValueError("owner username must be a simple lowercase account name")
-    if user.startswith('haos-a-') or user in {"root", "hermes", "haos-agent", "haos-control", "haos-gateway", "haos-provider", "haos-viewer", observer}:
+    if user.startswith('haos-a-') or user in {"root", "hermes", "haos-agent", "haos-control", "haos-gateway", "haos-provider", "haos-provider-acp", "haos-viewer", observer}:
         raise PermissionError("owner must be separate from observer and service accounts")
     try:
         pwd.getpwnam(user)

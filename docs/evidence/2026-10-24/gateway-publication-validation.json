@@ -1,0 +1,96 @@
+{
+  "base_commit": "ec6e16b",
+  "full_tests": {
+    "passed": 979,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 979,
+    "existing_skips": 2
+  },
+  "actual_root_and_kernel_socket_tests": 17,
+  "container": {
+    "image": "python:3.11-slim-bookworm",
+    "image_id": "sha256:141fe9b385f3bb6d618c07ace1836c0b3c72bf525566ac3eb13cd1f405069877",
+    "network": "none",
+    "repository_mount": "read-only",
+    "host_configuration_changed": false
+  },
+  "durable_stage_fault_injection": [
+    "journal",
+    "withdrawal",
+    "credentials",
+    "policy"
+  ],
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "gui_action": "recover-configuration",
+  "fixture_not_installed_or_external_delivery_acceptance": true,
+  "all_five_predecessor_ci_gates_successful": "1682f67653db1e239d3a618c5f514561a1ac8306",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "b5e26ec7fbb982c27202046f9c7c65a173ce797091cf873fc896cbbcf85c6fec"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "fab2fa751d5bbcfc6d018658542eff644826a653ecef49353cca59c2cda4b253"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "824a29f927d1a0ea82d5bd24dea677f6bec9532436896f30af6988c2d65b3df0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "44ab4cbedcb3b36ed6f758ac2665be4d7eab94658246ee2b42fc19b6c582c94f"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "8c88fc03fa5108dd4a8dd7cedda651ce555d072ad66073e2767b17673c74ab9a"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "a72dbc41ccc41369f60786bbfe3545a84ffbcd05f701f72bbf9cca4e3e9b91f7"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "638d3251fec0088002585f16b39db99bdd8f8b2963e6b9bd6c482b985b8f0b86"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_publication.py",
+      "sha256": "5fb5e8abb083de25b011b0dec174f55afe7149217d52864a97f3b25eb7fc2c8f"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "172ddb1eb10a8d545da1f9282964cc994a5a992f0c37bd638de0180de1504184"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "192fcb194c46755d9ed1bedf3a4e9cfd9cb75aaf72a0858b1285818516cd0f35"
+    }
+  ],
+  "logs": {
+    "root-final": {
+      "sha256": "f0c78a13935758cefbf20135044b02538d372b09384ef57fc33358b4d1c87ab1",
+      "result": "17 passed in 0.61s"
+    },
+    "gui-normal": {
+      "sha256": "75dc357619beff979f09bdf8e69360661d814dc4c6fb28a696b0b06f44065a63",
+      "result": "All seven native HAOS setup pages and live operation state rendered under Xvfb"
+    },
+    "gui-compact": {
+      "sha256": "f9115ff388087d1070dac84eb1d087579737190d2c61d129516572b4c011acb8",
+      "result": "All seven setup pages render within a 640x480 X screen"
+    },
+    "full": {
+      "sha256": "0f816ac60dd786a69c34f9fd0cf7a202dde6fc72133b837173836f148cf9c05b",
+      "result": "979 passed, 2 skipped in 6.95s"
+    },
+    "minimal": {
+      "sha256": "1ebbe0901caaec743732289eae05b41f565a2c09fa05a1e79b57ca49ce22a3c9",
+      "result": "979 passed, 2 skipped in 7.04s"
+    }
+  }
+}

@@ -14,6 +14,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from haos.gateway import GatewayEngine, GatewayPolicy
 from haos.store import MissionStore
+from haos.gateway_raw import NativeInbox
+from haos.redaction import Redactor
 
 
 @pytest.fixture
@@ -25,8 +27,77 @@ def uid_fixture_path():
         yield Path(directory)
 
 
+@pytest.mark.parametrize('decision',['retry','discard'])
+@pytest.mark.parametrize('platform',['discord','mattermost'])
+def test_native_ingress_recovery_uses_actual_private_gateway_uid(uid_fixture_path,decision,platform):
+    root=uid_fixture_path; root.chmod(0o755)
+    modules=root/'modules'; modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    state=root/'state';state.mkdir(mode=0o700)
+    database=state/'native.db'
+    config={'version':1,'connectors':[{'id':'bot','platform':'discord'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':'42','chat':'123','scope':'999','thread':'',
+         'identity':'principal','capabilities':['create','read'],'generation':'a'*64}]}
+    if platform=='mattermost':
+        config['connectors'][0]['platform']='mattermost'
+        config['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
+    source=config['bindings'][0]
+    inbox=NativeInbox(database,Redactor())
+    key=inbox.admit(GatewayPolicy(config),'bot',{'platform':platform,'sender':source['sender'],'chat':source['chat'],
+        'scope':source['scope'],'thread':'','message_id':'m'*26 if platform=='mattermost' else '101','is_bot':False,'text':'private incoming fixture'},
+        {'content':'private incoming fixture'})
+    if platform=='mattermost':
+        from types import SimpleNamespace
+        from haos.gateway_mattermost import transport_status
+        transport_status(SimpleNamespace(_haos_native=SimpleNamespace(inbox=inbox,connector='bot')),'authentication-refused')
+    inbox.db.execute("UPDATE native_inbox SET state='failed',attempt=8")
+    inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    canary=root/'owner-secret';canary.write_text('root-only-disposable-canary');canary.chmod(0o600)
+    payload={'path':str(database),'canary':str(canary),'policy':config,'request':{
+        'ingress_id':key,'attempt':8,'state':'failed','decision':decision,'owner_uid':1000,'note_sha256':'b'*64}}
+    code='''
+import json,os,sys
+from pathlib import Path
+from haos.gateway import GatewayPolicy
+from haos.gateway_raw import NativeInbox
+from haos.gateway_raw_recovery import reconcile,unresolved
+from haos.redaction import Redactor
+d=json.load(sys.stdin)
+assert os.geteuid()==65534 and os.getegid()==65534 and os.getgroups()==[]
+try: Path(d['canary']).read_bytes()
+except PermissionError: pass
+else: raise AssertionError('gateway UID read owner secret')
+inbox=NativeInbox(Path(d['path']),Redactor())
+try:
+    metadata=unresolved(inbox)
+    assert len(metadata['ingress'])==1
+    if d['policy']['connectors'][0]['platform']=='mattermost':
+        assert metadata['transport'][0]['status']=='authentication-refused'
+    result=reconcile(inbox,GatewayPolicy(d['policy']),d['request'])
+    row=inbox.db.execute('SELECT payload FROM native_inbox').fetchone()
+    assert json.loads(row[0])['content']=='private incoming fixture'
+    event=inbox.db.execute('SELECT owner_uid,decision FROM native_owner_events').fetchone()
+    assert tuple(event)==(1000,d['request']['decision'])
+finally: inbox.close()
+print(json.dumps({'uid':os.geteuid(),'owner_secret_denied':True,'result':result}))
+'''
+    completed=subprocess.run([sys.executable,'-c',code],input=json.dumps(payload),text=True,capture_output=True,
+        timeout=15,user=65534,group=65534,extra_groups=[],umask=0o077,cwd=root,
+        env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(modules),'PYTHONDONTWRITEBYTECODE':'1'})
+    assert completed.returncode==0,'actual unprivileged native ingress recovery failed'
+    report=json.loads(completed.stdout)
+    assert report['uid']==65534 and report['owner_secret_denied']
+    assert report['result']['state']==('pending' if decision=='retry' else 'discarded')
+    assert 'root-only-disposable-canary' not in completed.stdout+completed.stderr
+
+
 @pytest.mark.parametrize("decision", ["retry", "delivered", "discard"])
-def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision):
+@pytest.mark.parametrize('platform',['telegram','slack','mattermost'])
+def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision,platform):
     tmp_path = uid_fixture_path
     assert os.geteuid() == 0, "run this explicit UID fixture as root"
     tmp_path.chmod(0o755)
@@ -44,10 +115,17 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     config = {"version": 1, "connectors": [{"id": "first", "platform": "telegram"}],
               "bindings": [{"id": "device", "connector": "first", "sender": "42", "chat": "42", "scope": "",
                             "thread": "", "identity": "principal", "capabilities": ["create", "read"]}]}
+    if platform=='slack':
+        config['connectors'][0]['platform']='slack'
+        config['bindings'][0].update(sender='U42',chat='D42',scope='T999')
+    if platform=='mattermost':
+        config['connectors'][0]['platform']='mattermost'
+        config['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
     policy = GatewayPolicy(config)
     engine = GatewayEngine(store)
-    mission = asyncio.run(engine.receive(policy, "first", {"platform": "telegram", "sender": "42", "chat": "42",
-        "scope": "", "thread": "", "message_id": "1", "is_bot": False, "text": "Local UID fixture"}, None))
+    source=config['bindings'][0]
+    mission = asyncio.run(engine.receive(policy, "first", {"platform": platform,"sender":source['sender'],"chat":source['chat'],
+        "scope":source['scope'],"thread":"","message_id":"1","is_bot":False,"text":"Local UID fixture"},None))
     delivery = engine.next_delivery(policy)
     engine.acknowledge(policy, delivery["id"], {"attempt": 1, "status": "uncertain"})
     store.close()
@@ -60,7 +138,7 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     canary.chmod(0o600)
     payload = {"path": str(path), "canary": str(canary), "policy": config,
                "request": {"delivery_id": delivery["id"], "attempt": 1, "decision": decision, "owner_uid": 1000,
-                           "note_sha256": "a" * 64, "receipt": "42" if decision == "delivered" else None,
+                           "note_sha256": "a" * 64, "receipt": ("1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
                            "confirmed_not_delivered": decision == "retry"}}
     code = '''
 import json,os,sys

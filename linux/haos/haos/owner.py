@@ -37,6 +37,21 @@ def audit(kind: str, details: dict):
         os.close(fd)
 
 
+def runtime_action(verb):
+    """Fixed owner action shared by console and trusted local management UI."""
+    if os.geteuid()!=0:raise PermissionError('runtime management requires authenticated owner authority')
+    if verb not in {'stop','start'}:raise ValueError('invalid owner runtime action')
+    units=['haos-controller.service','haos-hermes.service','haos-policy.service']
+    if verb=='stop':subprocess.run(['/usr/bin/systemctl','stop','haos-gateway.service'],check=True,timeout=60)
+    if verb=='start' and Path('/etc/haos/provider.json').exists():
+        subprocess.run(['/usr/bin/systemctl','start','haos-provider.socket'],check=True,timeout=60)
+    subprocess.run(['/usr/bin/systemctl',verb,*units],check=True,timeout=60)
+    if verb=='stop':
+        subprocess.run(['/usr/bin/systemctl','stop','haos-provider.socket','haos-provider.service'],check=True,timeout=60)
+    else:subprocess.run(['/usr/bin/systemctl','start','haos-gateway.service'],check=True,timeout=60)
+    audit('runtime.'+verb,{})
+
+
 def _kernel_virtual_terminal(device: str) -> bool:
     """Only actual Linux kernel VTs, never pseudo-terminals, symlinks or serial TTYs."""
     if not isinstance(device, str) or not device.startswith("/dev/tty"):
@@ -152,11 +167,11 @@ def main():
     applications_sub.add_parser("revoke").add_argument("id")
     gateway = sub.add_parser("gateway", help="owner-authenticated transport credentials and exact sender pairing")
     gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
-    for action in ("status", "start", "stop"):
+    for action in ("status", "start", "stop", "recover-configuration"):
         gateway_sub.add_parser(action)
     setup = gateway_sub.add_parser("setup")
     setup.add_argument("connector")
-    setup.add_argument("platform", choices=["telegram", "discord"])
+    setup.add_argument("platform", choices=["telegram", "discord", "slack", "mattermost"])
     pair = gateway_sub.add_parser("pair")
     pair.add_argument("binding")
     pair.add_argument("connector")
@@ -172,6 +187,14 @@ def main():
     remove.add_argument("connector")
     deliveries = gateway_sub.add_parser("deliveries", help="list unresolved outbox metadata with all runtime services stopped")
     deliveries.add_argument("--after", type=int, default=0)
+    ingress = gateway_sub.add_parser('ingress', help='list unresolved private native input with gateway service stopped')
+    ingress.add_argument('--after', type=int, default=0)
+    recover_ingress = gateway_sub.add_parser('reconcile-ingress', help='owner retries failed decoding or preserves discarded input')
+    recover_ingress.add_argument('ingress_id')
+    recover_ingress.add_argument('--attempt', type=int, required=True)
+    recover_ingress.add_argument('--state', choices=['pending','processing','failed','expired','revoked'], required=True)
+    recover_ingress.add_argument('--decision', choices=['retry','discard'], required=True)
+    recover_ingress.add_argument('--note', required=True, help='non-secret inspection evidence; only its digest is retained')
     delivery = gateway_sub.add_parser("reconcile-delivery", help="record inspected delivery; never blindly resend an uncertain reply")
     delivery.add_argument("delivery_id")
     delivery.add_argument("--attempt", type=int, required=True)
@@ -195,11 +218,25 @@ def main():
     provider_sub = provider.add_subparsers(dest="provider_action", required=True)
     for action in ("status", "stop", "disable", "login-codex", "logout-codex"):
         provider_sub.add_parser(action)
+    from .provider_registry import account_providers
+    for action in ("login", "logout", "auth-status"):
+        auth_action = provider_sub.add_parser(action)
+        auth_action.add_argument("provider", choices=sorted(account_providers()))
+        auth_action.add_argument("--region", choices=["global", "cn"], default="global",
+                                 help="MiniMax account region; other providers require global")
+    for action in ("set-default", "fallbacks", "remove"):
+        route_action = provider_sub.add_parser(action)
+        route_action.add_argument("route")
+        if action == "fallbacks":
+            route_action.add_argument("--fallback", action="append", default=[])
+    ensemble = provider_sub.add_parser("ensemble")
+    ensemble.add_argument("name")
     configure = provider_sub.add_parser("configure")
-    configure.add_argument("provider", choices=["openai-codex", "openai", "openrouter", "local"])
+    from .provider_policy import ENDPOINTS
+    configure.add_argument("provider", choices=sorted({*ENDPOINTS, "local", "lmstudio"}))
     configure.add_argument("--model", required=True)
     configure.add_argument("--allow-model", action="append", default=[])
-    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions"])
+    configure.add_argument("--api-mode", choices=["codex_responses", "chat_completions", "anthropic_messages"])
     configure.add_argument("--endpoint", help="local loopback /v1 endpoint; remote endpoints are fixed")
     configure.add_argument("--requests-per-day", type=int, default=200)
     configure.add_argument("--requests-per-minute", type=int, default=30)
@@ -318,18 +355,7 @@ def main():
         print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory(),
                           "runtime_volumes": trusted_json(runtime) if runtime.exists() or runtime.is_symlink() else None}, indent=2))
     elif args.action in {"stop", "start"}:
-        verb = args.action
-        units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]
-        if verb == "stop":
-            subprocess.run(["/usr/bin/systemctl", "stop", "haos-gateway.service"], check=True)
-        if verb == "start" and Path("/etc/haos/provider.json").exists():
-            subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"], check=True)
-        subprocess.run(["/usr/bin/systemctl", verb, *units], check=True)
-        if verb == "stop":
-            subprocess.run(["/usr/bin/systemctl", "stop", "haos-provider.socket", "haos-provider.service"], check=True)
-        if verb == "start":
-            subprocess.run(["/usr/bin/systemctl", "start", "haos-gateway.service"], check=True)
-        audit(f"runtime.{verb}", {})
+        runtime_action(args.action)
     elif args.action == "volume":
         stopped()
         policy = trusted_json(Path("/etc/haos/volumes.json"))

@@ -1,0 +1,39 @@
+{
+  "actual_sdk_http_history_recovery_cases": [
+    "failed durable admission leaves actual SDK history cursor unchanged",
+    "only approved post-grant messages admitted; older and unknown-sender messages excluded",
+    "reopened durable history input reaches native SDK decoder and HAOS relay once",
+    "crash after raw commit before cursor update retains idempotent recovery",
+    "revocation while actual HTTP request is outstanding prevents admission",
+    "repaired grant starts after its new boundary and cannot revive historic input",
+    "legacy grant without original boundary performs no automatic history fetch",
+    "original snowflake time survives commit; expired missed input retained without execution",
+    "future provider identity cannot skip the durable history cursor",
+    "three actual reversed REST pages advance only across committed or definitively refused input",
+    "actual SDK permission refusal persists safe status visible to owner recovery"
+  ],
+  "external_discord_connected": false,
+  "deleted_remote_messages_recoverable": false,
+  "source_files": [
+    {
+      "path": "probe_discord_history.py",
+      "sha256": "744eadd9d48a4a780ff6e7b7530451e3c6aaa0c12d8ea6d4c0d428c653159765"
+    },
+    {
+      "path": "gateway_discord_history.py",
+      "sha256": "71ebf3843d3f98fefcac7ca2cf4005905cf15859a68481a883a184f2819104e0"
+    },
+    {
+      "path": "gateway.py",
+      "sha256": "d7bb9d10b8d1257cb6d87f38f03495cea2049fdadf586d1be577077977ce1a6a"
+    },
+    {
+      "path": "gateway_setup.py",
+      "sha256": "2099e491607a612af0b148ad83aa11ddc39056f2b437ebb682d06f0bdeda4a1e"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "afd3bd07a90418518185e766b0a5d8f557a668ed07708357c244b4e468ae38c0"
+    }
+  ]
+}

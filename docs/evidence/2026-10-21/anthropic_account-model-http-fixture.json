@@ -1,0 +1,37 @@
+{
+  "model_fixture_source_sha256": {
+    "probe_anthropic_account.py": "db15782e71ec5accad1ca8171a6cd81b21a53821234af2a12ea02e0443fbe20e",
+    "probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "actual_authorized_account_broker_sdk_model_cases": [
+    "json",
+    "stream",
+    "abort",
+    "401",
+    "429"
+  ],
+  "model_case_count": 5,
+  "actual_native_anthropic_account_cases": [
+    "success",
+    "bad-state",
+    "empty-code",
+    "denied",
+    "missing-token",
+    "non-json",
+    "short-body"
+  ],
+  "case_count": 7,
+  "actual_pkce_state_private_pool_expiry_refresh_broker_status_logout": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_anthropic_account.py",
+      "sha256": "db15782e71ec5accad1ca8171a6cd81b21a53821234af2a12ea02e0443fbe20e"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "fcd72c6ff721bd2509213addf9137b534582d9c1fc9367f38512892896d962e5"
+    }
+  ]
+}

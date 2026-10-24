@@ -1,0 +1,23 @@
+{
+  "passed": 17,
+  "cases": [
+    "native_exact_flat_receipt",
+    "native_exact_thread_receipt",
+    "native_single_post_400",
+    "native_single_post_401",
+    "native_single_post_403",
+    "native_single_post_404",
+    "native_single_post_413",
+    "native_single_post_429",
+    "native_single_post_500",
+    "native_single_post_302",
+    "wrong_route_201_stays_uncertain",
+    "lost_http_receipt_stays_uncertain",
+    "partial_chunk_then_refusal_stays_uncertain",
+    "revoke_between_chunks_never_posts_again",
+    "actual_team_mismatch_no_post",
+    "forged_binding_generation_no_post",
+    "real_connector_refusal_before_post_can_retry"
+  ],
+  "external_connections": false
+}

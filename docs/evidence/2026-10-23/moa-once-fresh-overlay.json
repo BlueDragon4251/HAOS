@@ -1,0 +1,8 @@
+{
+  "upstream_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "fresh_original_sha256": "e83807074f3577ac3980f43bfd578ffcc95efb591e38a9427d0e7d33ec7d8e4a",
+  "derived_sha256": "4d2aee9ceb4f0274705f55ec8374251d1382018f96345d9290d2817e32f44c40",
+  "check_only_preserves_original": true,
+  "prepared_runtime_matches_fresh_derivation": true,
+  "dependency_versions_changed": false
+}

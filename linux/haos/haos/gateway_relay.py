@@ -37,9 +37,10 @@ class RelayInbox:
         fingerprint = digest(envelope)
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            old = self.db.execute("SELECT fingerprint FROM inbox WHERE id=?", (key,)).fetchone()
+            old = self.db.execute("SELECT fingerprint,binding_id,binding_digest FROM inbox WHERE id=?", (key,)).fetchone()
             if old:
-                if old[0] != fingerprint:
+                if (old["fingerprint"] != fingerprint or old["binding_id"] != binding["id"]
+                        or old["binding_digest"] != digest(binding)):
                     raise Conflict("transport replay changed content")
             else:
                 if self.db.execute("SELECT COUNT(*) FROM inbox WHERE state='pending'").fetchone()[0] >= 4096:

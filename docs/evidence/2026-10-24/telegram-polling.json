@@ -1,0 +1,23 @@
+{
+  "native_disconnect_holds_then_reconnects": false,
+  "native_drop_pending_request_forced_false": true,
+  "actual_ptb_getupdates_offsets": [
+    0,
+    0,
+    13,
+    13
+  ],
+  "real_sqlite_insert_failure_then_sdk_retry": 1,
+  "offset_advanced_only_after_independent_sqlite_reader_saw_commit": true,
+  "unknown_sender_not_admitted": true,
+  "shutdown_cancelled_fixture_polls": 1,
+  "actual_native_adapter_text_codec_and_application_handlers": true,
+  "external_telegram_connected": false,
+  "legacy_native_receipts_preserved_and_not_trusted_for_admission": true,
+  "source_sha256": {
+    "probe_telegram_polling.py": "27a5f6c659edcdebfa51f33be0895becdd5051ab162c6fc94056aa021034d3b2",
+    "gateway_telegram.py": "421b2db7e95c33c03e29c4a3ee387b6f653a04fe2977af84d52b9790fe8f4f6a",
+    "gateway_ingress.py": "1d239ccfb5900c9ee89fe249f9a01c19e761b9416937edd60a9f9f6180859846",
+    "gateway_runtime.py": "f26c927c5f3db2b4fa4b3d57d0b14294b3abb07b31344c516c1e12a7d6eaeae3"
+  }
+}
