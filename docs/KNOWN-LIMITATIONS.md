@@ -5,8 +5,9 @@
   private bot/app tokens, durable capture before Socket Mode ACK, actual SDK
   reconnect, reviewed outgoing certainty and platform-specific owner recovery.
   These are local SDK/HTTP/WebSocket/kernel contracts, not live provider or
-  external delivery acceptance. Slack history recovery beyond the remote retry
-  window, complete media/voice, nineteen further gateways, Android continuous
+  external delivery acceptance. Owner-bounded Slack history recovery now has
+  actual local SDK/HTTP/SQLite proof; remote retention and permissions remain
+  prerequisites. Complete media/voice, nineteen further gateways, Android continuous
   desktop control, optional phone firstboot and consistent installed artifacts
   remain open. Exact sources: `evidence/2026-10-24/slack-owner-delivery-validation.json`.
 

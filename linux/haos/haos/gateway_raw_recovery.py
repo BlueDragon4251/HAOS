@@ -42,6 +42,12 @@ def unresolved(inbox, after=0):
                     {'ready','permission-denied','rate-limited','transport-unavailable','storage-unavailable','invalid-source'}):
                 raise ValueError('invalid history status metadata')
             history.append(dict(row))
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='slack_history'").fetchone():
+        for row in inbox.db.execute('SELECT binding_digest,status,updated_at FROM slack_history ORDER BY updated_at DESC LIMIT 512'):
+            if (not re.fullmatch('[0-9a-f]{64}',row['binding_digest']) or row['status'] not in
+                    {'ready','permission-denied','rate-limited','transport-unavailable','storage-unavailable','invalid-source'}):
+                raise ValueError('invalid Slack history status metadata')
+            history.append({**dict(row),'platform':'slack'})
     return {'ingress':result,'history':history,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 

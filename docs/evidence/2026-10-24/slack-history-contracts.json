@@ -1,0 +1,35 @@
+{
+  "actual_sdk_http_history_cases": [
+    "real SDK descending pages retain one window; failed raw commit cannot advance page cursor",
+    "only exact authorized post-grant messages are captured; boundary equality and unknown sender refused",
+    "reopened raw input uses actual native decoder once; overlapping inclusive windows remain idempotent",
+    "crash after raw commit before provider cursor write replays without duplicate retained input",
+    "actual SDK invalid-cursor refusal restarts the same retained window safely",
+    "real SDK rate-limit delay survives scheduling and fixed permission status is owner-visible",
+    "root grant is rechecked after real HTTP completes, before admission or cursor advancement",
+    "repaired grants start a fresh boundary and legacy grants do not fetch historic conversations",
+    "original provider timestamp is atomic and expired missed messages stay retained without execution",
+    "future or out-of-window provider data cannot advance committed history floor",
+    "actual SDK replies endpoint and native decoder preserve exact thread grant; parent is not a flat grant"
+  ],
+  "external_slack_connected": false,
+  "remote_retention_deleted_messages_recoverable": false,
+  "source_files": [
+    {
+      "path": "probe_slack_history.py",
+      "sha256": "350ce4c8d5a43f4d1b2a5d5ed54f37e87f5886a5578d31b6f29e293737689d74"
+    },
+    {
+      "path": "gateway_slack_history.py",
+      "sha256": "30fc130e62e81ff5af03cf5969ea002a836f7c61d32eb4634ded8c42d11ca08e"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "791f94eb4b10286d5ca7a6054cf1736ff0fadef2815199b748f8d411b9874e93"
+    },
+    {
+      "path": "gateway_raw_recovery.py",
+      "sha256": "798fe04baf347eb98e61a7459208ad7db8630992f8af95829866924544f71a42"
+    }
+  ]
+}

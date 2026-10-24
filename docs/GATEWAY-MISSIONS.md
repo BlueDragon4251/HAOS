@@ -557,3 +557,35 @@ No external Slack account, permission grant or message has been tested. Captured
 input survives local outages, but Slack messages never delivered beyond its
 remote retry window still need a separate history-recovery path. Full media,
 voice and additional gateways remain open. No stable distribution is accepted.
+
+## Slack history recovery within exact owner grants (2026-10-24)
+
+The private gateway now also recovers permitted channel/DM history and exact
+thread replies through its actual authenticated native SDK client. Each grant
+has an independent durable window and provider page cursor. The upper timestamp
+stays fixed until every page is processed; a cursor moves only after all approved
+inputs in its page are durably retained. A crash or expired provider cursor can
+repeat pages without duplicate raw input or missions. Inclusive bounds and a
+five-minute overlap avoid a gap at identical timestamps and tolerate delayed
+indexing; only the original current grant and its publication boundary authorize
+messages. A repaired grant starts fresh; an unchanged legacy grant without a
+boundary does no automatic history read.
+
+Requests use at most 15 messages and a conservative minute interval per adapter,
+with actual provider Retry-After backoff persisted in the ledger. Fetching old
+messages does not renew their original execution age. Unknown users, mismatched
+workspace/conversation/thread, malformed pagination, future or out-of-window data
+cannot advance history or gain authority. Permission/rate/transport/storage/source
+status appears in the same owner recovery UI. Deleted remote messages and absent
+history permissions remain real limits, explained in the graphical setup.
+
+Eleven actual local SDK/HTTP/SQLite cases cover descending pages in one fixed
+window, both crash windows, reopened actual native decoding, overlap dedup,
+expired provider cursors, real rate-limit/permission responses, revocation during
+HTTP, repaired/legacy grants, original age/expiry, invalid future data and exact
+`conversations.replies` routing. Required build/CI probe:
+`probe_slack_history.py`. Full/minimal Python suites pass 1032 tests with two
+existing skips; 26 real root/UID/socket gateway cases and both Tk sizes pass.
+Receipts: `docs/evidence/2026-10-24/slack-history-validation.json`.
+All five CI gates for predecessor `8b4da84` passed. No live Slack delivery,
+permission, retention or media/voice acceptance is inferred from local fixtures.

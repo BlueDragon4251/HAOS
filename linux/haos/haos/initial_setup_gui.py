@@ -645,6 +645,8 @@ class Wizard:
                 "Den Bot mit chat:write, users:read, app_mentions:read und den Verlaufsrechten der verwendeten Gespräche installieren "
                 "(channels:history, groups:history, im:history bzw. mpim:history). Events app_mention sowie message.channels, "
                 "message.groups, message.im und message.mpim passend abonnieren und den Bot in die freigegebenen Kanäle einladen. "
+                "Nach Ausfällen wird genehmigter Verlauf seitenweise ab der Freigabe nachgeladen. Anbieterlimits können das verlangsamen; "
+                "über 24 Stunden alte Eingänge werden nur erhalten. Gelöschte Slack-Nachrichten sind nicht wiederherstellbar. "
                 "Socket Mode benötigt keinen öffentlichen Webhook oder Signing-Secret. Tokens bleiben im privaten Gateway-Dienst.",
                 size=10,color=self.MUTED).pack(anchor="w",pady=6)
             def configure():
