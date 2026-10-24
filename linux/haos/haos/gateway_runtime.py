@@ -183,17 +183,15 @@ async def serve():
                     if not adapter.is_connected:
                         result = {"status": "retry", "retry_after": 5}
                     else:
-                        metadata = {"thread_id": delivery["thread"]} if delivery["thread"] else {}
+                        metadata = {"notify": True}
+                        if delivery["thread"]:
+                            metadata["thread_id"] = delivery["thread"]
                         if delivery["scope"] and policy.connectors[delivery["connector"]]["platform"] == "slack":
                             metadata["slack_team_id"] = delivery["scope"]
                         try:
                             receipt = await asyncio.wait_for(adapter.send(delivery["chat"], delivery["content"], reply_to=delivery["reply_to"], metadata=metadata), 60)
-                            if receipt.success and receipt.message_id:
-                                result = {"status": "delivered", "message_id": str(receipt.message_id)}
-                            elif receipt.retryable or receipt.error_kind == "rate_limited":
-                                result = {"status": "retry", "retry_after": min(86400, max(1, receipt.retry_after or 5))}
-                            else:
-                                result = {"status": "failed"}
+                            from .gateway_delivery import delivery_result
+                            result = delivery_result(receipt, redactor)
                         except Exception:
                             result = {"status": "uncertain"}
                     await call("gateway.ack", {"id": delivery["id"], "result": {**result, "attempt": delivery["attempt"]}})

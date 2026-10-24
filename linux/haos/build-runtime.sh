@@ -34,6 +34,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-polling-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-held-build-probe.json held
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_fallback_matrix.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-fallback-builder-matrix.json
 for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream vertex vertex-stream reserved-tools reserved-tools-stream reserved-tools-reverse reserved-tools-reverse-stream context-aliases context-aliases-stream; do
     .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_provider_fallback_wire.py" /tmp/herald-os/linux/haos "/usr/lib/haos/runtime-provenance/provider-fallback-$scenario.json" "$scenario"

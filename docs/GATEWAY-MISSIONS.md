@@ -278,3 +278,37 @@ dispatch probes pass too. Exact receipts/sources are in
 `docs/evidence/2026-10-24/telegram-polling-validation.json`. All five CI gates for
 `1881a20` passed. No external Telegram connection, message delivery, voice/media
 or installed-service acceptance is claimed by these local contracts.
+
+## Telegram outbound ambiguity and exact threads (2026-10-24)
+
+The actual native SDK fixture on archived `4fdc7e7` reproduced repeated sends
+after the server read the request and disconnected. HAOS now retains the native
+adapter's formatting/chunking, per-chat pacing, reply routing and actual SDK,
+but sends each chunk once. It never drops the owner-approved thread after a
+thread-not-found error. Only an explicit Bot API `BadRequest` formatting refusal
+allows the native plain-text codec fallback on the same route. Rich-message
+fast paths are excluded until their separate replay semantics are reviewed.
+
+Ambiguous disconnects, HTTP 500 parser errors, malformed/missing/nonpositive
+receipt IDs and partial delivery become durable `uncertain` obligations, without
+automatic replay. Explicit rate-limit refusals and proven connection/pool failure
+before dispatch remain bounded ledger retries. Confirmed forbidden/not-found
+refusals are terminal failures. Successful remote IDs are bounded and redacted
+before crossing into the controller. The shared decoder no longer treats an
+adapter's `retryable` flag alone as proof of non-delivery: other platforms need
+their own reviewed certainty markers. Discord's internal send retries remain
+a separate next audit, not a completed outbound acceptance.
+
+Ten required actual PTB HTTP/SQLite/reopen cases cover read-disconnect, a server
+error containing parser wording, missing thread, rate limit, forbidden, malformed
+receipt, invalid numeric ID, confirmed parse fallback, success and an actual
+closed local socket before dispatch. All sends stay on the approved chat/thread;
+only the confirmed formatting refusal makes a second request. Uncertain rows
+remain unsent after reopening; safe retries preserve the durable attempt count.
+Fourteen ordinary-user decoder cases cover ambiguous retry flags, partials,
+invalid/private IDs and finite/bounded rate timing. Full/minimal suites pass
+**993 tests, two existing skips**. Incoming polling/held-reconnect and existing
+Telegram/Discord native contracts also pass. Source hashes and complete receipts
+are in `docs/evidence/2026-10-24/telegram-delivery-validation.json`. All five CI
+gates for `4fdc7e7` passed. No external messages or installed/live Telegram
+acceptance are claimed.

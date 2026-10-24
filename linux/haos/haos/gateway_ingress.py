@@ -73,6 +73,12 @@ def durable_adapter(adapter):
                 # A native conflict-recovery branch otherwise drops pending
                 # updates. Another active consumer requires owner intervention.
                 return await original._start_polling_once(self, app, drop_pending_updates=False, **kwargs)
+            async def send(self, chat_id, content, reply_to=None, metadata=None):
+                return await gateway_telegram.send_native(self, original.send, chat_id, content, reply_to, metadata)
+            async def send_chunk(self, *args, **kwargs):
+                return await gateway_telegram.send_chunk(self, *args, **kwargs)
+            def classify_send(self, error, error_types):
+                return gateway_telegram.classify_send(error)
             def telegram_authorized(self, message):
                 source = self._source_from_message_for_auth(message)
                 return self._is_sender_authorized(source.user_id, chat_type=source.chat_type,
@@ -81,7 +87,8 @@ def durable_adapter(adapter):
             attributes['_is_user_authorized_from_message'] = telegram_authorized
             attributes.update(_register_handlers=register_handlers, _accept_update=accept_update,
                 _fail_update_preparation=fail_preparation, _hold_inbound_event=hold_event,
-                _start_polling_once=start_polling)
+                _start_polling_once=start_polling, send=send, _send_chunk_with_retries=send_chunk,
+                _classify_send_exception=classify_send, _should_attempt_rich=lambda *args, **kwargs: False)
         _CLASSES[original] = type('HAOS' + original.__name__, (original, DurableIngress), attributes)
     adapter.__class__ = _CLASSES[original]
     if getattr(adapter.platform, 'value', None) == 'telegram':
