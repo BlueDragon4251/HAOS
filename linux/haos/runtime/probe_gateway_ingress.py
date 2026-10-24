@@ -32,6 +32,10 @@ def main():
         (home / 'config.yaml').write_text(json.dumps({'plugins': {'enabled': ['haos-unapproved-fixture']}}))
         for name in ('telegram', 'discord'):
             adapter = build_adapter(name, {'token': '123456:' + 'x' * 35})
+            if name == 'telegram':
+                replacement = build_adapter(name, {'token': '123456:' + 'x' * 35})
+                assert replacement._update_receipt_dir == adapter._update_receipt_dir
+                assert adapter._update_receipt_dir.name == 'haos-durable-v1'
             policy = GatewayPolicy({'version': 1, 'connectors': [{'id': name, 'platform': name}], 'bindings': [
                 {'id': 'paired', 'connector': name, 'sender': '42', 'chat': '42', 'scope': '', 'thread': '',
                  'identity': 'principal', 'capabilities': ['create', 'read']}]})

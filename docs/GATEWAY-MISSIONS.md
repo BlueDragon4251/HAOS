@@ -242,3 +242,39 @@ connecting. These are not physical power-cut, installed service or external
 delivery acceptance. Exact sources, image identity and results are recorded in
 `docs/evidence/2026-10-24/gateway-publication-validation.json`. All five CI gates
 for provider predecessor `1682f67` passed; new-source CI remains required.
+
+## Telegram offset follows durable native admission (2026-10-24)
+
+Actual PTB polling on the predecessor advanced the Bot API offset while a local
+SQLite admission failed. The pinned Updater awaits `update_queue.put` before
+confirming its next offset. HAOS now uses that public queue seam to run the real
+Application/native handlers serially through their synchronous durable admission
+boundary. PTB's shutdown sentinel still uses its ordinary queue. Preparation
+errors and held-in-memory events leave the update unconfirmed for actual SDK
+retry. Native early handoff markers are deferred until a durable admission or
+explicit refusal. A full admission queue raises a retryable failure rather than
+being mistaken for a definitive sender refusal. No process-global SDK patch or
+replacement Bot client is installed.
+
+The native conflict path also cannot request `drop_pending_updates=True` under
+HAOS. A competing consumer can therefore require owner intervention; HAOS does
+not discard messages to seize the token. Existing native receipt files remain
+untouched; new post-admission receipts use a separate HAOS namespace, including
+same-process replacement adapters. Redelivery still passes independent HAOS
+identity/grant checks and durable idempotency. Telegram's server retention
+limits still apply during prolonged storage/network failure.
+
+Two required build/CI probes use actual PTB Bot API HTTP, the actual native
+Telegram application/handlers/codec, and real SQLite. An injected SQLite insert
+failure and a native disconnect/hold/reconnect each observe offsets
+`0, 0, 13, 13`: the batch retries, and a separate SQLite reader verifies the
+commit before confirmation. An unknown sender in the batch is not admitted.
+Both probes also pass a native requested drop flag through the HAOS guard and
+verify that an earlier legacy receipt neither suppresses admission nor changes
+on disk. Explicitly cancelled fixture polls during SDK shutdown are counted;
+all other fixture failures remain fatal. Full/minimal suites pass **979 tests,
+two existing skips**; existing actual Telegram/Discord constructor and durable
+dispatch probes pass too. Exact receipts/sources are in
+`docs/evidence/2026-10-24/telegram-polling-validation.json`. All five CI gates for
+`1881a20` passed. No external Telegram connection, message delivery, voice/media
+or installed-service acceptance is claimed by these local contracts.

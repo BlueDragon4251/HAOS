@@ -144,7 +144,7 @@ async def serve():
                 # acknowledgement ordering also needs platform-specific SDK proof.
                 inbox.admit(current, connector["id"], envelope)
                 return True
-            except (PermissionError, ValueError, Conflict):
+            except (PermissionError, ValueError):
                 logging.warning("Gateway message refused")
             return False
         adapter.set_durable_message_handler(receive)

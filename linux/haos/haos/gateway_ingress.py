@@ -37,6 +37,10 @@ def durable_adapter(adapter):
                 if type(accepted) is not bool:
                     raise TypeError('explicit durable admission receipt required')
                 event._gateway_accepted = accepted
+                if getattr(self.platform, 'value', None) == 'telegram':
+                    from .gateway_telegram import admitted
+                    admitted()
+                    self._accept_update()
 
             async def handle_message(self, event):
                 self._haos_admit(event)
@@ -52,12 +56,37 @@ def durable_adapter(adapter):
         attributes = {'__module__': __name__, '_wire_plugin_handlers': no_plugins,
             '_register_plugin_action_handlers': no_plugins, 'rewire_plugin_handlers': no_plugins}
         if getattr(adapter.platform, 'value', None) == 'telegram':
+            from . import gateway_telegram
+            def register_handlers(self, app):
+                gateway_telegram.install(app)
+                return original._register_handlers(self, app)
+            def accept_update(self):
+                return gateway_telegram.accept_native(self, original._accept_update)
+            def fail_preparation(self):
+                gateway_telegram.failed()
+                return original._fail_update_preparation(self)
+            def hold_event(self, *args, **kwargs):
+                gateway_telegram.failed()
+                original._fail_update_preparation(self)
+                return original._hold_inbound_event(self, *args, **kwargs)
+            async def start_polling(self, app, *, drop_pending_updates, **kwargs):
+                # A native conflict-recovery branch otherwise drops pending
+                # updates. Another active consumer requires owner intervention.
+                return await original._start_polling_once(self, app, drop_pending_updates=False, **kwargs)
             def telegram_authorized(self, message):
                 source = self._source_from_message_for_auth(message)
                 return self._is_sender_authorized(source.user_id, chat_type=source.chat_type,
                     chat_id=source.chat_id, thread_id=source.thread_id, is_bot=source.is_bot) is True
             # Native pairing/env fallback is not HAOS owner authorization.
             attributes['_is_user_authorized_from_message'] = telegram_authorized
+            attributes.update(_register_handlers=register_handlers, _accept_update=accept_update,
+                _fail_update_preparation=fail_preparation, _hold_inbound_event=hold_event,
+                _start_polling_once=start_polling)
         _CLASSES[original] = type('HAOS' + original.__name__, (original, DurableIngress), attributes)
     adapter.__class__ = _CLASSES[original]
+    if getattr(adapter.platform, 'value', None) == 'telegram':
+        # Apply to every fresh adapter, including a same-process reconnect.
+        # Earlier native receipts can precede HAOS's durable commit. Keep those
+        # files intact and use a separate post-admission namespace.
+        adapter._update_receipt_dir = adapter._update_receipt_dir / 'haos-durable-v1'
     return adapter
