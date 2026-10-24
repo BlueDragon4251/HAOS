@@ -638,3 +638,16 @@ Mattermost remains unavailable in the public registry and GUI. This transport
 foundation does not establish incoming authorization, durable WebSocket capture,
 reconnect/history recovery, owner publication, outbox integration or live delivery.
 These remain required before enabling it; the supported gateway count stays three.
+
+Follow-up: private outgoing context is also bound to its exact adapter instance;
+a second native adapter cannot borrow it even for the same channel. A later
+refusal after a successful native chunk retains partial-delivery uncertainty.
+The expanded probe has 18 actual native/HTTP cases, and full/minimal suites
+remain 1057 passed with two existing skips. Receipts:
+`docs/evidence/2026-10-24/mattermost-route-context-validation.json`.
+
+Fresh CI access was recovered through the connected GitHub tool while local
+`gh` credentials remained rejected. All five gates for Slack-history commit
+`3af3af908133aef84ce7b0d0926faf7926564bbb` were confirmed successful.
+The graphical setup gate also passed for `28042b7` and `741cce1`; other gates
+for these later sources were still running at that observation.

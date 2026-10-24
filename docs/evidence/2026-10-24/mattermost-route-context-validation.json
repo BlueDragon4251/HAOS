@@ -1,0 +1,24 @@
+{
+  "base_commit": "741cce1047c95dd351ee8b72b505cc727563d071",
+  "full_tests": {
+    "passed": 1057,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1057,
+    "existing_skips": 2
+  },
+  "actual_native_http_cases": 18,
+  "public_mattermost_gateway_enabled": false,
+  "live_account_acceptance": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_mattermost.py",
+      "sha256": "c369c179bcc26f6c5b0701b460a5b65970560f4aaee5186fc3b9daac8e5d7919"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_transport.py",
+      "sha256": "bddb8274acdbec584cfb3ff5e539acdafb83cf559e1355bd9881518acd2b7331"
+    }
+  ]
+}

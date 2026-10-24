@@ -68,7 +68,7 @@ def install_api(adapter, allow_read):
             if payload is not None or not read_path or allow_read(path) is not True:
                 raise PermissionError('Mattermost read is outside current owner authority')
         elif method == 'POST':
-            if (path != 'posts' or route is None or not isinstance(payload, dict)
+            if (path != 'posts' or route is None or route.get('adapter') is not self or not isinstance(payload, dict)
                     or set(payload) - {'channel_id', 'message', 'root_id', 'props'}
                     or payload.get('channel_id') != route['chat']
                     or payload.get('root_id', '') != route['thread']
@@ -124,13 +124,15 @@ async def send_native(adapter, original_send, chat, content, thread=''):
     if not isinstance(chat, str) or not _ID.fullmatch(chat) or (thread and (
             not isinstance(thread, str) or not _ID.fullmatch(thread))):
         raise ValueError('invalid Mattermost destination identity')
-    route = {'chat': chat, 'thread': thread, 'statuses': [], 'receipts': [], 'ambiguous': False}
+    route = {'adapter': adapter, 'chat': chat, 'thread': thread, 'statuses': [], 'receipts': [], 'ambiguous': False}
     token = _SENDING.set(route)
     # Native root resolution performs a GET and can silently substitute a root.
     # Use the already approved thread verbatim at the private post-builder seam.
     try:
         result = await original_send(adapter, chat, content, reply_to=None,
             metadata={'thread_id': thread, 'notify': True})
+        if not result.success and route['receipts']:
+            route['ambiguous'] = True
         return result, route
     finally:
         _SENDING.reset(token)
@@ -139,7 +141,7 @@ async def send_native(adapter, original_send, chat, content, thread=''):
 def install_post_builder(adapter):
     async def post(self, chat, message, reply_to, metadata, file_ids=None):
         route = _SENDING.get()
-        if route is None or chat != route['chat'] or reply_to is not None or file_ids is not None:
+        if route is None or route.get('adapter') is not self or chat != route['chat'] or reply_to is not None or file_ids is not None:
             raise PermissionError('Mattermost post has no exact private route')
         payload = {'channel_id': chat, 'message': message, 'props': {'disable_mentions': True}}
         if route['thread']:

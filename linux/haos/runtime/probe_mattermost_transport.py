@@ -27,6 +27,8 @@ def main():
             body = await request.json()
             assert body['channel_id'] == chat and body.get('root_id', '') == state.get('thread', '')
             assert body['props'] == {'disable_mentions': True} and not body.get('file_ids')
+            if state.get('reject_second') and len(state['calls']) == state['reject_second']:
+                return web.json_response({'message':'denied'},status=403)
             if state.get('body') is not None:
                 return web.Response(body=state['body'], content_type='application/json')
             if state['status'] == 302:
@@ -85,6 +87,23 @@ def main():
                 result, observed = await send_native(adapter, MattermostAdapter.send, chat, 'a'*4100, thread)
                 assert result.success and len(state['calls']) == before+2 and len(observed['receipts']) == 2
                 cases.append('actual_native_multichunk_preserves_exact_route')
+                state['reject_second'] = len(state['calls'])+2
+                result, observed = await send_native(adapter, MattermostAdapter.send, chat, 'b'*4100, thread)
+                assert not result.success and observed['statuses'] == [201,403]
+                assert len(observed['receipts']) == 1 and observed['ambiguous']
+                state.pop('reject_second')
+                cases.append('partial_native_delivery_keeps_uncertainty')
+                other = MattermostAdapter(adapter.config)
+                other._base_url = adapter._base_url; other._session = session
+                install_post_builder(install_api(other, lambda path: False))
+                async def cross_instance(_adapter, *args, **kwargs):
+                    return await MattermostAdapter.send(other, chat, 'cross-instance post')
+                before = len(state['calls'])
+                try: await send_native(adapter, cross_instance, chat, 'forged context', thread)
+                except PermissionError: pass
+                else: raise AssertionError('send context must be bound to its private adapter')
+                assert len(state['calls']) == before
+                cases.append('different_adapter_cannot_borrow_send_context')
                 for name, body in [('malformed_json', b'{'), ('oversized_json', b' '*(1024*1024+1))]:
                     state['body'] = body
                     result, observed = await send_native(adapter, MattermostAdapter.send, chat, 'bounded response', thread)
