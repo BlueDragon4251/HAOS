@@ -188,6 +188,9 @@ async def serve():
                     return False
             adapter._haos_source_authorizer = authorize_source
         tasks.append(asyncio.create_task(maintain(adapter, stop)))
+        if connector['platform'] == 'discord':
+            from .gateway_discord_history import maintain as recover_discord_history
+            tasks.append(asyncio.create_task(recover_discord_history(adapter,stop,current_policy,connector['id'])))
     try:
         while not stop.is_set():
             for task in tasks:

@@ -9,6 +9,7 @@ import pwd
 import stat
 import subprocess
 import secrets
+import time
 from copy import deepcopy
 from pathlib import Path
 
@@ -46,6 +47,10 @@ def owner_ingress(args, policy):
     if result.returncode or len(result.stdout) > 256*1024:
         raise RuntimeError('offline native ingress recovery failed; check selected state, attempt, grant and 24-hour expiry')
     value = json.loads(result.stdout)
+    from .gateway import digest
+    names = {digest(row):row['id'] for row in policy['bindings']}
+    for row in value.get('history',[]):
+        row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
     return value
@@ -130,6 +135,7 @@ def renewed_policy(policy, previous):
         before = old.get(binding["id"])
         if (before is None or "generation" not in before or binding != before):
             binding["generation"] = secrets.token_hex(32)
+            binding['since'] = time.time_ns() // 1_000_000
     return output
 
 

@@ -30,7 +30,14 @@ def unresolved(inbox, after=0):
         result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],
             'attempt':row['attempt'],'created_at':row['created_at'],
             'payload_sha256':hashlib.sha256(row['payload'].encode()).hexdigest()})
-    return {'ingress':result,'next_cursor':rows[-1]['cursor'] if rows else after}
+    history=[]
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='discord_history_status'").fetchone():
+        for row in inbox.db.execute('SELECT binding_digest,status,updated_at FROM discord_history_status ORDER BY updated_at DESC LIMIT 512'):
+            if (not re.fullmatch('[0-9a-f]{64}',row['binding_digest']) or row['status'] not in
+                    {'ready','permission-denied','rate-limited','transport-unavailable','storage-unavailable','invalid-source'}):
+                raise ValueError('invalid history status metadata')
+            history.append(dict(row))
+    return {'ingress':result,'history':history,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
 def reconcile(inbox, policy, request):

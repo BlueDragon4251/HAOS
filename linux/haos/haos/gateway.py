@@ -47,8 +47,10 @@ class GatewayPolicy:
         routes = set()
         for binding in config["bindings"]:
             fields = {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}
-            if set(binding) not in (fields, fields | {"generation"}):
+            if not fields <= set(binding) <= fields | {"generation", "since"}:
                 raise ValueError("invalid gateway identity binding")
+            if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
+                raise ValueError('invalid gateway grant time boundary')
             if "generation" in binding and (not isinstance(binding["generation"], str)
                     or not re.fullmatch(r"[a-f0-9]{64}", binding["generation"])):
                 raise ValueError("invalid gateway binding generation")

@@ -1,5 +1,6 @@
 """Bounded private native ingress journal, committed before protocol acknowledgement."""
 import json
+import math
 import os
 from pathlib import Path
 import sqlite3
@@ -60,8 +61,13 @@ class NativeInbox:
     def key(connector, envelope):
         return digest([connector, *(envelope[key] for key in ('platform','scope','chat','thread','message_id'))])
 
-    def admit(self, policy, connector, envelope, payload):
+    def admit(self, policy, connector, envelope, payload, *, received_at=None):
         binding = policy.authorize(connector, envelope)
+        now = time.time()
+        received_at = now if received_at is None else received_at
+        if (type(received_at) not in {int,float} or not 0 < received_at <= now+300
+                or not math.isfinite(received_at)):
+            raise ValueError('invalid original native input time')
         if not isinstance(payload, dict):
             raise ValueError('native payload must be an object')
         if not isinstance(envelope['text'], str) or not 1 <= len(envelope['text'].strip()) <= 32000:
@@ -85,7 +91,7 @@ class NativeInbox:
                 self.db.execute('''INSERT INTO native_inbox
                     (id,connector,platform,message_id,binding_id,binding_digest,fingerprint,envelope,payload,created_at)
                     VALUES(?,?,?,?,?,?,?,?,?,?)''', (key,connector,envelope['platform'],envelope['message_id'],binding['id'],digest(binding),
-                    fingerprint,json.dumps(self.redactor.clean(envelope)),serialized,time.time()))
+                    fingerprint,json.dumps(self.redactor.clean(envelope)),serialized,received_at))
             self.db.execute('COMMIT')
         except BaseException:
             self.db.execute('ROLLBACK'); raise

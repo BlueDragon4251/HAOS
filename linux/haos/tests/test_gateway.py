@@ -331,6 +331,7 @@ def test_legacy_gateway_inbox_migration_keeps_history_and_never_reexecutes_old_m
     store.db.execute('ALTER TABLE gateway_inbox DROP COLUMN binding_digest')
     store.db.execute('UPDATE gateway_schema SET version=1')
     store.close()
+
     store = MissionStore(path)
     GatewayEngine(store)
     migrated = dict(store.db.execute('SELECT * FROM gateway_inbox').fetchone())
@@ -342,3 +343,24 @@ def test_legacy_gateway_inbox_migration_keeps_history_and_never_reexecutes_old_m
     fresh = admitted(store, GatewayPolicy(policy_config), envelope(message_id='new-after-migration'))
     assert fresh['mission_id'] != original['mission_id'] and len(store.list()) == 2
     store.close()
+
+
+@pytest.mark.parametrize('value',[True,0,-1,1.5,'1792800000000',2**53])
+def test_gateway_grant_since_boundary_is_strict_integer(policy_config,value):
+    policy_config['bindings'][0]['since']=value
+    with pytest.raises(ValueError):GatewayPolicy(policy_config)
+
+
+def test_new_grant_records_owner_time_but_keeps_unchanged_legacy_binding(policy_config):
+    from haos.gateway_setup import renewed_policy
+    import time
+    previous={**policy_config,'bindings':[]}
+    before=time.time_ns()//1_000_000
+    published=renewed_policy(policy_config,previous)
+    assert before<=published['bindings'][0]['since']<=time.time_ns()//1_000_000
+    assert renewed_policy(published,published)==published
+    legacy={**policy_config,'bindings':[{**policy_config['bindings'][0],'generation':'a'*64}]}
+    assert renewed_policy(legacy,legacy)==legacy
+    # An edit cannot smuggle a backdated history boundary through publication.
+    edited={**published,'bindings':[{**published['bindings'][0],'since':1}]}
+    assert renewed_policy(edited,published)['bindings'][0]['since']>=before

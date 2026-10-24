@@ -102,3 +102,12 @@ def test_native_journal_refuses_replaced_sqlite_sidecars(tmp_path):
     sidecar.symlink_to(target)
     with pytest.raises(PermissionError):NativeInbox(path,Redactor())
     assert target.read_text()=='preserved'
+
+
+@pytest.mark.parametrize('received_at',[True,0,-1,float('nan'),float('inf'),1e30])
+def test_native_original_receive_time_is_bounded_before_commit(tmp_path,received_at):
+    inbox=NativeInbox(tmp_path/'native.db',Redactor())
+    try:
+        with pytest.raises(ValueError):inbox.admit(GatewayPolicy(policy()),'bot',envelope(),{},received_at=received_at)
+        assert inbox.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0]==0
+    finally:inbox.close()

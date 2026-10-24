@@ -430,3 +430,43 @@ runtime builds and provider CI. Receipts bind sources in
 All targets were local fixtures. This does not prove Discord's live remote nonce
 deduplication, account permissions or external delivery. Complete media/voice
 and long-outage history recovery remain open.
+
+## Discord history recovery after transport outages (2026-10-24)
+
+New or changed owner grants now record an immutable publication-time millisecond
+boundary alongside their fresh generation. An unchanged legacy grant retains its
+original digest and permissions; without an original boundary it performs no
+automatic history fetch. Explicit re-pairing starts a fresh boundary rather than
+running old channel messages. The containing millisecond is excluded, preventing
+sub-millisecond pre-grant messages from being treated as newly authorized.
+
+The gateway uses the actual installed Discord SDK's authenticated history API,
+one bounded page per step, in a separate supervised recovery task. It validates
+the actual channel/guild/thread, rechecks the root policy after awaiting HTTP,
+and admits only approved messages after the matching grant boundary. Unknown
+senders and unsupported content cannot become missions. A cursor advances only
+after a durable raw commit or definitive refusal; failed storage/cursor writes
+remain recoverable and replay uses the existing raw receipt. Stored history
+uses the same actual native decoder and independent HAOS relay as live input.
+
+The original Discord snowflake time is committed atomically with the retained
+input. Its 24-hour execution window is not renewed by fetching it later: expired
+missed input remains available to the owner but cannot run. Invalid future IDs
+cannot advance the cursor. History permission, rate-limit, source, transport and
+storage failures persist fixed credential-free status codes; the owner GUI
+identifies the grant and explains channel/history permissions. The GUI exposes
+the network permissions and explicit re-pairing prerequisite for legacy grants.
+
+Eleven actual SDK/HTTP/SQLite cases cover both commit windows, restart, scope and
+grant-time filtering, revocation during HTTP, repaired and legacy grants, original
+age/expiry, invalid future IDs, three reversed 100-message pages, and actual SDK
+403 reporting to owner recovery. These are mandatory in runtime builds and
+provider CI. Full/minimal suites pass 1021 tests with two existing skips; all 19
+explicit root/UID/socket gateway cases pass. Tk renders at 1280×800 and 640×480,
+including the actual recovery control and permission-status label. Exact sources:
+`docs/evidence/2026-10-24/discord-history-validation.json`.
+
+Local fixtures do not establish external Discord permissions or live recovery.
+The service needs a correct system clock and the bot's view-channel/read-history
+permissions. Already deleted remote messages cannot be recovered. Media/voice
+remain refused, and the other twenty gateways remain separate implementation work.

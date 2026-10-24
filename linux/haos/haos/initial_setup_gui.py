@@ -660,7 +660,9 @@ class Wizard:
                         size=10, color=self.MUTED).pack(anchor="w", pady=6)
             self._label(self.content, "Discord: Server-ID als Bereich angeben. Für einen Thread dessen ID sowohl als Chat-ID "
                 "als auch als Thread-ID eintragen. In Server-Kanälen den Bot direkt erwähnen. "
-                "Automatische neue Threads und native Slash-Menüs sind nicht freigegeben.",
+                "Für Wiederherstellung nach Ausfällen benötigt der Bot Kanalansicht und Nachrichtenverlauf. "
+                "Neue Freigaben lesen nur Nachrichten nach ihrer Zeitgrenze nach; alte Freigaben ohne Zeitgrenze "
+                "müssen dafür ausdrücklich erneut gekoppelt werden. Automatische neue Threads und native Slash-Menüs sind nicht freigegeben.",
                 size=10, color=self.MUTED).pack(anchor="w", pady=6)
             rights = {}
             for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
@@ -715,6 +717,15 @@ class Wizard:
             recovery_frame.pack(fill="x", pady=4)
             def show_ingress(value):
                 for child in recovery_frame.winfo_children(): child.destroy()
+                history_labels = {'ready':'Verlaufabruf erfolgreich; keine externe Zustellung bestätigt',
+                    'permission-denied':'Zugriff verweigert: Kanal-/Thread-ID, Kanalansicht und Nachrichtenverlauf prüfen',
+                    'rate-limited':'Anbieter begrenzt Abrufe; Wiederholung erfolgt nach Neustart',
+                    'transport-unavailable':'Verbindung zum Verlauf derzeit nicht verfügbar',
+                    'storage-unavailable':'Privates Journal nicht beschreibbar; Datenträger prüfen',
+                    'invalid-source':'Verlaufantwort passt nicht zur freigegebenen Quelle'}
+                for history in value.get('history',[]):
+                    self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
+                        size=10, color=self.MUTED).pack(anchor="w", pady=3)
                 rows = value["ingress"]
                 if not rows:
                     self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
