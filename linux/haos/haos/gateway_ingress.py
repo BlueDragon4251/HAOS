@@ -76,10 +76,18 @@ def durable_adapter(adapter):
             def client_set(self, value):
                 if value is not None:
                     gateway_discord.install_capture(self, value)
+                    gateway_discord.install_delivery(value)
                 self.__dict__['_client'] = value
+            async def send_discord(self, chat_id, content, reply_to=None, metadata=None):
+                return await gateway_discord.send_native(self, original.send, chat_id, content, reply_to, metadata)
+            async def resolve_discord(self, channel_id):
+                return await gateway_discord.resolve_delivery(self, original._resolve_channel, channel_id)
+            def rejected_reply(error):
+                return gateway_discord.reply_rejected(original._is_reply_reference_rejected, error)
             attributes.update(_dispatch_discord_message=dispatch_discord, _dispatch_recovered_message=dispatch_recovered,
                 _is_allowed_user=discord_allowed, _discord_message_admission=discord_admission,
                 _record_response_async=record_response, _client=property(client_get, client_set),
+                send=send_discord, _resolve_channel=resolve_discord, _is_reply_reference_rejected=staticmethod(rejected_reply),
                 _haos_native_dispatch=staticmethod(original._dispatch_discord_message))
         if getattr(adapter.platform, 'value', None) == 'telegram':
             from . import gateway_telegram

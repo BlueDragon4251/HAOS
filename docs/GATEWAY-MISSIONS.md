@@ -399,3 +399,34 @@ root/UID/Unix-socket gateway cases include actual demoted-UID retry/discard with
 root-only canary remaining unreadable. The real Tk workflow renders at 1280×800
 and 640×480 and exercises the recovery selection/button/backend argument handoff.
 Receipts: `docs/evidence/2026-10-24/discord-ingress-recovery-validation.json`.
+
+## Discord outgoing certainty and exact destinations (2026-10-24)
+
+HAOS now scopes the actual native send to the approved guild/channel/thread and
+accepts only actual SDK text, thread or direct-message destinations. A forum
+parent cannot create a new unapproved thread. The private client's actual HTTP
+request must retain the SDK's nonce and `enforce_nonce=True`; its supported HTTP
+trace records status/transport outcomes without credential or body logging.
+SDK retries retain the same nonce. A later refusal or rate limit following an
+ambiguous server/transport outcome or a delivered chunk stays uncertain and is
+not automatically replayed by HAOS. Confirmed first-request rate limits and
+connector failures before dispatch can retry; confirmed refusal is terminal.
+
+Reply-reference fallback requires a typed SDK HTTP 400/404 refusal. A server
+error merely containing a missing-reply code cannot trigger another native send
+with a fresh nonce. Actual SDK success must carry a valid positive Discord ID.
+
+Sixteen native-adapter/SDK/HTTP/SQLite-reopen cases cover success, stable-nonce
+500 retry, ambiguous-then-forbidden, misleading server reply error, rate limit,
+forbidden, confirmed missing reply, malformed/zero receipt, read disconnect,
+wrong guild, forbidden forum creation, partial delivery before rate limit,
+exact thread success, mismatched thread and refused TCP connection. The same
+fixture on archived `0668497` reproduced two sends for the misleading server
+error; the corrected path makes one. Full/minimal suites still pass 1008 tests,
+two existing skips; 19 real root/UID/socket cases pass. Required probe runs in
+runtime builds and provider CI. Receipts bind sources in
+`docs/evidence/2026-10-24/discord-native-delivery-validation.json`.
+
+All targets were local fixtures. This does not prove Discord's live remote nonce
+deduplication, account permissions or external delivery. Complete media/voice
+and long-outage history recovery remain open.

@@ -222,7 +222,7 @@ async def serve():
                     if not adapter.is_connected:
                         result = {"status": "retry", "retry_after": 5}
                     else:
-                        metadata = {"notify": True}
+                        metadata = {"notify": True, "haos_scope": delivery["scope"]}
                         if delivery["thread"]:
                             metadata["thread_id"] = delivery["thread"]
                         if delivery["scope"] and policy.connectors[delivery["connector"]]["platform"] == "slack":

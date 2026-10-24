@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import logging
 
 _CURRENT = ContextVar('haos_discord_owner_source', default=None)
+_SENDING = ContextVar('haos_discord_delivery', default=None)
 
 
 def source_envelope(adapter, message):
@@ -151,6 +152,106 @@ def install_capture(adapter, client):
     client._connection.dispatch = dispatch
     client._enable_debug_events = True
     client._haos_capture_installed = True
+
+
+def install_delivery(client):
+    """Observe the private client's real SDK HTTP attempts, preserving SDK nonce retries."""
+    if getattr(client, '_haos_delivery_installed', False): return
+    import aiohttp
+    http = client.http
+    trace = http.http_trace or aiohttp.TraceConfig()
+    async def response_end(session, context, params):
+        state = _SENDING.get()
+        if state is not None and params.method == 'POST':
+            state.statuses.append(params.response.status)
+            if params.response.status >= 500: state.ambiguous = True
+    async def response_error(session, context, params):
+        state = _SENDING.get()
+        if state is not None and params.method == 'POST':
+            if isinstance(params.exception, aiohttp.ClientConnectorError):
+                state.connect_failed = True
+            else: state.ambiguous = True
+    trace.on_request_end.append(response_end)
+    trace.on_request_exception.append(response_error)
+    http.http_trace = trace
+    original = http.request
+    async def request(route, **kwargs):
+        state = _SENDING.get()
+        if state is not None and route.method not in {'GET','HEAD'}:
+            payload = kwargs.get('json')
+            if (route.method != 'POST' or route.path != '/channels/{channel_id}/messages'
+                    or str(route.channel_id) != state.target or not isinstance(payload, dict)
+                    or payload.get('enforce_nonce') is not True or not payload.get('nonce')):
+                state.refused = True
+                raise PermissionError('Discord delivery cannot change its approved target or idempotency contract')
+            state.started = True
+        try: return await original(route, **kwargs)
+        except Exception as error:
+            if state is not None: state.error = error
+            raise
+    http.request = request
+    client._haos_delivery_installed = True
+
+
+async def resolve_delivery(adapter, original, channel_id):
+    channel = await original(adapter, channel_id)
+    state = _SENDING.get()
+    if state is None: return channel
+    import discord
+    guild = getattr(channel, 'guild', None)
+    thread = isinstance(channel, discord.Thread)
+    if (str(getattr(channel,'id','')) != state.target
+            or not isinstance(channel,(discord.TextChannel,discord.Thread,discord.DMChannel))
+            or (str(guild.id) if guild else '') != state.scope
+            or thread != bool(state.thread)):
+        state.refused = True
+        raise PermissionError('Discord resolved target differs from owner guild/channel/thread')
+    return channel
+
+
+def reply_rejected(original, error):
+    import discord
+    return (isinstance(error,discord.HTTPException) and error.status in {400,404}
+        and original(error))
+
+
+async def send_native(adapter, original, chat_id, content, reply_to=None, metadata=None):
+    from gateway.platforms.base import SendResult
+    import discord
+    metadata = metadata or {}
+    scope, thread = metadata.get('haos_scope'), metadata.get('thread_id','')
+    if not isinstance(scope,str) or thread and str(thread) != str(chat_id):
+        return SendResult(success=False,error='exact owner Discord scope and thread required',error_kind='forbidden',
+            raw_response={'haos_delivery':'refused'})
+    state = SimpleNamespace(target=str(thread or chat_id),scope=scope,thread=thread,started=False,
+        refused=False,ambiguous=False,connect_failed=False,statuses=[],error=None)
+    token = _SENDING.set(state)
+    try:
+        result = await original(adapter,chat_id,content,reply_to,metadata)
+        if result.success is True:
+            ids = result.raw_response.get('message_ids') if isinstance(result.raw_response,dict) else None
+            ids = ids or [result.message_id]
+            if any(isinstance(value,bool) or not isinstance(value,(str,int)) or not str(value).isascii()
+                    or not str(value).isdigit() or len(str(value)) > 20 or not 0 < int(value) < 2**64 for value in ids):
+                return SendResult(success=False,error='Discord returned no valid delivery identity',error_kind='unknown')
+            return result
+        raw = dict(result.raw_response) if isinstance(result.raw_response,dict) else {}
+        error = state.error
+        if state.ambiguous or any(200 <= status < 300 for status in state.statuses):
+            return SendResult(success=False,error='Discord delivery outcome uncertain',error_kind='unknown')
+        if state.refused:
+            result.error_kind='forbidden';raw['haos_delivery']='refused'
+        elif isinstance(error,discord.RateLimited):
+            result.error_kind='rate_limited'; result.retry_after=error.retry_after
+            raw['haos_delivery']='refused'
+        elif isinstance(error,discord.HTTPException) and error.status in {400,401,403,404}:
+            result.error_kind='not_found' if error.status==404 else 'bad_format' if error.status==400 else 'forbidden'
+            raw['haos_delivery']='refused'
+        elif not state.started or state.connect_failed and not state.statuses:
+            result.retryable=True;raw['haos_delivery']='not-dispatched'
+        result.raw_response=raw
+        return result
+    finally: _SENDING.reset(token)
 
 
 def capture_envelope(adapter, client, payload, policy, connector):
