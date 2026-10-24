@@ -124,6 +124,10 @@ async def serve():
     handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
+    native_inbox = None
+    if any(row["platform"] == "discord" for row in policy.connectors.values()):
+        from .gateway_raw import NativeInbox
+        native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
     def current_policy():
         current = GatewayPolicy(trusted_json(config / "gateways.json"))
@@ -162,6 +166,20 @@ async def serve():
                 return False
         adapter.set_authorization_check(authorize)
         if connector["platform"] == "discord":
+            from types import SimpleNamespace
+            from . import gateway_discord
+            adapter._haos_native = SimpleNamespace(inbox=native_inbox, connector=connector["id"], policy=current_policy)
+            def capture(client, payload, connector=connector, adapter=adapter):
+                try:
+                    current = current_policy()
+                except PermissionError:
+                    return False
+                envelope = gateway_discord.capture_envelope(adapter, client, payload, current, connector["id"])
+                if envelope is None:
+                    return False
+                native_inbox.admit(current, connector["id"], envelope, payload)
+                return True
+            adapter._haos_native_capture = capture
             def authorize_source(envelope, connector=connector):
                 try:
                     current_policy().authorize(connector["id"], envelope)
@@ -178,6 +196,15 @@ async def serve():
                     raise ConnectionError("gateway maintenance task stopped")
             try:
                 current = current_policy()
+                if native_inbox is not None:
+                    for connector_id, adapter in adapters.items():
+                        if policy.connectors[connector_id]["platform"] == "discord" and adapter.is_connected:
+                            key = native_inbox.due(connector_id)
+                            if key is not None:
+                                try:
+                                    await asyncio.wait_for(gateway_discord.dispatch_stored(adapter, adapter._haos_native_dispatch, key), 15)
+                                except (OSError, ValueError, Conflict, TimeoutError):
+                                    logging.warning("Native Discord input deferred for recovery")
                 incoming = inbox.next(current)
                 if incoming:
                     try:
@@ -216,7 +243,13 @@ async def serve():
     finally:
         stop.set()
         await asyncio.gather(*tasks, return_exceptions=True)
+        receivers = {task for adapter in adapters.values() for task in getattr(adapter, '_haos_receive_tasks', set())}
+        for task in receivers:
+            task.cancel()
+        await asyncio.gather(*receivers, return_exceptions=True)
         inbox.close()
+        if native_inbox is not None:
+            native_inbox.close()
 
 
 async def maintain(adapter, stop):

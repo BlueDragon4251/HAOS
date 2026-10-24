@@ -71,9 +71,16 @@ def durable_adapter(adapter):
             async def record_response(self, reply_to, result, content, final, metadata=None):
                 # HAOS owns the sole persistent reply/recovery obligation.
                 return result
+            def client_get(self):
+                return self.__dict__.get('_client')
+            def client_set(self, value):
+                if value is not None:
+                    gateway_discord.install_capture(self, value)
+                self.__dict__['_client'] = value
             attributes.update(_dispatch_discord_message=dispatch_discord, _dispatch_recovered_message=dispatch_recovered,
                 _is_allowed_user=discord_allowed, _discord_message_admission=discord_admission,
-                _record_response_async=record_response)
+                _record_response_async=record_response, _client=property(client_get, client_set),
+                _haos_native_dispatch=staticmethod(original._dispatch_discord_message))
         if getattr(adapter.platform, 'value', None) == 'telegram':
             from . import gateway_telegram
             def register_handlers(self, app):

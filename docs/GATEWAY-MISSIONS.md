@@ -346,3 +346,31 @@ nonce carries `enforce_nonce=True`. HTTP retries there must be assessed against
 that real server idempotency contract; they are not presumed to be the same
 unsafe replay reproduced for Telegram. Durable Discord transport capture and
 outbound certainty still require separate implementation/proof.
+
+## Discord commits native frames before SDK acknowledgement (2026-10-24)
+
+The private receiving client now captures approved `MESSAGE_CREATE` frames at
+the actual SDK's synchronous raw-debug seam, before it updates the resumable
+sequence. HAOS commits a bounded, service-private SQLite journal first. A failed
+commit closes that socket with its previous sequence; the actual heartbeat
+reader cannot acknowledge the uncommitted input. No upstream source is changed.
+
+Live and restarted delivery both decode the redacted stored payload through the
+actual Discord SDK and native adapter, check the exact source and current grant
+generation, and enter the independently idempotent HAOS relay. A crash after
+relay commit but before raw completion cannot create another relay obligation.
+Completed payloads are compacted while receipt keys remain; unresolved input is
+retained. Pending input expires after 24 hours and decoder retries stop after
+eight failures. Storage limits stop acknowledgement rather than dropping rows.
+
+Five actual local WebSocket/SDK/SQLite cases exercise failed commit and heartbeat
+sequence, a separate heartbeat thread during insertion, independent-reader
+commit visibility, both crash windows, and revoked pending input. This probe is
+mandatory in runtime builds and provider CI. Full and minimal suites pass 1000
+tests with two existing skips. Exact sources are recorded in
+`docs/evidence/2026-10-24/discord-native-transport-validation.json`.
+
+This establishes local durable capture, not external Discord delivery or recovery
+of frames after the remote resume window has expired. Owner inspection/retry
+of failed raw input, long-outage history recovery, outgoing certainty and complete
+media/voice paths remain separate work. No third gateway is claimed.

@@ -17,21 +17,21 @@ def source_envelope(adapter, message):
         'message_id': str(message.id), 'is_bot': source.is_bot, 'text': message.content}
 
 
-async def dispatch(adapter, original, message, *args, **kwargs):
+async def _dispatch_owner(adapter, original, message, *args, **kwargs):
     handler = getattr(adapter, '_haos_source_authorizer', None)
     if handler is None:
-        return False
+        return False, False
     envelope = source_envelope(adapter, message)
     if handler(envelope) is not True:
         logging.warning('Discord source refused by HAOS owner policy')
-        return False
+        return False, False
     reference = getattr(message, 'reference', None)
     referenced = getattr(reference, 'resolved', None)
     snapshots = getattr(message, 'message_snapshots', ()) or ()
     if (message.attachments or getattr(referenced, 'attachments', None)
             or any(getattr(item, 'attachments', None) for item in snapshots)):
         logging.warning('Discord media refused: no approved HAOS media broker configured')
-        return False
+        return False, False
     state = SimpleNamespace(adapter=adapter, envelope=envelope, accepted=False)
     token = _CURRENT.set(state)
     try:
@@ -40,9 +40,61 @@ async def dispatch(adapter, original, message, *args, **kwargs):
             # Native claim=True records before dispatch. Only HAOS's committed
             # admission may consume this cache key; a failed write can retry.
             adapter._dedup.is_duplicate(str(message.id))
-        return result
+        return result, state.accepted
     finally:
         _CURRENT.reset(token)
+
+
+async def dispatch(adapter, original, message, *args, **kwargs):
+    import asyncio
+    tasks = getattr(adapter, '_haos_receive_tasks', None)
+    if tasks is None:
+        tasks = adapter._haos_receive_tasks = set()
+    task = asyncio.current_task(); tasks.add(task)
+    try:
+        native = getattr(adapter, '_haos_native', None)
+        if native is not None:
+            key = native.inbox.find_discord(native.connector, message.id)
+            if key is None: return False
+            return await dispatch_stored(adapter, original, key, message)
+        result, _ = await _dispatch_owner(adapter, original, message, *args, **kwargs)
+        return result
+    finally:
+        tasks.discard(task)
+
+
+async def dispatch_stored(adapter, original, key, live_message=None):
+    import asyncio
+    import discord
+    native = adapter._haos_native
+    row = native.inbox.claim(key, native.policy())
+    if row is None: return False
+    task = asyncio.current_task()
+    tasks = getattr(adapter, '_haos_receive_tasks', None)
+    if tasks is None: tasks = adapter._haos_receive_tasks = set()
+    tasks.add(task)
+    try:
+        if adapter._dedup.contains(row['message_id']):
+            # This HAOS-scoped in-memory cache is written only after the relay
+            # commits. It never imports the old native response ledger.
+            native.inbox.complete(key, True)
+            return True
+        await asyncio.wait_for(adapter._ready_event.wait(), 30)
+        channel = live_message.channel if live_message is not None else await adapter._resolve_channel(row['envelope']['chat'])
+        message = discord.Message(state=adapter._client._connection, channel=channel, data=row['payload'])
+        source = source_envelope(adapter, message)
+        fields = ('platform','sender','chat','scope','thread','message_id','is_bot')
+        if any(source[name] != row['envelope'][name] for name in fields):
+            raise ValueError('native replay changed its owner source context')
+        result, accepted = await _dispatch_owner(adapter, original, message)
+        native.policy().current_binding(row)
+        native.inbox.complete(key, accepted)
+        return result
+    except BaseException:
+        native.inbox.retry(key)
+        raise
+    finally:
+        tasks.discard(task)
 
 
 def allowed(adapter, user_id, author=None, *, guild=None, is_dm=False, channel_ids=None):
@@ -59,3 +111,72 @@ def admitted(adapter, accepted):
     state = _CURRENT.get()
     if state is not None and state.adapter is adapter:
         state.accepted = accepted is True
+
+
+def install_capture(adapter, client):
+    """Private-instance SDK debug seam runs before received_message sets sequence."""
+    capture = getattr(adapter, '_haos_native_capture', None)
+    if capture is None or getattr(client, '_haos_capture_installed', False):
+        return
+    import asyncio
+    import errno
+    import inspect
+    import json
+    import sqlite3
+    from .gateway import Conflict
+    original = client.dispatch
+    def dispatch(event, *args, **kwargs):
+        if event == 'socket_raw_receive' and args:
+            raw = args[0]
+            if not isinstance(raw, str) or len(raw.encode()) > 1024*1024:
+                raise OSError(errno.EMSGSIZE, 'native Discord frame exceeds its limit')
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get('op') == 0 and data.get('t') == 'MESSAGE_CREATE':
+                try:
+                    result = capture(client, data.get('d'))
+                    if inspect.isawaitable(result):
+                        if callable(getattr(result, 'close', None)): result.close()
+                        raise TypeError('native capture cannot defer its durable commit')
+                    if type(result) is not bool:
+                        raise TypeError('explicit native capture outcome required')
+                except (sqlite3.Error, Conflict, OSError, TypeError) as error:
+                    # Close this exact socket. KeepAlive must stop while the SDK
+                    # reconnects with the last sequence whose input was durable.
+                    websocket = client.ws
+                    if websocket is not None:
+                        asyncio.get_running_loop().create_task(websocket.close(code=4000))
+                    raise OSError(errno.ENOSPC, 'HAOS native ingress durability unavailable') from error
+        return original(event, *args, **kwargs)
+    client.dispatch = dispatch
+    client._connection.dispatch = dispatch
+    client._enable_debug_events = True
+    client._haos_capture_installed = True
+
+
+def capture_envelope(adapter, client, payload, policy, connector):
+    """Decode a real SDK message before the transport can acknowledge its frame."""
+    import discord
+    if (not isinstance(payload, dict) or payload.get('type', 0) not in {0, 19}
+            or not isinstance(payload.get('content'), str) or not payload['content'].strip()
+            or payload.get('attachments') or payload.get('message_snapshots')):
+        logging.warning('Discord native input refused: unsupported content')
+        return None
+    channel, guild = client._connection._get_guild_channel(payload)
+    message = discord.Message(state=client._connection, channel=channel, data=payload)
+    envelope = source_envelope(adapter, message)
+    if guild is None and payload.get('guild_id'):
+        envelope['scope'] = str(payload['guild_id'])
+    candidates = [envelope]
+    if isinstance(channel, discord.PartialMessageable):
+        candidates = [{**envelope, 'thread': value} for value in ('', envelope['chat'])]
+    admitted = []
+    for candidate in candidates:
+        try: policy.authorize(connector, candidate)
+        except (PermissionError, ValueError): continue
+        admitted.append(candidate)
+    if len(admitted) > 1:
+        raise ValueError('native Discord channel context is ambiguous')
+    if not admitted:
+        logging.warning('Discord source refused by HAOS owner policy')
+        return None
+    return admitted[0]

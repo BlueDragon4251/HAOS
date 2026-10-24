@@ -52,6 +52,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
           "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_discord_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-transport.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
           "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"
