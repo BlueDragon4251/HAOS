@@ -47,6 +47,7 @@ async def _dispatch_owner(adapter, original, message, *args, **kwargs):
 
 
 async def dispatch(adapter, original, message, *args, **kwargs):
+    if getattr(adapter,'_haos_stopping',False):return False
     import asyncio
     tasks = getattr(adapter, '_haos_receive_tasks', None)
     if tasks is None:
@@ -65,6 +66,7 @@ async def dispatch(adapter, original, message, *args, **kwargs):
 
 
 async def dispatch_stored(adapter, original, key, live_message=None):
+    if getattr(adapter,'_haos_stopping',False):return False
     import asyncio
     import discord
     native = adapter._haos_native

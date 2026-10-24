@@ -1,0 +1,62 @@
+{
+  "base_commit": "2bfa0224b838c827ed5290fb15c91ad58513f0b5",
+  "all_five_predecessor_ci_gates_successful": "2bfa0224b838c827ed5290fb15c91ad58513f0b5",
+  "actual_sdk_http_bolt_local_websocket_cases": 9,
+  "full_tests": {
+    "passed": 1021,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1021,
+    "existing_skips": 2
+  },
+  "root_uid_socket_tests": 19,
+  "owner_cli_and_gui_slack_provisioning_enabled": false,
+  "full_slack_outgoing_certainty_complete": false,
+  "external_slack_connected": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "regression_probes": [
+    "gateway",
+    "gateway_ingress",
+    "discord_ingress",
+    "discord_transport",
+    "discord_delivery",
+    "discord_history",
+    "telegram_delivery"
+  ],
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_slack.py",
+      "sha256": "b58d9605ac5101f92c91c03b0d7952cc8dfdaad146637bf9917f2e212eb20b37"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "91c2ced8a214b52ee7e6ad2e75d615895b239a78b1cea90b305e1edc204163e4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_discord.py",
+      "sha256": "9fbbf0db3324ab8eb097bbb7b4fcb3644f791b57c2bf51ce3a405029dc043b1e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "46364e2982152af4304be3c492e75bac8d1b8209003cfbc8b4d175443afc11ce"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "8f818be57dffe0dab1b86b518dbe6f5d308789949fc3e93e976f593d5df0648f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_ingress.py",
+      "sha256": "6a304c8b1b50c86359ccc40275c216161870a6d1c14e3998525b59ec09973052"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "5ef00a1d6bcdfb4e34d4a9865fe076206bee97d49ab6d2b130580b2c471b461d"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "bfab3847bbacae38b431bc23278aac9f7c9fe4d0728af2cffd8c145eb81d6cbc"
+    }
+  ],
+  "contracts_sha256": "328cae278c4ec921df1c94e89e8485b49b90235239fecfdda807d0c6baebe3b5"
+}

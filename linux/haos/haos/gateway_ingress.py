@@ -44,6 +44,9 @@ def durable_adapter(adapter):
                 elif getattr(self.platform, 'value', None) == 'discord':
                     from .gateway_discord import admitted
                     admitted(self, accepted)
+                elif getattr(self.platform, 'value', None) == 'slack':
+                    from .gateway_slack import admitted
+                    admitted(self, accepted)
 
             async def handle_message(self, event):
                 self._haos_admit(event)
@@ -58,6 +61,46 @@ def durable_adapter(adapter):
             return None
         attributes = {'__module__': __name__, '_wire_plugin_handlers': no_plugins,
             '_register_plugin_action_handlers': no_plugins, 'rewire_plugin_handlers': no_plugins}
+        if getattr(adapter.platform,'value',None)=='slack':
+            from . import gateway_slack
+            async def slack_connect(self,*args,**kwargs):
+                with gateway_slack.secret_scope(self._haos_secrets,self._haos_secret_home):
+                    return await original.connect(self,*args,**kwargs)
+            async def slack_dispatch(self,event,payload=None):
+                return await gateway_slack.dispatch(self,original._handle_slack_message,event,payload)
+            async def slack_disconnect(self):
+                with gateway_slack.secret_scope(self._haos_secrets,self._haos_secret_home):
+                    return await original.disconnect(self)
+            async def slack_send(self,chat_id,content,reply_to=None,metadata=None):
+                return await gateway_slack.send_native(self,original.send,chat_id,content,reply_to,metadata)
+            def register_slack(self):
+                async def receive(event,body):await self._handle_slack_message(event,body)
+                self._app.event('message')(receive)
+                self._app.event('app_mention')(receive)
+            def handler_get(self):return self.__dict__.get('_handler')
+            def handler_set(self,value):
+                if value is not None:gateway_slack.install_socket(self,value)
+                self.__dict__['_handler']=value
+            async def no_history(self,**kwargs):return None,[],[]
+            async def no_title(self,*args,**kwargs):return None
+            async def user_name(self,user_id,**kwargs):return user_id
+            async def channel_name(self,channel_id,**kwargs):return channel_id
+            async def human_mentions(self,text,**kwargs):return text
+            def new_slack_client(self,*args,**kwargs):
+                client=original._new_web_client(*args,**kwargs)
+                client.retry_handlers=[]
+                return client
+            attributes.update(connect=slack_connect,disconnect=slack_disconnect,send=slack_send,_handle_slack_message=slack_dispatch,
+                _haos_native_dispatch=staticmethod(original._handle_slack_message),
+                _handler=property(handler_get,handler_set),_register_bolt_handlers=register_slack,
+                _early_reject_unauthorized=lambda self,user,channel,is_dm:not gateway_slack.allowed(self,user,channel),
+                _channel_gate_allows=gateway_slack.channel_allowed,
+                _hydrate_thread_context=no_history,_set_assistant_thread_title=no_title,
+                _resolve_user_name=user_name,_resolve_channel_name=channel_name,_humanize_user_mentions=human_mentions,
+                _reactions_enabled=lambda self:False,_slack_allow_bots=lambda self:'none',
+                _is_block_payload_rejection=staticmethod(lambda error:gateway_slack.block_rejected(original._is_block_payload_rejection,error)),
+                _clear_thread_status_quietly=no_title,stop_typing=no_title,
+                _remember_processed_message_ts=no_plugins,_new_web_client=new_slack_client)
         if getattr(adapter.platform, 'value', None) == 'discord':
             from . import gateway_discord
             async def dispatch_discord(self, message):
@@ -125,6 +168,9 @@ def durable_adapter(adapter):
                 _classify_send_exception=classify_send, _should_attempt_rich=lambda *args, **kwargs: False)
         _CLASSES[original] = type('HAOS' + original.__name__, (original, DurableIngress), attributes)
     adapter.__class__ = _CLASSES[original]
+    if getattr(adapter.platform,'value',None)=='slack':
+        from . import gateway_slack
+        adapter._dedup=gateway_slack.NativeDedup()
     if getattr(adapter.platform, 'value', None) == 'telegram':
         # Apply to every fresh adapter, including a same-process reconnect.
         # Earlier native receipts can precede HAOS's durable commit. Keep those

@@ -66,7 +66,8 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
 
 def build_adapter(platform: str, credentials: dict):
     if (platform not in SUPPORTED or not isinstance(credentials, dict)
-            or set(credentials) - {"token", "extra"} or not isinstance(credentials.get("extra", {}), dict)):
+            or set(credentials) - ({"token", "extra", "app_token"} if platform=='slack' else {"token", "extra"})
+            or not isinstance(credentials.get("extra", {}), dict)):
         raise ValueError("unsupported adapter configuration")
     # Use the native hardening switch before importing any bundled adapter.
     os.environ["HERMES_SAFE_MODE"] = "1"
@@ -91,11 +92,27 @@ def build_adapter(platform: str, credentials: dict):
         # Native auto-threading, role/slash policy and unrelated channel context
         # cannot widen the exact HAOS-owned route or become agent instructions.
         extra.update(auto_thread=False, free_response_auto_thread=False, history_backfill=False, slash_commands=False)
+    if platform == 'slack':
+        if (not isinstance(credentials.get('token'),str) or not credentials['token'].startswith('xoxb-')
+                or not isinstance(credentials.get('app_token'),str) or not credentials['app_token'].startswith('xapp-')
+                or any(not 16<=len(credentials[key])<=4096 or any(c.isspace() or ord(c)<32 for c in credentials[key])
+                    for key in ('token','app_token'))):
+            raise ValueError('Slack requires separate private bot and Socket Mode app tokens')
+        extra.update(reply_in_thread=False,dm_top_level_threads_as_sessions=False,reactions=False)
     config = PlatformConfig(enabled=True, token=credentials.get("token"), extra=extra)
     if entry.validate_config and not entry.validate_config(config):
         raise ValueError("adapter configuration rejected")
     # Avoid the registry's optional runtime installer: immutable images must never pip-install.
     from .gateway_ingress import durable_adapter
+    if platform == 'slack':
+        import uuid
+        from .gateway_slack import secret_scope
+        home='/var/lib/haos-gateway/private-scope/'+uuid.uuid4().hex
+        secrets={'SLACK_APP_TOKEN':credentials['app_token'],'SLACK_BOT_TOKEN':credentials['token']}
+        with secret_scope(secrets,home):
+            adapter=durable_adapter(entry.adapter_factory(config))
+        adapter._haos_secrets=secrets;adapter._haos_secret_home=home
+        return adapter
     return durable_adapter(entry.adapter_factory(config))
 
 
@@ -119,13 +136,14 @@ async def serve():
     validate_snapshot(snapshot, credentials)
     if pending(config):
         raise PermissionError("gateway owner publication changed during startup")
-    redactor = Redactor([item["token"] for item in credentials["connectors"].values() if item.get("token")])
+    redactor = Redactor([item[key] for item in credentials["connectors"].values()
+        for key in ('token','app_token') if item.get(key)])
     handler = logging.StreamHandler()
     handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] == "discord" for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -165,10 +183,11 @@ async def serve():
                 logging.warning("Gateway authorization policy unavailable")
                 return False
         adapter.set_authorization_check(authorize)
-        if connector["platform"] == "discord":
+        if connector['platform'] in {'discord','slack'}:
             from types import SimpleNamespace
+            adapter._haos_native = SimpleNamespace(inbox=native_inbox,connector=connector['id'],policy=current_policy)
+        if connector["platform"] == "discord":
             from . import gateway_discord
-            adapter._haos_native = SimpleNamespace(inbox=native_inbox, connector=connector["id"], policy=current_policy)
             def capture(client, payload, connector=connector, adapter=adapter):
                 try:
                     current = current_policy()
@@ -201,13 +220,18 @@ async def serve():
                 current = current_policy()
                 if native_inbox is not None:
                     for connector_id, adapter in adapters.items():
-                        if policy.connectors[connector_id]["platform"] == "discord" and adapter.is_connected:
+                        platform=policy.connectors[connector_id]['platform']
+                        if platform in {'discord','slack'} and adapter.is_connected:
                             key = native_inbox.due(connector_id)
                             if key is not None:
                                 try:
-                                    await asyncio.wait_for(gateway_discord.dispatch_stored(adapter, adapter._haos_native_dispatch, key), 15)
+                                    if platform=='slack':
+                                        from . import gateway_slack
+                                        dispatch=gateway_slack.dispatch_stored
+                                    else:dispatch=gateway_discord.dispatch_stored
+                                    await asyncio.wait_for(dispatch(adapter,adapter._haos_native_dispatch,key),15)
                                 except (OSError, ValueError, Conflict, TimeoutError):
-                                    logging.warning("Native Discord input deferred for recovery")
+                                    logging.warning("Native gateway input deferred for recovery")
                 incoming = inbox.next(current)
                 if incoming:
                     try:
@@ -245,6 +269,7 @@ async def serve():
                 pass
     finally:
         stop.set()
+        for adapter in adapters.values():adapter._haos_stopping=True
         await asyncio.gather(*tasks, return_exceptions=True)
         receivers = {task for adapter in adapters.values() for task in getattr(adapter, '_haos_receive_tasks', set())}
         for task in receivers:

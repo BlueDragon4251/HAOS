@@ -470,3 +470,43 @@ Local fixtures do not establish external Discord permissions or live recovery.
 The service needs a correct system clock and the bot's view-channel/read-history
 permissions. Already deleted remote messages cannot be recovered. Media/voice
 remain refused, and the other twenty gateways remain separate implementation work.
+
+## Slack native ingress contracts in progress (2026-10-24)
+
+The runtime and private policy parser now understand Slack for actual bundled
+adapter/SDK contract tests. Owner CLI and graphical provisioning still reject
+Slack; it is not yet counted as a third configured GUI transport. Outgoing HTTP
+certainty, private two-token owner setup, recovery and GUI integration still need
+their own completed evidence before provisioning is enabled.
+
+The private native adapter receives distinct bot and Socket Mode app tokens
+through the actual Hermes task-local secret resolver, with a separate provenance
+home and no process-environment injection. SDK child tasks inherit only that
+scope. Missing profile credentials cannot fall back to another profile's ambient
+provider keys. Both gateway credentials enter service-side log redaction.
+
+The exact sender/workspace/channel/thread is checked before native preparation.
+Only authenticated workspace clients can capture. The actual SDK Socket Mode
+listener commits the bounded private raw journal before invoking Bolt and its
+transport ACK. Unknown/unsupported sources receive an explicit transport refusal
+without HAOS authority. Actual native message parsing enters the independent
+relay; raw claims and policy generations own replay instead of the native
+volatile team+timestamp cache. Decoder failure after ACK remains recoverable.
+
+Only message/app-mention Bolt listeners are registered. Native slash/actions,
+app-context lifecycle, automatic thread/history hydration, reactions, assistant
+status/title writes and media downloads are excluded. Channel and group messages
+still require a bot mention; a directly paired 1:1 DM does not. Out-of-context
+native user authorization fails closed. SDK HTTP retry handlers are removed and
+block-format fallback requires a typed confirmed HTTP 200/400 refusal. Initial
+outbound guards require the authenticated workspace and an exact channel/thread;
+their full HTTP/outbox validation is still pending.
+
+Nine actual SDK/HTTP/Bolt/local-WebSocket cases cover parallel secret scopes,
+independent-reader commit before ACK, duplicate transport envelopes, unknown
+sender/channel/workspace, failed raw commit with no ACK, decoder failure after
+ACK and reopened replay, exact threads, revocation and late callbacks against a
+closed journal. The latter cannot access a closed database or acknowledge fresh
+input during service shutdown. Mandatory probe: `probe_slack_ingress.py`.
+Receipts: `docs/evidence/2026-10-24/slack-native-ingress-validation.json`.
+No live Slack connection or external message delivery is claimed.
