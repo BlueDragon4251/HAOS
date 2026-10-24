@@ -87,6 +87,10 @@ def build_adapter(platform: str, credentials: dict):
     if platform == "telegram":
         # Reboot/reconnect must not discard messages waiting at the authentic transport.
         extra["drop_pending_on_cold_boot"] = False
+    if platform == "discord":
+        # Native auto-threading, role/slash policy and unrelated channel context
+        # cannot widen the exact HAOS-owned route or become agent instructions.
+        extra.update(auto_thread=False, free_response_auto_thread=False, history_backfill=False, slash_commands=False)
     config = PlatformConfig(enabled=True, token=credentials.get("token"), extra=extra)
     if entry.validate_config and not entry.validate_config(config):
         raise ValueError("adapter configuration rejected")
@@ -157,6 +161,14 @@ async def serve():
                 logging.warning("Gateway authorization policy unavailable")
                 return False
         adapter.set_authorization_check(authorize)
+        if connector["platform"] == "discord":
+            def authorize_source(envelope, connector=connector):
+                try:
+                    current_policy().authorize(connector["id"], envelope)
+                    return True
+                except (PermissionError, ValueError):
+                    return False
+            adapter._haos_source_authorizer = authorize_source
         tasks.append(asyncio.create_task(maintain(adapter, stop)))
     try:
         while not stop.is_set():

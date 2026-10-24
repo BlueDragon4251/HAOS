@@ -658,6 +658,10 @@ class Wizard:
             identity = self._field(self.content, "HAOS-Identität", "personal")
             self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
                         size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            self._label(self.content, "Discord: Server-ID als Bereich angeben. Für einen Thread dessen ID sowohl als Chat-ID "
+                "als auch als Thread-ID eintragen. In Server-Kanälen den Bot direkt erwähnen. "
+                "Automatische neue Threads und native Slash-Menüs sind nicht freigegeben.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=6)
             rights = {}
             for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
                     ("cancel", "Eigene Missionen abbrechen"), ("answer", "Rückfragen und Freigaben beantworten"),

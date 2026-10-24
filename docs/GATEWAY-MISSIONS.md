@@ -312,3 +312,37 @@ Telegram/Discord native contracts also pass. Source hashes and complete receipts
 are in `docs/evidence/2026-10-24/telegram-delivery-validation.json`. All five CI
 gates for `4fdc7e7` passed. No external messages or installed/live Telegram
 acceptance are claimed.
+
+## Discord's full native receiving path uses exact HAOS grants (2026-10-24)
+
+The actual native Discord entrypoint on archived `222f6cb` rejected an exactly
+HAOS-paired sender because its separate native allowlists were empty. HAOS now
+authorizes the complete actual SDK sender/guild/channel/thread tuple before
+native preparation and scopes the native user gate to that one receiving call.
+Native env, role, pairing and allow-all options cannot authorize another source;
+out-of-context native auth remains denied. The final durable inbox independently
+checks current owner policy again. Native dedup is consumed only after HAOS
+commits, so a failed SQLite write can retry the same actual SDK message.
+
+Native automatic new threads, extra channel-history context, slash-menu handlers
+and the separate native response ledger are excluded: they do not own HAOS
+authority or its sole reply obligations. Unsupported media is refused before
+any native download/transcription. The GUI explains that a Discord thread uses
+its own ID for both chat and thread, with the guild ID as scope, and that server
+channel messages must directly mention the bot.
+
+Seven required native SDK/SQLite cases cover exact channel admission, other
+sender/guild/channel rejection even with native allow-all enabled, failed-write
+retry, committed dedup, early media refusal, exact actual SDK thread routing,
+and revocation/out-of-context refusal. Full/minimal suites pass **993 tests, two
+existing skips**; actual Telegram outgoing/polling and shared adapter contracts
+pass. Tk pages also render at both display sizes. Receipts bind exact sources in
+`docs/evidence/2026-10-24/discord-native-ingress-validation.json`. All five gates
+for `222f6cb` passed. No external Discord connection, WebSocket sequence/heartbeat
+durability or complete media/voice acceptance is inferred from these cases.
+
+Inspection of the actual Discord HTTP serializer also confirms that its generated
+nonce carries `enforce_nonce=True`. HTTP retries there must be assessed against
+that real server idempotency contract; they are not presumed to be the same
+unsafe replay reproduced for Telegram. Durable Discord transport capture and
+outbound certainty still require separate implementation/proof.

@@ -41,6 +41,9 @@ def durable_adapter(adapter):
                     from .gateway_telegram import admitted
                     admitted()
                     self._accept_update()
+                elif getattr(self.platform, 'value', None) == 'discord':
+                    from .gateway_discord import admitted
+                    admitted(self, accepted)
 
             async def handle_message(self, event):
                 self._haos_admit(event)
@@ -55,6 +58,22 @@ def durable_adapter(adapter):
             return None
         attributes = {'__module__': __name__, '_wire_plugin_handlers': no_plugins,
             '_register_plugin_action_handlers': no_plugins, 'rewire_plugin_handlers': no_plugins}
+        if getattr(adapter.platform, 'value', None) == 'discord':
+            from . import gateway_discord
+            async def dispatch_discord(self, message):
+                return await gateway_discord.dispatch(self, original._dispatch_discord_message, message)
+            async def dispatch_recovered(self, message):
+                return await gateway_discord.dispatch(self, original._dispatch_recovered_message, message)
+            def discord_allowed(self, *args, **kwargs):
+                return gateway_discord.allowed(self, *args, **kwargs)
+            def discord_admission(self, message, *, claim):
+                return original._discord_message_admission(self, message, claim=False)
+            async def record_response(self, reply_to, result, content, final, metadata=None):
+                # HAOS owns the sole persistent reply/recovery obligation.
+                return result
+            attributes.update(_dispatch_discord_message=dispatch_discord, _dispatch_recovered_message=dispatch_recovered,
+                _is_allowed_user=discord_allowed, _discord_message_admission=discord_admission,
+                _record_response_async=record_response)
         if getattr(adapter.platform, 'value', None) == 'telegram':
             from . import gateway_telegram
             def register_handlers(self, app):
