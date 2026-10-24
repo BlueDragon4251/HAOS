@@ -589,3 +589,28 @@ existing skips; 26 real root/UID/socket gateway cases and both Tk sizes pass.
 Receipts: `docs/evidence/2026-10-24/slack-history-validation.json`.
 All five CI gates for predecessor `8b4da84` passed. No live Slack delivery,
 permission, retention or media/voice acceptance is inferred from local fixtures.
+
+## Graphical outgoing-delivery recovery (2026-10-24)
+
+The trusted local gateway management page now exposes the existing private
+outbox recovery actions. Inspection stops all mission and provider services
+before reading paginated metadata. An owner can record an inspected platform
+message identity, explicitly confirm non-delivery before releasing one bounded
+retry, or discard further delivery while retaining the stored data. Existing
+platform-specific receipt, current-grant, attempt-budget and private-UID checks
+remain authoritative. Notes are hashed by the existing recovery backend.
+
+Services remain stopped after a decision. A separate fixed service-start action
+requires completed administrator/recovery setup, a ready normal user, and no
+firstboot operation in progress. The same fixed owner action serves the console
+and graphical management path. No service name or shell command is supplied by
+the UI. Failures propagate to the existing expandable error display.
+
+Both full and minimal Python environments pass 1038 tests with two existing
+skips; 26 actual root/UID/socket gateway cases pass unchanged. Native Tk fixtures
+exercise the selected receipt and explicit retry confirmation at 1280×800 and
+640×480. Service invocation is a local command-contract test, not an installed
+systemd or external-delivery acceptance. Source-bound receipt:
+`docs/evidence/2026-10-24/gateway-outbox-gui-validation.json`. Fresh GitHub CI
+verification was unavailable because the API rejected the configured credentials
+with HTTP 401; no successful CI result is inferred for this change.

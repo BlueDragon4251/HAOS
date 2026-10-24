@@ -495,6 +495,49 @@ def gateway_process_status():
     return values
 
 
+def gateway_deliveries(after=0):
+    require_root()
+    if type(after) is not int or after<0:raise ValueError('invalid delivery cursor')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup()
+    return owner_gateway(SimpleNamespace(gateway_action='deliveries',after=after))
+
+
+def reconcile_gateway_delivery(row,decision,note,receipt=None,confirmed_not_delivered=False):
+    require_root()
+    import re
+    if (not isinstance(row,dict) or not isinstance(row.get('delivery_id'),str)
+            or not re.fullmatch('[0-9a-f]{64}',row['delivery_id'])
+            or type(row.get('attempt')) is not int or not 1<=row['attempt']<=5
+            or row.get('state') not in {'sending','uncertain','failed'}
+            or decision not in {'delivered','retry','discard'} or not isinstance(note,str)
+            or not 1<=len(note.strip())<=2000 or type(confirmed_not_delivered) is not bool):
+        raise ValueError('select an unresolved delivery and provide bounded non-secret inspection evidence')
+    if decision=='delivered':
+        if not isinstance(receipt,str) or not 1<=len(receipt)<=64 or any(ord(c)<33 or ord(c)>126 for c in receipt):
+            raise ValueError('record the inspected platform message identity')
+    elif receipt is not None and receipt!='':raise ValueError('only confirmed delivery accepts a receipt')
+    if decision=='retry' and not confirmed_not_delivered:
+        raise PermissionError('retry requires explicit evidence that the previous attempt was not delivered')
+    if decision!='retry' and confirmed_not_delivered:raise ValueError('non-delivery confirmation applies only to retry')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup()
+    return owner_gateway(SimpleNamespace(gateway_action='reconcile-delivery',delivery_id=row['delivery_id'],attempt=row['attempt'],
+        decision=decision,note=note,receipt=receipt if decision=='delivered' else None,
+        confirm_not_delivered=confirmed_not_delivered))
+
+
+def resume_runtime():
+    require_root()
+    if not account_status()['complete'] or not normal_user_ready() or setup_in_progress():
+        raise PermissionError('complete administrator, recovery and normal-user setup before starting mission services')
+    from .owner import runtime_action
+    runtime_action('start')
+    return {'started':True}
+
+
 def acknowledge_recovery(username: str):
     """Only the trusted root window after *displaying* all recovery codes."""
     require_root()

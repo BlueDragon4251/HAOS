@@ -771,6 +771,51 @@ class Wizard:
                 self._run_async(lambda: initial_setup.gateway_ingress(after),
                     success="Private Eingangsmetadaten geladen. Gateway-Dienst bleibt gestoppt.", result_handler=show_ingress)
             self._button(self.content, "Gateway-Dienst stoppen und gespeicherte Eingänge prüfen", load_ingress).pack(anchor="w", pady=6)
+            self._label(self.content,"Ausgehende Antworten · ungeklärte Zustellung",color=self.CYAN,
+                size=13,bold=True).pack(anchor="w",pady=(14,0))
+            self._label(self.content,"Diese Prüfung stoppt Gateway, Controller, Hermes und Provider. Prüfe den tatsächlichen "
+                "Empfang in der Plattform. Erneutes Senden ist nur nach bestätigter Nichtzustellung erlaubt. "
+                "Verwerfen führt keine weitere Zustellung aus und erhält die gespeicherten Daten.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
+            delivery_frame=tk.Frame(self.content,bg=self.PANEL);delivery_frame.pack(fill="x",pady=4)
+            def show_deliveries(value):
+                for child in delivery_frame.winfo_children():child.destroy()
+                rows=value['deliveries']
+                if not rows:
+                    self._label(delivery_frame,"Keine weiteren ungeklärten Zustellungen.",size=10,color=self.MUTED).pack(anchor="w")
+                    return
+                choices={row['delivery_id']+' · '+row['state']+' · Versuch '+str(row['attempt']):row for row in rows}
+                selected=self._choice(delivery_frame,"Gespeicherte Zustellung",list(choices),next(iter(choices)),width=24 if self.compact else 48)
+                details=self._label(delivery_frame,"",size=10,color=self.MUTED);details.pack(anchor="w",pady=4)
+                def delivery_details(*_args):
+                    details.configure(text='Mission: '+choices[selected.get()]['mission_id'])
+                selected.trace_add('write',delivery_details);delivery_details()
+                receipt=self._field(delivery_frame,"Nur für bestätigt zugestellt · tatsächliche Plattform-Nachrichten-ID")
+                note=self._field(delivery_frame,"Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")
+                not_delivered=tk.BooleanVar(value=False)
+                tk.Checkbutton(delivery_frame,text="Ich habe geprüft: Der vorige Versuch wurde nicht zugestellt",
+                    variable=not_delivered,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,
+                    activebackground=self.PANEL,wraplength=self.label_wrap,justify='left').pack(anchor="w",pady=4)
+                def decide_delivery(decision):
+                    from tkinter import messagebox
+                    row,evidence,remote_id,confirmation=choices[selected.get()],note.get(),receipt.get(),not_delivered.get()
+                    prompts={'delivered':'Zustellung anhand der angegebenen Plattform-ID als bestätigt erfassen?',
+                        'retry':'Nach geprüfter Nichtzustellung einen weiteren begrenzten Sendeversuch freigeben?',
+                        'discard':'Weitere Zustellung ausschließen und die gespeicherten Daten erhalten?'}
+                    if messagebox.askyesno('Ausgehende Gateway-Antwort',prompts[decision]):
+                        self._run_async(lambda:initial_setup.reconcile_gateway_delivery(row,decision,evidence,remote_id or None,confirmation),
+                            success="Owner-Entscheidung gespeichert. Dienste bleiben gestoppt.",
+                            result_handler=lambda _:load_deliveries())
+                for decision,label in (('delivered','Anhand Plattform-ID als zugestellt erfassen'),
+                        ('retry','Nach bestätigter Nichtzustellung erneut versuchen'),('discard','Weitere Zustellung verwerfen · Daten erhalten')):
+                    self._button(delivery_frame,label,lambda selected_decision=decision:decide_delivery(selected_decision)).pack(anchor="w",pady=4)
+                self._button(delivery_frame,'Nächste Zustellungen anzeigen',lambda:load_deliveries(value['next_cursor'])).pack(anchor="w",pady=4)
+            def load_deliveries(after=0):
+                self._run_async(lambda:initial_setup.gateway_deliveries(after),
+                    success="Private Zustellmetadaten geladen. Alle Missionsdienste bleiben gestoppt.",result_handler=show_deliveries)
+            self._button(self.content,'Missionsdienste stoppen und ungeklärte Zustellungen prüfen',load_deliveries).pack(anchor="w",pady=6)
+            self._button(self.content,'Missionsdienste nach Wiederherstellung starten',lambda:self._run_async(initial_setup.resume_runtime,
+                success="Dienststart angefordert. Aktuellen Status prüfen; dies bestätigt keine externe Zustellung.")).pack(anchor="w",pady=6)
             self._label(self.content,
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",

@@ -37,6 +37,21 @@ def audit(kind: str, details: dict):
         os.close(fd)
 
 
+def runtime_action(verb):
+    """Fixed owner action shared by console and trusted local management UI."""
+    if os.geteuid()!=0:raise PermissionError('runtime management requires authenticated owner authority')
+    if verb not in {'stop','start'}:raise ValueError('invalid owner runtime action')
+    units=['haos-controller.service','haos-hermes.service','haos-policy.service']
+    if verb=='stop':subprocess.run(['/usr/bin/systemctl','stop','haos-gateway.service'],check=True,timeout=60)
+    if verb=='start' and Path('/etc/haos/provider.json').exists():
+        subprocess.run(['/usr/bin/systemctl','start','haos-provider.socket'],check=True,timeout=60)
+    subprocess.run(['/usr/bin/systemctl',verb,*units],check=True,timeout=60)
+    if verb=='stop':
+        subprocess.run(['/usr/bin/systemctl','stop','haos-provider.socket','haos-provider.service'],check=True,timeout=60)
+    else:subprocess.run(['/usr/bin/systemctl','start','haos-gateway.service'],check=True,timeout=60)
+    audit('runtime.'+verb,{})
+
+
 def _kernel_virtual_terminal(device: str) -> bool:
     """Only actual Linux kernel VTs, never pseudo-terminals, symlinks or serial TTYs."""
     if not isinstance(device, str) or not device.startswith("/dev/tty"):
@@ -340,18 +355,7 @@ def main():
         print(json.dumps({"policy": trusted_json(Path("/etc/haos/volumes.json")), "devices": inventory(),
                           "runtime_volumes": trusted_json(runtime) if runtime.exists() or runtime.is_symlink() else None}, indent=2))
     elif args.action in {"stop", "start"}:
-        verb = args.action
-        units = ["haos-controller.service", "haos-hermes.service", "haos-policy.service"]
-        if verb == "stop":
-            subprocess.run(["/usr/bin/systemctl", "stop", "haos-gateway.service"], check=True)
-        if verb == "start" and Path("/etc/haos/provider.json").exists():
-            subprocess.run(["/usr/bin/systemctl", "start", "haos-provider.socket"], check=True)
-        subprocess.run(["/usr/bin/systemctl", verb, *units], check=True)
-        if verb == "stop":
-            subprocess.run(["/usr/bin/systemctl", "stop", "haos-provider.socket", "haos-provider.service"], check=True)
-        if verb == "start":
-            subprocess.run(["/usr/bin/systemctl", "start", "haos-gateway.service"], check=True)
-        audit(f"runtime.{verb}", {})
+        runtime_action(args.action)
     elif args.action == "volume":
         stopped()
         policy = trusted_json(Path("/etc/haos/volumes.json"))

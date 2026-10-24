@@ -410,6 +410,26 @@ jobs:
           settle_owner_operation()
           assert setup_calls == [("slack-main", "slack", "xoxb-" + "x" * 24, "xapp-" + "y" * 24)]
           assert not bot_entry.get() and not app_entry.get()
+          # Outgoing reconciliation carries an exact saved attempt and explicit
+          # non-delivery evidence; it never infers success from local UI state.
+          delivery_calls = []
+          delivery_row = {"delivery_id": "c" * 64, "attempt": 1, "state": "uncertain", "mission_id": "00000000-0000-4000-8000-000000000001"}
+          initial_setup.gateway_deliveries = lambda after=0: {"deliveries": [delivery_row], "next_cursor": 1}
+          initial_setup.reconcile_gateway_delivery = lambda *args: delivery_calls.append(args)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Missionsdienste stoppen und ungeklärte Zustellungen prüfen").invoke()
+          settle_owner_operation()
+          outbox_frame = next(parent for parent in wizard.content.winfo_children()
+                              if any(isinstance(item, tkinter.Button) and item.cget("text") == "Nach bestätigter Nichtzustellung erneut versuchen"
+                                     for item in parent.winfo_children()))
+          entries = [item for item in outbox_frame.winfo_children() if isinstance(item, tkinter.Entry)]
+          assert len(entries) == 2
+          entries[1].insert(0, "Remote Empfang geprüft")
+          next(item for item in outbox_frame.winfo_children() if isinstance(item, tkinter.Checkbutton)).invoke()
+          next(item for item in outbox_frame.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Nach bestätigter Nichtzustellung erneut versuchen").invoke()
+          settle_owner_operation()
+          assert delivery_calls == [(delivery_row, "retry", "Remote Empfang geprüft", None, True)]
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY
@@ -452,6 +472,16 @@ jobs:
           wizard.root.setvar(menu.cget('textvariable'), 'slack')
           wizard.root.update()
           assert wizard.root.winfo_reqwidth() <= 640, 'Slack credentials overflow the small setup screen'
+          import time
+          initial_setup.gateway_deliveries = lambda after=0: {"deliveries": [{"delivery_id": "c" * 64, "attempt": 1,
+              "state": "uncertain", "mission_id": "00000000-0000-4000-8000-000000000001"}], "next_cursor": 1}
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Missionsdienste stoppen und ungeklärte Zustellungen prüfen").invoke()
+          for _ in range(80):
+              wizard.root.update()
+              if not wizard.running: break
+              time.sleep(.02)
+          assert not wizard.running and wizard.root.winfo_reqwidth() <= 640, 'outbox recovery overflows the compact screen'
           wizard.root.destroy()
           print('All seven setup pages render within a 640x480 X screen')
           PY

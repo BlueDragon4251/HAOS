@@ -19,6 +19,9 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.gateway_process_status(),
         lambda: initial_setup.gateway_ingress(),
         lambda: initial_setup.reconcile_gateway_ingress({}, 'retry', 'fixture'),
+        lambda: initial_setup.gateway_deliveries(),
+        lambda: initial_setup.reconcile_gateway_delivery({},'retry','fixture'),
+        lambda: initial_setup.resume_runtime(),
     ):
         with pytest.raises(PermissionError):
             call()
@@ -65,6 +68,67 @@ def test_graphical_slack_setup_keeps_two_credentials_private_and_rejects_bad_inp
     assert saved[0][1]=={'connectors':{'slack-main':{'token':bot,'app_token':app}}}
     assert calls[0]=={'gateway_only':True}
     assert bot not in repr(calls) and app not in repr(calls)
+
+
+def test_graphical_delivery_retry_requires_owner_evidence_before_quiescing(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(('stop',kwargs)))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(('owner',vars(args))))
+    row={'delivery_id':'a'*64,'attempt':1,'state':'uncertain'}
+    with pytest.raises(ValueError):initial_setup.gateway_deliveries(-1)
+    with pytest.raises(PermissionError):initial_setup.reconcile_gateway_delivery(row,'retry','inspected')
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_delivery(row,'delivered','inspected',None)
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_delivery(row,'discard','inspected',None,True)
+    assert calls==[]
+    initial_setup.gateway_deliveries(5)
+    initial_setup.reconcile_gateway_delivery(row,'retry','inspected',None,True)
+    assert calls==[('stop',{}),('owner',{'gateway_action':'deliveries','after':5}),('stop',{}),
+        ('owner',{'gateway_action':'reconcile-delivery','delivery_id':'a'*64,'attempt':1,'decision':'retry',
+            'note':'inspected','receipt':None,'confirm_not_delivered':True})]
+
+
+@pytest.mark.parametrize('gate',['administrator','user','incomplete-wizard'])
+def test_graphical_runtime_start_cannot_bypass_firstboot_gates(monkeypatch,gate):
+    from haos import owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'account_status',lambda:{'complete':gate!='administrator'})
+    monkeypatch.setattr(initial_setup,'normal_user_ready',lambda:gate!='user')
+    monkeypatch.setattr(initial_setup,'setup_in_progress',lambda:gate=='incomplete-wizard')
+    calls=[];monkeypatch.setattr(owner,'runtime_action',lambda verb:calls.append(verb))
+    with pytest.raises(PermissionError):initial_setup.resume_runtime()
+    assert calls==[]
+
+
+def test_completed_owner_runtime_start_uses_fixed_existing_owner_action(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'account_status',lambda:{'complete':True})
+    monkeypatch.setattr(initial_setup,'normal_user_ready',lambda:True)
+    monkeypatch.setattr(initial_setup,'setup_in_progress',lambda:False)
+    calls=[];monkeypatch.setattr(owner,'runtime_action',lambda verb:calls.append(verb))
+    assert initial_setup.resume_runtime()=={'started':True} and calls==['start']
+
+
+def test_owner_runtime_action_uses_only_fixed_units_and_preserves_policy_start(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr(owner.os,'geteuid',lambda:0)
+    monkeypatch.setattr(owner,'Path',lambda value:SimpleNamespace(exists=lambda:value=='/etc/haos/provider.json'))
+    calls=[];events=[]
+    monkeypatch.setattr(owner.subprocess,'run',lambda args,**kwargs:calls.append((args,kwargs)))
+    monkeypatch.setattr(owner,'audit',lambda kind,details:events.append((kind,details)))
+    with pytest.raises(ValueError):owner.runtime_action('restart-anything')
+    assert calls==[]
+    owner.runtime_action('start')
+    assert [args for args,_ in calls]==[
+        ['/usr/bin/systemctl','start','haos-provider.socket'],
+        ['/usr/bin/systemctl','start','haos-controller.service','haos-hermes.service','haos-policy.service'],
+        ['/usr/bin/systemctl','start','haos-gateway.service']]
+    assert all(options=={'check':True,'timeout':60} for _,options in calls)
+    assert events==[('runtime.start',{})]
+    monkeypatch.setattr(owner.os,'geteuid',lambda:1000)
+    with pytest.raises(PermissionError):owner.runtime_action('start')
 
 
 def test_initial_owner_requires_repeated_password_before_stopping_services(monkeypatch):
