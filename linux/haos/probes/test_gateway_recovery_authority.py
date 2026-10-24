@@ -84,7 +84,8 @@ print(json.dumps({'uid':os.geteuid(),'owner_secret_denied':True,'result':result}
 
 
 @pytest.mark.parametrize("decision", ["retry", "delivered", "discard"])
-def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision):
+@pytest.mark.parametrize('platform',['telegram','slack'])
+def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision,platform):
     tmp_path = uid_fixture_path
     assert os.geteuid() == 0, "run this explicit UID fixture as root"
     tmp_path.chmod(0o755)
@@ -102,10 +103,14 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     config = {"version": 1, "connectors": [{"id": "first", "platform": "telegram"}],
               "bindings": [{"id": "device", "connector": "first", "sender": "42", "chat": "42", "scope": "",
                             "thread": "", "identity": "principal", "capabilities": ["create", "read"]}]}
+    if platform=='slack':
+        config['connectors'][0]['platform']='slack'
+        config['bindings'][0].update(sender='U42',chat='D42',scope='T999')
     policy = GatewayPolicy(config)
     engine = GatewayEngine(store)
-    mission = asyncio.run(engine.receive(policy, "first", {"platform": "telegram", "sender": "42", "chat": "42",
-        "scope": "", "thread": "", "message_id": "1", "is_bot": False, "text": "Local UID fixture"}, None))
+    source=config['bindings'][0]
+    mission = asyncio.run(engine.receive(policy, "first", {"platform": platform,"sender":source['sender'],"chat":source['chat'],
+        "scope":source['scope'],"thread":"","message_id":"1","is_bot":False,"text":"Local UID fixture"},None))
     delivery = engine.next_delivery(policy)
     engine.acknowledge(policy, delivery["id"], {"attempt": 1, "status": "uncertain"})
     store.close()
@@ -118,7 +123,7 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     canary.chmod(0o600)
     payload = {"path": str(path), "canary": str(canary), "policy": config,
                "request": {"delivery_id": delivery["id"], "attempt": 1, "decision": decision, "owner_uid": 1000,
-                           "note_sha256": "a" * 64, "receipt": "42" if decision == "delivered" else None,
+                           "note_sha256": "a" * 64, "receipt": ("1792800000.000042" if platform=='slack' else "42") if decision == "delivered" else None,
                            "confirmed_not_delivered": decision == "retry"}}
     code = '''
 import json,os,sys

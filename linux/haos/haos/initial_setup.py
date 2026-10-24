@@ -374,18 +374,19 @@ def configure_moa(name, value):
     return result
 
 
-def configure_gateway(connector: str, platform: str, token: str):
-    """Graphical root-seat setup for HAOS's TWO authorized message adapters.
-
-    Upstream Hermes lists more platform plugins, but HAOS's ingress authorization
-    currently supports only these two. Never auto-authorize upstream modules.
-    """
+def configure_gateway(connector: str, platform: str, token: str, app_token: str = ''):
+    """Graphical root-seat setup for explicitly integrated native adapters."""
     require_root()
-    if platform not in {"telegram", "discord"}:
+    if platform not in {"telegram", "discord", "slack"}:
         raise ValueError("HAOS has not approved this platform for gateway execution")
     if (not isinstance(token, str) or not 16 <= len(token) <= 4096
             or any(c.isspace() or ord(c) < 32 for c in token)):
         raise ValueError("invalid protected gateway credential")
+    if platform=='slack':
+        from .gateway_slack import validate_credentials
+        validate_credentials(token,app_token)
+    elif app_token:
+        raise ValueError('an app token applies only to Slack')
     from .gateway_setup import load, persist, stopped_gateway
     from .gateway import GatewayPolicy
     from .owner import audit
@@ -397,6 +398,7 @@ def configure_gateway(connector: str, platform: str, token: str):
         {"id": connector, "platform": platform}]
     GatewayPolicy(policy)
     credentials["connectors"][connector] = {"token": token}
+    if platform=='slack':credentials['connectors'][connector]['app_token']=app_token
     persist(policy, credentials)
     audit("setup.gateway", {"connector": connector, "platform": platform})
     return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}

@@ -10,9 +10,9 @@ describe('HAOS gateway status is not misleading', () => {
     expect(GATEWAYS).toContain('teams')
   })
   it('does not silently authorize unintegrated platforms', () => {
-    expect([...HAOS_APPROVED_GATEWAYS].sort()).toEqual(['discord', 'telegram'])
+    expect([...HAOS_APPROVED_GATEWAYS].sort()).toEqual(['discord', 'slack', 'telegram'])
     for (const p of GATEWAYS) {
-      if (p !== 'discord' && p !== 'telegram') expect(HAOS_APPROVED_GATEWAYS.has(p)).toBe(false)
+      if (p !== 'discord' && p !== 'telegram' && p !== 'slack') expect(HAOS_APPROVED_GATEWAYS.has(p)).toBe(false)
     }
   })
 })

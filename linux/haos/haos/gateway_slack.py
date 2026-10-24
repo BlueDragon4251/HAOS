@@ -3,9 +3,17 @@ import asyncio
 from contextlib import contextmanager
 from contextvars import ContextVar
 import re
+from types import SimpleNamespace
 
 _CURRENT = ContextVar('haos_slack_owner_source',default=None)
+_SENDING = ContextVar('haos_slack_delivery',default=None)
 _TS = re.compile(r'[1-9][0-9]{0,15}\.[0-9]{6}\Z')
+
+
+def validate_credentials(bot_token,app_token):
+    for value,prefix in ((bot_token,'xoxb-'),(app_token,'xapp-')):
+        if not isinstance(value,str) or not re.fullmatch(prefix+r'[A-Za-z0-9-]{11,4091}',value):
+            raise ValueError('Slack requires a separate bot token and Socket Mode app token; token lists are not supported')
 
 
 @contextmanager
@@ -133,7 +141,8 @@ def admitted(adapter,accepted):
 def block_rejected(original,error):
     from slack_sdk.errors import SlackApiError
     return (isinstance(error,SlackApiError) and error.response.status_code in {200,400}
-        and error.response.get('ok') is False and original(error))
+        and error.response.get('ok') is False
+        and error.response.get('error') in {'invalid_blocks','msg_too_long','too_many_blocks'} and original(error))
 
 
 async def send_native(adapter,original,chat_id,content,reply_to=None,metadata=None):
@@ -149,15 +158,86 @@ async def send_native(adapter,original,chat_id,content,reply_to=None,metadata=No
         return SendResult(success=False,error='Slack transport unavailable',retryable=True,
             raw_response={'haos_delivery':'not-dispatched'})
     metadata['thread_ts']=thread
-    with secret_scope(adapter._haos_secrets,adapter._haos_secret_home):
-        # Explicit owner thread only. Native reply_to otherwise synthesizes a
-        # new thread for a top-level message, changing its approved context.
-        result=await original(adapter,chat_id,content,None,metadata)
+    state=SimpleNamespace(chat=chat_id,thread=thread,started=False,successful=0,ambiguous=False,
+        error=None,refused=False,connect_failed=False)
+    token=_SENDING.set(state)
+    try:
+        with secret_scope(adapter._haos_secrets,adapter._haos_secret_home):
+            # Explicit owner thread only; no synthetic reply_to thread.
+            result=await original(adapter,chat_id,content,None,metadata)
+    finally:_SENDING.reset(token)
     if result.success is True:
         if (not isinstance(result.message_id,str) or not _TS.fullmatch(result.message_id)
                 or not callable(getattr(result.raw_response,'get',None)) or result.raw_response.get('channel')!=chat_id):
             return SendResult(success=False,error='Slack returned no valid exact-route delivery identity',error_kind='unknown')
+    elif state.ambiguous or state.successful:
+        return SendResult(success=False,error='Slack delivery outcome uncertain',error_kind='unknown')
+    else:
+        from slack_sdk.errors import SlackApiError
+        error=state.error
+        raw=dict(result.raw_response) if isinstance(result.raw_response,dict) else {}
+        if state.refused:
+            result.error_kind='forbidden';raw['haos_delivery']='refused'
+        elif isinstance(error,SlackApiError):
+            status=error.response.status_code
+            code=error.response.get('error')
+            if status==429 and error.response.get('ok') is False and code in {'ratelimited','rate_limited'}:
+                result.error_kind='rate_limited';result.retry_after=adapter._retry_after_from_exc(error)
+                raw['haos_delivery']='refused'
+            elif status in {200,400,401,403,404} and error.response.get('ok') is False and code in {
+                    'invalid_auth','not_authed','token_revoked','account_inactive','missing_scope',
+                    'no_permission','restricted_action','not_in_channel','is_archived',
+                    'channel_not_found','thread_not_found','invalid_blocks','invalid_arguments','msg_too_long'}:
+                result.error_kind=('not_found' if code in {'channel_not_found','thread_not_found'} else
+                    'too_long' if code=='msg_too_long' else 'bad_format' if code in {'invalid_blocks','invalid_arguments'} else 'forbidden')
+                raw['haos_delivery']='refused'
+        elif state.connect_failed or not state.started:
+            result.retryable=True;raw['haos_delivery']='not-dispatched'
+        result.raw_response=raw
     return result
+
+
+_WEB_CLIENTS = {}
+
+
+def install_web_client(client):
+    """Private SDK subclass preserves copy/token semantics of Bolt's real clients."""
+    client.retry_handlers=[]
+    base=type(client)
+    if getattr(base,'_haos_delivery_guard',False):return client
+    if base not in _WEB_CLIENTS:
+        from functools import wraps
+        @wraps(base.api_call)
+        async def call(self,api_method,*args,**kwargs):
+            return await web_call(base.api_call,self,api_method,*args,**kwargs)
+        _WEB_CLIENTS[base]=type('HAOS'+base.__name__,(base,),{
+            '__module__':__name__,'_haos_delivery_guard':True,'api_call':call})
+    client.__class__=_WEB_CLIENTS[base]
+    return client
+
+
+async def web_call(original,client,method,*args,**kwargs):
+    import aiohttp
+    from slack_sdk.errors import SlackApiError
+    state=_SENDING.get()
+    if state is not None:
+        payload=kwargs.get('json')
+        if (method!='chat.postMessage' or not isinstance(payload,dict) or payload.get('channel')!=state.chat
+                or (payload.get('thread_ts') or '')!=state.thread or payload.get('reply_broadcast')):
+            state.refused=True
+            raise PermissionError('Slack send cannot change its approved channel/thread or perform another action')
+        state.started=True
+    try:
+        result=await original(client,method,*args,**kwargs)
+        if state is not None:state.successful+=1
+        return result
+    except Exception as error:
+        if state is not None:
+            state.error=error
+            if isinstance(error,aiohttp.ClientConnectorError):state.connect_failed=True
+            elif not isinstance(error,SlackApiError) or error.response.status_code>=500:
+                state.ambiguous=True
+        raise
 
 
 class NativeDedup:

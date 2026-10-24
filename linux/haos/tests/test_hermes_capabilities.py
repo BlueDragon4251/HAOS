@@ -29,5 +29,6 @@ def test_ui_does_not_label_untested_adapters_as_supported():
     assert providers["copilot-acp"] == "GUI"
     assert gateways["telegram"] == "GUI"
     assert gateways["discord"] == "GUI"
-    for name in ("whatsapp", "matrix", "slack", "feishu", "email"):
+    assert gateways['slack'] == 'GUI'
+    for name in ("whatsapp", "matrix", "feishu", "email"):
         assert gateways[name] == "Nicht integriert"

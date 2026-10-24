@@ -93,11 +93,8 @@ def build_adapter(platform: str, credentials: dict):
         # cannot widen the exact HAOS-owned route or become agent instructions.
         extra.update(auto_thread=False, free_response_auto_thread=False, history_backfill=False, slash_commands=False)
     if platform == 'slack':
-        if (not isinstance(credentials.get('token'),str) or not credentials['token'].startswith('xoxb-')
-                or not isinstance(credentials.get('app_token'),str) or not credentials['app_token'].startswith('xapp-')
-                or any(not 16<=len(credentials[key])<=4096 or any(c.isspace() or ord(c)<32 for c in credentials[key])
-                    for key in ('token','app_token'))):
-            raise ValueError('Slack requires separate private bot and Socket Mode app tokens')
+        from .gateway_slack import validate_credentials
+        validate_credentials(credentials.get('token'),credentials.get('app_token'))
         extra.update(reply_in_thread=False,dm_top_level_threads_as_sessions=False,reactions=False)
     config = PlatformConfig(enabled=True, token=credentials.get("token"), extra=extra)
     if entry.validate_config and not entry.validate_config(config):

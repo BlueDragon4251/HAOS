@@ -138,16 +138,22 @@ def test_real_owner_publication_renews_pairing_epochs_and_preserves_unchanged_gr
 
 
 @pytest.mark.parametrize('interrupted_after', ['journal', 'withdrawal', 'credentials', 'policy'])
-def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_sender_authority(tmp_path, monkeypatch, interrupted_after):
+@pytest.mark.parametrize('credential_field',['token','app_token'])
+def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_sender_authority(tmp_path, monkeypatch, interrupted_after,credential_field):
     from haos import gateway_publication
     assert os.geteuid() == 0, 'actual protected files and owner UID required'
     policy = {'version': 1, 'connectors': [{'id': 'first', 'platform': 'telegram'}], 'bindings': [
         {'id': 'paired', 'connector': 'first', 'sender': '42', 'chat': '42', 'scope': '', 'thread': '',
          'identity': 'principal', 'capabilities': ['create', 'read']}]}
     old_secret = {'connectors': {'first': {'token': 'disposable-old-account-credential'}}}
+    if credential_field=='app_token':
+        policy['connectors'][0]['platform']='slack'
+        policy['bindings'][0].update(sender='U42',chat='C123',scope='T999')
+        old_secret['connectors']['first']={'token':'xoxb-'+'x'*24,'app_token':'xapp-'+'y'*24}
     persist(policy, old_secret, config=tmp_path, gid=0)
     before, _ = load(tmp_path)
-    new_secret = {'connectors': {'first': {'token': 'disposable-new-account-credential'}}}
+    new_secret=copy.deepcopy(old_secret)
+    new_secret['connectors']['first'][credential_field]='xapp-'+'z'*24 if credential_field=='app_token' else 'disposable-new-account-credential'
     original = gateway_publication.atomic_json
     writes = []
     class PowerLoss(Exception): pass
@@ -176,5 +182,6 @@ def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_se
     private = trusted_json(tmp_path/'gateway-credentials')
     gateway_publication.validate_snapshot(public, private)
     assert public['publication'] == private['publication']
-    assert all(value['token'] not in (tmp_path/'gateways.json').read_text() for value in (old_secret['connectors']['first'], new_secret['connectors']['first']))
+    assert all(secret_value not in (tmp_path/'gateways.json').read_text()
+        for account in (old_secret['connectors']['first'],new_secret['connectors']['first']) for secret_value in account.values())
     with pytest.raises(FileNotFoundError): gateway_publication.recover(tmp_path, 0)

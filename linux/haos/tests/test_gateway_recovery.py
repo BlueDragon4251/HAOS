@@ -13,6 +13,27 @@ from haos import gateway_setup, owner
 from haos.store import Conflict, MissionStore
 
 
+@pytest.mark.parametrize('receipt',['42','1.2','0.000001','1792800000.000042'])
+def test_slack_owner_recovery_requires_inspected_platform_timestamp(tmp_path,receipt):
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
+         'identity':'principal','capabilities':['create','read']}]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'bot',{'platform':'slack','sender':'U42','chat':'C123','scope':'T999','thread':'',
+            'message_id':'1792800000.000001','is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy)
+        engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request={'delivery_id':delivery['id'],'attempt':1,'decision':'delivered','owner_uid':1000,
+            'note_sha256':'a'*64,'receipt':receipt,'confirmed_not_delivered':False}
+        if receipt=='1792800000.000042':
+            assert reconcile(store,policy,request)['state']=='delivered'
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()
+
+
 @pytest.fixture
 def outbox(tmp_path):
     tmp_path.chmod(0o700)

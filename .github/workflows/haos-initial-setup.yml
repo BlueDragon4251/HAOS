@@ -241,7 +241,7 @@ jobs:
           pair_calls = []
           initial_setup.pair_gateway_sender = lambda *args, **kwargs: pair_calls.append((args, kwargs))
           for prefix, value in (("Konnektor-ID", "discord-main"), ("Absender-ID", "sender-fixture"),
-                  ("Chat-ID", "channel-fixture"), ("Bereich /", "guild-fixture"), ("Thread-ID", "thread-fixture")):
+                  ("Chat-ID", "channel-fixture"), ("Bereich ·", "guild-fixture"), ("Thread-ID", "thread-fixture")):
               entry = field(prefix)
               entry.delete(0, tkinter.END)
               entry.insert(0, value)
@@ -384,6 +384,32 @@ jobs:
                if isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen").invoke()
           settle_owner_operation()
           assert ingress_calls == [(recovery_row, "retry", "Fixture geprüft")]
+          # Two private Slack inputs must reach the real owner setup interface
+          # and be cleared when changing platform or submitting an operation.
+          setup_calls = []
+          initial_setup.configure_gateway = lambda *args: setup_calls.append(args)
+          wizard.show("gateways")
+          gateway_menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "slack")
+          wizard.root.update()
+          slack_frame = next(parent for parent in wizard.content.winfo_children()
+                             if any(isinstance(item, tkinter.Label) and item.cget("text").startswith("Slack App-Token")
+                                    for item in parent.winfo_children()))
+          app_entry = next(item for item in slack_frame.winfo_children() if isinstance(item, tkinter.Entry))
+          assert slack_frame.winfo_manager() == "pack" and app_entry.cget("show")
+          bot_entry = field("Bot-Token")
+          bot_entry.insert(0, "xoxb-" + "x" * 24); app_entry.insert(0, "xapp-" + "y" * 24)
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "telegram")
+          wizard.root.update()
+          assert not bot_entry.get() and not app_entry.get() and not slack_frame.winfo_manager()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "slack")
+          wizard.root.update()
+          bot_entry.insert(0, "xoxb-" + "x" * 24); app_entry.insert(0, "xapp-" + "y" * 24)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway sicher anlegen").invoke()
+          settle_owner_operation()
+          assert setup_calls == [("slack-main", "slack", "xoxb-" + "x" * 24, "xapp-" + "y" * 24)]
+          assert not bot_entry.get() and not app_entry.get()
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY
@@ -420,6 +446,12 @@ jobs:
           assert wizard.root.winfo_reqwidth() <= 640, "approved-model pickers overflow the small setup screen"
           assert any(isinstance(item, tkinter.Button) and item.cget('text') == 'Modellteam als Standard aktivieren'
                      for item in wizard.content.winfo_children())
+          wizard.show('gateways')
+          wizard.root.update()
+          menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(menu.cget('textvariable'), 'slack')
+          wizard.root.update()
+          assert wizard.root.winfo_reqwidth() <= 640, 'Slack credentials overflow the small setup screen'
           wizard.root.destroy()
           print('All seven setup pages render within a 640x480 X screen')
           PY

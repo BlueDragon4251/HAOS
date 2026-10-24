@@ -21,12 +21,17 @@ def validate_snapshot(policy, credentials):
         raise ValueError('gateway credentials and policy disagree')
     if policy.get('publication') != credentials.get('publication'):
         raise PermissionError('gateway policy and credentials are from different owner publications')
-    for row in credentials['connectors'].values():
-        if (not isinstance(row, dict) or set(row) not in ({'token'}, {'token', 'extra'})
+    platforms={item['id']:item['platform'] for item in policy['connectors']}
+    for name,row in credentials['connectors'].items():
+        required={'token','app_token'} if platforms[name]=='slack' else {'token'}
+        if (not isinstance(row, dict) or set(row) not in (required,required|{'extra'})
                 or not isinstance(row.get('token'), str) or not 16 <= len(row['token']) <= 4096
                 or any(char.isspace() or ord(char) < 32 for char in row['token'])
                 or ('extra' in row and not isinstance(row['extra'], dict))):
             raise ValueError('invalid protected gateway credential')
+        if platforms[name]=='slack':
+            from .gateway_slack import validate_credentials
+            validate_credentials(row['token'],row['app_token'])
     if len(json.dumps(credentials).encode()) > 32768:
         raise ValueError('gateway credentials exceed service bound')
 

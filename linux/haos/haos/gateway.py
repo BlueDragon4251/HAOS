@@ -59,6 +59,13 @@ class GatewayPolicy:
                     raise ValueError("invalid HAOS identity")
             for key in ("sender", "chat", "scope", "thread"):
                 identifier(binding[key], empty=key in {"scope", "thread"})
+            connector = self.connectors.get(binding['connector'])
+            if connector and connector['platform']=='slack':
+                if (not re.fullmatch('[UW][A-Z0-9]+',binding['sender'])
+                        or not re.fullmatch('[CDG][A-Z0-9]+',binding['chat'])
+                        or not re.fullmatch('T[A-Z0-9]+',binding['scope'])
+                        or binding['thread'] and not re.fullmatch(r'[1-9][0-9]{0,15}\.[0-9]{6}',binding['thread'])):
+                    raise ValueError('Slack requires exact user, conversation, workspace and optional thread timestamp IDs')
             capabilities = binding["capabilities"]
             if (not isinstance(capabilities, list) or not capabilities or not set(capabilities) <= CAPABILITIES
                     or len(set(capabilities)) != len(capabilities)):

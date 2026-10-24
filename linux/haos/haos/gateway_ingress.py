@@ -88,8 +88,7 @@ def durable_adapter(adapter):
             async def human_mentions(self,text,**kwargs):return text
             def new_slack_client(self,*args,**kwargs):
                 client=original._new_web_client(*args,**kwargs)
-                client.retry_handlers=[]
-                return client
+                return gateway_slack.install_web_client(client)
             attributes.update(connect=slack_connect,disconnect=slack_disconnect,send=slack_send,_handle_slack_message=slack_dispatch,
                 _haos_native_dispatch=staticmethod(original._handle_slack_message),
                 _handler=property(handler_get,handler_set),_register_bolt_handlers=register_slack,

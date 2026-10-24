@@ -364,3 +364,11 @@ def test_new_grant_records_owner_time_but_keeps_unchanged_legacy_binding(policy_
     # An edit cannot smuggle a backdated history boundary through publication.
     edited={**published,'bindings':[{**published['bindings'][0],'since':1}]}
     assert renewed_policy(edited,published)['bindings'][0]['since']>=before
+
+
+@pytest.mark.parametrize('field,value',[('sender','42'),('chat','U42'),('scope',''),('scope','T*'),('thread','1792800000'),('thread','0.000001')])
+def test_slack_grant_requires_exact_native_ids(field,value):
+    row={'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
+        'identity':'principal','capabilities':['create','read']}
+    row[field]=value
+    with pytest.raises(ValueError):GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[row]})

@@ -22,7 +22,8 @@ Do not release this branch as production-ready on the basis of those tests.
 - Seven responsive, vertically scrollable graphical pages:
   administrator and recovery, normal user, language and keyboard, Hermes
   provider/model, stable/dev image updates with private GHCR credentials,
-  Telegram/Discord bot credentials and sender bindings, and finish/reboot.
+  Telegram/Discord bot credentials, separate Slack bot/Socket Mode app tokens,
+  exact sender/workspace/thread bindings, and finish/reboot.
 - Separate 20+-character owner password validation through HAOS enrollment;
   ten one-time offline recovery codes must be displayed and acknowledged.
   Interrupted attempts and pre-existing owner accounts missing recovery can

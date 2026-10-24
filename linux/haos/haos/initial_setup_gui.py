@@ -637,23 +637,39 @@ class Wizard:
                 success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack"], "telegram")
             token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
-            platform.trace_add("write", lambda *_args: token.delete(0, tk.END))
+            slack_credentials = tk.Frame(self.content,bg=self.PANEL)
+            app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
+            self._label(slack_credentials, "In deiner Slack-App Socket Mode aktivieren und einen App-Token mit connections:write erstellen. "
+                "Den Bot mit chat:write, users:read, app_mentions:read und den Verlaufsrechten der verwendeten Gespräche installieren "
+                "(channels:history, groups:history, im:history bzw. mpim:history). Events app_mention sowie message.channels, "
+                "message.groups, message.im und message.mpim passend abonnieren und den Bot in die freigegebenen Kanäle einladen. "
+                "Socket Mode benötigt keinen öffentlichen Webhook oder Signing-Secret. Tokens bleiben im privaten Gateway-Dienst.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
             def configure():
-                secret = token.get()
+                secret, app_secret = token.get(), app_token.get()
                 token.delete(0, tk.END)
+                app_token.delete(0, tk.END)
                 selected_connector, selected_platform = connector.get(), platform.get()
                 self._run_async(lambda: initial_setup.configure_gateway(
-                    selected_connector, selected_platform, secret),
+                    selected_connector, selected_platform, secret, app_secret),
                     success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
-            self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
+            configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
+            configure_button.pack(anchor="w", pady=10)
+            def platform_changed(*_args):
+                token.delete(0, tk.END);app_token.delete(0, tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main'}:
+                    connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
+                if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
+                else:slack_credentials.pack_forget()
+            platform.trace_add("write",platform_changed)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
             binding = self._field(self.content, "Freigabe-ID (z. B. mein-handy)", "my-device")
             sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
-            scope = self._field(self.content, "Bereich / Discord-Server-ID (leer für Direktnachrichten)")
+            scope = self._field(self.content, "Bereich · Discord-Server-ID / Slack-Workspace-ID")
             thread = self._field(self.content, "Thread-ID (leer nur für Nachrichten ohne Thread)")
             identity = self._field(self.content, "HAOS-Identität", "personal")
             self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
@@ -664,6 +680,11 @@ class Wizard:
                 "Neue Freigaben lesen nur Nachrichten nach ihrer Zeitgrenze nach; alte Freigaben ohne Zeitgrenze "
                 "müssen dafür ausdrücklich erneut gekoppelt werden. Automatische neue Threads und native Slash-Menüs sind nicht freigegeben.",
                 size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            self._label(self.content, "Slack: Benutzer-ID U…/W…, Gesprächs-ID C…/G…/D… und Workspace-ID T… angeben, "
+                "auch für Direktnachrichten. Für vorhandene Threads den vollständigen thread_ts-Zeitstempel angeben. "
+                "In Kanälen und Gruppen den Bot erwähnen. Leerer Thread bedeutet nur Nachrichten außerhalb eines Threads; "
+                "Antworten erzeugen keinen neuen Thread. Medien, native Slash-Menüs und interaktive Slack-Schaltflächen sind nicht freigegeben.",
+                size=10,color=self.MUTED).pack(anchor="w",pady=6)
             rights = {}
             for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
                     ("cancel", "Eigene Missionen abbrechen"), ("answer", "Rückfragen und Freigaben beantworten"),
@@ -707,7 +728,7 @@ class Wizard:
                         success="Konnektor, zugehörige Freigaben und Zugangsdaten entfernt; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
                 self._button(self.content, "Konnektor und Zugangsdaten entfernen", remove_connector).pack(anchor="w", pady=6)
             self._button(self.content, "Gateway-Konfiguration neu laden", lambda: self.show("gateways")).pack(anchor="w", pady=6)
-            self._label(self.content, "Discord · gespeicherte Eingänge wiederherstellen",
+            self._label(self.content, "Gateways · gespeicherte Eingänge wiederherstellen",
                 color=self.CYAN, size=13, bold=True).pack(anchor="w", pady=(14, 0))
             self._label(self.content, "Die Prüfung stoppt den Gateway-Dienst. Nur fehlgeschlagene Dekodierung innerhalb von 24 Stunden "
                 "und mit unveränderter Absenderfreigabe kann erneut versucht werden. Verwerfen erhält die gespeicherten Daten, "
@@ -730,14 +751,14 @@ class Wizard:
                 if not rows:
                     self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
                     return
-                choices = {row["ingress_id"] + " · " + row["state"] + " · Versuch " + str(row["attempt"]): row for row in rows}
+                choices = {row.get('platform','') + " · " + row["ingress_id"] + " · " + row["state"] + " · Versuch " + str(row["attempt"]): row for row in rows}
                 selected = self._choice(recovery_frame, "Gespeicherter Eingang", list(choices), next(iter(choices)), width=24 if self.compact else 48)
                 note = self._field(recovery_frame, "Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")
                 def decide(decision):
                     from tkinter import messagebox
                     row, evidence = choices[selected.get()], note.get()
                     prompt = "Gespeicherte Nachricht erneut dekodieren und bei gültiger Freigabe ausführen?" if decision == "retry" else "Diesen Eingang von der Ausführung ausschließen und seine Daten erhalten?"
-                    if messagebox.askyesno("Gespeicherter Discord-Eingang", prompt):
+                    if messagebox.askyesno("Gespeicherter Gateway-Eingang", prompt):
                         self._run_async(lambda: initial_setup.reconcile_gateway_ingress(row, decision, evidence),
                             success="Owner-Entscheidung gespeichert. Gateway-Dienst bleibt gestoppt.",
                             result_handler=lambda _: load_ingress())

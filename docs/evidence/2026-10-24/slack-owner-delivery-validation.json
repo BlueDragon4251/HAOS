@@ -1,0 +1,146 @@
+{
+  "base_commit": "aa16e6e32fe031c9f795e737a9e229d9a4fe7ceb",
+  "full_tests": {
+    "passed": 1032,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1032,
+    "existing_skips": 2
+  },
+  "actual_sdk_ingress_connect_reconnect_cases": 11,
+  "actual_sdk_http_outbox_cases": 14,
+  "actual_root_uid_socket_gateway_cases": 26,
+  "root_app_token_rotation_fault_stages": [
+    "journal",
+    "withdrawal",
+    "credentials",
+    "policy"
+  ],
+  "actual_desktop_tests": {
+    "passed": 841,
+    "files": 115,
+    "platform": "Linux"
+  },
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "actual_masked_app_token_visibility_clearing_and_backend_handoff": true,
+  "external_slack_connected": false,
+  "remote_retry_window_history_recovery_complete": false,
+  "full_media_voice_complete": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "dadd84dbb19438210c13e919ba08ab2bdb39cb7c5bb5658169fd26b440afc5a9"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "018b9da55c48ac7c0b87377e59e83310ade806996b1154b30534fc095dc56a7e"
+    },
+    {
+      "path": "apps/desktop/src/features/settings/sections/GatewayCatalogue.test.ts",
+      "sha256": "be3de1da5c9693f305c2e9fab97650c069fae8397be799cc96c3fddaf33a191b"
+    },
+    {
+      "path": "apps/desktop/src/features/settings/sections/GatewayCatalogue.tsx",
+      "sha256": "696600d5ec220938578971937da68d1bdc6b95cb088d43f63443b60735c6478f"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "7665af14013357ad3677d06284e999e5a8846a1afca895178b95a04c9cd4f59b"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "fdb382743b4003977685a614c5065f8a54e43954fcb5a9b7ead7b48c84b2ce12"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "149329d0b1407c776ef69e0b5e16582d8c8050a656707df66c54b6b70d926822"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "9b9f9562d902d86199b5b03af8b6faaa096345d0a888841ee13b803356c17ed5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "3fd00f777230dc74972b116f78c1995e1db029b25c565b2eb28259f34165f087"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "9111ea0de73ed373a03303b7c9af60f28e8ac2ad7d5d4cc89d936fbbea806ba1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f7e5df8f9611635c8ed2691a704aede2c0493581d0cdbc00e9f320da88b9017a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "84a18d83a6a54878c192663240bbb1692a5591315cd51117d5cec295064cbf43"
+    },
+    {
+      "path": "linux/haos/haos/gateway_slack.py",
+      "sha256": "7de8c7c426bd8a5df7db50baf55ad93f3d4a9357a09f759ad7cc61194cd7e9e9"
+    },
+    {
+      "path": "linux/haos/haos/hermes_capabilities.py",
+      "sha256": "335144150863b08532dd7d2bbdaa483918d4100673b0850c5b891243d9a4ae52"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "cdddf86864fa0c268c9ee2d2a85cf837ab7f3aa63e91d8841aa832a25c913510"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "a34c28192e17ec51a394369061f8c25950d6b11f11769836851cea1845f0489f"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "cd719b090002f1b5aa9ddf5722491a4e2b5eff2f9146a0aa4986819c6c12afab"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "82f339ceaf05fbfef8e7c458eae56930ec6e2e37eb9cae9fe9087df6dbbf8c75"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "5812f658ec505eaa20d1ad6e2d4eaff712b847b700ebfcee3c8a5370a45708c3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_delivery.py",
+      "sha256": "eab8f249afbf858318758cae5b5d2f87d5f8560a5fc24c1d5a78c478f7fa779b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_ingress.py",
+      "sha256": "1baecdd1fec46daf4370a1a264aaa8d495bf0525ae043d2f3706fbc0cddcd1eb"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway.py",
+      "sha256": "1c6d65299ddc2f16a4703bb574ca7eafb121e7b63f2394ef08ea929477538ae6"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_recovery.py",
+      "sha256": "768b38c13c148d4edff8c9d5bf610c7e32e7167fdb282363239ec0875ca5f91a"
+    },
+    {
+      "path": "linux/haos/tests/test_hermes_capabilities.py",
+      "sha256": "c6eba3e077eaf9e9cf3b72416c8e522f8c3e9f3787747b58d419c3b60a61526b"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "846dafa7665e488b9124dbf20f3d9c7b811eed583caf0a46ca3110a6e45793e6"
+    }
+  ],
+  "contracts": [
+    {
+      "path": "slack-owner-ingress-contracts.json",
+      "sha256": "a4d64ee59c616c10db2c788889a2224f7c1ef5133f670a2c8127695b7b72e7df"
+    },
+    {
+      "path": "slack-owner-delivery-contracts.json",
+      "sha256": "5d039a7b1fc44b6fefd66393685e28a7a6134a4a668ff9ffa54685e75d6a1a72"
+    }
+  ]
+}

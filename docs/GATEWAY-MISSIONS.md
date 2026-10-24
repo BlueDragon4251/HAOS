@@ -510,3 +510,50 @@ closed journal. The latter cannot access a closed database or acknowledge fresh
 input during service shutdown. Mandatory probe: `probe_slack_ingress.py`.
 Receipts: `docs/evidence/2026-10-24/slack-native-ingress-validation.json`.
 No live Slack connection or external message delivery is claimed.
+
+## Slack private owner setup and reviewed outgoing delivery (2026-10-24)
+
+Slack now has a real root-owner CLI and graphical setup path with two separate
+masked inputs: a single `xoxb-` bot token and `xapp-` Socket Mode app token.
+Malformed credentials and token lists are rejected before the GUI stops services.
+Both inputs clear on platform changes and submission; private atomic publication
+stores both and changing either withdraws existing sender grants until explicitly
+re-paired. The desktop catalogue and native setup agree on these three implemented
+text gateway paths: Telegram, Discord and Slack. This supersedes the internal-only
+provisioning status above and does not claim complete media/voice support.
+
+The setup explains Socket Mode, `connections:write`, bot API scopes, event
+subscriptions and channel invitations. Pairing requires exact U/W user, C/G/D
+conversation and T workspace IDs, plus an optional full `thread_ts` timestamp.
+DMs also require their workspace ID. The original thread is preserved; a flat
+reply does not create a new thread, a broadcast or a new DM. Unknown workspaces
+cannot fall back to another authenticated client.
+
+The actual SDK client retains its own token/URL/proxy when Bolt copies it. SDK
+automatic POST retries stay disabled. The private send context permits only
+`chat.postMessage` to the approved channel/thread, with no broadcast. A successful
+response needs a valid Slack timestamp and matching channel. Only exact typed
+format refusals allow a second send without blocks. A server error or an unknown
+error merely mentioning invalid blocks cannot trigger a resend. Confirmed first
+rate limits and TCP connector refusal may retry; ambiguity and prior partial
+success remain uncertain. Offline owner reconciliation now validates receipt
+syntax against the actual current gateway platform, including Slack timestamps.
+
+Eleven actual native SDK/HTTP/Bolt/local-WebSocket ingress cases now include full
+native connect, authenticated Socket Mode URL retrieval, actual SDK reconnect and
+same-adapter disconnect/reconnect. Independent SQLite readers check the exact
+message ID before each transport ACK. Fourteen actual native SDK/HTTP/reopened
+outbox cases cover copy identity, success, server/format errors, rate limit,
+permission refusal, malformed and wrong-route receipts, disconnect, connector
+refusal and exact threads. Both probes are mandatory in builds and provider CI.
+Actual Tk tests exercise private input clearing, backend argument handoff and the
+640×480 Slack form. Full/minimal Python suites pass 1032 tests with two existing
+skips; 26 real root/UID/socket gateway cases include Slack retry/delivered/discard
+with the private ledger and root-only canary, plus app-token rotation with actual
+durable writes interrupted after each publication stage. Source-bound receipts:
+`docs/evidence/2026-10-24/slack-owner-delivery-validation.json`.
+
+No external Slack account, permission grant or message has been tested. Captured
+input survives local outages, but Slack messages never delivered beyond its
+remote retry window still need a separate history-recovery path. Full media,
+voice and additional gateways remain open. No stable distribution is accepted.

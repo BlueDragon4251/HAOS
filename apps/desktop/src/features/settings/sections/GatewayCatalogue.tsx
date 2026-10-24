@@ -12,7 +12,7 @@ export const GATEWAYS = [
   'telegram', 'wecom', 'whatsapp'
 ] as const
 
-export const HAOS_APPROVED_GATEWAYS = new Set<string>(['telegram', 'discord'])
+export const HAOS_APPROVED_GATEWAYS = new Set<string>(['telegram', 'discord', 'slack'])
 
 const names: Record<string, string> = {
   a2a: 'Agent-to-Agent', buzz: 'Buzz', dingtalk: 'DingTalk',
@@ -38,7 +38,7 @@ export function GatewayCatalogue() {
         </div>
       </div>
       <div className="text-[12px] text-fg-2">
-        HAOS beschränkt derzeit den autorisierten Nachrichteneingang auf Telegram und Discord.
+        HAOS beschränkt derzeit den autorisierten Nachrichteneingang auf Telegram, Discord und Slack.
         Alle anderen Adapter werden erst aktiviert, wenn Zugangsdaten, Absenderbindung und
         Zustellung nachweislich im HAOS-Sicherheitsmodell funktionieren.
       </div>
@@ -66,7 +66,7 @@ export function GatewayCatalogue() {
           )
         })}
       </div>
-      <p className="text-[11px] text-fg-3">Keine dieser Anzeigen behauptet, dass ein Gateway schon verbunden ist. Das vollständige grafische Pairing und weitere Plattformen befinden sich in Entwicklung.</p>
+      <p className="text-[11px] text-fg-3">Diese Anzeige bestätigt keine Live-Verbindung. Einrichtung und genaue Absenderfreigaben erfolgen in der grafischen HAOS-Owner-Konsole. Weitere Plattformen und Medienpfade befinden sich in Entwicklung.</p>
     </GlassCard>
   )
 }

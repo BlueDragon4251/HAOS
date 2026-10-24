@@ -182,8 +182,8 @@ def owner_gateway(args):
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord"}:
-            raise ValueError("currently provisioned transports: telegram, discord")
+        if args.platform not in {"telegram", "discord", "slack"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         # Validate the proposed connector before asking for a credential.
@@ -193,6 +193,11 @@ def owner_gateway(args):
         if not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
+        if args.platform=='slack':
+            from .gateway_slack import validate_credentials
+            app_token=getpass.getpass('Slack Socket Mode app token (private): ')
+            validate_credentials(token,app_token)
+            credentials['connectors'][args.connector]['app_token']=app_token
     elif args.gateway_action == "pair":
         binding = {"id": args.binding, "connector": args.connector, "sender": args.sender, "chat": args.chat,
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,

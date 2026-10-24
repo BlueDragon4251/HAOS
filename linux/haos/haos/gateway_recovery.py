@@ -75,9 +75,8 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             or type(request["confirmed_not_delivered"]) is not bool):
         raise ValueError("invalid owner inspection evidence")
     receipt = request["receipt"]
-    # The supported Telegram/Discord adapters return numeric remote message IDs.
     if decision == "delivered":
-        if not isinstance(receipt, str) or not re.fullmatch(r"[1-9][0-9]{0,31}", receipt):
+        if not isinstance(receipt, str) or not 1<=len(receipt)<=64:
             raise ValueError("delivered requires the inspected remote message ID")
         if request["confirmed_not_delivered"]:
             raise ValueError("contradictory owner evidence")
@@ -100,6 +99,12 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             binding = policy.current_binding(dict(row))
             if "read" not in binding["capabilities"]:
                 raise PermissionError("gateway result delivery is no longer authorized")
+        if decision=='delivered':
+            platform=policy.connectors[binding['connector']]['platform']
+            pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if platform=='slack' else
+                r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else None)
+            if pattern is None or not re.fullmatch(pattern,receipt):
+                raise ValueError('inspected receipt does not match its approved gateway platform')
         if decision == "retry" and attempt >= 5:
             raise Conflict("delivery retry budget exhausted")
         state = {"delivered": "delivered", "retry": "pending", "discard": "revoked"}[decision]

@@ -27,7 +27,12 @@ def unresolved(inbox, after=0):
     for row in rows:
         if not re.fullmatch('[0-9a-f]{64}',row['id']) or type(row['attempt']) is not int or not 0 <= row['attempt'] <= 8:
             raise ValueError('invalid native receipt metadata')
-        result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],
+        pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
+            r'[1-9][0-9]{0,19}' if row['platform']=='discord' else None)
+        if pattern is None or not re.fullmatch(pattern,row['message_id']):
+            raise ValueError('invalid native source metadata')
+        result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],'platform':row['platform'],
+            'message_id':row['message_id'],
             'attempt':row['attempt'],'created_at':row['created_at'],
             'payload_sha256':hashlib.sha256(row['payload'].encode()).hexdigest()})
     history=[]
@@ -92,7 +97,14 @@ def main():
     if not isinstance(data,dict) or set(data) != {'action','policy','params'} or not isinstance(data['params'],dict):
         raise ValueError('invalid ingress recovery request')
     policy = GatewayPolicy(data['policy'])
-    if not DATABASE.exists(): raise FileNotFoundError('native ingress journal has not been created')
+    try:DATABASE.lstat()
+    except FileNotFoundError:
+        if data['action']=='ingress' and set(data['params'])=={'after'}:
+            after=data['params']['after']
+            if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
+            print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
+            return
+        raise
     inbox = NativeInbox(DATABASE,Redactor())
     try:
         if data['action'] == 'ingress' and set(data['params']) == {'after'}:

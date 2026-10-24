@@ -48,6 +48,25 @@ def test_graphical_native_ingress_recovery_preserves_selected_receipt_and_quiesc
         'attempt':8,'state':'failed','decision':'retry','note':'inspected fixture'})]
 
 
+def test_graphical_slack_setup_keeps_two_credentials_private_and_rejects_bad_input_before_stopping(monkeypatch):
+    from haos import gateway_setup,owner
+    from copy import deepcopy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[];saved=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'load',lambda:({'version':1,'connectors':[],'bindings':[]},{'connectors':{}}))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((deepcopy(p),deepcopy(c))))
+    monkeypatch.setattr(owner,'audit',lambda *args:calls.append(args))
+    bot='xoxb-'+'x'*24;app='xapp-'+'y'*24
+    for token,app_token in [(bot,''),(bot,bot),(bot+','+bot,app),(bot,app+'\n')]:
+        with pytest.raises(ValueError):initial_setup.configure_gateway('slack-main','slack',token,app_token)
+    assert calls==[] and saved==[]
+    initial_setup.configure_gateway('slack-main','slack',bot,app)
+    assert saved[0][1]=={'connectors':{'slack-main':{'token':bot,'app_token':app}}}
+    assert calls[0]=={'gateway_only':True}
+    assert bot not in repr(calls) and app not in repr(calls)
+
+
 def test_initial_owner_requires_repeated_password_before_stopping_services(monkeypatch):
     monkeypatch.setattr(initial_setup.os, "geteuid", lambda: 0)
     with pytest.raises(ValueError):

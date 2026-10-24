@@ -37,20 +37,28 @@ def main():
         current=lambda:GatewayPolicy(config)
         native=NativeInbox(directory/'native.db',Redactor([token,app_token]))
         relay=RelayInbox(directory/'relay.db',Redactor([token,app_token]))
-        acknowledgements=asyncio.Queue();api_calls=[]
+        acknowledgements=asyncio.Queue();api_calls=[];messages={}
+        live={'frame':None,'connections':0,'journal':directory/'native.db'}
         async def api(request):
             method=request.match_info['method'];api_calls.append(method)
+            if method=='apps.connections.open':
+                assert request.headers['Authorization']=='Bearer '+app_token
+                return web.json_response({'ok':True,'url':f'ws://127.0.0.1:{port}/socket'})
             if method=='auth.test':return web.json_response({'ok':True,'team_id':'T999','user_id':'UBOT','bot_id':'B1','team':'Fixture'})
             if method=='users.info':return web.json_response({'ok':True,'user':{'id':'U42','is_bot':False,'name':'fixture'}})
             raise AssertionError('unapproved Slack API call: '+method)
         async def websocket(request):
             socket=web.WebSocketResponse();await socket.prepare(request)
+            if live['frame'] is not None:
+                live['connections']+=1
+                await socket.send_json(live['frame'])
             async for message in socket:
                 ack=json.loads(message.data)
                 # Independent reader proves the SDK ACK cannot race an uncommitted raw input.
                 if ack['envelope_id'].startswith('approved'):
-                    with sqlite3.connect(directory/'native.db') as observer:
-                        assert observer.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0]>0
+                    with sqlite3.connect(live['journal']) as observer:
+                        assert observer.execute('SELECT id FROM native_inbox WHERE message_id=?',
+                            (messages[ack['envelope_id']],)).fetchone() is not None
                 await acknowledgements.put(ack)
             return socket
         app=web.Application();app.router.add_route('*','/api/{method}',api);app.router.add_get('/socket',websocket)
@@ -72,6 +80,7 @@ def main():
         def frame(identity,sender='U42',channel='C123',team='T999',ts=None):
             event={'type':'message','channel':channel,'channel_type':'channel','user':sender,
                 'text':'<@UBOT> fixture task','ts':ts or timestamp,'client_msg_id':identity}
+            messages[identity]=event['ts']
             return {'type':'events_api','envelope_id':identity,'accepts_response_payload':False,
                 'payload':{'type':'event_callback','team_id':team,'api_app_id':'A1','event_id':identity,
                     'event':event,'authorizations':[{'team_id':team,'user_id':'UBOT','is_bot':True}]}}
@@ -160,13 +169,58 @@ def main():
             except TimeoutError:pass
             else:raise AssertionError('stopping gateway acknowledged input without durable capture')
             cases.append('late SDK callbacks cannot touch closed journal or acknowledge fresh input during shutdown')
+            await handler.client.close()
+            relay.close()
+            native=NativeInbox(directory/'live-native.db',Redactor([token,app_token]))
+            relay=RelayInbox(directory/'live-relay.db',Redactor([token,app_token]))
+            live['journal']=directory/'live-native.db'
+            config['bindings']=[{'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999',
+                'thread':'','identity':'principal','capabilities':['create','read']}]
+            fresh=build_adapter('slack',{'token':token,'app_token':app_token})
+            fresh._haos_native=SimpleNamespace(inbox=native,connector='bot',policy=current)
+            fresh.set_durable_message_handler(lambda event:bool(relay.admit(current(),'bot',adapter_envelope(event,'slack'))))
+            real_factory=fresh._new_web_client
+            def local_client(*args,**kwargs):
+                result=real_factory(*args,**kwargs);result.base_url=f'http://127.0.0.1:{port}/api/'
+                return result
+            fresh._new_web_client=local_client
+            install=gateway_slack.install_socket
+            def local_socket(item,socket_handler):
+                socket_handler.client.web_client.base_url=f'http://127.0.0.1:{port}/api/'
+                install(item,socket_handler)
+            gateway_slack.install_socket=local_socket
+            try:
+                live['frame']=frame('approved-live-connect',ts=timestamp.split('.')[0]+'.000101')
+                assert await fresh.connect() is True
+                handler=fresh._handler
+                assert (await asyncio.wait_for(acknowledgements.get(),3))['envelope_id']=='approved-live-connect'
+                await wait_relay(1)
+                live['frame']=frame('approved-live-reconnect',ts=timestamp.split('.')[0]+'.000102')
+                await asyncio.wait_for(handler.client.connect_to_new_endpoint(force=True),3)
+                assert (await asyncio.wait_for(acknowledgements.get(),3))['envelope_id']=='approved-live-reconnect'
+                await wait_relay(2)
+                assert live['connections']==2 and api_calls.count('apps.connections.open')>=2
+                cases.append('full actual native connect and SDK reconnect authenticate both tokens and durably receive from local WebSocket')
+                await fresh.disconnect()
+                live['frame']=frame('approved-live-native-restart',ts=timestamp.split('.')[0]+'.000103')
+                assert await fresh.connect() is True
+                handler=fresh._handler
+                assert (await asyncio.wait_for(acknowledgements.get(),3))['envelope_id']=='approved-live-native-restart'
+                await wait_relay(3)
+                assert live['connections']==3
+                cases.append('same native adapter disconnect/reconnect creates one fresh authenticated Socket Mode receiver')
+            finally:
+                gateway_slack.install_socket=install
+                fresh._haos_stopping=True
+                await fresh.disconnect()
         finally:
             await handler.client.close()
             if client.session is not None:await client.session.close()
             await runner.cleanup();native.close();relay.close()
     with tempfile.TemporaryDirectory() as directory:asyncio.run(exercise(Path(directory)))
     receipt={'actual_sdk_socket_bolt_cases':cases,'external_slack_connected':False,
-        'full_slack_owner_setup_and_delivery_complete':False,'source_files':[{'path':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
+        'owner_gui_is_separate_fixture':True,'full_gateway_live_media_history_acceptance_complete':False,
+        'source_files':[{'path':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in (Path(__file__),root/'haos/gateway_slack.py',root/'haos/gateway_ingress.py',root/'haos/gateway_runtime.py')]}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 
