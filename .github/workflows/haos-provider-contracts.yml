@@ -59,6 +59,9 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_slack_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-delivery.json"
           "$PYTHON" linux/haos/runtime/probe_slack_history.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-history.json"
           "$PYTHON" linux/haos/runtime/probe_mattermost_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_history.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-history.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
           "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"

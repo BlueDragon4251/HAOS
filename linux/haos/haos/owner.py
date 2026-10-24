@@ -171,7 +171,7 @@ def main():
         gateway_sub.add_parser(action)
     setup = gateway_sub.add_parser("setup")
     setup.add_argument("connector")
-    setup.add_argument("platform", choices=["telegram", "discord", "slack"])
+    setup.add_argument("platform", choices=["telegram", "discord", "slack", "mattermost"])
     pair = gateway_sub.add_parser("pair")
     pair.add_argument("binding")
     pair.add_argument("connector")

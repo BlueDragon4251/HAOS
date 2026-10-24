@@ -66,7 +66,7 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
 
 def build_adapter(platform: str, credentials: dict):
     if (platform not in SUPPORTED or not isinstance(credentials, dict)
-            or set(credentials) - ({"token", "extra", "app_token"} if platform=='slack' else {"token", "extra"})
+            or set(credentials) - ({"token", "extra", "app_token"} if platform=='slack' else {"token", "extra", "server_url"} if platform=='mattermost' else {"token", "extra"})
             or not isinstance(credentials.get("extra", {}), dict)):
         raise ValueError("unsupported adapter configuration")
     # Use the native hardening switch before importing any bundled adapter.
@@ -96,19 +96,27 @@ def build_adapter(platform: str, credentials: dict):
         from .gateway_slack import validate_credentials
         validate_credentials(credentials.get('token'),credentials.get('app_token'))
         extra.update(reply_in_thread=False,dm_top_level_threads_as_sessions=False,reactions=False)
+    if platform == 'mattermost':
+        from .gateway_mattermost import validate_credentials
+        extra.update(url=validate_credentials(credentials.get('token'),credentials.get('server_url')),reply_mode='off',
+            require_mention=True,free_response_channels=[],allowed_channels=[],channel_prompts={})
     config = PlatformConfig(enabled=True, token=credentials.get("token"), extra=extra)
     if entry.validate_config and not entry.validate_config(config):
         raise ValueError("adapter configuration rejected")
     # Avoid the registry's optional runtime installer: immutable images must never pip-install.
     from .gateway_ingress import durable_adapter
-    if platform == 'slack':
+    if platform in {'slack','mattermost'}:
         import uuid
         from .gateway_slack import secret_scope
         home='/var/lib/haos-gateway/private-scope/'+uuid.uuid4().hex
-        secrets={'SLACK_APP_TOKEN':credentials['app_token'],'SLACK_BOT_TOKEN':credentials['token']}
+        secrets=({'SLACK_APP_TOKEN':credentials['app_token'],'SLACK_BOT_TOKEN':credentials['token']} if platform=='slack' else
+            {'MATTERMOST_TOKEN':credentials['token'],'MATTERMOST_URL':credentials['server_url']})
         with secret_scope(secrets,home):
             adapter=durable_adapter(entry.adapter_factory(config))
         adapter._haos_secrets=secrets;adapter._haos_secret_home=home
+        if platform=='mattermost':
+            from .gateway_mattermost import install
+            adapter=install(adapter)
         return adapter
     return durable_adapter(entry.adapter_factory(config))
 
@@ -140,7 +148,7 @@ async def serve():
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] in {'discord','slack'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -180,7 +188,7 @@ async def serve():
                 logging.warning("Gateway authorization policy unavailable")
                 return False
         adapter.set_authorization_check(authorize)
-        if connector['platform'] in {'discord','slack'}:
+        if connector['platform'] in {'discord','slack','mattermost'}:
             from types import SimpleNamespace
             adapter._haos_native = SimpleNamespace(inbox=native_inbox,connector=connector['id'],policy=current_policy)
         if connector["platform"] == "discord":
@@ -207,6 +215,9 @@ async def serve():
         if connector['platform'] == 'discord':
             from .gateway_discord_history import maintain as recover_discord_history
             tasks.append(asyncio.create_task(recover_discord_history(adapter,stop,current_policy,connector['id'])))
+        elif connector['platform']=='mattermost':
+            from .gateway_mattermost_history import maintain as recover_mattermost_history
+            tasks.append(asyncio.create_task(recover_mattermost_history(adapter,stop,current_policy,connector['id'])))
         elif connector['platform']=='slack':
             from .gateway_slack_history import maintain as recover_slack_history
             tasks.append(asyncio.create_task(recover_slack_history(adapter,stop,current_policy,connector['id'])))
@@ -221,11 +232,14 @@ async def serve():
                 if native_inbox is not None:
                     for connector_id, adapter in adapters.items():
                         platform=policy.connectors[connector_id]['platform']
-                        if platform in {'discord','slack'} and adapter.is_connected:
+                        if platform in {'discord','slack','mattermost'} and adapter.is_connected:
                             key = native_inbox.due(connector_id)
                             if key is not None:
                                 try:
-                                    if platform=='slack':
+                                    if platform=='mattermost':
+                                        from . import gateway_mattermost
+                                        dispatch=gateway_mattermost.dispatch_stored
+                                    elif platform=='slack':
                                         from . import gateway_slack
                                         dispatch=gateway_slack.dispatch_stored
                                     else:dispatch=gateway_discord.dispatch_stored
@@ -249,7 +263,8 @@ async def serve():
                     if not adapter.is_connected:
                         result = {"status": "retry", "retry_after": 5}
                     else:
-                        metadata = {"notify": True, "haos_scope": delivery["scope"]}
+                        metadata = {"notify": True, "haos_scope": delivery["scope"],
+                            "haos_binding": {key:delivery[key] for key in ("binding_id","binding_digest")}}
                         if delivery["thread"]:
                             metadata["thread_id"] = delivery["thread"]
                         if delivery["scope"] and policy.connectors[delivery["connector"]]["platform"] == "slack":

@@ -44,6 +44,9 @@ def durable_adapter(adapter):
                 elif getattr(self.platform, 'value', None) == 'discord':
                     from .gateway_discord import admitted
                     admitted(self, accepted)
+                elif getattr(self.platform, 'value', None) == 'mattermost':
+                    from .gateway_mattermost import admitted
+                    admitted(self, accepted)
                 elif getattr(self.platform, 'value', None) == 'slack':
                     from .gateway_slack import admitted
                     admitted(self, accepted)

@@ -102,7 +102,8 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
         if decision=='delivered':
             platform=policy.connectors[binding['connector']]['platform']
             pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if platform=='slack' else
-                r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else None)
+                r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else
+                r'[a-z0-9]{26}' if platform=='mattermost' else None)
             if pattern is None or not re.fullmatch(pattern,receipt):
                 raise ValueError('inspected receipt does not match its approved gateway platform')
         if decision == "retry" and attempt >= 5:

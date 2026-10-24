@@ -28,7 +28,8 @@ def uid_fixture_path():
 
 
 @pytest.mark.parametrize('decision',['retry','discard'])
-def test_native_ingress_recovery_uses_actual_private_gateway_uid(uid_fixture_path,decision):
+@pytest.mark.parametrize('platform',['discord','mattermost'])
+def test_native_ingress_recovery_uses_actual_private_gateway_uid(uid_fixture_path,decision,platform):
     root=uid_fixture_path; root.chmod(0o755)
     modules=root/'modules'; modules.mkdir(mode=0o755)
     shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
@@ -39,10 +40,18 @@ def test_native_ingress_recovery_uses_actual_private_gateway_uid(uid_fixture_pat
     config={'version':1,'connectors':[{'id':'bot','platform':'discord'}],'bindings':[
         {'id':'paired','connector':'bot','sender':'42','chat':'123','scope':'999','thread':'',
          'identity':'principal','capabilities':['create','read'],'generation':'a'*64}]}
+    if platform=='mattermost':
+        config['connectors'][0]['platform']='mattermost'
+        config['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
+    source=config['bindings'][0]
     inbox=NativeInbox(database,Redactor())
-    key=inbox.admit(GatewayPolicy(config),'bot',{'platform':'discord','sender':'42','chat':'123',
-        'scope':'999','thread':'','message_id':'101','is_bot':False,'text':'private incoming fixture'},
+    key=inbox.admit(GatewayPolicy(config),'bot',{'platform':platform,'sender':source['sender'],'chat':source['chat'],
+        'scope':source['scope'],'thread':'','message_id':'m'*26 if platform=='mattermost' else '101','is_bot':False,'text':'private incoming fixture'},
         {'content':'private incoming fixture'})
+    if platform=='mattermost':
+        from types import SimpleNamespace
+        from haos.gateway_mattermost import transport_status
+        transport_status(SimpleNamespace(_haos_native=SimpleNamespace(inbox=inbox,connector='bot')),'authentication-refused')
     inbox.db.execute("UPDATE native_inbox SET state='failed',attempt=8")
     inbox.close()
     os.chown(state,65534,65534)
@@ -64,7 +73,10 @@ except PermissionError: pass
 else: raise AssertionError('gateway UID read owner secret')
 inbox=NativeInbox(Path(d['path']),Redactor())
 try:
-    assert len(unresolved(inbox)['ingress'])==1
+    metadata=unresolved(inbox)
+    assert len(metadata['ingress'])==1
+    if d['policy']['connectors'][0]['platform']=='mattermost':
+        assert metadata['transport'][0]['status']=='authentication-refused'
     result=reconcile(inbox,GatewayPolicy(d['policy']),d['request'])
     row=inbox.db.execute('SELECT payload FROM native_inbox').fetchone()
     assert json.loads(row[0])['content']=='private incoming fixture'
@@ -84,7 +96,7 @@ print(json.dumps({'uid':os.geteuid(),'owner_secret_denied':True,'result':result}
 
 
 @pytest.mark.parametrize("decision", ["retry", "delivered", "discard"])
-@pytest.mark.parametrize('platform',['telegram','slack'])
+@pytest.mark.parametrize('platform',['telegram','slack','mattermost'])
 def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision,platform):
     tmp_path = uid_fixture_path
     assert os.geteuid() == 0, "run this explicit UID fixture as root"
@@ -106,6 +118,9 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     if platform=='slack':
         config['connectors'][0]['platform']='slack'
         config['bindings'][0].update(sender='U42',chat='D42',scope='T999')
+    if platform=='mattermost':
+        config['connectors'][0]['platform']='mattermost'
+        config['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
     policy = GatewayPolicy(config)
     engine = GatewayEngine(store)
     source=config['bindings'][0]
@@ -123,7 +138,7 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     canary.chmod(0o600)
     payload = {"path": str(path), "canary": str(canary), "policy": config,
                "request": {"delivery_id": delivery["id"], "attempt": 1, "decision": decision, "owner_uid": 1000,
-                           "note_sha256": "a" * 64, "receipt": ("1792800000.000042" if platform=='slack' else "42") if decision == "delivered" else None,
+                           "note_sha256": "a" * 64, "receipt": ("1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
                            "confirmed_not_delivered": decision == "retry"}}
     code = '''
 import json,os,sys

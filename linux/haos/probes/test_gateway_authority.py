@@ -138,7 +138,7 @@ def test_real_owner_publication_renews_pairing_epochs_and_preserves_unchanged_gr
 
 
 @pytest.mark.parametrize('interrupted_after', ['journal', 'withdrawal', 'credentials', 'policy'])
-@pytest.mark.parametrize('credential_field',['token','app_token'])
+@pytest.mark.parametrize('credential_field',['token','app_token','server_url'])
 def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_sender_authority(tmp_path, monkeypatch, interrupted_after,credential_field):
     from haos import gateway_publication
     assert os.geteuid() == 0, 'actual protected files and owner UID required'
@@ -150,10 +150,14 @@ def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_se
         policy['connectors'][0]['platform']='slack'
         policy['bindings'][0].update(sender='U42',chat='C123',scope='T999')
         old_secret['connectors']['first']={'token':'xoxb-'+'x'*24,'app_token':'xapp-'+'y'*24}
+    if credential_field=='server_url':
+        policy['connectors'][0]['platform']='mattermost'
+        policy['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
+        old_secret['connectors']['first']={'token':'x'*26,'server_url':'https://old-owner.invalid'}
     persist(policy, old_secret, config=tmp_path, gid=0)
     before, _ = load(tmp_path)
     new_secret=copy.deepcopy(old_secret)
-    new_secret['connectors']['first'][credential_field]='xapp-'+'z'*24 if credential_field=='app_token' else 'disposable-new-account-credential'
+    new_secret['connectors']['first'][credential_field]='xapp-'+'z'*24 if credential_field=='app_token' else 'https://new-owner.invalid' if credential_field=='server_url' else 'disposable-new-account-credential'
     original = gateway_publication.atomic_json
     writes = []
     class PowerLoss(Exception): pass

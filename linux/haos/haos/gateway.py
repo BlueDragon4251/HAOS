@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -66,6 +66,10 @@ class GatewayPolicy:
                         or not re.fullmatch('T[A-Z0-9]+',binding['scope'])
                         or binding['thread'] and not re.fullmatch(r'[1-9][0-9]{0,15}\.[0-9]{6}',binding['thread'])):
                     raise ValueError('Slack requires exact user, conversation, workspace and optional thread timestamp IDs')
+            if connector and connector['platform']=='mattermost':
+                if any(not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('sender','chat')) or any(
+                        binding[key] and not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('scope','thread')):
+                    raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
             capabilities = binding["capabilities"]
             if (not isinstance(capabilities, list) or not capabilities or not set(capabilities) <= CAPABILITIES
                     or len(set(capabilities)) != len(capabilities)):
@@ -259,7 +263,7 @@ class GatewayEngine:
         with self.store.transaction():
             # No transport idempotency contract: crashed sends are uncertain, never blindly repeated.
             self.store.db.execute("UPDATE gateway_outbox SET state='uncertain',error='sender lost before delivery receipt' WHERE state='sending' AND lease_until<=?", (now,))
-            row = self.store.db.execute("""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to
+            row = self.store.db.execute("""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to,r.binding_id,r.binding_digest
                 FROM gateway_outbox o JOIN gateway_routes r ON o.route_id=r.id
                 WHERE o.state='pending' AND o.next_attempt<=? ORDER BY o.rowid LIMIT 1""", (now,)).fetchone()
             if row is None:

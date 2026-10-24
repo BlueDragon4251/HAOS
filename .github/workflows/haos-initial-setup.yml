@@ -362,7 +362,7 @@ jobs:
           messagebox.askyesno = lambda *args, **kwargs: True
           ingress_calls = []
           recovery_row = {"ingress_id": "a" * 64, "state": "failed", "attempt": 8}
-          initial_setup.gateway_ingress = lambda after=0: {"ingress": [recovery_row], "history": [{"binding_digest": "b" * 64, "binding_id": "my-device", "status": "permission-denied"}], "next_cursor": 1}
+          initial_setup.gateway_ingress = lambda after=0: {"ingress": [recovery_row], "history": [{"binding_digest": "b" * 64, "binding_id": "my-device", "status": "permission-denied"}], "transport": [{"connector":"mattermost-main","status":"authentication-refused","updated_at":1792872000.0}], "next_cursor": 1}
           initial_setup.reconcile_gateway_ingress = lambda *args: ingress_calls.append(args)
           wizard.show("gateways")
           def settle_owner_operation():
@@ -379,6 +379,7 @@ jobs:
                               for item in parent.winfo_children()))
           assert any(isinstance(item, tkinter.Label) and "my-device" in item.cget("text")
                      and "Nachrichtenverlauf prüfen" in item.cget("text") for item in frame.winfo_children())
+          assert any(isinstance(item, tkinter.Label) and 'Anmeldung abgelehnt' in item.cget('text') for item in frame.winfo_children())
           next(item for item in frame.winfo_children() if isinstance(item, tkinter.Entry)).insert(0, "Fixture geprüft")
           next(item for item in frame.winfo_children()
                if isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen").invoke()
@@ -410,6 +411,23 @@ jobs:
           settle_owner_operation()
           assert setup_calls == [("slack-main", "slack", "xoxb-" + "x" * 24, "xapp-" + "y" * 24)]
           assert not bot_entry.get() and not app_entry.get()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "mattermost")
+          wizard.root.update()
+          mm_frame = next(parent for parent in wizard.content.winfo_children()
+                          if any(isinstance(item, tkinter.Label) and item.cget("text").startswith("Mattermost HTTPS-Server")
+                                 for item in parent.winfo_children()))
+          server_entry = next(item for item in mm_frame.winfo_children() if isinstance(item, tkinter.Entry))
+          assert mm_frame.winfo_manager() == "pack" and not slack_frame.winfo_manager()
+          server_entry.insert(0, "https://owner.invalid")
+          bot_entry.insert(0, "m" * 26)
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway sicher anlegen").invoke()
+          settle_owner_operation()
+          assert setup_calls[-1] == ("mattermost-main", "mattermost", "m" * 26, "", "https://owner.invalid")
+          assert not bot_entry.get()
+          wizard.root.setvar(gateway_menu.cget("textvariable"), "telegram")
+          wizard.root.update()
+          assert not server_entry.get() and not mm_frame.winfo_manager()
           # Outgoing reconciliation carries an exact saved attempt and explicit
           # non-delivery evidence; it never infers success from local UI state.
           delivery_calls = []
@@ -469,6 +487,9 @@ jobs:
           wizard.show('gateways')
           wizard.root.update()
           menu = next(item for item in wizard.content.winfo_children() if isinstance(item, tkinter.OptionMenu))
+          wizard.root.setvar(menu.cget('textvariable'), 'mattermost')
+          wizard.root.update()
+          assert wizard.root.winfo_reqwidth() <= 640, 'Mattermost setup overflows the compact screen'
           wizard.root.setvar(menu.cget('textvariable'), 'slack')
           wizard.root.update()
           assert wizard.root.winfo_reqwidth() <= 640, 'Slack credentials overflow the small setup screen'

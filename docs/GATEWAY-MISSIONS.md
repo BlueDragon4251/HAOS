@@ -1,6 +1,6 @@
 # Gateway missions
 
-HAOS now connects the **pinned Hermes Telegram and Discord adapters** to its durable controller.
+HAOS connects the **pinned Hermes Telegram, Discord, Slack and Mattermost adapters** to its durable controller for reviewed text paths. Media/voice and live-account acceptance remain open. Historical increments below describe their exact earlier source states.
 It uses their actual `register(ctx)`, `PlatformConfig`, `MessageEvent`, `SessionSource`,
 `connect` and `send` interfaces, with a HAOS-owned durable dispatch bridge. It never invokes the upstream gateway's
 separate agent executor. Only the existing mission worker submits model turns. The image builds
@@ -651,3 +651,68 @@ Fresh CI access was recovered through the connected GitHub tool while local
 `3af3af908133aef84ce7b0d0926faf7926564bbb` were confirmed successful.
 The graphical setup gate also passed for `28042b7` and `741cce1`; other gates
 for these later sources were still running at that observation.
+
+## Mattermost owner setup, native ingress and delivery (2026-10-24)
+
+Mattermost now has a real owner CLI and native GUI path. Run `haos-owner gateway
+setup mattermost-main mattermost`, enter a separate bot/service-account token
+privately and provide the HTTPS server URL (optionally with its deployment
+prefix). REST API v4 and WebSocket access are required. The server certificate
+must be trusted by the system; there is no TLS bypass or public HAOS webhook.
+The bot must belong to the selected channels. Token/server changes use the
+existing recoverable private publication and withdraw existing sender grants.
+
+Pair the exact 26-character user/channel/team IDs, optionally the root-post ID.
+An empty scope is allowed for actual direct/group conversations; an empty thread
+means only messages outside a thread. Mention the bot in channels. Actual server
+channel/team metadata and human-user identity are checked under current owner
+authority before native preparation; unknown senders, bots, system/edited posts,
+media and unsolicited plugin events do not receive execution authority. A native
+thread root is verified in its approved channel. Native volatile dedup no longer
+owns the commit boundary. Approved originals are captured in the private SQLite
+journal before native decoding and durable relay admission; native decoding uses
+retained redacted input. Repeated or revoked inputs cannot gain a new mission.
+
+The actual native WebSocket client must receive a successful authentication
+response before reporting healthy. Unauthenticated events are ignored; a rejected
+challenge is fatal until owner correction/restart. Both HTTP and WebSocket
+redirects are refused before credentials can move to another target. Reconnects
+reuse durable receipts. Safe last transport status is persisted for the stopped
+owner recovery view, including an explicit authentication-refused message. A
+stored connected status is historical metadata, not a new live health check.
+
+History recovery pages through actual channel REST history in a fixed descending
+window per grant digest. Every approved page input must be retained before the
+cursor advances. After a crash, committed raw receipts prevent duplicate work.
+If a remote pagination anchor was deleted, the same authorized lower boundary
+is restarted and deduplicated. A five-minute inclusive overlap covers equal
+millisecond timestamps and delayed indexing. History cannot recover remotely
+deleted messages, absent permissions or arbitrary indexing delays. Original
+input age is retained: inputs older than 24 hours remain stored and do not run.
+Legacy grants without an original time boundary do no automatic history read.
+Provider Retry-After and permission/source/storage/transport errors are persisted.
+
+Outgoing native formatting/chunking uses exactly the controller's current owner
+binding digest, channel, team and root thread. Each chunk rechecks that digest;
+a revoked binding cannot authorize a subsequent chunk. There is no reply-root
+substitution or flat-channel fallback. A confirmed refusal may fail or release a
+bounded rate-limit retry; a missing response, wrong-route receipt, partial send
+or server-side uncertainty stays uncertain. The existing CLI/GUI owner recovery
+supports Mattermost receipt IDs without resending on inspection. Removing the
+connector removes its private credentials and withdraws its bindings; it does
+not delete owner recovery or historical mission data.
+
+Local proof uses the actual pinned Mattermost adapter, aiohttp HTTP/WebSocket
+clients, native message codec and real reopened SQLite ledgers: 18 transport,
+21 ingress, 17 outgoing delivery and 15 history cases. All four probes are
+mandatory in runtime builds and provider CI. Full/minimal Python environments
+pass 1058 tests with two existing skips; 35 actual root/UID/socket gateway cases
+cover private-ledger recovery and interrupted server rotation. Native Tk verifies
+token/URL handoff, clearing, safe status rendering and compact layout. The
+Desktop suite passes 841 tests in 115 files. Source-bound receipt:
+`docs/evidence/2026-10-24/mattermost-owner-integration-validation.json`.
+
+These are local contract results. No external Mattermost account, installation,
+permission, network or real message delivery is accepted. The reviewed text
+setup count is four of 22; full media/voice, the remaining adapters, Android,
+optional phone firstboot and installed OS/artifact acceptance remain unfinished.

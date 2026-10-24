@@ -182,8 +182,8 @@ def owner_gateway(args):
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         # Validate the proposed connector before asking for a credential.
@@ -198,6 +198,10 @@ def owner_gateway(args):
             app_token=getpass.getpass('Slack Socket Mode app token (private): ')
             validate_credentials(token,app_token)
             credentials['connectors'][args.connector]['app_token']=app_token
+        if args.platform=='mattermost':
+            from .gateway_mattermost import validate_credentials
+            url=input('Mattermost HTTPS server URL (no token or credentials in URL): ')
+            credentials['connectors'][args.connector]['server_url']=validate_credentials(token,url)
     elif args.gateway_action == "pair":
         binding = {"id": args.binding, "connector": args.connector, "sender": args.sender, "chat": args.chat,
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,

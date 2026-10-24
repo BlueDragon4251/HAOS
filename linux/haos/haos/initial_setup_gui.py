@@ -637,7 +637,7 @@ class Wizard:
                 success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost"], "telegram")
             token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
             app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
@@ -649,29 +649,41 @@ class Wizard:
                 "über 24 Stunden alte Eingänge werden nur erhalten. Gelöschte Slack-Nachrichten sind nicht wiederherstellbar. "
                 "Socket Mode benötigt keinen öffentlichen Webhook oder Signing-Secret. Tokens bleiben im privaten Gateway-Dienst.",
                 size=10,color=self.MUTED).pack(anchor="w",pady=6)
+            mattermost_credentials = tk.Frame(self.content,bg=self.PANEL)
+            mm_server = self._field(mattermost_credentials,'Mattermost HTTPS-Server · optional mit Installationspfad')
+            self._label(mattermost_credentials,'Im Mattermost-Server einen Bot mit Token-Zugriff einrichten und in die vorgesehenen Kanäle aufnehmen. '
+                'Alternativ einen getrennten Dienstbenutzer mit Personal Access Token verwenden. Der HTTPS-Server muss erreichbar sein und ein '
+                'vom System vertrautes Zertifikat verwenden. REST API v4 und WebSocket müssen zugänglich sein; ein öffentlicher HAOS-Webhook ist nicht nötig. '
+                'Benutzer-, Kanal-, Team- und optionale Root-Post-ID exakt koppeln. In Kanälen den Bot erwähnen. '
+                'Verlauf wird nur innerhalb aktueller Owner-Freigaben nachgeladen; gelöschte Nachrichten und fehlende Leserechte sind echte Grenzen. '
+                'Token oder Serverwechsel entzieht bisherige Absenderfreigaben. Medien/Voice und beliebige Plugins sind nicht freigegeben.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
             def configure():
                 secret, app_secret = token.get(), app_token.get()
                 token.delete(0, tk.END)
                 app_token.delete(0, tk.END)
-                selected_connector, selected_platform = connector.get(), platform.get()
-                self._run_async(lambda: initial_setup.configure_gateway(
-                    selected_connector, selected_platform, secret, app_secret),
+                selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
+                self._run_async(lambda: (initial_setup.configure_gateway(
+                    selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
+                    else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
                     success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
-                token.delete(0, tk.END);app_token.delete(0, tk.END)
-                if connector.get() in {'telegram-main','discord-main','slack-main'}:
+                token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
+                if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
+                else:mattermost_credentials.pack_forget()
             platform.trace_add("write",platform_changed)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
             binding = self._field(self.content, "Freigabe-ID (z. B. mein-handy)", "my-device")
             sender = self._field(self.content, "Absender-ID aus der jeweiligen Plattform")
             chat = self._field(self.content, "Chat-ID der jeweiligen Plattform")
-            scope = self._field(self.content, "Bereich · Discord-Server-ID / Slack-Workspace-ID")
+            scope = self._field(self.content, "Bereich · Discord-Server / Slack-Workspace / Mattermost-Team")
             thread = self._field(self.content, "Thread-ID (leer nur für Nachrichten ohne Thread)")
             identity = self._field(self.content, "HAOS-Identität", "personal")
             self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
@@ -746,6 +758,14 @@ class Wizard:
                     'transport-unavailable':'Verbindung zum Verlauf derzeit nicht verfügbar',
                     'storage-unavailable':'Privates Journal nicht beschreibbar; Datenträger prüfen',
                     'invalid-source':'Verlaufantwort passt nicht zur freigegebenen Quelle'}
+                transport_labels={'connecting':'Verbindungsaufbau; noch keine bestätigte WebSocket-Anmeldung',
+                    'connected':'WebSocket-Anmeldung bestätigt; keine externe Zustellung abgeleitet',
+                    'disconnected':'Verbindung getrennt; Gateway-Dienst nach Prüfung neu starten',
+                    'authentication-refused':'Anmeldung abgelehnt: privaten Token und Bot-/Dienstkonto prüfen',
+                    'transport-unavailable':'Server/TLS/WebSocket nicht verfügbar; Adresse, Zertifikat und Netzwerk prüfen'}
+                for item in value.get('transport',[]):
+                    self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+transport_labels[item['status']]
+                        +' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for history in value.get('history',[]):
                     self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
                         size=10, color=self.MUTED).pack(anchor="w", pady=3)

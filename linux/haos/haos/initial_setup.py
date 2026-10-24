@@ -374,10 +374,10 @@ def configure_moa(name, value):
     return result
 
 
-def configure_gateway(connector: str, platform: str, token: str, app_token: str = ''):
+def configure_gateway(connector: str, platform: str, token: str, app_token: str = '', server_url: str = ''):
     """Graphical root-seat setup for explicitly integrated native adapters."""
     require_root()
-    if platform not in {"telegram", "discord", "slack"}:
+    if platform not in {"telegram", "discord", "slack", "mattermost"}:
         raise ValueError("HAOS has not approved this platform for gateway execution")
     if (not isinstance(token, str) or not 16 <= len(token) <= 4096
             or any(c.isspace() or ord(c) < 32 for c in token)):
@@ -387,6 +387,10 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
         validate_credentials(token,app_token)
     elif app_token:
         raise ValueError('an app token applies only to Slack')
+    if platform=='mattermost':
+        from .gateway_mattermost import validate_credentials
+        server_url=validate_credentials(token,server_url)
+    elif server_url:raise ValueError('a server URL applies only to Mattermost')
     from .gateway_setup import load, persist, stopped_gateway
     from .gateway import GatewayPolicy
     from .owner import audit
@@ -399,6 +403,7 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     GatewayPolicy(policy)
     credentials["connectors"][connector] = {"token": token}
     if platform=='slack':credentials['connectors'][connector]['app_token']=app_token
+    if platform=='mattermost':credentials['connectors'][connector]['server_url']=server_url
     persist(policy, credentials)
     audit("setup.gateway", {"connector": connector, "platform": platform})
     return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}

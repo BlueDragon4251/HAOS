@@ -1,0 +1,138 @@
+{
+  "base_commit": "2f74c47f7a2620b8edd80d269975318e5e3bc27f",
+  "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "actual_native_local_cases": {
+    "transport": 18,
+    "ingress": 21,
+    "delivery": 17,
+    "history": 15
+  },
+  "full_tests": {
+    "passed": 1058,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1058,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 35,
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "desktop_tests": {
+    "files": 115,
+    "passed": 841
+  },
+  "predecessor_all_five_ci_gates_successful": true,
+  "external_mattermost_connections": false,
+  "full_media_voice_acceptance": false,
+  "installed_system_acceptance": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "8027757fc5d80ff2d870326a95c7ad364559ede83c33c88f30cbc0ae5afd15b7"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "44b9dee7feb88ecae65dba93a15a24724862ee6cc195c3e601e9c1a324d1783f"
+    },
+    {
+      "path": "apps/desktop/src/features/settings/sections/GatewayCatalogue.test.ts",
+      "sha256": "d01bac92916fafd6ca7c5b3be1f8611b2243a776f9fecb0a0a3759d1a4253930"
+    },
+    {
+      "path": "apps/desktop/src/features/settings/sections/GatewayCatalogue.tsx",
+      "sha256": "cdb134b1f6f1758960b02d4c1da5b8e993009b45b423a26805b7603d77712be2"
+    },
+    {
+      "path": "docs/GATEWAY-MISSIONS.md",
+      "sha256": "94c95592395b36f6d0c4565669e897a1f3069cede11775e04d1f26491b7910f7"
+    },
+    {
+      "path": "docs/GRAPHICAL-OWNER-SETUP.md",
+      "sha256": "ab5f63a4b6b0be517366b763b5d7b865f66509ae90e78aa5b448444653dc328d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "4a5759f05592fa8e05af4d724ed4684e49460594ad7582b85aa5fad366003cc9"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "3a4952c3e8984427fe7237855dd2ad7d9de368d414fc1801cdf2a6df473ae390"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "82591f5e14d7302b168426229077776df6c17fbee56cbd200d3c170eee673f18"
+    },
+    {
+      "path": "linux/haos/haos/gateway_mattermost.py",
+      "sha256": "278dbcbfbf4d4293029d2c6eccab583005a481dad6bf35c0f852552b3ea4dc66"
+    },
+    {
+      "path": "linux/haos/haos/gateway_mattermost_history.py",
+      "sha256": "68bcb0450680c62083ae09e64e91ef81ef2679916c83059fc15e994232e9a8af"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "a930693414a41fdee1a16b69ca33643dbb7619495234b4f801b77714f187aa61"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "3c812dc150236a2173233259f7306ac896db375d81994049d9dfcd818fa9e8d8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "97666afa749a1cefac29b869644d5b6f78b01eaa8641061bfb85195d2544a4de"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f8b4bc31bec7dee7bfe8b81a0f98ffccecd6c2bf414976bf541f7ba6665ffaba"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "5e776ac64bea42fbee2f27a4bdd88d755047f847be5f2466155a3ba1b660d904"
+    },
+    {
+      "path": "linux/haos/haos/hermes_capabilities.py",
+      "sha256": "f9ce4e765c1a6fca7958b0a92eb4af2db163a6475eadd71b26ef767760ca7994"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "355864e597f4de0adedaab99dbee2199f24b20bd10ba2f00423d587882b2cb3f"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "d07c8cbf69cea8a9c244208350a997abf7a7bf3932f3a1a3ace5df716dbeb79c"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "fb68af7f1a343703453dd9f81e786c70b7aded60d5b2463f785c5d4d2347f84e"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "170a62afce3c973b5afaf83fb33a52de6d5b047f9a23addc0f9b2ac8c5adb3e9"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "05fdecd13617c0922ea4735ea9584577a08b6de2b607e1dc5c3ee539e15d9676"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_delivery.py",
+      "sha256": "bcbf5615fb92914009886c20629d7aac5e786f1d0b054c67b06793028edc4063"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_history.py",
+      "sha256": "5a65df991cae10ae2c209bc360a6805a46a18ef577149352be4240d53e194135"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_ingress.py",
+      "sha256": "b10a7c150768ed24f6ba2970ac71c18b7f3de2c7aae69b42a1a2178ff38f8c80"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "7394cbeaf1434643e3987c6e709cca22e058803706aca051c112593c543dc70a"
+    }
+  ]
+}

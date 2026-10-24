@@ -23,7 +23,8 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
-        required={'token','app_token'} if platforms[name]=='slack' else {'token'}
+        required=({'token','app_token'} if platforms[name]=='slack' else
+            {'token','server_url'} if platforms[name]=='mattermost' else {'token'})
         if (not isinstance(row, dict) or set(row) not in (required,required|{'extra'})
                 or not isinstance(row.get('token'), str) or not 16 <= len(row['token']) <= 4096
                 or any(char.isspace() or ord(char) < 32 for char in row['token'])
@@ -32,6 +33,10 @@ def validate_snapshot(policy, credentials):
         if platforms[name]=='slack':
             from .gateway_slack import validate_credentials
             validate_credentials(row['token'],row['app_token'])
+        if platforms[name]=='mattermost':
+            from .gateway_mattermost import validate_credentials
+            if validate_credentials(row['token'],row['server_url']) != row['server_url']:
+                raise ValueError('Mattermost server URL must use its canonical owner representation')
     if len(json.dumps(credentials).encode()) > 32768:
         raise ValueError('gateway credentials exceed service bound')
 

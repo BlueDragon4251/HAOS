@@ -28,7 +28,8 @@ def unresolved(inbox, after=0):
         if not re.fullmatch('[0-9a-f]{64}',row['id']) or type(row['attempt']) is not int or not 0 <= row['attempt'] <= 8:
             raise ValueError('invalid native receipt metadata')
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
-            r'[1-9][0-9]{0,19}' if row['platform']=='discord' else None)
+            r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
+            r'[a-z0-9]{26}' if row['platform']=='mattermost' else None)
         if pattern is None or not re.fullmatch(pattern,row['message_id']):
             raise ValueError('invalid native source metadata')
         result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],'platform':row['platform'],
@@ -48,7 +49,22 @@ def unresolved(inbox, after=0):
                     {'ready','permission-denied','rate-limited','transport-unavailable','storage-unavailable','invalid-source'}):
                 raise ValueError('invalid Slack history status metadata')
             history.append({**dict(row),'platform':'slack'})
-    return {'ingress':result,'history':history,'next_cursor':rows[-1]['cursor'] if rows else after}
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mattermost_history'").fetchone():
+        for row in inbox.db.execute('SELECT binding_digest,status,updated_at FROM mattermost_history ORDER BY updated_at DESC LIMIT 512'):
+            if (not re.fullmatch('[0-9a-f]{64}',row['binding_digest']) or row['status'] not in
+                    {'ready','permission-denied','rate-limited','transport-unavailable','storage-unavailable','invalid-source'}):
+                raise ValueError('invalid Mattermost history status metadata')
+            history.append({**dict(row),'platform':'mattermost'})
+    transport=[]
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mattermost_transport'").fetchone():
+        from .gateway_mattermost import TRANSPORT_KINDS
+        import math
+        for row in inbox.db.execute('SELECT connector,status,updated_at FROM mattermost_transport ORDER BY updated_at DESC LIMIT 64'):
+            if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector']) or row['status'] not in TRANSPORT_KINDS
+                    or type(row['updated_at']) not in {int,float} or not math.isfinite(row['updated_at']) or row['updated_at']<=0):
+                raise ValueError('invalid Mattermost transport status metadata')
+            transport.append({**dict(row),'platform':'mattermost'})
+    return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
 def reconcile(inbox, policy, request):

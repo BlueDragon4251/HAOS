@@ -316,3 +316,19 @@ def test_gateway_process_status_uses_only_fixed_service_and_public_fields(monkey
     monkeypatch.setattr(initial_setup.subprocess, 'run', status)
     assert initial_setup.gateway_process_status()['ActiveState'] == 'active'
     assert calls == [['/usr/bin/systemctl', 'show', '--property=LoadState,ActiveState,SubState,Result,ExecMainStatus', 'haos-gateway.service']]
+
+
+def test_graphical_mattermost_setup_canonicalizes_private_owner_server_before_publication(monkeypatch):
+    from haos import gateway_setup,owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[];saved=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'load',lambda:({'version':1,'connectors':[],'bindings':[]},{'connectors':{}}))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(owner,'audit',lambda *args:calls.append(args))
+    for token,url in [('x'*26,'http://owner.invalid'),('x'*26,'https://user:pass@owner.invalid'),('x'*26+',list','https://owner.invalid')]:
+        with pytest.raises(ValueError):initial_setup.configure_gateway('mm','mattermost',token,'',url)
+    assert not calls and not saved
+    initial_setup.configure_gateway('mm','mattermost','x'*26,'','https://Owner.Invalid:443/prefix/')
+    assert saved[0][1]=={'connectors':{'mm':{'token':'x'*26,'server_url':'https://owner.invalid/prefix'}}}
+    assert calls[0]=={'gateway_only':True} and 'x'*26 not in repr(calls)

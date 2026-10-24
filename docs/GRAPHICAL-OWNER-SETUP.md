@@ -23,6 +23,7 @@ Do not release this branch as production-ready on the basis of those tests.
   administrator and recovery, normal user, language and keyboard, Hermes
   provider/model, stable/dev image updates with private GHCR credentials,
   Telegram/Discord bot credentials, separate Slack bot/Socket Mode app tokens,
+  and private Mattermost tokens with an explicitly validated HTTPS server,
   exact sender/workspace/thread bindings, and finish/reboot.
 - Separate 20+-character owner password validation through HAOS enrollment;
   ten one-time offline recovery codes must be displayed and acknowledged.
@@ -51,7 +52,8 @@ Do not release this branch as production-ready on the basis of those tests.
 - Provider GUI configures **one active provider**. The separate pure automatic
   multi-model routing policy is not wired into the live Hermes broker; multiple
   simultaneous providers and per-task model choice are not delivered yet.
-- Only Telegram and Discord have HAOS gateway authorization. The wider Hermes
+- Telegram, Discord, Slack and Mattermost have reviewed HAOS text gateway paths.
+  Full media/voice and live-account acceptance remain open. The wider Hermes
   plugin catalogue is not equivalent to HAOS runtime support.
 - Mobile is an Android APK with read-only owner-granted mission inspection;
   actual remote desktop capture, low-latency touch, secure QR pairing, revocation,
