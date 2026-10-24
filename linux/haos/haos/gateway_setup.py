@@ -18,6 +18,39 @@ from .sandbox import trusted_json
 CONFIG = Path("/etc/haos")
 
 
+def owner_ingress(args, policy):
+    """Owner authenticates; only the gateway UID opens its private native journal."""
+    from .owner import audit
+    if os.geteuid() != 0:
+        raise PermissionError('native ingress recovery requires authenticated owner authority')
+    stopped_gateway()
+    GatewayPolicy(policy)
+    params = {'after':args.after} if args.gateway_action == 'ingress' else None
+    if params is None:
+        if not isinstance(args.note,str) or not 1 <= len(args.note.strip()) <= 2000:
+            raise ValueError('bounded non-secret owner inspection evidence required')
+        params = {'ingress_id':args.ingress_id,'attempt':args.attempt,'state':args.state,
+            'decision':args.decision,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+            'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest()}
+    directory = Path('/usr/lib/haos').lstat()
+    if not stat.S_ISDIR(directory.st_mode) or directory.st_uid != 0 or directory.st_mode & 0o022:
+        raise PermissionError('untrusted installed recovery code')
+    account = pwd.getpwnam('haos-gateway')
+    if account.pw_uid == 0 or account.pw_gid == 0:
+        raise PermissionError('gateway recovery may not retain root')
+    result = subprocess.run(['/usr/bin/python3','-E','-s','-m','haos.gateway_raw_recovery'],
+        input=json.dumps({'action':args.gateway_action,'policy':policy,'params':params}),
+        text=True,capture_output=True,check=False,timeout=15,user=account.pw_uid,group=account.pw_gid,
+        extra_groups=[],umask=0o077,cwd='/usr/lib/haos',
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'})
+    if result.returncode or len(result.stdout) > 256*1024:
+        raise RuntimeError('offline native ingress recovery failed; check selected state, attempt, grant and 24-hour expiry')
+    value = json.loads(result.stdout)
+    if args.gateway_action == 'reconcile-ingress':
+        audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
+    return value
+
+
 def owner_delivery(args, policy):
     """Drop root before opening controller-owned SQLite; keep credentials out of the child."""
     from .owner import audit, stopped
@@ -139,6 +172,8 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
+    if args.gateway_action in {'ingress','reconcile-ingress'}:
+        return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
         if args.platform not in {"telegram", "discord"}:

@@ -705,6 +705,38 @@ class Wizard:
                         success="Konnektor, zugehörige Freigaben und Zugangsdaten entfernt; Gateway-Dienst gestoppt.", result_handler=lambda _: self.show("gateways"))
                 self._button(self.content, "Konnektor und Zugangsdaten entfernen", remove_connector).pack(anchor="w", pady=6)
             self._button(self.content, "Gateway-Konfiguration neu laden", lambda: self.show("gateways")).pack(anchor="w", pady=6)
+            self._label(self.content, "Discord · gespeicherte Eingänge wiederherstellen",
+                color=self.CYAN, size=13, bold=True).pack(anchor="w", pady=(14, 0))
+            self._label(self.content, "Die Prüfung stoppt den Gateway-Dienst. Nur fehlgeschlagene Dekodierung innerhalb von 24 Stunden "
+                "und mit unveränderter Absenderfreigabe kann erneut versucht werden. Verwerfen erhält die gespeicherten Daten, "
+                "führt sie aber nicht aus. Anschließend den Dienst oben manuell starten.",
+                size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            recovery_frame = tk.Frame(self.content, bg=self.PANEL)
+            recovery_frame.pack(fill="x", pady=4)
+            def show_ingress(value):
+                for child in recovery_frame.winfo_children(): child.destroy()
+                rows = value["ingress"]
+                if not rows:
+                    self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
+                    return
+                choices = {row["ingress_id"] + " · " + row["state"] + " · Versuch " + str(row["attempt"]): row for row in rows}
+                selected = self._choice(recovery_frame, "Gespeicherter Eingang", list(choices), next(iter(choices)), width=24 if self.compact else 48)
+                note = self._field(recovery_frame, "Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")
+                def decide(decision):
+                    from tkinter import messagebox
+                    row, evidence = choices[selected.get()], note.get()
+                    prompt = "Gespeicherte Nachricht erneut dekodieren und bei gültiger Freigabe ausführen?" if decision == "retry" else "Diesen Eingang von der Ausführung ausschließen und seine Daten erhalten?"
+                    if messagebox.askyesno("Gespeicherter Discord-Eingang", prompt):
+                        self._run_async(lambda: initial_setup.reconcile_gateway_ingress(row, decision, evidence),
+                            success="Owner-Entscheidung gespeichert. Gateway-Dienst bleibt gestoppt.",
+                            result_handler=lambda _: load_ingress())
+                self._button(recovery_frame, "Fehlgeschlagene Dekodierung erneut versuchen", lambda: decide("retry")).pack(anchor="w", pady=4)
+                self._button(recovery_frame, "Eingang verwerfen · Daten erhalten", lambda: decide("discard")).pack(anchor="w", pady=4)
+                self._button(recovery_frame, "Nächste Eingänge anzeigen", lambda: load_ingress(value["next_cursor"])).pack(anchor="w", pady=4)
+            def load_ingress(after=0):
+                self._run_async(lambda: initial_setup.gateway_ingress(after),
+                    success="Private Eingangsmetadaten geladen. Gateway-Dienst bleibt gestoppt.", result_handler=show_ingress)
+            self._button(self.content, "Gateway-Dienst stoppen und gespeicherte Eingänge prüfen", load_ingress).pack(anchor="w", pady=6)
             self._label(self.content,
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",

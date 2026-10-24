@@ -357,6 +357,31 @@ jobs:
                         if isinstance(item, tkinter.Listbox))
           assert not wizard.running and picker.size() == 0
           assert "Konfiguration geändert" in wizard.status.cget("text")
+          # Native owner recovery UI carries the selected durable receipt to its backend.
+          from tkinter import messagebox
+          messagebox.askyesno = lambda *args, **kwargs: True
+          ingress_calls = []
+          recovery_row = {"ingress_id": "a" * 64, "state": "failed", "attempt": 8}
+          initial_setup.gateway_ingress = lambda after=0: {"ingress": [recovery_row], "next_cursor": 1}
+          initial_setup.reconcile_gateway_ingress = lambda *args: ingress_calls.append(args)
+          wizard.show("gateways")
+          def settle_owner_operation():
+              for _ in range(80):
+                  wizard.root.update()
+                  if not wizard.running: break
+                  time.sleep(0.02)
+              assert not wizard.running
+          next(item for item in wizard.content.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Gateway-Dienst stoppen und gespeicherte Eingänge prüfen").invoke()
+          settle_owner_operation()
+          frame = next(parent for parent in wizard.content.winfo_children()
+                       if any(isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen"
+                              for item in parent.winfo_children()))
+          next(item for item in frame.winfo_children() if isinstance(item, tkinter.Entry)).insert(0, "Fixture geprüft")
+          next(item for item in frame.winfo_children()
+               if isinstance(item, tkinter.Button) and item.cget("text") == "Fehlgeschlagene Dekodierung erneut versuchen").invoke()
+          settle_owner_operation()
+          assert ingress_calls == [(recovery_row, "retry", "Fixture geprüft")]
           wizard.root.destroy()
           print("All seven native HAOS setup pages and live operation state rendered under Xvfb")
           PY

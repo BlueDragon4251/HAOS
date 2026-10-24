@@ -452,6 +452,34 @@ def manage_gateway(action: str, identifier: str = ""):
         connector=identifier if action == "remove" else None))
 
 
+def gateway_ingress(after=0):
+    require_root()
+    if type(after) is not int or after < 0:
+        raise ValueError('invalid ingress cursor')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='ingress',after=after))
+
+
+def reconcile_gateway_ingress(row, decision, note):
+    require_root()
+    import re
+    if (not isinstance(row,dict) or not isinstance(row.get('ingress_id'),str)
+            or not re.fullmatch('[0-9a-f]{64}',row['ingress_id'])
+            or type(row.get('attempt')) is not int or not 0 <= row['attempt'] <= 8
+            or row.get('state') not in {'pending','processing','failed','expired','revoked'}
+            or decision not in {'retry','discard'} or not isinstance(note,str) or not 1 <= len(note.strip()) <= 2000):
+        raise ValueError('select an unresolved ingress and provide bounded non-secret inspection evidence')
+    if decision == 'retry' and row['state'] != 'failed':
+        raise ValueError('only failed native decoding may be retried')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='reconcile-ingress',ingress_id=row['ingress_id'],
+        attempt=row['attempt'],state=row['state'],decision=decision,note=note))
+
+
 def gateway_process_status():
     require_root()
     result = subprocess.run(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,SubState,Result,ExecMainStatus",

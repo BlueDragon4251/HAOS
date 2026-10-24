@@ -17,6 +17,8 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.manage_gateway("start"),
         lambda: initial_setup.manage_gateway("revoke", "fixture"),
         lambda: initial_setup.gateway_process_status(),
+        lambda: initial_setup.gateway_ingress(),
+        lambda: initial_setup.reconcile_gateway_ingress({}, 'retry', 'fixture'),
     ):
         with pytest.raises(PermissionError):
             call()
@@ -27,6 +29,23 @@ def test_no_existing_owner_may_be_reenrolled(monkeypatch):
     monkeypatch.setattr(initial_setup, "owners", lambda: [{"username": "present", "uid": 1002}])
     with pytest.raises(PermissionError):
         initial_setup.create_initial_owner("other", "secret", "secret")
+
+
+def test_graphical_native_ingress_recovery_preserves_selected_receipt_and_quiesces_first(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(('stop',kwargs)))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(('owner',vars(args))))
+    with pytest.raises(ValueError):initial_setup.gateway_ingress(-1)
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_ingress({},'retry','fixture')
+    assert calls==[]
+    initial_setup.gateway_ingress(10)
+    row={'ingress_id':'a'*64,'attempt':8,'state':'failed'}
+    initial_setup.reconcile_gateway_ingress(row,'retry','inspected fixture')
+    assert calls==[('stop',{'gateway_only':True}),('owner',{'gateway_action':'ingress','after':10}),
+        ('stop',{'gateway_only':True}),('owner',{'gateway_action':'reconcile-ingress','ingress_id':'a'*64,
+        'attempt':8,'state':'failed','decision':'retry','note':'inspected fixture'})]
 
 
 def test_initial_owner_requires_repeated_password_before_stopping_services(monkeypatch):

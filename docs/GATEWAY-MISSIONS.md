@@ -371,6 +371,31 @@ tests with two existing skips. Exact sources are recorded in
 `docs/evidence/2026-10-24/discord-native-transport-validation.json`.
 
 This establishes local durable capture, not external Discord delivery or recovery
-of frames after the remote resume window has expired. Owner inspection/retry
-of failed raw input, long-outage history recovery, outgoing certainty and complete
-media/voice paths remain separate work. No third gateway is claimed.
+of frames after the remote resume window has expired. Long-outage history recovery,
+outgoing certainty and complete media/voice paths remain separate work.
+No third gateway is claimed.
+
+## Owner recovery of retained native input (2026-10-24)
+
+`haos-owner gateway ingress --after 0` lists up to 100 unresolved receipt metadata
+rows, without message text or credentials. `gateway reconcile-ingress ID
+--state failed --attempt 8 --decision retry --note 'non-secret inspection evidence'`
+reopens a failed decoder budget only while the original 24-hour window and exact
+owner grant remain valid. `--decision discard` excludes an unresolved input from
+execution while preserving its original payload, envelope and timestamps.
+Stale state/attempt decisions are rejected; the decision and note digest commit
+atomically in the private journal. Failed audit insertion rolls the decision back.
+
+The authenticated root wrapper requires a stopped gateway and drops to the
+`haos-gateway` UID, no supplementary groups and a fixed credential-free environment
+before opening SQLite. The graphical gateway page exposes the same real backend,
+explicitly stops the service before inspecting it, carries the selected receipt
+and evidence into the decision, and leaves restart to the owner. Expired or revoked
+input cannot be revived by clicking retry. Recovery makes no provider calls and
+sends no external messages. No owner, mission or recovery data is deleted.
+
+Full and minimal suites pass 1008 tests with two existing skips. Nineteen explicit
+root/UID/Unix-socket gateway cases include actual demoted-UID retry/discard with a
+root-only canary remaining unreadable. The real Tk workflow renders at 1280×800
+and 640×480 and exercises the recovery selection/button/backend argument handoff.
+Receipts: `docs/evidence/2026-10-24/discord-ingress-recovery-validation.json`.
