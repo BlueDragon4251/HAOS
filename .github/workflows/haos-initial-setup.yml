@@ -261,6 +261,7 @@ jobs:
           initial_setup.manage_gateway = lambda action, identifier="": gateway_actions.append((action, identifier))
           initial_setup.gateway_process_status = lambda: {"ActiveState": "active", "SubState": "running", "Result": "success"}
           for label in ("Gateway-Dienststatus prüfen", "Gateway-Dienst starten", "Gateway-Dienst stoppen",
+                  "Unterbrochene Gateway-Konfiguration wiederherstellen",
                   "Ausgewählte Absenderfreigabe entziehen", "Konnektor und Zugangsdaten entfernen"):
               next(item for item in wizard.content.winfo_children()
                    if isinstance(item, tkinter.Button) and item.cget("text") == label).invoke()
@@ -270,7 +271,7 @@ jobs:
                       break
                   time.sleep(0.02)
               assert not wizard.running
-          assert gateway_actions == [("start", ""), ("stop", ""), ("revoke", "bound-fixture"), ("remove", "discord-main")]
+          assert gateway_actions == [("start", ""), ("stop", ""), ("recover-configuration", ""), ("revoke", "bound-fixture"), ("remove", "discord-main")]
           wizard._run_async(lambda: time.sleep(0.05), success="Async operation complete")
           assert wizard.running
           for _ in range(80):

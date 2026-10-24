@@ -399,7 +399,7 @@ def configure_gateway(connector: str, platform: str, token: str):
     credentials["connectors"][connector] = {"token": token}
     persist(policy, credentials)
     audit("setup.gateway", {"connector": connector, "platform": platform})
-    return {"configured": True, "platform": platform, "restart_required": True}
+    return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}
 
 
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
@@ -433,13 +433,15 @@ def gateway_configuration():
 
 def manage_gateway(action: str, identifier: str = ""):
     require_root()
-    if action not in {"start", "stop", "revoke", "remove"}:
+    if action not in {"start", "stop", "revoke", "remove", "recover-configuration"}:
         raise ValueError("unsupported graphical gateway action")
     from types import SimpleNamespace
     from .gateway_setup import owner_gateway
-    if action in {"start", "stop"}:
+    if action in {"start", "stop", "recover-configuration"}:
         if identifier:
             raise ValueError("service actions do not select a gateway identity")
+        if action == "recover-configuration":
+            quiesce_for_setup(gateway_only=True)
         return owner_gateway(SimpleNamespace(gateway_action=action))
     configured = gateway_configuration()
     rows = configured["bindings"] if action == "revoke" else configured["connectors"]

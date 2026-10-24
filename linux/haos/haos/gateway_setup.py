@@ -13,7 +13,6 @@ from copy import deepcopy
 from pathlib import Path
 
 from .gateway import GatewayPolicy
-from .policy import atomic_json
 from .sandbox import trusted_json
 
 CONFIG = Path("/etc/haos")
@@ -64,6 +63,9 @@ def stopped_gateway():
 
 
 def load(config=CONFIG):
+    from .gateway_publication import pending, validate_snapshot
+    if pending(config):
+        raise PermissionError("interrupted gateway publication; stop the gateway and recover-configuration")
     metadata = config.lstat()
     if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o022:
         raise PermissionError("untrusted gateway configuration directory")
@@ -74,9 +76,11 @@ def load(config=CONFIG):
     if secret_path.exists() and stat.S_IMODE(secret_path.lstat().st_mode) & 0o077:
         raise PermissionError("transport credential store must be root-private")
     credentials = trusted_json(secret_path) if secret_path.exists() else {"connectors": {}}
-    if set(credentials) != {"connectors"} or not isinstance(credentials["connectors"], dict):
-        raise ValueError("invalid protected transport credentials")
-    return policy, credentials
+    validate_snapshot(policy, credentials)
+    if pending(config):
+        raise PermissionError("gateway publication changed during inspection")
+    return ({key: value for key, value in policy.items() if key != "publication"},
+            {key: value for key, value in credentials.items() if key != "publication"})
 
 
 def renewed_policy(policy, previous):
@@ -99,21 +103,33 @@ def renewed_policy(policy, previous):
 def persist(policy, credentials, *, config=CONFIG, gid=None):
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
-    previous, _ = load(config)
-    GatewayPolicy(policy)
-    policy = renewed_policy(policy, previous)
-    if set(credentials["connectors"]) != {c["id"] for c in policy["connectors"]}:
-        raise ValueError("transport credentials and connector policy disagree")
-    gid = grp.getgrnam("haos-gateway").gr_gid if gid is None else gid
-    # Service is stopped. A crash between writes cannot introduce an authorized new sender.
-    atomic_json(config / "gateway-credentials", credentials)
-    atomic_json(config / "gateways.json", policy, mode=0o640, gid=gid)
+    from .gateway_publication import writer, publish
+    with writer(config):
+        previous, old_credentials = load(config)
+        policy = deepcopy(policy)
+        # A credential/account replacement requires fresh sender approval.
+        # Preserve old records, but withdraw all bindings on that connector.
+        changed = {key for key in credentials.get("connectors", {})
+            if key in old_credentials["connectors"] and credentials["connectors"][key] != old_credentials["connectors"][key]}
+        old_platforms = {row["id"]: row["platform"] for row in previous["connectors"]}
+        changed.update(row["id"] for row in policy["connectors"] if row["id"] in old_platforms
+            and row["platform"] != old_platforms[row["id"]])
+        policy["bindings"] = [binding for binding in policy["bindings"] if binding["connector"] not in changed]
+        policy = renewed_policy(policy, previous)
+        gid = grp.getgrnam("haos-gateway").gr_gid if gid is None else gid
+        publish(config, policy, credentials, previous, gid)
 
 
 def owner_gateway(args):
     from .owner import audit
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
+    if args.gateway_action == "recover-configuration":
+        from .gateway_publication import recover
+        stopped_gateway()
+        value = recover(CONFIG, grp.getgrnam("haos-gateway").gr_gid)
+        audit("gateway.configuration-recovered", {})
+        return value
     if args.gateway_action in {"start", "stop"}:
         subprocess.run(["/usr/bin/systemctl", args.gateway_action, "haos-gateway.service"], check=True, timeout=30)
         audit("gateway." + args.gateway_action, {})

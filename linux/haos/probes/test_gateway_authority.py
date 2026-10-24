@@ -135,3 +135,46 @@ def test_real_owner_publication_renews_pairing_epochs_and_preserves_unchanged_gr
     with pytest.raises(PermissionError):
         GatewayPolicy(repaired).current_binding({'binding_id': 'paired', 'binding_digest': digest(first['bindings'][0])})
     assert 'generation' not in policy['bindings'][0]
+
+
+@pytest.mark.parametrize('interrupted_after', ['journal', 'withdrawal', 'credentials', 'policy'])
+def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_sender_authority(tmp_path, monkeypatch, interrupted_after):
+    from haos import gateway_publication
+    assert os.geteuid() == 0, 'actual protected files and owner UID required'
+    policy = {'version': 1, 'connectors': [{'id': 'first', 'platform': 'telegram'}], 'bindings': [
+        {'id': 'paired', 'connector': 'first', 'sender': '42', 'chat': '42', 'scope': '', 'thread': '',
+         'identity': 'principal', 'capabilities': ['create', 'read']}]}
+    old_secret = {'connectors': {'first': {'token': 'disposable-old-account-credential'}}}
+    persist(policy, old_secret, config=tmp_path, gid=0)
+    before, _ = load(tmp_path)
+    new_secret = {'connectors': {'first': {'token': 'disposable-new-account-credential'}}}
+    original = gateway_publication.atomic_json
+    writes = []
+    class PowerLoss(Exception): pass
+    def durable_then_interrupt(path, value, **kwargs):
+        original(path, value, **kwargs)
+        stage = ('journal' if path.name == gateway_publication.PENDING else 'credentials'
+            if path.name == 'gateway-credentials' else 'policy' if value['connectors'] else 'withdrawal')
+        writes.append(stage)
+        if stage == interrupted_after: raise PowerLoss()
+    monkeypatch.setattr(gateway_publication, 'atomic_json', durable_then_interrupt)
+    with pytest.raises(PowerLoss): persist(before, new_secret, config=tmp_path, gid=0)
+    assert gateway_publication.pending(tmp_path)
+    with pytest.raises(PermissionError): load(tmp_path)
+    from haos.sandbox import trusted_json
+    journal = trusted_json(tmp_path/gateway_publication.PENDING)
+    assert journal['previous_policy'] == before
+    assert journal['policy']['bindings'] == []
+    assert stat.S_IMODE((tmp_path/gateway_publication.PENDING).stat().st_mode) == 0o600
+    monkeypatch.setattr(gateway_publication, 'atomic_json', original)
+    assert gateway_publication.recover(tmp_path, 0)['recovered'] is True
+    assert not gateway_publication.pending(tmp_path)
+    after, secret = load(tmp_path)
+    assert after['connectors'] == before['connectors'] and after['bindings'] == []
+    assert secret == new_secret
+    public = trusted_json(tmp_path/'gateways.json')
+    private = trusted_json(tmp_path/'gateway-credentials')
+    gateway_publication.validate_snapshot(public, private)
+    assert public['publication'] == private['publication']
+    assert all(value['token'] not in (tmp_path/'gateways.json').read_text() for value in (old_secret['connectors']['first'], new_secret['connectors']['first']))
+    with pytest.raises(FileNotFoundError): gateway_publication.recover(tmp_path, 0)

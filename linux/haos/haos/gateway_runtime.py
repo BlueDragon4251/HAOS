@@ -105,16 +105,28 @@ class SafeFormatter(logging.Formatter):
 
 
 async def serve():
-    policy = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+    from .gateway_publication import pending, validate_snapshot
+    config = Path("/etc/haos")
+    if pending(config):
+        raise PermissionError("gateway owner publication requires recovery")
+    snapshot = trusted_json(config / "gateways.json")
+    policy = GatewayPolicy(snapshot)
     credentials = json.loads((Path(os.environ["CREDENTIALS_DIRECTORY"]) / "gateway-credentials").read_text())
-    if set(credentials) != {"connectors"} or set(credentials["connectors"]) != set(policy.connectors):
-        raise ValueError("gateway credentials and owner policy disagree")
+    validate_snapshot(snapshot, credentials)
+    if pending(config):
+        raise PermissionError("gateway owner publication changed during startup")
     redactor = Redactor([item["token"] for item in credentials["connectors"].values() if item.get("token")])
     handler = logging.StreamHandler()
     handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     stop = asyncio.Event()
+    def current_policy():
+        current = GatewayPolicy(trusted_json(config / "gateways.json"))
+        if pending(config) or current.publication != policy.publication:
+            stop.set()
+            raise PermissionError("gateway owner publication changed; restart required")
+        return current
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
@@ -127,10 +139,10 @@ async def serve():
         def receive(event, connector=connector):
             try:
                 envelope = adapter_envelope(event, connector["platform"])
-                current_policy = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+                current = current_policy()
                 # Commit before returning from native dispatch; transport-level
                 # acknowledgement ordering also needs platform-specific SDK proof.
-                inbox.admit(current_policy, connector["id"], envelope)
+                inbox.admit(current, connector["id"], envelope)
                 return True
             except (PermissionError, ValueError, Conflict):
                 logging.warning("Gateway message refused")
@@ -138,7 +150,7 @@ async def serve():
         adapter.set_durable_message_handler(receive)
         def authorize(user_id, chat_type=None, chat_id=None, *, is_bot=False, thread_id=None, connector=connector):
             try:
-                current = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
+                current = current_policy()
                 return native_authorization_prefilter(current, connector["id"], user_id, chat_id,
                     thread_id=thread_id, is_bot=is_bot)
             except Exception:
@@ -153,8 +165,8 @@ async def serve():
                     await task
                     raise ConnectionError("gateway maintenance task stopped")
             try:
-                current_policy = GatewayPolicy(trusted_json(Path("/etc/haos/gateways.json")))
-                incoming = inbox.next(current_policy)
+                current = current_policy()
+                incoming = inbox.next(current)
                 if incoming:
                     try:
                         response = await call("gateway.receive", {"connector": incoming["connector"], "envelope": incoming["envelope"]})
@@ -166,6 +178,7 @@ async def serve():
                         inbox.retry(incoming["id"])
                 delivery = await call("gateway.next", {})
                 if delivery:
+                    current_policy()
                     adapter = adapters[delivery["connector"]]
                     if not adapter.is_connected:
                         result = {"status": "retry", "retry_after": 5}

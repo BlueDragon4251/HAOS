@@ -152,7 +152,7 @@ def main():
     applications_sub.add_parser("revoke").add_argument("id")
     gateway = sub.add_parser("gateway", help="owner-authenticated transport credentials and exact sender pairing")
     gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
-    for action in ("status", "start", "stop"):
+    for action in ("status", "start", "stop", "recover-configuration"):
         gateway_sub.add_parser(action)
     setup = gateway_sub.add_parser("setup")
     setup.add_argument("connector")

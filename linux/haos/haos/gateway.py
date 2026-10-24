@@ -26,8 +26,13 @@ def identifier(value, *, empty=False):
 
 class GatewayPolicy:
     def __init__(self, config: dict):
-        if config.get("version") != 1 or set(config) != {"version", "connectors", "bindings"}:
+        fields = {"version", "connectors", "bindings"}
+        if config.get("version") != 1 or set(config) not in (fields, fields | {"publication"}):
             raise ValueError("unsupported gateway policy")
+        self.publication = config.get("publication")
+        if "publication" in config and (not isinstance(self.publication, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", self.publication)):
+            raise ValueError("invalid gateway publication")
         self.connectors, self.bindings = {}, {}
         if (not isinstance(config["connectors"], list) or not isinstance(config["bindings"], list)
                 or len(config["connectors"]) > 16 or len(config["bindings"]) > 512):

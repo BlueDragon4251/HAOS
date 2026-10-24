@@ -210,3 +210,35 @@ checks actual owner files in CI; it has not run locally. Source hashes and recei
 are in `docs/evidence/2026-10-24/gateway-generation-validation.json`. This change
 does not yet solve crash-atomic credential/account rotation or transport-level
 acknowledgement ordering; those remain separate work before adapter expansion.
+
+## Recoverable credential/account replacement (2026-10-24)
+
+Owner publication now journals the approved target and previous policy in a
+root-private file, durably withdraws the old policy, replaces credentials and
+publishes the matched target. A random publication ID binds public policy to
+the exact private credential snapshot delivered by systemd. A mismatched or
+pending snapshot refuses adapter startup. Running adapters stop admitting or
+sending when the owner publication changes. Writers are serialized by a
+root-private lock. Replacing a connector's token/account or platform withdraws
+its sender grants, requiring fresh explicit pairing; old account messages cannot
+inherit identically named recipients in another account. Mission/history rows
+are retained. Exact unchanged grants retain their grant generation.
+
+If publication is interrupted, stop the gateway and use the authenticated owner
+CLI `sudo haos-owner gateway recover-configuration`, or the graphical Gateway
+page's recovery action. Recovery completes the already approved journaled target;
+it does not restore old account authority, fabricate sender approval or send
+messages. The journal remains private until completion. Foreign/writable/symlinked
+authority paths and malformed snapshots are refused. A token/account change
+requires re-pairing before restarting.
+
+Local full/minimal suites pass **979 tests, two existing skips**. Seventeen real
+root-file/forked-UID/Unix-socket tests pass in a network-disabled read-only-source
+Docker fixture, including fault injection after each fsynced publication stage
+and exact-target recovery. This also verifies the preceding pairing-generation
+root case. Actual Tk tests invoke the recovery action and render all pages at
+1280x800 and 640x480; real Telegram/Discord native dispatch fixtures pass without
+connecting. These are not physical power-cut, installed service or external
+delivery acceptance. Exact sources, image identity and results are recorded in
+`docs/evidence/2026-10-24/gateway-publication-validation.json`. All five CI gates
+for provider predecessor `1682f67` passed; new-source CI remains required.

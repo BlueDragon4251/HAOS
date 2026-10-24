@@ -632,6 +632,10 @@ class Wizard:
             for action, label in (("start", "Gateway-Dienst starten"), ("stop", "Gateway-Dienst stoppen")):
                 self._button(self.content, label, lambda selected_action=action: self._run_async(
                     lambda: initial_setup.manage_gateway(selected_action), success="Gateway-Dienstaktion abgeschlossen.")).pack(anchor="w", pady=4)
+            self._button(self.content, "Unterbrochene Gateway-Konfiguration wiederherstellen", lambda: self._run_async(
+                lambda: initial_setup.manage_gateway("recover-configuration"),
+                success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
+                result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             platform = self._choice(self.content, "Plattform", ["telegram", "discord"], "telegram")
             token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
@@ -642,7 +646,7 @@ class Wizard:
                 selected_connector, selected_platform = connector.get(), platform.get()
                 self._run_async(lambda: initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret),
-                    success="Gateway gespeichert. Neustart des Gateway-Dienstes erforderlich.")
+                    success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
             self._button(self.content, "Gateway sicher anlegen", configure, primary=True).pack(anchor="w", pady=10)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
