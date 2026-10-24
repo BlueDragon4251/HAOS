@@ -94,10 +94,18 @@ class Credentials:
     def __init__(self, policy, credentials):
         self.policy, self.credentials = policy, credentials
         self.lock = threading.Lock()
-        self.cloud_data, self.cloud_cache = None, {}
+        self.cloud_cache = {}
         self.router_cache = {}
         self.query = {}
         self.request_state = threading.local()
+
+    @property
+    def cloud_data(self):
+        return getattr(self.request_state, "cloud_data", None)
+
+    @cloud_data.setter
+    def cloud_data(self, value):
+        self.request_state.cloud_data = value
 
     @property
     def effective_endpoint(self):
@@ -128,6 +136,9 @@ class Credentials:
         if self.policy.provider in CLOUD:
             with self.lock:
                 self.cloud_data = credential_data(self.policy.provider, self.credentials.get("api_key"))
+                if self.policy.provider == "bedrock":
+                    from .provider_cloud import aws_identity
+                    self.cloud_data = aws_identity(self.cloud_data, self.cloud_cache)
                 headers, values = cloud_headers(self.policy, self.cloud_data, self.cloud_cache)
                 self.query = dict(self.cloud_cache.get("query", {}))
                 if self.policy.provider == "bedrock" and self.policy.api_mode == "codex_responses":

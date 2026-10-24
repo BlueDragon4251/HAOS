@@ -97,6 +97,9 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
           "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"
           "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-native.json"
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-profile.json" profile
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-default-chain.json" default-chain
+          "$PYTHON" linux/haos/runtime/probe_aws_identity.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-identity.json"
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-replay.json"
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"

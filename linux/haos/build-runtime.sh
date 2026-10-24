@@ -78,6 +78,9 @@ done
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_messages_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-messages-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_http_provider_matrix.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-http-matrix-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_aws_native.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-aws-native-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_aws_native.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-aws-profile-build-probe.json profile
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_aws_native.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-aws-default-chain-build-probe.json default-chain
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_aws_identity.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-aws-identity-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_converse_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-converse-replay-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_converse_replay.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/provider-converse-route-scope-build-probe.json route-scope
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_acp_provider.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/acp-provider-build-probe.json /usr/lib/haos/copilot/copilot

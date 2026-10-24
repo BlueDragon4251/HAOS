@@ -257,3 +257,12 @@ project access or OpenAI-endpoint compatibility. The GUI marks this distinction;
 publication still requires explicit provider/model configuration. Changed input
 discards an in-flight result. API errors retain clearly identified offline
 suggestions rather than claiming a successful catalogue or inference.
+
+AWS SDK identity resolution stays inside the private provider service. A named
+profile or standard service identity is refreshed by the actual SDK; every
+request uses one frozen identity for signing and response redaction, including
+temporary role session tokens. Profile/default-chain selection requires that
+identity to be provisioned for the provider service itself. It does not read
+the desktop owner's AWS files, automatically provision SSO, or prove access to
+a selected model. Removing the HAOS route withdraws local authority; remote
+IAM/SSO revocation remains an account-side operation.

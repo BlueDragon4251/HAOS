@@ -1135,3 +1135,32 @@ scenarios and three fresh broker/main-agent generation pairs also pass. Exact
 source hashes and all 33 contract receipts are in `converse-scope-validation.json`
 and `converse-scope-contracts.json`. No live account or installed acceptance
 is inferred. Root/UID/kernel CI remains a separate mandatory check.
+
+## Frozen private AWS SDK identities and response redaction (2026-10-24)
+
+An actual native AWS fixture using a private named SDK profile reproduced a
+reflected session token reaching the broker response: redaction knew only the
+profile name. Before dispatch, the private broker now resolves the real SDK
+chain into a frozen per-request identity and gives those same values to both
+the signer and redactor. A cached private native session retains role/chain
+refresh; bearer-only routes never resolve another IAM chain. Request snapshots
+are thread-local, so a concurrent refresh cannot change an in-flight signer.
+Cloud model discovery uses that same identity and filters reflected credentials
+from public model IDs. No vendor credential enters the agent profile.
+
+Required build/CI add twenty native Mantle/Claude profile/default-chain cases
+(alongside twenty explicit IAM/bearer cases) and an actual STS AssumeRole probe.
+The latter verifies source SigV4 cryptographically, native session caching,
+expiry-driven refresh via two real local STS HTTP calls, and retention of the
+first request's signer/redactor while another request refreshes. Only fixture
+credential-cache expiry timestamps are advanced; SDK loaders/signers/parsers
+remain real. Catalogue fixtures cover explicit, named-profile and default-chain
+identities and reflected model IDs.
+
+Both full/minimal suites pass **964 tests, two existing skips**. Existing
+Converse JSON/EventStream and same-model separate-route fixtures also pass
+(24 actual boto3 calls). Exact source hashes and contract receipts are in
+`docs/evidence/2026-10-24/aws-chain-validation.json`. All five CI gates, including
+real kernel/UID/service checks, passed for predecessor `c962fbc`; new-source CI
+remains required. These fixture profiles/role responses do not establish real
+AWS account access, SSO login, installed provisioning or live inference.

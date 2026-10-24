@@ -83,3 +83,27 @@ def test_custom_dns_is_checked_once_and_connection_is_pinned_with_original_tls_h
     with pytest.raises(PermissionError):
         Handler.forward(handler, {"model": "fixture"}, {}, Redactor(), defer_errors=True)
     assert calls == []
+
+
+def test_bearer_identity_never_resolves_an_unrelated_iam_chain():
+    from haos.provider_cloud import aws_identity
+    cache = {}
+    value = {"bearer_token": "fixture-bearer"}
+    assert aws_identity(value, cache) == value
+    assert cache == {}
+
+
+def test_cloud_signer_snapshot_is_local_to_its_request_thread():
+    import threading
+    from haos.provider_proxy import Credentials
+    private = Credentials(None, {})
+    private.cloud_data = {"session_token": "first-request"}
+    seen = []
+    def other_request():
+        assert private.cloud_data is None
+        private.cloud_data = {"session_token": "second-request"}
+        seen.append(private.cloud_data)
+    thread = threading.Thread(target=other_request)
+    thread.start(); thread.join(5)
+    assert not thread.is_alive() and seen == [{"session_token": "second-request"}]
+    assert private.cloud_data == {"session_token": "first-request"}

@@ -224,9 +224,10 @@ def discover(policy, credential):
             return vertex_catalog(policy, credentials)
         if policy.provider == "bedrock":
             from botocore.config import Config
-            from .provider_cloud import credential_data, aws_session
+            from .provider_cloud import aws_session
             from agent.bedrock_adapter import _list_foundation_models, _list_inference_profiles
-            data = credential_data(policy.provider, credential)
+            _, redactor = credentials.headers()
+            data = credentials.cloud_data
             region = urlsplit(policy.endpoint).hostname.split(".")[1]
             client = aws_session(data).client("bedrock", region_name=region,
                 config=Config(connect_timeout=5, read_timeout=8, retries={"total_max_attempts": 1},
@@ -258,7 +259,7 @@ def discover(policy, credential):
                 bounded = BoundedControl()
                 _list_foundation_models(bounded, set(), models)
                 _list_inference_profiles(bounded, set(), models)
-                return receipt(policy.provider, [m["id"] for m in models], "sdk-catalog", redactor=Redactor(data.values()))
+                return receipt(policy.provider, [m["id"] for m in models], "sdk-catalog", redactor=redactor)
             finally:
                 client.close()
         return http_catalog(policy, credentials)

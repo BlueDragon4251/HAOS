@@ -7,6 +7,7 @@ import hmac
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -58,14 +59,22 @@ def main():
     from botocore.awsrequest import AWSRequest
     from botocore.credentials import Credentials as AWSCredentials
     from agent.bedrock_adapter import bedrock_openai_base_url
+    chain = sys.argv[3] if len(sys.argv) == 4 else None
+    assert chain in {None, "profile", "default-chain"}
     results, failures = [], []
     original_https, original_client = http.client.HTTPSConnection, messages_bridge.create_client
     for family in ("mantle", "claude"):
-        for auth in ("iam", "bearer"):
+        for auth in (("iam",) if chain else ("iam", "bearer")):
             for case in ("json", "stream", "truncated", "rate-limit", "terminal-framing"):
                 release = threading.Event()
                 key, secret, session, bearer = "fixture-access-id", secrets.token_urlsafe(40), secrets.token_urlsafe(40), secrets.token_urlsafe(48)
                 private = {"access_key_id": key, "secret_access_key": secret, "session_token": session} if auth == "iam" else {"bearer_token": bearer}
+                if chain:
+                    section = "fixture" if chain == "profile" else "default"
+                    Path(os.environ["AWS_SHARED_CREDENTIALS_FILE"]).write_text(
+                        f"[{section}]\naws_access_key_id={key}\naws_secret_access_key={secret}\naws_session_token={session}\n")
+                    Path(os.environ["AWS_SHARED_CREDENTIALS_FILE"]).chmod(0o600)
+                    private = {"profile": "fixture"} if chain == "profile" else None
                 reflected = session if auth == "iam" else bearer
                 capability = secrets.token_urlsafe(48)
                 endpoint = "https://bedrock-runtime.us-east-1.amazonaws.com"
@@ -205,7 +214,7 @@ def main():
                     with tempfile.TemporaryDirectory() as temp:
                         ledger = FixtureLedger(Path(temp) / "usage.db")
                         try:
-                            with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": json.dumps(private)}), ledger)) as port:
+                            with serving(Broker(("127.0.0.1", 0), policy, capability, Credentials(policy, {"api_key": json.dumps(private) if private is not None else None}), ledger)) as port:
                                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
                                 path = "/v1/responses" if family == "mantle" else "/v1/messages"
                                 conn.request("POST", path, json.dumps(request), {"Authorization": "Bearer " + capability})
@@ -248,7 +257,7 @@ def main():
                 assert len(seen) == 1
                 results.append(family + ":" + auth + ":" + case)
     assert not failures
-    receipt = {"actual_native_aws_http_cases": results, "botocore_sigv4_verified_cryptographically": True,
+    receipt = {"actual_native_aws_http_cases": results, "actual_sdk_private_credential_chain": chain, "botocore_sigv4_verified_cryptographically": True,
         "mantle_endpoint_and_protocol_derived_from_pinned_rules": True,
         "actual_anthropic_bedrock_binary_eventstream": True, "claude_signed_thinking_replay": True,
         "per_route_iam_and_bearer_no_global_env_changes": True, "early_stream_and_truncation_rate_limit": True,
@@ -262,4 +271,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with tempfile.TemporaryDirectory() as directory:
+        overrides = {"AWS_SHARED_CREDENTIALS_FILE": str(Path(directory)/"credentials"),
+            "AWS_CONFIG_FILE": str(Path(directory)/"config"), "AWS_EC2_METADATA_DISABLED": "true"}
+        keys = {*overrides, "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_DEFAULT_PROFILE"}
+        previous = {key: os.environ.get(key) for key in keys}
+        try:
+            for key in keys: os.environ.pop(key, None)
+            os.environ.update(overrides)
+            Path(overrides["AWS_CONFIG_FILE"]).write_text("")
+            main()
+        finally:
+            for key, value in previous.items():
+                if value is None: os.environ.pop(key, None)
+                else: os.environ[key] = value

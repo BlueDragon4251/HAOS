@@ -6,6 +6,7 @@ the agent receives only the existing scoped broker capability.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import time
 import uuid
@@ -91,6 +92,29 @@ def aws_session(data):
         session.register_component("credential_provider", CredentialResolver([]))
         options["botocore_session"] = session
     return boto3.Session(**options)
+
+
+def aws_identity(data, cache):
+    """Freeze this request's real SDK identity before signing and redaction.
+
+    The private session retains native role/SSO/chain refresh. Downstream SDKs
+    receive the same frozen values that this request's redactor knows, so a
+    concurrent refresh cannot change its signer behind the response boundary.
+    """
+    if "bearer_token" in data:
+        return dict(data)
+    identity = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+    if cache.get("aws_identity") != identity:
+        session = aws_session(data)
+        cache.update(aws_identity=identity, aws_session=session)
+    credentials = cache["aws_session"].get_credentials()
+    if credentials is None:
+        raise PermissionError("AWS IAM credentials are not available for this route")
+    frozen = credentials.get_frozen_credentials()
+    values = {"access_key_id": frozen.access_key, "secret_access_key": frozen.secret_key}
+    if frozen.token:
+        values["session_token"] = frozen.token
+    return credential_data("bedrock", json.dumps(values))
 
 
 def mantle_endpoint(endpoint):
