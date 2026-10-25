@@ -48,6 +48,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_sync.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-sync-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-ingress-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-polling-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-held-build-probe.json held
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-delivery-build-probe.json

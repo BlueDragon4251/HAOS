@@ -1,0 +1,29 @@
+{
+  "passed": 21,
+  "cases": [
+    "actual_native_format_sdk_plaintext_and_reopened_outbox",
+    "actual_native_root_thread_preserved",
+    "single_native_http_400",
+    "single_native_http_401",
+    "single_native_http_403",
+    "single_native_http_404",
+    "single_native_http_413",
+    "single_native_http_429",
+    "single_native_http_500",
+    "single_native_http_302",
+    "lost_receipt_does_not_trigger_native_e2ee_retry",
+    "malformed_success_receipt_stays_uncertain",
+    "partial_chunks_then_refusal_stays_uncertain",
+    "revocation_between_chunks_stops_before_second_send",
+    "forged_binding_cannot_send",
+    "scope_substitution_cannot_send",
+    "thread_substitution_cannot_send",
+    "raw_sdk_send_outside_private_context_has_no_write_authority",
+    "encrypted_room_cannot_downgrade_or_infer_outbound_device_approval",
+    "unavailable_encryption_state_cannot_downgrade",
+    "plaintext_needs_explicit_owner_consent"
+  ],
+  "external_connections": false,
+  "encrypted_outbound_implemented": false,
+  "installed_matrix_gateway_enabled": false
+}

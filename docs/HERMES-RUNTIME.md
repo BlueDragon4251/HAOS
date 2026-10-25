@@ -188,3 +188,27 @@ recovery, complete profile lifecycle and owner setup remain required before
 activation. These fixtures use disposable local identities and create local
 fixture missions; they accept no external account, remote trust, inference,
 message delivery, installation or release.
+
+
+## Prepared Matrix outgoing text boundary (2026-10-25)
+
+The next private component preserves pinned Hermes formatting/chunking and actual
+Matrix SDK HTTP encoding, while rechecking the exact owner binding/room/thread
+before every chunk and at wire authorization. Both the native adapter's broad
+E2EE resend and the pinned HTTP transport's independent PUT retry are stopped.
+A lost response, malformed receipt, 5xx, redirect or partial multi-chunk send
+remains uncertain in the reopened actual HAOS outbox. A confirmed rate limit can
+release a bounded retry; inspection never resends an uncertain obligation.
+Unsolicited SDK writes outside the private outgoing context remain denied.
+
+Twenty-one actual local SDK/HTTP/native/outbox cases cover exact flat/thread
+routes, 400/401/403/404/413/429/500/302, lost connections with exactly one wire
+send, malformed receipts, partial sends, revocation between chunks, forged
+binding/scope/thread, unsolicited SDK sends and encryption downgrade refusal.
+This is a prepared plaintext path only: current room encryption state must be
+read successfully or explicitly report absence, and the owner must explicitly
+allow plaintext. A stale SDK encryption cache cannot distribute group keys.
+Encrypted outgoing messages remain refused until recipient/key-distribution
+approval is implemented; inbound device approval is not reused as that proof.
+Matrix remains disabled in installed setup. No external delivery is accepted.
+Source-bound evidence: `docs/evidence/2026-10-25/matrix-delivery-validation.json`.

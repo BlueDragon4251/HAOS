@@ -77,6 +77,12 @@ class HTTPBoundary:
         if existing is not None:
             if existing is not self:raise PermissionError('Matrix API already belongs to another private boundary')
             return client
+        # The pinned aiohttp transport independently retries idempotent HTTP
+        # methods on a lost connection, including Matrix PUT sends. SDK retry
+        # settings alone do not prevent this second wire dispatch.
+        if type(getattr(api.session,'_retry_connection',None)) is not bool:
+            raise RuntimeError('Matrix private HTTP retry contract changed')
+        api.session._retry_connection=False
         api._haos_matrix_http_boundary=self
         original_request=api.request
         signature=inspect.signature(original_request)
