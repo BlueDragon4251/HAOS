@@ -25,7 +25,7 @@ class HTTPBoundary:
         self.allow_room_read=allow_room_read or (lambda _room:False)
         self.allow_write=allow_write or (lambda _method,_path:False)
         self.allow_login=allow_login is True;self.allow_recovery=allow_recovery is True
-        self._token_digest=None;self._client=None
+        self._token_digest=None;self._client=None;self.last_status=None;self.last_retry_after=5
 
     def confirm(self,client,proof):
         if (client is not self._client or str(getattr(proof,'user_id',''))!=self.user or str(getattr(proof,'device_id',None) or '')!=self.device
@@ -33,6 +33,9 @@ class HTTPBoundary:
                 or not isinstance(client.api.token,str) or not client.api.token):
             raise PermissionError('Matrix HTTP identity was not confirmed by the actual SDK response')
         self._token_digest=hashlib.sha256(client.api.token.encode()).digest()
+
+    def revoke(self):
+        self._token_digest=None;self._client=None
 
     def path(self,url):
         actual=urlsplit(str(url));target=urlsplit(self._target)
@@ -53,6 +56,8 @@ class HTTPBoundary:
         return logical
 
     def authorize(self,api,method,url,query):
+        if self._client is None or api is not self._client.api:
+            raise PermissionError('Matrix request belongs to a superseded private client')
         path=self.path(url);method=str(method)
         if any(key in query for key in ('access_token','user_id','device_id','org.matrix.msc3202.device_id')):
             raise PermissionError('Matrix impersonation and credential query parameters are forbidden')
@@ -72,7 +77,7 @@ class HTTPBoundary:
         raise PermissionError('Matrix operation has no explicit private authorization')
 
     def bind(self,client):
-        api=client.api;self._client=client;self._token_digest=None
+        api=client.api;self._client=client;self._token_digest=None;self.last_status=None;self.last_retry_after=5
         existing=getattr(api,'_haos_matrix_http_boundary',None)
         if existing is not None:
             if existing is not self:raise PermissionError('Matrix API already belongs to another private boundary')
@@ -103,6 +108,7 @@ class HTTPBoundary:
             try:
                 async with self.session.request(str(method),url,data=content,params=query_params,headers=headers,
                         allow_redirects=False,timeout=aiohttp.ClientTimeout(total=45)) as response:
+                    boundary.last_status=response.status
                     data=bytearray();limit=8*1024*1024 if 200<=response.status<300 else 65536
                     async for chunk in response.content.iter_chunked(65536):
                         data.extend(chunk)
@@ -123,6 +129,7 @@ class HTTPBoundary:
                             except ValueError:delay=5
                         if not math.isfinite(delay):delay=5
                         error.retry_after=min(86400,max(1,delay))
+                        boundary.last_retry_after=error.retry_after
                         raise error
                     if not isinstance(value,dict):raise ValueError('Matrix response has no native JSON object')
                     return value,response

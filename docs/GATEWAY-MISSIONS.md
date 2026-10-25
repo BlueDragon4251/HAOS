@@ -844,3 +844,44 @@ Matrix remains disabled in installed owner setup. Profile construction,
 supervision, credential lifecycle and GUI need final integration before it can
 be offered. These are disposable local keys and loopback HTTP contracts, not
 verified real accounts, federated delivery, installation or release acceptance.
+
+
+## Prepared Matrix profile lifecycle (2026-10-25)
+
+The actual pinned Matrix adapter can now be constructed as a stable private
+profile keyed by canonical homeserver, exact user and device. Credentials accept
+an explicit access token and optional owner recovery material; native extra
+configuration and implicit device discovery are refused. A real exclusive kernel
+lease prevents two writers from using the same identity. Token rotation reuses
+the existing account; changing device identity never resets its predecessor.
+Native home and secret scopes are task-local, with safe mode enabled. Native
+status transitions are persisted in the owned profile database because the SDK's
+process-global background status writer cannot preserve a private task context.
+
+Actual native authentication and crypto setup install the already tested input,
+outgoing recipient and history guards before retained initial sync. Live sync
+uses bounded native long polling; an independent recovery worker reopens pending
+pages, raw input and history. Missing decryption keys do not starve newer sync
+responses. Original grant snapshots and timestamps survive recovery. Superseded
+or disconnected SDK clients lose the private HTTP boundary. Auth refusal stops
+the adapter; safe error status, pending counts and Retry-After survive closure
+and a fresh factory. Closing cancels an in-progress native login, stops workers,
+closes SDK/SQLite handles and releases the lease even if status persistence fails.
+It retains crypto, account, inbound and recovery files.
+
+Twenty actual local native SDK/HTTP/SQLite/profile/mission/outbox cases exercise
+the full connect/reconnect path, same-account token rotation, exclusive lease,
+private files/home/status, plain and actual Olm/Megolm answers, auth refusal,
+persisted rate limits, wrong device, pending-key recovery alongside live sync,
+concurrent close during login, owner revocation and a real SQLite status failure.
+Nineteen additional standard-library credential contracts run without Hermes.
+Full/minimal suites each pass 1103 tests with two existing skips. Thirty-eight
+actual root/UID/socket gateway checks pass, including a new real UID 65533/65534
+lease/file/canary check with no identity or authorization mocks. All preceding
+native Matrix probes also pass. The new profile probe is mandatory in build/CI.
+Source-bound evidence: `docs/evidence/2026-10-25/matrix-profile-validation.json`.
+
+Matrix is still unavailable in installed setup: the public controller and owner
+CLI/GUI remain closed until the service/publication/setup paths are integrated.
+These private loopback fixtures are no real account, external delivery,
+installation, boot or release acceptance. No existing owner data is removed.

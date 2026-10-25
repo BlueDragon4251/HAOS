@@ -323,13 +323,15 @@ async def _dispatch_page(adapter,client,journal,key):
         _ACTIVE.reset(token)
 
 
-async def receive_sync(adapter,client,journal,authority,*,initial=False):
+async def receive_sync(adapter,client,journal,authority,*,initial=False,timeout_ms=0):
+    if type(timeout_ms) is not int or not 0<=timeout_ms<=30000:
+        raise ValueError('bounded Matrix long-poll timeout required')
     lock=getattr(adapter,'_haos_sync_receive_lock',None)
     if lock is None:lock=adapter._haos_sync_receive_lock=asyncio.Lock()
     # Actual immutable SDK owns authentication, request encoding and response
     # decoding. This API deliberately performs no room/sender authorization.
     async with lock:
         before=journal.cursor
-        payload=await asyncio.wait_for(client.sync(since=before,timeout=0,full_state=initial),45)
+        payload=await asyncio.wait_for(client.sync(since=before,timeout=timeout_ms,full_state=initial),45)
         key=journal.capture(payload,authority,initial=initial,from_batch=before)
     return await dispatch_page(adapter,client,journal,key)

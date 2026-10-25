@@ -203,3 +203,62 @@ def test_prepared_matrix_policy_cannot_be_published_by_installed_owner_backend(t
     assert not (tmp_path/'gateway-credentials').exists()
     assert not (tmp_path/'gateway-publication.json').exists()
     assert {path.name for path in tmp_path.iterdir()}<=before|{'.gateway-publication.lock'}
+
+
+def test_matrix_profile_kernel_lease_is_private_exclusive_and_released_between_real_uids():
+    import select
+    import tempfile
+    from haos.gateway_matrix_profile import acquire_lease
+    assert os.geteuid()==0,'actual kernel identities required'
+    with tempfile.TemporaryDirectory(prefix='haos-matrix-lease-') as temporary:
+        root=Path(temporary);root.chmod(0o755)
+        profile=root/'profile';profile.mkdir(mode=0o700);os.chown(profile,65534,65534)
+        canary=root/'owner-canary';canary.write_text('disposable root-only owner evidence');canary.chmod(0o600)
+        ready_read,ready_write=os.pipe();release_read,release_write=os.pipe()
+        first=os.fork()
+        if first==0:
+            try:
+                os.close(ready_read);os.close(release_write)
+                os.setgroups([]);os.setgid(65534);os.setuid(65534)
+                fd=acquire_lease(profile)
+                try:canary.read_text()
+                except PermissionError:pass
+                else:os._exit(4)
+                os.write(ready_write,b'1')
+                assert os.read(release_read,1)==b'1'
+                os.close(fd);os._exit(0)
+            except BaseException:os._exit(3)
+        os.close(ready_write);os.close(release_read)
+        def other(uid,allowed):
+            child=os.fork()
+            if child==0:
+                try:
+                    os.setgroups([]);os.setgid(uid);os.setuid(uid)
+                    if uid==65533:
+                        try:(profile/'profile.lock').read_bytes()
+                        except PermissionError:pass
+                        else:os._exit(7)
+                    try:fd=acquire_lease(profile)
+                    except PermissionError:
+                        if allowed:os._exit(5)
+                    else:
+                        os.close(fd)
+                        if not allowed:os._exit(6)
+                    try:canary.read_text()
+                    except PermissionError:pass
+                    else:os._exit(4)
+                    os._exit(0)
+                except BaseException:os._exit(3)
+            assert os.waitstatus_to_exitcode(os.waitpid(child,0)[1])==0
+        try:
+            assert select.select([ready_read],[],[],5)[0] and os.read(ready_read,1)==b'1'
+            assert (profile/'profile.lock').stat().st_uid==65534
+            assert stat.S_IMODE((profile/'profile.lock').stat().st_mode)==0o600
+            other(65533,False);other(65534,False)
+        finally:
+            try:os.write(release_write,b'1')
+            except BrokenPipeError:pass
+            os.close(release_write);os.close(ready_read)
+            assert os.waitstatus_to_exitcode(os.waitpid(first,0)[1])==0
+        other(65534,True)
+        assert canary.read_text()=='disposable root-only owner evidence'
