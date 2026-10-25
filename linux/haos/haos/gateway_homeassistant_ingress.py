@@ -22,6 +22,8 @@ class PreparedHomeAssistantPolicy(GatewayPolicy):
         super().__init__(config)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']!='homeassistant':continue
+            if ('homeassistant_shared_notifications' in binding and type(binding['homeassistant_shared_notifications']) is not bool):
+                raise ValueError('explicit boolean approval of shared Home Assistant notifications required')
             if (not _USER.fullmatch(binding['sender']) or not _ENTITY.fullmatch(binding['chat'])
                     or binding['scope'] or binding['thread'] or type(binding.get('since')) is not int
                     or not binding.get('generation')):

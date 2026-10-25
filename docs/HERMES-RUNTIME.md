@@ -669,3 +669,41 @@ wrong subscription routing and actual message-too-big close code 1009. Only
 the fixture replaces WSS with loopback WS. It confirms no live/TLS/account,
 notification, agent device tool, installed service or hardware acceptance.
 Home Assistant remains publicly disabled; six text gateway paths are active.
+
+### Prepared Home Assistant native notification delivery
+
+The pinned native adapter creates persistent notifications shared by the whole
+Home Assistant instance; it has no recipient-user argument. The prepared
+publisher therefore requires **explicit boolean owner approval** through
+`homeassistant_shared_notifications: true`, plus read authority for the exact
+current source binding. Without that approval, it performs no POST. This is
+not silently equivalent to a private reply to one user/entity. Public setup is
+still disabled until that distinction is presented in the actual owner GUI.
+
+`gateway_homeassistant_delivery.Publisher` executes the actual pinned send
+codec through one fixed private service endpoint. A stable per-outbox/chunk
+notification ID is added to that approved native payload; other REST/device
+services and unscoped native fallback have no authority. Complete Unicode text
+is chunked without the native 4096-character truncation. Current owner grant
+and private token are rechecked throughout publication and receipt validation.
+
+Native send returns a random UUID even on an empty HTTP 200 response, so it is
+never accepted as a remote receipt. A separate private observer executes the
+actual native authentication/subscription exchange, then only the fixed
+`persistent_notification/get` read. It returns no unrelated notifications to
+the agent. Delivery requires one actual matching remote notification ID, title
+and complete chunk text. The API shape and shared audience were read from Home
+Assistant Core commit `9eb964b8b95fddc61ec4841277fbce7ce32dc586`; the read-only
+reference manifest is included in runtime provenance, not vendored as code.
+
+The mandatory local probe has 22 actual native REST/WS/send cases including six
+reopened real mission outboxes. Missing/wrong/duplicate receipt data, lost
+responses, redirects, auth failures and 5xx remain uncertain; a partial reply
+followed by 429 does not retry the whole message. The notification verification
+read remains bounded (including the 64-KiB WS frame limit); excessive server
+notification collections cannot fabricate success. Full/minimal suites pass
+1151 tests with two existing skips. Actual root/UID/socket regression remains
+47 cases. Home Assistant still lacks full private profile/recovery/history and
+owner GUI integration, and stays publicly disabled; six text paths remain
+reviewed. No external notification, actual server/account/TLS, installed boot,
+hardware or release acceptance is claimed. Device-control tools remain denied.

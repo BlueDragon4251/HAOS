@@ -30,7 +30,13 @@ def test_prepared_homeassistant_requires_exact_authenticated_actor_entity_and_gr
 def test_homeassistant_ingress_imports_without_site_packages_or_upstream():
     source=Path(__file__).resolve().parents[1]
     script=('import sys; sys.path.insert(0,'+repr(str(source))+'); '
-        'import haos.gateway_homeassistant_ingress, haos.gateway_homeassistant_transport; '
+        'import haos.gateway_homeassistant_ingress, haos.gateway_homeassistant_transport, haos.gateway_homeassistant_delivery; '
         'assert "gateway.config" not in sys.modules; assert "plugins" not in sys.modules')
     child=subprocess.run([sys.executable,'-I','-S','-c',script],capture_output=True,text=True)
     assert child.returncode==0,child.stderr
+
+
+@pytest.mark.parametrize('value',[1,'true',[],{}])
+def test_prepared_homeassistant_shared_audience_approval_cannot_use_truthy_non_boolean(value):
+    source=config();source['bindings'][0]['homeassistant_shared_notifications']=value
+    with pytest.raises(ValueError):PreparedHomeAssistantPolicy(source)
