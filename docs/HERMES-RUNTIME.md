@@ -607,3 +607,37 @@ ntfy timestamps have second precision. Originals that cannot be proved newer
 than the exact owner grant remain excluded; messages in the grant's same second
 can therefore require a fresh submission. Server cache retention, deleted
 messages and server clock correctness remain real recovery limits.
+
+### Prepared Home Assistant context/entity ingress (not publicly enabled)
+
+`gateway_homeassistant_ingress.py` now prepares the actual pinned Home Assistant
+state-change decoder behind independent user/entity grants and the private
+native inbox. The upstream decoder's synthetic `homeassistant` sender and
+wall-clock-generated message ID are not used as HAOS authorization/replay
+identities. A prepared event requires an exact context user ID, entity ID,
+matching new-state context, timezone-aware original timestamps and a captured
+owner grant generation. Stable message IDs derive from the original context,
+entity and source timestamps. Payload user labels cannot authorize a sender.
+
+The raw event commits before native decoding and relay admission. Native
+cooldown state cannot consume a failed durable attempt; a real database reopen
+and elapsed retry preserve the obligation. Regrant/revocation is checked before
+capture, replay and admission. Unknown entities/users, service contexts with no
+user, malformed state/attribute types, missing/naive/future/pregrant timestamps,
+and direct unretained native callbacks are refused.
+
+The mandatory build/CI fixture passes 24 actual native decoder/SQLite/relay
+cases; eight standard tests also cover closed public policy, exact grants and
+real imports without site packages/upstream. Full/minimal suites pass 1147 tests
+with two existing skips. This is prepared decoding only: authenticated bounded
+WebSocket transport, account proof, recovery/history, conservative native
+notification delivery and owner GUI remain unfinished. Home Assistant remains
+outside public owner setup and runtime routing, so the reviewed text-gateway
+count stays six. No authenticated HA transport, live account, external event
+or notification, installed service or hardware is accepted by this fixture.
+
+The private gateway token must not enable unrestricted Home Assistant device
+control in the agent. Native smart-home tools are not authorized by this
+prepared decoder; any future device control needs its own explicit bounded
+owner capabilities. Service/system event contexts also need separate explicit
+policy rather than silently mapping unknown senders into a trusted principal.
