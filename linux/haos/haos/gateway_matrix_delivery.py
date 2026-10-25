@@ -1,8 +1,8 @@
 """Prepared exact-route native Matrix text delivery; never retry an unclear send.
 
 Encrypted recipient/key-distribution approval is intentionally not inferred from
-inbound device approval. Until that separate guard exists, encrypted sends fail
-closed. This component does not enable Matrix in installed owner setup.
+inbound device approval. Encrypted sends require a separately installed private
+RecipientGuard. This component does not enable Matrix in installed owner setup.
 """
 from contextvars import ContextVar
 from types import MethodType
@@ -57,16 +57,20 @@ def install(adapter,boundary):
             try:await self._client.get_state_event(RoomID(chat),EventType.ROOM_ENCRYPTION)
             except MNotFound:encrypted=False
             else:encrypted=True
-            if encrypted or not binding['allow_plaintext']:
-                raise PermissionError('Matrix outgoing encryption approval is not implemented')
+            guard=getattr(self,'_haos_matrix_recipients',None)
+            if encrypted and guard is None or not encrypted and not binding['allow_plaintext']:
+                raise PermissionError('Matrix outgoing encryption policy refused')
             # Prevent native outbound @room/user notification expansion.
             content['m.mentions']={}
             current(route)
             route['message_active']=True;route['attempts']+=1
-            # This prepared path is explicitly plaintext-only. Do not let a
-            # stale SDK encryption cache implicitly distribute new group keys.
-            identity=str(await asyncio.wait_for(self._client.send_message_event(
-                RoomID(chat),EventType.ROOM_MESSAGE,content,disable_encryption=True),timeout=45))
+            if encrypted:
+                identity=await asyncio.wait_for(guard.send_text(route['binding_route'],chat,content),timeout=45)
+            else:
+                # Explicit plaintext approval plus current absent encryption;
+                # a stale SDK cache cannot implicitly distribute group keys.
+                identity=str(await asyncio.wait_for(self._client.send_message_event(
+                    RoomID(chat),EventType.ROOM_MESSAGE,content,disable_encryption=True),timeout=45))
             if not opaque(identity,'$'):raise ValueError('Matrix send returned no valid event receipt')
             route['receipts'].append(identity)
             return identity

@@ -1,0 +1,65 @@
+{
+  "base_commit": "68ebe3ddb1a6ef83a28deea275b7d5411a6353e9",
+  "actual_native_olm_megolm_http_outbox_cases": 17,
+  "independent_matrix_policy_cases": 24,
+  "regression_cases": {
+    "crypto": 13,
+    "identity": 15,
+    "sync": 14,
+    "http": 17,
+    "ingress": 18,
+    "delivery_without_recipient_guard": 21,
+    "history": 16
+  },
+  "full_tests": {
+    "passed": 1084,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1084,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 37,
+  "base_all_five_ci_gates_successful": true,
+  "matrix_publicly_enabled": false,
+  "external_account_or_delivery_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "af7c605d669f3498507a9d2e25d7fbfba760a94360feefe0d610e73ab3cbce60"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "a1d79bb8fcd72f3adcc638ad60fb5f56919881c59e515d740cc67c0abef511fb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_delivery.py",
+      "sha256": "2ee0fb5ed5561c8090f08594cb660e8dab4f7c4992b48846c04b729538a0fc68"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_recipients.py",
+      "sha256": "ef7942129c91a7ed8c833e60b02ddaf3182eb64d1923ddfa47580fac486f65f1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_policy.py",
+      "sha256": "72c14183e11b63efcc78265c181374a07a48fbe24f31e7dfb6946441edfaecfa"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_matrix_policy.py",
+      "sha256": "5ebbe587ba117b04737eaf29ed87bf49aa058c38067784c86a2ac3f137516fa7"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_recipients.py",
+      "sha256": "e416c786203aa880ea0df7590ea039f0ee686257ac5388618a919f617caf7376"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "6eb0c674be5f834674ff377ce57ad572df24e58aa54f5d158034c291b1021403"
+    },
+    {
+      "path": "docs/GATEWAY-MISSIONS.md",
+      "sha256": "9a40f7b45bd6ea15f7d202bf70cfcb5904cc806ed2583a1870cc45fb3ced7cec"
+    }
+  ]
+}

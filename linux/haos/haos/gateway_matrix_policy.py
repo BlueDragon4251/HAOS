@@ -34,7 +34,8 @@ def validate_binding(binding):
     identities=set()
     for device in devices:
         if (not isinstance(device,dict) or set(device)!={'device_id','ed25519','curve25519'}
-                or not opaque(device['device_id']) or not public_key(device['ed25519']) or not public_key(device['curve25519'])
+                or not opaque(device['device_id']) or device['device_id']=='*'
+                or not public_key(device['ed25519']) or not public_key(device['curve25519'])
                 or device['device_id'] in identities):
             raise ValueError('Matrix device approval requires one exact device ID and both canonical public keys')
         identities.add(device['device_id'])

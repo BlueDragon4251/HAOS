@@ -59,3 +59,8 @@ def test_plaintext_needs_explicit_owner_consent_and_original_grant_time():
     policy=PreparedMatrixPolicy(config)
     assert authorize_original(policy,'bot',envelope,int(time.time()*1000),snapshot(policy,'bot'),None)['id']=='paired'
     with pytest.raises(PermissionError):authorize_original(policy,'bot',envelope,config['bindings'][0]['since'],snapshot(policy,'bot'),None)
+
+
+def test_matrix_device_wildcard_never_means_explicit_owner_approval():
+    config,_,_=fixture();config['bindings'][0]['matrix_devices'][0]['device_id']='*'
+    with pytest.raises(ValueError):PreparedMatrixPolicy(config)

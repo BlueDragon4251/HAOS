@@ -805,3 +805,42 @@ owner setup/lifecycle and independently approved encrypted outgoing key sharing
 still need integration. Server-deleted messages, absent account permissions and
 unavailable remote history cannot be recovered by local fixtures. No external
 account, remote delivery, installation or release is accepted by these results.
+
+
+## Prepared Matrix encrypted outgoing recipients (2026-10-25)
+
+A separate private recipient guard now supports actual Olm distribution and
+Megolm text answers through the pinned SDK. The current HAOS binding, exact room
+and root thread are rechecked before key sharing and encrypted wire sends.
+Only the binding's explicitly named recipient devices receive keys. Current
+joined membership, both owner fingerprints, actual native device-signature
+validation and distribution acknowledgement are required. Unknown devices,
+mismatched signatures/fingerprints, local blacklists and missing signed one-time
+keys refuse the result. A native session marked shared without all approved
+devices being distributed to is insufficient. Device wildcard `*` is invalid.
+
+Outgoing sessions are bound to the complete grant digest and session identity;
+a changed grant or freshly reopened guard rotates only the outbound group
+session. Account identity, inbound keys and recovery material remain retained.
+Uncertain key distribution sends no result and never authorizes an automatic
+resend of the old outbox obligation. Native/SDK/HTTP send retries remain disabled.
+Direct SDK key distribution outside the private owner context has no authority.
+The plaintext component still refuses encrypted rooms when this guard is absent.
+
+Seventeen actual local SDK/HTTP/native/outbox cases use signed device keys,
+real one-time keys, actual Olm distribution, a real SQLite crypto store and an
+independent actual peer SDK to decrypt Megolm answers. They cover exact threaded
+answers, missing one-time keys, unknown devices, fingerprint/signature failures,
+local blacklist, departed recipient, 429/500, lost encrypted receipt with one
+wire send, revocation between chunks, forged generations, lost key-share
+acknowledgement, subsequent distinct authorized obligations, and a genuinely
+closed/reopened SQLite database with a fresh SDK identity/guard. Full and minimal
+environments each pass 1084 tests with two existing skips; 37 actual root/UID/
+socket checks and the seven earlier Matrix probes pass. Build/CI require all
+these native probes. Source-bound evidence:
+`docs/evidence/2026-10-25/matrix-recipients-validation.json`.
+
+Matrix remains disabled in installed owner setup. Profile construction,
+supervision, credential lifecycle and GUI need final integration before it can
+be offered. These are disposable local keys and loopback HTTP contracts, not
+verified real accounts, federated delivery, installation or release acceptance.
