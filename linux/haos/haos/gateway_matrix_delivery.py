@@ -2,7 +2,7 @@
 
 Encrypted recipient/key-distribution approval is intentionally not inferred from
 inbound device approval. Encrypted sends require a separately installed private
-RecipientGuard. This component does not enable Matrix in installed owner setup.
+RecipientGuard and the current service-owned identity and owner route.
 """
 from contextvars import ContextVar
 from types import MethodType

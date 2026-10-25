@@ -327,3 +327,73 @@ Matrix is still unavailable in installed setup: the public controller and owner
 CLI/GUI remain closed until the service/publication/setup paths are integrated.
 These private loopback fixtures are no real account, external delivery,
 installation, boot or release acceptance. No existing owner data is removed.
+
+
+## Matrix owner setup and service integration (2026-10-25)
+
+Matrix now has a reviewed HAOS text setup path alongside Telegram, Discord,
+Slack and Mattermost: five of 22 adapters have owner provisioning and native
+text integration. This supersedes the earlier private-only activation guards.
+The public policy applies the same exact sender/room/root-thread/device rules
+used by the native contracts. Complete canonical homeserver/user/device
+credentials are required; a token alone or native extra overrides cannot be
+published. The service constructs the guarded stable profile with current owner
+authority and private raw storage, and closes it on service shutdown.
+
+The graphical and owner CLI paths store tokens/recovery material privately,
+expose exact route/capability/device choices, and never auto-approve a discovered
+device. Public device discovery runs through the actual SDK as the gateway UID
+with confirmed whoami and native self-signature validation; the owner must still
+compare the fingerprint with the physical device. Credentials travel to this
+short-lived helper only over stdin, not argv/environment. Discovery stops the
+gateway until the owner restarts it. Unknown devices receive no result keys.
+A fresh actual encrypted answer remains unreadable by an independent unapproved
+SDK device of the same account, while the selected device can decrypt it.
+
+Owner rotation/removal withdraws bindings and private configuration atomically;
+recovery/account files remain retained. Removal is local HAOS withdrawal, not a
+claim that the homeserver revoked its account token. Revoke obsolete tokens in
+the Matrix account as appropriate. Stopped-owner inspection includes safe
+profile/auth/rate/history status and retained-page counts; it reveals no message
+content or private credentials. Offline input/outbox reconciliation accepts exact
+Matrix event IDs, preserves original input age, and never sends on inspection.
+
+In the GUI choose Matrix, enter a separate service account's existing access
+token, canonical HTTPS homeserver, exact @user:server and stable device ID.
+Optional recovery material must already exist; setup does not reset identities.
+Join the service account to the intended rooms yourself. For each allowed sender,
+enter @sender:server and !room ID, keep scope empty and choose the existing $root
+thread or leave it empty for flat messages. Load signed devices, compare their
+Ed25519 fingerprints out of band and explicitly stage the desired devices.
+The signature also binds Curve25519. Then save the route and selected rights.
+Plaintext defaults off and mentions default on. Restart the gateway after pairing.
+
+Equivalent owner console setup (replace all example public IDs/key placeholders):
+
+```sh
+sudo haos-owner gateway setup matrix-main matrix
+sudo haos-owner gateway matrix-devices matrix-main '@owner:example.org'
+sudo haos-owner gateway pair phone matrix-main '@owner:example.org' '!room:example.org' \
+  --identity personal --matrix-device PHONE ED25519_PUBLIC_BASE64 CURVE25519_PUBLIC_BASE64 \
+  --capabilities create read
+sudo haos-owner gateway start
+```
+
+The setup command asks for private material through protected input. Optional
+`--allow-plaintext` and `--no-require-mention` are explicit Matrix exceptions;
+`--thread '$root-event'` selects one existing root thread. Invalid or self-echo
+service-account bindings are refused. No public webhook, automatic invite join,
+interactive native tool approval or arbitrary plugin is enabled.
+
+Local validation covers 1118 full/minimal tests with two existing skips, 40 real
+root/UID/socket gateway cases, 165 actual native Matrix cases across ten probes,
+13 regression probes for the existing gateway paths, and seven real Tk Matrix
+handoff/layout cases at each of 1280x800 and 640x480. Existing complete GUI
+fixtures also pass at both sizes. Build/CI require native account discovery and
+GUI tests. Source-bound evidence:
+`docs/evidence/2026-10-25/matrix-owner-integration-validation.json`.
+
+These contracts use disposable accounts/keys and loopback HTTP. They confirm no
+external Matrix delivery, physical device trust, installed service/boot or
+release. Full media/voice, the remaining 17 adapters, Android, phone firstboot
+and installed OS/artifact acceptance remain unfinished.

@@ -19,6 +19,47 @@ from .sandbox import trusted_json
 CONFIG = Path("/etc/haos")
 
 
+def owner_matrix_devices(connector,sender):
+    if os.geteuid()!=0:raise PermissionError('Matrix device inspection requires authenticated owner authority')
+    from .gateway_matrix_policy import opaque,public_key
+    if not opaque(sender,'@') or ':' not in sender:raise ValueError('exact Matrix sender account required')
+    stopped_gateway();policy,private=load()
+    selected=next((row for row in policy['connectors'] if row['id']==connector),None)
+    if selected is None or selected['platform']!='matrix':raise ValueError('select one configured Matrix connector')
+    code=Path('/usr/lib/haos');interpreter=code/'hermes/.venv/bin/python'
+    for path in (code,code/'haos',code/'hermes',code/'hermes/.venv',interpreter.parent):
+        info=path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:
+            raise PermissionError('untrusted installed Matrix helper runtime')
+    binary=interpreter.resolve().lstat()
+    if not stat.S_ISREG(binary.st_mode) or binary.st_uid!=0 or binary.st_mode&0o022:
+        raise PermissionError('untrusted installed Matrix helper interpreter')
+    account=pwd.getpwnam('haos-gateway')
+    if account.pw_uid==0 or account.pw_gid==0:raise PermissionError('Matrix account helper must drop root')
+    row=private['connectors'][connector]
+    values={key:row[key] for key in ('token','homeserver','user_id','device_id')}
+    result=subprocess.run([str(interpreter),'-E','-s','-m','haos.gateway_matrix_account'],
+        input=json.dumps({'credentials':values,'sender':sender}),text=True,capture_output=True,check=False,timeout=70,
+        user=account.pw_uid,group=account.pw_gid,extra_groups=[],umask=0o077,cwd=str(code),
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'})
+    if result.returncode or len(result.stdout)>131072:raise RuntimeError('Matrix device inspection failed in the private gateway identity')
+    response=json.loads(result.stdout)
+    if set(response)=={'error'}:raise RuntimeError('Matrix-Geräteabfrage abgelehnt oder nicht erreichbar; Konto, Gerät, Token und TLS prüfen.')
+    if (set(response)!={'devices','signature_checked','owner_approval_required'} or response['signature_checked'] is not True
+            or response['owner_approval_required'] is not True or not isinstance(response['devices'],list) or len(response['devices'])>256):
+        raise ValueError('invalid private Matrix device inspection response')
+    seen=set()
+    for device in response['devices']:
+        if (not isinstance(device,dict) or set(device)!={'device_id','ed25519','curve25519'}
+                or not opaque(device['device_id']) or device['device_id']=='*' or device['device_id'] in seen
+                or not public_key(device['ed25519']) or not public_key(device['curve25519'])):
+            raise ValueError('invalid inspected Matrix public device keys')
+        seen.add(device['device_id'])
+    from .owner import audit
+    audit('gateway.matrix-devices-inspected',{'connector':connector,'devices':len(seen)})
+    return response
+
+
 def owner_ingress(args, policy):
     """Owner authenticates; only the gateway UID opens its private native journal."""
     from .owner import audit
@@ -173,6 +214,7 @@ def owner_gateway(args):
         subprocess.run(["/usr/bin/systemctl", args.gateway_action, "haos-gateway.service"], check=True, timeout=30)
         audit("gateway." + args.gateway_action, {})
         return {"action": args.gateway_action}
+    if args.gateway_action=='matrix-devices':return owner_matrix_devices(args.connector,args.sender)
     policy, credentials = load()
     if args.gateway_action == "status":
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
@@ -182,15 +224,17 @@ def owner_gateway(args):
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack", "mattermost"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
+        if any(c['id']==args.connector and c['platform']!=args.platform for c in policy['connectors']):
+            policy['bindings']=[row for row in policy['bindings'] if row['connector']!=args.connector]
         # Validate the proposed connector before asking for a credential.
         policy["connectors"] = [c for c in policy["connectors"] if c["id"] != args.connector] + [{"id": args.connector, "platform": args.platform}]
         GatewayPolicy(policy)
         token = getpass.getpass("Bot token (stored only in the owner-protected credential store): ")
-        if not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token):
+        if args.platform!='matrix' and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
         if args.platform=='slack':
@@ -202,10 +246,26 @@ def owner_gateway(args):
             from .gateway_mattermost import validate_credentials
             url=input('Mattermost HTTPS server URL (no token or credentials in URL): ')
             credentials['connectors'][args.connector]['server_url']=validate_credentials(token,url)
+        if args.platform=='matrix':
+            from .gateway_matrix_profile import credentials as matrix_credentials
+            homeserver=input('Matrix HTTPS homeserver: ')
+            user_id=input('Exact Matrix account ID (@user:server): ')
+            device_id=input('Existing stable device ID belonging to this token: ')
+            recovery=getpass.getpass('Existing Matrix recovery key (optional, private; empty skips): ')
+            credentials['connectors'][args.connector]=matrix_credentials({'token':token,'homeserver':homeserver,
+                'user_id':user_id,'device_id':device_id,**({'recovery_key':recovery} if recovery else {})})
     elif args.gateway_action == "pair":
         binding = {"id": args.binding, "connector": args.connector, "sender": args.sender, "chat": args.chat,
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
+        selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
+        devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
+        unmentioned=getattr(args,'no_require_mention',False)
+        if selected and selected['platform']=='matrix':
+            binding.update(matrix_devices=[dict(zip(('device_id','ed25519','curve25519'),row)) for row in devices],
+                allow_plaintext=plain,require_mention=not unmentioned)
+        elif devices or plain or unmentioned:
+            raise ValueError('Matrix device/encryption options apply only to Matrix')
         policy["bindings"] = [b for b in policy["bindings"] if b["id"] != args.binding] + [binding]
     elif args.gateway_action == "revoke":
         if not any(b["id"] == args.binding for b in policy["bindings"]):

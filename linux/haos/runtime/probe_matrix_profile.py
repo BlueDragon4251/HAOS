@@ -34,7 +34,7 @@ def main():
             {'id':'paired','connector':'bot','sender':peer,'chat':room,'scope':'','thread':'',
              'identity':'principal','capabilities':['create','read'],'generation':'a'*64,'since':original_ms-10000,
              'allow_plaintext':True,'require_mention':False,'matrix_devices':[]}]}
-        current=lambda:PreparedMatrixPolicy(deepcopy(config))
+        current=lambda:GatewayPolicy(deepcopy(config))
         value={'token':'disposable-local-private-token','homeserver':'https://owner.invalid','user_id':bot,'device_id':device}
         state={'token':value['token'],'keys':{},'peer_keys':{},'calls':[],'queue':asyncio.Queue(),'cursor':'start',
             'auth_status':200,'auth_hold':None,'sync_status':200,'whoami_device':device,'posts':0,'revoke':False,
@@ -109,12 +109,15 @@ def main():
         raw=NativeInbox(directory/'raw.db',Redactor());relay=RelayInbox(directory/'relay.db',Redactor())
         missions=MissionStore(directory/'missions.db');engine=GatewayEngine(missions);adapters=[]
         def make(source=None):
-            adapter=build(source or value,parent,'bot',current,raw);adapters.append(adapter)
+            from haos.gateway_runtime import build_adapter
+            adapter=build_adapter('matrix',source or value,matrix_context={'parent':parent,'connector':'bot','policy':current,'inbox':raw})
+            adapters.append(adapter)
             # Only this fixture maps the validated owner HTTPS origin onto its
             # loopback listener. Actual native SDK/client construction is kept.
             adapter._homeserver=f'http://127.0.0.1:{port}';adapter._haos_matrix_http._target=adapter._homeserver
             def receive(native):relay.admit(current(),'bot',adapter_envelope(native,'matrix'));return True
             adapter.set_durable_message_handler(receive)
+            adapter.set_authorization_check(lambda *_args,**_kwargs:False)
             return adapter
         async def drain():
             while (item:=relay.next(current())) is not None:
@@ -123,9 +126,7 @@ def main():
             async with asyncio.timeout(8):
                 while not predicate():await asyncio.sleep(0.02)
         try:
-            try:GatewayPolicy(config)
-            except ValueError:pass
-            else:raise AssertionError('installed policy enabled prepared Matrix')
+            assert GatewayPolicy(config).bindings==current().bindings
             adapter=make()
             try:make()
             except PermissionError:pass
@@ -184,6 +185,11 @@ def main():
             await until(lambda:not adapter.is_connected)
             assert adapter.has_fatal_error and adapter.matrix_status()['status']=='authentication-refused'
             assert adapter.matrix_status()['last_error']=='authentication-refused'
+            from haos.gateway_raw_recovery import unresolved
+            metadata=unresolved(raw);row=next(item for item in metadata['transport'] if item['platform']=='matrix')
+            assert row['status']=='authentication-refused' and row['last_error']=='authentication-refused'
+            assert state['token'] not in json.dumps(metadata) and row['pending_pages']>=0
+            cases.append('actual_owner_transport_metadata_retains_safe_auth_error_without_credentials')
             before=len(state['calls']);assert await adapter.connect() is False;assert len(state['calls'])==before
             cases.append('actual_live_auth_refusal_is_fatal_until_owner_restart_or_correction')
             await adapter.close_profile();state['sync_status']=200
@@ -199,12 +205,28 @@ def main():
             state['queue'].put_nowait(page('after-limit'))
             assert await adapter.connect();assert str(adapter._client.crypto.account.identity_key)==original_key
             cases.append('native_owner_corrected_profile_recovers_after_persisted_rate_limit')
+            await adapter.disconnect()
+            from haos.gateway_runtime import maintain
+            stopped=asyncio.Event();supervisor=asyncio.create_task(maintain(adapter,stopped))
+            await until(lambda:adapter.is_connected)
+            stopped.set();await asyncio.wait_for(supervisor,5)
+            assert not adapter.is_connected and adapter._client is None and adapter._haos_recovery_task is None
+            cases.append('actual_gateway_service_supervisor_connects_and_stops_native_profile_and_workers')
             await adapter.close_profile();adapter=make(rotated);state['whoami_device']='FOREIGN'
             assert await adapter.connect() is False and not adapter.is_connected
             assert adapter.matrix_status()['status']=='identity-refused'
             assert (profile/'crypto'/'crypto.db').exists()
             cases.append('native_wrong_device_never_resets_or_deletes_stored_crypto')
             await adapter.close_profile();state['whoami_device']=device
+            adapter=make(rotated);state['sync_status']=401
+            assert await adapter.connect() is False and not adapter.is_connected and adapter._client is None
+            before=len(state['calls'])
+            try:await adapter.send(room,'failed initial sync must not authorize sends')
+            except PermissionError:pass
+            else:raise AssertionError('initial sync failure lost the scoped disconnected send guard')
+            assert len(state['calls'])==before
+            await adapter.close_profile();state['sync_status']=200
+            cases.append('actual_initial_sync_refusal_keeps_disconnected_send_guard_and_closes_client')
             # Actual encrypted input is withheld from its real inbound session
             # until after a newer live page has been admitted.
             from mautrix.api import HTTPAPI
@@ -286,7 +308,7 @@ def main():
         try:asyncio.run(exercise(Path(temporary)))
         finally:os.umask(previous)
     output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,
-        'installed_matrix_gateway_enabled':False,'live_account_accepted':False},indent=2)+'\n'
+        'installed_service_accepted':False,'live_account_accepted':False},indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(output)
     print(output,end='')
 

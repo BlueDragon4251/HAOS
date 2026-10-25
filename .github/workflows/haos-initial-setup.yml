@@ -506,6 +506,10 @@ jobs:
           wizard.root.destroy()
           print('All seven setup pages render within a 640x480 X screen')
           PY
+      - name: Render actual Matrix owner identity and device controls
+        run: |
+          xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_matrix_owner_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_matrix_owner_gui.py linux/haos
       - name: Assert firstboot and migration gate wiring
         run: |
           grep -F 'systemctl enable haos-setup-desktop.service' linux/haos/install.sh

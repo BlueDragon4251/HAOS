@@ -1,7 +1,7 @@
 """Dedicated native graphical *local root seat* HAOS setup, not a web/agent API.
 
-A separate X server with disabled TCP is required. This component ships
-disabled while real UEFI/BIOS and input-device acceptance is pending.
+A separate X server with disabled TCP and the physical owner-seat gate is
+required. Real UEFI/BIOS and input-device acceptance remains separate.
 """
 from __future__ import annotations
 
@@ -637,8 +637,8 @@ class Wizard:
                 success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost"], "telegram")
-            token = self._field(self.content, "Bot-Token (geschützte Eingabe)", secret=True)
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix"], "telegram")
+            token = self._field(self.content, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
             app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
             self._label(slack_credentials, "In deiner Slack-App Socket Mode aktivieren und einen App-Token mit connections:write erstellen. "
@@ -658,25 +658,44 @@ class Wizard:
                 'Verlauf wird nur innerhalb aktueller Owner-Freigaben nachgeladen; gelöschte Nachrichten und fehlende Leserechte sind echte Grenzen. '
                 'Token oder Serverwechsel entzieht bisherige Absenderfreigaben. Medien/Voice und beliebige Plugins sind nicht freigegeben.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            matrix_credentials=tk.Frame(self.content,bg=self.PANEL)
+            matrix_server=self._field(matrix_credentials,'Matrix HTTPS-Homeserver')
+            matrix_user=self._field(matrix_credentials,'Matrix-Konto · @benutzer:server')
+            matrix_device=self._field(matrix_credentials,'Bestehende Geräte-ID dieses Zugangstokens')
+            matrix_recovery=self._field(matrix_credentials,'Vorhandener Recovery-Schlüssel · optional, geschützt',secret=True)
+            self._label(matrix_credentials,'Verwende ein getrenntes Matrix-Dienstkonto mit einem bestehenden festen Gerät und dessen Zugangstoken. '
+                'Das freigegebene Absenderkonto muss ein anderes Konto sein. '
+                'Der Homeserver benötigt ein vom System vertrautes HTTPS-Zertifikat. Lade das Konto selbst in die gewünschten Räume ein und tritt dort bei; '
+                'HAOS tritt unbekannten Einladungen nicht automatisch bei. Konto, Gerät und beide Geräteschlüssel werden tatsächlich geprüft. '
+                'Recovery-Material wird nur auf ausdrückliche Eingabe verwendet; vorhandene Schlüssel werden nicht zurückgesetzt. '
+                'Kontowechsel oder Tokenänderung entzieht bisherige Freigaben. Medien und Voice sind noch nicht freigegeben.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
             def configure():
                 secret, app_secret = token.get(), app_token.get()
+                matrix_values={'homeserver':matrix_server.get(),'user_id':matrix_user.get(),'device_id':matrix_device.get(),
+                    'recovery_key':matrix_recovery.get()}
                 token.delete(0, tk.END)
                 app_token.delete(0, tk.END)
+                matrix_recovery.delete(0,tk.END)
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
                 self._run_async(lambda: (initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
-                    else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
+                    else initial_setup.configure_gateway(selected_connector,selected_platform,secret,app_secret,**matrix_values)
+                    if selected_platform=='matrix' else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
                     success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main'}:
+                for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
                 if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
                 else:mattermost_credentials.pack_forget()
+                if platform.get()=='matrix':matrix_credentials.pack(fill='x',before=configure_button)
+                else:matrix_credentials.pack_forget()
             platform.trace_add("write",platform_changed)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
@@ -686,8 +705,72 @@ class Wizard:
             scope = self._field(self.content, "Bereich · Discord-Server / Slack-Workspace / Mattermost-Team")
             thread = self._field(self.content, "Thread-ID (leer nur für Nachrichten ohne Thread)")
             identity = self._field(self.content, "HAOS-Identität", "personal")
-            self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
-                        size=10, color=self.MUTED).pack(anchor="w", pady=6)
+            matrix_pair=tk.Frame(self.content,bg=self.PANEL)
+            peer_device=self._field(matrix_pair,'Matrix-Absendergerät · exakte Geräte-ID')
+            peer_ed=self._field(matrix_pair,'Öffentlicher Ed25519-Geräteschlüssel · Base64 ohne Leerzeichen')
+            peer_curve=self._field(matrix_pair,'Öffentlicher Curve25519-Geräteschlüssel · Base64 ohne Leerzeichen')
+            device_candidates=tk.Frame(matrix_pair,bg=self.PANEL);device_candidates.pack(fill='x')
+            def load_matrix_devices():
+                selected_connector,selected_sender=connector.get(),sender.get()
+                def display_devices(value):
+                    if platform.get()!='matrix' or connector.get()!=selected_connector or sender.get()!=selected_sender:
+                        self.status.configure(text='Konfiguration geändert; Geräteschlüssel erneut laden.')
+                        return
+                    for child in device_candidates.winfo_children():child.destroy()
+                    if not value['devices']:
+                        self._label(device_candidates,'Keine signierten Geräte für dieses Konto gefunden.',size=10,color=self.MUTED).pack(anchor='w')
+                        return
+                    choices={row['device_id']+' · '+row['ed25519'][:8]:row for row in value['devices']}
+                    selected=self._choice(device_candidates,'Gerät vom Homeserver · Signatur geprüft, noch nicht freigegeben',
+                        list(choices),next(iter(choices)),width=24 if self.compact else 48)
+                    def copy_device(*_args):
+                        row=choices[selected.get()]
+                        for field,key in ((peer_device,'device_id'),(peer_ed,'ed25519'),(peer_curve,'curve25519')):
+                            field.delete(0,tk.END);field.insert(0,row[key])
+                    selected.trace_add('write',copy_device);copy_device()
+                self._run_async(lambda:initial_setup.matrix_gateway_devices(selected_connector,selected_sender),
+                    success='Öffentliche Geräteschlüssel geladen; Gateway-Dienst bleibt gestoppt. Vergleiche den Ed25519-Fingerprint mit dem tatsächlichen Gerät, bevor du es freigibst.',
+                    result_handler=display_devices)
+            self._button(matrix_pair,'Absendergeräte vom Homeserver laden',load_matrix_devices).pack(anchor='w',pady=4)
+            approved_devices=[]
+            device_summary=self._label(matrix_pair,'Keine Absendergeräte vorgemerkt.',size=10,color=self.MUTED)
+            device_summary.pack(anchor='w',pady=4)
+            def add_device():
+                from .gateway_matrix_policy import opaque,public_key
+                item={'device_id':peer_device.get(),'ed25519':peer_ed.get(),'curve25519':peer_curve.get()}
+                if (not opaque(item['device_id']) or item['device_id']=='*' or not public_key(item['ed25519'])
+                        or not public_key(item['curve25519']) or len(approved_devices)>=16
+                        or any(row['device_id']==item['device_id'] for row in approved_devices)):
+                    self._show_error(describe_error(ValueError('Genau eine neue Geräte-ID und beide gültigen öffentlichen Geräteschlüssel eingeben.'),area=self.page))
+                    return
+                approved_devices.append(item)
+                device_summary.configure(text='Vorgemerkte Geräte: '+', '.join(row['device_id'] for row in approved_devices))
+                for field in (peer_device,peer_ed,peer_curve):field.delete(0,tk.END)
+            self._button(matrix_pair,'Absendergerät zur Freigabe vormerken',add_device).pack(anchor='w',pady=4)
+            def clear_devices():
+                approved_devices.clear();device_summary.configure(text='Keine Absendergeräte vorgemerkt.')
+            self._button(matrix_pair,'Vorgemerkte Geräte verwerfen',clear_devices).pack(anchor='w',pady=4)
+            allow_plain=tk.BooleanVar(value=False);mention_required=tk.BooleanVar(value=True)
+            for label,variable in [('Unverschlüsselte Nachrichten für diese Freigabe ausdrücklich erlauben',allow_plain),
+                    ('Bot muss erwähnt werden',mention_required)]:
+                tk.Checkbutton(matrix_pair,text=label,variable=variable,bg=self.PANEL,fg=self.TEXT,
+                    selectcolor=self.BG,activebackground=self.PANEL,wraplength=self.label_wrap,justify='left').pack(anchor='w')
+            self._label(matrix_pair,'Absender als @benutzer:server, Raum als !raum-ID und optional den exakten Root-Ereignis-Thread ($…) angeben. '
+                'Bereich bleibt bei Matrix leer. Lade die signierten Geräteschlüssel vom Homeserver oder trage sie selbst ein. '
+                'Vergleiche den Ed25519-Fingerprint mit dem tatsächlichen Absendergerät; dessen geprüfte Signatur bindet auch den Curve25519-Schlüssel. '
+                'bevor du es vormerkst. Vormerken allein erteilt keine Rechte: Erst die nachfolgende Freigabe speichert Geräte und Rechte gemeinsam. '
+                'Neue oder geänderte Geräte werden nicht automatisch vertraut. Ohne Geräte ist nur ausdrücklich erlaubter Klartext möglich.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def matrix_pair_changed(*_args):
+                clear_devices();allow_plain.set(False);mention_required.set(True)
+                for child in device_candidates.winfo_children():child.destroy()
+                for field in (peer_device,peer_ed,peer_curve):field.delete(0,tk.END)
+                if platform.get()=='matrix':matrix_pair.pack(fill='x',before=pairing_note)
+                else:matrix_pair.pack_forget()
+            platform.trace_add('write',matrix_pair_changed)
+            pairing_note=self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
+                        size=10, color=self.MUTED)
+            pairing_note.pack(anchor="w", pady=6)
             self._label(self.content, "Discord: Server-ID als Bereich angeben. Für einen Thread dessen ID sowohl als Chat-ID "
                 "als auch als Thread-ID eintragen. In Server-Kanälen den Bot direkt erwähnen. "
                 "Für Wiederherstellung nach Ausfällen benötigt der Bot Kanalansicht und Nachrichtenverlauf. "
@@ -711,7 +794,9 @@ class Wizard:
                 selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
                             tuple(key for key, value in rights.items() if value.get()))
                 selected_scope, selected_thread = scope.get(), thread.get()
-                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread),
+                options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
+                    'require_mention':mention_required.get()} if platform.get()=='matrix' else {})
+                self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
                          pair_sender, primary=True).pack(anchor="w", pady=(10, 0))
@@ -764,8 +849,29 @@ class Wizard:
                     'authentication-refused':'Anmeldung abgelehnt: privaten Token und Bot-/Dienstkonto prüfen',
                     'transport-unavailable':'Server/TLS/WebSocket nicht verfügbar; Adresse, Zertifikat und Netzwerk prüfen'}
                 for item in value.get('transport',[]):
-                    self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+transport_labels[item['status']]
-                        +' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
+                    matrix_labels={'created':'Privates Profil vorbereitet; noch nicht verbunden','connecting':'Matrix-Anmeldung wird geprüft',
+                        'connected':'Matrix-Anmeldung und Sync bestätigt; keine externe Zustellung abgeleitet',
+                        'decode-pending':'Eingänge erhalten; fehlende Schlüssel oder Dekodierung werden erneut geprüft',
+                        'rate-limited':'Homeserver begrenzt Anfragen; gespeicherte Wartefrist wird eingehalten',
+                        'authentication-refused':'Matrix-Anmeldung abgelehnt; privaten Zugangstoken und Gerät prüfen',
+                        'identity-refused':'Konto/Gerät/Schlüssel passen nicht; vorhandene Recovery-Daten bleiben erhalten',
+                        'policy-unavailable':'Owner-Freigabe entzogen oder nicht lesbar; keine weitere Ausführung',
+                        'transport-unavailable':'Matrix-Verbindung oder privater Speicher nicht verfügbar',
+                        'disconnected':'Matrix-Verbindung getrennt','closed':'Privates Matrix-Profil geschlossen; Daten erhalten'}
+                    labels=matrix_labels if item.get('platform')=='matrix' else transport_labels
+                    import datetime
+                    retry_time=(datetime.datetime.fromtimestamp(item['next_sync']).strftime('%d.%m.%Y %H:%M:%S')
+                        if item.get('next_sync',0)>0 else 'keine Wartefrist')
+                    extra=(' · erhaltene Sync-Seiten '+str(item['pending_pages'])+' · nächste Anfrage: '+retry_time
+                        +' · offene Verlaufslücken '+str(item['history_gaps'])
+                        +({'rate-limited':' · Verlauf: Homeserver-Limit; Wartefrist gespeichert',
+                            'source-unavailable':' · Verlauf: Berechtigung oder Quelle nicht verfügbar',
+                            'transport-unavailable':' · Verlauf: Verbindung nicht verfügbar',
+                            'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
+                            '':''}[item['history_error']])
+                        +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
+                    self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+labels[item['status']]
+                        +extra+' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for history in value.get('history',[]):
                     self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
                         size=10, color=self.MUTED).pack(anchor="w", pady=3)

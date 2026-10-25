@@ -1,4 +1,4 @@
-"""Prepared private Matrix profile lifecycle; installed policy still refuses it."""
+"""Private Matrix profile lifecycle for the owner-approved native service."""
 import asyncio
 from contextlib import contextmanager
 import fcntl
@@ -9,11 +9,14 @@ import stat
 import time
 from types import MethodType,SimpleNamespace
 
-from .gateway import digest
+from .gateway import GatewayPolicy,digest
 from .gateway_matrix import private_store,protect_crypto
 from .gateway_matrix_http import homeserver_url
-from .gateway_matrix_policy import PreparedMatrixPolicy,opaque,snapshot
+from .gateway_matrix_policy import opaque,snapshot
 from .gateway_matrix_sync import SyncJournal,DeferredDispatch,receive_sync,dispatch_page
+
+PROFILE_STATES=frozenset({'created','connecting','connected','decode-pending','rate-limited','authentication-refused',
+    'identity-refused','transport-unavailable','policy-unavailable','disconnected','closed'})
 
 
 def credentials(value):
@@ -62,7 +65,7 @@ def build(value,parent,connector,policy,inbox):
     def current():
         try:result=policy()
         except Exception:raise PermissionError('Matrix independent owner policy is unavailable') from None
-        if (not isinstance(result,PreparedMatrixPolicy) or connector not in result.connectors
+        if (not isinstance(result,GatewayPolicy) or connector not in result.connectors
                 or result.connectors[connector]['platform']!='matrix'):
             raise PermissionError('prepared Matrix connector has no independent owner policy')
         return result
@@ -113,8 +116,13 @@ def _install(adapter,journal,fd,home,values):
     columns={row['name'] for row in journal.db.execute('PRAGMA table_info(matrix_profile_status)')}
     for name,declaration in [('last_error',"TEXT NOT NULL DEFAULT ''"),('error_at','REAL NOT NULL DEFAULT 0')]:
         if name not in columns:journal.db.execute('ALTER TABLE matrix_profile_status ADD COLUMN '+name+' '+declaration)
-    kinds={'created','connecting','connected','decode-pending','rate-limited','authentication-refused',
-        'identity-refused','transport-unavailable','policy-unavailable','disconnected','closed'}
+    kinds=PROFILE_STATES
+    adapter._haos_native.inbox.db.execute('''CREATE TABLE IF NOT EXISTS matrix_transport(
+        connector TEXT PRIMARY KEY,status TEXT NOT NULL,last_error TEXT NOT NULL,updated_at REAL NOT NULL,
+        next_sync REAL NOT NULL,pending_pages INTEGER NOT NULL)''')
+    transport_columns={row['name'] for row in adapter._haos_native.inbox.db.execute('PRAGMA table_info(matrix_transport)')}
+    for name,declaration in [('history_gaps','INTEGER NOT NULL DEFAULT 0'),('history_error',"TEXT NOT NULL DEFAULT ''")]:
+        if name not in transport_columns:adapter._haos_native.inbox.db.execute('ALTER TABLE matrix_transport ADD COLUMN '+name+' '+declaration)
     def status(kind,next_sync=0):
         if kind not in kinds:raise ValueError('safe Matrix profile status required')
         now=time.time();error=kind if kind in kinds-{'created','connecting','connected','decode-pending','disconnected','closed'} else ''
@@ -123,6 +131,14 @@ def _install(adapter,journal,fd,home,values):
             "last_error=CASE WHEN excluded.status='connected' THEN '' WHEN excluded.last_error!='' THEN excluded.last_error ELSE matrix_profile_status.last_error END,"
             "error_at=CASE WHEN excluded.status='connected' THEN 0 WHEN excluded.last_error!='' THEN excluded.error_at ELSE matrix_profile_status.error_at END",
             (journal.scope,kind,now,next_sync,error,now if error else 0))
+        last=journal.db.execute('SELECT last_error FROM matrix_profile_status WHERE scope=?',(journal.scope,)).fetchone()[0]
+        pending=journal.db.execute("SELECT COUNT(*) FROM matrix_sync_pages WHERE scope=? AND state='pending'",(journal.scope,)).fetchone()[0]
+        gaps=journal.db.execute("SELECT COUNT(*) FROM matrix_sync_gaps g LEFT JOIN matrix_history_progress p ON p.gap_id=g.id WHERE g.scope=? AND (p.gap_id IS NULL OR p.state='pending')",(journal.scope,)).fetchone()[0]
+        history=journal.db.execute("SELECT last_error FROM matrix_history_progress WHERE state='pending' AND last_error!='' ORDER BY updated_at DESC LIMIT 1").fetchone()
+        adapter._haos_native.inbox.db.execute('INSERT INTO matrix_transport(connector,status,last_error,updated_at,next_sync,pending_pages,history_gaps,history_error) VALUES(?,?,?,?,?,?,?,?) '
+            'ON CONFLICT(connector) DO UPDATE SET status=excluded.status,last_error=excluded.last_error,updated_at=excluded.updated_at,'
+            'next_sync=excluded.next_sync,pending_pages=excluded.pending_pages,history_gaps=excluded.history_gaps,history_error=excluded.history_error',
+            (adapter._haos_native.connector,kind,last,now,next_sync,pending,gaps,history['last_error'] if history else ''))
     def health(self):
         row=journal.db.execute('SELECT status,updated_at,next_sync,last_error,error_at FROM matrix_profile_status WHERE scope=?',(journal.scope,)).fetchone()
         native=journal.db.execute('SELECT state FROM matrix_native_status WHERE scope=?',(journal.scope,)).fetchone()
@@ -152,7 +168,9 @@ def _install(adapter,journal,fd,home,values):
         return result
     async def initial(self,client):
         boundary=self._haos_matrix_http
-        attach_client(self,client);delivery(self,boundary);RecipientGuard(self,client,boundary);install_reads(self,boundary)
+        attach_client(self,client);delivery(self,boundary)
+        self._haos_profile_send=self.send;self.send=MethodType(send,self)
+        RecipientGuard(self,client,boundary);install_reads(self,boundary)
         try:await receive_sync(self,client,journal,snapshot(self._haos_native.policy(),self._haos_native.connector),initial=True)
         except DeferredDispatch:status('decode-pending')
         self._haos_matrix_phase='sync'
@@ -274,14 +292,7 @@ def _install(adapter,journal,fd,home,values):
                 finally:
                     try:journal.close()
                     finally:os.close(fd);self._haos_profile_closed=True
-    # Preserve the scoped public send wrapper when each reconnect installs its
-    # new private SDK boundary and native formatter.
-    original_initial=initial
-    async def setup_initial(self,client):
-        await original_initial(self,client)
-        self._haos_profile_send=self.send
-        self.send=MethodType(send,self)
-    for name,method in {'_connect_authenticate':auth,'_connect_initial_sync':setup_initial,'_sync_loop':sync,
+    for name,method in {'_connect_authenticate':auth,'_connect_initial_sync':initial,'_sync_loop':sync,
             '_refresh_dm_cache':no_action,'_on_invite':no_action,'_on_reaction':no_action,
             '_write_runtime_status_safe':native_status,'connect':connect,'disconnect':disconnect,
             'close_profile':close,'matrix_status':health,'send':send}.items():

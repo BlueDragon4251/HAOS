@@ -170,7 +170,7 @@ def main():
         previous=os.umask(0o077)
         try:asyncio.run(exercise(Path(temporary)))
         finally:os.umask(previous)
-    output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,'installed_matrix_gateway_enabled':False},indent=2)+'\n'
+    output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,'installed_service_accepted':False},indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(output)
     print(output,end='')
 

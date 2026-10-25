@@ -130,7 +130,7 @@ def main():
         finally:await runner.cleanup()
     with tempfile.TemporaryDirectory() as temporary:asyncio.run(exercise(Path(temporary)))
     output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,
-        'encrypted_outbound_implemented':False,'installed_matrix_gateway_enabled':False},indent=2)+'\n'
+        'recipient_guard_installed':False,'installed_service_accepted':False},indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(output)
     print(output,end='')
 

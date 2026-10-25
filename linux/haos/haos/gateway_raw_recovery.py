@@ -30,7 +30,9 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else None)
-        if pattern is None or not re.fullmatch(pattern,row['message_id']):
+        from .gateway_matrix_policy import opaque
+        valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
+        if not valid:
             raise ValueError('invalid native source metadata')
         result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],'platform':row['platform'],
             'message_id':row['message_id'],
@@ -64,6 +66,18 @@ def unresolved(inbox, after=0):
                     or type(row['updated_at']) not in {int,float} or not math.isfinite(row['updated_at']) or row['updated_at']<=0):
                 raise ValueError('invalid Mattermost transport status metadata')
             transport.append({**dict(row),'platform':'mattermost'})
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='matrix_transport'").fetchone():
+        import math
+        from .gateway_matrix_profile import PROFILE_STATES
+        for row in inbox.db.execute('SELECT connector,status,last_error,updated_at,next_sync,pending_pages,history_gaps,history_error FROM matrix_transport ORDER BY updated_at DESC LIMIT 64'):
+            if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector']) or row['status'] not in PROFILE_STATES
+                    or row['last_error'] not in PROFILE_STATES|{''}
+                    or any(type(row[name]) not in {int,float} or not math.isfinite(row[name]) or row[name]<0 for name in ('updated_at','next_sync'))
+                    or type(row['pending_pages']) is not int or not 0<=row['pending_pages']<=65536
+                    or type(row['history_gaps']) is not int or not 0<=row['history_gaps']<=4096
+                    or row['history_error'] not in {'','rate-limited','source-unavailable','transport-unavailable','invalid-page'}):
+                raise ValueError('invalid Matrix transport status metadata')
+            transport.append({**dict(row),'platform':'matrix'})
     return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 

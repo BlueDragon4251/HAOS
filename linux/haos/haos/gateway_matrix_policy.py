@@ -1,8 +1,4 @@
-"""Prepared Matrix grants use the same independent HAOS policy/mission engine.
-
-The installed controller still constructs GatewayPolicy, which refuses Matrix.
-No input field or plugin can select this prepared class or enable the platform.
-"""
+"""Exact Matrix device grants use the independent HAOS policy/mission engine."""
 import base64
 
 from .gateway import GatewayPolicy,SUPPORTED,digest

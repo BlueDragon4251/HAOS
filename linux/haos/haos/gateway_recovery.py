@@ -76,7 +76,7 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
         raise ValueError("invalid owner inspection evidence")
     receipt = request["receipt"]
     if decision == "delivered":
-        if not isinstance(receipt, str) or not 1<=len(receipt)<=64:
+        if not isinstance(receipt, str) or not 1<=len(receipt)<=255:
             raise ValueError("delivered requires the inspected remote message ID")
         if request["confirmed_not_delivered"]:
             raise ValueError("contradictory owner evidence")
@@ -104,7 +104,9 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if platform=='slack' else
                 r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else
                 r'[a-z0-9]{26}' if platform=='mattermost' else None)
-            if pattern is None or not re.fullmatch(pattern,receipt):
+            from .gateway_matrix_policy import opaque
+            valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)
+            if not valid:
                 raise ValueError('inspected receipt does not match its approved gateway platform')
         if decision == "retry" and attempt >= 5:
             raise Conflict("delivery retry budget exhausted")

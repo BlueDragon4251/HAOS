@@ -37,7 +37,7 @@ def main():
         room=RoomID('!private:owner.invalid');device=DeviceID('PHONE');bot_device=DeviceID('HAOS')
         state={'posts':0,'key_posts':0,'next_event':0,'status':200,'disconnect':False,'key_disconnect':False,
             'unknown_device':False,'invalid_signature':False,'no_otk':False,'joined':True,'revoke':False,'algorithm':'m.megolm.v1.aes-sha2',
-            'plaintext':[],'sessions':[]}
+            'plaintext':[],'sessions':[],'last_event':None}
         peer_crypto=None;keys={};one_time={};config={};bot_db=None
         async def api(request):
             assert request.headers['Authorization']=='Bearer disposable-local-private-token'
@@ -69,8 +69,9 @@ def main():
             if state['status']==429:
                 return web.json_response({'errcode':'M_LIMIT_EXCEEDED','error':'disposable-local-private-token','retry_after_ms':19000},status=429)
             identity='$wire-'+str(state['next_event'])
-            decrypted=await peer_crypto.decrypt_megolm_event(EncryptedEvent.deserialize({'type':'m.room.encrypted',
-                'room_id':room,'event_id':identity,'sender':bot,'origin_server_ts':int(time.time()*1000),'content':body}))
+            state['last_event']={'type':'m.room.encrypted','room_id':room,'event_id':identity,'sender':bot,
+                'origin_server_ts':int(time.time()*1000),'content':body}
+            decrypted=await peer_crypto.decrypt_megolm_event(EncryptedEvent.deserialize(state['last_event']))
             content=decrypted.content.serialize();assert content['msgtype']=='m.text' and content['m.mentions']=={}
             assert (content.get('m.relates_to') or {}).get('event_id','')==config['bindings'][0]['thread']
             state['plaintext'].append(content['body']);state['sessions'].append(body['session_id'])
@@ -135,8 +136,18 @@ def main():
                 await run('actual_encrypted_native_thread_kept_and_new_grant_rotates_session','delivered')
                 assert state['sessions'][-1]!=first_session
                 state['posts']=0;state['unknown_device']=True;before=state['key_posts']
-                await run('unapproved_remote_device_cannot_receive_keys_or_results','failed');assert state['posts']==0 and state['key_posts']==before
-                state['unknown_device']=False;pin['ed25519']=str(extra_account.signing_key)
+                config['bindings'][0]['generation']='e'*64
+                await run('only_owner_selected_device_gets_answer_when_account_has_other_devices','delivered')
+                assert state['posts']==1 and state['key_posts']==before+1
+                from mautrix.errors import DecryptionError
+                extra_client=client(peer,DeviceID('UNAPPROVED'));extra_store=MemoryCryptoStore(peer,'disposable-extra-key')
+                await extra_store.put_account(extra_account)
+                extra_crypto=OlmMachine(extra_client,extra_store,_CryptoStateStore(extra_client.state_store,{room},extra_client));await extra_crypto.load()
+                try:await extra_crypto.decrypt_megolm_event(EncryptedEvent.deserialize(deepcopy(state['last_event'])))
+                except DecryptionError:pass
+                else:raise AssertionError('unapproved actual device decrypted the private result')
+                cases.append('actual_unapproved_sdk_device_cannot_decrypt_selected_device_answer')
+                state['unknown_device']=False;state['posts']=0;config['bindings'][0]['generation']='a'*64;pin['ed25519']=str(extra_account.signing_key)
                 await run('owner_fingerprint_mismatch_refuses_before_key_share','failed');assert state['posts']==0
                 pin['ed25519']=str(peer_crypto.account.signing_key);state['invalid_signature']=True
                 await run('actual_native_signed_key_validation_is_required','failed');assert state['posts']==0
@@ -192,7 +203,7 @@ def main():
         try:asyncio.run(exercise(Path(temporary)))
         finally:os.umask(previous)
     output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,'live_device_trust_accepted':False,
-        'installed_matrix_gateway_enabled':False},indent=2)+'\n'
+        'installed_service_accepted':False},indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(output)
     print(output,end='')
 

@@ -40,7 +40,13 @@ class RecipientGuard:
 
         async def find(machine,session,user,device,identity):
             from mautrix.types import TrustState
-            value=state();check_device(value,user,device,identity)
+            value=state()
+            if str(user)==value['binding']['sender'] and str(device) not in value['devices']:
+                from mautrix.crypto.encrypt_megolm import already_shared
+                # Native ignored-device semantics: no key, withheld notice or
+                # trust upgrade is sent to another device of this account.
+                session.users_ignored.add((user,device));return already_shared
+            check_device(value,user,device,identity)
             # This verification is the explicit owner fingerprint approval,
             # after native signed-key validation, not TOFU or remote claims.
             identity.trust=TrustState.VERIFIED
@@ -106,16 +112,18 @@ class RecipientGuard:
                         raise PermissionError('Matrix outbound device remains explicitly blacklisted')
                 await local_blacklist()
                 response=await client.query_keys([peer])
-                if response.failures or set(response.device_keys)!={peer} or set(response.device_keys[peer])!=set(state['devices']):
-                    raise PermissionError('Matrix remote devices require explicit owner review')
+                if response.failures or set(response.device_keys)!={peer} or not set(state['devices'])<=set(response.device_keys[peer]):
+                    raise PermissionError('Matrix approved remote devices are missing or unavailable')
                 for device,keys in response.device_keys[peer].items():
+                    if str(device) not in state['devices']:continue
                     pin=state['devices'][str(device)];values={str(k):str(v) for k,v in keys.keys.items()}
                     if (str(keys.user_id)!=str(peer) or str(keys.device_id)!=str(device)
                             or values.get('ed25519:'+str(device))!=pin['ed25519']
                             or values.get('curve25519:'+str(device))!=pin['curve25519']):
                         raise PermissionError('Matrix server keys differ from explicit owner fingerprints')
                 await local_blacklist()
-                devices=await crypto._process_fetched_keys(peer,response.device_keys[peer],response)
+                selected={device:keys for device,keys in response.device_keys[peer].items() if str(device) in state['devices']}
+                devices=await crypto._process_fetched_keys(peer,selected,response)
                 if set(devices)!=set(state['devices']):raise PermissionError('native Matrix device signature validation failed')
                 for identity in devices.values():
                     if identity.trust==TrustState.BLACKLISTED:

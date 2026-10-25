@@ -1,4 +1,4 @@
-"""Private Matrix SDK HTTP boundary; no public gateway or mission authority."""
+"""Private Matrix SDK HTTP boundary; account proof grants no mission authority."""
 import hashlib
 import inspect
 import json

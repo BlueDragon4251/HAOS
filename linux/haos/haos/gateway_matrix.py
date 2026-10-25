@@ -1,4 +1,4 @@
-"""Private Matrix identity/crypto safeguards; public HAOS gateway stays disabled."""
+"""Private Matrix identity/crypto safeguards for the owner-approved native path."""
 import os
 from pathlib import Path
 import stat
@@ -32,7 +32,7 @@ def private_store(path):
 def protect_crypto(adapter, store_dir, *, recovery_key=None):
     """Scope one actual native adapter; no global patches or implicit owner reset.
 
-    A later approved factory must supply a stable isolated identity profile and
+    The approved factory supplies a stable isolated identity profile and
     retain these hooks around actual native auth/setup, before any sync dispatch.
     """
     expected_user,expected_device=adapter._user_id,adapter._device_id

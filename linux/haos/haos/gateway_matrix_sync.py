@@ -1,7 +1,7 @@
 """Retain private Matrix sync pages before acknowledging a transport cursor.
 
-Transport persistence grants no sender/room/mission authority. The public Matrix
-factory remains disabled; prepared admission independently checks owner grants.
+Transport persistence grants no sender/room/mission authority. Native admission
+independently checks current owner grants after durable transport capture.
 """
 import asyncio
 from contextvars import ContextVar

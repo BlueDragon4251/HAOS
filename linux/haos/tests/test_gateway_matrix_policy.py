@@ -18,10 +18,11 @@ def fixture():
     return config,envelope,crypto
 
 
-def test_prepared_matrix_class_cannot_be_selected_by_installed_controller_policy():
+def test_installed_matrix_policy_uses_same_exact_owner_grants_as_native_contracts():
     config,_,_=fixture()
+    assert GatewayPolicy(config).bindings==PreparedMatrixPolicy(config).bindings
+    config['bindings'][0]['matrix_devices']=[]
     with pytest.raises(ValueError):GatewayPolicy(config)
-    assert PreparedMatrixPolicy(config).connectors['bot']['platform']=='matrix'
 
 
 @pytest.mark.parametrize('change',[{'sender':'foreign'},{'chat':'#alias:example.org'},{'scope':'*'},

@@ -191,7 +191,7 @@ def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_se
     with pytest.raises(FileNotFoundError): gateway_publication.recover(tmp_path, 0)
 
 
-def test_prepared_matrix_policy_cannot_be_published_by_installed_owner_backend(tmp_path):
+def test_matrix_identity_cannot_be_published_with_incomplete_private_credentials(tmp_path):
     from haos.gateway_matrix_policy import PreparedMatrixPolicy
     assert os.geteuid()==0,'actual owner files and root authority required'
     policy={'version':1,'connectors':[{'id':'matrix-preview','platform':'matrix'}],'bindings':[]}
@@ -203,6 +203,58 @@ def test_prepared_matrix_policy_cannot_be_published_by_installed_owner_backend(t
     assert not (tmp_path/'gateway-credentials').exists()
     assert not (tmp_path/'gateway-publication.json').exists()
     assert {path.name for path in tmp_path.iterdir()}<=before|{'.gateway-publication.lock'}
+
+
+def test_graphical_matrix_owner_publication_devices_rotation_and_real_uid_denial(tmp_path,monkeypatch):
+    import base64
+    from haos import initial_setup,gateway_setup,owner
+    assert os.geteuid()==0,'real owner files and UID gates required'
+    config=tmp_path/'config';config.mkdir(mode=0o700)
+    original_load,original_persist=gateway_setup.load,gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args:original_load(config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda policy,secret:original_persist(policy,secret,config=config,gid=0))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:None)
+    actions=[];monkeypatch.setattr(owner,'audit',lambda action,fields:actions.append(action))
+    fields={'homeserver':'https://matrix.example.org','user_id':'@haos:example.org','device_id':'HAOS'}
+    child=os.fork()
+    if child==0:
+        try:
+            os.setgroups([]);os.setgid(65534);os.setuid(65534)
+            for action in (lambda:initial_setup.configure_gateway('matrix-main','matrix','disposable-private-matrix-token',**fields),
+                    lambda:initial_setup.matrix_gateway_devices('matrix-main','@owner:example.org')):
+                try:action()
+                except PermissionError:continue
+                os._exit(4)
+            os._exit(0)
+        except BaseException:os._exit(3)
+    assert os.waitstatus_to_exitcode(os.waitpid(child,0)[1])==0
+    initial_setup.configure_gateway('matrix-main','matrix','disposable-private-matrix-token',
+        recovery_key='disposable-private-recovery-fixture',**fields)
+    key=base64.b64encode(b'x'*32).decode().rstrip('=')
+    initial_setup.pair_gateway_sender('phone','matrix-main','@owner:example.org','!room:example.org','principal',
+        ('create','read'),matrix_devices=[{'device_id':'PHONE','ed25519':key,'curve25519':key}],
+        allow_plaintext=False,require_mention=True)
+    policy,secret=original_load(config)
+    binding=policy['bindings'][0]
+    assert binding['matrix_devices'][0]['device_id']=='PHONE' and not binding['allow_plaintext']
+    assert binding['generation'] and binding['since']>0 and binding['require_mention'] is True
+    public=initial_setup.gateway_configuration()
+    assert 'disposable-private-matrix-token' not in repr(public) and 'disposable-private-recovery-fixture' not in repr(public)
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    assert stat.S_IMODE((config/'gateways.json').stat().st_mode)==0o640
+    assert secret['connectors']['matrix-main']['homeserver']==fields['homeserver']
+    preserved=config/'owner-recovery-canary';preserved.write_bytes(b'disposable recovery evidence');preserved.chmod(0o600)
+    initial_setup.configure_gateway('matrix-main','matrix','disposable-rotated-matrix-token',**fields)
+    policy,secret=original_load(config)
+    assert policy['bindings']==[] and secret['connectors']['matrix-main']['token']=='disposable-rotated-matrix-token'
+    assert preserved.read_bytes()==b'disposable recovery evidence'
+    assert 'setup.gateway-pair' in actions
+
+
+def test_matrix_account_helper_refuses_to_run_credentialed_sdk_as_root():
+    from haos.gateway_matrix_account import main
+    assert os.geteuid()==0,'actual root identity required'
+    with pytest.raises(PermissionError):main()
 
 
 def test_matrix_profile_kernel_lease_is_private_exclusive_and_released_between_real_uids():

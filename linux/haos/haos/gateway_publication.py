@@ -23,6 +23,13 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='matrix':
+            from .gateway_matrix_profile import credentials as matrix_credentials
+            if matrix_credentials(row)!=row:
+                raise ValueError('Matrix homeserver must use its canonical owner representation')
+            if any(binding['connector']==name and binding['sender'].lower()==row['user_id'].lower() for binding in policy['bindings']):
+                raise ValueError('Matrix sender must differ from the gateway account to prevent self-echo loops')
+            continue
         required=({'token','app_token'} if platforms[name]=='slack' else
             {'token','server_url'} if platforms[name]=='mattermost' else {'token'})
         if (not isinstance(row, dict) or set(row) not in (required,required|{'extra'})

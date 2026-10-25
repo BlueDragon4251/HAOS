@@ -30,5 +30,6 @@ def test_ui_does_not_label_untested_adapters_as_supported():
     assert gateways["telegram"] == "GUI"
     assert gateways["discord"] == "GUI"
     assert gateways['slack'] == 'GUI'
-    for name in ("whatsapp", "matrix", "feishu", "email"):
+    assert gateways['matrix']=='GUI'
+    for name in ("whatsapp", "feishu", "email"):
         assert gateways[name] == "Nicht integriert"

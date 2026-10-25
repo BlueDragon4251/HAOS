@@ -77,10 +77,8 @@ def main():
                      'identity':'principal','capabilities':['create','read'],'generation':'a'*64,'since':now-10000,
                      'allow_plaintext':False,'require_mention':True,'matrix_devices':[pin]}]}
                 current=lambda:PreparedMatrixPolicy(deepcopy(config))
-                try:GatewayPolicy(config)
-                except ValueError:pass
-                else:raise AssertionError('installed controller prematurely enabled Matrix')
-                cases.append('installed_controller_refuses_prepared_matrix_policy')
+                assert GatewayPolicy(config).bindings==current().bindings
+                cases.append('installed_controller_enforces_same_exact_owner_matrix_grants')
                 adapter=install(durable_adapter(MatrixAdapter(PlatformConfig(enabled=True,token='disposable-private-token',extra={
                     'homeserver':'https://owner.invalid','user_id':bot,'device_id':'HAOS','e2ee_mode':'required'}))))
                 adapter._client=actual;adapter._haos_native=SimpleNamespace(inbox=raw,connector='bot',policy=current)
@@ -191,7 +189,7 @@ def main():
         with tempfile.TemporaryDirectory() as value:asyncio.run(exercise(Path(value)))
     finally:os.umask(old)
     output=json.dumps({'passed':len(cases),'cases':cases,'external_connections':False,
-        'installed_matrix_gateway_enabled':False,'live_account_accepted':False},indent=2)+'\n'
+        'installed_service_accepted':False,'live_account_accepted':False},indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(output)
     else:print(output,end='')
 

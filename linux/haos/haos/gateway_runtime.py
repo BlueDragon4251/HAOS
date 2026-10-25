@@ -64,7 +64,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None):
+    if platform=='matrix':
+        if (not isinstance(matrix_context,dict) or set(matrix_context)!={'parent','connector','policy','inbox'}):
+            raise ValueError('Matrix requires a private profile and current owner authority')
+        from .gateway_matrix_profile import build
+        return build(credentials,**matrix_context)
     if (platform not in SUPPORTED or not isinstance(credentials, dict)
             or set(credentials) - ({"token", "extra", "app_token"} if platform=='slack' else {"token", "extra", "server_url"} if platform=='mattermost' else {"token", "extra"})
             or not isinstance(credentials.get("extra", {}), dict)):
@@ -142,13 +147,13 @@ async def serve():
     if pending(config):
         raise PermissionError("gateway owner publication changed during startup")
     redactor = Redactor([item[key] for item in credentials["connectors"].values()
-        for key in ('token','app_token') if item.get(key)])
+        for key in ('token','app_token','recovery_key') if item.get(key)])
     handler = logging.StreamHandler()
     handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] in {'discord','slack','mattermost'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -165,7 +170,12 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
-        adapter = build_adapter(connector["platform"], credentials["connectors"][connector["id"]])
+        context=None
+        if connector['platform']=='matrix':
+            parent=Path('/var/lib/haos-gateway/matrix');parent.mkdir(mode=0o700,exist_ok=True)
+            context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
+        adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],matrix_context=context)
+            if context else build_adapter(connector["platform"], credentials["connectors"][connector["id"]]))
         adapters[connector["id"]] = adapter
         def receive(event, connector=connector):
             try:
@@ -290,6 +300,8 @@ async def serve():
         for task in receivers:
             task.cancel()
         await asyncio.gather(*receivers, return_exceptions=True)
+        for adapter in adapters.values():
+            if getattr(adapter,'close_profile',None) is not None:await adapter.close_profile()
         inbox.close()
         if native_inbox is not None:
             native_inbox.close()
