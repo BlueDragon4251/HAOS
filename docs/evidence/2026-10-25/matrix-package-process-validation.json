@@ -1,0 +1,45 @@
+{
+  "base_commit": "fcc3e9eeac9ffcd89892ab860e2a802f5ed8840c",
+  "base_ci_all_five_gates_successful": true,
+  "full_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 44,
+  "actual_gateway_uid_local_tls_process_cases": 7,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "external_delivery_accepted": false,
+  "installed_boot_accepted": false,
+  "historical_hp_or_qemu_cause_established": false,
+  "final_artifacts_accepted": false,
+  "source_files": [
+    {
+      "path": "linux/haos/install.sh",
+      "sha256": "7227dca9d4c4445fe92af9232a2409f9ac72b6634d2a4a36ba64f0c7c9849293"
+    },
+    {
+      "path": "linux/haos/runtime/install_package.py",
+      "sha256": "fb704a9caf94af02a49edf0b33bf89e1398e4329fa363ce330352041c083ae76"
+    },
+    {
+      "path": "linux/haos/probes/probe_matrix_account_process.py",
+      "sha256": "5c04f21df1544d7494c83bc8642bc8027b33d7f5b7c0ea4e863b022f90e06125"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "d63526d0c146f1cf438bcf78df7f3d5c57405d697eb71307e00c8bcab1ec27f3"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "f0e0fb2832be8184b7fdedd7feb5f81546b6545bda288677fc242f1796c3c03b"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "a6babc8892504e1d6cace2e82ee4fd8a5e96d5cab4f81c14cfe444f9acfa4c44"
+    }
+  ]
+}

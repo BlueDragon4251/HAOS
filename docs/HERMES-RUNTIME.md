@@ -397,3 +397,22 @@ These contracts use disposable accounts/keys and loopback HTTP. They confirm no
 external Matrix delivery, physical device trust, installed service/boot or
 release. Full media/voice, the remaining 17 adapters, Android, phone firstboot
 and installed OS/artifact acceptance remain unfinished.
+
+### Public Python package permissions
+
+The image installer installs only `linux/haos/haos` through
+`runtime/install_package.py`: root-owned directories use `0755`, regular public
+code uses `0644`, independently of the checkout umask. Links and special source
+files are refused; destination symlinks and multiply linked files are refused.
+This operation does not traverse provider credentials, Matrix profiles, owner
+state or recovery stores. This fixes a reproducible restrictive-checkout import
+failure; it is not evidence of the cause of historical HP or installed-QEMU
+failures.
+
+The provider-contract workflow additionally runs the actual Matrix account
+helper as root, an unrelated UID and the gateway UID in a fresh disposable
+container with networking disabled. Seven local HTTPS/SDK cases verify the
+process gate, system CA verification, exact account/device identity, signed
+public device discovery and redacted 401/429/signature errors. Discovery still
+requires separate owner approval; this fixture does not accept a live account,
+external delivery, installed boot or physical device trust.

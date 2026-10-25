@@ -128,6 +128,18 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - name: Execute Matrix account helper under actual gateway UID and local TLS
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_matrix_account_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_MATRIX_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/matrix-account-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/matrix-account-process.json"
       - uses: actions/upload-artifact@v4
         with:
           name: provider-contracts-${{ github.sha }}

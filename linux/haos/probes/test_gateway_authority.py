@@ -314,3 +314,69 @@ def test_matrix_profile_kernel_lease_is_private_exclusive_and_released_between_r
             assert os.waitstatus_to_exitcode(os.waitpid(first,0)[1])==0
         other(65534,True)
         assert canary.read_text()=='disposable root-only owner evidence'
+
+
+# Actual cross-UID installation from restrictive public build input.
+import importlib.util
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+import pytest
+
+spec = importlib.util.spec_from_file_location('install_package', Path(__file__).parents[1] / 'runtime/install_package.py')
+installer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(installer)
+
+
+@pytest.fixture
+def public_build_directory():
+    with tempfile.TemporaryDirectory(prefix='haos-public-build-') as directory:
+        yield Path(directory)
+
+
+def test_restrictive_source_installs_readable_code_without_exposing_neighbor(public_build_directory):
+    tmp_path = public_build_directory
+    assert os.geteuid() == 0
+    tmp_path.chmod(0o755)
+    source = tmp_path / 'source'
+    source.mkdir(mode=0o700)
+    (source / '__init__.py').write_text('answer = 42\n')
+    (source / '__init__.py').chmod(0o600)
+    secret = tmp_path / 'private-credential'
+    secret.write_text('disposable-private-value')
+    secret.chmod(0o600)
+    destination = tmp_path / 'package'
+    installer.install_package(source, destination)
+    assert destination.stat().st_mode & 0o777 == 0o755
+    assert (destination / '__init__.py').stat().st_mode & 0o777 == 0o644
+    assert secret.stat().st_mode & 0o777 == 0o600
+    result = subprocess.run([sys.executable, '-I', '-c',
+        'import runpy,sys; assert runpy.run_path(sys.argv[1])["answer"] == 42',
+        str(destination / '__init__.py')], user=65534, group=65534, extra_groups=[], capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize('attack', ['source-link', 'destination-link', 'destination-hardlink'])
+def test_installation_refuses_links_without_modifying_neighbor(tmp_path, attack):
+    assert os.geteuid() == 0
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'module.py').write_text('public code')
+    neighbor = tmp_path / 'private'
+    neighbor.write_text('unchanged')
+    neighbor.chmod(0o600)
+    destination = tmp_path / 'package'
+    destination.mkdir()
+    if attack == 'source-link':
+        (source / 'link').symlink_to(neighbor)
+    elif attack == 'destination-link':
+        (destination / 'module.py').symlink_to(neighbor)
+    else:
+        os.link(neighbor, destination / 'module.py')
+    with pytest.raises(ValueError):
+        installer.install_package(source, destination)
+    assert neighbor.read_text() == 'unchanged'
+    assert neighbor.stat().st_mode & 0o777 == 0o600
