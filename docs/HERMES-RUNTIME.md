@@ -128,3 +128,33 @@ The sync increment also adds an actual SDK recovery-error contract: explicitly
 supplied invalid recovery material produces only a fixed safe owner error and
 never a verified flag. The native identity probe now has 15 cases (the earlier
 14-case receipt remains bound to its earlier source).
+
+
+## Private Matrix HTTP boundary (2026-10-25)
+
+The guarded native identity setup now attaches `gateway_matrix_http.HTTPBoundary`
+to its actual SDK client before authentication. Only the canonical owner HTTPS
+homeserver and client API prefix receive requests. Actual whoami must confirm
+user/device before private sync/key/account operations are allowed; a changed
+token loses that confirmation. Impersonation/token query parameters, other
+origins, redirects, unknown room reads and implicit/destructive writes are
+refused. SDK request logging cannot expose an unapproved body/query before wire
+admission. Native HTTP request encoding/response codecs remain in use.
+
+Wire bodies/responses are bounded before JSON decode. Typed SDK errors retain
+safe status/code and bounded Retry-After without vendor text or credentials.
+SDK retries are forced off. Room sends require a separate explicit private
+callback; account presence itself grants no send authority. This callback is
+not a replacement for the still-pending HAOS binding/outbox implementation.
+
+Seventeen actual local native-client HTTP cases cover confirmed whoami/sync,
+encoded room reads/sends, refused reads/device deletion/creation/join/account
+writes, single 401/429/500/302 responses, redacted errors, malformed/oversized
+bodies, impersonation, token changes, origin mismatch, preserved deployment
+prefixes and refusal of explicitly requested SDK retries. Existing 15 native
+identity/crypto cases also pass through this boundary. Both probes are build/CI
+requirements. Source-bound evidence:
+`docs/evidence/2026-10-25/matrix-http-validation.json`.
+
+Matrix remains disabled as an HAOS gateway. No real account, remote verification,
+key exchange, message delivery, installed boot or release is accepted here.

@@ -47,8 +47,12 @@ def main():
         port=site._server.sockets[0].getsockname()[1]
         def adapter(profile,expected_device=device):
             native=MatrixAdapter(PlatformConfig(enabled=True,token=token,extra={
-                'homeserver':f'http://127.0.0.1:{port}','user_id':user,'device_id':expected_device,'e2ee_mode':'required'}))
-            return protect_crypto(native,directory/profile)
+                'homeserver':'https://owner.invalid','user_id':user,'device_id':expected_device,'e2ee_mode':'required'}))
+            native=protect_crypto(native,directory/profile)
+            # Production credentials stay HTTPS-bound; fixture alone redirects
+            # the private target to this actual local HTTP listener.
+            native._haos_matrix_http._target=f'http://127.0.0.1:{port}'
+            return native
         async def client(session,dev=device):
             return Client(mxid=UserID(user),device_id=DeviceID(dev),
                 api=HTTPAPI(base_url=f'http://127.0.0.1:{port}',token=token,client_session=session),state_store=MemoryStateStore())
@@ -72,7 +76,7 @@ def main():
                 cases.append('unverified_device_and_unsolicited_key_requests_not_enabled')
                 invalid_key='!!!disposable-private-recovery-material!!!'
                 recovery_native=MatrixAdapter(PlatformConfig(enabled=True,token=token,extra={
-                    'homeserver':f'http://127.0.0.1:{port}','user_id':user,'device_id':device,'e2ee_mode':'required'}))
+                    'homeserver':'https://owner.invalid','user_id':user,'device_id':device,'e2ee_mode':'required'}))
                 recovery_native=protect_crypto(recovery_native,directory/'recovery-profile',recovery_key=invalid_key)
                 try:await recovery_native._verify_or_bootstrap_cross_signing(actual.crypto,actual)
                 except PermissionError as error:

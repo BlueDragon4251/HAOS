@@ -43,6 +43,10 @@ def protect_crypto(adapter, store_dir, *, recovery_key=None):
         raise ValueError('explicit Matrix user and stable device identity required')
     if recovery_key is not None and (not isinstance(recovery_key,str) or not 1<=len(recovery_key)<=4096):
         raise ValueError('bounded private Matrix recovery material required')
+    from .gateway_matrix_http import HTTPBoundary
+    boundary=HTTPBoundary(adapter._homeserver,expected_user,expected_device,
+        allow_login=bool(adapter._password),allow_recovery=recovery_key is not None)
+    adapter._haos_matrix_http=boundary
     path=Path(store_dir)
     original_auth=adapter._connect_authenticate
     original_setup=adapter._connect_setup_e2ee
@@ -54,6 +58,7 @@ def protect_crypto(adapter, store_dir, *, recovery_key=None):
         return self._store_dir
 
     async def authenticate(self,client,api):
+        boundary.bind(client)
         if not await original_auth(client,api):return False
         # The native builder may substitute the configured device when whoami
         # omits one. Configuration alone is not a proof of token ownership.
@@ -62,6 +67,7 @@ def protect_crypto(adapter, store_dir, *, recovery_key=None):
                 or str(client.mxid)!=expected_user or str(client.device_id or '')!=expected_device
                 or getattr(self,'_device_id_unverified',False)):
             return await self._abort_connect(api)
+        boundary.confirm(client,proof)
         return True
 
     async def retain_device(self,store,device_id):

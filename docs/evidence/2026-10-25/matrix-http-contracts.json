@@ -1,0 +1,25 @@
+{
+  "passed": 17,
+  "cases": [
+    "owner_homeserver_requires_unambiguous_https",
+    "private_account_proof_required_before_sync",
+    "actual_whoami_and_sync_codecs_cross_confirmed_boundary",
+    "explicit_room_read_crosses_actual_sdk_path_encoding",
+    "foreign_rooms_and_destructive_or_unsolicited_writes_refused_before_http",
+    "actual_sdk_send_needs_explicit_local_callback_not_account_presence",
+    "bounded_typed_single_request_401",
+    "bounded_typed_single_request_429",
+    "bounded_typed_single_request_500",
+    "bounded_typed_single_request_302",
+    "explicit_sdk_retry_argument_cannot_replay_request",
+    "malformed_success_body_has_no_native_result",
+    "response_size_is_bounded_before_json_decode",
+    "appservice_impersonation_query_has_no_authority",
+    "token_replacement_needs_new_identity_proof",
+    "another_origin_cannot_receive_private_auth_header",
+    "actual_sdk_preserves_owner_deployment_prefix"
+  ],
+  "external_connections": false,
+  "haos_matrix_gateway_enabled": false,
+  "mission_authorization_accepted": false
+}
