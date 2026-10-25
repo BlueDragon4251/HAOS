@@ -1,0 +1,32 @@
+{
+  "passed": 13,
+  "cases": [
+    "actual_pinned_native_e2ee_dependency_imports",
+    "unshared_session_cannot_encrypt",
+    "actual_sdk_self_room_megolm_roundtrip_preserves_unicode_and_thread",
+    "same_event_replay_remains_same_native_identity",
+    "different_event_id_cannot_reuse_message_index",
+    "tampered_megolm_ciphertext_refused",
+    "other_room_cannot_reuse_private_session",
+    "actual_sqlite_reopen_preserves_identity_device_sync_and_ratchet",
+    "reopened_native_session_advances_message_index",
+    "replay_index_survives_database_reopen",
+    "wrong_pickle_key_fails_without_deleting_private_account",
+    "distinct_account_namespace_does_not_inherit_identity",
+    "actual_crypto_files_private_and_no_plaintext_message_persisted"
+  ],
+  "versions": {
+    "mautrix": "0.21.1",
+    "python-olm": "3.2.16",
+    "aiosqlite": "0.22.1",
+    "asyncpg": "0.31.0",
+    "aiohttp-socks": "0.11.0",
+    "pycryptodome": "3.23.0",
+    "python-socks": "2.8.1",
+    "base58": "2.1.1",
+    "unpaddedbase64": "2.1.0"
+  },
+  "external_connections": false,
+  "remote_key_share_or_device_verification": false,
+  "haos_matrix_gateway_enabled": false
+}

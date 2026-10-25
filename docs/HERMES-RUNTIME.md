@@ -1,6 +1,6 @@
 # Hermes runtime
 
-`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with web/messaging extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
+`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with reviewed web, messaging, anthropic, bedrock, vertex, azure-identity and matrix extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
 
 The reviewed `linux/haos/runtime` overlay pins all runtime requirements with package hashes, including fixes for anyio, multidict, PyJWT, tornado and urllib3. Its preparation checks the exact upstream commit, original pyproject/uv.lock hashes and requirements digest before changing the conflicting PyJWT metadata. Installation requires hashes and `uv pip check`; installed versions and the source/requirements provenance remain in immutable `/usr/lib/haos/runtime-provenance`. Run `37818579514` verified the resolved dependencies with pip-audit, the actual pinned Hermes CLI and an expired-JWT regression. That CI result validates dependencies; the resulting updated Fedora image still requires its own build and guest evidence.
 
@@ -16,7 +16,7 @@ The root-managed [network guard](NETWORK-POLICY.md) is an additional required st
 
 Downloaded evidence for image `9e0d4a3` from acceptance `37842665549` shows successful installer completion and installed UEFI boot/firstboot, followed by the backend health assertion failing around guest uptime 303 seconds. The later host timeout did not identify the underlying failure. New guarded diagnostics capture bounded, token-redacted service state/journals and power off a failed disposable guest. Full installed-service acceptance remains open.
 
-Provider setup remains upstream configuration inside agent state. A validated HAOS credential wizard/vault is incomplete. Do not copy a human's credential/session directories. No provider-less probe is a real model mission. Bounded restarts do not prove unknown background work stopped; use [recovery](RECOVERY.md).
+Current provider setup uses the separate private HAOS broker and owner credential wizard; see [provider setup](PROVIDER-SETUP.md) and [parity evidence](PROVIDER-PARITY.md). True provider keys and refresh tokens do not belong in agent state. Historical probe results below do not establish current live-provider or installed-system acceptance. Do not copy a human's credential/session directories. No provider-less probe is a real model mission. Bounded restarts do not prove unknown background work stopped; use [recovery](RECOVERY.md).
 
 The replacement reuse `37878610539` completed with the exact cause: Hermes could not traverse the root-created runtime policy directory because systemd `UMask=0077` masked its requested group bits. The broker now explicitly applies root:agent-group 0750 to verified runtime directory inodes, retaining root:agent-group 0640 on the compiled policy. Mounted, writable, foreign-owned and symlinked directories are rejected. The real diagnostic/poweroff path worked; a rebuilt installed guest must still validate the correction.
 
@@ -27,3 +27,31 @@ run before writes. Build and provider-contract CI execute the actual pinned
 MoA engine over Chat, Responses and Messages, including early deltas, native
 stream abortions and scoped local SDK capabilities. Provenance distinguishes
 the immutable Hermes base from the derived auxiliary source hash.
+
+
+## Frozen Matrix crypto foundation (2026-10-25)
+
+The same pinned Hermes lock contains its Matrix extra. Runtime builds and provider
+CI now install that exact extra, then the unchanged hash-pinned HAOS overlay,
+including MSAL 1.39.0. This adds nine locked packages without changing or removing
+any existing runtime dependency. `source.json` records their exact versions;
+`prepare.py` still rejects unreviewed extra sets, input hashes and dependency
+metadata. No runtime package installer is introduced.
+
+`probe_matrix_crypto.py` uses real mautrix 0.21.1, libolm bindings 3.2.16, the
+pinned native Hermes crypto-state wrapper and actual SQLite crypto storage. Its
+13 local self-room cases check encryption/decryption with Unicode and threads,
+missing sessions, tampering, wrong-room data, message-index replay, identity/
+device/sync/ratchet persistence after reopening, wrong pickle material without
+account deletion, account namespaces and private file modes. Session creation
+uses the actual SDK with no remote recipients; no shared flag is fabricated.
+The probe is mandatory in builds and provider CI.
+
+This is a crypto/dependency contract, not Matrix gateway enablement, remote
+login, device verification, key exchange, network delivery or installed-system
+acceptance. Matrix remains absent from HAOS's approved gateway set. Its native
+sync path advances the batch before event dispatch and can swallow handler
+errors; HAOS needs a durable dispatch boundary before using that transport.
+Native automatic crypto-store reset/migration and unverified-device key sharing
+also need independent HAOS guards before any real owner identity is connected.
+No existing owner or recovery store is touched by these temporary fixtures.

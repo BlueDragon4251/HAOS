@@ -9,7 +9,8 @@
     "anthropic",
     "bedrock",
     "vertex",
-    "azure-identity"
+    "azure-identity",
+    "matrix"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",
@@ -24,5 +25,16 @@
   "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514",
   "provider_versions": {
     "msal": "1.39.0"
+  },
+  "gateway_versions": {
+    "mautrix": "0.21.1",
+    "python-olm": "3.2.16",
+    "aiosqlite": "0.22.1",
+    "asyncpg": "0.31.0",
+    "aiohttp-socks": "0.11.0",
+    "pycryptodome": "3.23.0",
+    "python-socks": "2.8.1",
+    "base58": "2.1.1",
+    "unpaddedbase64": "2.1.0"
   }
 }

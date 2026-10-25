@@ -36,7 +36,7 @@ jobs:
           python -m pip install uv
           bash scripts/sync-upstream.sh
           python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
-          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix
           uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
       - name: Compare the generated registry and execute real local protocol probes
@@ -62,6 +62,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_mattermost_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_mattermost_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-delivery.json"
           "$PYTHON" linux/haos/runtime/probe_mattermost_history.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_crypto.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-crypto.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
           "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"
