@@ -71,6 +71,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_matrix_history.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-history.json"
           "$PYTHON" linux/haos/runtime/probe_matrix_recipients.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-recipients.json"
           "$PYTHON" linux/haos/runtime/probe_matrix_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-prepared-delivery.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-prepared-transport.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-prepared-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_matrix_account.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-account.json"

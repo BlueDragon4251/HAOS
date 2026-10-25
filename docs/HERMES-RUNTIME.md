@@ -470,3 +470,28 @@ Only the fixture replaces the reviewed HTTPS origin with loopback HTTP. This
 is not TLS/live-account acceptance. ntfy remains disabled in public setup and
 runtime until output delivery, owner GUI and complete lifecycle integration
 are finished; the number of reviewed public text gateway paths remains five.
+
+### Prepared ntfy native answer delivery
+
+`gateway_ntfy_delivery.Publisher` now executes the actual pinned adapter's send
+codec through a private per-task publication capability. Only the exact current
+owner-approved topic can receive an answer; the native `publish_topic` override
+cannot redirect it. The owner grant and credential identity are rechecked for
+each chunk and immediately before each HTTP POST. Direct native send calls and
+unscoped HTTP calls have no publication authority.
+
+UTF-8 chunks stay within 4096 bytes without truncating Unicode or dropping a
+suffix. Only a bounded native server receipt with matching topic and a safe
+real event ID proves delivery; missing IDs cannot use the upstream random-ID
+fallback. Reflected credentials are refused as public receipt IDs. Vendor
+error bodies never reach native logging. A known first-chunk 429 can be retried
+by the durable outbox after its bounded delay; lost/invalid receipts, 5xx,
+redirects, or any successful chunk before a later refusal remain uncertain.
+There is no automatic resend of an uncertain complete reply.
+
+The mandatory build/CI probe has 29 actual codec/HTTP cases, including six
+reopened real MissionStore/GatewayEngine outbox checks and revocation between
+chunks. These are local fixtures, not external ntfy publication. Public ntfy
+setup/runtime remain disabled pending integrated private profile, service
+lifecycle and owner GUI. Prepared replies currently target the same explicitly
+approved topic; separate publish-topic management is not yet enabled.

@@ -1,0 +1,40 @@
+{
+  "base_commit": "4af2e9d5d1d3ae58eb4660353f30e191943eecc5",
+  "actual_native_send_http_and_outbox_cases": 29,
+  "actual_reopened_mission_outbox_cases_included": 6,
+  "public_ntfy_enabled": false,
+  "reviewed_public_text_gateway_paths": 5,
+  "full_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "external_publish_accepted": false,
+  "installed_boot_or_release_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_ntfy_delivery.py",
+      "sha256": "08deea91eace29d5584e9d2472496510d2fa1c7fd80ed1c4b5bab9d788a7f4cd"
+    },
+    {
+      "path": "linux/haos/runtime/probe_ntfy_delivery.py",
+      "sha256": "5d7702f0109fdec68938ed439c4978001df69204691beebd13a419a1932bbc0c"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "cca56c401d2f65329ace7a8ea9c0f7b110b41acaac05d0acbdc82de09df6d7d0"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "b5db9732ad5fe20454938412a0333187505a764ac67b734f7e4d8d44f9cd27a2"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "70e215b03976cf113dee037dbef4e5c12f4e383fc15ac251184f9216bceeabea"
+    }
+  ]
+}
