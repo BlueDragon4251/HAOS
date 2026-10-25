@@ -442,3 +442,31 @@ image build and provider-contract CI. This is prepared ingress, not a sixth
 usable gateway: the continuous authenticated HTTP transport, persistent stream
 cursor/recovery, conservative output delivery and complete owner GUI still
 need integration. No external subscription or publication was performed.
+
+### Prepared ntfy continuous transport and recovery
+
+`gateway_ntfy_transport.Subscription` adds a bounded private HTTP subscription
+with the actual pinned ntfy adapter's authentication and decoder. The immutable
+owner-selected HTTPS server/topic and private credential are bound to the
+captured grant. HTTP proxies and redirects are disabled. The reader admits
+small newline-delimited events immediately during the open stream, checks
+bounded UTF-8/JSON frames (including duplicate keys), and refuses compressed,
+partial or oversized records. The server's message cache is requested with
+`since`; per-message admission still enforces original grant age independently.
+
+The native raw inbox commits before the separate cursor update. A crash or
+cursor-write failure can therefore cause replay, but cannot advance beyond an
+unsaved obligation. The cursor and bounded retry deadlines survive database
+reopen; 401/403 and missing sources stop automatic retries, 429 retains a bounded
+deadline, and vendor bodies never become status text. Credential or grant
+changes stop the old subscription. `run()` maintains continuous receive and
+pending replay in separate tasks, including real reconnects; `close()` cancels
+both and closes the HTTP client. No external publishing is implemented here.
+
+The mandatory build/CI probe has 19 real loopback HTTP cases, including early
+stream delivery while the end is held, durable reconnect, an actual SQLite
+cursor fault, independent replay while a connection is open, and cancellation.
+Only the fixture replaces the reviewed HTTPS origin with loopback HTTP. This
+is not TLS/live-account acceptance. ntfy remains disabled in public setup and
+runtime until output delivery, owner GUI and complete lifecycle integration
+are finished; the number of reviewed public text gateway paths remains five.
