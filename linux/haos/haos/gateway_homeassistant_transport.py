@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import json
+import math
 from types import MethodType
 
 from .gateway_homeassistant_ingress import snapshot,capture,dispatch_stored
@@ -35,7 +36,7 @@ class Boundary:
         self.endpoint=self.server.replace('https:','wss:',1)+'/api/websocket'
         self._target=self.endpoint
         self.sessions=set();self.sockets=set();self.socket=None;self.confirmed=False;self.subscription_id=None
-        self.status='created';self.closed=False;self._handshake_seconds=30
+        self.status='created';self.closed=False;self._handshake_seconds=30;self.retry_after=0
 
     def current(self):
         if (self.closed or self.adapter._hass_url!=self.server or not isinstance(self.adapter._hass_token,str)
@@ -148,14 +149,20 @@ def install(adapter):
         boundary.revoke('handshake-refused');await self._cleanup_ws();return False
     async def connect(self,*args,**kwargs):
         try:
+            boundary.retry_after=0
             boundary.current()
             async with asyncio.timeout(boundary._handshake_seconds):
                 return await native_connect(*args,**kwargs)
         except asyncio.CancelledError:
             await self._cleanup_ws();boundary.revoke('cancelled');raise
         except Exception as error:
+            limited=getattr(error,'status',None)==429
+            if limited:
+                try:delay=float((getattr(error,'headers',None) or {}).get('Retry-After','60'))
+                except (ValueError,TypeError):delay=60
+                boundary.retry_after=min(86400,max(1,delay)) if math.isfinite(delay) else 60
             reason=('handshake-timeout' if isinstance(error,TimeoutError) else 'revoked' if isinstance(error,PermissionError) else 'authentication-refused' if boundary.status=='authentication-refused' or getattr(error,'status',None) in {401,403}
-                else 'handshake-refused')
+                else 'rate-limited' if limited else 'handshake-refused')
             await self._cleanup_ws();boundary.revoke(reason);return False
     async def read(self):
         import aiohttp

@@ -727,3 +727,36 @@ Home Assistant remains prepared, with no public GUI/profile integration or live
 delivery acceptance. A native live WebSocket alone cannot recover unseen events
 from a disconnect: the server history API omits the direct event context user,
 so history is not silently granted the authority of an authenticated live event.
+
+### Prepared Home Assistant isolated lifecycle (2026-10-25)
+
+After `505eb657b9690f07f220ae61b7b21363d406986a`, a private prepared profile
+constructs only the pinned bundled adapter inside its isolated Hermes HOME.
+Canonical service-owned 0700 directories and a private single-link kernel lock
+prevent parallel use. Credentials are validated before native imports; no native
+plugin manager, automatic sender pairing or device-control tool is enabled.
+
+The lifecycle uses the reviewed native WebSocket handshake/reader, independent
+durable raw-input replay, bounded reconnect delays and separate notification
+receipt verification. An owner-grant change revokes the running profile instead
+of granting old work new authority. Authentication refusal persists across
+profile close/reopen; rotating credentials creates a new authentication identity
+while preserving the private HOME. HTTP 429 Retry-After deadlines persist across
+close/reopen. The native global status writer is disabled; safe status is written
+synchronously into the private native inbox. `gap_since` records an interval
+whose unseen remote events cannot be recovered from native HA state history.
+It is never cleared merely because a live connection returns.
+
+Twenty-two actual local profile/WS/SQLite/kernel-lock cases pass, including a real
+raw-journal reopen, failed relay admission retried while the live socket is idle,
+credential rotation, concurrent close and shutdown during a rate-limited start.
+Transport/ingress/delivery regression passes 24/24/26 cases. Full and minimal
+HAOS regression each pass 1161 tests and two existing skips, with the existing
+local backup-file exclusion. The 47 existing actual root/UID/socket/recovery
+checks pass in a disposable network-isolated container. No CI skips were added.
+The profile probe is mandatory in runtime build and provider-contract CI.
+
+Evidence: `docs/evidence/2026-10-25/homeassistant-prepared-profile-validation.json`.
+Public runtime/CLI/GUI wiring, owner authentication-retry management and full
+remote replay are still unfinished. This is not a seventh public gateway, a live
+HA-account/TLS/notification acceptance, or an installed service/boot acceptance.

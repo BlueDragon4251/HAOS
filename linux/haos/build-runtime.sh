@@ -52,6 +52,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_history.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-history-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_recipients.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-recipients-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-profile-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-ingress-build-probe.json
