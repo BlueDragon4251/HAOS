@@ -416,3 +416,29 @@ process gate, system CA verification, exact account/device identity, signed
 public device discovery and redacted 401/429/signature errors. Discovery still
 requires separate owner approval; this fixture does not accept a live account,
 external delivery, installed boot or physical device trust.
+
+### Prepared ntfy ingress (not publicly enabled)
+
+`gateway_ntfy.py` now prepares the actual pinned bundled ntfy text decoder
+behind the private native inbox. A prepared grant explicitly trusts **all
+publishers to one exact topic** (`trust_topic_publishers: true`). ntfy has no
+independently authenticated individual sender identity: publisher-controlled
+titles, sender labels and user fields never become HAOS principals. A server
+and its topic ACL must supply the topic's trust boundary. Public owner setup,
+`GatewayPolicy` and runtime factory still reject ntfy.
+
+Before native decoding, HAOS requires an exact topic and stable event ID,
+original server timestamp newer than the grant, captured grant generation and
+bounded plain text. Attachments, actions, click targets, encodings and native
+echo-tagged messages are refused. The raw event and exact owner route commit
+to SQLite before the actual native decoder runs. Failed admission remains
+pending across database reopen; native in-memory TTL dedup cannot swallow its
+retry. Revocation is checked again at replay and admission. The native callback
+cannot bypass retained capture.
+
+`probe_ntfy_ingress.py` has 24 local cases through that actual decoder and
+SQLite journal, including reopen/retry and revocation. It is required by the
+image build and provider-contract CI. This is prepared ingress, not a sixth
+usable gateway: the continuous authenticated HTTP transport, persistent stream
+cursor/recovery, conservative output delivery and complete owner GUI still
+need integration. No external subscription or publication was performed.

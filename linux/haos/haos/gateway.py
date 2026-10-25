@@ -50,7 +50,8 @@ class GatewayPolicy:
         for binding in config["bindings"]:
             fields = {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}
             connector = self.connectors.get(binding.get('connector'))
-            extras={'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix' else set()
+            extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
+                else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy' else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
