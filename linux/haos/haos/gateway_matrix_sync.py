@@ -1,7 +1,7 @@
 """Retain private Matrix sync pages before acknowledging a transport cursor.
 
 Transport persistence grants no sender/room/mission authority. The public Matrix
-factory and independent HAOS message admission are deliberately not enabled.
+factory remains disabled; prepared admission independently checks owner grants.
 """
 import asyncio
 from contextvars import ContextVar
@@ -44,7 +44,7 @@ class SyncJournal:
         self.scope=scope;self.db=sqlite3.connect(path,isolation_level=None);self.db.row_factory=sqlite3.Row
         self.db.execute('PRAGMA journal_mode=WAL');self.db.execute('PRAGMA synchronous=FULL')
         version=self.db.execute('PRAGMA user_version').fetchone()[0]
-        if version not in {0,1}:self.db.close();raise ValueError('unsupported Matrix sync journal')
+        if version not in {0,1,2}:self.db.close();raise ValueError('unsupported Matrix sync journal')
         self.db.executescript('''CREATE TABLE IF NOT EXISTS matrix_sync_cursor(
             scope TEXT PRIMARY KEY,cursor TEXT,updated_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS matrix_sync_pages(
@@ -55,7 +55,14 @@ class SyncJournal:
             CREATE TABLE IF NOT EXISTS matrix_sync_gaps(
             id TEXT PRIMARY KEY,scope TEXT NOT NULL,page_id TEXT NOT NULL,room_id TEXT NOT NULL,
             before_token TEXT NOT NULL,authority TEXT NOT NULL,created_at REAL NOT NULL);
-            PRAGMA user_version=1;''')
+            CREATE TABLE IF NOT EXISTS matrix_history_progress(
+            gap_id TEXT PRIMARY KEY,next_token TEXT,state TEXT NOT NULL DEFAULT 'pending',
+            next_attempt REAL NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',updated_at REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS matrix_history_steps(
+            gap_id TEXT NOT NULL,from_token TEXT NOT NULL,to_token TEXT,page_id TEXT NOT NULL,
+            PRIMARY KEY(gap_id,from_token));
+            CREATE UNIQUE INDEX IF NOT EXISTS matrix_history_page_id ON matrix_history_steps(page_id);
+            PRAGMA user_version=2;''')
         self.db.execute('INSERT OR IGNORE INTO matrix_sync_cursor(scope,updated_at) VALUES(?,?)',(scope,time.time()))
 
     def close(self):self.db.close()
@@ -127,6 +134,62 @@ class SyncJournal:
         row=self.db.execute("SELECT id FROM matrix_sync_pages WHERE scope=? AND state='pending' AND next_attempt<=? ORDER BY next_attempt,created_at LIMIT 1",
             (self.scope,time.time() if now is None else now)).fetchone()
         return row[0] if row else None
+
+    def history_gap(self,now=None):
+        row=self.db.execute('''SELECT g.*,COALESCE(p.next_token,g.before_token) AS resume_token
+            FROM matrix_sync_gaps g LEFT JOIN matrix_history_progress p ON p.gap_id=g.id
+            WHERE g.scope=? AND (p.gap_id IS NULL OR (p.state='pending' AND p.next_attempt<=?))
+            ORDER BY g.created_at,g.id LIMIT 1''',(self.scope,time.time() if now is None else now)).fetchone()
+        return {**dict(row),'authority':json.loads(row['authority'])} if row else None
+
+    def is_history(self,key):
+        return self.db.execute('SELECT 1 FROM matrix_history_steps WHERE page_id=?',(key,)).fetchone() is not None
+
+    def history_status(self,gap,state,*,error='',retry_after=0):
+        if state not in {'pending','revoked'} or error not in {'','rate-limited','transport-unavailable','source-unavailable','invalid-page'}:
+            raise ValueError('safe Matrix history recovery status required')
+        if not 0<=retry_after<=86400:raise ValueError('bounded Matrix history retry delay required')
+        self.db.execute('''INSERT INTO matrix_history_progress(gap_id,next_token,state,next_attempt,last_error,updated_at)
+            VALUES(?,?,?,?,?,?) ON CONFLICT(gap_id) DO UPDATE SET state=excluded.state,
+            next_attempt=excluded.next_attempt,last_error=excluded.last_error,updated_at=excluded.updated_at''',
+            (gap['id'],gap['resume_token'],state,time.time()+retry_after,error,time.time()))
+
+    def capture_history(self,gap,end,events):
+        """Retain a decoded native history page and advance only its gap cursor."""
+        if (end is not None and (not isinstance(end,str) or not 1<=len(end)<=4096 or any(ord(c)<32 for c in end))
+                or not isinstance(events,list) or len(events)>100 or any(not isinstance(event,dict) for event in events)):
+            raise ValueError('bounded native Matrix history page required')
+        if end==gap['resume_token'] and events:raise Conflict('Matrix history cursor repeated without progress')
+        key=digest([self.scope,'history',gap['id'],gap['resume_token'],end,events])
+        payload={'next_batch':'history:'+key,'rooms':{'join':{gap['room_id']:{'timeline':{'events':events}}}}}
+        encoded=json.dumps(payload,ensure_ascii=False,allow_nan=False,separators=(',',':'))
+        authority=json.dumps(gap['authority'],allow_nan=False,separators=(',',':'))
+        if len(encoded.encode())>8*1024*1024 or len(authority.encode())>65536:raise ValueError('Matrix history page exceeds private bound')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            own=self.db.execute('SELECT * FROM matrix_sync_gaps WHERE id=? AND scope=?',(gap['id'],self.scope)).fetchone()
+            progress=self.db.execute('SELECT * FROM matrix_history_progress WHERE gap_id=?',(gap['id'],)).fetchone()
+            if (own is None or own['room_id']!=gap['room_id'] or json.loads(own['authority'])!=gap['authority']
+                    or (progress['next_token'] if progress else own['before_token'])!=gap['resume_token']
+                    or progress is not None and progress['state']!='pending'):
+                raise Conflict('Matrix history response belongs to another retained gap cursor')
+            if end and end!=gap['resume_token'] and self.db.execute(
+                    'SELECT 1 FROM matrix_history_steps WHERE gap_id=? AND from_token=?',(gap['id'],end)).fetchone():
+                raise Conflict('Matrix history cursor returned to an earlier page')
+            used=(self.db.execute('PRAGMA page_count').fetchone()[0]-self.db.execute('PRAGMA freelist_count').fetchone()[0])*self.db.execute('PRAGMA page_size').fetchone()[0]
+            if used+len(encoded.encode())+len(authority.encode())>64*1024*1024 or self.db.execute('SELECT COUNT(*) FROM matrix_sync_pages').fetchone()[0]>=65536:
+                raise Conflict('private Matrix history journal capacity reached')
+            self.db.execute('''INSERT INTO matrix_sync_pages(id,scope,from_batch,next_batch,fingerprint,payload,authority,initial,created_at)
+                VALUES(?,?,?,?,?,?,?,?,?)''',(key,self.scope,'history:'+gap['id'],payload['next_batch'],digest(payload),encoded,authority,0,time.time()))
+            self.db.execute('INSERT INTO matrix_history_steps(gap_id,from_token,to_token,page_id) VALUES(?,?,?,?)',
+                (gap['id'],gap['resume_token'],end,key))
+            self.db.execute('''INSERT INTO matrix_history_progress(gap_id,next_token,state,updated_at)
+                VALUES(?,?,?,?) ON CONFLICT(gap_id) DO UPDATE SET next_token=excluded.next_token,state=excluded.state,
+                next_attempt=0,last_error='',updated_at=excluded.updated_at''',
+                (gap['id'],end,'pending' if end and end!=gap['resume_token'] else 'complete',time.time()))
+            self.db.execute('COMMIT')
+        except BaseException:self.db.execute('ROLLBACK');raise
+        return key
 
 
 def active_page():
@@ -242,7 +305,11 @@ async def _dispatch_page(adapter,client,journal,key):
     adapter._dispatch_sync=strict
     adapter._schedule_pending_invite_joins=lambda _data:None
     try:
-        await adapter._absorb_sync(client,row['payload'],initial=bool(row['initial']))
+        if journal.is_history(key):
+            # A historical page is not a fresh live sync or proof of a joined
+            # room. Keep native live health/cache state unchanged.
+            await strict(row['payload'])
+        else:await adapter._absorb_sync(client,row['payload'],initial=bool(row['initial']))
         if state['failed']:raise DeferredDispatch()
         journal.finish(key);return True
     except BaseException:

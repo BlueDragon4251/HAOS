@@ -770,3 +770,38 @@ Encrypted outgoing messages remain refused until recipient/key-distribution
 approval is implemented; inbound device approval is not reused as that proof.
 Matrix remains disabled in installed setup. No external delivery is accepted.
 Source-bound evidence: `docs/evidence/2026-10-25/matrix-delivery-validation.json`.
+
+
+## Prepared Matrix limited-timeline history (2026-10-25)
+
+The private recovery component now reads actual SDK `/messages` pages from each
+retained limited-timeline marker. One call fetches at most 100 events; every
+response is stored with the original grant snapshot in the private sync journal
+before its independent history cursor advances. This transaction never changes
+the normal sync cursor or native live-sync health. Failed native decoding remains independently replayable
+from retained pages, even after the history cursor advanced or finished.
+Version-two additive SQLite migration preserves existing transport/recovery data.
+
+History uses current matching connector/room grants and their captured digests;
+a new generation cannot reopen an old gap under renewed authority. Native text
+admission still checks exact sender/thread, original timestamp, device proof and
+capabilities. Empty pages with a new cursor do not terminate recovery. Wrong
+start/room, repeated or cyclic cursors are refused without advancing. Safe
+permission/rate-limit/transport statuses and bounded backoff remain persisted.
+A failed SQLite cursor commit rolls back the retained page in the same real
+transaction. No remote join, message send or automatic grant is involved.
+
+Sixteen actual local SDK/HTTP/SQLite/native/mission cases cover old-schema reopen,
+independent cursors, replay/unauthorized/expired input, empty pages, receiver
+failure and reopen without another HTTP read, 401/403/404/429/500, wrong start or
+room, repeated/cyclic pagination, real SQLite-trigger rollback and revoked
+snapshots. All six preceding Matrix probes also pass. Full/minimal environments
+each pass 1083 tests with two existing skips; 37 actual root/UID/socket checks
+pass. Source-bound evidence:
+`docs/evidence/2026-10-25/matrix-history-validation.json`.
+
+Matrix remains disabled in installed setup. The profile factory, supervision,
+owner setup/lifecycle and independently approved encrypted outgoing key sharing
+still need integration. Server-deleted messages, absent account permissions and
+unavailable remote history cannot be recovered by local fixtures. No external
+account, remote delivery, installation or release is accepted by these results.
