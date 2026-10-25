@@ -23,7 +23,8 @@ class Publisher:
                 or not isinstance(adapter._token, str) or not 1 <= len(adapter._token) <= 8192
                 or any(ord(c) < 33 or ord(c) > 126 for c in adapter._token)):
             raise ValueError('private ntfy topic and authentication required')
-        if getattr(adapter, '_haos_ntfy_publisher', None) is not None:
+        existing = getattr(adapter, '_haos_ntfy_publisher', None)
+        if existing is not None and not getattr(existing, 'closed', False):
             raise PermissionError('ntfy adapter already has a private publisher')
         self.adapter = adapter
         self.topic = adapter._topic

@@ -1,0 +1,82 @@
+{
+  "base_commit": "e2e24e555c5eeb2370954bf7ae3148ccf8548240",
+  "actual_native_ntfy_cases": {
+    "ingress": 24,
+    "continuous_transport": 19,
+    "native_delivery_and_outbox": 29,
+    "private_profile": 21
+  },
+  "native_case_total": 93,
+  "full_tests": {
+    "passed": 1130,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1130,
+    "existing_skips": 2
+  },
+  "actual_without_site_packages_or_upstream_import_test": true,
+  "public_ntfy_enabled": false,
+  "reviewed_public_text_gateway_paths": 5,
+  "external_subscription_or_delivery_accepted": false,
+  "installed_service_boot_or_release_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_ntfy.py",
+      "sha256": "d30b00d34e32571a09833203b7cc10d59997feb56d0340515f1fa418922af5e9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_transport.py",
+      "sha256": "75419fe116e0c6d0b066e296dbb853d85bfdfa7c871fcffc77d540f5f35fe2fe"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_delivery.py",
+      "sha256": "5b4edcee7292854ddca34652232657d00a791427fb3e15b5e0dee13aa5064ce2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_profile.py",
+      "sha256": "5b5b0c5deff90883452feb158e1054c7b281028b32e2e707e9ea6ff8ab761d7c"
+    },
+    {
+      "path": "linux/haos/runtime/probe_ntfy_profile.py",
+      "sha256": "8213a757a8f3a71515b81cf3015a9c69d78a0f337b1c03a9feb72d7c937e4e16"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_ntfy_profile.py",
+      "sha256": "1d57e174788637fe72d16ff7928b3da545703a5c32c52d1fbdacc83a815b5405"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "4953bda2e70eedc2330e1c8b33a0674c8f01155d03f30a0ca3a82946984e795c"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "1c4cef5f456f81714af1390c6fabc8477b19d32f0ba7c128f4fde61b85cc75e1"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "1a611c12424d5014935dcbc538c6c98b2ea12c0998231d3b786e93166f87f5d7"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "4f74b110a8ec6febc94a13cfdb6c1f7ee56d223171cb153369fb9925f573f62f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw.py",
+      "sha256": "fa35713de053315843f32ba71e25b890ed9683533cabd435cebf60da56658cc7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_relay.py",
+      "sha256": "abb29abeb5349ccaa2b6b592002241377edbcce5764d141d1a0bc57b0e94557f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_profile.py",
+      "sha256": "01e853e90f35c118fd3983ff339546e75710ba366f58ff494ab677257228f854"
+    }
+  ]
+}

@@ -65,6 +65,9 @@ class Subscription:
     def status(self, value, delay=0):
         self.db.execute('UPDATE ntfy_subscription SET status=?,next_attempt=? WHERE identity=?',
                         (value, time.time()+delay if delay else 0, self.identity))
+        callback = getattr(self.adapter, '_haos_ntfy_transport_status', None)
+        if callback is not None:
+            callback(value)
 
     def current(self):
         if (self.stopping or self.adapter._topic != self.topic
@@ -195,6 +198,9 @@ class Subscription:
                 if task.cancelled() and self.stopping:
                     continue
                 task.result()
+        except PermissionError:
+            self.status('revoked')
+            raise
         finally:
             await self.close()
 

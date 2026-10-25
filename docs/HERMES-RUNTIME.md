@@ -495,3 +495,39 @@ chunks. These are local fixtures, not external ntfy publication. Public ntfy
 setup/runtime remain disabled pending integrated private profile, service
 lifecycle and owner GUI. Prepared replies currently target the same explicitly
 approved topic; separate publish-topic management is not yet enabled.
+
+### Prepared ntfy private profile lifecycle
+
+`gateway_ntfy_profile.build` now composes the actual bundled adapter, durable
+source admission, continuous subscription, independent pending replay and native
+answer publisher. It accepts only the private token, canonical HTTPS server and
+literal topic. A stable per-server/topic directory and private home use `0700`;
+a single-link `0600` file with an actual nonblocking kernel flock prevents a
+second active identity profile. Existing stores are retained across close,
+fresh factories and explicit token rotation.
+
+Hermes imports and adapter construction occur inside the private task-local
+home/secret scope. Stream workers inherit that scope; sends enter it explicitly.
+An actual lifecycle fixture initially reproduced global-home bootstrap writes
+when imports occurred before entering the scope. Those imports were moved
+inside it. The native process-global background status writer is replaced only
+on this adapter instance; actual transport/health/error/retry transitions are
+persisted synchronously in the service-owned inbox. No unrelated process-global
+Hermes home is created or modified by the validated lifecycle.
+
+Connect waits for the authenticated HTTP stream; disconnected profiles have no
+send capability. Only exact current retained route metadata can send through
+the native publisher. Disconnect closes both HTTP directions and workers;
+concurrent profile close releases the lease once. Real 401 state survives
+restart and blocks automatic credential retry; explicit credential rotation
+creates fresh credential-bound transport state without removing earlier
+receipts. Owner revocation stops workers and preserves its safe error code.
+
+Four mandatory native probes now cover 24 ingress, 19 continuous transport,
+29 delivery (including six reopened real mission outboxes), and 21 profile
+cases: **93 local contracts**. Twelve additional standard tests include a real
+`python -I -S` import without site packages/upstream and invalid private
+configuration cases. Full and minimal suites each pass 1130 tests with two
+existing skips. Public ntfy owner setup, GUI and production service routing
+remain disabled and unfinished. These fixtures accept no external account,
+subscription/delivery, installed service/boot or final release artifact.
