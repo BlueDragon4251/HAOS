@@ -103,7 +103,8 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             platform=policy.connectors[binding['connector']]['platform']
             pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if platform=='slack' else
                 r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else
-                r'[a-z0-9]{26}' if platform=='mattermost' else None)
+                r'[a-z0-9]{26}' if platform=='mattermost' else
+                r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
             from .gateway_matrix_policy import opaque
             valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)
             if not valid:

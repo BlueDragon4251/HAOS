@@ -380,3 +380,41 @@ def test_installation_refuses_links_without_modifying_neighbor(tmp_path, attack)
         installer.install_package(source, destination)
     assert neighbor.read_text() == 'unchanged'
     assert neighbor.stat().st_mode & 0o777 == 0o600
+
+
+def test_actual_ntfy_owner_publication_and_cross_uid_credential_isolation(public_build_directory):
+    from haos.gateway import GatewayPolicy
+    assert os.geteuid() == 0
+    config = public_build_directory
+    config.chmod(0o755)
+    policy = {'version':1,'connectors':[{'id':'topic','platform':'ntfy'}],'bindings':[]}
+    secret = {'connectors':{'topic':{'token':'u:p','server_url':'https://owner.invalid','topic':'private-topic'}}}
+    persist(policy, secret, config=config, gid=65534)
+    policy, stored = load(config)
+    assert stored == secret
+    policy['bindings'] = [{'id':'owner','connector':'topic','sender':'private-topic','chat':'private-topic',
+        'scope':'','thread':'','identity':'owner','capabilities':['create','read'],'trust_topic_publishers':True}]
+    persist(policy, secret, config=config, gid=65534)
+    published, stored = load(config)
+    grant = published['bindings'][0]
+    assert len(grant['generation']) == 64 and type(grant['since']) is int and grant['since'] > 0
+    source={'platform':'ntfy','sender':'private-topic','chat':'private-topic','scope':'','thread':'',
+        'message_id':'real-shape-id','is_bot':False,'text':'fixture'}
+    assert GatewayPolicy(published).authorize('topic',source) == grant
+    with pytest.raises(PermissionError):
+        GatewayPolicy(published).authorize('topic',{**source,'sender':'pretend-owner'})
+    script = ('from pathlib import Path; import sys; '
+              'assert Path(sys.argv[1]).read_bytes(); '
+              '\ntry: Path(sys.argv[2]).read_bytes()\nexcept PermissionError: pass\nelse: raise AssertionError("private credential became readable")')
+    child = subprocess.run([sys.executable,'-I','-c',script,str(config/'gateways.json'),str(config/'gateway-credentials')],
+        user=65534,group=65534,extra_groups=[],capture_output=True)
+    assert child.returncode == 0, child.stderr
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode) == 0o600
+    # An explicit credential edit withdraws old grants before publishing, while
+    # retaining the store and neighboring owner data.
+    marker = config/'retained-owner-data'
+    marker.write_text('preserved')
+    replacement={'connectors':{'topic':{**secret['connectors']['topic'],'token':'rotated-private-credential'}}}
+    persist(published,replacement,config=config,gid=65534)
+    assert load(config)[0]['bindings'] == [] and marker.read_text() == 'preserved'
+    assert 'u:p' not in (config/'gateways.json').read_text()

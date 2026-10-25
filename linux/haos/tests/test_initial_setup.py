@@ -18,6 +18,7 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.manage_gateway("revoke", "fixture"),
         lambda: initial_setup.gateway_process_status(),
         lambda: initial_setup.gateway_ingress(),
+        lambda: initial_setup.retry_ntfy_gateway_auth("topic"),
         lambda: initial_setup.reconcile_gateway_ingress({}, 'retry', 'fixture'),
         lambda: initial_setup.gateway_deliveries(),
         lambda: initial_setup.reconcile_gateway_delivery({},'retry','fixture'),
@@ -332,3 +333,63 @@ def test_graphical_mattermost_setup_canonicalizes_private_owner_server_before_pu
     initial_setup.configure_gateway('mm','mattermost','x'*26,'','https://Owner.Invalid:443/prefix/')
     assert saved[0][1]=={'connectors':{'mm':{'token':'x'*26,'server_url':'https://owner.invalid/prefix'}}}
     assert calls[0]=={'gateway_only':True} and 'x'*26 not in repr(calls)
+
+
+def test_ntfy_graphical_owner_configuration_validates_before_stop_and_never_exposes_token(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[],'bindings':[]}
+    credentials={'connectors':{}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(policy,credentials))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    from haos import owner
+    monkeypatch.setattr(owner,'audit',lambda *_args:None)
+    with pytest.raises(ValueError):initial_setup.configure_gateway('topic','ntfy','u:p',server_url='http://unsafe.invalid',topic='private')
+    assert not saved and not stopped
+    initial_setup.configure_gateway('topic','ntfy','u:p',server_url='https://Owner.Invalid:443/prefix/',topic='private')
+    assert credentials['connectors']['topic']=={'token':'u:p','server_url':'https://owner.invalid/prefix','topic':'private'}
+    assert stopped==[{'gateway_only':True}]
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['ntfy']=={'topic':{'server_url':'https://owner.invalid/prefix','topic':'private'}}
+    assert 'u:p' not in repr(metadata)
+
+
+def test_ntfy_pairing_requires_explicit_all_publishers_trust_and_exact_topic(monkeypatch):
+    from haos import gateway_setup,owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    config={'version':1,'connectors':[{'id':'topic','platform':'ntfy'}],'bindings':[]}
+    stored={'connectors':{'topic':{'token':'private-fixture-token','server_url':'https://owner.invalid','topic':'private'}}}
+    import copy
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(config),copy.deepcopy(stored)))
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append(p))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    monkeypatch.setattr(owner,'audit',lambda *_args:None)
+    for sender,chat,scope,thread,trust in [('private','private','','',False),('pretend-owner','private','','',True),
+            ('private','private','invented','',True),('private','private','','invented',True),('another','another','','',True)]:
+        with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','topic',sender,chat,'personal',
+            scope=scope,thread=thread,trust_topic_publishers=trust)
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('owner','topic','private','private','personal',trust_topic_publishers=True,ntfy_server_url='https://unsaved.invalid')
+    assert not saved and not stopped
+    initial_setup.pair_gateway_sender('owner','topic','private','private','personal',('create','read'),trust_topic_publishers=True)
+    assert len(saved)==1 and saved[0]['bindings'][0]['trust_topic_publishers'] is True
+    assert GatewayPolicy(saved[0]).bindings['owner']['capabilities']==['create','read']
+
+
+def test_ntfy_owner_auth_retry_validates_selection_before_stopping_and_uses_offline_owner_backend(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'topic','platform':'ntfy'},{'id':'other','platform':'telegram'}],'bindings':[]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'authentication_blocks_cleared':1,'network_requested':False})
+    for invalid in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_ntfy_gateway_auth(invalid)
+    assert not calls and not stopped
+    result=initial_setup.retry_ntfy_gateway_auth('topic')
+    assert result=={'authentication_blocks_cleared':1,'network_requested':False}
+    assert stopped==[{'gateway_only':True}] and calls[0].gateway_action=='retry-ntfy-auth' and calls[0].connector=='topic'

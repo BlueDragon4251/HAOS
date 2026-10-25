@@ -1,0 +1,19 @@
+{
+  "passed": 11,
+  "cases": [
+    "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+    "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+    "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+    "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+    "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+    "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+    "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+    "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+    "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+    "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+    "real_scrollable_normal_or_compact_owner_layout"
+  ],
+  "external_connections": false,
+  "privileged_backend_accepted": false,
+  "installed_setup_accepted": false
+}

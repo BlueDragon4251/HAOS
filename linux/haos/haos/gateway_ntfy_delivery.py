@@ -1,4 +1,4 @@
-"""Prepared native ntfy replies: exact topic, bounded chunks, no uncertain resend."""
+"""Owner-approved native ntfy replies: exact topic, bounded chunks, no uncertain resend."""
 from contextvars import ContextVar
 from copy import deepcopy
 import hashlib
@@ -7,7 +7,7 @@ import math
 from types import MethodType
 
 from .gateway import digest
-from .gateway_ntfy import _EVENT, _TOPIC
+from .gateway_ntfy import _EVENT, _TOPIC, credential_token
 
 _APPROVED = ContextVar('haos_ntfy_publish', default=None)
 
@@ -19,10 +19,9 @@ class Publisher:
             self.server = server_url(adapter._server)
         except ValueError:
             raise ValueError('ntfy publication requires an exact approved HTTPS server') from None
-        if (not isinstance(adapter._topic, str) or not _TOPIC.fullmatch(adapter._topic)
-                or not isinstance(adapter._token, str) or not 1 <= len(adapter._token) <= 8192
-                or any(ord(c) < 33 or ord(c) > 126 for c in adapter._token)):
-            raise ValueError('private ntfy topic and authentication required')
+        credential_token(adapter._token)
+        if not isinstance(adapter._topic,str) or not _TOPIC.fullmatch(adapter._topic):
+            raise ValueError('ntfy requires one exact private topic')
         existing = getattr(adapter, '_haos_ntfy_publisher', None)
         if existing is not None and not getattr(existing, 'closed', False):
             raise PermissionError('ntfy adapter already has a private publisher')

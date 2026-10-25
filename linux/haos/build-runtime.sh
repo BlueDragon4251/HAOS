@@ -52,10 +52,10 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_history.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-history-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_recipients.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-recipients-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-profile-build-probe.json
-.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-prepared-profile-build-probe.json
-.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-prepared-delivery-build-probe.json
-.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-prepared-transport-build-probe.json
-.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-prepared-ingress-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-profile-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-delivery-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-transport-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_matrix_account.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/matrix-native-account-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-polling-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_telegram_polling.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/telegram-held-build-probe.json held

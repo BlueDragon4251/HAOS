@@ -62,6 +62,7 @@ def main():
             elif state['mode'] == 'held':
                 await response.write(json.dumps(event('running')).encode()+b'\n')
                 await held.wait()
+            elif state['mode'] == 'reflected': await response.write(json.dumps({**event('reflected'),'id':token}).encode()+b'\n')
             elif state['mode'] == 'fresh': await response.write(json.dumps(event('fresh')).encode()+b'\n')
             elif state['mode'] == 'partial': await response.write(json.dumps(event('partial')).encode())
             elif state['mode'] == 'oversize': await response.write(b'A'*16385)
@@ -97,6 +98,7 @@ def main():
             await asyncio.sleep(2.1)
             state['mode']='partial'; await sub.receive_once()
             assert state['calls'][-1]['since']=='second' and sub.state()['cursor']=='second' and 'partial' not in accepted
+            assert sub.state()['status']=='invalid-stream'
             cases.append('actual_reconnect_supplies_durable_since_cursor_and_partial_line_cannot_advance_it')
             for code in [401,403,404,429,302]:
                 adapter._token=token+str(code)
@@ -109,10 +111,11 @@ def main():
                 await sub.receive_once(); assert len(state['calls'])==before+1
                 cases.append('actual_http_safe_persisted_single_attempt_'+str(code))
             state['status']=200
-            for mode in ['oversize','duplicate','old']:
+            for mode in ['oversize','duplicate','old','reflected']:
                 adapter._token+='x'; token=adapter._token; sub=build(); state['mode']=mode; await sub.receive_once()
                 assert accepted==['first','second']
                 assert sub.state()['cursor']==('old' if mode=='old' else '')
+                if mode!='old':assert sub.state()['status']=='invalid-stream'
                 cases.append('actual_http_'+mode+'_has_no_native_admission')
             adapter._token+='x'; token=adapter._token; sub=build()
             before=len(state['calls']); adapter._token+='rotated'
@@ -159,7 +162,7 @@ def main():
             native.close(); await runner.cleanup()
     with tempfile.TemporaryDirectory(prefix='haos-ntfy-stream-') as value: awaitable=exercise(Path(value)); asyncio.run(awaitable)
     receipt={'passed':len(cases),'cases':cases,'actual_loopback_http_and_native_decoder':True,'loopback_endpoint_replacement_only_in_fixture':True,
-             'public_gateway_enabled':False,'external_subscription_or_publish':False,'tls_live_account_accepted':False}
+             'public_gateway_enabled':True,'external_subscription_or_publish':False,'tls_live_account_accepted':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n'); print(json.dumps(receipt))
 
 

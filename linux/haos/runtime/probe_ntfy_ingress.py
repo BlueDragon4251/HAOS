@@ -42,7 +42,8 @@ def main():
             try: action()
             except (ValueError, PermissionError): return
             raise AssertionError('unsafe ntfy authority unexpectedly admitted')
-        denied(lambda: GatewayPolicy(config)); cases.append('public_policy_remains_disabled')
+        assert GatewayPolicy(config).bindings==policy().bindings
+        cases.append('public_policy_uses_same_exact_topic_and_explicit_publisher_trust')
         for field, value in [('trust_topic_publishers', False), ('sender', 'forged-name'), ('thread', 'invented'), ('scope', 'invented')]:
             changed = copy.deepcopy(config); changed['bindings'][0][field] = value
             denied(lambda: PreparedNtfyPolicy(changed)); cases.append('explicit_topic_boundary_'+field)
@@ -66,6 +67,12 @@ def main():
                        {'click': 'https://external.invalid'}, {'encoding': 'base64'}, {'tags': ['hermes-agent']}, {'message': 'é'*2049}]:
             assert envelope({**base, **change}, 'private-in') is None
             cases.append('invalid_native_source_'+next(iter(change)))
+        assert capture(adapter,{**base,'id':adapter._token},authority) is None
+        cases.append('reflected_private_token_cannot_become_public_native_source_id')
+        original_token=adapter._token;adapter._token='u:p'
+        assert capture(adapter,{**base,'id':'dTpw'},authority) is None
+        adapter._token=original_token
+        cases.append('reflected_basic_credential_cannot_become_public_native_source_id')
         key = capture(adapter, base, authority)
         assert await dispatch_stored(adapter, key)
         assert accepted == ['native text']
@@ -108,7 +115,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-ntfy-ingress-') as value:
         asyncio.run(exercise(Path(value)))
     receipt = {'passed': len(cases), 'cases': cases, 'actual_pinned_decoder': True,
-               'public_gateway_enabled': False, 'external_connections': False, 'live_delivery_accepted': False}
+               'public_gateway_enabled': True, 'external_connections': False, 'live_delivery_accepted': False}
     Path(sys.argv[2]).write_text(json.dumps(receipt, indent=2)+'\n')
     print(json.dumps(receipt))
 

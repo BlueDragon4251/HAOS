@@ -29,7 +29,8 @@ def unresolved(inbox, after=0):
             raise ValueError('invalid native receipt metadata')
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
-            r'[a-z0-9]{26}' if row['platform']=='mattermost' else None)
+            r'[a-z0-9]{26}' if row['platform']=='mattermost' else
+            r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
         if not valid:
@@ -78,6 +79,15 @@ def unresolved(inbox, after=0):
                     or row['history_error'] not in {'','rate-limited','source-unavailable','transport-unavailable','invalid-page'}):
                 raise ValueError('invalid Matrix transport status metadata')
             transport.append({**dict(row),'platform':'matrix'})
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ntfy_profile_status'").fetchone():
+        import math
+        from .gateway_ntfy_profile import STATES
+        for row in inbox.db.execute('SELECT * FROM ntfy_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in STATES or row['last_error'] not in STATES|{''}
+                    or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
+                raise ValueError('invalid ntfy transport metadata')
+            transport.append({**dict(row),'platform':'ntfy'})
     return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -121,6 +131,34 @@ def reconcile(inbox, policy, request):
     return {'ingress_id':key,'attempt':attempt,'decision':decision,'state':target}
 
 
+def retry_ntfy_auth(inbox,policy,request):
+    # Explicit owner recheck permission; never an authentication or send bypass.
+    from .gateway import digest
+    if (set(request)!={'connector','owner_uid','note_sha256'}
+            or not isinstance(request['connector'],str)
+            or policy.connectors.get(request['connector'],{}).get('platform')!='ntfy'
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
+            or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+        raise ValueError('exact ntfy connector and authenticated owner audit context required')
+    connector=request['connector']
+    changed=0
+    inbox.db.execute('BEGIN IMMEDIATE')
+    try:
+        if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ntfy_subscription'").fetchone():
+            changed=inbox.db.execute("UPDATE ntfy_subscription SET status='ready',next_attempt=0 WHERE connector=? AND status='authentication-denied'",(connector,)).rowcount
+        if changed:
+            inbox.db.execute('CREATE TABLE IF NOT EXISTS ntfy_owner_events ('
+                'connector TEXT NOT NULL, created_at REAL NOT NULL, owner_uid INTEGER NOT NULL,'
+                'decision TEXT NOT NULL, changed INTEGER NOT NULL, policy_sha256 TEXT NOT NULL, note_sha256 TEXT NOT NULL)')
+            authority=digest([policy.publication,sorted(digest(b) for b in policy.bindings.values() if b['connector']==connector)])
+            inbox.db.execute('INSERT INTO ntfy_owner_events VALUES(?,?,?,?,?,?,?)',
+                (connector,time.time(),request['owner_uid'],'retry-auth',changed,authority,request['note_sha256']))
+        inbox.db.execute('COMMIT')
+    except BaseException:
+        inbox.db.execute('ROLLBACK');raise
+    return {'connector':connector,'authentication_blocks_cleared':changed,'network_requested':False}
+
+
 def main():
     account = pwd.getpwnam('haos-gateway')
     if os.geteuid() == 0 or os.geteuid() != account.pw_uid:
@@ -145,6 +183,8 @@ def main():
     try:
         if data['action'] == 'ingress' and set(data['params']) == {'after'}:
             result = unresolved(inbox,data['params']['after'])
+        elif data['action'] == 'retry-ntfy-auth':
+            result=retry_ntfy_auth(inbox,policy,data['params'])
         elif data['action'] == 'reconcile-ingress':
             result = reconcile(inbox,policy,data['params'])
         else: raise ValueError('unknown ingress recovery action')

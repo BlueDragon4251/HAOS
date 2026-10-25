@@ -68,6 +68,11 @@ def owner_ingress(args, policy):
     stopped_gateway()
     GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
+    if args.gateway_action=='retry-ntfy-auth':
+        if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
+            raise ValueError('bounded non-secret owner action context required')
+        params={'connector':args.connector,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+            'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest()}
     if params is None:
         if not isinstance(args.note,str) or not 1 <= len(args.note.strip()) <= 2000:
             raise ValueError('bounded non-secret owner inspection evidence required')
@@ -92,6 +97,8 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
+    if args.gateway_action=='retry-ntfy-auth':
+        audit('gateway.ntfy-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
     return value
@@ -220,12 +227,12 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         if any(c['id']==args.connector and c['platform']!=args.platform for c in policy['connectors']):
@@ -234,7 +241,7 @@ def owner_gateway(args):
         policy["connectors"] = [c for c in policy["connectors"] if c["id"] != args.connector] + [{"id": args.connector, "platform": args.platform}]
         GatewayPolicy(policy)
         token = getpass.getpass("Bot token (stored only in the owner-protected credential store): ")
-        if args.platform!='matrix' and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
+        if args.platform not in {'matrix','ntfy'} and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
         if args.platform=='slack':
@@ -246,6 +253,11 @@ def owner_gateway(args):
             from .gateway_mattermost import validate_credentials
             url=input('Mattermost HTTPS server URL (no token or credentials in URL): ')
             credentials['connectors'][args.connector]['server_url']=validate_credentials(token,url)
+        if args.platform=='ntfy':
+            from .gateway_ntfy_profile import credentials as ntfy_credentials
+            url=input('ntfy HTTPS server URL (no embedded credentials): ')
+            topic=input('Exact private ntfy topic (all its publishers share the approved identity): ')
+            credentials['connectors'][args.connector]=ntfy_credentials({'token':token,'server_url':url,'topic':topic})
         if args.platform=='matrix':
             from .gateway_matrix_profile import credentials as matrix_credentials
             homeserver=input('Matrix HTTPS homeserver: ')
@@ -266,6 +278,9 @@ def owner_gateway(args):
                 allow_plaintext=plain,require_mention=not unmentioned)
         elif devices or plain or unmentioned:
             raise ValueError('Matrix device/encryption options apply only to Matrix')
+        trust=getattr(args,'trust_topic_publishers',False)
+        if selected and selected['platform']=='ntfy':binding['trust_topic_publishers']=trust
+        elif trust:raise ValueError('topic publisher trust applies only to ntfy')
         policy["bindings"] = [b for b in policy["bindings"] if b["id"] != args.binding] + [binding]
     elif args.gateway_action == "revoke":
         if not any(b["id"] == args.binding for b in policy["bindings"]):

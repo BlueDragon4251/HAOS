@@ -637,7 +637,8 @@ class Wizard:
                 success="Freigegebene Konfiguration wiederhergestellt. Dienstneustart und bei Kontowechsel erneute Absenderkopplung erforderlich.",
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix"], "telegram")
+            connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy"], "telegram")
             token = self._field(self.content, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
             app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
@@ -658,6 +659,27 @@ class Wizard:
                 'Verlauf wird nur innerhalb aktueller Owner-Freigaben nachgeladen; gelöschte Nachrichten und fehlende Leserechte sind echte Grenzen. '
                 'Token oder Serverwechsel entzieht bisherige Absenderfreigaben. Medien/Voice und beliebige Plugins sind nicht freigegeben.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            ntfy_credentials=tk.Frame(self.content,bg=self.PANEL)
+            ntfy_server=self._field(ntfy_credentials,'ntfy HTTPS-Server · optional mit Installationspfad')
+            ntfy_server_value=tk.StringVar(value='');ntfy_server.configure(textvariable=ntfy_server_value);ntfy_server._haos_public_value=ntfy_server_value
+            ntfy_topic=self._field(ntfy_credentials,'Exaktes privates ntfy-Topic')
+            ntfy_topic_value=tk.StringVar(value='');ntfy_topic.configure(textvariable=ntfy_topic_value)
+            self._label(ntfy_credentials,'ntfy kennt keine verlässliche Identität einzelner Absender. Die Freigabe gilt für ALLE Publisher dieses Topics. '
+                'Verwende ein privates Topic mit serverseitig geprüften Schreibrechten nur für vertrauenswürdige Publisher. '
+                'Ein geheimer Topic-Name allein schützt nicht. Ein getrenntes Dienstkonto mit Lese- und Schreibrechten sowie Zugangstoken '
+                'oder Benutzer:Passwort-Zugang wird benötigt. Der HTTPS-Server muss ein vom System vertrautes Zertifikat verwenden; '
+                'ein öffentlicher HAOS-Webhook ist nicht nötig. Titel und Anzeigenamen verleihen keine Rechte. '
+                'Eingang und Antworten verwenden dasselbe Topic; durchgereichte Echo-Markierungen führen keine Mission aus. '
+                'Der Servercache begrenzt die Wiederherstellung: bereits gelöschte oder abgelaufene Nachrichten sind nicht nachladbar. '
+                'Medien/Voice, einzelne Nutzerfreigaben und Threads sind nicht freigegeben.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def retry_ntfy_auth():
+                selected_connector=connector.get()
+                self._run_async(lambda:initial_setup.retry_ntfy_gateway_auth(selected_connector),
+                    success='Gespeicherte Auth-Sperre geprüft. Gateway bleibt gestoppt; nach Prüfung manuell starten. Keine Nachricht gesendet.')
+            self._button(ntfy_credentials,'ntfy-Anmeldung erneut erlauben',retry_ntfy_auth).pack(anchor='w',pady=6)
+            self._label(ntfy_credentials,'Nach Korrektur von Konto- oder Topic-Rechten auf dem Server kann diese Owner-Aktion eine gespeicherte '
+                '401/403-Sperre aufheben. Cursor, Nachrichten und Freigaben bleiben erhalten. Erst ein anschließender Dienststart '
+                'prüft die tatsächliche Anmeldung erneut.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
             matrix_credentials=tk.Frame(self.content,bg=self.PANEL)
             matrix_server=self._field(matrix_credentials,'Matrix HTTPS-Homeserver')
             matrix_user=self._field(matrix_credentials,'Matrix-Konto · @benutzer:server')
@@ -677,23 +699,34 @@ class Wizard:
                 token.delete(0, tk.END)
                 app_token.delete(0, tk.END)
                 matrix_recovery.delete(0,tk.END)
+                selected_ntfy_server,selected_ntfy_topic=ntfy_server.get(),ntfy_topic.get()
+                if platform.get()=='ntfy':trust_publishers.set(False)
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
                 self._run_async(lambda: (initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
                     else initial_setup.configure_gateway(selected_connector,selected_platform,secret,app_secret,**matrix_values)
-                    if selected_platform=='matrix' else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
+                    if selected_platform=='matrix' else initial_setup.configure_gateway(selected_connector,selected_platform,secret,
+                        server_url=selected_ntfy_server,topic=selected_ntfy_topic) if selected_platform=='ntfy'
+                    else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
                     success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main'}:
+                for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
                 if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
                 else:mattermost_credentials.pack_forget()
+                if platform.get()=='ntfy':
+                    ntfy_credentials.pack(fill='x',before=configure_button)
+                    existing=configured_gateways.get('ntfy',{}).get(connector.get())
+                    if existing:
+                        ntfy_server.insert(0,existing['server_url']);ntfy_topic.insert(0,existing['topic'])
+                else:ntfy_credentials.pack_forget()
                 if platform.get()=='matrix':matrix_credentials.pack(fill='x',before=configure_button)
                 else:matrix_credentials.pack_forget()
             platform.trace_add("write",platform_changed)
@@ -768,6 +801,39 @@ class Wizard:
                 if platform.get()=='matrix':matrix_pair.pack(fill='x',before=pairing_note)
                 else:matrix_pair.pack_forget()
             platform.trace_add('write',matrix_pair_changed)
+            ntfy_pair=tk.Frame(self.content,bg=self.PANEL)
+            trust_publishers=tk.BooleanVar(value=False)
+            tk.Checkbutton(ntfy_pair,text='Ich vertraue ALLEN Publishern dieses privaten Topics die gewählten Rechte an',
+                variable=trust_publishers,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w')
+            self._label(ntfy_pair,'Absender und Chat werden aus dem exakten Topic übernommen. Bereich und Thread bleiben leer. '
+                'Alle Publisher teilen die gewählte HAOS-Identität und bei Leserecht deren Missionen. '
+                'Keine Berechtigung für einzelne Nutzer wird behauptet. Prüfe die Topic-Schreibrechte auf deinem ntfy-Server.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            previous_ntfy=[False]
+            def sync_ntfy_topic(*_args):
+                if platform.get()!='ntfy':return
+                trust_publishers.set(False)
+                for field in (sender,chat):
+                    field.configure(state='normal');field.delete(0,tk.END);field.insert(0,ntfy_topic_value.get());field.configure(state='disabled')
+            ntfy_topic_value.trace_add('write',sync_ntfy_topic)
+            connector_value.trace_add('write',lambda *_args:trust_publishers.set(False))
+            ntfy_server_value.trace_add('write',lambda *_args:trust_publishers.set(False))
+            def ntfy_pair_changed(*_args):
+                trust_publishers.set(False)
+                active=platform.get()=='ntfy'
+                for field in (scope,thread):
+                    field.configure(state='normal')
+                    if active or previous_ntfy[0]:field.delete(0,tk.END)
+                    if active:field.configure(state='disabled')
+                if active:
+                    ntfy_pair.pack(fill='x',before=pairing_note);sync_ntfy_topic()
+                else:
+                    ntfy_pair.pack_forget()
+                    if previous_ntfy[0]:
+                        for field in (sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                previous_ntfy[0]=active
+            platform.trace_add('write',ntfy_pair_changed)
             pairing_note=self._label(self.content, "Die Freigabe gilt nur für diese exakte Kombination. Leere Felder sind keine Platzhalter.",
                         size=10, color=self.MUTED)
             pairing_note.pack(anchor="w", pady=6)
@@ -794,8 +860,12 @@ class Wizard:
                 selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
                             tuple(key for key, value in rights.items() if value.get()))
                 selected_scope, selected_thread = scope.get(), thread.get()
+                if platform.get()=='ntfy' and not trust_publishers.get():
+                    self._show_error(describe_error(ValueError('Bestätige ausdrücklich das Vertrauen in alle Publisher dieses privaten Topics.'),area=self.page))
+                    return
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
-                    'require_mention':mention_required.get()} if platform.get()=='matrix' else {})
+                    'require_mention':mention_required.get()} if platform.get()=='matrix'
+                    else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy' else {})
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
@@ -810,7 +880,9 @@ class Wizard:
                     selected_id = binding_labels[revoked_binding.get()]
                     row = next(row for row in configured_gateways["bindings"] if row["id"] == selected_id)
                     binding_details.configure(text="Absender: " + row["sender"] + " · Chat: " + row["chat"]
-                        + " · Identität: " + row["identity"] + " · Rechte: " + ", ".join(row["capabilities"]))
+                        + " · Identität: " + row["identity"] + " · Rechte: " + ", ".join(row["capabilities"])
+                        + (" · Gilt für ALLE Publisher dieses Topics" if any(c["id"]==row["connector"] and c["platform"]=="ntfy"
+                            for c in configured_gateways["connectors"]) else ""))
                 revoked_binding.trace_add("write", show_binding_details)
                 show_binding_details()
                 def revoke_binding():
@@ -858,7 +930,16 @@ class Wizard:
                         'policy-unavailable':'Owner-Freigabe entzogen oder nicht lesbar; keine weitere Ausführung',
                         'transport-unavailable':'Matrix-Verbindung oder privater Speicher nicht verfügbar',
                         'disconnected':'Matrix-Verbindung getrennt','closed':'Privates Matrix-Profil geschlossen; Daten erhalten'}
-                    labels=matrix_labels if item.get('platform')=='matrix' else transport_labels
+                    ntfy_labels={'created':'Privates Topic-Profil vorbereitet','connecting':'ntfy-Stream wird angemeldet',
+                        'ready':'Topic-Profil bereit','streaming':'Authentifizierter ntfy-Stream offen; keine externe Zustellung abgeleitet',
+                        'disconnected':'ntfy-Verbindung getrennt','authentication-denied':'ntfy-Zugang abgelehnt; privaten Token und Topic-Rechte prüfen',
+                        'source-unavailable':'ntfy-Topic oder Cache-Cursor nicht verfügbar; Topic und serverseitigen Cache prüfen',
+                        'rate-limited':'ntfy begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten',
+                        'transport-unavailable':'ntfy-Server/TLS oder privater Speicher nicht verfügbar',
+                        'invalid-stream':'ntfy-Streamformat ungültig; keine unvollständigen Frames ausgeführt',
+                        'revoked':'Keine aktuelle Topic-Freigabe; zuerst koppeln oder Entzug prüfen. Keine weitere Ausführung',
+                        'closed':'Privates ntfy-Profil geschlossen; vorhandene Daten bleiben erhalten'}
+                    labels=matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy' else transport_labels
                     import datetime
                     retry_time=(datetime.datetime.fromtimestamp(item['next_sync']).strftime('%d.%m.%Y %H:%M:%S')
                         if item.get('next_sync',0)>0 else 'keine Wartefrist')
@@ -870,6 +951,10 @@ class Wizard:
                             'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
                             '':''}[item['history_error']])
                         +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
+                    if item.get('platform')=='ntfy':
+                        deadline=item.get('next_attempt',0)
+                        extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
+                            +(' · letzter Fehler: '+ntfy_labels[item['last_error']] if item.get('last_error') else ''))
                     self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+labels[item['status']]
                         +extra+' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for history in value.get('history',[]):

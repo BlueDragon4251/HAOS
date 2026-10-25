@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -75,6 +75,9 @@ class GatewayPolicy:
                 if any(not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('sender','chat')) or any(
                         binding[key] and not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('scope','thread')):
                     raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
+            if connector and connector['platform']=='ntfy':
+                from .gateway_ntfy import validate_binding
+                validate_binding(binding)
             if connector and connector['platform']=='matrix':
                 from .gateway_matrix_policy import validate_binding
                 validate_binding(binding)

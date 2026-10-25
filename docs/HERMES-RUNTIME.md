@@ -531,3 +531,79 @@ configuration cases. Full and minimal suites each pass 1130 tests with two
 existing skips. Public ntfy owner setup, GUI and production service routing
 remain disabled and unfinished. These fixtures accept no external account,
 subscription/delivery, installed service/boot or final release artifact.
+
+### ntfy owner setup and service integration (2026-10-25)
+
+ntfy is now publicly selectable through owner publication, CLI, graphical setup
+and the private gateway service factory. This supersedes the earlier prepared-
+only status above. There are **six reviewed text gateway paths**: Telegram,
+Discord, Slack, Mattermost, Matrix and ntfy. The other 16 adapters and complete
+media/voice integration remain unfinished; no live account/delivery is accepted
+by these local fixtures.
+
+In the graphical gateway page choose ntfy, enter an explicit system-trusted
+HTTPS server, literal private topic and protected API token or `user:password`.
+Native Basic auth supports UTF-8 passwords, internal spaces and colons; Bearer
+tokens remain header-safe ASCII. The GUI explains the necessary server-side
+ACL: a secret topic name is insufficient. **ntfy has no independently verified
+individual publisher identity.** Its owner grant explicitly trusts every
+publisher allowed to that exact topic, with the selected HAOS identity and
+capabilities. All those publishers share that identity's missions when granted
+read rights. Configure trusted publishers on the server first.
+
+Sender and chat are filled from the topic; scope/thread fields are disabled.
+An unchecked publisher-trust box cannot submit pairing. Topic, server or
+connector edits reset that confirmation. Pairing additionally checks that the
+submitted topic and server match the actual saved private connector; unsaved
+endpoint edits cannot silently bind another server. Nonsecret saved endpoint
+metadata can be reviewed without returning the token. Credential changes
+withdraw previous grants before the atomic publication. Renewed grants receive
+a fresh generation and time boundary; legacy grants without one cannot start
+a subscription or capture input.
+
+The CLI uses protected credential prompts, never a token argument:
+
+```sh
+haos-owner gateway setup ntfy-main ntfy
+haos-owner gateway pair ntfy-owner ntfy-main private-topic private-topic \
+  --identity ntfy-owner --capabilities create read --trust-topic-publishers
+haos-owner gateway start
+```
+
+Input and answers currently use the same explicitly approved topic. The native
+`publish_topic` override cannot redirect a reply. Private profiles and inboxes
+are opened by the service, not by the agent. Owner ingress inspection exposes
+only validated status/receipt metadata and retry deadlines; it never sends.
+Source IDs and receipts reflecting raw or encoded private credentials are
+refused, including before a source ID could become a `since` query parameter.
+UI recovery shows actual auth, stream-format, retry and revocation errors.
+Local removal/revocation does not claim server-side token revocation; use the
+ntfy server's account administration for that independent action.
+
+At the source hashes in `ntfy-owner-integration-validation.json`, full and
+minimal suites each pass **1139 tests with two existing skips**. There are
+**47 actual root/UID/socket gateway cases**, including a real child UID that can
+read its group-approved policy but cannot read the private credential file.
+Native ntfy probes pass **26 ingress + 20 transport + 32 delivery/outbox + 23
+profile = 101 cases**. Native Basic auth and error redaction run over actual
+loopback HTTP. Eleven real Tk cases pass at each 1280x800 and 640x480; existing
+complete GUI fixtures and seven Matrix owner GUI cases pass at both sizes.
+Ten native Matrix probes (165 cases) and 13 other gateway probes still pass.
+Build/CI require the probes. These are no external subscription/delivery,
+physical owner-seat, installed service/boot, hardware or release acceptance.
+
+The explicit owner action `haos-owner gateway retry-ntfy-auth ntfy-main` (or
+“ntfy-Anmeldung erneut erlauben” in the GUI) stops the gateway and clears a
+persisted 401/403 block through the separate gateway-UID offline helper. It
+preserves cursors, credentials, grants and raw message payloads and performs no
+network request. Status update and private owner audit are one transaction;
+real SQLite audit failure rolls both back. A subsequent manual service start
+must still authenticate successfully with the actual server. This allows
+recovery after server/account correction without rotating an otherwise valid
+token or regranting sender authority. The actual native lifecycle fixture also
+checks same-token reauthentication without duplicate admission.
+
+ntfy timestamps have second precision. Originals that cannot be proved newer
+than the exact owner grant remain excluded; messages in the grant's same second
+can therefore require a fresh submission. Server cache retention, deleted
+messages and server clock correctness remain real recovery limits.

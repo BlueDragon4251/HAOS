@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real prepared private ntfy factory, native lifecycle, HTTP and durable journals."""
 import asyncio
+import base64
 import json
 import os
 from pathlib import Path
@@ -17,9 +18,10 @@ def main():
     from haos import gateway_ntfy_profile as profile
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
-    from haos.gateway_runtime import adapter_envelope
+    from haos.gateway_runtime import adapter_envelope, build_adapter, credential_redactor
     from haos.redaction import Redactor
     from haos.gateway_delivery import delivery_result
+    from haos.gateway_raw_recovery import retry_ntfy_auth
     cases=[]
     async def exercise(directory):
         global_home=directory/'unrelated-home'; global_home.mkdir(mode=0o700)
@@ -31,13 +33,14 @@ def main():
             'id':'owner','connector':'test','sender':'private','chat':'private','scope':'','thread':'',
             'identity':'owner','capabilities':['create'],'since':int(time.time()*1000)-10000,
             'generation':'a'*64,'trust_topic_publishers':True}]}
-        policy=lambda:PreparedNtfyPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         value={'server_url':'https://fixture.invalid','topic':'private','token':'private-fixture-token'}
         state={'mode':'normal','calls':[],'posts':[],'sockets':[],'event':{
             'event':'message','topic':'private','id':'original','time':int(time.time()),'message':'actual profile message'}}
         release=asyncio.Event()
         async def api(request):
-            assert request.headers['Authorization']=='Bearer '+value['token']
+            expected=('Basic '+base64.b64encode(value['token'].encode('utf-8')).decode('ascii') if ':' in value['token'] else 'Bearer '+value['token'])
+            assert request.headers['Authorization']==expected
             state['calls'].append((request.method,dict(request.query)))
             if request.method=='POST':
                 state['posts'].append(await request.read())
@@ -60,7 +63,7 @@ def main():
         profile.Subscription,profile.Publisher=LocalSubscription,LocalPublisher
         adapters=[]; accepted=[]
         def build():
-            adapter=profile.build(value,parent,'test',policy,native); adapters.append(adapter)
+            adapter=build_adapter('ntfy',value,ntfy_context={'parent':parent,'connector':'test','policy':policy,'inbox':native}); adapters.append(adapter)
             def receive(event):
                 source=adapter_envelope(event,'ntfy'); relay.admit(policy(),'test',source); accepted.append(source)
                 return True
@@ -93,6 +96,9 @@ def main():
             cases.append('actual_private_lifecycle_stream_native_capture_and_relay_commit')
             receipt=delivery_result(await adapter.send('private','profile answer','original',metadata))
             assert receipt['status']=='delivered' and state['posts']==[b'profile answer']
+            runtime_metadata={'notify':True,'haos_scope':'','haos_binding':dict(metadata['haos_binding'])}
+            runtime_receipt=delivery_result(await adapter.send('private','actual runtime metadata','original',runtime_metadata))
+            assert runtime_receipt['status']=='delivered'
             cases.append('connected_profile_sends_actual_native_reply_only_under_exact_retained_route')
             for bad in [{**metadata,'thread_id':'invented'},{**metadata,'haos_scope':'invented'},
                         {**metadata,'publish_topic':'unapproved'},
@@ -100,7 +106,7 @@ def main():
                 try: await adapter.send('private','forged route','original',bad)
                 except PermissionError: pass
                 else: raise AssertionError('forged route sent')
-                assert len(state['posts'])==1
+                assert len(state['posts'])==2
             cases.append('profile_refuses_forged_scope_thread_metadata_and_grant_without_http')
             before=len(state['calls']); await adapter.disconnect()
             assert not adapter.is_connected and adapter._haos_ntfy_publisher.closed
@@ -123,10 +129,29 @@ def main():
             assert replacement.ntfy_status()['last_error']=='authentication-denied'
             before=len(state['calls']); assert not await replacement.connect(); assert len(state['calls'])==before
             cases.append('real_401_survives_restart_and_stops_automatic_credential_retry')
+            state['mode']='normal'
+            previous_grant=digest(config['bindings'][0])
+            reset=retry_ntfy_auth(native,policy(),{'connector':'test','owner_uid':1000,'note_sha256':'b'*64})
+            assert reset['authentication_blocks_cleared']==1 and reset['network_requested'] is False
+            assert await replacement.connect() and len(accepted)==1
+            assert digest(config['bindings'][0])==previous_grant
+            cases.append('explicit_owner_auth_recheck_reuses_same_credentials_and_cursor_without_regrant_or_duplicate_input')
             await replacement.close_profile(); value['token']='rotated-private-fixture-token'; state['mode']='normal'
             rotated=build(); assert rotated._haos_ntfy_profile==location
             assert await rotated.connect(); assert len(accepted)==1
             cases.append('explicit_credential_rotation_reuses_private_profile_and_preserves_existing_receipts')
+            await rotated.close_profile()
+            value['token']='owner:päss with spaces'
+            encoded=base64.b64encode(value['token'].encode('utf-8')).decode('ascii')
+            redactor=credential_redactor({'connectors':{'test':value}},policy())
+            native.redactor=redactor;relay.redactor=redactor
+            state['event']={**state['event'],'id':'encoded-basic-body','time':int(time.time()),
+                'message':'private aliases '+encoded+' / '+value['token']}
+            rotated=build(); assert await rotated.connect()
+            await eventually(lambda:len(accepted)==2)
+            assert encoded not in accepted[-1]['text'] and value['token'] not in accepted[-1]['text']
+            assert '[REDACTED]' in accepted[-1]['text']
+            cases.append('actual_native_basic_auth_ingress_redacts_raw_and_encoded_credentials_before_relay')
             config['bindings']=[]
             await eventually(lambda:not rotated.is_connected)
             assert rotated.ntfy_status()['last_error']=='revoked'
@@ -165,7 +190,7 @@ def main():
             relay.close(); native.close(); await runner.cleanup()
     with tempfile.TemporaryDirectory(prefix='haos-ntfy-profile-') as value: asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_native_factory_http_sqlite_and_flock':True,
-        'loopback_target_replacement_only_in_fixture':True,'public_gateway_enabled':False,'external_subscription_or_delivery_accepted':False,
+        'loopback_target_replacement_only_in_fixture':True,'public_gateway_enabled':True,'external_subscription_or_delivery_accepted':False,
         'installed_service_or_boot_accepted':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n'); print(json.dumps(receipt))
 

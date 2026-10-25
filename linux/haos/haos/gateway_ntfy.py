@@ -1,7 +1,6 @@
-"""Prepared ntfy admission: exact trusted topic, never publisher-supplied identity.
+"""Exact owner-approved ntfy topic admission before the pinned native decoder.
 
-Not enabled by public GatewayPolicy or the owner GUI until transport, delivery
-and recovery are integrated. No platform/plugin discovery or network startup.
+Individual publisher identity is unavailable; topic trust is always explicit.
 """
 import asyncio
 from contextvars import ContextVar
@@ -16,19 +15,33 @@ _TOPIC = re.compile(r'[A-Za-z0-9_-]{1,64}\Z')
 _EVENT = re.compile(r'[A-Za-z0-9_-]{1,64}\Z')
 
 
-class PreparedNtfyPolicy(GatewayPolicy):
-    platforms = frozenset(SUPPORTED | {'ntfy'})
+def credential_token(value):
+    """Match native Bearer/UTF-8 Basic auth without header control characters."""
+    if not isinstance(value,str) or not 1<=len(value)<=8192 or value!=value.strip():
+        raise ValueError('provide one bounded private ntfy token or user:password credential')
+    try: size=len(value.encode('utf-8'))
+    except UnicodeError: raise ValueError('ntfy credential must use valid UTF-8') from None
+    if size>8192 or not all(char.isprintable() for char in value):
+        raise ValueError('provide one bounded printable private ntfy credential')
+    if ':' in value:
+        user,password=value.split(':',1)
+        if not user or not password or any(char.isspace() for char in user):
+            raise ValueError('ntfy Basic authentication requires an explicit user and password')
+    elif any(ord(char)<33 or ord(char)>126 for char in value):
+        raise ValueError('ntfy Bearer tokens must be printable ASCII without whitespace')
+    return value
 
-    def __init__(self, config):
-        super().__init__(config)
-        for binding in self.bindings.values():
-            if self.connectors[binding['connector']]['platform'] != 'ntfy':
-                continue
-            if (not _TOPIC.fullmatch(binding['chat']) or binding['sender'] != binding['chat']
-                    or binding['scope'] or binding['thread']
-                    or binding.get('trust_topic_publishers') is not True
-                    or type(binding.get('since')) is not int or not binding.get('generation')):
-                raise ValueError('ntfy requires explicit trust of all publishers to one exact private topic; no individual sender identity')
+
+def validate_binding(binding):
+    if (not _TOPIC.fullmatch(binding['chat']) or binding['sender'] != binding['chat']
+            or binding['scope'] or binding['thread']
+            or binding.get('trust_topic_publishers') is not True):
+        raise ValueError('ntfy requires explicit trust of all publishers to one exact private topic; no individual sender identity')
+
+
+class PreparedNtfyPolicy(GatewayPolicy):
+    """Compatibility name for the same independently validated owner policy."""
+    platforms = frozenset(SUPPORTED | {'ntfy'})
 
 
 def snapshot(policy, connector):
@@ -53,6 +66,13 @@ def envelope(event, topic):
             'message_id': event['id'], 'is_bot': False, 'text': event['message'].strip()}
 
 
+def safe_event_id(adapter,value):
+    from .redaction import Redactor
+    if not isinstance(value,str) or not _EVENT.fullmatch(value):return False
+    authorization=adapter._auth_headers().get('Authorization','').split(' ',1)[-1]
+    return Redactor([adapter._token,authorization]).text(value)==value
+
+
 def capture(adapter, event, authority):
     source = envelope(event, adapter._topic)
     if source is None:
@@ -63,8 +83,11 @@ def capture(adapter, event, authority):
     original = event['time'] * 1000
     if (not isinstance(authority, dict) or authority.get('connector') != native.connector
             or digest(binding) not in authority.get('bindings', [])
+            or type(binding.get('since')) is not int or not binding.get('generation')
             or original <= binding['since'] or original > time.time() * 1000 + 300000):
         raise PermissionError('ntfy original is outside the captured owner grant')
+    if not safe_event_id(adapter,source['message_id']):
+        return None
     return native.inbox.admit(policy, native.connector, source, {'event': event}, received_at=event['time'])
 
 

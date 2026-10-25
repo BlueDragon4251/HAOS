@@ -266,3 +266,11 @@ identity to be provisioned for the provider service itself. It does not read
 the desktop owner's AWS files, automatically provision SSO, or prove access to
 a selected model. Removing the HAOS route withdraws local authority; remote
 IAM/SSO revocation remains an account-side operation.
+
+
+Gateway setup now includes ntfy with a real private service profile and explicit
+all-publishers topic approval. Use the owner gateway page or protected CLI
+prompts; no token belongs in a command argument or an agent session. See
+[ntfy owner setup and service integration](HERMES-RUNTIME.md#ntfy-owner-setup-and-service-integration-2026-10-25)
+for the server ACL requirement, identity limits, tested paths and remaining
+media/live/installed acceptance.

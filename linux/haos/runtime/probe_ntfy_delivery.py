@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Actual pinned ntfy send codec over loopback HTTP; no external publication."""
 import asyncio
+import base64
 import io
 import json
 import logging
@@ -41,15 +42,15 @@ def main():
             'topic':'private','publish_topic':'unapproved','server':'https://fixture.invalid','token':token})))
         adapter._haos_native=SimpleNamespace(policy=policy,connector='test')
         publisher=Publisher(adapter)
-        state={'status':200,'mode':'normal','requests':[],'index':0,'revoke':False,'rate_after':False,'leaked':0}
+        state={'status':200,'mode':'normal','requests':[],'index':0,'revoke':False,'rate_after':False,'leaked':0,'expected_auth':'Bearer '+token}
         async def publish(request):
             state['index']+=1
             body=await request.read(); state['requests'].append(body)
-            assert request.headers['Authorization']=='Bearer '+token
+            assert request.headers['Authorization']==state['expected_auth']
             assert request.headers['X-Tags']=='hermes-agent' and len(body)<=4096
             assert request.path=='/private'
             code=429 if state['rate_after'] and len(state['requests'])>1 else state['status']
-            if code!=200: return web.Response(status=code,text=token,headers={'Retry-After':'19','Location':'/leak'})
+            if code!=200: return web.Response(status=code,text=adapter._token,headers={'Retry-After':'19','Location':'/leak'})
             proof={'event':'message','id':'receipt'+str(state['index']),'topic':'private','time':int(time.time())}
             if state['revoke']: config['bindings']=[]
             if state.get('mutate_grant'): config['bindings'][0]['generation']='b'*64
@@ -135,6 +136,21 @@ def main():
             result=delivery_result(await publisher.send(binding,'x'*65537))
             assert result=={'status':'failed'} and not state['requests']
             cases.append('oversized_whole_reply_is_refused_before_any_dispatch')
+            target=publisher._target
+            for basic in ['owner:päss with spaces','owner:password:colon']:
+                await publisher.aclose();adapter._token=basic
+                publisher=Publisher(adapter);publisher._target=target
+                state['expected_auth']='Basic '+base64.b64encode(basic.encode('utf-8')).decode('ascii')
+                state['requests']=[]
+                result=delivery_result(await publisher.send(binding,'native Basic answer'))
+                assert result['status']=='delivered' and state['requests']==[b'native Basic answer']
+                cases.append('native_utf8_basic_auth_'+('spaces' if ' ' in basic else 'colon'))
+            state['status']=401;state['requests']=[]
+            result=delivery_result(await publisher.send(binding,'refused Basic answer'))
+            assert result=={'status':'failed'} and len(state['requests'])==1
+            assert adapter._token not in logs.getvalue() and state['expected_auth'] not in logs.getvalue()
+            cases.append('native_basic_auth_refusal_redacts_raw_and_encoded_credentials')
+            state['requests']=[]
             adapter._token='rotated-private-token'
             try: await publisher.send(binding,'old identity')
             except PermissionError: pass
@@ -146,7 +162,7 @@ def main():
             logger.removeHandler(handler); await publisher.aclose(); await runner.cleanup()
     with tempfile.TemporaryDirectory(prefix='haos-ntfy-delivery-') as value: asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_native_send_and_http':True,'loopback_endpoint_replacement_only_in_fixture':True,
-             'public_gateway_enabled':False,'external_publish_accepted':False,'installed_service_accepted':False}
+             'public_gateway_enabled':True,'external_publish_accepted':False,'installed_service_accepted':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n'); print(json.dumps(receipt))
 
 

@@ -222,3 +222,68 @@ print(json.dumps({'actual_uid':os.geteuid(),'owner_secret_denied':True}))
         assert result.returncode==0,'actual Matrix journal UID isolation failed'
         assert json.loads(result.stdout)=={'actual_uid':uid,'owner_secret_denied':True}
         assert 'disposable-root-only-owner-canary' not in result.stdout+result.stderr
+
+
+@pytest.mark.parametrize('storage_failure',[False,True])
+def test_ntfy_auth_retry_is_audited_atomic_and_cursor_preserving_under_actual_gateway_uid(uid_fixture_path,storage_failure):
+    root=uid_fixture_path;root.chmod(0o755)
+    modules=root/'modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    state=root/'state';state.mkdir(mode=0o700)
+    database=state/'native.db'
+    config={'version':1,'connectors':[{'id':'topic','platform':'ntfy'}],'bindings':[{
+        'id':'owner','connector':'topic','sender':'private','chat':'private','scope':'','thread':'',
+        'identity':'owner','capabilities':['create','read'],'trust_topic_publishers':True,'generation':'a'*64,'since':1}]}
+    inbox=NativeInbox(database,Redactor())
+    inbox.admit(GatewayPolicy(config),'topic',{'platform':'ntfy','sender':'private','chat':'private','scope':'','thread':'',
+        'message_id':'retained-command','is_bot':False,'text':'preserved command'},{'body':'preserved command'})
+    inbox.db.execute('CREATE TABLE ntfy_subscription(identity TEXT PRIMARY KEY,connector TEXT,cursor TEXT,status TEXT,next_attempt REAL)')
+    inbox.db.execute("INSERT INTO ntfy_subscription VALUES('private-identity','topic','retained-cursor','authentication-denied',12345)")
+    inbox.db.execute("INSERT INTO ntfy_subscription VALUES('other-identity','other','other-cursor','authentication-denied',12345)")
+    inbox.db.execute('CREATE TABLE ntfy_owner_events(connector TEXT,created_at REAL,owner_uid INTEGER,decision TEXT,changed INTEGER,policy_sha256 TEXT,note_sha256 TEXT)')
+    if storage_failure:
+        inbox.db.execute("CREATE TRIGGER owner_audit_fault BEFORE INSERT ON ntfy_owner_events BEGIN SELECT RAISE(ABORT,'disposable audit storage failure'); END")
+    inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    canary=root/'owner-secret';canary.write_text('root-only-disposable-canary');canary.chmod(0o600)
+    code='''
+import json,os,sqlite3,sys
+from pathlib import Path
+from haos.gateway import GatewayPolicy
+from haos.gateway_raw import NativeInbox
+from haos.gateway_raw_recovery import retry_ntfy_auth
+from haos.redaction import Redactor
+request=json.load(sys.stdin)
+assert os.geteuid()==65534 and os.getegid()==65534 and os.getgroups()==[]
+try: Path(request['canary']).read_bytes()
+except PermissionError: pass
+else: raise AssertionError('gateway UID read owner secret')
+inbox=NativeInbox(Path(request['database']),Redactor())
+try:
+    policy=GatewayPolicy(request['policy'])
+    params={'connector':'topic','owner_uid':1000,'note_sha256':'b'*64}
+    if request['storage_failure']:
+        try: retry_ntfy_auth(inbox,policy,params)
+        except sqlite3.IntegrityError: pass
+        else: raise AssertionError('audit failure was swallowed')
+        assert tuple(inbox.db.execute("SELECT status,cursor,next_attempt FROM ntfy_subscription WHERE connector='topic'").fetchone())==('authentication-denied','retained-cursor',12345)
+        assert inbox.db.execute('SELECT COUNT(*) FROM ntfy_owner_events').fetchone()[0]==0
+    else:
+        assert retry_ntfy_auth(inbox,policy,params)=={'connector':'topic','authentication_blocks_cleared':1,'network_requested':False}
+        assert tuple(inbox.db.execute("SELECT status,cursor,next_attempt FROM ntfy_subscription WHERE connector='topic'").fetchone())==('ready','retained-cursor',0)
+        assert retry_ntfy_auth(inbox,policy,params)['authentication_blocks_cleared']==0
+        assert inbox.db.execute('SELECT COUNT(*) FROM ntfy_owner_events').fetchone()[0]==1
+        assert tuple(inbox.db.execute('SELECT owner_uid,decision,note_sha256 FROM ntfy_owner_events').fetchone())==(1000,'retry-auth','b'*64)
+    assert tuple(inbox.db.execute("SELECT status,cursor FROM ntfy_subscription WHERE connector='other'").fetchone())==('authentication-denied','other-cursor')
+    assert json.loads(inbox.db.execute('SELECT payload FROM native_inbox').fetchone()[0])=={'body':'preserved command'}
+    assert inbox.db.execute('SELECT state FROM native_inbox').fetchone()[0]=='pending'
+finally: inbox.close()
+'''
+    child=subprocess.run([sys.executable,'-c',code],input=json.dumps({'database':str(database),'canary':str(canary),
+        'policy':config,'storage_failure':storage_failure}),text=True,capture_output=True,
+        user=65534,group=65534,extra_groups=[],umask=0o077,cwd=str(root),
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
+    assert child.returncode==0,child.stderr

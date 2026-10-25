@@ -1,4 +1,4 @@
-"""Prepared isolated ntfy lifecycle; explicit factory, no public/plugin discovery."""
+"""Isolated owner-approved ntfy lifecycle; fixed reviewed bundle only."""
 import asyncio
 import fcntl
 import os
@@ -7,8 +7,8 @@ import stat
 import time
 from types import MethodType, SimpleNamespace
 
-from .gateway import digest
-from .gateway_ntfy import PreparedNtfyPolicy, _TOPIC, _EVENT, install
+from .gateway import GatewayPolicy, digest
+from .gateway_ntfy import _TOPIC, _EVENT, install, credential_token
 from .gateway_ntfy_transport import Subscription
 from .gateway_ntfy_delivery import Publisher
 
@@ -23,9 +23,8 @@ def credentials(value):
     result = dict(value)
     try: result['server_url'] = server_url(value['server_url'])
     except ValueError: raise ValueError('provide an exact ntfy HTTPS server without embedded credentials') from None
-    if (not isinstance(value['topic'],str) or not _TOPIC.fullmatch(value['topic'])
-            or not isinstance(value['token'],str) or not 1 <= len(value['token']) <= 8192
-            or any(ord(c)<33 or ord(c)>126 for c in value['token'])):
+    result['token']=credential_token(value['token'])
+    if not isinstance(value['topic'],str) or not _TOPIC.fullmatch(value['topic']):
         raise ValueError('provide one bounded private ntfy credential and literal topic')
     return result
 
@@ -41,8 +40,8 @@ def build(value, parent, connector, policy, inbox):
     value = credentials(value)
     def current():
         result = policy()
-        if not isinstance(result, PreparedNtfyPolicy) or result.connectors.get(connector,{}).get('platform') != 'ntfy':
-            raise PermissionError('ntfy profile requires exact independent prepared owner authority')
+        if not isinstance(result, GatewayPolicy) or result.connectors.get(connector,{}).get('platform') != 'ntfy':
+            raise PermissionError('ntfy profile requires exact independent owner authority')
         return result
     current()
     parent = Path(parent)
@@ -126,8 +125,8 @@ def _install(adapter,fd,profile,values):
     async def send(self,chat,content,reply_to=None,metadata=None):
         if self._haos_ntfy_profile_closed or not self.is_connected:
             raise PermissionError('private ntfy profile is not connected')
-        if (not isinstance(metadata,dict) or set(metadata)!={'haos_scope','thread_id','haos_binding'}
-                or metadata['haos_scope'] or metadata['thread_id']
+        if (not isinstance(metadata,dict) or not {'haos_scope','haos_binding'}<=set(metadata)<={'haos_scope','haos_binding','thread_id','notify'}
+                or metadata['haos_scope'] or metadata.get('thread_id','') or metadata.get('notify',True) is not True
                 or not isinstance(metadata['haos_binding'],dict) or set(metadata['haos_binding'])!={'binding_id','binding_digest'}
                 or reply_to is not None and (not isinstance(reply_to,str) or not _EVENT.fullmatch(reply_to))):
             raise PermissionError('exact current ntfy owner delivery metadata required')

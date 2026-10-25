@@ -375,12 +375,12 @@ def configure_moa(name, value):
 
 
 def configure_gateway(connector: str, platform: str, token: str, app_token: str = '', server_url: str = '', *,
-                      homeserver: str = '', user_id: str = '', device_id: str = '', recovery_key: str = ''):
+                      homeserver: str = '', user_id: str = '', device_id: str = '', recovery_key: str = '', topic: str = ''):
     """Graphical root-seat setup for explicitly integrated native adapters."""
     require_root()
-    if platform not in {"telegram", "discord", "slack", "mattermost", "matrix"}:
+    if platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}:
         raise ValueError("HAOS has not approved this platform for gateway execution")
-    if platform!='matrix' and (not isinstance(token, str) or not 16 <= len(token) <= 4096
+    if platform not in {'matrix','ntfy'} and (not isinstance(token, str) or not 16 <= len(token) <= 4096
             or any(c.isspace() or ord(c) < 32 for c in token)):
         raise ValueError("invalid protected gateway credential")
     if platform=='slack':
@@ -391,7 +391,12 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     if platform=='mattermost':
         from .gateway_mattermost import validate_credentials
         server_url=validate_credentials(token,server_url)
-    elif server_url:raise ValueError('a server URL applies only to Mattermost')
+    elif platform!='ntfy' and server_url:raise ValueError('a server URL applies only to Mattermost or ntfy')
+    ntfy=None
+    if platform=='ntfy':
+        from .gateway_ntfy_profile import credentials as ntfy_credentials
+        ntfy=ntfy_credentials({'token':token,'server_url':server_url,'topic':topic})
+    elif topic:raise ValueError('a topic applies only to ntfy')
     matrix=None
     if platform=='matrix':
         from .gateway_matrix_profile import credentials as matrix_credentials
@@ -411,7 +416,7 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     policy["connectors"] = [c for c in policy["connectors"] if c["id"] != connector] + [
         {"id": connector, "platform": platform}]
     GatewayPolicy(policy)
-    credentials["connectors"][connector] = matrix or {"token": token}
+    credentials["connectors"][connector] = matrix or ntfy or {"token": token}
     if platform=='slack':credentials['connectors'][connector]['app_token']=app_token
     if platform=='mattermost':credentials['connectors'][connector]['server_url']=server_url
     persist(policy, credentials)
@@ -421,7 +426,7 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
 
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
                         identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = "",
-                        matrix_devices=None, allow_plaintext=False, require_mention=True):
+                        matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url=""):
     """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
@@ -438,6 +443,18 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
     elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True:
         raise ValueError('Matrix device and encryption options apply only to Matrix')
+    if selected and selected['platform']=='ntfy':
+        configured=credentials['connectors'][connector]
+        if chat!=configured['topic']:
+            raise ValueError('ntfy-Topic stimmt nicht mit dem gespeicherten Konnektor überein; Konfiguration zuerst speichern')
+        if ntfy_server_url:
+            from .gateway_ntfy_profile import credentials as ntfy_credentials
+            requested=ntfy_credentials({'token':configured['token'],'server_url':ntfy_server_url,'topic':chat})
+            if requested['server_url']!=configured['server_url']:
+                raise ValueError('ntfy-Server stimmt nicht mit dem gespeicherten Konnektor überein; Konfiguration zuerst speichern')
+        item['trust_topic_publishers']=trust_topic_publishers
+    elif trust_topic_publishers or ntfy_server_url:
+        raise ValueError('topic publisher trust applies only to ntfy')
     policy["bindings"] = [b for b in policy["bindings"] if b["id"] != binding_id] + [item]
     GatewayPolicy(policy)
     quiesce_for_setup(gateway_only=True)
@@ -451,7 +468,11 @@ def gateway_configuration():
     require_root()
     from .gateway_setup import load
     policy, _credentials = load()
-    return {"connectors": policy["connectors"], "bindings": policy["bindings"]}
+    result={"connectors": policy["connectors"], "bindings": policy["bindings"]}
+    topics={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('server_url','topic')}
+        for row in policy['connectors'] if row['platform']=='ntfy'}
+    if topics:result['ntfy']=topics
+    return result
 
 
 def matrix_gateway_devices(connector,sender):
@@ -482,6 +503,18 @@ def manage_gateway(action: str, identifier: str = ""):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action=action, binding=identifier if action == "revoke" else None,
         connector=identifier if action == "remove" else None))
+
+
+def retry_ntfy_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='ntfy' for row in configured['connectors']):
+        raise ValueError('select an existing ntfy connector before retrying authentication')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-ntfy-auth',connector=connector,
+        note='Owner requested a new ntfy authentication check'))
 
 
 def gateway_ingress(after=0):

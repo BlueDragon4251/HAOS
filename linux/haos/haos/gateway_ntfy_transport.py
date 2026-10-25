@@ -1,4 +1,4 @@
-"""Prepared bounded ntfy subscription with durable cursor; no public activation."""
+"""Private bounded ntfy subscription with durable cursor and independent replay."""
 import asyncio
 import hashlib
 import json
@@ -6,7 +6,7 @@ import math
 import time
 
 from .gateway import digest
-from .gateway_ntfy import _EVENT, _TOPIC, capture, dispatch_stored, snapshot
+from .gateway_ntfy import _EVENT, _TOPIC, capture, dispatch_stored, snapshot, safe_event_id, credential_token
 
 
 def _object(pairs):
@@ -26,16 +26,16 @@ class Subscription:
             self.server = server_url(adapter._server)
         except ValueError:
             raise ValueError('ntfy requires an exact HTTPS server without credentials or ambiguous paths') from None
-        if (not isinstance(adapter._topic, str) or not _TOPIC.fullmatch(adapter._topic)
-                or not isinstance(adapter._token, str) or not 1 <= len(adapter._token) <= 8192
-                or any(ord(c) < 33 or ord(c) > 126 for c in adapter._token)):
-            raise ValueError('ntfy requires one exact private topic and a private authentication credential')
+        credential_token(adapter._token)
+        if not isinstance(adapter._topic,str) or not _TOPIC.fullmatch(adapter._topic):
+            raise ValueError('ntfy requires one exact private topic')
         self._target = self.server
         self.topic = adapter._topic
         self.credential_digest = hashlib.sha256(adapter._token.encode()).digest()
         self.native = adapter._haos_native
         self.authority = snapshot(self.native.policy(), self.native.connector)
         if not any(b['connector'] == self.native.connector and b['chat'] == adapter._topic
+                   and type(b.get('since')) is int and b.get('generation')
                    for b in self.native.policy().bindings.values()):
             raise PermissionError('ntfy subscription requires an exact current topic grant')
         self.identity = digest({'authority': self.authority, 'server': self.server, 'topic': adapter._topic,
@@ -54,7 +54,7 @@ class Subscription:
     def state(self):
         value = dict(self.db.execute('SELECT cursor,status,next_attempt FROM ntfy_subscription WHERE identity=?',
                                      (self.identity,)).fetchone())
-        if (not isinstance(value['cursor'], str) or value['cursor'] and not _EVENT.fullmatch(value['cursor'])
+        if (not isinstance(value['cursor'], str) or value['cursor'] and not safe_event_id(self.adapter,value['cursor'])
                 or value['status'] not in {'ready','streaming','disconnected','authentication-denied',
                     'source-unavailable','rate-limited','transport-unavailable','invalid-stream','revoked'}
                 or type(value['next_attempt']) not in {int,float} or not math.isfinite(value['next_attempt'])
@@ -135,7 +135,7 @@ class Subscription:
                             if not isinstance(event, dict): raise ValueError('invalid ntfy event')
                             if event.get('event') in {'open', 'keepalive'}: continue
                             if (event.get('event') != 'message' or event.get('topic') != self.adapter._topic
-                                    or not isinstance(event.get('id'), str) or not _EVENT.fullmatch(event['id'])):
+                                    or not safe_event_id(self.adapter,event.get('id'))):
                                 raise ValueError('invalid ntfy original identity')
                             # Raw obligation commits first. A crash before the
                             # separate cursor write only causes idempotent replay.
@@ -158,6 +158,8 @@ class Subscription:
             except PermissionError:
                 self.status('revoked')
                 raise
+            except (ValueError, UnicodeError):
+                self.status('invalid-stream', 2)
             except Exception:
                 # No vendor bodies, credentials or exception text in metadata.
                 self.status('transport-unavailable', 2)

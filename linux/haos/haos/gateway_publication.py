@@ -23,6 +23,13 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='ntfy':
+            from .gateway_ntfy_profile import credentials as ntfy_credentials
+            if ntfy_credentials(row)!=row:
+                raise ValueError('ntfy server must use its canonical owner representation')
+            if any(b['connector']==name and b['chat']!=row['topic'] for b in policy['bindings']):
+                raise ValueError('ntfy grant must match the exact credential-bound private topic')
+            continue
         if platforms[name]=='matrix':
             from .gateway_matrix_profile import credentials as matrix_credentials
             if matrix_credentials(row)!=row:

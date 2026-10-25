@@ -64,7 +64,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None):
+    if platform=='ntfy':
+        if not isinstance(ntfy_context,dict) or set(ntfy_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('ntfy requires a private topic profile and current owner authority')
+        from .gateway_ntfy_profile import build
+        return build(credentials,**ntfy_context)
     if platform=='matrix':
         if (not isinstance(matrix_context,dict) or set(matrix_context)!={'parent','connector','policy','inbox'}):
             raise ValueError('Matrix requires a private profile and current owner authority')
@@ -135,6 +140,17 @@ class SafeFormatter(logging.Formatter):
         return self.redactor.text(super().format(record))
 
 
+def credential_redactor(credentials, policy):
+    """Register private wire aliases before SDK logging or durable admission."""
+    import base64
+    secrets=[item[key] for item in credentials['connectors'].values()
+        for key in ('token','app_token','recovery_key') if item.get(key)]
+    for name,item in credentials['connectors'].items():
+        if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
+            secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
+    return Redactor(secrets)
+
+
 async def serve():
     from .gateway_publication import pending, validate_snapshot
     config = Path("/etc/haos")
@@ -146,14 +162,13 @@ async def serve():
     validate_snapshot(snapshot, credentials)
     if pending(config):
         raise PermissionError("gateway owner publication changed during startup")
-    redactor = Redactor([item[key] for item in credentials["connectors"].values()
-        for key in ('token','app_token','recovery_key') if item.get(key)])
+    redactor = credential_redactor(credentials,policy)
     handler = logging.StreamHandler()
     handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -171,10 +186,10 @@ async def serve():
     adapters = {}
     for connector in policy.connectors.values():
         context=None
-        if connector['platform']=='matrix':
-            parent=Path('/var/lib/haos-gateway/matrix');parent.mkdir(mode=0o700,exist_ok=True)
+        if connector['platform'] in {'matrix','ntfy'}:
+            parent=Path('/var/lib/haos-gateway')/connector['platform'];parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
-        adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],matrix_context=context)
+        adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})
             if context else build_adapter(connector["platform"], credentials["connectors"][connector["id"]]))
         adapters[connector["id"]] = adapter
         def receive(event, connector=connector):
