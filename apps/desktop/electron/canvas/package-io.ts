@@ -70,6 +70,13 @@ async function assetSizes(dir: string, manifest: CompManifest): Promise<Record<s
       throw new Error(`${name} is too large`)
     }
 
+    // An in-place external save truncates before writing. Neither a PNG nor a
+    // colour table can be empty; keep the previous usable project until a
+    // subsequent watch event or poll observes the completed asset.
+    if (stat.size === 0) {
+      throw new Error(`${name} is empty`)
+    }
+
     assets[name] = stat.size
   }
 

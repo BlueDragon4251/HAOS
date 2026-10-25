@@ -121,6 +121,28 @@ describe('PackageWatcher', () => {
     }
   }
 
+  it('keeps the last usable project while an external image is truncated', async () => {
+    const dir = await project()
+    const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
+    const first = await writePackage(dir, { manifest: twoLayers(), assets })
+    const sizes: number[] = []
+    const watcher = new PackageWatcher(dir, first, contents => sizes.push(contents.assets[imageFileFor(B)]))
+    watcher.start()
+    try {
+      const file = path.join(dir, 'images', imageFileFor(B))
+      await fs.truncate(file, 0)
+      await watcher.check()
+      expect(sizes).toEqual([])
+      await expect(readPackage(dir)).rejects.toThrow(/empty/)
+      const replacement = encodePng({ width: 2, height: 2, channels: 4, data: Uint8Array.from({ length: 16 }, (_, i) => (i * 97) % 256) })
+      await fs.writeFile(file, replacement)
+      await watcher.check()
+      expect(sizes).toEqual([replacement.byteLength])
+    } finally {
+      watcher.stop()
+    }
+  })
+
   it('reports a change made elsewhere, but not Herald saving its own work', { timeout: 10_000 }, async () => {
     const dir = await project()
     const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
