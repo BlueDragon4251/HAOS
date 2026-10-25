@@ -1,0 +1,38 @@
+{
+  "base_commit": "28f5d535d99d7e942732a7681a135d0f301eb1fc",
+  "actual_native_local_http_crypto_identity_cases": 14,
+  "full_tests": {
+    "passed": 1060,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1060,
+    "existing_skips": 2
+  },
+  "matrix_haos_gateway_enabled": false,
+  "remote_account_or_device_accepted": false,
+  "owner_data_used_or_deleted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "bdc3327feec594635dd1a7670492545d40af1094f46a7210b88352d26b666ae7"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "9bc13d77f903e246323decee09eba3f75a3b34c18013b9d11b997092bdeb3ef6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix.py",
+      "sha256": "4d886deaa192f4fca20552baf8fe920816b40d3e09f9f28a65c532b3b3a2a276"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_identity.py",
+      "sha256": "1b81005e3a095bdca6d58b3ebe2938ee7bf75652db774a502f5d572be911c2bb"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "067965c561c32862bdbbbff63773e514b55e3f52dbac94c20442a3f76d8f1631"
+    }
+  ]
+}

@@ -55,3 +55,36 @@ errors; HAOS needs a durable dispatch boundary before using that transport.
 Native automatic crypto-store reset/migration and unverified-device key sharing
 also need independent HAOS guards before any real owner identity is connected.
 No existing owner or recovery store is touched by these temporary fixtures.
+
+
+## Private Matrix identity guards, still not enabled (2026-10-25)
+
+`gateway_matrix.protect_crypto` now wraps one real native adapter instance.
+The intended Matrix user and stable device must be explicit, and actual SDK
+`whoami` must confirm both. The upstream substitution of a configured device
+when the server omits it is insufficient. Crypto setup remains required; no
+optional plaintext fallback is accepted on a dependency or identity failure.
+
+Existing device changes, legacy pickle material, wrong pickle keys, symlinked
+profiles and foreign/shared crypto files are refused. Login does not delete or
+silently re-pickle an existing account/session store. Both signing and curve
+keys must match the server's actual device-key response. Missing keys can be
+published initially; existing mismatched keys cannot trigger a remote device
+DELETE or replacement. Auto-bootstrap and recovery-file export are disabled;
+only explicitly supplied private recovery material can invoke SDK cross-signing
+verification. Unverified recipient devices and unsolicited key-forward requests
+receive no key authority. These checks do not grant mission or room authority.
+
+Fourteen local contracts use actual native auth/setup, real mautrix HTTP clients,
+real server-response codecs, actual libolm accounts and private SQLite stores.
+They cover initial publication/reopen, both key mismatches, changed/missing/wrong
+device and wrong/revoked account, retained legacy material and actual symlink
+refusal. The probe is mandatory in builds/provider CI. No real owner material is
+used or deleted. Source receipt:
+`docs/evidence/2026-10-25/matrix-identity-validation.json`.
+
+Matrix is still absent from the approved HAOS gateway set. A stable isolated
+profile factory, durable sync/dispatch, independent sender/room/thread grants,
+safe outgoing obligations, owner CLI/GUI and further recovery remain required
+before enabling it. Local device-key fixtures do not accept a real account,
+remote device trust, federation, key exchange, delivery or installed system.
