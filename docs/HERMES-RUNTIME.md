@@ -641,3 +641,31 @@ control in the agent. Native smart-home tools are not authorized by this
 prepared decoder; any future device control needs its own explicit bounded
 owner capabilities. Service/system event contexts also need separate explicit
 policy rather than silently mapping unknown senders into a trusted principal.
+
+
+### Prepared Home Assistant authenticated WebSocket boundary
+
+The actual pinned adapter now performs its native `auth_required` / token /
+`auth_ok` / `subscribe_events` exchange through a private instance boundary.
+Authority starts only after an exact matching result ID with boolean success;
+early events, wrong/bool IDs and duplicate JSON fields cannot complete it. The
+canonical HTTPS/WSS origin is fixed, redirects/proxies/TLS overrides are refused,
+and frames are limited to 64 KiB. Invalid remote bodies never enter native
+handshake logging. Token or owner-grant changes revoke the socket proof,
+including changes while an acknowledgement is pending. Superseded sockets
+cannot borrow or revoke a newer socket's proof.
+
+The retained reader calls the actual native state codec only after raw SQLite
+admission. Socket EOF revokes health. Native standalone notification fallback,
+REST writes, other origins and WebSocket device-service calls are denied;
+notification delivery is still unimplemented. The handshake has a 30-second
+production deadline, closes interrupted/cancelled connections, and bounds
+WebSocket close to five seconds before aborting the pinned response transport.
+
+`probe_homeassistant_transport.py` passes 23 real local aiohttp/native handshake
+and input cases. It tests a real held handshake with a deliberately shortened
+0.05-second fixture deadline (not a latency benchmark), caller cancellation,
+wrong subscription routing and actual message-too-big close code 1009. Only
+the fixture replaces WSS with loopback WS. It confirms no live/TLS/account,
+notification, agent device tool, installed service or hardware acceptance.
+Home Assistant remains publicly disabled; six text gateway paths are active.
