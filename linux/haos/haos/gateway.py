@@ -25,6 +25,8 @@ def identifier(value, *, empty=False):
 
 
 class GatewayPolicy:
+    platforms = SUPPORTED
+
     def __init__(self, config: dict):
         fields = {"version", "connectors", "bindings"}
         if config.get("version") != 1 or set(config) not in (fields, fields | {"publication"}):
@@ -40,14 +42,16 @@ class GatewayPolicy:
         for connector in config["connectors"]:
             name = connector.get("id")
             if (not isinstance(name, str) or not _NAME.fullmatch(name) or name in self.connectors
-                    or connector.get("platform") not in SUPPORTED
+                    or connector.get("platform") not in self.platforms
                     or set(connector) != {"id", "platform"}):
                 raise ValueError("invalid or unsupported gateway connector")
             self.connectors[name] = connector
         routes = set()
         for binding in config["bindings"]:
             fields = {"id", "connector", "sender", "chat", "scope", "thread", "identity", "capabilities"}
-            if not fields <= set(binding) <= fields | {"generation", "since"}:
+            connector = self.connectors.get(binding.get('connector'))
+            extras={'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix' else set()
+            if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
                 raise ValueError('invalid gateway grant time boundary')
@@ -70,6 +74,9 @@ class GatewayPolicy:
                 if any(not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('sender','chat')) or any(
                         binding[key] and not re.fullmatch('[a-z0-9]{26}',binding[key]) for key in ('scope','thread')):
                     raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
+            if connector and connector['platform']=='matrix':
+                from .gateway_matrix_policy import validate_binding
+                validate_binding(binding)
             capabilities = binding["capabilities"]
             if (not isinstance(capabilities, list) or not capabilities or not set(capabilities) <= CAPABILITIES
                     or len(set(capabilities)) != len(capabilities)):

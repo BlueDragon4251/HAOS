@@ -136,6 +136,13 @@ def active_page():
     return state['row']
 
 
+def verified_crypto(event):
+    state=_ACTIVE.get()
+    if state is None:raise PermissionError('Matrix event has no retained private decode context')
+    value=state['crypto'].get(id(event))
+    return value[1] if value is not None and value[0] is event else None
+
+
 class JournalSyncStore:
     def __init__(self,journal):self.journal=journal
     async def get_next_batch(self):return self.journal.cursor
@@ -154,6 +161,7 @@ def protect_dispatch(client):
             raise PermissionError('Matrix crypto identity changed; use a fresh verified client')
         return
     original_dispatch=client.dispatch_manual_event
+    original_event=client.dispatch_event
     async def call(self,handler,data):await handler(data)
     def dispatch(self,*args,**kwargs):
         # Include callbacks that the native SDK normally starts as background
@@ -165,10 +173,15 @@ def protect_dispatch(client):
         state=_ACTIVE.get()
         if state is not None:state['tasks'].update(tasks)
         return tasks
+    def event_dispatch(self,event,source):
+        gate=getattr(self,'_haos_sync_source_gate',None)
+        if event is not None and gate is not None and gate(event) is not True:return []
+        return original_event(event,source)
     def deserialize(self,cls,data):
         try:return cls.deserialize(data)
         except Exception:raise DeferredDispatch() from None
     client._catch_errors=MethodType(call,client)
+    client.dispatch_event=MethodType(event_dispatch,client)
     client.dispatch_manual_event=MethodType(dispatch,client)
     client._try_deserialize=MethodType(deserialize,client)
     if any(client.event_middlewares.values()):raise RuntimeError('unreviewed Matrix event middleware')
@@ -181,6 +194,14 @@ def protect_dispatch(client):
             # Native default logs/deletes this dispatch obligation on a missing
             # session. Retain it so later to-device keys can unblock a retry.
             decrypted=await client.crypto.decrypt_megolm_event(event)
+            stored=await client.crypto.crypto_store.get_group_session(event.room_id,event.content.session_id)
+            state=_ACTIVE.get()
+            if state is None or stored is None:raise DeferredDispatch()
+            descriptor={
+                'sender':str(event.sender),'room':str(event.room_id),'event_id':str(event.event_id),
+                'device_id':str(event.content.device_id or ''),
+                'ed25519':str(stored.signing_key),'curve25519':str(stored.sender_key)}
+            state['crypto'][id(decrypted)]=(decrypted,descriptor)
             client.dispatch_event(decrypted,event.source)
         client.add_event_handler(EventType.ROOM_ENCRYPTED,decrypt,wait_sync=True)
     client._haos_sync_crypto=getattr(client,'crypto',None)
@@ -198,7 +219,7 @@ async def _dispatch_page(adapter,client,journal,key):
     row=journal.page(key)
     if row['state']=='processed':return True
     protect_dispatch(client);client.sync_store=JournalSyncStore(journal)
-    state={'row':row,'journal':journal,'tasks':set(),'failed':False};token=_ACTIVE.set(state)
+    state={'row':row,'journal':journal,'tasks':set(),'failed':False,'crypto':{}};token=_ACTIVE.set(state)
     original=adapter._dispatch_sync
     pending_invites=adapter._schedule_pending_invite_joins
     async def strict(_data):

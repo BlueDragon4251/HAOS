@@ -189,3 +189,17 @@ def test_real_gateway_rotation_recovers_after_every_durable_stage_without_old_se
     assert all(secret_value not in (tmp_path/'gateways.json').read_text()
         for account in (old_secret['connectors']['first'],new_secret['connectors']['first']) for secret_value in account.values())
     with pytest.raises(FileNotFoundError): gateway_publication.recover(tmp_path, 0)
+
+
+def test_prepared_matrix_policy_cannot_be_published_by_installed_owner_backend(tmp_path):
+    from haos.gateway_matrix_policy import PreparedMatrixPolicy
+    assert os.geteuid()==0,'actual owner files and root authority required'
+    policy={'version':1,'connectors':[{'id':'matrix-preview','platform':'matrix'}],'bindings':[]}
+    assert PreparedMatrixPolicy(policy).connectors['matrix-preview']['platform']=='matrix'
+    before={path.name for path in tmp_path.iterdir()}
+    with pytest.raises(ValueError):
+        persist(policy,{'connectors':{'matrix-preview':{'token':'disposable-preview-token'}}},config=tmp_path,gid=0)
+    assert not (tmp_path/'gateways.json').exists()
+    assert not (tmp_path/'gateway-credentials').exists()
+    assert not (tmp_path/'gateway-publication.json').exists()
+    assert {path.name for path in tmp_path.iterdir()}<=before|{'.gateway-publication.lock'}

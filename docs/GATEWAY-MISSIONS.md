@@ -716,3 +716,33 @@ These are local contract results. No external Mattermost account, installation,
 permission, network or real message delivery is accepted. The reviewed text
 setup count is four of 22; full media/voice, the remaining adapters, Android,
 optional phone firstboot and installed OS/artifact acceptance remain unfinished.
+
+
+## Prepared Matrix mission admission (2026-10-25)
+
+The private Matrix path now admits actual decrypted SDK events through the
+independent HAOS sender/room/root-thread/device policy, retained raw input and
+relay, and the actual mission engine. Only the exact decrypted object carries
+private crypto evidence; serialized copies and network encryption flags do not.
+Owner grants name both device public keys, original grant time and generation,
+and explicit plaintext/mention rules. Unknown actors are rejected before SDK
+profile/device lookup. Native Hermes still prepares text and source metadata;
+HAOS preserves the approved thread and original 24-hour input-age boundary.
+Recovery reopens retained input without renewing its authority or timestamp.
+
+Eighteen local contracts exercise actual Olm/Megolm, SDK event decoding, pinned
+Hermes text preparation, SQLite raw/relay persistence and real HAOS mission
+creation. Twenty-three policy tests cover exact identities, device keys and
+revocation. Full and minimal environments pass 1083 tests with two existing
+skips; 37 real root/UID/socket checks pass, including rejection of prepared Matrix
+publication by the installed owner backend. The other four gateways' thirteen
+native regression probes pass. Evidence is source-bound in
+`docs/evidence/2026-10-25/matrix-admission-validation.json`.
+
+Matrix remains unavailable in installed setup: the prepared policy is selected
+only by private implementation callers, never by root RPC, JSON, CLI or GUI.
+The public controller still rejects it. Outgoing delivery, limited-history
+recovery, complete profile lifecycle and owner setup remain required before
+activation. These fixtures use disposable local identities and create local
+fixture missions; they accept no external account, remote trust, inference,
+message delivery, installation or release.
