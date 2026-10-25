@@ -1,0 +1,63 @@
+{
+  "baseline_commit": "cd7002f398d56196a276fc976346971cd8e9fdfb",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_delivery.py",
+      "sha256": "7c3e4fc6faedd7a2b275c0748b76cefb5637db7dd5061b704b53c3afbf7854df"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_delivery.py",
+      "sha256": "5805ed53ebcee21f99bae0faf0d02810dd0e4fcf6227e47dea7beca7f654d9c3"
+    }
+  ],
+  "native_delivery_cases": {
+    "passed": 26,
+    "cases": [
+      "shared_instance_audience_requires_explicit_owner_grant_before_any_post",
+      "native_http_and_authenticated_ws_verify_exact_real_notification_id",
+      "native_unicode_chunks_preserve_complete_message",
+      "native_single_post_400",
+      "native_single_post_401",
+      "native_single_post_403",
+      "native_single_post_404",
+      "native_single_post_413",
+      "native_single_post_429",
+      "native_single_post_500",
+      "native_single_post_302",
+      "native_unproven_missing_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-message_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-id_cannot_use_random_sdk_uuid",
+      "native_unproven_duplicate-proof_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-result-id_cannot_use_random_sdk_uuid",
+      "native_unproven_auth-invalid_cannot_use_random_sdk_uuid",
+      "native_unproven_lost_cannot_use_random_sdk_uuid",
+      "unconfirmed_missing_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "unconfirmed_wrong-result-id_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "unconfirmed_duplicate-proof_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "cancelled_witness_closes_connection_and_never_resends_previous_obligation",
+      "partial_notification_then_429_never_retries_complete_reply",
+      "revoke_after_first_native_post_prevents_next_chunk_and_receipt_claim",
+      "direct_native_send_has_no_shared_notification_capability",
+      "token_rotation_revokes_old_private_notification_publisher"
+    ],
+    "actual_pinned_send_codec_rest_ws_and_outbox": true,
+    "homeassistant_core_protocol_reference": "9eb964b8b95fddc61ec4841277fbce7ce32dc586",
+    "loopback_targets_replaced_only_in_fixture": true,
+    "public_gateway_enabled": false,
+    "shared_audience_requires_explicit_owner_grant": true,
+    "external_notification_or_tls_account_accepted": false,
+    "agent_device_tools_enabled": false,
+    "installed_service_accepted": false
+  },
+  "regression_full_runtime": {
+    "passed": 1151,
+    "existing_skips": 2
+  },
+  "regression_without_upstream_pythonpath": {
+    "passed": 1151,
+    "existing_skips": 2
+  },
+  "local_excluded_file": "linux/haos/tests/test_backup.py",
+  "ci_exclusions_added": false,
+  "installed_or_live_acceptance": false
+}

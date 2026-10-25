@@ -132,24 +132,33 @@ class NotificationWitness:
         import json
         async with self.lock:
             self.publisher.current(binding)
-            async with asyncio.timeout(15):
-                if not self.boundary.confirmed:
-                    if not await self.adapter._ws_connect():return False
-                self.boundary.require_ready()
-                request_id=self.adapter._next_id()
-                # Only this fixed read is available to the private witness;
-                # no result list or unrelated notification escapes the broker.
-                await self.boundary.socket.raw.send_json({'id':request_id,'type':'persistent_notification/get'})
-                for _ in range(128):
-                    value=await self.boundary.socket.raw.receive_json(loads=lambda text:json.loads(text,object_pairs_hook=_object))
-                    self.publisher.current(binding);self.boundary.require_ready()
-                    if not isinstance(value,dict):return False
-                    if value.get('type')=='event' and value.get('id')==self.boundary.subscription_id:continue
-                    if (value.get('type')!='result' or type(value.get('id')) is not int or value['id']!=request_id
-                            or value.get('success') is not True or not isinstance(value.get('result'),list)
-                            or len(value['result'])>4096):return False
-                    matches=[row for row in value['result'] if isinstance(row,dict) and row.get('notification_id')==notification_id]
-                    return (len(matches)==1 and matches[0].get('message')==message and matches[0].get('title')=='Hermes Agent')
-            return False
+            verified=False
+            try:
+                async with asyncio.timeout(15):
+                    if not self.boundary.confirmed:
+                        if not await self.adapter._ws_connect():return False
+                    self.boundary.require_ready()
+                    request_id=self.adapter._next_id()
+                    # Only this fixed read is available to the private witness;
+                    # no result list or unrelated notification escapes the broker.
+                    await self.boundary.socket.raw.send_json({'id':request_id,'type':'persistent_notification/get'})
+                    for _ in range(128):
+                        value=await self.boundary.socket.raw.receive_json(loads=lambda text:json.loads(text,object_pairs_hook=_object))
+                        self.publisher.current(binding);self.boundary.require_ready()
+                        if not isinstance(value,dict):return False
+                        if value.get('type')=='event' and value.get('id')==self.boundary.subscription_id:continue
+                        if (value.get('type')!='result' or type(value.get('id')) is not int or value['id']!=request_id
+                                or value.get('success') is not True or not isinstance(value.get('result'),list)
+                                or len(value['result'])>4096):return False
+                        matches=[row for row in value['result'] if isinstance(row,dict) and row.get('notification_id')==notification_id]
+                        verified=(len(matches)==1 and matches[0].get('message')==message and matches[0].get('title')=='Hermes Agent')
+                        return verified
+                return False
+            finally:
+                # A failed, interrupted or timed-out proof must not leave late
+                # result frames available to the next outbox obligation.
+                if not verified:
+                    self.boundary.revoke('receipt-unconfirmed')
+                    await self.adapter._cleanup_ws()
 
     async def close(self):await self.boundary.close()

@@ -707,3 +707,23 @@ notification collections cannot fabricate success. Full/minimal suites pass
 owner GUI integration, and stays publicly disabled; six text paths remain
 reviewed. No external notification, actual server/account/TLS, installed boot,
 hardware or release acceptance is claimed. Device-control tools remain denied.
+### Prepared Home Assistant receipt connection recovery (2026-10-25)
+
+After baseline `cd7002f398d56196a276fc976346971cd8e9fdfb`, the private
+notification witness closes its authenticated WebSocket and session whenever
+a receipt is unconfirmed, malformed, or interrupted. Successful receipts may
+reuse the connection. A distinct subsequent outbox obligation performs a fresh
+native authentication/subscription handshake after failure; this does not retry
+the previous uncertain publication. Cancellation still propagates to the caller.
+
+The native delivery probe now passes 26 cases, including missing, wrong-ID,
+duplicate-proof and caller-cancellation recovery on actual loopback REST/WS
+connections. The unchanged ingress/transport probes pass 24/23 cases. Full
+and minimal-runtime regression each pass 1151 tests with two existing skips
+and the existing local backup-file exclusion; no CI skips were added. Source
+hashes and limits are recorded in
+`docs/evidence/2026-10-25/homeassistant-witness-recovery-validation.json`.
+Home Assistant remains prepared, with no public GUI/profile integration or live
+delivery acceptance. A native live WebSocket alone cannot recover unseen events
+from a disconnect: the server history API omits the direct event context user,
+so history is not silently granted the authority of an authenticated live event.

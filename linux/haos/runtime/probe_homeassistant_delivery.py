@@ -36,7 +36,7 @@ def main():
             'homeassistant_shared_notifications':False}]}
         policy=lambda:PreparedHomeAssistantPolicy(config)
         state={'posts':[],'status':200,'mode':'normal','notifications':{},'gets':0,'leaks':0,'revoke':False,'partial':False}
-        publishers=[];sockets=[]
+        publishers=[];sockets=[];proof_waiting=asyncio.Event();release_proof=asyncio.Event()
         async def post(request):
             assert request.headers['Authorization']=='Bearer '+token
             data=await request.json();assert set(data)=={'title','message','notification_id'} and data['title']=='Hermes Agent'
@@ -64,6 +64,8 @@ def main():
                 value=json.loads(message.data)
                 assert set(value)=={'id','type'} and value['type']=='persistent_notification/get'
                 state['gets']+=1;result=list(state['notifications'].values())
+                if state['mode']=='held-proof':
+                    proof_waiting.set();await release_proof.wait()
                 if state['mode']=='duplicate-proof' and state['posts']:
                     result.extend(row for row in list(result) if row['notification_id']==state['posts'][-1]['notification_id'])
                 await socket.send_json({'id':value['id']+1 if state['mode']=='wrong-result-id' else value['id'],
@@ -124,6 +126,38 @@ def main():
                 state['mode']=mode
                 await run('native_unproven_'+mode+'_cannot_use_random_sdk_uuid','uncertain',outbox=mode in {'missing','lost'})
                 assert len(state['posts'])==1
+            for mode in ['missing','wrong-result-id','duplicate-proof']:
+                state['mode']=mode;publisher=build();state['posts']=[]
+                binding=dict(config['bindings'][0])
+                result=delivery_result(await publisher.send(binding,digest('unconfirmed-'+mode),'first obligation'))
+                assert result['status']=='uncertain' and len(state['posts'])==1
+                assert not publisher.witness.boundary.confirmed
+                assert publisher.witness.adapter._ws is None and publisher.witness.adapter._session is None
+                old_socket=publisher.witness.boundary.socket
+                assert old_socket.closed
+                state['mode']='normal'
+                result=delivery_result(await publisher.send(binding,digest('distinct-next-'+mode),'different new obligation'))
+                assert result['status']=='delivered' and len(state['posts'])==2
+                assert publisher.witness.boundary.socket is not old_socket
+                assert publisher.witness.boundary.confirmed
+                await publisher.close()
+                cases.append('unconfirmed_'+mode+'_closes_witness_and_next_distinct_obligation_reauthenticates')
+            state['mode']='held-proof';publisher=build();state['posts']=[]
+            binding=dict(config['bindings'][0])
+            task=asyncio.create_task(publisher.send(binding,digest('cancelled-witness'),'ambiguous previous obligation'))
+            await asyncio.wait_for(proof_waiting.wait(),2)
+            old_socket=publisher.witness.boundary.socket
+            task.cancel();release_proof.set()
+            try:await task
+            except asyncio.CancelledError:pass
+            else:raise AssertionError('cancelled witness did not propagate cancellation')
+            assert old_socket.closed and not publisher.witness.boundary.confirmed
+            assert publisher.witness.adapter._ws is None and publisher.witness.adapter._session is None
+            state['mode']='normal'
+            result=delivery_result(await publisher.send(binding,digest('distinct-after-cancel'),'separate new obligation'))
+            assert result['status']=='delivered' and len(state['posts'])==2
+            assert publisher.witness.boundary.socket is not old_socket
+            await publisher.close();cases.append('cancelled_witness_closes_connection_and_never_resends_previous_obligation')
             state['mode']='normal';state['partial']=True
             await run('partial_notification_then_429_never_retries_complete_reply','uncertain','p'*5000,outbox=True)
             assert len(state['posts'])==2;state['partial']=False
