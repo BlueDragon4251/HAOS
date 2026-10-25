@@ -30,6 +30,10 @@ def main():
             if request.path.endswith('/account/whoami'):
                 if state['auth_status']!=200:return web.json_response({'errcode':'M_UNKNOWN_TOKEN','error':'fixture refusal'},status=state['auth_status'])
                 return web.json_response({'user_id':state['user'],'device_id':state['device']})
+            if '/account_data/m.secret_storage.' in request.path:
+                assert request.method=='GET'
+                if request.path.endswith('m.secret_storage.default_key'):return web.json_response({'key':'local-fixture-key'})
+                return web.json_response({'algorithm':'m.secret_storage.v1.aes-hmac-sha2','iv':'AAAAAAAAAAAAAAAAAAAAAA','mac':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'})
             if request.path.endswith('/keys/query'):
                 body=await request.json();assert body['device_keys']=={user:[state['device']]}
                 return web.json_response({'device_keys':{user:{state['device']:state['keys']}} if state['keys'] else {}})
@@ -66,6 +70,18 @@ def main():
                 assert first._haos_cross_signing_verified is False
                 assert not any(item.startswith('DELETE ') for item in state['methods'])
                 cases.append('unverified_device_and_unsolicited_key_requests_not_enabled')
+                invalid_key='!!!disposable-private-recovery-material!!!'
+                recovery_native=MatrixAdapter(PlatformConfig(enabled=True,token=token,extra={
+                    'homeserver':f'http://127.0.0.1:{port}','user_id':user,'device_id':device,'e2ee_mode':'required'}))
+                recovery_native=protect_crypto(recovery_native,directory/'recovery-profile',recovery_key=invalid_key)
+                try:await recovery_native._verify_or_bootstrap_cross_signing(actual.crypto,actual)
+                except PermissionError as error:
+                    assert str(error)=='Matrix recovery verification failed; owner material retained'
+                    assert invalid_key not in str(error)
+                else:raise AssertionError('invalid recovery material was accepted')
+                assert recovery_native._haos_cross_signing_verified is False
+                cases.append('actual_sdk_recovery_failure_exposes_no_private_material')
+
                 room=RoomID('!self:owner.invalid')
                 await actual.crypto.share_group_session(room,[])
                 await actual.crypto.encrypt_megolm_event(room,EventType.ROOM_MESSAGE,{'msgtype':'m.text','body':'local retained crypto fixture'})

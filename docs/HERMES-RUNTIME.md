@@ -88,3 +88,43 @@ profile factory, durable sync/dispatch, independent sender/room/thread grants,
 safe outgoing obligations, owner CLI/GUI and further recovery remain required
 before enabling it. Local device-key fixtures do not accept a real account,
 remote device trust, federation, key exchange, delivery or installed system.
+
+
+## Retained Matrix sync transport foundation (2026-10-25)
+
+`gateway_matrix_sync` retains each bounded private sync response and its opaque
+next cursor in one SQLite transaction before SDK callbacks run. This cursor
+acknowledges retained transport data, not successful mission execution. Failed
+pages remain separately pending while newer responses can arrive, including
+missing to-device keys. Replaying an older page cannot roll the transport cursor
+back. Authority snapshots are retained as evidence and never grant authority.
+
+Private hooks await the actual SDK callback tree, including recursively created
+background callbacks, and detect failures that the SDK/native dispatchers would
+otherwise swallow. Missing crypto sessions retain encrypted input; later local
+fixture keys permit actual decryption and replay. Cancellation retains input and
+cancels outstanding callbacks. Raw pages compact only after callbacks finish.
+Limited-timeline pagination markers and their original snapshots are retained
+atomically before compaction; this does not implement their history fetcher.
+
+Fourteen actual local HTTP/SDK/SQLite contracts cover commit ordering, repeated
+cursors, reopen/replay, sibling/nested failures, newer protocol pages during an
+old failure, malformed/stale cursors, a real SQLite trigger failure, namespace
+separation, limited timeline markers, cancellation and late-key decryption.
+The mandatory root gateway probe also runs real UID 65533/65534 child processes:
+the agent cannot open private sync data, the gateway can resume it, and neither
+can read the root-only owner canary. No UID/credential/authorization mocks or
+additional skips replace these checks. Source-bound evidence:
+`docs/evidence/2026-10-25/matrix-sync-validation.json`.
+
+Matrix remains disabled. This is a private transport component, not a complete
+HAOS gateway or mission authorization path. The approved profile factory,
+endpoint restrictions, sender/room/thread/device gates, limited-history fetcher,
+mission/outbox integration and owner CLI/GUI remain required. No real account,
+remote key exchange, federated delivery or installation is accepted by fixtures.
+
+
+The sync increment also adds an actual SDK recovery-error contract: explicitly
+supplied invalid recovery material produces only a fixed safe owner error and
+never a verified flag. The native identity probe now has 15 cases (the earlier
+14-case receipt remains bound to its earlier source).

@@ -177,3 +177,48 @@ print(json.dumps({'actual_uid':os.geteuid(),'owner_secret_denied':secret_denied,
         assert store.db.execute("SELECT attempt FROM gateway_outbox").fetchone()[0] == 1
     finally:
         store.close()
+
+
+def test_matrix_sync_journal_is_private_to_actual_gateway_uid_and_unreadable_to_agent(uid_fixture_path):
+    from haos.gateway_matrix_sync import SyncJournal
+    root=uid_fixture_path;root.chmod(0o755)
+    modules=root/'modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    state=root/'state';state.mkdir(mode=0o700);path=state/'sync.db'
+    journal=SyncJournal(path,'a'*64)
+    journal.capture({'next_batch':'retained','to_device':{'events':[]}}, {'fixture_snapshot_only':True})
+    journal.close()
+    os.chown(state,65534,65534)
+    for file in state.iterdir():file.chmod(0o600);os.chown(file,65534,65534)
+    canary=root/'owner-secret';canary.write_text('disposable-root-only-owner-canary');canary.chmod(0o600)
+    code='''
+import json,os,sys
+from pathlib import Path
+from haos.gateway_matrix_sync import SyncJournal
+d=json.load(sys.stdin)
+assert os.geteuid()==d['uid'] and os.getegid()==d['uid'] and os.getgroups()==[]
+try: Path(d['canary']).read_bytes()
+except PermissionError: pass
+else: raise AssertionError('unprivileged identity could read owner data')
+if d['uid']==65533:
+    try: SyncJournal(d['path'],'a'*64)
+    except PermissionError: pass
+    else: raise AssertionError('agent identity opened private Matrix protocol data')
+else:
+    journal=SyncJournal(d['path'],'a'*64)
+    try:
+        assert journal.cursor=='retained'
+        journal.capture({'next_batch':'next','to_device':{'events':[]}}, {},from_batch='retained')
+        assert journal.cursor=='next'
+    finally: journal.close()
+print(json.dumps({'actual_uid':os.geteuid(),'owner_secret_denied':True}))
+'''
+    for uid in (65533,65534):
+        result=subprocess.run([sys.executable,'-c',code],input=json.dumps({'uid':uid,'path':str(path),'canary':str(canary)}),
+            text=True,capture_output=True,timeout=15,user=uid,group=uid,extra_groups=[],umask=0o077,cwd=root,
+            env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(modules),'PYTHONDONTWRITEBYTECODE':'1'})
+        assert result.returncode==0,'actual Matrix journal UID isolation failed'
+        assert json.loads(result.stdout)=={'actual_uid':uid,'owner_secret_denied':True}
+        assert 'disposable-root-only-owner-canary' not in result.stdout+result.stderr

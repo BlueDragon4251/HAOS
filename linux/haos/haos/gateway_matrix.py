@@ -99,7 +99,9 @@ def protect_crypto(adapter, store_dir, *, recovery_key=None):
 
     async def cross_sign(self,olm,_client):
         if recovery_key is not None:
-            await olm.verify_with_recovery_key(recovery_key)
+            try:await olm.verify_with_recovery_key(recovery_key)
+            except Exception:
+                raise PermissionError('Matrix recovery verification failed; owner material retained') from None
             self._haos_cross_signing_verified=True
         # No auto-bootstrap, recovery-file overwrite or fabricated verification.
 

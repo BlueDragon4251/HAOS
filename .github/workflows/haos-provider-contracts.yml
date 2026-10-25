@@ -64,6 +64,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_mattermost_history.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-history.json"
           "$PYTHON" linux/haos/runtime/probe_matrix_crypto.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-crypto.json"
           "$PYTHON" linux/haos/runtime/probe_matrix_identity.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-identity.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_sync.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-sync.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
           "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
           "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"
