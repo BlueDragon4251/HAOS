@@ -73,3 +73,16 @@ def test_prepared_irc_profile_refuses_untrusted_parent_before_optional_runtime_i
     with pytest.raises((ValueError,PermissionError)):
         build(value,parent,'irc',lambda:PreparedIRCPolicy(config()),None)
     assert not (tmp_path/'private/profile.lock').exists()
+
+
+@pytest.mark.parametrize('password',['private fixture with spaces','x'*276,'y'*900,'pässword Unicode'])
+def test_irc_private_password_and_actual_sasl_wire_chunks_are_redacted_without_redacting_terminal_plus(password):
+    from haos.gateway_irc_transport import sasl_chunks
+    from haos.gateway_runtime import credential_redactor
+    value={'sasl_username':'bot-account','sasl_password':password,'server_password':'private-server-fixture'}
+    chunks=sasl_chunks(value)
+    redactor=credential_redactor({'connectors':{'irc':value}},PreparedIRCPolicy(config()))
+    for alias in [password,value['server_password'],''.join(x for x in chunks if x!='+')]+[x for x in chunks if x!='+']:
+        assert redactor.text('echo '+alias)=='echo [REDACTED]'
+    assert redactor.text('AUTHENTICATE +')=='AUTHENTICATE +'
+    assert redactor.text('owner-account #haos')=='owner-account #haos'

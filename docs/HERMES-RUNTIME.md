@@ -1098,3 +1098,16 @@ no unseen outage input is claimed recovered. Prepared owner auth-recheck metadat
 reviewed delivery/receipt/recovery and public CLI/GUI remain required. IRC stays
 publicly disabled; these fixtures prove neither external accounts nor installed
 boot/release acceptance.
+
+### Prepared IRC private wire-alias redaction (2026-10-26)
+
+The shared credential redactor now includes private IRC server/NickServ/SASL
+passwords and the exact SASL base64 payload and 400-character chunks. The SASL
+builder and redactor share one canonical chunk encoder; the protocol terminal
+`+` is not registered as a secret. A reflected private alias is removed before
+native inbox persistence, actual IRC decoding and durable relay admission.
+An isolated copy of the exact parent `657f7dd` runtime redactor fails the new
+native pre-persistence assertion; current code passes without relaxing it.
+Thirty ingress, 44 TLS/transport and 14 private-profile cases pass (88 total),
+as do 1244 tests/two existing skips in both Python 3.11 environments. This remains
+prepared IRC work: no public enablement, external account or installed acceptance.

@@ -149,10 +149,15 @@ def credential_redactor(credentials, policy):
     """Register private wire aliases before SDK logging or durable admission."""
     import base64
     secrets=[item[key] for item in credentials['connectors'].values()
-        for key in ('token','app_token','recovery_key') if item.get(key)]
+        for key in ('token','app_token','recovery_key','server_password','nickserv_password','sasl_password') if item.get(key)]
     for name,item in credentials['connectors'].items():
         if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
             secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
+        if policy.connectors[name]['platform']=='irc':
+            from .gateway_irc_transport import sasl_chunks
+            chunks=[chunk for chunk in sasl_chunks(item) if chunk!='+']
+            secrets.extend(chunks)
+            if chunks:secrets.append(''.join(chunks))
     return Redactor(secrets)
 
 

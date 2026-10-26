@@ -49,6 +49,15 @@ def credentials(value):
     return dict(value)
 
 
+def sasl_chunks(value):
+    if not value.get('sasl_username'):return ()
+    user=value['sasl_username']
+    encoded=base64.b64encode((user+'\0'+user+'\0'+value['sasl_password']).encode()).decode()
+    chunks=[encoded[i:i+400] for i in range(0,len(encoded),400)]
+    if len(encoded)%400==0:chunks.append('+')
+    return tuple(chunks)
+
+
 class Boundary:
     def __init__(self,adapter,value):
         self.value=credentials(value)
@@ -65,10 +74,7 @@ class Boundary:
         self._open=asyncio.open_connection
         self.required=REQUIRED_CAPS|({'sasl'} if self.value.get('sasl_username') else set())
         self._sasl_stage='none';self._sasl_logged_in=False
-        plain=(self.value.get('sasl_username','')+'\0'+self.value.get('sasl_username','')+'\0'+self.value.get('sasl_password','')).encode()
-        encoded=base64.b64encode(plain).decode()
-        self._sasl_chunks=[encoded[i:i+400] for i in range(0,len(encoded),400)]
-        if len(encoded)%400==0:self._sasl_chunks.append('+')
+        self._sasl_chunks=sasl_chunks(self.value)
 
     def current(self):
         if (self.closed or digest(self.value)!=self.identity

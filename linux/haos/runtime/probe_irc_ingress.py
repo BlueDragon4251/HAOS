@@ -106,6 +106,21 @@ def main():
         native.db.execute('UPDATE native_inbox SET next_attempt=0 WHERE id=?',(key,))
         fail[0]=False;assert await dispatch_stored(adapter,key)
         cases.append('actual_sqlite_reopen_replays_failed_local_admission_without_network')
+        from haos.gateway_runtime import credential_redactor
+        from haos.gateway_irc_transport import sasl_chunks
+        private={'server_password':'private-server-fixture','sasl_username':'bot-account','sasl_password':'private-sasl-fixture-'*32}
+        chunks=[x for x in sasl_chunks(private) if x!='+']
+        aliases=[private['server_password'],private['sasl_password'],''.join(chunks),*chunks]
+        redactor=credential_redactor({'connectors':{'irc':private}},policy())
+        native.redactor=redactor;relay.redactor=redactor
+        reflected=frame('private_aliases').replace('hello owner','echo '+' '.join(aliases))
+        key=capture(adapter,reflected,authority,REQUIRED_CAPS)
+        pending=native.db.execute('SELECT payload,envelope FROM native_inbox WHERE id=?',(key,)).fetchone()
+        assert all(alias not in str(tuple(pending)) for alias in aliases)
+        assert await dispatch_stored(adapter,key)
+        assert all(alias not in json.dumps(accepted[-1]) for alias in aliases)
+        assert '[REDACTED]' in accepted[-1]['text']
+        cases.append('actual_native_decode_and_durable_relay_never_receive_reflected_private_password_or_sasl_wire_aliases')
         key=capture(adapter,frame('withdrawn'),authority,REQUIRED_CAPS);config['bindings']=[]
         assert not await dispatch_stored(adapter,key)
         assert native.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()[0]=='revoked'
