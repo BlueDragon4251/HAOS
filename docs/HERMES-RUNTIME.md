@@ -1061,3 +1061,15 @@ the fixture's command journal. Full and minimal Python 3.11 suites each pass 123
 tests with two existing skips. Durable profile/reconnect/auth-recheck status,
 outbox witnesses/recovery and public owner setup remain unfinished. No external
 IRC service/account or installed acceptance is inferred from these fixtures.
+
+### Prepared IRC tagged server controls (2026-10-26)
+
+IRCv3 server-time may tag registration, JOIN and PING as well as application
+messages. A new real TLS fixture fails at the positive tagged-control handshake
+against isolated exact `322eae6` transport source (timeout); the corrected boundary
+strips a validated, duplicate-free tag envelope before the actual pinned parser
+handles controls. Account admission continues to require its separate original
+authenticated tags. Password/access refusals 464/465 now latch authentication
+refusal rather than entering generic reconnect. All prior assertions remain;
+the transport probe now passes 44 cases. Both runtime suites pass 1237 tests/two
+existing skips. No public IRC enablement or external acceptance is implied.

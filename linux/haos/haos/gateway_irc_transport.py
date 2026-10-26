@@ -103,12 +103,28 @@ class Boundary:
         try:return raw[:-2].decode('utf-8',errors='strict')
         except UnicodeError:raise Rejected('IRC frame is not UTF-8') from None
 
-    async def control(self,raw):
+    @staticmethod
+    def parse(raw):
         from plugins.platforms.irc.adapter import _parse_irc_message
-        msg=_parse_irc_message(raw)
+        if not isinstance(raw,str) or len(raw.encode())>4096 or any(c in raw for c in '\r\n\0'):
+            raise Rejected('invalid IRC frame')
+        if raw.startswith('@'):
+            tags,separator,raw=raw[1:].partition(' ')
+            if not separator:raise Rejected('IRC tag envelope has no frame')
+            names=set()
+            for tag in tags.split(';'):
+                name=tag.partition('=')[0]
+                if not name or name in names:raise Rejected('IRC duplicate or empty tag')
+                names.add(name)
+        return _parse_irc_message(raw)
+
+    async def control(self,raw):
+        msg=self.parse(raw)
         if msg['command']=='PING':
             if len(msg['params'])!=1:raise Rejected('invalid IRC keepalive')
             await self.write('PONG :'+msg['params'][0]);return True
+        if msg['command'] in {'464','465'}:
+            raise AuthenticationRejected('IRC account or server access refused')
         if msg['command']=='ERROR' or re.fullmatch(r'[45][0-9]{2}',msg['command']):
             raise Rejected('IRC server refused registration or subscription')
         return False
@@ -131,14 +147,13 @@ class Boundary:
             if self.value.get('server_password'):await self.write('PASS '+self.value['server_password'])
             await self.write('NICK '+self.value['nickname'])
             await self.write('USER '+self.value['nickname']+' 0 * :HAOS private gateway')
-            from plugins.platforms.irc.adapter import _parse_irc_message
             deadline=time.monotonic()+self._handshake_seconds;offered=set();mechanisms=None;requested=False;registered=False
             while True:
                 remaining=deadline-time.monotonic()
                 if remaining<=0:raise Rejected('IRC handshake timed out')
                 raw=await self.read(remaining)
                 if await self.control(raw):continue
-                msg=_parse_irc_message(raw);params=msg['params'];command=msg['command']
+                msg=self.parse(raw);params=msg['params'];command=msg['command']
                 if command=='CAP':
                     if len(params)<3:raise Rejected('invalid IRC capability response')
                     operation=params[1]
@@ -199,8 +214,7 @@ class Boundary:
                 try:raw=await self.read(.5)
                 except asyncio.TimeoutError:continue
                 if await self.control(raw):continue
-                from plugins.platforms.irc.adapter import _parse_irc_message
-                msg=_parse_irc_message(raw)
+                msg=self.parse(raw)
                 if msg['command'] in {'900','901','902','904','905','906','907'}:
                     raise AuthenticationRejected('IRC authenticated account changed during subscription')
                 if msg['command']=='CAP':raise Rejected('IRC account capability changed during subscription')

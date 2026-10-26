@@ -52,7 +52,11 @@ def main():
         async def server(reader,writer):
             state['writers'].add(writer);task=asyncio.current_task();state['tasks'].add(task)
             mode=state['mode']
-            async def put(value):writer.write(value.encode() if isinstance(value,str) else value);await writer.drain()
+            async def put(value):
+                if mode=='tagged_controls' and isinstance(value,str):
+                    value=''.join((line if line.startswith('@') else '@time='+datetime.now(timezone.utc).isoformat()+' '+line)+'\r\n'
+                        for line in value.split('\r\n') if line)
+                writer.write(value.encode() if isinstance(value,str) else value);await writer.drain()
             async def get():
                 value=(await asyncio.wait_for(reader.readuntil(b'\r\n'),2)).decode().strip()
                 redacted=('<private PASS>' if value.startswith('PASS ') else '<private SASL payload>'
@@ -67,6 +71,8 @@ def main():
                 assert line.startswith('NICK ')
                 assert (await get()).startswith('USER ')
                 if mode=='early_registration':await put(':server 001 haos-bot :welcome\r\n')
+                elif mode=='server_password_refused':await put(':server 464 haos-bot :access refused\r\n')
+                elif mode=='duplicate_control_tags':await put('@time=one;time=two :server CAP haos-bot LS :account-tag server-time message-tags\r\n')
                 elif mode=='no_account_capability':await put(':server CAP haos-bot LS :server-time message-tags\r\n')
                 elif mode=='eof':return
                 elif mode=='oversized':await put(b'x'*8192)
@@ -111,7 +117,7 @@ def main():
                         if mode!='changed_nickname':
                             assert await get()=='JOIN #haos'
                             await put(':haos-bot!bot@server JOIN :'+('#wrong' if mode=='wrong_join' else '#haos')+'\r\n')
-                            if mode=='good':
+                            if mode in {'good','tagged_controls'}:
                                 await put('PING :local-keepalive\r\n')
                                 assert await get()=='PONG :local-keepalive'
                                 await put(frame('unknown-account','unknown'))
@@ -179,11 +185,22 @@ def main():
             await refused(lambda:worker)
             assert not boundary.confirmed and not adapter.is_connected and boundary.writer is None
             cases.append('owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input')
-            for mode in ['early_registration','no_account_capability','eof','oversized','bad_utf8','incomplete_frame',
+            boundary,adapter,config,accepted=build('tagged_controls');assert await boundary.connect()
+            worker=asyncio.create_task(boundary.receive());deadline=time.monotonic()+2
+            while not accepted and time.monotonic()<deadline:await asyncio.sleep(.01)
+            assert len(accepted)==1 and 'PONG :local-keepalive' in state['commands']
+            worker.cancel()
+            try:await worker
+            except asyncio.CancelledError:pass
+            cases.append('real_server_time_tags_on_capabilities_registration_join_and_ping_preserve_native_admission')
+            for mode in ['server_password_refused','duplicate_control_tags','early_registration','no_account_capability','eof','oversized','bad_utf8','incomplete_frame',
                     'timeout','cap_nak','partial_ack','changed_nickname','wrong_join']:
                 boundary,adapter,config,accepted=build(mode)
                 await refused(boundary.connect)
                 assert not boundary.confirmed and not accepted and boundary.writer is None
+                if mode=='server_password_refused':
+                    assert boundary.status=='authentication-refused'
+                    before=list(state['commands']);await refused(boundary.connect);assert state['commands']==before
                 cases.append('actual_tls_'+mode+'_never_admits_messages')
             for mode in ['cap_loss','live_eof','kick','part','nick_change']:
                 boundary,adapter,config,accepted=build(mode);assert await boundary.connect()

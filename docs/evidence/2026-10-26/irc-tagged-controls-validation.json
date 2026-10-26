@@ -1,0 +1,69 @@
+{
+  "parent_commit": "322eae632989ba1fea5c7647d1b9eefa48d4466f",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_transport.py",
+      "sha256": "62fd12cdd748fe347b370936aa3dee777a2ee86c7afcb9ac7cfb6b22c490f962"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_transport.py",
+      "sha256": "6a1211e10a0956af78c72b10d6fe0cf6e4872db607c340d0829ba4ebabac39b8"
+    }
+  ],
+  "fixture": {
+    "passed": 44,
+    "cases": [
+      "actual_verified_tls_multiline_cap_negotiation_join_keepalive_and_native_account_admission",
+      "raw_and_native_standalone_send_remain_denied_before_outbox_implementation",
+      "owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input",
+      "real_server_time_tags_on_capabilities_registration_join_and_ping_preserve_native_admission",
+      "actual_tls_server_password_refused_never_admits_messages",
+      "actual_tls_duplicate_control_tags_never_admits_messages",
+      "actual_tls_early_registration_never_admits_messages",
+      "actual_tls_no_account_capability_never_admits_messages",
+      "actual_tls_eof_never_admits_messages",
+      "actual_tls_oversized_never_admits_messages",
+      "actual_tls_bad_utf8_never_admits_messages",
+      "actual_tls_incomplete_frame_never_admits_messages",
+      "actual_tls_timeout_never_admits_messages",
+      "actual_tls_cap_nak_never_admits_messages",
+      "actual_tls_partial_ack_never_admits_messages",
+      "actual_tls_changed_nickname_never_admits_messages",
+      "actual_tls_wrong_join_never_admits_messages",
+      "actual_tls_cap_loss_closes_confirmed_subscription",
+      "actual_tls_live_eof_closes_confirmed_subscription",
+      "actual_tls_kick_closes_confirmed_subscription",
+      "actual_tls_part_closes_confirmed_subscription",
+      "actual_tls_nick_change_closes_confirmed_subscription",
+      "private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log",
+      "live_private_server_mutation_revokes_actual_tls_connection",
+      "live_private_port_mutation_revokes_actual_tls_connection",
+      "live_private_channel_mutation_revokes_actual_tls_connection",
+      "live_private_use_tls_mutation_revokes_actual_tls_connection",
+      "live_private_server_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickserv_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickname_mutation_revokes_actual_tls_connection",
+      "real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames",
+      "real_tls_untrusted_ca_refused_before_irc_credentials_or_frames",
+      "actual_tls_sasl_logout_closes_socket_and_refuses_implicit_reauthentication",
+      "actual_tls_sasl_good_private_account_authenticated_before_registration",
+      "actual_tls_sasl_chunked_private_account_authenticated_before_registration",
+      "actual_tls_sasl_exact_chunk_private_account_authenticated_before_registration",
+      "actual_tls_sasl_refused_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_wrong_account_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_missing_account_confirmation_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_wrong_challenge_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_missing_mechanism_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_no_capability_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_early_registration_never_authorizes_registration_or_messages",
+      "native_plaintext_configuration_refused_before_connection"
+    ],
+    "actual_local_tls_ircv3_and_pinned_native_codec": true,
+    "fixture_only_loopback_destination_and_disposable_ca": true,
+    "public_gateway_enabled": false,
+    "live_server_account_nickserv_sasl_delivery_or_installed_acceptance": false
+  },
+  "isolated_exact_predecessor_positive_tagged_controls": "fails with TimeoutError; no checkout reset",
+  "full_and_minimal_python311": "1237 passed, 2 existing skips",
+  "external_or_installed_acceptance": false
+}
