@@ -1,0 +1,64 @@
+{
+  "parent_commit": "5d165b80e0c31097601fa7be0d2890b101dea60b",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_line_delivery.py",
+      "sha256": "504ce335a20057ee02522f5decb552bad976e013aced799ce41d47e17faad100"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_delivery.py",
+      "sha256": "707df050a388be71ca10ce9358dab46585b8eb0c60998d3ea614a96ec011f882"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "9ed3fbc5db267a77afb7196260b32773c884f15e0c620b21a53e25c919925122"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "b3f79df0d104fbde7bb63620341e2b53a6e061cd7c83c157f88cffa8d85831e0"
+    }
+  ],
+  "native_probe": {
+    "passed": 25,
+    "cases": [
+      "actual_native_markdown_codec_and_push_after_observable_write_intent_uses_remote_receipt_not_native_none",
+      "confirmed_same_attempt_returns_journaled_receipt_without_another_native_push",
+      "same_attempt_changed_content_refused_before_socket",
+      "actual_native_client_push_without_context_cannot_open_socket",
+      "native_http_401_classified_without_redirect_or_repeat",
+      "native_http_403_classified_without_redirect_or_repeat",
+      "native_http_429_classified_without_redirect_or_repeat",
+      "native_http_500_classified_without_redirect_or_repeat",
+      "native_http_abort_classified_without_redirect_or_repeat",
+      "native_http_redirect_classified_without_redirect_or_repeat",
+      "native_http_huge_classified_without_redirect_or_repeat",
+      "native_http_missing-request-id_classified_without_redirect_or_repeat",
+      "native_http_missing-message-id_classified_without_redirect_or_repeat",
+      "native_http_wrong-count_classified_without_redirect_or_repeat",
+      "native_http_duplicate-id_classified_without_redirect_or_repeat",
+      "native_ellipsis_truncation_and_oversized_utf16_bubble_refused_before_side_effect",
+      "actual_sqlite_intent_failure_prevents_every_native_side_effect",
+      "confirmed_receipt_survives_actual_sqlite_reopen_without_repeat",
+      "actual_sqlite_confirmation_failure_and_reopen_preserve_uncertainty_without_resend",
+      "native_reply_token_cannot_trigger_reply_then_push_fallback",
+      "actual_cancel_after_http_write_preserves_intent_and_never_reposts_same_attempt",
+      "actual_native_https_refuses_unknown_certificate_without_http_request",
+      "actual_native_https_refuses_wrong_hostname_without_http_request",
+      "actual_native_https_push_accepts_explicit_fixture_ca_with_hostname_verification",
+      "current_owner_withdrawal_prevents_native_push"
+    ],
+    "actual_pinned_native_codec_push_and_loopback_http_sqlite": true,
+    "fixture_only_loopback_target": true,
+    "fixture_only_disposable_ca": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": false,
+    "external_account_or_recipient_receipt_or_installed_acceptance": false
+  },
+  "full_frozen_and_minimal_runtime_each": {
+    "passed": 1289,
+    "existing_skips": 2,
+    "local_exclusion": "linux/haos/tests/test_backup.py"
+  },
+  "public_line_enabled": false,
+  "external_or_installed_acceptance": false
+}

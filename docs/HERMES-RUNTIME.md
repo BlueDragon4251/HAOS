@@ -1338,3 +1338,36 @@ same unmodified probe against `cb8dec6` fails specifically because reflected
 private values remain in its payload. Thirteen actual loopback listener cases
 still pass. Both full frozen and minimal Python 3.11 suites pass 1,289 tests with
 two existing skips and the unchanged local backup-file exception.
+
+### 2026-10-26 — prepared native LINE push receipts and write intent
+
+The actual pinned `LineAdapter.send`, markdown/text chunker and `_LineClient.push`
+now run behind a prepared HAOS publisher. Its only allowed wire operation is the
+fixed LINE push endpoint with the approved exact chat, native payload and private
+bearer token. Current owner `read` authority is checked before invocation and
+again at the native HTTP boundary. Native reply-token and pending postback
+capabilities are refused, preventing automatic reply-to-push fallback.
+
+A bounded private SQLite intent is committed before the native POST. The same
+outbox ID/attempt cannot inherit changed content or grants. Confirmed attempts
+return their retained receipt without another write; writing/uncertain attempts
+never resend automatically, including after reopen. Failure to retain a server
+confirmation leaves uncertainty. Only an HTTP 200 with a canonical remote request
+ID and a complete, distinct set of remote message IDs confirms server acceptance;
+the native adapter's `None` result ID is not promoted to a receipt. Quote tokens
+and vendor error bodies are not exposed. This is not proof of recipient receipt.
+
+Production uses default verified TLS, no proxy inheritance, redirects or transport
+retries. Twenty-five real native/loopback HTTP/TLS/SQLite cases cover server
+receipts, refusal/rate-limit/error handling, missing/invalid proofs, redirect and
+connection abort, commit/confirmation faults, cancellation after HTTP write,
+SQLite reopen, raw-client denial, revocation, unknown CA and wrong hostname.
+A disposable trusted CA succeeds with hostname verification enabled. Build and
+CI run this probe. Both Python 3.11 regression environments pass 1,289 tests with
+two existing skips and the unchanged local backup-file exception.
+
+This prepared path admits one native push (up to five bubbles). Native ellipsis
+truncation or a bubble exceeding LINE's UTF-16 limit is rejected before dispatch.
+It is not yet connected to a public LINE service profile, outbox factory or
+owner setup/recovery. LINE remains publicly disabled; no external message or
+account/installed acceptance is claimed.
