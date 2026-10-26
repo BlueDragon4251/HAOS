@@ -760,3 +760,33 @@ Evidence: `docs/evidence/2026-10-25/homeassistant-prepared-profile-validation.js
 Public runtime/CLI/GUI wiring, owner authentication-retry management and full
 remote replay are still unfinished. This is not a seventh public gateway, a live
 HA-account/TLS/notification acceptance, or an installed service/boot acceptance.
+
+### Prepared Home Assistant owner recovery contracts (2026-10-26)
+
+All five CI gates passed for `be08b7530c4645591924fb485537799506908b33`.
+The next source change adds bounded safe Home Assistant metadata to the offline
+raw-inbox inspection and a prepared, audited authentication-recheck function.
+Inspection returns only receipt/status fields, including `gap_since` and
+`unseen_remote_history_recovered: false`; payload content and credentials stay
+private. Invalid status, connector and time values fail closed.
+
+The recheck clears only authentication-refused rows for the explicitly selected
+Home Assistant connector. It preserves rate limits, revocations, gaps, raw
+payloads and attempts. An actual SQLite audit-storage failure rolls the decision
+back atomically. The function performs no network I/O: the subsequent profile
+start still performs the real native authentication and subscription handshake.
+No gap disappears after a successful authentication.
+
+Full/minimal suites each pass 1172 tests with two existing skips and the existing
+local backup-file exclusion. Forty-nine actual root/UID/socket/recovery checks
+pass in the network-isolated disposable container: the two new cases verify
+gateway UID 65534 can make the audited local decision, agent UID 65533 cannot
+open its journal, neither identity can read the root-only canary, and audit
+failure preserves the authentication block. The native profile probe passes
+24 cases including the actual authentication after the prepared owner decision.
+
+Evidence: `docs/evidence/2026-10-26/homeassistant-prepared-owner-recovery-validation.json`.
+The new recheck function is not yet exposed by the recovery helper's main action
+dispatcher or a CLI/GUI button. Public runtime/owner setup integration and remote
+history recovery remain unfinished. There are still six public text gateways;
+these are local contracts, not live or installed acceptance.

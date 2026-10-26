@@ -20,6 +20,7 @@ def main():
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope
     from haos.redaction import Redactor
+    from haos.gateway_raw_recovery import retry_homeassistant_auth,unresolved
     cases=[]
     async def exercise(directory):
         home=directory/'unrelated-home';home.mkdir(mode=0o700);os.environ['HERMES_HOME']=str(home)
@@ -154,6 +155,17 @@ def main():
             await adapter.close_profile();adapter=build()
             assert not await adapter.connect() and state['connections']==before
             cases.append('authentication_refusal_is_sticky_across_connect_close_and_actual_profile_reopen')
+            gap=adapter.homeassistant_status()['gap_since']
+            assert retry_homeassistant_auth(native,policy(),{'connector':'ha','owner_uid':1000,'note_sha256':'f'*64})=={
+                'connector':'ha','authentication_blocks_cleared':1,'network_requested':False}
+            assert state['connections']==before and adapter.homeassistant_status()['gap_since']==gap
+            state['mode']='quiet';assert await adapter.connect()
+            assert state['connections']==before+1 and adapter.homeassistant_status()['gap_since']==gap
+            metadata=unresolved(native)
+            assert any(row['platform']=='homeassistant' and row['gap_since']==gap
+                and row['unseen_remote_history_recovered'] is False for row in metadata['transport'])
+            cases.append('prepared_owner_auth_recheck_does_no_network_io_and_next_start_performs_real_native_auth')
+            cases.append('owner_metadata_preserves_explicit_unrecoverable_gap_after_successful_reauthentication')
             await adapter.close_profile();value['token']='rotated-private-disposable-token';token=value['token']
             stamp=datetime.now(timezone.utc).isoformat();context={'id':'d'*32,'user_id':user}
             event['time_fired']=stamp;event['context']=context

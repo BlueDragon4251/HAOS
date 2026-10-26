@@ -287,3 +287,76 @@ finally: inbox.close()
         user=65534,group=65534,extra_groups=[],umask=0o077,cwd=str(root),
         env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
     assert child.returncode==0,child.stderr
+
+
+@pytest.mark.parametrize('storage_failure',[False,True])
+def test_prepared_homeassistant_auth_retry_uses_real_private_uid_and_atomic_audit(uid_fixture_path,storage_failure):
+    root=uid_fixture_path;root.chmod(0o755)
+    modules=root/'modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    state=root/'state';state.mkdir(mode=0o700);database=state/'native.db'
+    from haos.gateway_homeassistant_ingress import PreparedHomeAssistantPolicy
+    config={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[{
+        'id':'owner','connector':'ha','sender':'a'*32,'chat':'input_text.owner','scope':'','thread':'',
+        'identity':'owner','capabilities':['create','read'],'generation':'b'*64,'since':1}]}
+    inbox=NativeInbox(database,Redactor())
+    inbox.admit(PreparedHomeAssistantPolicy(config),'ha',{'platform':'homeassistant','sender':'a'*32,'chat':'input_text.owner',
+        'scope':'','thread':'','message_id':'c'*64,'is_bot':False,'text':'retained private event'},
+        {'event':'retained private event'})
+    inbox.db.execute('CREATE TABLE homeassistant_profile_status(identity TEXT PRIMARY KEY,connector TEXT,status TEXT,updated_at REAL,next_attempt REAL,gap_since REAL)')
+    inbox.db.execute("INSERT INTO homeassistant_profile_status VALUES('auth','ha','authentication-refused',123,12345,42)")
+    inbox.db.execute("INSERT INTO homeassistant_profile_status VALUES('limited','ha','rate-limited',123,12345,42)")
+    inbox.db.execute('CREATE TABLE homeassistant_owner_events(connector TEXT,created_at REAL,owner_uid INTEGER,decision TEXT,changed INTEGER,policy_sha256 TEXT,note_sha256 TEXT)')
+    if storage_failure:
+        inbox.db.execute("CREATE TRIGGER owner_audit_fault BEFORE INSERT ON homeassistant_owner_events BEGIN SELECT RAISE(ABORT,'disposable audit failure'); END")
+    inbox.close();os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    canary=root/'owner-secret';canary.write_text('root-only-disposable-ha-canary');canary.chmod(0o600)
+    code='''
+import json,os,sqlite3,sys
+from pathlib import Path
+from haos.gateway_homeassistant_ingress import PreparedHomeAssistantPolicy
+from haos.gateway_raw import NativeInbox
+from haos.gateway_raw_recovery import retry_homeassistant_auth,unresolved
+from haos.redaction import Redactor
+request=json.load(sys.stdin)
+assert os.geteuid()==request['uid'] and os.getegid()==request['uid'] and os.getgroups()==[]
+try:Path(request['canary']).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('unprivileged identity read owner secret')
+if request['uid']==65533:
+    try:NativeInbox(Path(request['database']),Redactor())
+    except PermissionError:pass
+    else:raise AssertionError('agent opened private gateway protocol journal')
+else:
+    inbox=NativeInbox(Path(request['database']),Redactor())
+    try:
+        metadata=unresolved(inbox)
+        assert len(metadata['ingress'])==1 and len(metadata['transport'])==2
+        assert all(row['gap_since']==42 and not row['unseen_remote_history_recovered'] for row in metadata['transport'])
+        params={'connector':'ha','owner_uid':1000,'note_sha256':'d'*64}
+        policy=PreparedHomeAssistantPolicy(request['policy'])
+        if request['storage_failure']:
+            try:retry_homeassistant_auth(inbox,policy,params)
+            except sqlite3.IntegrityError:pass
+            else:raise AssertionError('audit storage failure was swallowed')
+            assert tuple(inbox.db.execute("SELECT status,next_attempt,gap_since FROM homeassistant_profile_status WHERE identity='auth'").fetchone())==('authentication-refused',12345,42)
+            assert inbox.db.execute('SELECT COUNT(*) FROM homeassistant_owner_events').fetchone()[0]==0
+        else:
+            assert retry_homeassistant_auth(inbox,policy,params)=={'connector':'ha','authentication_blocks_cleared':1,'network_requested':False}
+            assert tuple(inbox.db.execute("SELECT status,next_attempt,gap_since FROM homeassistant_profile_status WHERE identity='auth'").fetchone())==('created',0,42)
+            assert tuple(inbox.db.execute('SELECT owner_uid,decision,note_sha256 FROM homeassistant_owner_events').fetchone())==(1000,'retry-auth','d'*64)
+        assert tuple(inbox.db.execute("SELECT status,next_attempt,gap_since FROM homeassistant_profile_status WHERE identity='limited'").fetchone())==('rate-limited',12345,42)
+        assert json.loads(inbox.db.execute('SELECT payload FROM native_inbox').fetchone()[0])=={'event':'retained private event'}
+        assert inbox.db.execute('SELECT state FROM native_inbox').fetchone()[0]=='pending'
+        assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+    finally:inbox.close()
+'''
+    for uid in (65533,65534):
+        child=subprocess.run([sys.executable,'-c',code],input=json.dumps({'database':str(database),'canary':str(canary),
+            'policy':config,'storage_failure':storage_failure,'uid':uid}),text=True,capture_output=True,timeout=15,
+            user=uid,group=uid,extra_groups=[],umask=0o077,cwd=str(root),
+            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
+        assert child.returncode==0,child.stderr

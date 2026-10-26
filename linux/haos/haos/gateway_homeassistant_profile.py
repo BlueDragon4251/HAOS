@@ -13,6 +13,9 @@ from .gateway_homeassistant_ingress import PreparedHomeAssistantPolicy, install,
 from .gateway_homeassistant_transport import install as install_transport
 from .gateway_homeassistant_delivery import Publisher
 
+PROFILE_STATES=frozenset({'created','connecting','streaming','disconnected','authentication-refused',
+    'transport-unavailable','rate-limited','revoked','closed'})
+
 
 def credentials(value):
     from .gateway_mattermost import server_url
@@ -108,6 +111,7 @@ def _install(adapter,fd,profile,values,identity):
         return None
 
     def status(kind,delay=0,gap=False):
+        if kind not in PROFILE_STATES:raise ValueError('invalid safe Home Assistant profile status')
         db.execute('UPDATE homeassistant_profile_status SET status=?,updated_at=?,next_attempt=?, '
             'gap_since=CASE WHEN ? AND gap_since=0 THEN ? ELSE gap_since END WHERE identity=?',
             (kind,time.time(),time.time()+delay if delay else 0,gap,time.time(),identity))

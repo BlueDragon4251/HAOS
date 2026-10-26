@@ -30,6 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
+            r'[0-9a-f]{64}' if row['platform']=='homeassistant' else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
@@ -88,6 +89,16 @@ def unresolved(inbox, after=0):
                     or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
                 raise ValueError('invalid ntfy transport metadata')
             transport.append({**dict(row),'platform':'ntfy'})
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='homeassistant_profile_status'").fetchone():
+        import math
+        from .gateway_homeassistant_profile import PROFILE_STATES
+        for row in inbox.db.execute('SELECT connector,status,updated_at,next_attempt,gap_since FROM homeassistant_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in PROFILE_STATES
+                    or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0
+                        for key in ('updated_at','next_attempt','gap_since'))):
+                raise ValueError('invalid Home Assistant transport metadata')
+            transport.append({**dict(row),'platform':'homeassistant','unseen_remote_history_recovered':False})
     return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -152,6 +163,36 @@ def retry_ntfy_auth(inbox,policy,request):
                 'decision TEXT NOT NULL, changed INTEGER NOT NULL, policy_sha256 TEXT NOT NULL, note_sha256 TEXT NOT NULL)')
             authority=digest([policy.publication,sorted(digest(b) for b in policy.bindings.values() if b['connector']==connector)])
             inbox.db.execute('INSERT INTO ntfy_owner_events VALUES(?,?,?,?,?,?,?)',
+                (connector,time.time(),request['owner_uid'],'retry-auth',changed,authority,request['note_sha256']))
+        inbox.db.execute('COMMIT')
+    except BaseException:
+        inbox.db.execute('ROLLBACK');raise
+    return {'connector':connector,'authentication_blocks_cleared':changed,'network_requested':False}
+
+
+def retry_homeassistant_auth(inbox,policy,request):
+    """Permit a fresh server check; never clear revocation, gaps or rate limits."""
+    from .gateway import digest
+    from .gateway_homeassistant_ingress import PreparedHomeAssistantPolicy
+    if (not isinstance(policy,PreparedHomeAssistantPolicy)
+            or set(request)!={'connector','owner_uid','note_sha256'}
+            or not isinstance(request['connector'],str)
+            or policy.connectors.get(request['connector'],{}).get('platform')!='homeassistant'
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
+            or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+        raise ValueError('exact prepared Home Assistant connector and authenticated owner audit context required')
+    connector=request['connector'];changed=0
+    inbox.db.execute('BEGIN IMMEDIATE')
+    try:
+        if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='homeassistant_profile_status'").fetchone():
+            changed=inbox.db.execute("UPDATE homeassistant_profile_status SET status='created',updated_at=?,next_attempt=0 "
+                "WHERE connector=? AND status='authentication-refused'",(time.time(),connector)).rowcount
+        if changed:
+            inbox.db.execute('CREATE TABLE IF NOT EXISTS homeassistant_owner_events ('
+                'connector TEXT NOT NULL, created_at REAL NOT NULL, owner_uid INTEGER NOT NULL,'
+                'decision TEXT NOT NULL, changed INTEGER NOT NULL, policy_sha256 TEXT NOT NULL, note_sha256 TEXT NOT NULL)')
+            authority=digest([policy.publication,sorted(digest(b) for b in policy.bindings.values() if b['connector']==connector)])
+            inbox.db.execute('INSERT INTO homeassistant_owner_events VALUES(?,?,?,?,?,?,?)',
                 (connector,time.time(),request['owner_uid'],'retry-auth',changed,authority,request['note_sha256']))
         inbox.db.execute('COMMIT')
     except BaseException:
