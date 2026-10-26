@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
-    from haos.gateway import digest,GatewayEngine
+    from haos.gateway import digest,GatewayEngine,GatewayPolicy
     from haos.gateway_irc_ingress import PreparedIRCPolicy,install as ingress,REQUIRED_CAPS
     from haos.gateway_irc_transport import install as transport
     from haos.gateway_irc_delivery import Publisher
@@ -123,7 +123,7 @@ def main():
                     'id':'owner','connector':'irc','sender':'owner-account','chat':'#haos','scope':'irc.fixture.invalid:6697',
                     'thread':'','identity':'owner','capabilities':capabilities or ['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
             else:root,config=resume
-            policy=lambda:PreparedIRCPolicy(config)
+            policy=lambda:GatewayPolicy(config)
             native=NativeInbox(root/'native.db',Redactor())
             value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
             if mode.startswith('sasl_'):value.update(sasl_username='bot-account',sasl_password='private-sasl-fixture')
@@ -232,7 +232,7 @@ def main():
             assert state['writes']==['cancelled reply']
             cases.append('close_after_real_dispatch_cancels_joins_and_retains_uncertain_intent_without_resend')
             adapter,publisher,metadata,core_resume=await build('silent')
-            config=core_resume[1];policy=PreparedIRCPolicy(config);store=MissionStore(directory/'mission-outbox.db');engine=GatewayEngine(store)
+            config=core_resume[1];policy=GatewayPolicy(config);store=MissionStore(directory/'mission-outbox.db');engine=GatewayEngine(store)
             await engine.receive(policy,'irc',{'platform':'irc','sender':'owner-account','chat':'#haos','scope':'irc.fixture.invalid:6697',
                 'thread':'','message_id':digest('original-owner-request'),'is_bot':False,'text':'local queued fixture mission'},None)
             delivery=engine.next_delivery(policy,ready_connectors=['irc']);metadata=delivery_metadata(delivery,'irc')
@@ -305,7 +305,7 @@ def main():
             else:os.environ['SSL_CERT_FILE']=original_ca
     with tempfile.TemporaryDirectory(prefix='haos-irc-delivery-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_native_send_tls_and_private_sqlite':True,
-        'public_gateway_enabled':False,'server_echo_is_not_recipient_delivery_proof':True,
+        'public_gateway_enabled':True,'server_echo_is_not_recipient_delivery_proof':True,
         'fixture_only_loopback_target_and_disposable_ca':True,'external_account_message_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

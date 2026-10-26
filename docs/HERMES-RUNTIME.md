@@ -1266,3 +1266,23 @@ regressions retain 1275 tests/two existing skips in both Python 3.11 environment
 68 actual authority/control/recovery cases and three actual UID/SIGKILL/TLS cases.
 Public IRC owner setup remains disabled; no external or installed acceptance is
 inferred from these local cases.
+
+### 2026-10-26 — public IRC owner integration
+
+The IRC text path now connects the actual owner CLI and graphical management to
+its previously tested private native runtime. Canonical TLS server/channel
+credentials bind independent exact-account grants. SASL-less setup needs explicit
+owner consent; private fields clear on submission and context changes. The runtime
+refuses to connect before pairing. Offline authentication recovery now dispatches
+through the public policy under the actual unprivileged gateway UID. The owner
+view labels IRC transport/outage state and bounded private outgoing metadata,
+including the explicit server-echo/recipient-receipt distinction.
+
+Validation on this change: minimal and complete frozen Python 3.11 runtimes each
+passed 1,278 tests with two existing skips and the unchanged local backup-file
+exclusion. Actual Tk fixtures passed IRC 10, Home Assistant 11, ntfy 11 and Matrix
+7 cases at both 1280x800 and 640x480 (system Python 3.13.5). Four native IRC
+probes use the public GatewayPolicy and retain all TLS, capability, account,
+replay, SASL, private-profile and delivery assertions. Root publication and
+recovery probes use actual Unix UIDs and disposable owner-protected files.
+No external message, installed owner session or release artifact is claimed.

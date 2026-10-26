@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -78,6 +78,9 @@ class GatewayPolicy:
                     raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
             if connector and connector['platform']=='ntfy':
                 from .gateway_ntfy import validate_binding
+                validate_binding(binding)
+            if connector and connector['platform']=='irc':
+                from .gateway_irc_ingress import validate_binding
                 validate_binding(binding)
             if connector and connector['platform']=='homeassistant':
                 from .gateway_homeassistant_ingress import validate_binding

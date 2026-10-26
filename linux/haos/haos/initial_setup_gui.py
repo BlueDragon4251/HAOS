@@ -638,8 +638,9 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"], "telegram")
-            token = self._field(self.content, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc"], "telegram")
+            token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
+            token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
             app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
             self._label(slack_credentials, "In deiner Slack-App Socket Mode aktivieren und einen App-Token mit connections:write erstellen. "
@@ -708,6 +709,33 @@ class Wizard:
                 'Recovery-Material wird nur auf ausdrückliche Eingabe verwendet; vorhandene Schlüssel werden nicht zurückgesetzt. '
                 'Kontowechsel oder Tokenänderung entzieht bisherige Freigaben. Medien und Voice sind noch nicht freigegeben.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            irc_credentials=tk.Frame(self.content,bg=self.PANEL)
+            irc_server=self._field(irc_credentials,'IRC TLS-Server · exakter Hostname')
+            irc_port=self._field(irc_credentials,'IRC TLS-Port','6697')
+            irc_nick=self._field(irc_credentials,'IRC Bot-Nickname','haos-bot')
+            irc_channel=self._field(irc_credentials,'IRC Kanal · exakt #kanal oder &kanal','#haos')
+            irc_server_password=self._field(irc_credentials,'IRC Server-Passwort · optional',secret=True)
+            irc_user=self._field(irc_credentials,'IRC SASL-Konto · exakter serverseitiger Kontoname')
+            irc_password=self._field(irc_credentials,'IRC SASL-Passwort',secret=True)
+            irc_anonymous=tk.BooleanVar(value=False)
+            def irc_login_mode(*_args):
+                for field in (irc_user,irc_password):field.configure(state='normal')
+                if irc_anonymous.get():
+                    for field in (irc_user,irc_password):field.delete(0,tk.END);field.configure(state='disabled')
+            irc_anonymous.trace_add('write',irc_login_mode)
+            tk.Checkbutton(irc_credentials,text='Verbindung ohne SASL-Konto ausdrücklich freigeben',variable=irc_anonymous,
+                bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w',pady=6)
+            self._label(irc_credentials,'Der Server braucht ein vom System vertrautes TLS-Zertifikat, account-tag, server-time und message-tags '
+                'sowie stabile msgid-Tags. Für Antworten sind zusätzlich echo-message, labeled-response und batch erforderlich. '
+                'Absender ist der tatsächlich angemeldete IRC-Kontoname, niemals nur ein Nickname. In Kanälen den Bot ansprechen: botname: Aufgabe. '
+                'Antworten sehen alle Kanalmitglieder. Ein Server-Echo beweist keinen Empfang bei einzelnen Personen; Spamfilter können Echos vortäuschen. '
+                'Keine NickServ-Passwortweitergabe, DCC-, Medien- oder Voice-Freigabe. Unbekannte Offline-Ereignisse werden nicht als wiederhergestellt behauptet. '
+                'Beim Speichern Zugangsdaten erneut eingeben; ohne SASL ist eine ausdrückliche Freigabe nötig.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def irc_port_number(text):
+                if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1<=int(text)<=65535:
+                    raise ValueError('IRC TLS-Port muss eine ganze Zahl von 1 bis 65535 sein')
+                return int(text)
             def configure():
                 secret, app_secret = token.get(), app_token.get()
                 matrix_values={'homeserver':matrix_server.get(),'user_id':matrix_user.get(),'device_id':matrix_device.get(),
@@ -717,10 +745,15 @@ class Wizard:
                 matrix_recovery.delete(0,tk.END)
                 selected_ntfy_server,selected_ntfy_topic=ntfy_server.get(),ntfy_topic.get()
                 selected_ha_server=ha_server.get()
+                irc_values={'server':irc_server.get(),'port':irc_port.get(),'nickname':irc_nick.get(),'channel':irc_channel.get(),
+                    'server_password':irc_server_password.get(),'sasl_username':irc_user.get(),'sasl_password':irc_password.get(),
+                    'anonymous':irc_anonymous.get()}
+                irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
                 if platform.get()=='ntfy':trust_publishers.set(False)
                 if platform.get()=='homeassistant':reset_ha_consent()
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
-                self._run_async(lambda: (initial_setup.configure_gateway(
+                self._run_async(lambda: (initial_setup.configure_irc_gateway(selected_connector,**{**irc_values,'port':irc_port_number(irc_values['port'])})
+                    if selected_platform=='irc' else initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
                     else initial_setup.configure_gateway(selected_connector,selected_platform,secret,app_secret,**matrix_values)
                     if selected_platform=='matrix' else initial_setup.configure_gateway(selected_connector,selected_platform,secret,
@@ -736,8 +769,24 @@ class Wizard:
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
                 ha_server.delete(0,tk.END)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main'}:
+                irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_user.delete(0,tk.END);irc_anonymous.set(False)
+                for field,default in ((irc_server,''),(irc_port,'6697'),(irc_nick,'haos-bot'),(irc_channel,'#haos')):
+                    field.delete(0,tk.END);field.insert(0,default)
+                if platform.get()=='irc':
+                    token_box.pack_forget();irc_credentials.pack(fill='x',before=configure_button)
+                    existing=configured_gateways.get('irc',{}).get(connector.get())
+                    if existing:
+                        for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
+                            field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                else:
+                    irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
+                if platform.get()=='irc':
+                    existing=configured_gateways.get('irc',{}).get(connector.get())
+                    if existing:
+                        for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
+                            field.delete(0,tk.END);field.insert(0,str(existing[key]))
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
                 if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
@@ -755,6 +804,15 @@ class Wizard:
                 else:ha_credentials.pack_forget()
                 if platform.get()=='matrix':matrix_credentials.pack(fill='x',before=configure_button)
                 else:matrix_credentials.pack_forget()
+                self.root.after_idle(irc_pair_changed)
+            def reset_irc_secrets(*_args):
+                irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
+            for field in (irc_server,irc_port):
+                variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
+                variable.trace_add('write',reset_irc_secrets)
+            irc_username_value=tk.StringVar(value='');irc_user.configure(textvariable=irc_username_value);irc_user._haos_public_value=irc_username_value
+            irc_username_value.trace_add('write',lambda *_args:irc_password.delete(0,tk.END))
+            connector_value.trace_add('write',reset_irc_secrets)
             platform.trace_add("write",platform_changed)
             self._label(self.content, "Genau einen Absender freigeben", color=self.CYAN,
                         size=13, bold=True).pack(anchor="w", pady=(14, 0))
@@ -887,7 +945,7 @@ class Wizard:
             ntfy_server_value.trace_add('write',lambda *_args:trust_publishers.set(False))
             def ntfy_pair_changed(*_args):
                 trust_publishers.set(False)
-                if platform.get()=='homeassistant':
+                if platform.get() in {'homeassistant','irc'}:
                     ntfy_pair.pack_forget();previous_ntfy[0]=False;return
                 active=platform.get()=='ntfy'
                 for field in (scope,thread):
@@ -926,10 +984,46 @@ class Wizard:
                     selectcolor=self.BG, activebackground=self.PANEL)
                 widget.pack(anchor='w');rights_widgets[capability]=widget
             platform.trace_add('write',ha_pair_changed)
+            irc_pair=tk.Frame(self.content,bg=self.PANEL)
+            self._label(irc_pair,'IRC: tatsächlichen authentifizierten Kontonamen als Absender freigeben, nicht den Nicknamen. '
+                'Kanal und TLS-Server müssen zuerst oben gespeichert werden. Groß-/Kleinschreibung des Kontos exakt übernehmen. '
+                'Die Freigabe gilt nur für diesen Kanal dieses Servers; Antworten sind für alle Kanalmitglieder sichtbar. '
+                'Ein Server-Echo ist kein Empfangsnachweis für einzelne Personen. Threads werden nicht erzeugt.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            previous_irc=[False]
+            def irc_pair_changed(*_args):
+                if not irc_pair.winfo_exists():return
+                active=platform.get()=='irc'
+                if active:
+                    irc_pair.pack(fill='x',before=pairing_note)
+                    for field in (scope,thread):field.configure(state='normal');field.delete(0,tk.END)
+                    scope.insert(0,irc_server.get()+':'+irc_port.get())
+                    for field in (scope,thread):field.configure(state='disabled')
+                    chat.configure(state='normal');chat.delete(0,tk.END);chat.insert(0,irc_channel.get())
+                    if not previous_irc[0]:sender.configure(state='normal');sender.delete(0,tk.END)
+                else:
+                    irc_pair.pack_forget()
+                    if previous_irc[0] and platform.get() not in {'homeassistant','ntfy'}:
+                        for field in (scope,thread,sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                previous_irc[0]=active
+            platform.trace_add('write',irc_pair_changed)
+            for field in (irc_server,irc_port):field._haos_public_value.trace_add('write',irc_pair_changed)
+            irc_channel_value=tk.StringVar(value=irc_channel.get());irc_channel.configure(textvariable=irc_channel_value);irc_channel._haos_public_value=irc_channel_value
+            irc_channel_value.trace_add('write',irc_pair_changed)
+            def retry_irc():
+                selected_connector=connector.get()
+                self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
+                    success='Lokale Auth-Sperre geprüft. Der Gateway-Dienst bleibt gestoppt; nach Prüfung neu starten. Es wurde keine Nachricht versendet.')
+            self._button(irc_credentials,'IRC-Konto nach Korrektur erneut prüfen',retry_irc).pack(anchor='w',pady=6)
             def pair_sender():
                 selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
                             tuple(key for key, value in rights.items() if value.get()))
                 selected_scope, selected_thread = scope.get(), thread.get()
+                requested_irc_port=None
+                if platform.get()=='irc':
+                    try:requested_irc_port=irc_port_number(irc_port.get())
+                    except ValueError as error:
+                        self._show_error(describe_error(error,area=self.page));return
                 if platform.get()=='ntfy' and not trust_publishers.get():
                     self._show_error(describe_error(ValueError('Bestätige ausdrücklich das Vertrauen in alle Publisher dieses privaten Topics.'),area=self.page))
                     return
@@ -940,7 +1034,7 @@ class Wizard:
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
                     else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
-                        'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {})
+                        'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
@@ -1024,7 +1118,17 @@ class Wizard:
                         'transport-unavailable':'Home Assistant/TLS nicht verfügbar; Adresse, Zertifikat und Netzwerk prüfen',
                         'revoked':'Home-Assistant-Freigabe entzogen oder geändert; keine weitere Ausführung',
                         'closed':'Privates Home-Assistant-Profil geschlossen; Daten erhalten'}
+                    irc_labels={**ha_labels,'connecting':'IRC-TLS-Verbindung und Anmeldung werden geprüft',
+                        'streaming':'IRC angemeldet; keine Zustellung an Kanalmitglieder bestätigt',
+                        'authentication-refused':'IRC-Anmeldung abgelehnt; SASL/Server-Passwort prüfen und erneute Anmeldung ausdrücklich erlauben',
+                        'transport-unavailable':'IRC-TLS oder erforderliche Server-Fähigkeiten nicht verfügbar',
+                        'disconnected':'IRC getrennt; gespeicherte Eingänge bleiben erhalten',
+                        'revoked':'IRC-Freigabe entzogen oder geändert; keine weitere Ausführung',
+                        'closed':'Privates IRC-Profil geschlossen; Daten erhalten',
+                        'created':'Privates IRC-Profil vorbereitet',
+                        'rate-limited':'IRC begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten'}
                     labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                        else irc_labels if item.get('platform')=='irc'
                         else ha_labels if item.get('platform')=='homeassistant' else transport_labels)
                     import datetime
                     retry_time=(datetime.datetime.fromtimestamp(item['next_sync']).strftime('%d.%m.%Y %H:%M:%S')
@@ -1041,7 +1145,7 @@ class Wizard:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · letzter Fehler: '+ntfy_labels[item['last_error']] if item.get('last_error') else ''))
-                    if item.get('platform')=='homeassistant':
+                    if item.get('platform') in {'homeassistant','irc'}:
                         deadline=item.get('next_attempt',0);gap=item.get('gap_since',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · unbeobachtete Ereignisse seit '+datetime.datetime.fromtimestamp(gap).strftime('%d.%m.%Y %H:%M:%S')
@@ -1051,6 +1155,13 @@ class Wizard:
                 for history in value.get('history',[]):
                     self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
                         size=10, color=self.MUTED).pack(anchor="w", pady=3)
+                for outgoing in value.get('native_outgoing',[]):
+                    if outgoing.get('platform')=='irc':
+                        self._label(recovery_frame,'IRC-Ausgang · '+outgoing['delivery_id']+' · '+outgoing['state']
+                            +' · Server-Echos '+str(outgoing['confirmed_chunks'])+'/'+str(outgoing['chunk_count'])
+                            +' · keine Empfangsbestätigung der Kanalmitglieder'
+                            +(' · Prüfbeleg '+outgoing['server_echo_receipt'] if outgoing.get('server_echo_receipt') else ''),
+                            size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 rows = value["ingress"]
                 if not rows:
                     self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")

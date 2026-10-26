@@ -34,6 +34,13 @@ def validate_snapshot(policy, credentials):
             if any(b['connector']==name and b['chat']!=row['topic'] for b in policy['bindings']):
                 raise ValueError('ntfy grant must match the exact credential-bound private topic')
             continue
+        if platforms[name]=='irc':
+            from .gateway_irc_transport import credentials as irc_credentials
+            if irc_credentials(row)!=row:raise ValueError('canonical private IRC credentials required')
+            server=f"{row['server']}:{row['port']}"
+            if any(binding['connector']==name and (binding['scope']!=server or binding['chat']!=row['channel']) for binding in policy['bindings']):
+                raise ValueError('IRC owner route differs from configured server or channel')
+            continue
         if platforms[name]=='matrix':
             from .gateway_matrix_profile import credentials as matrix_credentials
             if matrix_credentials(row)!=row:

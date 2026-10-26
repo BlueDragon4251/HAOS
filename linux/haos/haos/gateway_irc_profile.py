@@ -7,8 +7,8 @@ import stat
 import time
 from types import MethodType,SimpleNamespace
 
-from .gateway import digest
-from .gateway_irc_ingress import PreparedIRCPolicy,install as install_ingress,snapshot,dispatch_stored
+from .gateway import digest,GatewayPolicy
+from .gateway_irc_ingress import PreparedIRCPolicy,install as install_ingress,snapshot,dispatch_stored,validate_binding
 from .gateway_irc_transport import credentials,install as install_transport,AuthenticationRejected,RateLimited
 
 STATES=frozenset({'created','connecting','streaming','disconnected','authentication-refused',
@@ -25,8 +25,10 @@ def build(value,parent,connector,policy,inbox):
     value=credentials(value);server=f"{value['server']}:{value['port']}"
     def current():
         result=policy()
-        if not isinstance(result,PreparedIRCPolicy) or not snapshot(result,connector,server)['bindings']:
+        if not isinstance(result,GatewayPolicy) or not snapshot(result,connector,server)['bindings']:
             raise PermissionError('prepared exact IRC account grants required')
+        for binding in result.bindings.values():
+            if binding['connector']==connector:validate_binding(binding,require_epoch=True)
         return result
     authority=snapshot(current(),connector,server)
     parent=Path(parent)

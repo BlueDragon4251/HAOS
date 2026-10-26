@@ -16,8 +16,10 @@ def config():
         'capabilities':['create','read'],'generation':'a'*64,'since':1}]}
 
 
-def test_irc_stays_unavailable_in_public_policy_until_transport_and_owner_setup_exist():
-    with pytest.raises(ValueError):GatewayPolicy(config())
+def test_public_irc_policy_retains_exact_account_authority_and_refuses_arbitrary_plugins():
+    assert GatewayPolicy(config()).bindings['owner']['sender']=='owner-account'
+    value=config();value['connectors'][0]['platform']='unreviewed-plugin'
+    with pytest.raises(ValueError):GatewayPolicy(value)
     assert PreparedIRCPolicy(config()).bindings['owner']['sender']=='owner-account'
 
 

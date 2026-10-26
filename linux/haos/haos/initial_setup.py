@@ -428,10 +428,35 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}
 
 
+def configure_irc_gateway(connector,server,port,nickname,channel,*,server_password='',sasl_username='',sasl_password='',anonymous=False):
+    """Owner-only real TLS IRC configuration; validate before stopping services."""
+    require_root()
+    if type(anonymous) is not bool or anonymous and (sasl_username or sasl_password) or not anonymous and not sasl_username:
+        raise ValueError('SASL-Konto angeben oder Verbindung ohne SASL ausdrücklich freigeben')
+    from .gateway_irc_transport import credentials as validate_irc
+    value=validate_irc({'server':server,'port':port,'nickname':nickname,'channel':channel,
+        **({'server_password':server_password} if server_password else {}),
+        **({'sasl_username':sasl_username,'sasl_password':sasl_password} if sasl_username or sasl_password else {})})
+    from .gateway_setup import load,persist
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy,credentials=load()
+    if any(row['id']!=connector and row['platform']=='irc' for row in policy['connectors']):
+        raise ValueError('one isolated adapter per platform is currently supported')
+    if any(row['id']==connector and row['platform']!='irc' for row in policy['connectors']):
+        policy['bindings']=[row for row in policy['bindings'] if row['connector']!=connector]
+    policy['connectors']=[row for row in policy['connectors'] if row['id']!=connector]+[{'id':connector,'platform':'irc'}]
+    GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
+    credentials['connectors'][connector]=value;persist(policy,credentials)
+    audit('setup.gateway',{'connector':connector,'platform':'irc'})
+    return {'configured':True,'platform':'irc','restart_required':True,'sender_pairing_required':True}
+
+
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
                         identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = "",
                         matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url="",
-                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False):
+                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False,irc_server="",irc_port=None,irc_channel=""):
     """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
@@ -460,6 +485,18 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
         item['trust_topic_publishers']=trust_topic_publishers
     elif trust_topic_publishers or ntfy_server_url:
         raise ValueError('topic publisher trust applies only to ntfy')
+    if selected and selected['platform']=='irc':
+        configured=credentials['connectors'][connector]
+        expected=f"{configured['server']}:{configured['port']}"
+        if irc_port is not None and type(irc_port) is not int:raise ValueError('exact integer IRC port required')
+        if (irc_server and irc_server!=configured['server'] or irc_port is not None and irc_port!=configured['port']
+                or irc_channel and irc_channel!=configured['channel']):
+            raise ValueError('IRC-Einstellungen zuerst speichern; Kopplung gehört zum gespeicherten Server und Kanal')
+        if scope and scope!=expected or chat!=configured['channel']:
+            raise ValueError('IRC-Server und Kanal müssen der gespeicherten Konfiguration entsprechen')
+        item['scope']=expected
+    elif irc_server or irc_port is not None or irc_channel:
+        raise ValueError('IRC connection context applies only to IRC')
     if selected and selected['platform']=='homeassistant':
         if type(homeassistant_shared_notifications) is not bool:
             raise ValueError('explicit boolean approval of shared Home Assistant notifications required')
@@ -494,6 +531,9 @@ def gateway_configuration():
     servers={row['id']:{'server_url':_credentials['connectors'][row['id']]['server_url']}
         for row in policy['connectors'] if row['platform']=='homeassistant'}
     if servers:result['homeassistant']=servers
+    irc={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('server','port','nickname','channel')}
+        for row in policy['connectors'] if row['platform']=='irc'}
+    if irc:result['irc']=irc
     return result
 
 
@@ -537,6 +577,18 @@ def retry_ntfy_gateway_auth(connector):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='retry-ntfy-auth',connector=connector,
         note='Owner requested a new ntfy authentication check'))
+
+
+def retry_irc_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='irc' for row in configured['connectors']):
+        raise ValueError('select one configured IRC connector')
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-irc-auth',connector=connector,
+        note='Owner requested a new IRC authentication check'))
 
 
 def retry_homeassistant_gateway_auth(connector):

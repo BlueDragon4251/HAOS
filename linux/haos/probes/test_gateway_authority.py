@@ -460,3 +460,44 @@ else:raise AssertionError('private Home Assistant credential became readable')
     marker=config/'retained-owner-data';marker.write_text('preserved')
     persist(published,{'connectors':{'ha':{**secret['connectors']['ha'],'token':'rotated-private-hass-token'}}},config=config,gid=65534)
     assert load(config)[0]['bindings']==[] and marker.read_text()=='preserved'
+
+
+def test_actual_irc_publication_binds_exact_account_server_channel_and_keeps_credentials_private(public_build_directory):
+    import subprocess
+    from haos.gateway import GatewayPolicy
+    config=public_build_directory;config.chmod(0o755)
+    policy={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[]}
+    secret={'connectors':{'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot',
+        'channel':'#owner','sasl_username':'BotAccount','sasl_password':'disposable-private-irc-password'}}}
+    persist(policy,secret,config=config,gid=65534)
+    policy['bindings']=[{'id':'owner','connector':'irc','sender':'OwnerAccount','chat':'#owner',
+        'scope':'irc.fixture.invalid:6697','thread':'','identity':'owner','capabilities':['create','read']}]
+    persist(policy,secret,config=config,gid=65534)
+    published,stored=load(config);authority=GatewayPolicy(published);binding=published['bindings'][0]
+    assert stored==secret and type(binding['since']) is int and len(binding['generation'])==64
+    source={'platform':'irc','sender':'OwnerAccount','chat':'#owner','scope':'irc.fixture.invalid:6697',
+        'thread':'','message_id':'c'*64,'is_bot':False,'text':'disposable authority fixture'}
+    assert authority.authorize('irc',source)==binding
+    for change in [{'sender':'owneraccount'},{'chat':'#other'},{'scope':'foreign.invalid:6697'}]:
+        with pytest.raises(PermissionError):authority.authorize('irc',{**source,**change})
+    code='''
+from pathlib import Path
+import os,sys
+assert os.geteuid()==65534 and os.getgroups()==[]
+assert Path(sys.argv[1]).read_bytes()
+try:Path(sys.argv[2]).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('private IRC credential became readable')
+'''
+    child=subprocess.run([sys.executable,'-I','-c',code,str(config/'gateways.json'),str(config/'gateway-credentials')],
+        user=65534,group=65534,extra_groups=[],capture_output=True,timeout=10)
+    assert child.returncode==0,child.stderr
+    before=[(config/name).read_bytes() for name in ['gateways.json','gateway-credentials']]
+    for change in [{'scope':'foreign.invalid:6697'},{'chat':'#other'}]:
+        invalid=copy.deepcopy(published);invalid['bindings'][0].update(change)
+        with pytest.raises(ValueError):persist(invalid,secret,config=config,gid=65534)
+        assert before==[(config/name).read_bytes() for name in ['gateways.json','gateway-credentials']]
+    marker=config/'retained-owner-data';marker.write_text('preserved')
+    rotated=copy.deepcopy(secret);rotated['connectors']['irc']['sasl_password']='rotated-private-irc-password'
+    persist(published,rotated,config=config,gid=65534)
+    assert load(config)[0]['bindings']==[] and marker.read_text()=='preserved'

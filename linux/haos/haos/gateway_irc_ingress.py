@@ -1,4 +1,4 @@
-"""Prepared IRCv3 account admission; not a public transport or a TLS implementation."""
+"""IRCv3 account admission behind the independently authorized TLS transport."""
 import asyncio
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -22,14 +22,19 @@ class PreparedIRCPolicy(GatewayPolicy):
         super().__init__(config)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']!='irc':continue
-            if (not _ACCOUNT.fullmatch(binding['sender']) or not _CHANNEL.fullmatch(binding['chat'])
-                    or not _SERVER.fullmatch(binding['scope']) or binding['thread']
-                    or not binding.get('generation') or type(binding.get('since')) is not int):
-                raise ValueError('IRC requires an exact account/channel/server and timed owner grant')
+            validate_binding(binding,require_epoch=True)
+
+
+def validate_binding(binding,*,require_epoch=False):
+    if (not _ACCOUNT.fullmatch(binding['sender']) or not _CHANNEL.fullmatch(binding['chat'])
+            or not _SERVER.fullmatch(binding['scope']) or binding['thread']):
+        raise ValueError('IRC requires an exact authenticated account, canonical channel and TLS server; threads do not apply')
+    if require_epoch and (not binding.get('generation') or type(binding.get('since')) is not int):
+        raise ValueError('IRC transport requires an explicit timed owner grant')
 
 
 def snapshot(policy,connector,server):
-    if (not isinstance(policy,PreparedIRCPolicy)
+    if (not isinstance(policy,GatewayPolicy)
             or policy.connectors.get(connector,{}).get('platform')!='irc'
             or not isinstance(server,str) or not _SERVER.fullmatch(server)):
         raise PermissionError('prepared IRC server authority required')
@@ -38,7 +43,7 @@ def snapshot(policy,connector,server):
 
 
 def envelope(adapter,raw,server,capabilities):
-    # Only a future TLS/capability-negotiated transport may supply these caps.
+    # Only the TLS/capability-negotiated transport may supply these caps.
     # Client-only (+account) tags, nicknames and hostmasks are never identities.
     if not REQUIRED_CAPS<=frozenset(capabilities):raise PermissionError('authenticated IRCv3 account/time/message capabilities required')
     if (not isinstance(raw,str) or not 1<=len(raw.encode())<=4096 or any(c in raw for c in '\r\n\0')

@@ -443,3 +443,63 @@ def test_homeassistant_owner_auth_retry_uses_offline_backend_after_exact_selecti
     assert initial_setup.retry_homeassistant_gateway_auth('ha')=={'network_requested':False}
     assert calls[0].gateway_action=='retry-homeassistant-auth' and calls[0].connector=='ha'
     assert stopped==[{'gateway_only':True}]
+
+
+def test_irc_owner_configuration_requires_explicit_auth_mode_before_stop_and_exposes_no_private_material(monkeypatch):
+    import copy
+    from haos import gateway_setup,owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[],'bindings':[]};stored={'connectors':{}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(stored)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    for options in [{},{'anonymous':1},{'sasl_username':'bot-account'},
+            {'anonymous':True,'sasl_username':'bot-account','sasl_password':'private-fixture'}]:
+        with pytest.raises(ValueError):initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',**options)
+    assert not saved and not stopped
+    initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',
+        sasl_username='bot-account',sasl_password='private-sasl-fixture',server_password='private-server-fixture')
+    assert stopped==[{'gateway_only':True}]
+    assert saved[0][1]['connectors']['irc']['sasl_password']=='private-sasl-fixture'
+    monkeypatch.setattr(gateway_setup,'load',lambda:saved[0])
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['irc']=={'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}}
+    assert 'private-sasl-fixture' not in repr(metadata) and 'private-server-fixture' not in repr(metadata)
+
+
+def test_irc_owner_pairing_uses_saved_exact_network_and_never_approves_unsaved_endpoint_or_unregistered_nickname(monkeypatch):
+    import copy
+    from haos import gateway_setup,owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[]}
+    stored={'connectors':{'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(stored)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append(p))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    for sender,chat,options in [('owner-account','#other',{}),('Nick!user@host','#haos',{}),
+        ('owner-account','#haos',{'irc_server':'unsaved.invalid'}),('owner-account','#haos',{'irc_port':6667}),
+        ('owner-account','#haos',{'irc_channel':'#other'}),('owner-account','#haos',{'thread':'invented'})]:
+        with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','irc',sender,chat,'owner',**options)
+    assert not saved and not stopped
+    initial_setup.pair_gateway_sender('owner','irc','Owner-Account','#haos','owner',irc_server='irc.fixture.invalid',irc_port=6697,irc_channel='#haos')
+    binding=GatewayPolicy(saved[0]).bindings['owner']
+    assert binding['scope']=='irc.fixture.invalid:6697' and binding['sender']=='Owner-Account' and binding['thread']==''
+
+
+def test_irc_owner_auth_recheck_only_accepts_its_configured_connector_and_calls_offline_backend(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'irc','platform':'irc'},{'id':'other','platform':'telegram'}]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'network_requested':False})
+    for bad in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_irc_gateway_auth(bad)
+    assert not calls and not stopped
+    assert initial_setup.retry_irc_gateway_auth('irc')=={'network_requested':False}
+    assert calls[0].gateway_action=='retry-irc-auth' and stopped==[{'gateway_only':True}]

@@ -15,6 +15,7 @@ import time
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from haos import gateway_irc_profile as profile
+    from haos.gateway import GatewayPolicy
     from haos.gateway_irc_ingress import PreparedIRCPolicy
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
@@ -55,7 +56,7 @@ def main():
         config={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[{
             'id':'owner','connector':'irc','sender':'owner-account','chat':'#haos','scope':'irc.fixture.invalid:6697',
             'thread':'','identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-        policy=lambda:PreparedIRCPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         state={'mode':'good','connections':0,'writers':set(),'tasks':set(),'message':0}
         accepted=[];fail=[False];adapters=[]
         async def server(reader,writer):
@@ -264,7 +265,7 @@ def main():
             else:os.environ['SSL_CERT_FILE']=original_ca
     with tempfile.TemporaryDirectory(prefix='haos-irc-profile-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_native_profile_tls_kernel_lease_and_sqlite':True,
-        'fixture_only_loopback_destination_ca_and_short_reconnect_delay':True,'public_gateway_enabled':False,
+        'fixture_only_loopback_destination_ca_and_short_reconnect_delay':True,'public_gateway_enabled':True,
         'unseen_remote_events_recovered':False,'external_server_account_delivery_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

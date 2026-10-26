@@ -303,3 +303,39 @@ Inspect the displayed gap timestamp after disconnects. The stock remote history
 API cannot prove original event authorship during an outage, so successful
 reconnection does not close that gap. This path does not enable Home Assistant
 device-control tools, media/voice or private per-recipient notifications.
+
+### IRC text gateway
+
+The owner gateway page supports one isolated IRC connector. Save the TLS
+hostname, port (normally 6697), bot nickname and one exact canonical channel
+(`#channel` or `&channel`). Certificates must validate against the system trust
+store. Enter the private SASL account/password and optional server PASS password;
+connecting without SASL instead requires a separate, initially unchecked owner
+approval. Password fields clear after submission and when changing the endpoint,
+connector or platform. Saved configuration metadata contains no private passwords.
+
+Pair each permitted sender by its exact **authenticated IRC account**, preserving
+case, rather than nickname or hostmask. The saved TLS server/port and channel
+bind the grant; an unsaved endpoint cannot be approved from the pairing form.
+Messages must address the bot. Unknown accounts remain unauthorized. Replies
+are visible to channel members: approve `read` only when that audience is intended.
+The native pinned Hermes adapter runs behind HAOS account, policy, lease,
+credential, replay and delivery boundaries; arbitrary plugins gain no authority.
+
+CLI: `haos-owner gateway setup irc-main irc` uses private password prompts.
+Use `haos-owner gateway pair --help` for binding, connector, account, channel,
+identity and permission arguments. The matching saved server scope is derived
+when omitted. `haos-owner gateway retry-irc-auth irc-main --note 'account corrected'`
+records an offline owner decision after fixing authentication; it preserves rate
+limits, revocation, retained inputs and outage gaps. Restart the gateway service
+explicitly after setup/recovery. An unpaired connector does not connect.
+
+The server must support account-tag, server-time, message-tags and stable message
+IDs. Sending additionally requires echo-message, labeled-response and batch.
+Server echoes are correlated with each native message chunk and journaled before
+HAOS accepts completion. An echo may be synthetic under IRCv3 rules, so it **does
+not prove that channel members received the message**. Uncertain or interrupted
+writes are not automatically resent; use the existing audited delivery recovery
+controls. Unobserved events during disconnection cannot be reliably recovered
+from stock history. NickServ shortcuts, DCC, media and voice are not enabled.
+This is software/loopback contract validation, not external IRC account acceptance.

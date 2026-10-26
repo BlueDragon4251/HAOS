@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
+    from haos.gateway import GatewayPolicy
     from haos.gateway_irc_ingress import PreparedIRCPolicy,install as ingress
     from haos.gateway_irc_transport import install,Rejected
     from haos.gateway_ingress import durable_adapter
@@ -146,7 +147,7 @@ def main():
             config={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[{
                 'id':'owner','connector':'irc','sender':'owner-account','chat':'#haos','scope':'irc.fixture.invalid:6697',
                 'thread':'','identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-            policy=lambda:PreparedIRCPolicy(config)
+            policy=lambda:GatewayPolicy(config)
             native=NativeInbox(home/'native.db',Redactor());relay=RelayInbox(home/'relay.db',Redactor())
             value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
             if mode=='server_password':value['server_password']='disposable-private-server-password'
@@ -269,7 +270,7 @@ def main():
             else:os.environ['SSL_CERT_FILE']=original_ca
     with tempfile.TemporaryDirectory(prefix='haos-irc-tls-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_local_tls_ircv3_and_pinned_native_codec':True,
-        'fixture_only_loopback_destination_and_disposable_ca':True,'public_gateway_enabled':False,
+        'fixture_only_loopback_destination_and_disposable_ca':True,'public_gateway_enabled':True,
         'live_server_account_nickserv_sasl_delivery_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

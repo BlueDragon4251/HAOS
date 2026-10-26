@@ -30,12 +30,14 @@ def main():
         config={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[{
             'id':'owner','connector':'irc','sender':'owner-account','chat':'#haos','scope':'irc.fixture.invalid:6697',
             'thread':'','identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-        policy=lambda:PreparedIRCPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         def denied(action):
             try:action()
             except (ValueError,PermissionError):return
             raise AssertionError('unapproved IRC authority admitted')
-        denied(lambda:GatewayPolicy(config));cases.append('public_owner_policy_still_refuses_unfinished_irc_transport')
+        assert GatewayPolicy(config).bindings['owner']['sender']=='owner-account'
+        denied(lambda:GatewayPolicy({**config,'connectors':[{'id':'irc','platform':'unreviewed-plugin'}]}))
+        cases.append('public_policy_accepts_exact_reviewed_irc_but_refuses_unknown_plugins')
         native=NativeInbox(directory/'native.db',Redactor());relay=RelayInbox(directory/'relay.db',Redactor())
         adapter=install(durable_adapter(IRCAdapter(PlatformConfig(enabled=True,extra={
             'server':'irc.fixture.invalid','nickname':'haos-bot','channel':'#haos','use_tls':True}))))
@@ -142,7 +144,7 @@ def main():
         native.close();relay.close()
     with tempfile.TemporaryDirectory(prefix='haos-irc-ingress-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_native_irc_codec_and_sqlite':True,
-        'public_gateway_enabled':False,'network_requested':False,'tls_or_capability_negotiation_accepted':False,
+        'public_gateway_enabled':True,'network_requested':False,'tls_or_capability_negotiation_accepted':False,
         'live_account_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

@@ -68,8 +68,8 @@ def owner_ingress(args, policy):
     stopped_gateway()
     GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth'}:
-        platform='ntfy' if args.gateway_action=='retry-ntfy-auth' else 'homeassistant'
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
+        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc'}[args.gateway_action]
         if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
             raise ValueError('select one configured connector for this authentication recheck')
         if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
@@ -100,7 +100,7 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth'}:
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
         audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
@@ -230,12 +230,12 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy, homeassistant")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy, homeassistant, irc")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         if any(c['id']==args.connector and c['platform']!=args.platform for c in policy['connectors']):
@@ -243,10 +243,23 @@ def owner_gateway(args):
         # Validate the proposed connector before asking for a credential.
         policy["connectors"] = [c for c in policy["connectors"] if c["id"] != args.connector] + [{"id": args.connector, "platform": args.platform}]
         GatewayPolicy(policy)
-        token = getpass.getpass("Bot token (stored only in the owner-protected credential store): ")
-        if args.platform not in {'matrix','ntfy','homeassistant'} and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
+        token = "" if args.platform=="irc" else getpass.getpass("Bot token (stored only in the owner-protected credential store): ")
+        if args.platform not in {'matrix','ntfy','homeassistant','irc'} and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
+        if args.platform=='irc':
+            from .gateway_irc_transport import credentials as irc_credentials
+            server=input('IRC TLS hostname (system-trusted certificate required): ')
+            port=int(input('IRC TLS port [6697]: ') or '6697')
+            nickname=input('IRC bot nickname: ');channel=input('Exact canonical IRC channel (#channel or &channel): ')
+            username=input('SASL account (empty for no account login): ')
+            if not username and input('Explicitly approve no SASL login by typing ANONYMOUS: ')!='ANONYMOUS':
+                raise ValueError('explicit owner approval of anonymous IRC connection required')
+            password=getpass.getpass('Private SASL password: ') if username else ''
+            server_password=getpass.getpass('Private server PASS password (optional): ')
+            credentials['connectors'][args.connector]=irc_credentials({'server':server,'port':port,'nickname':nickname,'channel':channel,
+                **({'server_password':server_password} if server_password else {}),
+                **({'sasl_username':username,'sasl_password':password} if username else {})})
         if args.platform=='homeassistant':
             from .gateway_homeassistant_profile import credentials as ha_credentials
             url=input('Home Assistant HTTPS server URL (system-trusted certificate required): ')
@@ -290,6 +303,11 @@ def owner_gateway(args):
         elif trust:raise ValueError('topic publisher trust applies only to ntfy')
         shared=getattr(args,'homeassistant_shared_notifications',False)
         system=getattr(args,'homeassistant_trust_system',False)
+        if selected and selected['platform']=='irc':
+            configured=credentials['connectors'][args.connector];expected=f"{configured['server']}:{configured['port']}"
+            if binding['scope'] and binding['scope']!=expected or binding['chat']!=configured['channel']:
+                raise ValueError('IRC route differs from configured TLS server/channel')
+            binding['scope']=expected
         if selected and selected['platform']=='homeassistant':
             if 'read' in binding['capabilities'] and shared is not True:
                 raise ValueError('explicit approval of replies visible to every Home Assistant instance user required')

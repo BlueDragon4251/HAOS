@@ -212,9 +212,7 @@ def retry_homeassistant_auth(inbox,policy,request):
 
 
 def retry_irc_auth(inbox,policy,request):
-    """Prepared offline owner decision; public IRC setup remains unavailable."""
-    from .gateway_irc_ingress import PreparedIRCPolicy
-    if not isinstance(policy,PreparedIRCPolicy):raise ValueError('prepared independent IRC owner authority required')
+    """Offline owner decision; retain revocation, gaps and rate limits."""
     return _retry_private_auth(inbox,policy,request,'irc')
 
 
@@ -237,8 +235,8 @@ def main():
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
             print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
             return
-        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth'}:
-            platform='ntfy' if data['action']=='retry-ntfy-auth' else 'homeassistant'
+        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
+            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc'}[data['action']]
             connector=_recheck_connector(policy,data['params'],platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,
                 'network_requested':False,'native_journal_created':False}))
@@ -250,6 +248,8 @@ def main():
             result = unresolved(inbox,data['params']['after'])
         elif data['action'] == 'retry-ntfy-auth':
             result=retry_ntfy_auth(inbox,policy,data['params'])
+        elif data['action'] == 'retry-irc-auth':
+            result=retry_irc_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-homeassistant-auth':
             result=retry_homeassistant_auth(inbox,policy,data['params'])
         elif data['action'] == 'reconcile-ingress':

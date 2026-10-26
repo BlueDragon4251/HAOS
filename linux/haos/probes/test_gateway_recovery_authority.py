@@ -28,7 +28,7 @@ def uid_fixture_path():
         yield Path(directory)
 
 
-@pytest.mark.parametrize('platform',['homeassistant','ntfy'])
+@pytest.mark.parametrize('platform',['homeassistant','ntfy','irc'])
 @pytest.mark.parametrize('journal_exists',[False,True])
 def test_actual_recovery_main_dispatches_auth_recheck_with_real_uid_nss_and_default_private_path(uid_fixture_path,platform,journal_exists):
     root=uid_fixture_path;root.chmod(0o755)
@@ -41,9 +41,9 @@ def test_actual_recovery_main_dispatches_auth_recheck_with_real_uid_nss_and_defa
     config={'version':1,'connectors':[{'id':'test','platform':platform}],'bindings':[]}
     if journal_exists:
         inbox=NativeInbox(database,Redactor())
-        if platform=='homeassistant':
-            inbox.db.execute('CREATE TABLE homeassistant_profile_status(identity TEXT PRIMARY KEY,connector TEXT,status TEXT,updated_at REAL,next_attempt REAL,gap_since REAL)')
-            inbox.db.execute("INSERT INTO homeassistant_profile_status VALUES('fixture','test','authentication-refused',123,0,42)")
+        if platform in {'homeassistant','irc'}:
+            inbox.db.execute(f'CREATE TABLE {platform}_profile_status(identity TEXT PRIMARY KEY,connector TEXT,status TEXT,updated_at REAL,next_attempt REAL,gap_since REAL)')
+            inbox.db.execute(f"INSERT INTO {platform}_profile_status VALUES('fixture','test','authentication-refused',123,0,42)")
         else:
             inbox.db.execute('CREATE TABLE ntfy_subscription(identity TEXT PRIMARY KEY,connector TEXT,cursor TEXT,status TEXT,next_attempt REAL)')
             inbox.db.execute("INSERT INTO ntfy_subscription VALUES('fixture','test','retained-cursor','authentication-denied',0)")
@@ -61,7 +61,7 @@ assert os.geteuid()==65534 and pwd.getpwnam('haos-gateway').pw_uid==65534
 gateway_raw_recovery.main()
 assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
 '''
-    request={'action':'retry-homeassistant-auth' if platform=='homeassistant' else 'retry-ntfy-auth',
+    request={'action':'retry-'+platform+'-auth',
         'policy':config,'params':{'connector':'test','owner_uid':1000,'note_sha256':'a'*64}}
     child=subprocess.run([sys.executable,'-c',code,str(root)],input=json.dumps(request),
         text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
@@ -74,9 +74,9 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         import sqlite3
         connection=sqlite3.connect(database)
         try:
-            if platform=='homeassistant':
-                assert tuple(connection.execute('SELECT status,gap_since FROM homeassistant_profile_status').fetchone())==('created',42)
-                assert connection.execute('SELECT owner_uid FROM homeassistant_owner_events').fetchone()[0]==1000
+            if platform in {'homeassistant','irc'}:
+                assert tuple(connection.execute(f'SELECT status,gap_since FROM {platform}_profile_status').fetchone())==('created',42)
+                assert connection.execute(f'SELECT owner_uid FROM {platform}_owner_events').fetchone()[0]==1000
             else:
                 assert tuple(connection.execute('SELECT status,cursor FROM ntfy_subscription').fetchone())==('ready','retained-cursor')
         finally:connection.close()
