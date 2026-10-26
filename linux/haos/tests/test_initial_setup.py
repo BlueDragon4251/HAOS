@@ -460,13 +460,15 @@ def test_irc_owner_configuration_requires_explicit_auth_mode_before_stop_and_exp
         with pytest.raises(ValueError):initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',**options)
     assert not saved and not stopped
     initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',
-        sasl_username='bot-account',sasl_password='private-sasl-fixture',server_password='private-server-fixture')
+        sasl_username='bot-account',sasl_password='private-sasl-fixture',server_password='private-server-fixture',channel_password='private-channel-key-fixture')
     assert stopped==[{'gateway_only':True}]
     assert saved[0][1]['connectors']['irc']['sasl_password']=='private-sasl-fixture'
+    assert saved[0][1]['connectors']['irc']['channel_password']=='private-channel-key-fixture'
     monkeypatch.setattr(gateway_setup,'load',lambda:saved[0])
     metadata=initial_setup.gateway_configuration()
     assert metadata['irc']=={'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}}
     assert 'private-sasl-fixture' not in repr(metadata) and 'private-server-fixture' not in repr(metadata)
+    assert 'private-channel-key-fixture' not in repr(metadata)
 
 
 def test_irc_owner_pairing_uses_saved_exact_network_and_never_approves_unsaved_endpoint_or_unregistered_nickname(monkeypatch):

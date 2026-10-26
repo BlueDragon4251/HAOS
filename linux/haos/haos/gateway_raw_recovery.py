@@ -96,12 +96,19 @@ def unresolved(inbox, after=0):
             from .gateway_homeassistant_profile import PROFILE_STATES as states
         else:
             from .gateway_irc_profile import STATES as states
-        for row in inbox.db.execute(f'SELECT connector,status,updated_at,next_attempt,gap_since FROM {table} ORDER BY updated_at DESC LIMIT 64'):
+        fields='connector,status,updated_at,next_attempt,gap_since'
+        detailed=platform=='irc' and 'last_error' in {row[1] for row in inbox.db.execute(f'PRAGMA table_info({table})')}
+        if detailed:fields+=',last_error'
+        for row in inbox.db.execute(f'SELECT {fields} FROM {table} ORDER BY updated_at DESC LIMIT 64'):
             if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
                     or row['status'] not in states
                     or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0
                         for key in ('updated_at','next_attempt','gap_since'))):
                 raise ValueError('invalid private gateway transport metadata')
+            if detailed:
+                from .gateway_irc_transport import DIAGNOSTICS
+                if not isinstance(row['last_error'],str) or row['last_error'] and row['last_error'] not in DIAGNOSTICS:
+                    raise ValueError('invalid private IRC diagnostic')
             transport.append({**dict(row),'platform':platform,'unseen_remote_history_recovered':False})
     from .gateway_irc_recovery import outgoing
     if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='line_profile_status'").fetchone():

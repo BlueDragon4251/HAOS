@@ -88,3 +88,9 @@ def test_irc_private_password_and_actual_sasl_wire_chunks_are_redacted_without_r
         assert redactor.text('echo '+alias)=='echo [REDACTED]'
     assert redactor.text('AUTHENTICATE +')=='AUTHENTICATE +'
     assert redactor.text('owner-account #haos')=='owner-account #haos'
+
+
+@pytest.mark.parametrize('key',['private key','private,key','private\rkey','private\nkey','x'*129])
+def test_private_channel_key_never_changes_irc_frame_or_channel_list(key):
+    from haos.gateway_irc_transport import credentials
+    with pytest.raises(ValueError):credentials({'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#owner','channel_password':key})

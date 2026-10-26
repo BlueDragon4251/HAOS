@@ -339,3 +339,10 @@ writes are not automatically resent; use the existing audited delivery recovery
 controls. Unobserved events during disconnection cannot be reliably recovered
 from stock history. NickServ shortcuts, DCC, media and voice are not enabled.
 This is software/loopback contract validation, not external IRC account acceptance.
+
+The IRC setup also accepts a private channel key for `+k` channels. It is sent as
+one bounded trailing JOIN parameter over verified TLS and is omitted from public
+configuration metadata, diagnostics and agent/relay data. Changing the channel
+clears the graphical key input; changing credentials withdraws old grants.
+See [IRC software scope and acceptance](GATEWAY-IRC.md) for the complete operator
+flow, diagnostics, protocol boundaries and source-linked validation.

@@ -501,3 +501,82 @@ else:raise AssertionError('private IRC credential became readable')
     rotated=copy.deepcopy(secret);rotated['connectors']['irc']['sasl_password']='rotated-private-irc-password'
     persist(published,rotated,config=config,gid=65534)
     assert load(config)[0]['bindings']==[] and marker.read_text()=='preserved'
+
+
+def test_actual_root_irc_cli_setup_pair_key_rotation_revoke_remove_preserves_owner_data(public_build_directory,monkeypatch):
+    """Real owner UID/files/audit; the service-stopped inspection is a fixture."""
+    import builtins
+    import json
+    import subprocess
+    import shutil
+    from types import SimpleNamespace
+    from haos import gateway_setup,owner,initial_setup
+    from haos.gateway import GatewayPolicy
+    assert os.geteuid()==0
+    config=public_build_directory;config.chmod(0o755)
+    retained=config/'retained-owner-recovery';retained.write_text('must remain intact')
+    audit_directory=config/'owner-audit';audit_directory.mkdir(mode=0o700)
+    original_load=gateway_setup.load;original_persist=gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args,**kwargs:original_load(config=config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:original_persist(p,c,config=config,gid=65534))
+    stopped=[];monkeypatch.setattr(gateway_setup,'stopped_gateway',lambda:stopped.append(True))
+    original_path=Path
+    monkeypatch.setattr(owner,'Path',lambda path:audit_directory if str(path)=='/var/lib/haos-owner' else original_path(path))
+    invalid_inputs=iter(['irc.fixture.invalid','pasted-private-port-fixture'])
+    monkeypatch.setattr(builtins,'input',lambda prompt:next(invalid_inputs))
+    with pytest.raises(ValueError) as invalid_port:
+        gateway_setup.owner_gateway(SimpleNamespace(gateway_action='setup',connector='irc',platform='irc'))
+    assert 'pasted-private-port-fixture' not in str(invalid_port.value)
+    assert not (config/'gateway-credentials').exists()
+    def setup(key):
+        inputs=iter(['irc.fixture.invalid','6697','haos-bot','#owner','BotAccount'])
+        passwords=iter(['disposable-sasl-credential','disposable-server-credential',key])
+        monkeypatch.setattr(builtins,'input',lambda prompt:next(inputs))
+        monkeypatch.setattr(gateway_setup.getpass,'getpass',lambda prompt:next(passwords))
+        result=gateway_setup.owner_gateway(SimpleNamespace(gateway_action='setup',connector='irc',platform='irc'))
+        assert result['configured'] is True
+    setup('disposable-channel-key')
+    saved,credentials=original_load(config=config)
+    assert credentials['connectors']['irc']['channel_password']=='disposable-channel-key' and saved['bindings']==[]
+    args=SimpleNamespace(gateway_action='pair',binding='owner',connector='irc',sender='OwnerAccount',chat='#owner',
+        scope='',thread='',identity='owner',capabilities=['create','read','cancel','answer','pause','resume'])
+    gateway_setup.owner_gateway(args)
+    first=original_load(config=config)[0]['bindings'][0]
+    assert first['scope']=='irc.fixture.invalid:6697' and first['generation'] and first['since']
+    status=gateway_setup.owner_gateway(SimpleNamespace(gateway_action='status'))
+    assert status['credential_configured']==['irc'] and 'disposable-' not in json.dumps(status)
+    assert 'disposable-' not in json.dumps(initial_setup.gateway_configuration())
+    setup('rotated-private-channel-key')
+    assert original_load(config=config)[0]['bindings']==[]
+    gateway_setup.owner_gateway(args)
+    renewed=original_load(config=config)[0]['bindings'][0]
+    assert renewed['generation']!=first['generation']
+    source={'platform':'irc','sender':'OwnerAccount','chat':'#owner','scope':'irc.fixture.invalid:6697','thread':'',
+        'message_id':'c'*64,'is_bot':False,'text':'authorised IRC mission'}
+    assert GatewayPolicy(original_load(config=config)[0]).authorize('irc',source)==renewed
+    gateway_setup.owner_gateway(SimpleNamespace(gateway_action='revoke',binding='owner'))
+    with pytest.raises(PermissionError):GatewayPolicy(original_load(config=config)[0]).authorize('irc',source)
+    gateway_setup.owner_gateway(SimpleNamespace(gateway_action='remove',connector='irc'))
+    saved,credentials=original_load(config=config)
+    assert saved['connectors']==[] and saved['bindings']==[] and credentials['connectors']=={}
+    assert retained.read_text()=='must remain intact' and stopped
+    audit=(audit_directory/'audit.jsonl').read_text()
+    assert all(secret not in audit for secret in ['disposable-sasl-credential','disposable-server-credential','disposable-channel-key','rotated-private-channel-key'])
+    assert all('gateway.'+action in audit for action in ['setup','pair','revoke','remove'])
+    code='''
+from types import SimpleNamespace
+from haos.gateway_setup import owner_gateway
+import os
+assert os.geteuid() in {65533,65534} and os.getgroups()==[]
+try:owner_gateway(SimpleNamespace(gateway_action='status'))
+except PermissionError:pass
+else:raise AssertionError('unprivileged identity gained owner CLI authority')
+'''
+    modules=config/'public-modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*'):path.chmod(0o755 if path.is_dir() else 0o644)
+    (modules/'haos').chmod(0o755)
+    for uid in [65533,65534]:
+        result=subprocess.run([sys.executable,'-c',code],user=uid,group=uid,extra_groups=[],
+            capture_output=True,text=True,timeout=10,env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(modules),'PYTHONDONTWRITEBYTECODE':'1'})
+        assert result.returncode==0,result.stderr

@@ -110,9 +110,9 @@ def main():
         cases.append('actual_sqlite_reopen_replays_failed_local_admission_without_network')
         from haos.gateway_runtime import credential_redactor
         from haos.gateway_irc_transport import sasl_chunks
-        private={'server_password':'private-server-fixture','sasl_username':'bot-account','sasl_password':'private-sasl-fixture-'*32}
+        private={'server_password':'private-server-fixture','channel_password':'private-channel-key-fixture','sasl_username':'bot-account','sasl_password':'private-sasl-fixture-'*32}
         chunks=[x for x in sasl_chunks(private) if x!='+']
-        aliases=[private['server_password'],private['sasl_password'],''.join(chunks),*chunks]
+        aliases=[private['server_password'],private['channel_password'],private['sasl_password'],''.join(chunks),*chunks]
         redactor=credential_redactor({'connectors':{'irc':private}},policy())
         native.redactor=redactor;relay.redactor=redactor
         reflected=frame('private_aliases').replace('hello owner','echo '+' '.join(aliases))
@@ -123,6 +123,14 @@ def main():
         assert all(alias not in json.dumps(accepted[-1]) for alias in aliases)
         assert '[REDACTED]' in accepted[-1]['text']
         cases.append('actual_native_decode_and_durable_relay_never_receive_reflected_private_password_or_sasl_wire_aliases')
+        for method in ('send_voice','send_video','send_document','send_image_file','send_multiple_images'):
+            before=len(accepted)
+            try:await getattr(adapter,method)('#haos','/private/owner/not-an-approved-transfer')
+            except PermissionError as error:
+                assert '/private/owner' not in str(error) and 'no native binary file or voice transport' in str(error)
+            else:raise AssertionError('IRC inherited fake media transfer success')
+            assert len(accepted)==before
+            cases.append('unsupported_native_'+method+'_fails_without_upload_fallback_or_private_path_disclosure')
         config['bindings'][0]['sender']='Owner-Account'
         mixed_authority=snapshot(policy(),'irc','irc.fixture.invalid:6697')
         mixed=frame('mixed_case',account='Owner-Account').replace(' #haos ',' #HAOS ')

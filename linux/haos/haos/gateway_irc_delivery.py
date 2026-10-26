@@ -1,4 +1,4 @@
-"""Prepared native IRC writes with durable intent and correlated server echoes."""
+"""Native IRC writes with durable intent and correlated server echoes."""
 import asyncio
 from contextvars import ContextVar
 from copy import deepcopy

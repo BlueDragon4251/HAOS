@@ -1,4 +1,4 @@
-"""Prepared private IRC identity, persistent recovery and bounded reconnect."""
+"""Private IRC identity, persistent recovery and bounded reconnect."""
 import asyncio
 import fcntl
 import os
@@ -9,7 +9,7 @@ from types import MethodType,SimpleNamespace
 
 from .gateway import digest,GatewayPolicy
 from .gateway_irc_ingress import PreparedIRCPolicy,install as install_ingress,snapshot,dispatch_stored,validate_binding
-from .gateway_irc_transport import credentials,install as install_transport,AuthenticationRejected,RateLimited
+from .gateway_irc_transport import credentials,install as install_transport,AuthenticationRejected,RateLimited,DIAGNOSTICS,diagnostic
 
 STATES=frozenset({'created','connecting','streaming','disconnected','authentication-refused',
     'transport-unavailable','rate-limited','revoked','closed'})
@@ -49,6 +49,10 @@ def build(value,parent,connector,policy,inbox):
         try:home.mkdir(mode=0o700)
         except FileExistsError:pass
         _directory(home)
+        from .gateway_runtime import credential_redactor
+        from .redaction import Redactor
+        private=credential_redactor({'connectors':{connector:value}},current())
+        inbox.redactor=Redactor([*inbox.redactor.secrets,*private.secrets])
         os.environ['HERMES_SAFE_MODE']='1'
         from .gateway_matrix_profile import scope
         from .gateway_ingress import durable_adapter
@@ -86,13 +90,15 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publis
         identity TEXT PRIMARY KEY, connector TEXT NOT NULL, status TEXT NOT NULL,
         updated_at REAL NOT NULL, next_attempt REAL NOT NULL, gap_since REAL NOT NULL,
         credential_scope TEXT NOT NULL)''')
+    if 'last_error' not in {row[1] for row in db.execute('PRAGMA table_info(irc_profile_status)')}:
+        db.execute("ALTER TABLE irc_profile_status ADD COLUMN last_error TEXT NOT NULL DEFAULT ''")
     prior=db.execute('SELECT status,next_attempt,gap_since FROM irc_profile_status WHERE connector=? AND credential_scope=?',
         (connector,credential_scope)).fetchall()
     blocked=any(row['status']=='authentication-refused' for row in prior)
     deadline=max([row['next_attempt'] for row in prior]+[0])
     gap=min([row['gap_since'] for row in prior if row['gap_since']>0]+
         [min(b['since'] for b in adapter._haos_native.policy().bindings.values() if b['connector']==connector)/1000])
-    db.execute('INSERT OR IGNORE INTO irc_profile_status VALUES(?,?,?,?,?,?,?)',
+    db.execute('INSERT OR IGNORE INTO irc_profile_status(identity,connector,status,updated_at,next_attempt,gap_since,credential_scope) VALUES(?,?,?,?,?,?,?)',
         (identity,connector,'authentication-refused' if blocked else 'created',time.time(),deadline,gap,credential_scope))
     db.execute('UPDATE irc_profile_status SET status=CASE WHEN ? THEN ? ELSE status END,'
         'next_attempt=MAX(next_attempt,?),gap_since=CASE WHEN gap_since=0 THEN ? ELSE MIN(gap_since,?) END WHERE identity=?',
@@ -105,13 +111,13 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publis
     close_lock=asyncio.Lock()
 
     def health(self):
-        return dict(db.execute('SELECT connector,status,updated_at,next_attempt,gap_since FROM irc_profile_status WHERE identity=?',
+        return dict(db.execute('SELECT connector,status,updated_at,next_attempt,gap_since,last_error FROM irc_profile_status WHERE identity=?',
             (identity,)).fetchone())
 
-    def status(kind,delay=0):
-        if kind not in STATES:raise ValueError('invalid safe IRC profile status')
-        db.execute('UPDATE irc_profile_status SET status=?,updated_at=?,next_attempt=? WHERE identity=?',
-            (kind,time.time(),time.time()+delay if delay else 0,identity))
+    def status(kind,delay=0,error=''):
+        if kind not in STATES or error and error not in DIAGNOSTICS:raise ValueError('invalid safe IRC profile status')
+        db.execute('UPDATE irc_profile_status SET status=?,updated_at=?,next_attempt=?,last_error=? WHERE identity=?',
+            (kind,time.time(),time.time()+delay if delay else 0,error,identity))
 
     async def replay():
         try:
@@ -132,19 +138,19 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publis
                 boundary.current();row=health(adapter)
                 if row['status']=='authentication-refused':return
                 if row['next_attempt']>time.time():await asyncio.sleep(row['next_attempt']-time.time())
-                boundary.current();status('connecting')
+                boundary.current();status('connecting');error_code=''
                 try:
                     with scope(profile/'home',values):
                         await boundary.connect();status('streaming');failures=0
                         await boundary.receive()
-                except AuthenticationRejected:status('authentication-refused');return
-                except RateLimited as error:status('rate-limited',error.retry_after);continue
+                except AuthenticationRejected as error:status('authentication-refused',error=diagnostic(error));return
+                except RateLimited as error:status('rate-limited',error.retry_after,diagnostic(error));continue
                 except PermissionError:raise
-                except Exception:pass
+                except Exception as error:error_code=diagnostic(error)
                 finally:await boundary.disconnect()
                 delay=adapter._haos_irc_retry_steps[min(failures,len(adapter._haos_irc_retry_steps)-1)]
-                failures+=1;status('transport-unavailable',delay)
-        except PermissionError:status('revoked')
+                failures+=1;status('transport-unavailable',delay,error_code)
+        except PermissionError:status('revoked',error='permission-revoked')
         finally:adapter._mark_disconnected();await boundary.disconnect()
 
     async def disconnect(self):
@@ -156,7 +162,7 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publis
         await boundary.disconnect()
         row=health(self)
         if row['status'] not in {'authentication-refused','revoked','closed'}:
-            status('disconnected',max(0,row['next_attempt']-time.time()))
+            status('disconnected',max(0,row['next_attempt']-time.time()),row['last_error'])
 
     async def connect(self,**_kwargs):
         if self._haos_irc_closed or self._haos_irc_connect_task is not None:
@@ -194,7 +200,7 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publis
                     try:
                         row=health(self)
                         if row['status'] not in {'authentication-refused','revoked'}:
-                            status('closed',max(0,row['next_attempt']-time.time()))
+                            status('closed',max(0,row['next_attempt']-time.time()),row['last_error'])
                     finally:os.close(fd)
 
     def no_global_status(self,*_args,**_kwargs):return None

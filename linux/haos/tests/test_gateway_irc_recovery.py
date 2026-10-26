@@ -116,3 +116,17 @@ def test_private_irc_outgoing_metadata_rejects_invalid_or_unbounded_fields(tmp_p
         inbox.db.execute('UPDATE irc_delivery_intents SET '+field+'=?',(value,))
         with pytest.raises(ValueError):outgoing(inbox)
     finally:inbox.close()
+
+
+@pytest.mark.parametrize('code',['channel-key-required','nickname-in-use','private-untrusted-vendor-error',None])
+def test_private_irc_owner_diagnostics_are_bounded_and_legacy_journals_remain_readable(tmp_path,code):
+    inbox,policy,params=fixture(tmp_path)
+    try:
+        assert all('last_error' not in row for row in unresolved(inbox)['transport'])
+        inbox.db.execute("ALTER TABLE irc_profile_status ADD COLUMN last_error TEXT DEFAULT ''")
+        inbox.db.execute("UPDATE irc_profile_status SET last_error=? WHERE identity='auth'",(code,))
+        if code in {'channel-key-required','nickname-in-use'}:
+            assert any(row.get('last_error')==code for row in unresolved(inbox)['transport'])
+        else:
+            with pytest.raises(ValueError):unresolved(inbox)
+    finally:inbox.close()

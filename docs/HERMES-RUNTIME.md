@@ -1485,3 +1485,30 @@ at both 1280x800 and 640x480 with distinct TLS-ready/unverified-external wording
 Full frozen and minimal Python 3.11 suites each pass 1,321 tests with two existing
 skips and the unchanged local backup-file exception. Public LINE setup and full
 gateway acceptance remain pending; no external DNS/router/account test claimed.
+
+### 2026-10-26 — IRC gateway software closure
+
+IRC now includes owner-managed private `+k` channel keys, exact JOIN parameter
+encoding (including leading colon), automatic private credential/wire-alias
+redaction at profile construction, and explicit refusal of non-native binary
+file/voice transfer methods. Those methods cannot emit misleading fallback
+success or private host paths. CLI port errors no longer echo arbitrary pasted
+input. GUI catalogue availability now follows the actual authorized transport
+set, including IRC and Home Assistant.
+
+Bounded diagnostic codes persist in an additive IRC profile column, survive
+close and appear through private owner inspection and GUI. They distinguish
+nickname, channel key/invite/ban/full/not-found/forwarding, capability and network/
+TLS problems without vendor text. Legacy journals remain readable. The runtime
+checks its actual service UID/GID and supplementary groups before credential
+loading; actual UID/NSS tests exercise valid/invalid identities and groups.
+
+The comprehensive scope/operation/acceptance matrix is `docs/GATEWAY-IRC.md`.
+Local validation passes both Python 3.11 environments (1,330 tests, two existing
+skips, unchanged local backup-file exception), 151 native IRC cases (37 input,
+54 transport, 21 profile, 39 delivery), 12 IRC GUI cases at both resolutions,
+all existing gateway GUI regressions and both complete embedded GUI workflow
+programs. Actual Root/UID/credential/recovery coverage is 79 cases, plus three
+actual installed-code/UID/TLS/SIGKILL process cases using public GatewayPolicy.
+The exact implementation commit still requires green CI; live server/account,
+recipient and installed-machine acceptance is separate. No final HAOS release.

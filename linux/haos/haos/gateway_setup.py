@@ -250,15 +250,20 @@ def owner_gateway(args):
         if args.platform=='irc':
             from .gateway_irc_transport import credentials as irc_credentials
             server=input('IRC TLS hostname (system-trusted certificate required): ')
-            port=int(input('IRC TLS port [6697]: ') or '6697')
+            raw_port=input('IRC TLS port [6697]: ') or '6697'
+            if not raw_port.isascii() or not raw_port.isdecimal() or len(raw_port)>5 or not 1<=int(raw_port)<=65535:
+                raise ValueError('IRC TLS port must contain digits from 1 to 65535')
+            port=int(raw_port)
             nickname=input('IRC bot nickname: ');channel=input('Exact canonical IRC channel (#channel or &channel): ')
             username=input('SASL account (empty for no account login): ')
             if not username and input('Explicitly approve no SASL login by typing ANONYMOUS: ')!='ANONYMOUS':
                 raise ValueError('explicit owner approval of anonymous IRC connection required')
             password=getpass.getpass('Private SASL password: ') if username else ''
             server_password=getpass.getpass('Private server PASS password (optional): ')
+            channel_password=getpass.getpass('Private channel key (optional, for +k channels): ')
             credentials['connectors'][args.connector]=irc_credentials({'server':server,'port':port,'nickname':nickname,'channel':channel,
                 **({'server_password':server_password} if server_password else {}),
+                **({'channel_password':channel_password} if channel_password else {}),
                 **({'sasl_username':username,'sasl_password':password} if username else {})})
         if args.platform=='homeassistant':
             from .gateway_homeassistant_profile import credentials as ha_credentials

@@ -58,9 +58,8 @@ def main():
     script.write_text('''
 import asyncio,json,os,pwd,sys
 from pathlib import Path
-from haos.gateway import digest
-from haos.gateway_irc_ingress import PreparedIRCPolicy
-from haos.gateway_runtime import build_adapter,delivery_result
+from haos.gateway import digest,GatewayPolicy
+from haos.gateway_runtime import build_adapter
 from haos.gateway_delivery import delivery_result
 from haos.gateway_raw import NativeInbox
 from haos.redaction import Redactor
@@ -83,7 +82,7 @@ async def exercise():
     root=Path(request['state']);inbox=NativeInbox(root/'native.db',Redactor([request['credentials']['server_password']]))
     before=inbox.db.execute("SELECT state FROM irc_delivery_intents").fetchone() if request['action']=='recover' else None
     parent=root/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
-    policy=lambda:PreparedIRCPolicy(request['policy'])
+    policy=lambda:GatewayPolicy(request['policy'])
     adapter=build_adapter('irc',request['credentials'],irc_context={'parent':parent,'connector':'irc','policy':policy,'inbox':inbox})
     adapter.set_durable_message_handler(lambda event:False)
     try:
@@ -99,7 +98,7 @@ async def exercise():
             'result':result,'private_owner_denied':True,'kernel_lease_reacquired':True}),flush=True)
     finally:await adapter.close_profile();inbox.close()
 asyncio.run(exercise())
-'''.replace('from haos.gateway_runtime import build_adapter,delivery_result','from haos.gateway_runtime import build_adapter'))
+''')
     script.chmod(0o644)
     state={'writes':0,'connections':0,'seen':asyncio.Event(),'writers':set(),'tasks':set()}
     cases=[]
@@ -174,7 +173,7 @@ asyncio.run(exercise())
             if state['tasks']:await asyncio.gather(*list(state['tasks']),return_exceptions=True)
     asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uid_cases':[0,65533,65534],
-        'actual_sigkill':True,'tls_verification_disabled':False,'public_gateway_enabled':False,
+        'actual_sigkill':True,'tls_verification_disabled':False,'public_gateway_enabled':True,
         'external_connections_or_recipient_acceptance':False,'installed_haos_accepted':False},indent=2))
 
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from .provider_registry import registry, http_providers
+from .gateway import SUPPORTED
 
 _EXPORT = json.loads(Path(__file__).with_name("hermes_registry.json").read_text())
 PINNED_HERMES_SHA = _EXPORT["hermes_sha"]
@@ -17,7 +18,7 @@ HERMES_PLATFORMS = tuple(_EXPORT["platforms"])
 # Implemented owner provisioning, transport, and security admission paths.
 # The pinned Hermes picker uses 'openai-api'; HAOS's policy uses 'openai'.
 HAOS_GUI_PROVIDERS = http_providers() | {"lmstudio", "nous", "openai-codex", "xai-oauth", "minimax-oauth", "gemini", "bedrock", "vertex", "azure-foundry", "moa", "custom", "copilot", "copilot-acp", "qwen-oauth"}
-HAOS_GUI_GATEWAYS = frozenset({"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"})
+HAOS_GUI_GATEWAYS = frozenset(SUPPORTED)
 # Local compatible model API is an HAOS route but not a Hermes vendor slug.
 HAOS_EXTRA_GUI_PROVIDERS = (("local", "Lokaler OpenAI-kompatibler Server"),)
 # Codex is supported via authenticated owner CLI, NOT graphical OAuth.

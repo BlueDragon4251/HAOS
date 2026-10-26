@@ -1,7 +1,8 @@
-"""Prepared bounded TLS/IRCv3 subscription; public setup and delivery stay disabled."""
+"""Bounded TLS/IRCv3 subscription behind independent exact owner authority."""
 import asyncio
 import base64
 import re
+import socket
 import ssl
 import time
 from types import MethodType
@@ -10,8 +11,28 @@ from .gateway import digest
 from .gateway_irc_ingress import REQUIRED_CAPS,snapshot,capture,dispatch_stored
 
 
+DIAGNOSTICS=frozenset({'protocol-refused','required-capabilities','unsupported-case-mapping','nickname-in-use',
+    'channel-full','channel-invite-required','channel-banned','channel-key-required','channel-not-found',
+    'account-required','channel-forwarding-refused','authentication-refused','rate-limited','permission-revoked',
+    'tls-certificate','tls-protocol','dns','connection-refused','timeout','connection-lost'})
+
+
 class Rejected(ConnectionError):
-    pass
+    def __init__(self,message,*,code='protocol-refused'):
+        super().__init__(message)
+        self.code=code if code in DIAGNOSTICS else 'protocol-refused'
+
+
+def diagnostic(error):
+    if isinstance(error,ssl.SSLCertVerificationError):return 'tls-certificate'
+    if isinstance(error,ssl.SSLError):return 'tls-protocol'
+    if isinstance(error,socket.gaierror):return 'dns'
+    if isinstance(error,ConnectionRefusedError):return 'connection-refused'
+    if isinstance(error,TimeoutError):return 'timeout'
+    if isinstance(error,AuthenticationRejected):return 'authentication-refused'
+    if isinstance(error,RateLimited):return 'rate-limited'
+    if isinstance(error,PermissionError):return 'permission-revoked'
+    return error.code if isinstance(error,Rejected) else 'connection-lost'
 
 
 class AuthenticationRejected(Rejected):
@@ -24,7 +45,7 @@ class RateLimited(Rejected):
 
 def credentials(value):
     required={'server','port','nickname','channel'}
-    if not isinstance(value,dict) or not required<=set(value)<=required|{'server_password','nickserv_password','sasl_username','sasl_password'}:
+    if not isinstance(value,dict) or not required<=set(value)<=required|{'server_password','nickserv_password','sasl_username','sasl_password','channel_password'}:
         raise ValueError('exact private IRC connection fields required')
     host=value['server'];port=value['port'];nick=value['nickname'];channel=value['channel']
     if (not isinstance(host,str) or len(host)>253 or host!=host.lower()
@@ -46,6 +67,10 @@ def credentials(value):
     # Do not send a password to a potentially unregistered NickServ nickname.
     # SASL authenticates to the TLS server; this option instead addresses a nick.
     if value.get('nickserv_password'):raise ValueError('IRC NickServ credential requires a reviewed authenticated service path')
+    channel_key=value.get('channel_password','')
+    if (not isinstance(channel_key,str) or len(channel_key)>128
+            or any(ord(c)<33 or ord(c)>126 or c==',' for c in channel_key)):
+        raise ValueError('bounded private IRC channel key without protocol separators required')
     return dict(value)
 
 
@@ -76,6 +101,9 @@ class Boundary:
         self._sasl_stage='none';self._sasl_logged_in=False
         self._sasl_chunks=sasl_chunks(self.value)
 
+    def join_command(self):
+        return 'JOIN '+self.value['channel']+(' :'+self.value['channel_password'] if self.value.get('channel_password') else '')
+
     def current(self):
         if (self.closed or digest(self.value)!=self.identity
                 or self.adapter.server!=self.value['server'] or self.adapter.port!=self.value['port']
@@ -95,7 +123,7 @@ class Boundary:
             raise Rejected('invalid IRC control frame')
         allowed={'CAP LS 302','CAP REQ :'+ ' '.join(sorted(self.required)),'CAP END',
             'NICK '+self.value['nickname'],'USER '+self.value['nickname']+' 0 * :HAOS private gateway',
-            'JOIN '+self.value['channel']}
+            self.join_command()}
         if self.value.get('server_password'):allowed.add('PASS '+self.value['server_password'])
         if self._sasl_stage=='mechanism':allowed.add('AUTHENTICATE PLAIN')
         if self._sasl_stage=='payload':allowed.update('AUTHENTICATE '+chunk for chunk in self._sasl_chunks)
@@ -107,7 +135,7 @@ class Boundary:
         self.current()
         if self.reader is None:raise Rejected('IRC connection unavailable')
         try:raw=await asyncio.wait_for(self.reader.readuntil(b'\r\n'),timeout)
-        except (asyncio.IncompleteReadError,asyncio.LimitOverrunError):raise Rejected('IRC framing interrupted or oversized') from None
+        except (asyncio.IncompleteReadError,asyncio.LimitOverrunError):raise Rejected('IRC framing interrupted or oversized',code='connection-lost') from None
         self.current()
         if len(raw)>4098:raise Rejected('IRC frame exceeds bound')
         try:return raw[:-2].decode('utf-8',errors='strict')
@@ -135,10 +163,14 @@ class Boundary:
             if len(msg['params'])!=1:raise Rejected('invalid IRC keepalive')
             await self.write('PONG :'+msg['params'][0]);return True
         if msg['command']=='005' and any(part.startswith('CASEMAPPING=') and part.split('=',1)[1] not in {'ascii','rfc1459','strict-rfc1459'} for part in msg['params']):
-            raise Rejected('IRC server case mapping is unsupported')
+            raise Rejected('IRC server case mapping is unsupported',code='unsupported-case-mapping')
         if msg['command'] in {'263','439'}:raise RateLimited('IRC server deferred account traffic')
         if msg['command'] in {'464','465'}:
             raise AuthenticationRejected('IRC account or server access refused')
+        errors={'433':'nickname-in-use','471':'channel-full','473':'channel-invite-required','474':'channel-banned',
+            '475':'channel-key-required','477':'account-required','403':'channel-not-found','470':'channel-forwarding-refused'}
+        if msg['command'] in errors:
+            raise Rejected('IRC server refused requested nickname or channel',code=errors[msg['command']])
         if msg['command']=='ERROR' or re.fullmatch(r'[45][0-9]{2}',msg['command']):
             raise Rejected('IRC server refused registration or subscription')
         return False
@@ -176,18 +208,18 @@ class Boundary:
                             name,sep,values=part.partition('=');offered.add(name)
                             if name=='sasl' and sep:mechanisms=values.split(',')
                         if len(params)==4 and params[2]=='*':continue
-                        if not self.required<=offered:raise Rejected('IRC server lacks required account capabilities')
+                        if not self.required<=offered:raise Rejected('IRC server lacks required account capabilities',code='required-capabilities')
                         if 'sasl' in self.required and mechanisms is not None and 'PLAIN' not in mechanisms:
                             raise AuthenticationRejected('IRC server does not offer reviewed TLS SASL mechanism')
                         await self.write('CAP REQ :'+ ' '.join(sorted(self.required)));requested=True
                     elif operation=='ACK' and requested and not self.capabilities:
                         acknowledged=frozenset(params[-1].split())
-                        if acknowledged!=self.required:raise Rejected('IRC account capabilities were not confirmed')
+                        if acknowledged!=self.required:raise Rejected('IRC account capabilities were not confirmed',code='required-capabilities')
                         self.capabilities=acknowledged
                         if 'sasl' in self.required:
                             self._sasl_stage='mechanism';await self.write('AUTHENTICATE PLAIN');self._sasl_stage='challenge'
                         else:await self.write('CAP END')
-                    else:raise Rejected('IRC capability negotiation refused or changed')
+                    else:raise Rejected('IRC capability negotiation refused or changed',code='required-capabilities')
                 elif command=='AUTHENTICATE':
                     if self._sasl_stage!='challenge' or params!=['+']:
                         raise AuthenticationRejected('IRC SASL challenge was not expected')
@@ -209,7 +241,7 @@ class Boundary:
                     if ('sasl' in self.required and self._sasl_stage!='complete'
                             or not self.capabilities or registered or not params or params[0].lower()!=self.value['nickname'].lower()):
                         raise Rejected('IRC registration preceded verified capabilities or changed nickname')
-                    registered=True;await self.write('JOIN '+self.value['channel'])
+                    registered=True;await self.write(self.join_command())
                 elif command=='JOIN':
                     if (not registered or msg['prefix'].split('!',1)[0].lower()!=self.value['nickname'].lower()
                             or len(params)!=1 or params[0].lower()!=self.value['channel']):raise Rejected('IRC subscription target changed')

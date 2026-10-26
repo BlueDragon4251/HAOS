@@ -17,7 +17,7 @@ def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from haos.gateway import GatewayPolicy
     from haos.gateway_irc_ingress import PreparedIRCPolicy,install as ingress
-    from haos.gateway_irc_transport import install,Rejected
+    from haos.gateway_irc_transport import install,Rejected,diagnostic
     from haos.gateway_ingress import durable_adapter
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
@@ -60,7 +60,7 @@ def main():
                 writer.write(value.encode() if isinstance(value,str) else value);await writer.drain()
             async def get():
                 value=(await asyncio.wait_for(reader.readuntil(b'\r\n'),2)).decode().strip()
-                redacted=('<private PASS>' if value.startswith('PASS ') else '<private SASL payload>'
+                redacted=('<private JOIN key>' if value.startswith('JOIN ') and ' :' in value else '<private PASS>' if value.startswith('PASS ') else '<private SASL payload>'
                     if value.startswith('AUTHENTICATE ') and value not in {'AUTHENTICATE PLAIN','AUTHENTICATE +'} else value)
                 state['commands'].append(redacted);return value
             try:
@@ -71,7 +71,8 @@ def main():
                     line=await get()
                 assert line.startswith('NICK ')
                 assert (await get()).startswith('USER ')
-                if mode=='early_registration':await put(':server 001 haos-bot :welcome\r\n')
+                if mode.startswith('numeric_'):await put(':server '+mode.split('_',1)[1]+' haos-bot :private vendor text must not escape\r\n')
+                elif mode=='early_registration':await put(':server 001 haos-bot :welcome\r\n')
                 elif mode=='server_password_refused':await put(':server 464 haos-bot :access refused\r\n')
                 elif mode=='unknown_case_mapping':await put(':server 005 haos-bot CASEMAPPING=vendor-sensitive :unsupported\r\n')
                 elif mode=='duplicate_control_tags':await put('@time=one;time=two :server CAP haos-bot LS :account-tag server-time message-tags\r\n')
@@ -117,7 +118,7 @@ def main():
                         assert await get()=='CAP END'
                         await put(':server 001 '+('other-bot' if mode=='changed_nickname' else 'haos-bot')+' :welcome\r\n')
                         if mode!='changed_nickname':
-                            assert await get()=='JOIN #haos'
+                            assert await get()==('JOIN #haos ::private-channel-key' if mode=='channel_key' else 'JOIN #haos')
                             await put(':haos-bot!bot@server JOIN :'+('#wrong' if mode=='wrong_join' else '#haos')+'\r\n')
                             if mode in {'good','tagged_controls'}:
                                 await put('PING :local-keepalive\r\n')
@@ -151,6 +152,7 @@ def main():
             native=NativeInbox(home/'native.db',Redactor());relay=RelayInbox(home/'relay.db',Redactor())
             value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
             if mode=='server_password':value['server_password']='disposable-private-server-password'
+            if mode=='channel_key':value['channel_password']=':private-channel-key'
             if mode.startswith('sasl_'):value.update(sasl_username='bot-account',sasl_password=sasl_password(mode))
             adapter=ingress(durable_adapter(IRCAdapter(PlatformConfig(enabled=True,extra=value))))
             adapter._haos_native=SimpleNamespace(connector='irc',policy=policy,inbox=native)
@@ -204,6 +206,16 @@ def main():
                     assert boundary.status=='authentication-refused'
                     before=list(state['commands']);await refused(boundary.connect);assert state['commands']==before
                 cases.append('actual_tls_'+mode+'_never_admits_messages')
+            for numeric,code in [('433','nickname-in-use'),('471','channel-full'),('473','channel-invite-required'),
+                    ('474','channel-banned'),('475','channel-key-required'),('477','account-required'),
+                    ('403','channel-not-found'),('470','channel-forwarding-refused')]:
+                boundary,adapter,config,accepted=build('numeric_'+numeric)
+                try:await boundary.connect()
+                except Rejected as error:
+                    assert diagnostic(error)==code and 'private vendor text' not in str(error)
+                else:raise AssertionError('IRC server refusal was accepted')
+                assert not accepted and boundary.writer is None
+                cases.append('actual_tls_numeric_'+numeric+'_provides_safe_specific_owner_diagnostic_without_vendor_text')
             for mode in ['cap_loss','live_eof','kick','part','nick_change']:
                 boundary,adapter,config,accepted=build(mode);assert await boundary.connect()
                 await refused(boundary.receive)
@@ -214,6 +226,11 @@ def main():
             assert not any('disposable-private-server-password' in x for x in state['commands'])
             await boundary.disconnect()
             cases.append('private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log')
+            boundary,adapter,config,accepted=build('channel_key')
+            assert await boundary.connect() and '<private JOIN key>' in state['commands']
+            assert not any(':private-channel-key' in command for command in state['commands'])
+            await boundary.disconnect()
+            cases.append('private_channel_key_with_leading_colon_crosses_only_verified_tls_with_exact_parameter_encoding')
             for attribute,value in [('server','other.fixture.invalid'),('port',6667),('channel','#other'),
                     ('use_tls',False),('server_password','changed'),('nickserv_password','unapproved'),('nickname','other-bot')]:
                 boundary,adapter,config,accepted=build('idle');assert await boundary.connect()

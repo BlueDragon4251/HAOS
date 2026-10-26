@@ -715,6 +715,7 @@ class Wizard:
             irc_nick=self._field(irc_credentials,'IRC Bot-Nickname','haos-bot')
             irc_channel=self._field(irc_credentials,'IRC Kanal · exakt #kanal oder &kanal','#haos')
             irc_server_password=self._field(irc_credentials,'IRC Server-Passwort · optional',secret=True)
+            irc_channel_password=self._field(irc_credentials,'IRC Kanal-Schlüssel · optional für +k',secret=True)
             irc_user=self._field(irc_credentials,'IRC SASL-Konto · exakter serverseitiger Kontoname')
             irc_password=self._field(irc_credentials,'IRC SASL-Passwort',secret=True)
             irc_anonymous=tk.BooleanVar(value=False)
@@ -730,7 +731,8 @@ class Wizard:
                 'sowie stabile msgid-Tags. Für Antworten sind zusätzlich echo-message, labeled-response und batch erforderlich. '
                 'Absender ist der tatsächlich angemeldete IRC-Kontoname, niemals nur ein Nickname. In Kanälen den Bot ansprechen: botname: Aufgabe. '
                 'Antworten sehen alle Kanalmitglieder. Ein Server-Echo beweist keinen Empfang bei einzelnen Personen; Spamfilter können Echos vortäuschen. '
-                'Keine NickServ-Passwortweitergabe, DCC-, Medien- oder Voice-Freigabe. Unbekannte Offline-Ereignisse werden nicht als wiederhergestellt behauptet. '
+                'Der gepinnte IRC-Adapter überträgt Text und HTTPS-Links, keine binären Datei- oder Voice-Uploads. '
+                'Keine NickServ-Passwortweitergabe oder DCC-Freigabe. Unbekannte Offline-Ereignisse werden nicht als wiederhergestellt behauptet. '
                 'Beim Speichern Zugangsdaten erneut eingeben; ohne SASL ist eine ausdrückliche Freigabe nötig.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
             def irc_port_number(text):
                 if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1<=int(text)<=65535:
@@ -748,6 +750,8 @@ class Wizard:
                 irc_values={'server':irc_server.get(),'port':irc_port.get(),'nickname':irc_nick.get(),'channel':irc_channel.get(),
                     'server_password':irc_server_password.get(),'sasl_username':irc_user.get(),'sasl_password':irc_password.get(),
                     'anonymous':irc_anonymous.get()}
+                if irc_channel_password.get():irc_values['channel_password']=irc_channel_password.get()
+                irc_channel_password.delete(0,tk.END)
                 irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
                 if platform.get()=='ntfy':trust_publishers.set(False)
                 if platform.get()=='homeassistant':reset_ha_consent()
@@ -769,7 +773,7 @@ class Wizard:
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
                 ha_server.delete(0,tk.END)
-                irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_user.delete(0,tk.END);irc_anonymous.set(False)
+                irc_server_password.delete(0,tk.END);irc_channel_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_user.delete(0,tk.END);irc_anonymous.set(False)
                 for field,default in ((irc_server,''),(irc_port,'6697'),(irc_nick,'haos-bot'),(irc_channel,'#haos')):
                     field.delete(0,tk.END);field.insert(0,default)
                 if platform.get()=='irc':
@@ -806,7 +810,7 @@ class Wizard:
                 else:matrix_credentials.pack_forget()
                 self.root.after_idle(irc_pair_changed)
             def reset_irc_secrets(*_args):
-                irc_server_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
+                irc_server_password.delete(0,tk.END);irc_channel_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
             for field in (irc_server,irc_port):
                 variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
                 variable.trace_add('write',reset_irc_secrets)
@@ -1009,6 +1013,7 @@ class Wizard:
             platform.trace_add('write',irc_pair_changed)
             for field in (irc_server,irc_port):field._haos_public_value.trace_add('write',irc_pair_changed)
             irc_channel_value=tk.StringVar(value=irc_channel.get());irc_channel.configure(textvariable=irc_channel_value);irc_channel._haos_public_value=irc_channel_value
+            irc_channel_value.trace_add('write',lambda *_args:irc_channel_password.delete(0,tk.END))
             irc_channel_value.trace_add('write',irc_pair_changed)
             def retry_irc():
                 selected_connector=connector.get()
@@ -1160,6 +1165,28 @@ class Wizard:
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · unbeobachtete Ereignisse seit '+datetime.datetime.fromtimestamp(gap).strftime('%d.%m.%Y %H:%M:%S')
                                 +' sind nicht verlässlich nachladbar; Wiederverbindung schließt diese Lücke nicht' if gap>0 else ''))
+                    if item.get('platform')=='irc' and item.get('last_error'):
+                        diagnostics={'protocol-refused':'Serverprotokoll abgelehnt; erforderliche IRCv3-Fähigkeiten prüfen',
+                            'required-capabilities':'Server bestätigt erforderliche IRCv3-Fähigkeiten nicht',
+                            'unsupported-case-mapping':'Server verwendet eine nicht unterstützte Namenszuordnung',
+                            'nickname-in-use':'Bot-Nickname belegt; anderen Namen konfigurieren oder Freigabe abwarten',
+                            'channel-full':'Kanal ist voll; Kanalverwaltung prüfen',
+                            'channel-invite-required':'Bot muss zuerst in den Kanal eingeladen werden',
+                            'channel-banned':'Bot oder Konto ist im Kanal gesperrt; Kanalrechte prüfen',
+                            'channel-key-required':'Kanal verlangt einen gültigen privaten +k-Schlüssel',
+                            'channel-not-found':'Freigegebener Kanal ist nicht verfügbar',
+                            'account-required':'Server verlangt ein angemeldetes Konto; SASL konfigurieren',
+                            'channel-forwarding-refused':'Server wollte in einen anderen Kanal umleiten; keine Freigabe geerbt',
+                            'authentication-refused':'Server-/SASL-Anmeldung abgelehnt; Zugangsdaten und Konto prüfen',
+                            'rate-limited':'Server begrenzt Anfragen; gespeicherte Wartefrist gilt',
+                            'permission-revoked':'Owner-Freigabe entzogen oder geändert',
+                            'tls-certificate':'TLS-Zertifikat oder Hostname nicht vertrauenswürdig; Serverzertifikat prüfen',
+                            'tls-protocol':'Sichere TLS-Verbindung nicht verfügbar',
+                            'dns':'Servername konnte nicht aufgelöst werden',
+                            'connection-refused':'Server lehnt TCP-Verbindung ab; Adresse, Port und Firewall prüfen',
+                            'timeout':'Server antwortet nicht rechtzeitig',
+                            'connection-lost':'Verbindung oder vollständiger Protokollrahmen unterbrochen'}
+                        extra+=' · letzter Fehler: '+diagnostics[item['last_error']]
                     self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+labels[item['status']]
                         +extra+' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for history in value.get('history',[]):

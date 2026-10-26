@@ -72,6 +72,7 @@ def main():
                 assert nickline.startswith('NICK ');nick=nickline.split(' ',1)[1]
                 assert (await get()).startswith('USER ')
                 if mode=='hang':await reader.read();return
+                if mode=='nickname_refused':await put(':server 433 '+nick+' :private vendor refusal text\r\n');await reader.read();return
                 if mode=='auth_refused':await put(':server 464 '+nick+' :access refused\r\n');await reader.read();return
                 if mode=='rate_limited':await put(':server 263 '+nick+' CAP :try later\r\n');await reader.read();return
                 caps=' '.join(sorted(REQUIRED_CAPS if mode=='incoming_only' else REQUIRED_CAPS|DELIVERY_CAPS))
@@ -164,6 +165,16 @@ def main():
             await asyncio.gather(adapter.close_profile(),adapter.close_profile())
             assert not adapter.is_connected and adapter._haos_irc_worker is None and adapter._haos_irc_replay is None
             cases.append('concurrent_close_joins_workers_and_releases_kernel_lease_once')
+            state['mode']='nickname_refused';adapter=build()
+            connecting=asyncio.create_task(adapter.connect())
+            await until(lambda:adapter.irc_status()['last_error']=='nickname-in-use')
+            await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
+            assert adapter.irc_status()['last_error']=='nickname-in-use'
+            from haos.gateway_raw_recovery import unresolved
+            metadata=unresolved(native)
+            assert any(item.get('last_error')=='nickname-in-use' for item in metadata['transport'])
+            assert 'private vendor refusal text' not in json.dumps(metadata)
+            cases.append('actual_tls_specific_diagnostic_survives_profile_close_and_private_owner_inspection_without_vendor_text')
             state['mode']='auth_refused';adapter=build();before=state['connections']
             assert not await adapter.connect();assert adapter.irc_status()['status']=='authentication-refused'
             assert state['connections']==before+1

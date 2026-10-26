@@ -139,4 +139,8 @@ def install(adapter):
     adapter._handle_line=MethodType(deny,adapter)
     adapter.build_source=MethodType(source,adapter)
     adapter.handle_message=MethodType(handle,adapter)
+    async def no_native_transfer(_self,*_args,**_kwargs):
+        raise PermissionError('IRC has no native binary file or voice transport; send approved text or HTTPS links')
+    for name in ('send_voice','send_video','send_document','send_image_file','send_multiple_images'):
+        setattr(adapter,name,MethodType(no_native_transfer,adapter))
     return adapter

@@ -7,6 +7,7 @@ import importlib
 import json
 import logging
 import os
+import pwd
 import signal
 from pathlib import Path
 
@@ -159,7 +160,7 @@ def credential_redactor(credentials, policy):
     """Register private wire aliases before SDK logging or durable admission."""
     import base64
     secrets=[item[key] for item in credentials['connectors'].values()
-        for key in ('token','app_token','recovery_key','server_password','nickserv_password','sasl_password','channel_secret','channel_access_token') if item.get(key)]
+        for key in ('token','app_token','recovery_key','server_password','channel_password','nickserv_password','sasl_password','channel_secret','channel_access_token') if item.get(key)]
     for name,item in credentials['connectors'].items():
         if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
             secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
@@ -182,7 +183,15 @@ def delivery_metadata(delivery,platform):
     return metadata
 
 
+def require_runtime_identity():
+    account=pwd.getpwnam('haos-gateway')
+    if (account.pw_uid==0 or account.pw_gid==0 or os.geteuid()!=account.pw_uid
+            or os.getegid()!=account.pw_gid or not set(os.getgroups())<={account.pw_gid}):
+        raise PermissionError('gateway runtime requires its unprivileged service UID/GID without supplementary authority')
+
+
 async def serve():
+    require_runtime_identity()
     from .gateway_publication import pending, validate_snapshot
     config = Path("/etc/haos")
     if pending(config):

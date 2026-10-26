@@ -23,7 +23,7 @@ def main():
     initial_setup.pair_gateway_sender=lambda *args,**kwargs:pairs.append((args,kwargs))
     initial_setup.retry_irc_gateway_auth=lambda connector:retries.append(connector) or {'network_requested':False}
     initial_setup.gateway_ingress=lambda after:{'ingress':[],'next_cursor':after,'transport':[
-        {'platform':'irc','connector':'irc-main','status':'streaming','updated_at':123,'next_attempt':0,'gap_since':42}],
+        {'platform':'irc','connector':'irc-main','status':'streaming','updated_at':123,'next_attempt':0,'gap_since':42,'last_error':'channel-key-required'}],
         'native_outgoing':[{'platform':'irc','delivery_id':'a'*64,'state':'confirmed','confirmed_chunks':2,
             'chunk_count':2,'server_echo_receipt':'irc_echo_'+'b'*64}]}
     wizard=Wizard(tk)
@@ -67,6 +67,12 @@ def main():
             'server_password':'private-gui-server-fixture','sasl_username':'bot-account','sasl_password':'private-gui-sasl-fixture','anonymous':False})]
         assert password.get()==server_password.get()==''
         cases.append('masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit')
+        key=fill('IRC Kanal-Schlüssel','private-channel-key-fixture')
+        assert key.cget('show')
+        fill('IRC SASL-Passwort','private-gui-sasl-fixture')
+        button('Gateway sicher anlegen').invoke();settle()
+        assert calls[-1][1]['channel_password']=='private-channel-key-fixture' and key.get()==password.get()==''
+        cases.append('masked_private_channel_key_reaches_real_backend_handoff_and_clears_after_submit')
         anonymous.invoke();wizard.root.update()
         assert field('IRC SASL-Konto').get()==field('IRC SASL-Passwort').get()==''
         assert str(field('IRC SASL-Konto').cget('state'))=='disabled'
@@ -79,6 +85,10 @@ def main():
         assert pairs[-1]==(('my-device','irc-main','Owner-Account','#owner','personal',('create','read')),
             {'scope':'irc.fixture.invalid:6697','thread':'','irc_server':'irc.fixture.invalid','irc_port':6697,'irc_channel':'#owner'})
         cases.append('actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend')
+        fill('IRC Kanal-Schlüssel','unsaved-other-channel-key');fill('IRC Kanal','#other')
+        assert key.get()=='' and field('Chat-ID').get()=='#other'
+        fill('IRC Kanal','#owner')
+        cases.append('changing_channel_cannot_inherit_a_key_approved_for_the_previous_channel')
         button('IRC-Konto nach Korrektur erneut prüfen').invoke();settle();assert retries==['irc-main']
         cases.append('actual_authentication_recheck_control_calls_offline_backend')
         fill('IRC SASL-Konto','other-account');fill('IRC SASL-Passwort','unsubmitted-private-fixture')
@@ -97,6 +107,7 @@ def main():
         button('Gateway-Dienst stoppen und gespeicherte Eingänge prüfen').invoke();settle()
         labels=' '.join(str(w.cget('text')) for w in widgets(wizard.content) if isinstance(w,tk.Label))
         assert 'IRC angemeldet' in labels and 'nicht verlässlich nachladbar' in labels
+        assert 'Kanal verlangt einen gültigen privaten +k-Schlüssel' in labels
         assert 'Server-Echos 2/2' in labels and 'keine Empfangsbestätigung der Kanalmitglieder' in labels
         assert 'irc_echo_'+'b'*64 in labels
         cases.append('actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim')

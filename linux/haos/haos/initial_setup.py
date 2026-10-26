@@ -428,7 +428,7 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}
 
 
-def configure_irc_gateway(connector,server,port,nickname,channel,*,server_password='',sasl_username='',sasl_password='',anonymous=False):
+def configure_irc_gateway(connector,server,port,nickname,channel,*,server_password='',channel_password='',sasl_username='',sasl_password='',anonymous=False):
     """Owner-only real TLS IRC configuration; validate before stopping services."""
     require_root()
     if type(anonymous) is not bool or anonymous and (sasl_username or sasl_password) or not anonymous and not sasl_username:
@@ -436,6 +436,7 @@ def configure_irc_gateway(connector,server,port,nickname,channel,*,server_passwo
     from .gateway_irc_transport import credentials as validate_irc
     value=validate_irc({'server':server,'port':port,'nickname':nickname,'channel':channel,
         **({'server_password':server_password} if server_password else {}),
+        **({'channel_password':channel_password} if channel_password else {}),
         **({'sasl_username':sasl_username,'sasl_password':sasl_password} if sasl_username or sasl_password else {})})
     from .gateway_setup import load,persist
     from .gateway import GatewayPolicy
