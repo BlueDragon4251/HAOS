@@ -893,3 +893,37 @@ contracts are recorded in
 This does not certify live Slack credentials, external delivery, installed boot
 or release artifacts. Telegram/Discord delivery authority is a separate check;
 this change does not claim to add the same guard to those transports.
+
+### Telegram/Discord current delivery authority (2026-10-26)
+
+The same actual SDK negative fixture reproduced ignored binding digests for
+Telegram and Discord on `c64bd36ca6728ca3cfb55e89aefaeb6697ecf9b7`.
+Independent fresh runs export that exact production source to disposable runtime
+copies and fail on forged-binding with the current fixture. The working checkout
+is never reset; the fixed source passes those same assertions.
+
+Both paths now capture and validate the independent owner route before sending
+and recheck it before subsequent native writes. Telegram receives the same private
+current-policy context in the service as the other native adapters, preserves
+shared nested-delivery accounting and denies owner changes before chunks or
+Markdown fallback. Accepted partial delivery remains uncertain, not retryable.
+Discord checks both the native request boundary and each actual HTTP attempt,
+including an SDK-internal nonce retry. Owner withdrawal prevents subsequent
+chunks, reply fallback and nonce retry without losing ambiguity from an earlier
+500 response. Existing thread/guild/nonce and receipt checks remain enforced.
+
+Fifty-nine actual native send/outbox cases pass: Telegram 16, Discord 23, Slack
+20. Each includes a valid current binding without read permission that must emit
+no reply. Telegram native polling/durable offset recovery and Discord ingress/
+history regression also pass. Full/minimal suites each pass 1202 tests and two
+existing skips with the unchanged local backup-file exclusion. Fifty-five actual
+root/UID/socket/recovery cases pass; atomic root-policy replacement is tested
+under the gateway UID for all three platforms, with owner secrets unreadable.
+No CI skips or mock replacements were added.
+
+Exact current/baseline source hashes, failed isolated reproductions and passing
+contracts are in
+`docs/evidence/2026-10-26/telegram-discord-current-authority-validation.json`.
+These local tests do not establish external delivery, real account access,
+installed service/boot or release acceptance. Home Assistant remains prepared;
+there are still six public text-gateway paths.

@@ -57,7 +57,7 @@ def main():
                     ('malformed','uncertain',1),('invalid-ts','uncertain',1),('wrong-receipt','uncertain',1),
                     ('disconnect','uncertain',1),('connect-refused','pending',0),('wrong-team','failed',0),
                     ('wrong-channel','failed',0),('thread-success','delivered',1),
-                    ('forged-binding','failed',0),('missing-binding','failed',0),
+                    ('forged-binding','failed',0),('missing-binding','failed',0),('no-read-grant','failed',0),
                     ('policy-unavailable','failed',0),('revoke-between-chunks','uncertain',1),
                     ('revoke-before-format-fallback','failed',1)]:
                 state.update(case=case,requests=[],reply_ts=f'{int(time.time())}.000055')
@@ -76,6 +76,7 @@ def main():
                     {'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':thread,
                      'identity':'principal','capabilities':['create','read']}]})
                 state['policy']=policy
+                if case=='no-read-grant':policy.bindings['paired']['capabilities']=['create']
                 def current():
                     if state['case']=='policy-unavailable':raise PermissionError('fixture owner policy unavailable')
                     return policy

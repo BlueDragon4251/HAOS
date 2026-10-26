@@ -162,6 +162,12 @@ def install_delivery(client):
     import aiohttp
     http = client.http
     trace = http.http_trace or aiohttp.TraceConfig()
+    async def request_start(session,context,params):
+        state=_SENDING.get()
+        if state is not None:
+            try:state.current()
+            except PermissionError:
+                state.refused=True;raise
     async def response_end(session, context, params):
         state = _SENDING.get()
         if state is not None and params.method == 'POST':
@@ -173,12 +179,17 @@ def install_delivery(client):
             if isinstance(params.exception, aiohttp.ClientConnectorError):
                 state.connect_failed = True
             else: state.ambiguous = True
+    trace.on_request_start.append(request_start)
     trace.on_request_end.append(response_end)
     trace.on_request_exception.append(response_error)
     http.http_trace = trace
     original = http.request
     async def request(route, **kwargs):
         state = _SENDING.get()
+        if state is not None:
+            try:state.current()
+            except PermissionError:
+                state.refused=True;raise
         if state is not None and route.method not in {'GET','HEAD'}:
             payload = kwargs.get('json')
             if (route.method != 'POST' or route.path != '/channels/{channel_id}/messages'
@@ -219,14 +230,19 @@ def reply_rejected(original, error):
 
 async def send_native(adapter, original, chat_id, content, reply_to=None, metadata=None):
     from gateway.platforms.base import SendResult
+    from .gateway_delivery_authority import current_delivery
     import discord
     metadata = metadata or {}
+    try:current=current_delivery(adapter,'discord',chat_id,metadata)
+    except PermissionError:
+        return SendResult(success=False,error='current exact owner Discord grant required',error_kind='forbidden',
+            raw_response={'haos_delivery':'refused'})
     scope, thread = metadata.get('haos_scope'), metadata.get('thread_id','')
     if not isinstance(scope,str) or thread and str(thread) != str(chat_id):
         return SendResult(success=False,error='exact owner Discord scope and thread required',error_kind='forbidden',
             raw_response={'haos_delivery':'refused'})
     state = SimpleNamespace(target=str(thread or chat_id),scope=scope,thread=thread,started=False,
-        refused=False,ambiguous=False,connect_failed=False,statuses=[],error=None)
+        refused=False,ambiguous=False,connect_failed=False,statuses=[],error=None,current=current)
     token = _SENDING.set(state)
     try:
         result = await original(adapter,chat_id,content,reply_to,metadata)

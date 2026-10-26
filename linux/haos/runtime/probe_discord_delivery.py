@@ -8,6 +8,7 @@ import socket
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
     from aiohttp import web
     import discord
     from discord.http import Route
-    from haos.gateway_runtime import build_adapter
+    from haos.gateway_runtime import build_adapter,delivery_metadata
     from haos.gateway import GatewayPolicy,GatewayEngine
     from haos.gateway_delivery import delivery_result
     from haos.store import MissionStore
@@ -28,6 +29,10 @@ def main():
         payload=await request.json();state['requests'].append({'channel':request.match_info['channel'],'payload':payload})
         case=state['case'];attempt=len(state['requests'])
         assert payload['enforce_nonce'] is True and payload['nonce']
+        if case in {'revoke-between-chunks','revoke-before-reply-fallback','revoke-before-nonce-retry'} and attempt==1:
+            state['policy'].bindings['paired']['generation']='b'*64
+            if case=='revoke-before-reply-fallback':return response({'message':'Unknown Message','code':10008},status=404)
+            if case=='revoke-before-nonce-retry':return response({'message':'fixture server failure','code':0},status=500)
         if case=='disconnect':
             request.transport.close();return web.Response()
         if case in {'nonce-retry','ambiguous-forbidden'} and attempt==1:
@@ -58,7 +63,10 @@ def main():
                     ('rate-limit','pending',1),('forbidden','failed',1),('reply-refused','delivered',2),
                     ('malformed','uncertain',1),('invalid-id','uncertain',1),('disconnect','uncertain',1),
                     ('wrong-guild','failed',0),('forum','failed',0),('partial-rate-limit','uncertain',2),
-                    ('thread-success','delivered',1),('wrong-thread','failed',0),('connect-refused','pending',0)]:
+                    ('thread-success','delivered',1),('wrong-thread','failed',0),('connect-refused','pending',0),
+                    ('forged-binding','failed',0),('missing-binding','failed',0),('policy-unavailable','failed',0),('no-read-grant','failed',0),
+                    ('revoke-between-chunks','uncertain',1),('revoke-before-reply-fallback','failed',1),
+                    ('revoke-before-nonce-retry','uncertain',1)]:
                 state.update(case=case,requests=[])
                 Route.BASE=f'http://127.0.0.1:{port}/api'
                 adapter=build_adapter('discord',{'token':'fixture-discord-private-token','extra':{'auto_thread':False,'history_backfill':False}})
@@ -85,19 +93,29 @@ def main():
                     {'id':'paired','connector':'bot','sender':'42','chat':approved_chat,'scope':'999','thread':approved_thread,
                      'identity':'principal','capabilities':['create','read']}]}
                 policy=GatewayPolicy(config);path=directory/(case+'.db');store=MissionStore(path);engine=GatewayEngine(store)
+                if case=='no-read-grant':policy.bindings['paired']['capabilities']=['create']
+                state['policy']=policy
+                def current():
+                    if state['case']=='policy-unavailable':raise PermissionError('fixture owner policy unavailable')
+                    return policy
+                adapter._haos_native=SimpleNamespace(connector='bot',policy=current)
                 try:
                     await engine.receive(policy,'bot',{'platform':'discord','sender':'42','chat':approved_chat,'scope':'999',
                         'thread':approved_thread,'message_id':'101','is_bot':False,'text':'fixture mission'},None)
                     delivery=engine.next_delivery(policy)
-                    metadata={'notify':True,'haos_scope':'998' if case=='wrong-guild' else '999'}
+                    metadata=delivery_metadata(delivery,'discord')
+                    if case=='wrong-guild':metadata['haos_scope']='998'
+                    if case=='forged-binding':metadata['haos_binding']['binding_digest']='0'*64
+                    if case=='missing-binding':metadata.pop('haos_binding')
                     if case in {'thread-success','wrong-thread'}:metadata['thread_id']='125'
                     with socket.socket() as unused:
                         if case=='connect-refused':
                             unused.bind(('127.0.0.1',0))
                             Route.BASE=f'http://127.0.0.1:{unused.getsockname()[1]}/api'
                         receipt=await adapter.send('125' if case=='thread-success' else '123',
-                            'x'*4100 if case=='partial-rate-limit' else delivery['content'],reply_to='101',metadata=metadata)
+                            'x'*4100 if case in {'partial-rate-limit','revoke-between-chunks'} else delivery['content'],reply_to='101',metadata=metadata)
                     translated=delivery_result(receipt)
+                    if case.startswith('revoke-'):policy.bindings['paired'].pop('generation')
                     engine.acknowledge(policy,delivery['id'],{**translated,'attempt':delivery['attempt']})
                     row=store.db.execute('SELECT state FROM gateway_outbox WHERE id=?',(delivery['id'],)).fetchone()
                     assert row['state']==expected,(case,translated,row['state'])

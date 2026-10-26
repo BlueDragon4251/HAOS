@@ -29,7 +29,8 @@ def uid_fixture_path():
 
 
 @pytest.mark.parametrize('change',['withdraw','generation'])
-def test_native_delivery_callback_observes_atomic_owner_policy_changes_as_real_gateway_uid(uid_fixture_path,change):
+@pytest.mark.parametrize('platform',['slack','telegram','discord'])
+def test_native_delivery_callback_observes_atomic_owner_policy_changes_as_real_gateway_uid(uid_fixture_path,change,platform):
     root=uid_fixture_path;root.chmod(0o755)
     modules=root/'modules';modules.mkdir(mode=0o755)
     shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
@@ -38,12 +39,17 @@ def test_native_delivery_callback_observes_atomic_owner_policy_changes_as_real_g
     config={'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[{
         'id':'owner','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
         'identity':'principal','capabilities':['create','read'],'generation':'a'*64}]}
+    config['connectors'][0]['platform']=platform
+    if platform=='telegram':config['bindings'][0].update(sender='42',chat='-10042',scope='',thread='7')
+    if platform=='discord':config['bindings'][0].update(sender='42',chat='123',scope='999')
     from haos.policy import atomic_json
     from haos.gateway import digest
     path=root/'gateways.json';atomic_json(path,config,mode=0o640,gid=65534)
     canary=root/'owner-secret';canary.write_text('disposable-root-owner-canary');canary.chmod(0o600)
-    payload={'policy':str(path),'canary':str(canary),'metadata':{'haos_scope':'T999',
-        'haos_binding':{'binding_id':'owner','binding_digest':digest(config['bindings'][0])}}}
+    binding=config['bindings'][0]
+    payload={'policy':str(path),'canary':str(canary),'platform':platform,'chat':binding['chat'],
+        'metadata':{'haos_scope':binding['scope'],'thread_id':binding['thread'],
+        'haos_binding':{'binding_id':'owner','binding_digest':digest(binding)}}}
     code='''
 import json,os,sys
 from pathlib import Path
@@ -58,7 +64,7 @@ except PermissionError:pass
 else:raise AssertionError('gateway UID read owner secret')
 current=lambda:GatewayPolicy(trusted_json(Path(d['policy'])))
 adapter=SimpleNamespace(_haos_native=SimpleNamespace(connector='bot',policy=current))
-check=current_delivery(adapter,'slack','C123',d['metadata']);check()
+check=current_delivery(adapter,d['platform'],d['chat'],d['metadata']);check()
 print('admitted',flush=True)
 assert sys.stdin.readline().strip()=='owner-updated'
 try:check()

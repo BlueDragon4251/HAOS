@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 from urllib.parse import parse_qs
 
 from probe_http_provider_matrix import serving
@@ -16,7 +17,7 @@ from probe_http_provider_matrix import serving
 
 def main():
     root = Path(sys.argv[1]).resolve(); sys.path.insert(0, str(root))
-    from haos.gateway_runtime import build_adapter
+    from haos.gateway_runtime import build_adapter,delivery_metadata
     from haos.gateway import GatewayPolicy, GatewayEngine
     from haos.store import MissionStore
     from telegram.ext import Application
@@ -37,6 +38,8 @@ def main():
                 elif method == 'sendmessage':
                     state['sends'].append(form)
                     case = state['case']
+                    if case in {'revoke-between-chunks','revoke-before-format-fallback'} and len(state['sends'])==1:
+                        policy.bindings['paired']['generation']='b'*64
                     if case == 'read-disconnect':
                         self.close_connection = True; return
                     if case == 'server-parser-error':
@@ -48,7 +51,7 @@ def main():
                     elif case == 'forbidden':
                         status=403; body={'ok': False, 'error_code': 403, 'description': 'Forbidden: bot blocked'}
                     elif case == 'malformed-receipt': body={'ok': True, 'result': {}}
-                    elif case == 'parse-rejected' and len(state['sends']) == 1:
+                    elif case in {'parse-rejected','revoke-before-format-fallback'} and len(state['sends']) == 1:
                         status=400; body={'ok': False, 'error_code': 400, 'description': "Bad Request: can't parse entities"}
                     else:
                         body={'ok': True, 'result': {'message_id': (0 if case=='invalid-id' else 55), 'date': 1700000000,
@@ -62,13 +65,20 @@ def main():
         old_home=os.environ.get('HERMES_HOME'); os.environ['HERMES_HOME']=str(Path(directory)/'hermes')
         try:
             for case, expected in [('read-disconnect','uncertain'), ('server-parser-error','uncertain'), ('missing-thread','failed'), ('rate-limit','pending'),
-                    ('forbidden','failed'), ('malformed-receipt','uncertain'), ('invalid-id','uncertain'), ('parse-rejected','delivered'), ('success','delivered'), ('connect-refused','pending')]:
+                    ('forbidden','failed'), ('malformed-receipt','uncertain'), ('invalid-id','uncertain'), ('parse-rejected','delivered'), ('success','delivered'),
+                    ('forged-binding','failed'),('missing-binding','failed'),('policy-unavailable','failed'),('no-read-grant','failed'),
+                    ('revoke-between-chunks','uncertain'),('revoke-before-format-fallback','failed'),('connect-refused','pending')]:
                 state.update(case=case,sends=[])
+                if case=='no-read-grant':policy.bindings['paired']['capabilities']=['create']
                 store=MissionStore(Path(directory)/(case+'.db')); engine=GatewayEngine(store)
                 await engine.receive(policy,'bot',{'platform':'telegram','sender':'42','chat':'-10042','scope':'','thread':'7',
                     'message_id':'101','is_bot':False,'text':'fixture mission'},None)
                 delivery=engine.next_delivery(policy)
                 adapter=build_adapter('telegram',{'token':'123456:'+'x'*35})
+                def current():
+                    if state['case']=='policy-unavailable':raise PermissionError('fixture owner policy unavailable')
+                    return policy
+                adapter._haos_native=SimpleNamespace(connector='bot',policy=current)
                 app=(Application.builder().token(adapter.config.token).base_url(f'http://127.0.0.1:{port}/bot')
                     .application_class(TelegramApplication,{'adapter':adapter}).build())
                 adapter._app=app;adapter._bot=app.bot
@@ -76,12 +86,16 @@ def main():
                     await app.initialize(); adapter._mark_connected()
                     if case=='connect-refused':
                         server.shutdown(); server.server_close()
-                    receipt=await adapter.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],
-                        metadata={'thread_id':delivery['thread'],'notify':True})
-                    assert len(state['sends']) == (2 if case=='parse-rejected' else 0 if case=='connect-refused' else 1), 'native send was repeated after ambiguous failure'
+                    metadata=delivery_metadata(delivery,'telegram')
+                    if case=='forged-binding':metadata['haos_binding']['binding_digest']='0'*64
+                    if case=='missing-binding':metadata.pop('haos_binding')
+                    receipt=await adapter.send(delivery['chat'],'r'*9000 if case=='revoke-between-chunks' else delivery['content'],
+                        reply_to=delivery['reply_to'],metadata=metadata)
+                    assert len(state['sends']) == (2 if case=='parse-rejected' else 0 if case in {'connect-refused','forged-binding','missing-binding','policy-unavailable','no-read-grant'} else 1), (case,len(state['sends']),'native send escaped current owner authority or repeated ambiguity')
                     assert all(row.get('message_thread_id')==['7'] and row['chat_id']==['-10042'] for row in state['sends']), 'native send escaped the owner thread'
                     from haos.gateway_delivery import delivery_result
                     result=delivery_result(receipt)
+                    if case.startswith('revoke-'):policy.bindings['paired'].pop('generation')
                     engine.acknowledge(policy,delivery['id'],{**result,'attempt':delivery['attempt']})
                     assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]==expected
                     store.close();store=MissionStore(Path(directory)/(case+'.db'));engine=GatewayEngine(store)
@@ -93,6 +107,7 @@ def main():
                     results.append({'case':case,'http_send_attempts':len(state['sends']),'durable_state':expected})
                 finally:
                     await app.shutdown(); store.close()
+                    if case=='no-read-grant':policy.bindings['paired']['capabilities']=['create','read']
         finally:
             if old_home is None: os.environ.pop('HERMES_HOME',None)
             else: os.environ['HERMES_HOME']=old_home

@@ -75,14 +75,34 @@ class AdmissionQueue(asyncio.Queue):
 _SENDING = ContextVar('haos_telegram_delivery', default=None)
 
 
-async def send_native(adapter, original, *args, **kwargs):
+async def send_native(adapter, original, chat_id, content, reply_to=None, metadata=None):
+    from gateway.platforms.base import SendResult
+    from .gateway_delivery_authority import current_delivery
+    metadata=metadata or {}
     state = _SENDING.get()
+    try:current=current_delivery(adapter,'telegram',chat_id,metadata)
+    except PermissionError:
+        if state is not None:state.refused=True
+        return SendResult(success=False,error='current exact owner Telegram grant required',error_kind='unknown'
+            if state is not None and state.successful else 'forbidden',
+            raw_response={} if state is not None and state.successful else {'haos_delivery':'refused'})
+    owner=(str(chat_id),metadata['haos_binding']['binding_id'],metadata['haos_binding']['binding_digest'],
+        metadata['haos_scope'],metadata.get('thread_id',''))
     token = None
     if state is None:
-        state = SimpleNamespace(started=False)
+        state = SimpleNamespace(started=False,successful=0,refused=False,current=current,adapter=adapter,owner=owner)
         token = _SENDING.set(state)
+    elif state.adapter is not adapter or state.owner!=owner:
+        state.refused=True
+        return SendResult(success=False,error='nested Telegram delivery changed owner authority',
+            error_kind='unknown' if state.successful else 'forbidden',
+            raw_response={} if state.successful else {'haos_delivery':'refused'})
     try:
-        result = await original(adapter, *args, **kwargs)
+        result = await original(adapter,chat_id,content,reply_to,metadata)
+        if state.refused:
+            return SendResult(success=False,error='Telegram owner authority changed before a native write',
+                error_kind='unknown' if state.successful else 'forbidden',
+                raw_response={} if state.successful else {'haos_delivery':'refused'})
         if result.success:
             ids = result.raw_response.get('message_ids') if isinstance(result.raw_response, dict) else None
             ids = ids or [result.message_id]
@@ -124,10 +144,16 @@ async def send_formatted(adapter, chunk, kwargs):
     from telegram.error import BadRequest
     from plugins.platforms.telegram.adapter import _await_with_thread_deadline, _TEXT_SEND_DEADLINE, _strip_mdv2
     state = _SENDING.get()
-    if state is not None: state.started = True
     async def dispatch(text, parse_mode):
-        return await _await_with_thread_deadline(adapter._bot.send_message(text=text, parse_mode=parse_mode, **kwargs),
+        if state is not None:
+            try:state.current()
+            except PermissionError:
+                state.refused=True;raise
+            state.started=True
+        result=await _await_with_thread_deadline(adapter._bot.send_message(text=text, parse_mode=parse_mode, **kwargs),
             timeout=_TEXT_SEND_DEADLINE, label='haos-telegram-send', dump_on_blocked_loop=False)
+        if state is not None:state.successful+=1
+        return result
     try:
         return await dispatch(chunk, ParseMode.MARKDOWN_V2)
     except BadRequest as error:

@@ -228,7 +228,7 @@ async def serve():
                 logging.warning("Gateway authorization policy unavailable")
                 return False
         adapter.set_authorization_check(authorize)
-        if connector['platform'] in {'discord','slack','mattermost'}:
+        if connector['platform'] in {'telegram','discord','slack','mattermost'}:
             from types import SimpleNamespace
             adapter._haos_native = SimpleNamespace(inbox=native_inbox,connector=connector['id'],policy=current_policy)
         if connector["platform"] == "discord":

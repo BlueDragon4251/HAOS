@@ -34,6 +34,13 @@ def test_current_delivery_refuses_another_connectors_otherwise_identical_valid_g
     with pytest.raises(PermissionError):current_delivery(adapter,'slack','C123',metadata)
 
 
+def test_current_delivery_refuses_valid_binding_digest_without_owner_read_permission():
+    config,adapter,metadata=fixture()
+    config['bindings'][0]['capabilities']=['create']
+    metadata['haos_binding']['binding_digest']=digest(config['bindings'][0])
+    with pytest.raises(PermissionError):current_delivery(adapter,'slack','C123',metadata)
+
+
 @pytest.mark.parametrize('change',['withdraw','scope','thread','rights','identity','policy_callback'])
 def test_native_delivery_rechecks_independent_owner_authority_on_every_operation(change):
     config,adapter,metadata=fixture();current=current_delivery(adapter,'slack','C123',metadata)
