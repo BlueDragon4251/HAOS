@@ -8,8 +8,8 @@ from types import MethodType
 
 from .gateway import GatewayPolicy, SUPPORTED, digest
 
-_ACCOUNT=re.compile(r'[a-z0-9][a-z0-9._-]{0,63}\Z')
-_CHANNEL=re.compile(r'#[a-z0-9][a-z0-9_-]{0,63}\Z')
+_ACCOUNT=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z')
+_CHANNEL=re.compile(r'[&#][a-z0-9][a-z0-9_-]{0,63}\Z')
 _SERVER=re.compile(r'[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?:[1-9][0-9]{0,4}\Z')
 _CURRENT=ContextVar('haos_retained_irc_account',default=None)
 REQUIRED_CAPS=frozenset({'account-tag','server-time','message-tags'})
@@ -59,14 +59,14 @@ def envelope(adapter,raw,server,capabilities):
         if not line.startswith(':'):return None
         prefix,command,chat,body=line[1:].split(' ',3)
         if (command!='PRIVMSG' or not re.fullmatch(r'[^\s!@:]+![^\s!@:]+@[^\s!@:]+',prefix)
-                or not _CHANNEL.fullmatch(chat) or not body.startswith(':')):return None
+                or not _CHANNEL.fullmatch(chat.lower()) or not body.startswith(':')):return None
         text=body[1:]
         if '\x01' in text or prefix.split('!',1)[0].lower()==adapter._current_nick.lower():return None
         for mention in (adapter._current_nick+':',adapter._current_nick+',',adapter._current_nick+' '):
             if text.lower().startswith(mention.lower()):text=text[len(mention):].strip();break
         else:return None
         if not text or len(text.encode())>32000:return None
-        source={'platform':'irc','sender':values['account'],'chat':chat,'scope':server,'thread':'',
+        source={'platform':'irc','sender':values['account'],'chat':chat.lower(),'scope':server,'thread':'',
             'message_id':digest([server,identity]),'is_bot':False,'text':text}
         return source,original.timestamp(),line
     except (ValueError,TypeError,OverflowError):return None

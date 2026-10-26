@@ -1250,3 +1250,19 @@ The actual SIGKILL/UID/TLS process fixture retains three cases at the new schema
 IRC/HA profile regressions retain 20/33 cases. IRC is still not publicly enabled,
 and these results are not external account/message, recipient or installed/boot
 acceptance.
+
+### Prepared IRC canonical channel and exact account identifiers (2026-10-26)
+
+Incoming standard IRC channel case and the bot's own nickname case are now
+compared canonically; authenticated account IDs retain their exact server spelling,
+including uppercase letters. This does not convert a nickname into an account or
+authorize a differently spelled principal. Exact local `&channel` routes use the
+actual pinned codec as well. Unknown advertised CASEMAPPING values fail closed.
+
+Native cases now total 136: ingress 32, transport 45, profile 20 and delivery 39.
+The new cases distinguish channel case from exact account identity, cover local
+channels and reject unsupported server case mapping. Existing broad/root/process
+regressions retain 1275 tests/two existing skips in both Python 3.11 environments,
+68 actual authority/control/recovery cases and three actual UID/SIGKILL/TLS cases.
+Public IRC owner setup remains disabled; no external or installed acceptance is
+inferred from these local cases.

@@ -87,9 +87,10 @@ def main():
                     stamp=datetime.now(timezone.utc).isoformat()
                     account=('unexpected-account' if mode=='sasl_account_mismatch' else 'bot-account') if mode.startswith('sasl_') else '*'
                     common='account='+account+';time='+stamp+';msgid=server_'+str(index)
-                    if mode=='wrong_sender':prefix='imposter!bot@server'
+                    if mode=='case_variants':prefix='HAOS-BOT!bot@server'
+                    elif mode=='wrong_sender':prefix='imposter!bot@server'
                     else:prefix='haos-bot!bot@server'
-                    target='#other' if mode=='wrong_channel' else '#haos'
+                    target='#other' if mode=='wrong_channel' else '#HAOS' if mode=='case_variants' else '#haos'
                     echoed=body+' changed' if mode=='modified_body' else body
                     if mode=='sasl_secret_msgid':common='account=bot-account;time='+stamp+';msgid=private-sasl-fixture'
                     if mode=='missing_msgid':common='account=*;time='+stamp
@@ -192,6 +193,10 @@ def main():
                     assert delivery_result(await adapter.send('#haos','bounded owner reply',metadata=metadata))=={'status':'uncertain'}
                     assert state['writes']==['bounded owner reply']
                     cases.append('same_uncertain_native_outbox_attempt_is_never_resent_while_connection_remains_live')
+            adapter,publisher,metadata,_=await build('case_variants')
+            receipt=await adapter.send('#haos','case-insensitive channel reply',metadata=metadata)
+            assert receipt.success and state['writes']==['case-insensitive channel reply']
+            cases.append('native_server_echo_accepts_standard_channel_and_own_nickname_case_variants_without_changing_owner_route')
             adapter,publisher,metadata,_=await build('sasl_good')
             receipt=await adapter.send('#haos','authenticated bot reply',metadata=metadata)
             assert receipt.success is True and state['writes']==['authenticated bot reply']

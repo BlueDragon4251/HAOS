@@ -31,7 +31,7 @@ def credentials(value):
             or any(not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?',label) for label in host.split('.'))
             or type(port) is not int or not 1<=port<=65535
             or not isinstance(nick,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,29}',nick)
-            or not isinstance(channel,str) or not re.fullmatch(r'#[a-z0-9][a-z0-9_-]{0,63}',channel)):
+            or not isinstance(channel,str) or not re.fullmatch(r'[&#][a-z0-9][a-z0-9_-]{0,63}',channel)):
         raise ValueError('bounded canonical IRC hostname, port, nickname and exact channel required')
     for field in ('server_password','nickserv_password'):
         secret=value.get(field,'')
@@ -40,7 +40,7 @@ def credentials(value):
     username=value.get('sasl_username','');password=value.get('sasl_password','')
     if (not isinstance(username,str) or not isinstance(password,str)
             or bool(username)!=bool(password)
-            or username and not re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,63}',username)
+            or username and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}',username)
             or len(password.encode())>4096 or any(ord(c)<32 or ord(c)==127 for c in password)):
         raise ValueError('paired bounded IRC SASL account and private password required')
     # Do not send a password to a potentially unregistered NickServ nickname.
@@ -134,6 +134,8 @@ class Boundary:
         if msg['command']=='PING':
             if len(msg['params'])!=1:raise Rejected('invalid IRC keepalive')
             await self.write('PONG :'+msg['params'][0]);return True
+        if msg['command']=='005' and any(part.startswith('CASEMAPPING=') and part.split('=',1)[1] not in {'ascii','rfc1459','strict-rfc1459'} for part in msg['params']):
+            raise Rejected('IRC server case mapping is unsupported')
         if msg['command'] in {'263','439'}:raise RateLimited('IRC server deferred account traffic')
         if msg['command'] in {'464','465'}:
             raise AuthenticationRejected('IRC account or server access refused')
@@ -194,7 +196,7 @@ class Boundary:
                     self._sasl_stage='result'
                 elif command=='900':
                     if (self._sasl_stage!='result' or len(params)<3
-                            or params[0]!=self.value['nickname'] or params[2]!=self.value.get('sasl_username')):
+                            or params[0].lower()!=self.value['nickname'].lower() or params[2]!=self.value.get('sasl_username')):
                         raise AuthenticationRejected('IRC server authenticated a different account')
                     self._sasl_logged_in=True
                 elif command=='903':
@@ -205,12 +207,12 @@ class Boundary:
                     raise AuthenticationRejected('IRC SASL authentication refused or interrupted')
                 elif command=='001':
                     if ('sasl' in self.required and self._sasl_stage!='complete'
-                            or not self.capabilities or registered or not params or params[0]!=self.value['nickname']):
+                            or not self.capabilities or registered or not params or params[0].lower()!=self.value['nickname'].lower()):
                         raise Rejected('IRC registration preceded verified capabilities or changed nickname')
                     registered=True;await self.write('JOIN '+self.value['channel'])
                 elif command=='JOIN':
-                    if (not registered or msg['prefix'].split('!',1)[0]!=self.value['nickname']
-                            or params!=[self.value['channel']]):raise Rejected('IRC subscription target changed')
+                    if (not registered or msg['prefix'].split('!',1)[0].lower()!=self.value['nickname'].lower()
+                            or len(params)!=1 or params[0].lower()!=self.value['channel']):raise Rejected('IRC subscription target changed')
                     self.confirmed=True;self.status='streaming';self.adapter._mark_connected();return True
                 elif command=='PRIVMSG':raise Rejected('IRC message arrived before authenticated subscription')
         except BaseException as error:
@@ -237,9 +239,9 @@ class Boundary:
                     raise AuthenticationRejected('IRC authenticated account changed during subscription')
                 if msg['command']=='CAP':raise Rejected('IRC account capability changed during subscription')
                 if (msg['command']=='KICK' and len(msg['params'])>=2
-                        and msg['params'][0]==self.value['channel'] and msg['params'][1]==self.value['nickname']
+                        and msg['params'][0]==self.value['channel'] and msg['params'][1].lower()==self.value['nickname'].lower()
                         or msg['command'] in {'PART','QUIT','NICK'}
-                        and msg['prefix'].split('!',1)[0]==self.value['nickname']):
+                        and msg['prefix'].split('!',1)[0].lower()==self.value['nickname'].lower()):
                     raise Rejected('IRC subscription or local identity was withdrawn')
                 # Tagged application frames are admitted independently of the
                 # native nickname allowlist; unpaired accounts are never sent on.

@@ -72,6 +72,7 @@ def main():
                 assert (await get()).startswith('USER ')
                 if mode=='early_registration':await put(':server 001 haos-bot :welcome\r\n')
                 elif mode=='server_password_refused':await put(':server 464 haos-bot :access refused\r\n')
+                elif mode=='unknown_case_mapping':await put(':server 005 haos-bot CASEMAPPING=vendor-sensitive :unsupported\r\n')
                 elif mode=='duplicate_control_tags':await put('@time=one;time=two :server CAP haos-bot LS :account-tag server-time message-tags\r\n')
                 elif mode=='no_account_capability':await put(':server CAP haos-bot LS :server-time message-tags\r\n')
                 elif mode=='eof':return
@@ -193,7 +194,7 @@ def main():
             try:await worker
             except asyncio.CancelledError:pass
             cases.append('real_server_time_tags_on_capabilities_registration_join_and_ping_preserve_native_admission')
-            for mode in ['server_password_refused','duplicate_control_tags','early_registration','no_account_capability','eof','oversized','bad_utf8','incomplete_frame',
+            for mode in ['server_password_refused','unknown_case_mapping','duplicate_control_tags','early_registration','no_account_capability','eof','oversized','bad_utf8','incomplete_frame',
                     'timeout','cap_nak','partial_ack','changed_nickname','wrong_join']:
                 boundary,adapter,config,accepted=build(mode)
                 await refused(boundary.connect)

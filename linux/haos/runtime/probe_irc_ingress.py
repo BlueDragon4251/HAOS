@@ -121,6 +121,20 @@ def main():
         assert all(alias not in json.dumps(accepted[-1]) for alias in aliases)
         assert '[REDACTED]' in accepted[-1]['text']
         cases.append('actual_native_decode_and_durable_relay_never_receive_reflected_private_password_or_sasl_wire_aliases')
+        config['bindings'][0]['sender']='Owner-Account'
+        mixed_authority=snapshot(policy(),'irc','irc.fixture.invalid:6697')
+        mixed=frame('mixed_case',account='Owner-Account').replace(' #haos ',' #HAOS ')
+        assert await dispatch_stored(adapter,capture(adapter,mixed,mixed_authority,REQUIRED_CAPS))
+        assert accepted[-1]['sender']=='Owner-Account' and accepted[-1]['chat']=='#haos'
+        denied(lambda:capture(adapter,frame('wrong_account_case',account='owner-account'),mixed_authority,REQUIRED_CAPS))
+        cases.append('actual_native_codec_canonicalizes_channel_case_but_preserves_exact_authenticated_account_case')
+        config['bindings'][0].update(sender='owner-account',chat='&haos')
+        local_authority=snapshot(policy(),'irc','irc.fixture.invalid:6697')
+        local=frame('local_channel').replace(' #haos ',' &HAOS ')
+        assert await dispatch_stored(adapter,capture(adapter,local,local_authority,REQUIRED_CAPS))
+        assert accepted[-1]['chat']=='&haos'
+        cases.append('actual_native_local_channel_codec_requires_exact_canonical_owner_channel')
+        config['bindings'][0]['chat']='#haos'
         key=capture(adapter,frame('withdrawn'),authority,REQUIRED_CAPS);config['bindings']=[]
         assert not await dispatch_stored(adapter,key)
         assert native.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()[0]=='revoked'

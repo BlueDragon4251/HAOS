@@ -93,12 +93,12 @@ class Witness:
             if command!='PRIVMSG':
                 # ACK by itself confirms processing, not message publication.
                 raise Rejected('IRC labeled response has no matching server echo')
-            if (ticket.receipt is not None or params!=[ticket.chat,ticket.text]
-                    or msg['prefix'].split('!',1)[0]!=self.boundary.value['nickname']
+            if (ticket.receipt is not None or len(params)!=2 or params[0].lower()!=ticket.chat or params[1]!=ticket.text
+                    or msg['prefix'].split('!',1)[0].lower()!=self.boundary.value['nickname'].lower()
                     or not re.fullmatch(r'[^\s!@:]+![^\s!@:]+@[^\s!@:]+',msg['prefix'])
                     or not isinstance(tags.get('msgid'),str) or not _ID.fullmatch(tags['msgid'])
                     or not isinstance(tags.get('account'),str)
-                    or not (tags['account']=='*' or re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,63}',tags['account']))
+                    or not (tags['account']=='*' or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}',tags['account']))
                     or self.boundary.value.get('sasl_username') and tags['account']!=self.boundary.value['sasl_username']
                     or batch is not None and ticket.batch!=batch
                     or batch is None and ticket.batch is not None):
