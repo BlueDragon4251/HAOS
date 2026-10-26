@@ -87,11 +87,17 @@ jobs:
           wizard.show("provider")
           wizard.root.update()
           def field(prefix):
-              children = wizard.content.winfo_children()
-              for i, widget in enumerate(children):
-                  if isinstance(widget, tkinter.Label) and widget.cget("text").startswith(prefix):
-                      return next(item for item in children[i+1:] if isinstance(item, tkinter.Entry))
-              raise AssertionError("missing native setup field")
+              def search(parent):
+                  children = parent.winfo_children()
+                  for i, widget in enumerate(children):
+                      if isinstance(widget, tkinter.Label) and widget.cget("text").startswith(prefix):
+                          return next(item for item in children[i+1:] if isinstance(item, tkinter.Entry))
+                      match = search(widget)
+                      if match is not None:
+                          return match
+              result = search(wizard.content)
+              assert result is not None, "missing native setup field: " + prefix
+              return result
           secret = field("API-Schlüssel")
           endpoint = field("URL")
           secret.insert(0, "fixture-only-previous-provider-key")
