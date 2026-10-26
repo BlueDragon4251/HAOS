@@ -1210,3 +1210,23 @@ are explicit. Both runtime suites remain 1264 tests/two existing skips. Shared
 factory regressions retain HA 33, ntfy 23 and Matrix 23 native profile cases.
 Server echo still does not prove recipient delivery; no public eighth gateway,
 external account/message or installed/boot acceptance is claimed.
+
+### Actual IRC gateway-UID process death and journal recovery (2026-10-26)
+
+A mandatory disposable-root provider-CI fixture installs public HAOS code,
+the exact frozen SDK dependencies and pinned prepared Hermes source with the
+normal package installer. It runs the registered private IRC factory as actual
+UID 65534 against an actual loopback TLS server using default system CA and
+hostname verification, with the disposable CA added only inside that fresh
+container. The production connection target is localhost; no socket/UID/TLS
+verification function is replaced.
+
+After the server observes the first native frame, the parent sends real SIGKILL
+to the still-waiting gateway process. Actual agent UID 65533 cannot read/open its
+journal or the private owner canary. A new UID-65534 process reopens the committed
+`writing` intent, reacquires the released kernel lease and retains it as uncertain;
+it authenticates a new TLS connection but emits no repeated application message.
+All three cases pass in the pinned container image with networking disabled.
+The fixture rejects execution on installed HAOS or outside its explicit fresh
+PID-1 Docker namespace. This is process/UID/TLS/journal evidence, not an installed
+HAOS boot, external account/message or recipient-delivery acceptance.
