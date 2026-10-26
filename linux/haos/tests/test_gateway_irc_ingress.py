@@ -31,7 +31,7 @@ def test_irc_prepared_owner_routes_are_exact_accounts_not_nick_or_hostmask(chang
 
 def test_irc_boundary_imports_without_hermes_or_site_packages():
     source=Path(__file__).resolve().parents[1]
-    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress,haos.gateway_irc_transport,haos.gateway_irc_profile;assert "gateway.config" not in sys.modules'
+    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress,haos.gateway_irc_transport,haos.gateway_irc_profile,haos.gateway_irc_witness,haos.gateway_irc_delivery;assert "gateway.config" not in sys.modules'
     result=subprocess.run([sys.executable,'-I','-S','-c',script],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
 

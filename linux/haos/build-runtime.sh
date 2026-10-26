@@ -19,7 +19,7 @@ uv pip check --python .venv/bin/python
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/export_registry.py" /usr/lib/haos/hermes /tmp/haos-registry.json
 cmp /tmp/haos-registry.json /usr/lib/haos/haos/hermes_registry.json
 mkdir -p /usr/lib/haos/runtime-provenance
-cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" "$HAOS_RUNTIME_OVERLAY/homeassistant-protocol-source.json" /usr/lib/haos/runtime-provenance/
+cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" "$HAOS_RUNTIME_OVERLAY/homeassistant-protocol-source.json" "$HAOS_RUNTIME_OVERLAY/irc-protocol-source.json" /usr/lib/haos/runtime-provenance/
 uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/installed.txt
 # Installed /usr is immutable and runtime bytecode writes are disabled. Compile
 # actual trusted sources here instead of parsing the entire cold import graph
@@ -59,6 +59,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-profile-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-transport-build-probe.json

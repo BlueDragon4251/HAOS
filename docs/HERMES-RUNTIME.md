@@ -1155,3 +1155,39 @@ revocation and invalid selection. A real native IRC TLS-profile case continues
 through mission persistence, offline polling, reopen and first online lease.
 Both Python 3.11 suites pass 1264 tests/two existing skips. This repairs shared
 queue behavior, not an external delivery or installed/boot acceptance.
+
+### Prepared IRC native send and correlated server acceptance (2026-10-26)
+
+The prepared sender now runs the actual pinned IRC markdown/UTF-8 chunker and
+`send` method behind an exact current owner channel/read/outbox/attempt capability.
+Native raw or standalone calls cannot write without that bounded context. Durable
+intent precedes socket writes; each native chunk waits for a correlated echo with
+matching label, own sender, account when SASL applies, channel, exact text, stable
+server ID and original server time. Every next write rechecks current authority.
+The SDK's synthetic local millisecond ID is never treated as a server receipt.
+
+Echo-message, labeled-response and batch capabilities must all be negotiated.
+A bare ACK is insufficient. Labeled batches require their correct terminal frame;
+wrong origin/type/identity, duplicate or missing echoes, incomplete batches and
+socket loss remain uncertain. Confirmed attempts reuse their durable receipt
+across actual journal reopen. Uncertain attempts are not resent. The actual
+mission outbox remains uncertain across reopen until an audited owner decision
+explicitly permits a new attempt. Cancellation joins active sends; actual SQLite
+intent failure prevents writes and confirmation-storage failure cannot report
+success. CTCP/DCC/control injection and unbounded payloads are refused.
+
+The 36 actual local TLS/SDK/SQLite cases cover these positive and negative paths,
+SASL account echo matching, native UTF-8 multi-chunk output, revocation between
+confirmed chunks, shared dispatcher metadata and actual owner-authorized retry.
+The other prepared IRC probes retain 30 ingress, 44 transport and 16 profile cases
+(126 total). Both broad Python 3.11 suites pass 1264 tests/two existing skips.
+Build/provider CI require the new probe and retain the protocol reference.
+
+**Confirmation limit:** IRCv3 explicitly permits a faked echo for silently blocked
+messages, such as spam filtering. This receipt confirms a matching server echo;
+it cannot prove fan-out or human receipt. `recipient_receipt_verified` stays false.
+The implementation checks the immutable reference at IRCv3 specifications commit
+`1b4050eecfd0e2c605c413080b555a41261e8696`; no external code is imported. Public
+IRC factory/profile sender wiring, complete recovery metadata and owner CLI/GUI
+remain unfinished. IRC is still publicly disabled, and no external message,
+account, recipient, installed/boot or release acceptance is claimed.

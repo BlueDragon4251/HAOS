@@ -121,12 +121,13 @@ class Boundary:
         if raw.startswith('@'):
             tags,separator,raw=raw[1:].partition(' ')
             if not separator:raise Rejected('IRC tag envelope has no frame')
-            names=set()
+            values={}
             for tag in tags.split(';'):
-                name=tag.partition('=')[0]
-                if not name or name in names:raise Rejected('IRC duplicate or empty tag')
-                names.add(name)
-        return _parse_irc_message(raw)
+                name,separator,value=tag.partition('=')
+                if not name or name in values:raise Rejected('IRC duplicate or empty tag')
+                values[name]=value if separator else None
+        else:values={}
+        return {**_parse_irc_message(raw),'tags':values}
 
     async def control(self,raw):
         msg=self.parse(raw)
@@ -225,6 +226,11 @@ class Boundary:
                 if not self.confirmed:raise Rejected('IRC has no current authenticated subscription')
                 try:raw=await self.read(.5)
                 except asyncio.TimeoutError:continue
+                witness=getattr(self,'_witness',None)
+                if witness is not None:
+                    consumed=witness.observe(raw)
+                    if type(consumed) is not bool:raise PermissionError('explicit IRC witness routing required')
+                    if consumed:continue
                 if await self.control(raw):continue
                 msg=self.parse(raw)
                 if msg['command'] in {'900','901','902','904','905','906','907'}:
@@ -249,6 +255,8 @@ class Boundary:
             self.confirmed=False;self.adapter._mark_disconnected();await self.disconnect()
 
     async def disconnect(self):
+        witness=getattr(self,'_witness',None)
+        if witness is not None:witness.disconnected()
         self.confirmed=False;self.adapter._mark_disconnected()
         writer,self.writer=self.writer,None;self.reader=None
         if writer is not None:

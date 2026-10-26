@@ -167,7 +167,8 @@ def delivery_metadata(delivery,platform):
         'haos_binding':{key:delivery[key] for key in ('binding_id','binding_digest')}}
     if delivery['thread']:metadata['thread_id']=delivery['thread']
     if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
-    if platform=='homeassistant':metadata['haos_delivery_id']=delivery['id']
+    if platform in {'homeassistant','irc'}:metadata['haos_delivery_id']=delivery['id']
+    if platform=='irc':metadata['haos_delivery_attempt']=delivery['attempt']
     return metadata
 
 
