@@ -187,7 +187,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-line-profile-') as temporary:asyncio.run(exercise(Path(temporary)))
     receipt={'passed':len(cases),'cases':cases,'actual_registered_native_adapter_http_sqlite_and_kernel_lease':True,
         'fixture_only_loopback_identity_target':True,'public_gateway_enabled':False,
-        'production_profile_listener':'127.0.0.1 only; external verified TLS ingress not configured here',
+        'fixture_profile_listener':'127.0.0.1 only; external verified TLS ingress not configured here',
         'external_or_installed_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(text)

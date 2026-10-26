@@ -1458,3 +1458,30 @@ missing LINE ingress-ID branch; the fix adds only LINE's canonical SHA-256 IDs,
 with explicit tests that unknown plugins and raw message IDs stay refused.
 Public TLS ingress/owner setup, remaining delivery recovery and media/voice are
 still incomplete. No public LINE, external account or installed acceptance.
+
+### 2026-10-26 — prepared LINE verified HTTPS listener material
+
+An optional owner TLS profile now starts the actual fixed webhook application as
+HTTPS. Canonical public URLs use the fixed `/line/webhook` path and standard
+HTTPS port, with no embedded credentials, query or fragment. Literal IP URLs
+are refused. An explicit boolean consent is required for wildcard public
+binding; legacy prepared profiles remain loopback-only without TLS.
+
+Before listener admission, the supplied PEM chain is verified against the local
+system trust store at the current time for the exact DNS name, and the private
+key must match. Weak/invalid/mismatched keys, untrusted/expired chains and unsafe
+listener choices are refused. Private TLS files are installed mode 0600 and
+single-link through atomic creation in the private profile, with no overwrite
+of conflicting retained files. Existing owner material stays available for
+recovery. The server requires TLS 1.2 or newer. Neither local trust nor successful
+binding proves remote LINE reachability or LINE's public trust acceptance.
+
+Seventeen actual X.509/TLS/native-profile cases pass, including verified HTTPS
+through signature validation, durable RelayInbox and the pinned native codec,
+wrong hostname/issuer/expiry/key, consent/path validation and retained-file
+conflicts. Runtime build and CI run the new probe. LINE profile 24, input 36,
+listener 13 and push 25 regressions pass. Seven actual recovery GUI cases pass
+at both 1280x800 and 640x480 with distinct TLS-ready/unverified-external wording.
+Full frozen and minimal Python 3.11 suites each pass 1,321 tests with two existing
+skips and the unchanged local backup-file exception. Public LINE setup and full
+gateway acceptance remain pending; no external DNS/router/account test claimed.

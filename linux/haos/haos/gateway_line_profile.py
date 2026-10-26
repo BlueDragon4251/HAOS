@@ -1,4 +1,4 @@
-"""Prepared private LINE identity and loopback-only webhook/replay lifecycle."""
+"""Prepared private LINE identity and explicitly configured webhook lifecycle."""
 import asyncio
 import fcntl
 import os
@@ -11,12 +11,13 @@ from types import MethodType,SimpleNamespace
 from .gateway import digest
 from .gateway_line_ingress import PreparedLINEPolicy,snapshot,install,dispatch_stored
 
-STATES=frozenset({'created','listening','disconnected','transport-unavailable','revoked','closed',
+STATES=frozenset({'created','listening','listening-tls','disconnected','transport-unavailable','revoked','closed',
     'authentication-refused','identity-refused','rate-limited'})
 
 
 def credentials(value):
-    if not isinstance(value,dict) or set(value)!={'channel_secret','channel_access_token','destination','port'}:
+    required={'channel_secret','channel_access_token','destination','port'}
+    if not isinstance(value,dict) or set(value) not in (required,required|{'tls'}):
         raise ValueError('exact LINE channel credentials, bot destination and local port required')
     if (not isinstance(value['channel_secret'],str) or not re.fullmatch(r'[0-9a-f]{32}',value['channel_secret'])
             or not isinstance(value['channel_access_token'],str) or not 16<=len(value['channel_access_token'])<=8192
@@ -24,7 +25,11 @@ def credentials(value):
             or not isinstance(value['destination'],str) or not re.fullmatch(r'U[0-9a-f]{32}',value['destination'])
             or type(value['port']) is not int or not 1024<=value['port']<=65535):
         raise ValueError('canonical private LINE identity and unprivileged loopback port required')
-    return dict(value)
+    result=dict(value)
+    if 'tls' in result:
+        from .gateway_line_tls import material
+        result['tls']=material(result['tls'])
+    return result
 
 
 def _directory(path):
@@ -159,8 +164,12 @@ def _install(adapter,fd,profile,value,authority,publisher):
             self._haos_line_runner=runner
             try:
                 await runner.setup()
-                site=web.TCPSite(runner,'127.0.0.1',value['port']);await site.start();check()
-                self._haos_line_verified_destination=value['destination'];self._mark_connected();status('listening')
+                tls=None;host='127.0.0.1'
+                if 'tls' in value:
+                    from .gateway_line_tls import context
+                    tls=context(value['tls'],profile);host=value['tls']['bind_host']
+                site=web.TCPSite(runner,host,value['port'],ssl_context=tls);await site.start();check()
+                self._haos_line_verified_destination=value['destination'];self._mark_connected();status('listening-tls' if tls else 'listening')
                 self._haos_line_replay=asyncio.create_task(replay());return True
             except asyncio.CancelledError:await stop();raise
             except PermissionError:await stop();status('revoked');raise

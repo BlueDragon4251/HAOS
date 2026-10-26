@@ -1128,6 +1128,7 @@ class Wizard:
                         'created':'Privates IRC-Profil vorbereitet',
                         'rate-limited':'IRC begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten'}
                     line_labels={'created':'Privates LINE-Profil vorbereitet','listening':'Lokaler LINE-Listener bereit; öffentliche HTTPS-Erreichbarkeit nicht bestätigt',
+                        'listening-tls':'LINE-HTTPS-Listener bereit; externe LINE-Erreichbarkeitsprüfung noch nicht bestätigt',
                         'disconnected':'LINE-Listener getrennt; gespeicherte Eingänge bleiben erhalten',
                         'authentication-refused':'LINE-Anmeldung abgelehnt; privaten Channel-Token prüfen und erneute Anmeldung ausdrücklich erlauben',
                         'identity-refused':'LINE-Bot-ID passt nicht zum Zugangstoken; gespeicherte Daten bleiben erhalten',

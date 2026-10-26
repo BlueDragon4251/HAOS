@@ -25,7 +25,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-line-owner-inspection-') as td:
         inbox=NativeInbox(Path(td)/'native.db',Redactor())
         inbox.db.execute('CREATE TABLE line_profile_status(identity TEXT PRIMARY KEY,connector TEXT,credential_scope TEXT,status TEXT,updated_at REAL,next_attempt REAL)')
-        for status in ['created','listening','disconnected','authentication-refused','identity-refused','rate-limited','transport-unavailable','revoked','closed']:
+        for status in ['created','listening','listening-tls','disconnected','authentication-refused','identity-refused','rate-limited','transport-unavailable','revoked','closed']:
             inbox.db.execute('INSERT INTO line_profile_status VALUES(?,?,?,?,?,?)',(status,'line-main','private-scope-hash',status,123,time.time()+30 if status=='rate-limited' else 0))
         inbox.db.execute('CREATE TABLE line_delivery_intents(delivery_id TEXT,attempt INTEGER,fingerprint TEXT,state TEXT,receipt TEXT,updated_at REAL)')
         for identity,state,receipt in [('a','confirmed','line_push_'+'b'*64),('c','writing',''),('d','uncertain','')]:
@@ -51,6 +51,7 @@ def main():
             wizard.root.update();assert not wizard.running
             labels=' '.join(str(w.cget('text')) for w in widgets(wizard.content) if isinstance(w,tk.Label))
             assert 'Lokaler LINE-Listener bereit; öffentliche HTTPS-Erreichbarkeit nicht bestätigt' in labels
+            assert 'LINE-HTTPS-Listener bereit; externe LINE-Erreichbarkeitsprüfung noch nicht bestätigt' in labels
             cases.append('actual_sqlite_profile_listening_does_not_claim_public_tls_or_external_webhook_readiness')
             assert 'LINE-Anmeldung abgelehnt' in labels and 'LINE-Bot-ID passt nicht zum Zugangstoken' in labels
             cases.append('actual_owner_sees_distinct_authentication_and_bot_identity_refusals')
