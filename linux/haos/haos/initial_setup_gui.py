@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"], "telegram")
             token = self._field(self.content, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
             app_token = self._field(slack_credentials, "Slack App-Token · xapp- · Socket Mode", secret=True)
@@ -660,6 +660,22 @@ class Wizard:
                 'Token oder Serverwechsel entzieht bisherige Absenderfreigaben. Medien/Voice und beliebige Plugins sind nicht freigegeben.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
             ntfy_credentials=tk.Frame(self.content,bg=self.PANEL)
+            ha_credentials=tk.Frame(self.content,bg=self.PANEL)
+            ha_server=self._field(ha_credentials,'Home Assistant HTTPS-Server')
+            ha_server_value=tk.StringVar(value='');ha_server.configure(textvariable=ha_server_value);ha_server._haos_public_value=ha_server_value
+            self._label(ha_credentials,'Erzeuge im Home-Assistant-Benutzerprofil einen Long-Lived Access Token und trage ihn oben geschützt ein. '
+                'Die HTTPS-Adresse benötigt ein vom System vertrautes Zertifikat. HAOS öffnet eine ausgehende WebSocket-Verbindung; '
+                'ein öffentlicher HAOS-Webhook ist nicht nötig. Kopple unten eine exakte Entity mit einer echten Benutzer-ID oder '
+                'einer ausdrücklich bestätigten Systemquelle. Unbekannte Benutzer werden nicht freigegeben. '
+                'Nach einer Trennung sind gespeicherte Eingänge wiederherstellbar; unbeobachtete Ereignisse können über '
+                'die native HA-History nicht mit sicherer Absenderzuordnung nachgeladen werden. Diese Lücke bleibt sichtbar. '
+                'Dieser Pfad steuert keine Geräte und bietet keine Chat-Befehle, Medien oder Voice.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def retry_ha_auth():
+                selected_connector=connector.get()
+                self._run_async(lambda:initial_setup.retry_homeassistant_gateway_auth(selected_connector),
+                    success='Home-Assistant-Auth-Sperre geprüft. Keine Nachricht gesendet; Lücken und Rechte bleiben erhalten. Dienst manuell starten.')
+            self._button(ha_credentials,'Home-Assistant-Anmeldung erneut erlauben',retry_ha_auth).pack(anchor='w',pady=6)
             ntfy_server=self._field(ntfy_credentials,'ntfy HTTPS-Server · optional mit Installationspfad')
             ntfy_server_value=tk.StringVar(value='');ntfy_server.configure(textvariable=ntfy_server_value);ntfy_server._haos_public_value=ntfy_server_value
             ntfy_topic=self._field(ntfy_credentials,'Exaktes privates ntfy-Topic')
@@ -700,13 +716,17 @@ class Wizard:
                 app_token.delete(0, tk.END)
                 matrix_recovery.delete(0,tk.END)
                 selected_ntfy_server,selected_ntfy_topic=ntfy_server.get(),ntfy_topic.get()
+                selected_ha_server=ha_server.get()
                 if platform.get()=='ntfy':trust_publishers.set(False)
+                if platform.get()=='homeassistant':reset_ha_consent()
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
                 self._run_async(lambda: (initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
                     else initial_setup.configure_gateway(selected_connector,selected_platform,secret,app_secret,**matrix_values)
                     if selected_platform=='matrix' else initial_setup.configure_gateway(selected_connector,selected_platform,secret,
                         server_url=selected_ntfy_server,topic=selected_ntfy_topic) if selected_platform=='ntfy'
+                    else initial_setup.configure_gateway(selected_connector,selected_platform,secret,server_url=selected_ha_server)
+                    if selected_platform=='homeassistant'
                     else initial_setup.configure_gateway(selected_connector, selected_platform, secret, app_secret)),
                     success="Gateway gespeichert. Bei Token-/Kontowechsel Absender erneut koppeln; anschließend Gateway-Dienst neu starten.")
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
@@ -715,7 +735,8 @@ class Wizard:
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main'}:
+                ha_server.delete(0,tk.END)
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
@@ -727,6 +748,11 @@ class Wizard:
                     if existing:
                         ntfy_server.insert(0,existing['server_url']);ntfy_topic.insert(0,existing['topic'])
                 else:ntfy_credentials.pack_forget()
+                if platform.get()=='homeassistant':
+                    ha_credentials.pack(fill='x',before=configure_button)
+                    existing=configured_gateways.get('homeassistant',{}).get(connector.get())
+                    if existing:ha_server.insert(0,existing['server_url'])
+                else:ha_credentials.pack_forget()
                 if platform.get()=='matrix':matrix_credentials.pack(fill='x',before=configure_button)
                 else:matrix_credentials.pack_forget()
             platform.trace_add("write",platform_changed)
@@ -802,6 +828,46 @@ class Wizard:
                 else:matrix_pair.pack_forget()
             platform.trace_add('write',matrix_pair_changed)
             ntfy_pair=tk.Frame(self.content,bg=self.PANEL)
+            ha_pair=tk.Frame(self.content,bg=self.PANEL)
+            share_ha=tk.BooleanVar(value=False);trust_ha_system=tk.BooleanVar(value=False)
+            tk.Checkbutton(ha_pair,text='Ich erlaube Missionantworten als Benachrichtigungen für ALLE Benutzer dieser HA-Instanz',
+                variable=share_ha,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w')
+            tk.Checkbutton(ha_pair,text='Ich vertraue allen System-/Automationsquellen dieser exakten Entity',
+                variable=trust_ha_system,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w')
+            self._label(ha_pair,'Ohne Systemfreigabe: echte Benutzer-ID mit 32 kleinen Hex-Zeichen als Absender. '
+                'Mit Systemfreigabe: Absender system; es wird keine verifizierte Person behauptet. '
+                'Chat ist die exakte Entity-ID, zum Beispiel sensor.kitchen oder input_text.owner. '
+                'Bereich und Thread bleiben leer. Bei Leserecht sind Antworten für alle Instanzbenutzer sichtbar.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            previous_ha=[False]
+            def ha_system_changed(*_args):
+                if platform.get()!='homeassistant':return
+                was_disabled=str(sender.cget('state'))=='disabled'
+                sender.configure(state='normal')
+                if trust_ha_system.get():
+                    sender.delete(0,tk.END);sender.insert(0,'system');sender.configure(state='disabled')
+                elif was_disabled and sender.get()=='system':sender.delete(0,tk.END)
+            trust_ha_system.trace_add('write',ha_system_changed)
+            def reset_ha_consent(*_args):
+                share_ha.set(False);trust_ha_system.set(False)
+            ha_server_value.trace_add('write',reset_ha_consent)
+            connector_value.trace_add('write',reset_ha_consent)
+            def ha_pair_changed(*_args):
+                reset_ha_consent();active=platform.get()=='homeassistant'
+                if active or previous_ha[0]:
+                    for field in (scope,thread):
+                        field.configure(state='normal');field.delete(0,tk.END)
+                        if active:field.configure(state='disabled')
+                    for field in (sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                if active:ha_pair.pack(fill='x',before=pairing_note)
+                else:ha_pair.pack_forget()
+                for capability,widget in rights_widgets.items():
+                    if capability not in {'create','read'}:
+                        widget.configure(state='disabled' if active else 'normal')
+                        if active:rights[capability].set(False)
+                previous_ha[0]=active
             trust_publishers=tk.BooleanVar(value=False)
             tk.Checkbutton(ntfy_pair,text='Ich vertraue ALLEN Publishern dieses privaten Topics die gewählten Rechte an',
                 variable=trust_publishers,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
@@ -821,6 +887,8 @@ class Wizard:
             ntfy_server_value.trace_add('write',lambda *_args:trust_publishers.set(False))
             def ntfy_pair_changed(*_args):
                 trust_publishers.set(False)
+                if platform.get()=='homeassistant':
+                    ntfy_pair.pack_forget();previous_ntfy[0]=False;return
                 active=platform.get()=='ntfy'
                 for field in (scope,thread):
                     field.configure(state='normal')
@@ -848,14 +916,16 @@ class Wizard:
                 "In Kanälen und Gruppen den Bot erwähnen. Leerer Thread bedeutet nur Nachrichten außerhalb eines Threads; "
                 "Antworten erzeugen keinen neuen Thread. Medien, native Slash-Menüs und interaktive Slack-Schaltflächen sind nicht freigegeben.",
                 size=10,color=self.MUTED).pack(anchor="w",pady=6)
-            rights = {}
+            rights = {};rights_widgets={}
             for capability, label in (("create", "Missionen erstellen"), ("read", "Eigene Missionen lesen"),
                     ("cancel", "Eigene Missionen abbrechen"), ("answer", "Rückfragen und Freigaben beantworten"),
                     ("pause", "Wartende Missionen pausieren"), ("resume", "Pausierte Missionen fortsetzen")):
                 variable = tk.BooleanVar(value=capability in {"create", "read"})
                 rights[capability] = variable
-                tk.Checkbutton(self.content, text=label, variable=variable, bg=self.PANEL, fg=self.TEXT,
-                    selectcolor=self.BG, activebackground=self.PANEL).pack(anchor="w")
+                widget=tk.Checkbutton(self.content, text=label, variable=variable, bg=self.PANEL, fg=self.TEXT,
+                    selectcolor=self.BG, activebackground=self.PANEL)
+                widget.pack(anchor='w');rights_widgets[capability]=widget
+            platform.trace_add('write',ha_pair_changed)
             def pair_sender():
                 selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
                             tuple(key for key, value in rights.items() if value.get()))
@@ -863,9 +933,14 @@ class Wizard:
                 if platform.get()=='ntfy' and not trust_publishers.get():
                     self._show_error(describe_error(ValueError('Bestätige ausdrücklich das Vertrauen in alle Publisher dieses privaten Topics.'),area=self.page))
                     return
+                if platform.get()=='homeassistant' and rights['read'].get() and not share_ha.get():
+                    self._show_error(describe_error(ValueError('Bestätige ausdrücklich die Sichtbarkeit von Antworten für ALLE Home-Assistant-Instanzbenutzer.'),area=self.page))
+                    return
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
-                    else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy' else {})
+                    else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
+                    else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
+                        'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {})
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
@@ -882,7 +957,9 @@ class Wizard:
                     binding_details.configure(text="Absender: " + row["sender"] + " · Chat: " + row["chat"]
                         + " · Identität: " + row["identity"] + " · Rechte: " + ", ".join(row["capabilities"])
                         + (" · Gilt für ALLE Publisher dieses Topics" if any(c["id"]==row["connector"] and c["platform"]=="ntfy"
-                            for c in configured_gateways["connectors"]) else ""))
+                            for c in configured_gateways["connectors"]) else "")
+                        + (" · Antworten für ALLE Instanzbenutzer sichtbar" if row.get('homeassistant_shared_notifications') else "")
+                        + (" · System-/Automationsquellen dieser Entity ausdrücklich freigegeben" if row.get('homeassistant_trust_system') else ""))
                 revoked_binding.trace_add("write", show_binding_details)
                 show_binding_details()
                 def revoke_binding():
@@ -939,7 +1016,16 @@ class Wizard:
                         'invalid-stream':'ntfy-Streamformat ungültig; keine unvollständigen Frames ausgeführt',
                         'revoked':'Keine aktuelle Topic-Freigabe; zuerst koppeln oder Entzug prüfen. Keine weitere Ausführung',
                         'closed':'Privates ntfy-Profil geschlossen; vorhandene Daten bleiben erhalten'}
-                    labels=matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy' else transport_labels
+                    ha_labels={'created':'Privates HA-Profil vorbereitet','connecting':'Home-Assistant-Anmeldung wird geprüft',
+                        'streaming':'Home-Assistant-Stream angemeldet; keine externe Zustellung abgeleitet',
+                        'disconnected':'Home Assistant getrennt; gespeicherte Eingänge bleiben erhalten',
+                        'authentication-refused':'HA-Anmeldung abgelehnt; Konto/Token prüfen und erneute Anmeldung ausdrücklich erlauben',
+                        'rate-limited':'Home Assistant begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten',
+                        'transport-unavailable':'Home Assistant/TLS nicht verfügbar; Adresse, Zertifikat und Netzwerk prüfen',
+                        'revoked':'Home-Assistant-Freigabe entzogen oder geändert; keine weitere Ausführung',
+                        'closed':'Privates Home-Assistant-Profil geschlossen; Daten erhalten'}
+                    labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                        else ha_labels if item.get('platform')=='homeassistant' else transport_labels)
                     import datetime
                     retry_time=(datetime.datetime.fromtimestamp(item['next_sync']).strftime('%d.%m.%Y %H:%M:%S')
                         if item.get('next_sync',0)>0 else 'keine Wartefrist')
@@ -955,6 +1041,11 @@ class Wizard:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · letzter Fehler: '+ntfy_labels[item['last_error']] if item.get('last_error') else ''))
+                    if item.get('platform')=='homeassistant':
+                        deadline=item.get('next_attempt',0);gap=item.get('gap_since',0)
+                        extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
+                            +(' · unbeobachtete Ereignisse seit '+datetime.datetime.fromtimestamp(gap).strftime('%d.%m.%Y %H:%M:%S')
+                                +' sind nicht verlässlich nachladbar; Wiederverbindung schließt diese Lücke nicht' if gap>0 else ''))
                     self._label(recovery_frame,'Letzter Transportstatus · '+item['connector']+' · '+labels[item['status']]
                         +extra+' · Zeitpunkt '+str(item['updated_at']),size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for history in value.get('history',[]):

@@ -28,6 +28,60 @@ def uid_fixture_path():
         yield Path(directory)
 
 
+@pytest.mark.parametrize('platform',['homeassistant','ntfy'])
+@pytest.mark.parametrize('journal_exists',[False,True])
+def test_actual_recovery_main_dispatches_auth_recheck_with_real_uid_nss_and_default_private_path(uid_fixture_path,platform,journal_exists):
+    root=uid_fixture_path;root.chmod(0o755)
+    # The child gets an actual kernel chroot and its own real passwd database;
+    # host accounts/configuration are never changed and UID calls are not mocked.
+    (root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    (root/'var/lib/haos-gateway').mkdir(parents=True,mode=0o700)
+    state=root/'var/lib/haos-gateway';database=state/'native-inbox.db'
+    config={'version':1,'connectors':[{'id':'test','platform':platform}],'bindings':[]}
+    if journal_exists:
+        inbox=NativeInbox(database,Redactor())
+        if platform=='homeassistant':
+            inbox.db.execute('CREATE TABLE homeassistant_profile_status(identity TEXT PRIMARY KEY,connector TEXT,status TEXT,updated_at REAL,next_attempt REAL,gap_since REAL)')
+            inbox.db.execute("INSERT INTO homeassistant_profile_status VALUES('fixture','test','authentication-refused',123,0,42)")
+        else:
+            inbox.db.execute('CREATE TABLE ntfy_subscription(identity TEXT PRIMARY KEY,connector TEXT,cursor TEXT,status TEXT,next_attempt REAL)')
+            inbox.db.execute("INSERT INTO ntfy_subscription VALUES('fixture','test','retained-cursor','authentication-denied',0)")
+        inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    code='''
+import json,os,pwd,sys
+from haos import gateway_raw_recovery
+from haos import gateway_homeassistant_profile
+pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(65534);os.setuid(65534)
+assert os.geteuid()==65534 and pwd.getpwnam('haos-gateway').pw_uid==65534
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    request={'action':'retry-homeassistant-auth' if platform=='homeassistant' else 'retry-ntfy-auth',
+        'policy':config,'params':{'connector':'test','owner_uid':1000,'note_sha256':'a'*64}}
+    child=subprocess.run([sys.executable,'-c',code,str(root)],input=json.dumps(request),
+        text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
+            'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    assert child.returncode==0,child.stderr
+    report=json.loads(child.stdout)
+    assert report['network_requested'] is False and report['authentication_blocks_cleared']==int(journal_exists)
+    if not journal_exists:assert not database.exists() and report['native_journal_created'] is False
+    else:
+        import sqlite3
+        connection=sqlite3.connect(database)
+        try:
+            if platform=='homeassistant':
+                assert tuple(connection.execute('SELECT status,gap_since FROM homeassistant_profile_status').fetchone())==('created',42)
+                assert connection.execute('SELECT owner_uid FROM homeassistant_owner_events').fetchone()[0]==1000
+            else:
+                assert tuple(connection.execute('SELECT status,cursor FROM ntfy_subscription').fetchone())==('ready','retained-cursor')
+        finally:connection.close()
+
+
 @pytest.mark.parametrize('change',['withdraw','generation'])
 @pytest.mark.parametrize('platform',['slack','telegram','discord'])
 def test_native_delivery_callback_observes_atomic_owner_policy_changes_as_real_gateway_uid(uid_fixture_path,change,platform):

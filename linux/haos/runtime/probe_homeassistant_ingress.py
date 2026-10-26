@@ -35,12 +35,14 @@ def main():
         config={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[{
             'id':'owner','connector':'ha','sender':uid,'chat':entity,'scope':'','thread':'',
             'identity':'ha-owner','capabilities':['create','read'],'generation':'a'*64,'since':int(time.time()*1000)-10000}]}
-        policy=lambda:PreparedHomeAssistantPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         def denied(action):
             try:action()
             except (ValueError,PermissionError):return
             raise AssertionError('unapproved prepared HA authority admitted')
-        denied(lambda:GatewayPolicy(config));cases.append('public_owner_policy_still_refuses_unfinished_homeassistant')
+        assert GatewayPolicy(config).bindings['owner']['sender']==uid
+        denied(lambda:GatewayPolicy({**config,'connectors':[{'id':'ha','platform':'unreviewed-plugin'}]}))
+        cases.append('public_owner_policy_admits_exact_reviewed_homeassistant_but_refuses_unknown_plugins')
         native=NativeInbox(directory/'native.db',Redactor())
         relay=RelayInbox(directory/'relay.db',Redactor())
         adapter=install(durable_adapter(context.entry.adapter_factory(PlatformConfig(enabled=True,token='local-only-fixture-token',extra={
@@ -117,10 +119,34 @@ def main():
         assert not await dispatch_stored(adapter,key) and len(accepted)==2
         denied(lambda:capture(adapter,event(8),authority))
         cases.append('regrant_revokes_retained_and_old_capture_snapshot_authority')
+        system=event(20);system['context']['user_id']=None;system['data']['new_state']['context']['user_id']=None
+        before=native.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0]
+        denied(lambda:capture(adapter,system,snapshot(policy(),'ha')))
+        assert native.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0]==before
+        cases.append('system_context_has_no_authority_without_explicit_exact_entity_owner_grant')
+        config['bindings'].append({**config['bindings'][0],'id':'system-owner','sender':'system',
+            'identity':'ha-system','generation':'d'*64,'homeassistant_trust_system':True})
+        system_authority=snapshot(policy(),'ha')
+        key=capture(adapter,system,system_authority)
+        assert key is not None and await dispatch_stored(adapter,key)
+        assert accepted[-1]['sender']=='system' and accepted[-1]['chat']==entity
+        assert not await dispatch_stored(adapter,key)
+        cases.append('explicit_system_entity_grant_uses_actual_native_codec_and_durable_replay_guard_without_claiming_human_identity')
+        outsider=event(21);outsider['context']['user_id']='b'*32;outsider['data']['new_state']['context']['user_id']='b'*32
+        denied(lambda:capture(adapter,outsider,system_authority))
+        cases.append('system_entity_trust_does_not_authorize_unknown_authenticated_human_user')
+        missing=copy.deepcopy(system);missing['context'].pop('user_id')
+        assert envelope(adapter,missing) is None
+        missing=copy.deepcopy(system);missing['data']['new_state']['context'].pop('user_id')
+        assert envelope(adapter,missing) is None
+        cases.append('explicit_system_route_still_requires_original_null_user_fields_in_both_contexts')
+        config['bindings'].pop()
+        denied(lambda:capture(adapter,system,system_authority))
+        cases.append('system_grant_withdrawal_revokes_its_captured_authority_without_deleting_receipts')
         native.close();relay.close()
     with tempfile.TemporaryDirectory(prefix='haos-ha-native-ingress-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_native_decoder':True,'actual_sqlite_and_relay':True,
-        'public_gateway_enabled':False,'transport_authentication_accepted':False,'external_connections':False,
+        'public_gateway_enabled':True,'transport_authentication_accepted':False,'external_connections':False,
         'homeassistant_device_tools_enabled_for_agent':False,'live_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

@@ -1,4 +1,4 @@
-"""Prepared isolated HA lifecycle. No public setup or history authority implied."""
+"""Isolated Home Assistant lifecycle; reconnect never implies unseen history recovery."""
 import asyncio
 import fcntl
 import hashlib
@@ -8,8 +8,8 @@ import stat
 import time
 from types import MethodType, SimpleNamespace
 
-from .gateway import digest
-from .gateway_homeassistant_ingress import PreparedHomeAssistantPolicy, install, dispatch_stored, snapshot
+from .gateway import GatewayPolicy,digest
+from .gateway_homeassistant_ingress import install, dispatch_stored, snapshot,validate_binding
 from .gateway_homeassistant_transport import install as install_transport
 from .gateway_homeassistant_delivery import Publisher
 
@@ -24,7 +24,9 @@ def credentials(value):
     token=value['token']
     if not isinstance(token,str) or not 1<=len(token)<=8192 or any(ord(c)<33 or ord(c)>126 for c in token):
         raise ValueError('bounded private Home Assistant bearer token required')
-    return {'server_url':server_url(value['server_url']),'token':token}
+    try:server=server_url(value['server_url'])
+    except ValueError:raise ValueError('exact Home Assistant HTTPS server without embedded credentials required') from None
+    return {'server_url':server,'token':token}
 
 
 def _directory(path):
@@ -38,10 +40,12 @@ def build(value,parent,connector,policy,inbox):
     value=credentials(value)
     def current():
         result=policy()
-        if not isinstance(result,PreparedHomeAssistantPolicy):
-            raise PermissionError('prepared independent Home Assistant authority required')
+        if not isinstance(result,GatewayPolicy):
+            raise PermissionError('independent Home Assistant authority required')
         if not snapshot(result,connector)['bindings']:
             raise PermissionError('exact user/entity owner grant required before profile creation')
+        for binding in result.bindings.values():
+            if binding['connector']==connector:validate_binding(binding,require_epoch=True)
         return result
     authority=snapshot(current(),connector)
     parent=Path(parent)
@@ -80,22 +84,43 @@ def build(value,parent,connector,policy,inbox):
             adapter._haos_native=SimpleNamespace(connector=connector,policy=current,inbox=inbox)
             install_transport(adapter)
         identity=digest([value['server_url'],connector,authority,hashlib.sha256(value['token'].encode()).hexdigest()])
-        return _install(adapter,fd,profile,values,identity)
+        credential_scope=digest([value['server_url'],connector,hashlib.sha256(value['token'].encode()).hexdigest()])
+        return _install(adapter,fd,profile,values,identity,credential_scope)
     except BaseException:os.close(fd);raise
 
 
-def _install(adapter,fd,profile,values,identity):
+def _install(adapter,fd,profile,values,identity,credential_scope):
     from .gateway_matrix_profile import scope
     boundary=adapter._haos_ha_transport
     db=adapter._haos_native.inbox.db
     db.execute('''CREATE TABLE IF NOT EXISTS homeassistant_profile_status (
         identity TEXT PRIMARY KEY, connector TEXT NOT NULL, status TEXT NOT NULL,
-        updated_at REAL NOT NULL, next_attempt REAL NOT NULL, gap_since REAL NOT NULL)''')
+        updated_at REAL NOT NULL, next_attempt REAL NOT NULL, gap_since REAL NOT NULL,
+        credential_scope TEXT NOT NULL DEFAULT '')''')
+    if 'credential_scope' not in {row[1] for row in db.execute('PRAGMA table_info(homeassistant_profile_status)')}:
+        db.execute("ALTER TABLE homeassistant_profile_status ADD COLUMN credential_scope TEXT NOT NULL DEFAULT ''")
     existed=db.execute('SELECT 1 FROM homeassistant_profile_status WHERE identity=?',(identity,)).fetchone()
-    db.execute('INSERT OR IGNORE INTO homeassistant_profile_status VALUES(?,?,?,?,?,?)',
-        (identity,adapter._haos_native.connector,'created',time.time(),0,
-         min(b['since'] for b in adapter._haos_native.policy().bindings.values()
-             if b['connector']==adapter._haos_native.connector)/1000))
+    # A binding epoch is not a new provider account. Retain throttles and auth
+    # refusal for the same credential across re-pairing. Unmappable legacy rows
+    # remain conservative and are never deleted or silently treated as healthy.
+    db.execute("UPDATE homeassistant_profile_status SET credential_scope=? WHERE identity=? AND credential_scope=''",
+        (credential_scope,identity))
+    previous=db.execute("SELECT status,next_attempt,gap_since FROM homeassistant_profile_status "
+        "WHERE connector=? AND (credential_scope=? OR credential_scope='')",
+        (adapter._haos_native.connector,credential_scope)).fetchall()
+    delay=max([row['next_attempt'] for row in previous]+[0])
+    blocked=any(row['status']=='authentication-refused' for row in previous)
+    earliest=min([row['gap_since'] for row in previous if row['gap_since']>0]+
+        [min(b['since'] for b in adapter._haos_native.policy().bindings.values()
+            if b['connector']==adapter._haos_native.connector)/1000])
+    db.execute('INSERT OR IGNORE INTO homeassistant_profile_status '
+        '(identity,connector,status,updated_at,next_attempt,gap_since,credential_scope) VALUES(?,?,?,?,?,?,?)',
+        (identity,adapter._haos_native.connector,'authentication-refused' if blocked else 'created',time.time(),delay,earliest,credential_scope))
+    if blocked:
+        db.execute("UPDATE homeassistant_profile_status SET status='authentication-refused' WHERE identity=?",(identity,))
+    db.execute('UPDATE homeassistant_profile_status SET next_attempt=MAX(next_attempt,?),'
+        'gap_since=CASE WHEN gap_since=0 THEN ? ELSE MIN(gap_since,?) END WHERE identity=?',
+        (delay,earliest,earliest,identity))
     if existed:
         db.execute('UPDATE homeassistant_profile_status SET gap_since=CASE WHEN gap_since=0 THEN ? ELSE gap_since END WHERE identity=?',
             (time.time(),identity))

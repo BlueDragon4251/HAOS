@@ -1,4 +1,4 @@
-"""Prepared HA context/entity admission; public setup and transport remain disabled."""
+"""Independent HA context/entity admission before actual native decoding."""
 import asyncio
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -22,12 +22,23 @@ class PreparedHomeAssistantPolicy(GatewayPolicy):
         super().__init__(config)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']!='homeassistant':continue
-            if ('homeassistant_shared_notifications' in binding and type(binding['homeassistant_shared_notifications']) is not bool):
-                raise ValueError('explicit boolean approval of shared Home Assistant notifications required')
-            if (not _USER.fullmatch(binding['sender']) or not _ENTITY.fullmatch(binding['chat'])
-                    or binding['scope'] or binding['thread'] or type(binding.get('since')) is not int
-                    or not binding.get('generation')):
-                raise ValueError('prepared Home Assistant requires exact authenticated user, entity and explicit timed owner grant')
+            validate_binding(binding,require_epoch=True)
+
+
+def validate_binding(binding,*,require_epoch=False):
+    if ('homeassistant_shared_notifications' in binding and type(binding['homeassistant_shared_notifications']) is not bool):
+        raise ValueError('explicit boolean approval of shared Home Assistant notifications required')
+    trusted=binding.get('homeassistant_trust_system',False)
+    if type(trusted) is not bool or trusted!=(binding['sender']=='system'):
+        raise ValueError('system entity events require explicit owner trust; human routes require the actual user ID')
+    if (not (_USER.fullmatch(binding['sender']) or binding['sender']=='system' and trusted) or not _ENTITY.fullmatch(binding['chat'])
+            or binding['scope'] or binding['thread']):
+        raise ValueError('Home Assistant requires an exact authenticated user and entity, without scope or thread')
+    if require_epoch and (type(binding.get('since')) is not int or not binding.get('generation')):
+        raise ValueError('Home Assistant transport requires an explicit timed owner grant')
+    if (not isinstance(binding['capabilities'],list) or not binding['capabilities']
+            or any(not isinstance(cap,str) or cap not in {'create','read'} for cap in binding['capabilities'])):
+        raise ValueError('Home Assistant state events support mission creation and reading, not chat command permissions')
 
 
 def snapshot(policy,connector):
@@ -50,20 +61,22 @@ def envelope(adapter,event):
         data=event.get('data');context=event.get('context')
         if not isinstance(data,dict) or not isinstance(context,dict):return None
         entity=data.get('entity_id');user=context.get('user_id');identity=context.get('id')
+        system=user is None and 'user_id' in context
         if (not isinstance(entity,str) or not _ENTITY.fullmatch(entity)
-                or not isinstance(user,str) or not _USER.fullmatch(user)
+                or not (system or isinstance(user,str) and _USER.fullmatch(user))
                 or not isinstance(identity,str) or not _CONTEXT.fullmatch(identity)):return None
         new=data.get('new_state');old=data.get('old_state')
         if (not isinstance(new,dict) or old is not None and not isinstance(old,dict)
                 or new.get('entity_id')!=entity or not isinstance(new.get('context'),dict)
                 or new['context'].get('id')!=identity or new['context'].get('user_id')!=user
+                or system and 'user_id' not in new['context']
                 or not isinstance(new.get('state'),str) or not isinstance(new.get('attributes',{}),dict)
                 or old is not None and 'state' in old and not isinstance(old['state'],str)):return None
         updated=_timestamp(new.get('last_updated'));fired=_timestamp(event.get('time_fired'))
         if not 0<=fired-updated<=300:return None
         text=adapter._format_state_change(entity,old,new)
         if not isinstance(text,str) or not 1<=len(text.encode())<=32000:return None
-        source={'platform':'homeassistant','sender':user,'chat':entity,'scope':'','thread':'',
+        source={'platform':'homeassistant','sender':'system' if system else user,'chat':entity,'scope':'','thread':'',
             'message_id':digest([entity,identity,new['last_updated'],event['time_fired']]),'is_bot':False,'text':text}
         return source,fired
     except (ValueError,TypeError,KeyError,OverflowError):return None

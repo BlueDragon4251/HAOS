@@ -58,6 +58,16 @@ def test_prepared_homeassistant_auth_retry_rolls_back_when_audit_storage_fails(t
     finally:inbox.close()
 
 
+def test_owner_auth_recheck_preserves_unexpired_throttle_even_when_authentication_is_also_refused(tmp_path):
+    inbox,policy,params=fixture(tmp_path)
+    try:
+        deadline=time.time()+3600
+        inbox.db.execute("UPDATE homeassistant_profile_status SET next_attempt=? WHERE identity='auth'",(deadline,))
+        assert retry_homeassistant_auth(inbox,policy,params)['authentication_blocks_cleared']==1
+        assert tuple(inbox.db.execute("SELECT status,next_attempt,gap_since FROM homeassistant_profile_status WHERE identity='auth'").fetchone())==('created',deadline,42)
+    finally:inbox.close()
+
+
 @pytest.mark.parametrize('change',[{'connector':'other'},{'owner_uid':True},{'owner_uid':-1},
     {'note_sha256':'raw private note'},{'extra':'unreviewed'}])
 def test_prepared_homeassistant_auth_retry_rejects_missing_owner_audit_authority(tmp_path,change):

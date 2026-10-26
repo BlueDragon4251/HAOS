@@ -17,6 +17,7 @@ from types import SimpleNamespace
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from aiohttp import web
+    from haos.gateway import GatewayPolicy
     from haos.gateway_homeassistant_ingress import PreparedHomeAssistantPolicy,install as ingress
     from haos.gateway_homeassistant_transport import install as transport
     from haos.gateway_ingress import durable_adapter
@@ -36,7 +37,7 @@ def main():
         config={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[{
             'id':'owner','connector':'ha','sender':user,'chat':entity,'scope':'','thread':'',
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int(time.time()*1000)-10000}]}
-        policy=lambda:PreparedHomeAssistantPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         native=NativeInbox(directory/'native.db',Redactor([token]));accepted=[];adapters=[]
         state={'mode':'normal','requests':0,'auth':[],'subscribe':[],'sockets':[],'leaked':0,'events':0}
         ack=asyncio.Event();release=asyncio.Event();send=asyncio.Event();silent=asyncio.Event()
@@ -191,7 +192,7 @@ def main():
             logger.removeHandler(handler);native.close();await runner.cleanup()
     with tempfile.TemporaryDirectory(prefix='haos-hass-ws-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_auth_subscription_codec_and_aiohttp':True,
-        'loopback_ws_target_replacement_only_in_fixture':True,'held_timeout_case_fixture_deadline_seconds':.05,'public_gateway_enabled':False,
+        'loopback_ws_target_replacement_only_in_fixture':True,'held_timeout_case_fixture_deadline_seconds':.05,'public_gateway_enabled':True,
         'external_account_or_tls_or_notification_accepted':False,'agent_device_tools_enabled':False,'installed_service_accepted':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

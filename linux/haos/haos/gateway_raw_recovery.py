@@ -142,16 +142,21 @@ def reconcile(inbox, policy, request):
     return {'ingress_id':key,'attempt':attempt,'decision':decision,'state':target}
 
 
+def _recheck_connector(policy,request,platform):
+    if (not isinstance(policy,GatewayPolicy) or not isinstance(request,dict)
+            or set(request)!={'connector','owner_uid','note_sha256'}
+            or not isinstance(request['connector'],str)
+            or policy.connectors.get(request['connector'],{}).get('platform')!=platform
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
+            or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+        raise ValueError('exact gateway connector and authenticated owner audit context required')
+    return request['connector']
+
+
 def retry_ntfy_auth(inbox,policy,request):
     # Explicit owner recheck permission; never an authentication or send bypass.
     from .gateway import digest
-    if (set(request)!={'connector','owner_uid','note_sha256'}
-            or not isinstance(request['connector'],str)
-            or policy.connectors.get(request['connector'],{}).get('platform')!='ntfy'
-            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
-            or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
-        raise ValueError('exact ntfy connector and authenticated owner audit context required')
-    connector=request['connector']
+    connector=_recheck_connector(policy,request,'ntfy')
     changed=0
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
@@ -173,20 +178,14 @@ def retry_ntfy_auth(inbox,policy,request):
 def retry_homeassistant_auth(inbox,policy,request):
     """Permit a fresh server check; never clear revocation, gaps or rate limits."""
     from .gateway import digest
-    from .gateway_homeassistant_ingress import PreparedHomeAssistantPolicy
-    if (not isinstance(policy,PreparedHomeAssistantPolicy)
-            or set(request)!={'connector','owner_uid','note_sha256'}
-            or not isinstance(request['connector'],str)
-            or policy.connectors.get(request['connector'],{}).get('platform')!='homeassistant'
-            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
-            or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
-        raise ValueError('exact prepared Home Assistant connector and authenticated owner audit context required')
-    connector=request['connector'];changed=0
+    connector=_recheck_connector(policy,request,'homeassistant');changed=0
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
         if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='homeassistant_profile_status'").fetchone():
-            changed=inbox.db.execute("UPDATE homeassistant_profile_status SET status='created',updated_at=?,next_attempt=0 "
-                "WHERE connector=? AND status='authentication-refused'",(time.time(),connector)).rowcount
+            now=time.time()
+            changed=inbox.db.execute("UPDATE homeassistant_profile_status SET status='created',updated_at=?,"
+                "next_attempt=CASE WHEN next_attempt>? THEN next_attempt ELSE 0 END "
+                "WHERE connector=? AND status='authentication-refused'",(now,now,connector)).rowcount
         if changed:
             inbox.db.execute('CREATE TABLE IF NOT EXISTS homeassistant_owner_events ('
                 'connector TEXT NOT NULL, created_at REAL NOT NULL, owner_uid INTEGER NOT NULL,'
@@ -219,6 +218,12 @@ def main():
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
             print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
             return
+        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth'}:
+            platform='ntfy' if data['action']=='retry-ntfy-auth' else 'homeassistant'
+            connector=_recheck_connector(policy,data['params'],platform)
+            print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,
+                'network_requested':False,'native_journal_created':False}))
+            return
         raise
     inbox = NativeInbox(DATABASE,Redactor())
     try:
@@ -226,6 +231,8 @@ def main():
             result = unresolved(inbox,data['params']['after'])
         elif data['action'] == 'retry-ntfy-auth':
             result=retry_ntfy_auth(inbox,policy,data['params'])
+        elif data['action'] == 'retry-homeassistant-auth':
+            result=retry_homeassistant_auth(inbox,policy,data['params'])
         elif data['action'] == 'reconcile-ingress':
             result = reconcile(inbox,policy,data['params'])
         else: raise ValueError('unknown ingress recovery action')

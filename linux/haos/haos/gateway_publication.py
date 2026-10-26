@@ -23,6 +23,10 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='homeassistant':
+            from .gateway_homeassistant_profile import credentials as ha_credentials
+            if ha_credentials(row)!=row:raise ValueError('Home Assistant HTTPS server must use its canonical owner representation')
+            continue
         if platforms[name]=='ntfy':
             from .gateway_ntfy_profile import credentials as ntfy_credentials
             if ntfy_credentials(row)!=row:

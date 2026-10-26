@@ -1,4 +1,4 @@
-"""Prepared HA admission stays closed and imports without optional runtime SDKs."""
+"""Public HA admission stays exact and imports without optional runtime SDKs."""
 from pathlib import Path
 import subprocess
 import sys
@@ -15,8 +15,10 @@ def config():
         'identity':'owner','capabilities':['create','read'],'generation':'b'*64,'since':1}]}
 
 
-def test_prepared_homeassistant_does_not_enable_public_setup():
-    with pytest.raises(ValueError):GatewayPolicy(config())
+def test_public_homeassistant_policy_preserves_exact_actor_and_rejects_unknown_plugins():
+    assert GatewayPolicy(config()).bindings['owner']['sender']=='a'*32
+    source=config();source['connectors'][0]['platform']='unreviewed-plugin'
+    with pytest.raises(ValueError):GatewayPolicy(source)
     assert PreparedHomeAssistantPolicy(config()).bindings['owner']['chat']=='light.owner'
 
 

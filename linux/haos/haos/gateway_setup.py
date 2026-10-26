@@ -68,7 +68,10 @@ def owner_ingress(args, policy):
     stopped_gateway()
     GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
-    if args.gateway_action=='retry-ntfy-auth':
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth'}:
+        platform='ntfy' if args.gateway_action=='retry-ntfy-auth' else 'homeassistant'
+        if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
+            raise ValueError('select one configured connector for this authentication recheck')
         if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
             raise ValueError('bounded non-secret owner action context required')
         params={'connector':args.connector,'owner_uid':int(os.environ.get('SUDO_UID','0')),
@@ -97,8 +100,8 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
-    if args.gateway_action=='retry-ntfy-auth':
-        audit('gateway.ntfy-auth-retry',{**value,'note_sha256':params['note_sha256']})
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth'}:
+        audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
     return value
@@ -227,12 +230,12 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy")
+        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"}:
+            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy, homeassistant")
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         if any(c['id']==args.connector and c['platform']!=args.platform for c in policy['connectors']):
@@ -241,9 +244,13 @@ def owner_gateway(args):
         policy["connectors"] = [c for c in policy["connectors"] if c["id"] != args.connector] + [{"id": args.connector, "platform": args.platform}]
         GatewayPolicy(policy)
         token = getpass.getpass("Bot token (stored only in the owner-protected credential store): ")
-        if args.platform not in {'matrix','ntfy'} and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
+        if args.platform not in {'matrix','ntfy','homeassistant'} and (not 16 <= len(token) <= 4096 or any(c.isspace() or ord(c) < 32 for c in token)):
             raise ValueError("invalid transport credential")
         credentials["connectors"][args.connector] = {"token": token}
+        if args.platform=='homeassistant':
+            from .gateway_homeassistant_profile import credentials as ha_credentials
+            url=input('Home Assistant HTTPS server URL (system-trusted certificate required): ')
+            credentials['connectors'][args.connector]=ha_credentials({'token':token,'server_url':url})
         if args.platform=='slack':
             from .gateway_slack import validate_credentials
             app_token=getpass.getpass('Slack Socket Mode app token (private): ')
@@ -281,6 +288,14 @@ def owner_gateway(args):
         trust=getattr(args,'trust_topic_publishers',False)
         if selected and selected['platform']=='ntfy':binding['trust_topic_publishers']=trust
         elif trust:raise ValueError('topic publisher trust applies only to ntfy')
+        shared=getattr(args,'homeassistant_shared_notifications',False)
+        system=getattr(args,'homeassistant_trust_system',False)
+        if selected and selected['platform']=='homeassistant':
+            if 'read' in binding['capabilities'] and shared is not True:
+                raise ValueError('explicit approval of replies visible to every Home Assistant instance user required')
+            binding['homeassistant_shared_notifications']=shared
+            binding['homeassistant_trust_system']=system
+        elif shared or system:raise ValueError('Home Assistant notification/system consent applies only to Home Assistant')
         policy["bindings"] = [b for b in policy["bindings"] if b["id"] != args.binding] + [binding]
     elif args.gateway_action == "revoke":
         if not any(b["id"] == args.binding for b in policy["bindings"]):

@@ -393,3 +393,53 @@ def test_ntfy_owner_auth_retry_validates_selection_before_stopping_and_uses_offl
     result=initial_setup.retry_ntfy_gateway_auth('topic')
     assert result=={'authentication_blocks_cleared':1,'network_requested':False}
     assert stopped==[{'gateway_only':True}] and calls[0].gateway_action=='retry-ntfy-auth' and calls[0].connector=='topic'
+
+
+def test_homeassistant_owner_configuration_and_consent_validate_before_service_stop(monkeypatch):
+    import copy
+    from haos import gateway_setup, owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[]}
+    credentials={'connectors':{'ha':{'token':'private-fixture-token','server_url':'https://owner.invalid'}}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(credentials)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    with pytest.raises(ValueError):initial_setup.configure_gateway('ha','homeassistant','private-fixture-token',server_url='http://unsafe.invalid')
+    for options in [{},{'homeassistant_shared_notifications':1},
+                    {'homeassistant_shared_notifications':True,'homeassistant_server_url':'https://unsaved.invalid'},
+                    {'homeassistant_shared_notifications':True,'homeassistant_trust_system':True}]:
+        with pytest.raises(ValueError):
+            initial_setup.pair_gateway_sender('human','ha','a'*32,'light.owner','owner',**options)
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('system','ha','system','light.owner','owner',homeassistant_shared_notifications=True)
+    assert not saved and not stopped
+    initial_setup.configure_gateway('ha','homeassistant','private-fixture-token',server_url='https://Owner.Invalid:443/')
+    assert saved[-1][1]['connectors']['ha']==credentials['connectors']['ha']
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['homeassistant']=={'ha':{'server_url':'https://owner.invalid'}}
+    assert 'private-fixture-token' not in repr(metadata)
+    for sender,trust in [('a'*32,False),('system',True)]:
+        initial_setup.pair_gateway_sender('route','ha',sender,'light.owner','owner',
+            homeassistant_shared_notifications=True,homeassistant_trust_system=trust,
+            homeassistant_server_url='https://owner.invalid')
+        binding=GatewayPolicy(saved[-1][0]).bindings['route']
+        assert binding['sender']==sender and binding['homeassistant_trust_system'] is trust
+    assert stopped==[{'gateway_only':True}]*3
+
+
+def test_homeassistant_owner_auth_retry_uses_offline_backend_after_exact_selection(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'ha','platform':'homeassistant'},{'id':'other','platform':'ntfy'}],'bindings':[]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'network_requested':False})
+    for selection in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_homeassistant_gateway_auth(selection)
+    assert not calls and not stopped
+    assert initial_setup.retry_homeassistant_gateway_auth('ha')=={'network_requested':False}
+    assert calls[0].gateway_action=='retry-homeassistant-auth' and calls[0].connector=='ha'
+    assert stopped==[{'gateway_only':True}]

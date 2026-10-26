@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -52,7 +52,7 @@ class GatewayPolicy:
             connector = self.connectors.get(binding.get('connector'))
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
-                else {'homeassistant_shared_notifications'} if connector and connector['platform']=='homeassistant' else set())
+                else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant' else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
@@ -78,6 +78,9 @@ class GatewayPolicy:
                     raise ValueError('Mattermost requires exact user, channel, optional team and root-post IDs')
             if connector and connector['platform']=='ntfy':
                 from .gateway_ntfy import validate_binding
+                validate_binding(binding)
+            if connector and connector['platform']=='homeassistant':
+                from .gateway_homeassistant_ingress import validate_binding
                 validate_binding(binding)
             if connector and connector['platform']=='matrix':
                 from .gateway_matrix_policy import validate_binding

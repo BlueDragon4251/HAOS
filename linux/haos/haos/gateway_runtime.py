@@ -183,7 +183,7 @@ async def serve():
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -200,8 +200,11 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
+        if connector['platform']=='homeassistant' and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
+            logging.warning('Home Assistant connector remains inactive until exact owner pairing')
+            continue
         context=None
-        if connector['platform'] in {'matrix','ntfy'}:
+        if connector['platform'] in {'matrix','ntfy','homeassistant'}:
             parent=Path('/var/lib/haos-gateway')/connector['platform'];parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
         adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})

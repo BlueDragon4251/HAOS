@@ -952,3 +952,42 @@ Source hashes and individual receipts are recorded in
 `docs/evidence/2026-10-26/private-gateway-sdk-no-redirect-validation.json`.
 These loopback protocol checks do not establish live account/TLS/external
 delivery, installed boot or final artifact acceptance.
+
+### Public Home Assistant text setup and owner recovery (2026-10-26)
+
+The public gateway policy, private runtime factory, graphical owner management
+and `haos-owner gateway setup home homeassistant` now share the reviewed
+Home Assistant path. This brings the public text paths to seven: Telegram,
+Discord, Slack, Mattermost, Matrix, ntfy and Home Assistant. This is not completion
+of the 22-adapter requirement or media/voice support.
+
+The private long-lived token and canonical HTTPS instance URL are validated
+before graphical configuration stops the gateway. The actual pinned adapter runs
+with a separate private HOME, a kernel lease, authenticated continuous WebSocket
+subscription and durable SQLite admission. Pairing requires an exact authenticated
+32-character user ID and exact entity ID; no scope/thread wildcard or synthetic
+human identity is accepted. Explicit `system` routes additionally require
+`--homeassistant-trust-system`: this authorizes all system/automation producers
+of that exact entity, not a verified person. Unknown human users remain denied.
+Only `create` and `read` apply; device tools and chat command rights are absent.
+
+Replies use native persistent notifications and are visible to **every user of
+the Home Assistant instance**. A read grant therefore requires unchecked-by-default
+GUI consent or `--homeassistant-shared-notifications` on pairing. Sending retains
+the existing exact-route/outbox binding, authenticated receipt witness and
+conservative uncertain-delivery recovery. This is not private per-user messaging.
+
+The GUI provides private credential entry, exact pairing, status and explicit
+`retry-homeassistant-auth` recovery. This offline owner action permits a fresh
+real authentication attempt; it never sends, grants a route, clears a future
+rate-limit deadline or repairs an unresolved delivery automatically. Re-pairing
+with the same account retains authentication refusal and throttling across new
+owner generations. The private legacy status schema migrates additively without
+removing earlier rows, receipts or gaps. Real UID/NSS/chroot tests exercise the
+actual recovery executable with both existing and absent journals.
+
+Stock Home Assistant history omits the original authenticated event context.
+Reconnecting therefore cannot authenticate unseen events from the outage;
+`gap_since` stays visible. Retained local events can be replayed subject to current
+HAOS authorization. No remote history, account, external notification, installed
+boot, hardware or final artifact acceptance is claimed by these local tests.

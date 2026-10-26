@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 from email.utils import formatdate
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -35,7 +36,7 @@ def main():
             'id':'owner','connector':'ha','sender':user,'chat':entity,'scope':'','thread':'','identity':'owner',
             'capabilities':['create','read'],'generation':'a'*64,'since':int(time.time()*1000)-10000,
             'homeassistant_shared_notifications':True}]}
-        policy=lambda:PreparedHomeAssistantPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         value={'server_url':'https://fixture.invalid','token':token}
         stamp=datetime.now(timezone.utc).isoformat()
         context={'id':'b'*32,'user_id':user}
@@ -99,7 +100,9 @@ def main():
             except (ValueError,PermissionError,OSError):return
             raise AssertionError('unsafe profile accepted')
         try:
-            refused(lambda:GatewayPolicy(config));cases.append('prepared_profile_does_not_enable_public_homeassistant_policy')
+            assert GatewayPolicy(config).bindings['owner']['sender']==user
+            refused(lambda:GatewayPolicy({**config,'connectors':[{'id':'ha','platform':'unreviewed-plugin'}]}))
+            cases.append('public_homeassistant_profile_requires_exact_owner_policy_and_refuses_unknown_plugins')
             refused(lambda:build_adapter('homeassistant',value))
             refused(lambda:build_adapter('homeassistant',value,homeassistant_context={'plugin':'arbitrary'}))
             cases.append('shared_factory_requires_exact_private_context_before_native_import_or_connection')
@@ -243,6 +246,36 @@ def main():
                 await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
                 cases.append('actual_http429_'+name+'_retry_after_survives_close_and_profile_reopen_without_early_request')
             cases.append('close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease')
+            config['bindings'][0].update(generation='f'*64,since=int(time.time()*1000)-1)
+            adapter=build();connecting=asyncio.create_task(adapter.connect());before=state['requests']
+            await asyncio.sleep(.15)
+            assert state['requests']==before and abs(adapter.homeassistant_status()['next_attempt']-deadline)<.02
+            await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
+            cases.append('new_owner_binding_epoch_cannot_bypass_existing_account_retry_deadline')
+            value['token']='isolated-auth-scope-fixture-token';token=value['token'];state['mode']='auth-invalid'
+            adapter=build();assert not await adapter.connect();await adapter.close_profile()
+            config['bindings'][0].update(generation='e'*64,since=int(time.time()*1000)-1)
+            before=state['requests'];adapter=build();assert not await adapter.connect()
+            assert state['requests']==before and adapter.homeassistant_status()['status']=='authentication-refused'
+            cases.append('new_owner_binding_epoch_cannot_implicitly_clear_same_account_authentication_refusal')
+            assert retry_homeassistant_auth(native,policy(),{'connector':'ha','owner_uid':1000,'note_sha256':'f'*64})['authentication_blocks_cleared']==2
+            state['mode']='quiet';assert await adapter.connect();assert state['requests']==before+1
+            await adapter.close_profile()
+            cases.append('explicit_owner_account_recheck_is_required_after_epoch_change_and_performs_real_next_authentication')
+            native.close();native=NativeInbox(directory/'legacy-native.db',Redactor([token]))
+            native.db.execute('CREATE TABLE homeassistant_profile_status(identity TEXT PRIMARY KEY,connector TEXT,status TEXT,updated_at REAL,next_attempt REAL,gap_since REAL)')
+            legacy_identity=digest([value['server_url'],'ha',snapshot(policy(),'ha'),hashlib.sha256(token.encode()).hexdigest()])
+            legacy_deadline=time.time()+100
+            native.db.execute('INSERT INTO homeassistant_profile_status VALUES(?,?,?,?,?,?)',
+                (legacy_identity,'ha','rate-limited',time.time(),legacy_deadline,42))
+            adapter=build()
+            assert native.db.execute('SELECT COUNT(*) FROM homeassistant_profile_status').fetchone()[0]==1
+            assert native.db.execute('SELECT credential_scope FROM homeassistant_profile_status').fetchone()[0]
+            assert adapter.homeassistant_status()['gap_since']==42 and adapter.homeassistant_status()['next_attempt']==legacy_deadline
+            connecting=asyncio.create_task(adapter.connect());before=state['requests'];await asyncio.sleep(.15)
+            assert state['requests']==before
+            await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
+            cases.append('legacy_private_status_schema_migrates_additively_preserving_receipt_identity_gap_and_retry_deadline')
             refused(lambda:profile.credentials({'server_url':'http://fixture.invalid','token':token}))
             refused(lambda:profile.credentials({'server_url':'https://fixture.invalid','token':token,'plugin':'arbitrary'}))
             cases.append('plain_http_and_arbitrary_plugin_configuration_are_refused')
@@ -253,7 +286,7 @@ def main():
             await runner.cleanup();native.close();relay.close()
     with tempfile.TemporaryDirectory(prefix='haos-hass-profile-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_native_profile_ws_kernel_lease_and_sqlite':True,
-        'loopback_target_replacement_only_in_fixture':True,'public_gateway_enabled':False,
+        'loopback_target_replacement_only_in_fixture':True,'public_gateway_enabled':True,
         'reconnect_delay_shortened_only_in_fixture':True,'unseen_remote_events_recovered':False,
         'external_account_notification_tls_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))

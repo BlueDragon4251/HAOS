@@ -418,3 +418,45 @@ def test_actual_ntfy_owner_publication_and_cross_uid_credential_isolation(public
     persist(published,replacement,config=config,gid=65534)
     assert load(config)[0]['bindings'] == [] and marker.read_text() == 'preserved'
     assert 'u:p' not in (config/'gateways.json').read_text()
+
+
+def test_actual_homeassistant_human_system_publication_and_private_credentials_preserve_owner_data(public_build_directory):
+    import subprocess
+    from haos.gateway import GatewayPolicy
+    config=public_build_directory;config.chmod(0o755)
+    policy={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[]}
+    secret={'connectors':{'ha':{'server_url':'https://owner.invalid','token':'private-disposable-hass-token'}}}
+    persist(policy,secret,config=config,gid=65534)
+    policy['bindings']=[{'id':key,'connector':'ha','sender':sender,'chat':entity,'scope':'','thread':'',
+        'identity':'owner','capabilities':['create','read'],'homeassistant_shared_notifications':True,
+        'homeassistant_trust_system':system} for key,sender,entity,system in [
+            ('human','a'*32,'input_text.owner',False),('system','system','sensor.room',True)]]
+    persist(policy,secret,config=config,gid=65534)
+    published,stored=load(config);authority=GatewayPolicy(published)
+    assert stored==secret and len(published['bindings'])==2
+    for binding in published['bindings']:
+        assert type(binding['since']) is int and len(binding['generation'])==64
+        source={'platform':'homeassistant','sender':binding['sender'],'chat':binding['chat'],'scope':'','thread':'',
+            'message_id':'c'*64,'is_bot':False,'text':'private authority fixture'}
+        assert authority.authorize('ha',source)==binding
+        with pytest.raises(PermissionError):authority.authorize('ha',{**source,'sender':'b'*32})
+    code='''
+from pathlib import Path
+import os,sys
+assert os.geteuid()==65534 and os.getgroups()==[]
+assert Path(sys.argv[1]).read_bytes()
+try:Path(sys.argv[2]).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('private Home Assistant credential became readable')
+'''
+    child=subprocess.run([sys.executable,'-I','-c',code,str(config/'gateways.json'),str(config/'gateway-credentials')],
+        user=65534,group=65534,extra_groups=[],capture_output=True,timeout=10)
+    assert child.returncode==0,child.stderr
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    before=[(config/name).read_bytes() for name in ['gateways.json','gateway-credentials']]
+    invalid=copy.deepcopy(published);invalid['bindings'][1]['homeassistant_trust_system']=False
+    with pytest.raises(ValueError):persist(invalid,secret,config=config,gid=65534)
+    assert before==[(config/name).read_bytes() for name in ['gateways.json','gateway-credentials']]
+    marker=config/'retained-owner-data';marker.write_text('preserved')
+    persist(published,{'connectors':{'ha':{**secret['connectors']['ha'],'token':'rotated-private-hass-token'}}},config=config,gid=65534)
+    assert load(config)[0]['bindings']==[] and marker.read_text()=='preserved'

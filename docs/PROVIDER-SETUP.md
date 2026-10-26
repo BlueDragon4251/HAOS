@@ -274,3 +274,32 @@ prompts; no token belongs in a command argument or an agent session. See
 [ntfy owner setup and service integration](HERMES-RUNTIME.md#ntfy-owner-setup-and-service-integration-2026-10-25)
 for the server ACL requirement, identity limits, tested paths and remaining
 media/live/installed acceptance.
+
+### Home Assistant gateway: exact entity events and shared replies
+
+In graphical owner management select `homeassistant`, save the instance's HTTPS
+URL (with a system-trusted certificate) and a privately entered long-lived access
+token. HAOS opens the authenticated outbound WebSocket; no public HAOS webhook
+is required. Save configuration before pairing. Pair the actual 32-character
+Home Assistant user ID with one exact entity such as `sensor.room`, then choose
+mission creation and, optionally, reply reading. Scope and thread do not apply.
+
+Replies are persistent notifications visible to **all users of the instance**.
+The initially unchecked shared-notification approval must be selected to grant
+reading. For system/automation events select the separate initially unchecked
+system trust option: the sender becomes `system` and the grant covers every
+system producer of that precise entity. Do not use this option to identify an
+individual human. Unknown human senders remain unauthorized.
+
+CLI equivalents are `haos-owner gateway setup home homeassistant` (private token prompt), followed by `haos-owner gateway pair`
+with the exact sender/entity, `--homeassistant-shared-notifications` for reading,
+and `--homeassistant-trust-system` only for a `system` sender. Consult `pair
+--help` for the existing binding and identity arguments. `haos-owner gateway
+retry-homeassistant-auth home --note 'account corrected'` requests
+an audited offline recheck after correcting account access. It does not bypass
+server authentication, pending rate limits, revocation or uncertain delivery.
+
+Inspect the displayed gap timestamp after disconnects. The stock remote history
+API cannot prove original event authorship during an outage, so successful
+reconnection does not close that gap. This path does not enable Home Assistant
+device-control tools, media/voice or private per-recipient notifications.

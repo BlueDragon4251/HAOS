@@ -15,7 +15,7 @@ from types import SimpleNamespace
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from aiohttp import web
-    from haos.gateway import digest,GatewayEngine
+    from haos.gateway import digest,GatewayEngine,GatewayPolicy
     from haos.gateway_homeassistant_ingress import PreparedHomeAssistantPolicy
     from haos.gateway_homeassistant_delivery import Publisher
     from haos.gateway_ingress import durable_adapter
@@ -35,7 +35,7 @@ def main():
             'id':'owner','connector':'ha','sender':user,'chat':entity,'scope':'','thread':'','identity':'owner',
             'capabilities':['create','read'],'generation':'a'*64,'since':int(time.time()*1000)-10000,
             'homeassistant_shared_notifications':False}]}
-        policy=lambda:PreparedHomeAssistantPolicy(config)
+        policy=lambda:GatewayPolicy(config)
         state={'posts':[],'status':200,'mode':'normal','notifications':{},'gets':0,'leaks':0,'revoke':False,'partial':False,'retry_after':'19'}
         publishers=[];sockets=[];proof_waiting=asyncio.Event();release_proof=asyncio.Event()
         async def post(request):
@@ -188,7 +188,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-hass-notify-') as value:asyncio.run(exercise(Path(value)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_send_codec_rest_ws_and_outbox':True,
         'homeassistant_core_protocol_reference':'9eb964b8b95fddc61ec4841277fbce7ce32dc586',
-        'loopback_targets_replaced_only_in_fixture':True,'public_gateway_enabled':False,'shared_audience_requires_explicit_owner_grant':True,
+        'loopback_targets_replaced_only_in_fixture':True,'public_gateway_enabled':True,'shared_audience_requires_explicit_owner_grant':True,
         'external_notification_or_tls_account_accepted':False,'agent_device_tools_enabled':False,'installed_service_accepted':False}
     Path(sys.argv[2]).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt))
 

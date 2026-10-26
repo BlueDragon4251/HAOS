@@ -378,9 +378,9 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
                       homeserver: str = '', user_id: str = '', device_id: str = '', recovery_key: str = '', topic: str = ''):
     """Graphical root-seat setup for explicitly integrated native adapters."""
     require_root()
-    if platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy"}:
+    if platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant"}:
         raise ValueError("HAOS has not approved this platform for gateway execution")
-    if platform not in {'matrix','ntfy'} and (not isinstance(token, str) or not 16 <= len(token) <= 4096
+    if platform not in {'matrix','ntfy','homeassistant'} and (not isinstance(token, str) or not 16 <= len(token) <= 4096
             or any(c.isspace() or ord(c) < 32 for c in token)):
         raise ValueError("invalid protected gateway credential")
     if platform=='slack':
@@ -391,7 +391,11 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     if platform=='mattermost':
         from .gateway_mattermost import validate_credentials
         server_url=validate_credentials(token,server_url)
-    elif platform!='ntfy' and server_url:raise ValueError('a server URL applies only to Mattermost or ntfy')
+    elif platform not in {'ntfy','homeassistant'} and server_url:raise ValueError('a server URL applies only to Mattermost, ntfy or Home Assistant')
+    homeassistant=None
+    if platform=='homeassistant':
+        from .gateway_homeassistant_profile import credentials as ha_credentials
+        homeassistant=ha_credentials({'token':token,'server_url':server_url})
     ntfy=None
     if platform=='ntfy':
         from .gateway_ntfy_profile import credentials as ntfy_credentials
@@ -416,7 +420,7 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     policy["connectors"] = [c for c in policy["connectors"] if c["id"] != connector] + [
         {"id": connector, "platform": platform}]
     GatewayPolicy(policy)
-    credentials["connectors"][connector] = matrix or ntfy or {"token": token}
+    credentials["connectors"][connector] = matrix or ntfy or homeassistant or {"token": token}
     if platform=='slack':credentials['connectors'][connector]['app_token']=app_token
     if platform=='mattermost':credentials['connectors'][connector]['server_url']=server_url
     persist(policy, credentials)
@@ -426,7 +430,8 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
 
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
                         identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = "",
-                        matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url=""):
+                        matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url="",
+                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False):
     """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
@@ -455,6 +460,20 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
         item['trust_topic_publishers']=trust_topic_publishers
     elif trust_topic_publishers or ntfy_server_url:
         raise ValueError('topic publisher trust applies only to ntfy')
+    if selected and selected['platform']=='homeassistant':
+        if type(homeassistant_shared_notifications) is not bool:
+            raise ValueError('explicit boolean approval of shared Home Assistant notifications required')
+        if 'read' in capabilities and not homeassistant_shared_notifications:
+            raise ValueError('Home Assistant-Antworten sind für alle Instanzbenutzer sichtbar; diese Freigabe ausdrücklich bestätigen')
+        configured=credentials['connectors'][connector]
+        if homeassistant_server_url:
+            from .gateway_homeassistant_profile import credentials as ha_credentials
+            if ha_credentials({'token':configured['token'],'server_url':homeassistant_server_url})['server_url']!=configured['server_url']:
+                raise ValueError('Home Assistant-Server stimmt nicht mit gespeichertem Konnektor überein; Konfiguration zuerst speichern')
+        item['homeassistant_shared_notifications']=homeassistant_shared_notifications
+        item['homeassistant_trust_system']=homeassistant_trust_system
+    elif homeassistant_shared_notifications or homeassistant_server_url or homeassistant_trust_system:
+        raise ValueError('Home Assistant notification consent applies only to Home Assistant')
     policy["bindings"] = [b for b in policy["bindings"] if b["id"] != binding_id] + [item]
     GatewayPolicy(policy)
     quiesce_for_setup(gateway_only=True)
@@ -472,6 +491,9 @@ def gateway_configuration():
     topics={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('server_url','topic')}
         for row in policy['connectors'] if row['platform']=='ntfy'}
     if topics:result['ntfy']=topics
+    servers={row['id']:{'server_url':_credentials['connectors'][row['id']]['server_url']}
+        for row in policy['connectors'] if row['platform']=='homeassistant'}
+    if servers:result['homeassistant']=servers
     return result
 
 
@@ -515,6 +537,18 @@ def retry_ntfy_gateway_auth(connector):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='retry-ntfy-auth',connector=connector,
         note='Owner requested a new ntfy authentication check'))
+
+
+def retry_homeassistant_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='homeassistant' for row in configured['connectors']):
+        raise ValueError('select an existing Home Assistant connector before retrying authentication')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-homeassistant-auth',connector=connector,
+        note='Owner requested a new Home Assistant authentication check'))
 
 
 def gateway_ingress(after=0):
