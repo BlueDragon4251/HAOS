@@ -28,6 +28,7 @@ def main():
     from haos.gateway_matrix_http import HTTPBoundary
     from haos.gateway_matrix_delivery import install
     from haos.gateway_delivery import delivery_result
+    from haos.gateway_runtime import delivery_metadata
     from haos.store import MissionStore
     cases=[]
     async def exercise(directory):
@@ -83,8 +84,7 @@ def main():
                     await engine.receive(current(),'bot',{'platform':'matrix','sender':peer,'chat':room,'scope':'',
                         'thread':binding['thread'],'message_id':'$input-'+str(len(cases)),'is_bot':False,'text':'prepared native delivery fixture'},None)
                     obligation=engine.next_delivery(current())
-                    metadata={'haos_binding':{'binding_id':obligation['binding_id'],'binding_digest':obligation['binding_digest']},
-                        'haos_scope':'','thread_id':binding['thread']}
+                    metadata=delivery_metadata(obligation,'matrix')
                     if forged:metadata.update(forged)
                     receipt=await adapter.send(room,content or obligation['content'],obligation['reply_to'],metadata)
                     assert 'disposable-local-private-token' not in (receipt.error or '')

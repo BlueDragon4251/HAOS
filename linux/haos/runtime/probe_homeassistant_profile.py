@@ -15,11 +15,13 @@ def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from aiohttp import web
     from haos import gateway_homeassistant_profile as profile
-    from haos.gateway import digest,GatewayPolicy
+    from haos.gateway import digest,GatewayPolicy,GatewayEngine
     from haos.gateway_homeassistant_ingress import PreparedHomeAssistantPolicy,capture,snapshot
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
-    from haos.gateway_runtime import adapter_envelope
+    from haos.gateway_runtime import adapter_envelope,build_adapter,delivery_metadata,maintain
+    from haos.gateway_delivery import delivery_result
+    from haos.store import MissionStore
     from haos.redaction import Redactor
     from haos.gateway_raw_recovery import retry_homeassistant_auth,unresolved
     cases=[]
@@ -79,7 +81,8 @@ def main():
                 self.witness.boundary._target=target
         profile.Publisher=LocalPublisher
         def build():
-            adapter=profile.build(value,parent,'ha',policy,native);adapters.append(adapter)
+            adapter=build_adapter('homeassistant',value,homeassistant_context={
+                'parent':parent,'connector':'ha','policy':policy,'inbox':native});adapters.append(adapter)
             adapter._haos_ha_retry_steps=(.05,.1)
             def receive(message):
                 if state['admit_failures']:
@@ -97,6 +100,9 @@ def main():
             raise AssertionError('unsafe profile accepted')
         try:
             refused(lambda:GatewayPolicy(config));cases.append('prepared_profile_does_not_enable_public_homeassistant_policy')
+            refused(lambda:build_adapter('homeassistant',value))
+            refused(lambda:build_adapter('homeassistant',value,homeassistant_context={'plugin':'arbitrary'}))
+            cases.append('shared_factory_requires_exact_private_context_before_native_import_or_connection')
             adapter=build();location=adapter._haos_ha_profile
             assert not adapter.is_connected and state['connections']==0
             cases.append('private_factory_never_connects_before_explicit_start')
@@ -129,10 +135,19 @@ def main():
                 except PermissionError:pass
                 else:raise AssertionError('unapproved metadata accepted')
                 assert not state['posts'];cases.append('profile_refuses_'+name+'_before_native_post')
-            result=await adapter.send(entity,'private lifecycle response',metadata=metadata)
-            assert result.success and state['posts'][-1]['message']=='private lifecycle response'
+            path=directory/'actual-profile-missions.db';store=MissionStore(path);engine=GatewayEngine(store)
+            await engine.receive(policy(),'ha',accepted[0],None)
+            obligation=engine.next_delivery(policy());metadata=delivery_metadata(obligation,'homeassistant')
+            assert metadata['haos_delivery_id']==obligation['id']
+            result=await adapter.send(obligation['chat'],obligation['content'],reply_to=obligation['reply_to'],metadata=metadata)
+            assert result.success and state['posts'][-1]['message']==obligation['content']
             assert result.message_id==state['posts'][-1]['notification_id']
+            engine.acknowledge(policy(),obligation['id'],{'attempt':obligation['attempt'],**delivery_result(result)})
+            store.close();store=MissionStore(path)
+            assert store.db.execute('SELECT state FROM gateway_outbox WHERE id=?',(obligation['id'],)).fetchone()[0]=='delivered'
+            store.close()
             cases.append('actual_private_profile_send_uses_native_rest_and_separate_authenticated_receipt_witness')
+            cases.append('shared_dispatch_metadata_connects_actual_mission_outbox_to_native_receipt_and_reopened_delivery_state')
             before=state['connections'];await state['sockets'][0].close()
             await eventually(lambda:state['connections']>before and adapter.is_connected)
             assert len(accepted)==1 and adapter.homeassistant_status()['gap_since']>0
@@ -193,6 +208,22 @@ def main():
             cases.append('actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event')
             cases.append('independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle')
             await adapter.close_profile()
+            adapter=build();stop=asyncio.Event();supervised=asyncio.create_task(maintain(adapter,stop))
+            try:
+                await eventually(lambda:adapter.is_connected)
+                state['mode']='auth-invalid';await state['sockets'][-1].close()
+                await eventually(lambda:adapter.homeassistant_status()['status']=='authentication-refused'
+                    and adapter._haos_ha_worker is None)
+                requests=state['requests'];await asyncio.sleep(1.3)
+                assert state['requests']==requests and not supervised.done()
+                cases.append('actual_shared_service_supervisor_does_not_bypass_persisted_native_authentication_refusal')
+            finally:
+                stop.set();await asyncio.wait_for(supervised,4)
+            assert not adapter.is_connected and adapter._haos_ha_worker is None and adapter._haos_ha_replay is None
+            assert adapter._haos_ha_publisher is None and adapter._haos_ha_transport.socket.closed
+            await adapter.close_profile()
+            cases.append('actual_shared_supervisor_stop_joins_private_profile_workers_and_closes_native_sessions')
+            assert retry_homeassistant_auth(native,policy(),{'connector':'ha','owner_uid':1000,'note_sha256':'f'*64})['authentication_blocks_cleared']==1
             for name,header,minimum,maximum in [('seconds','19',17,19),
                     ('http-date',formatdate(time.time()+3600,usegmt=True),3597,3600)]:
                 if name=='http-date':

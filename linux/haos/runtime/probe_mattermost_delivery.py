@@ -15,7 +15,7 @@ def main():
     root=Path(sys.argv[1]).resolve();sys.path.insert(0,str(root))
     from aiohttp import ClientSession,web
     from haos.gateway import GatewayEngine,GatewayPolicy,digest
-    from haos.gateway_runtime import build_adapter
+    from haos.gateway_runtime import build_adapter,delivery_metadata
     from haos.gateway_delivery import delivery_result
     from haos.store import MissionStore
     cases=[]
@@ -55,8 +55,7 @@ def main():
                 'message_id':str(len(cases)+100).zfill(26),'is_bot':False,'text':'native outbox fixture'}
             await engine.receive(current(),'bot',envelope,None)
             obligation=engine.next_delivery(current())
-            metadata={'haos_scope':team,'thread_id':binding['thread'],'haos_binding':{
-                'binding_id':obligation['binding_id'],'binding_digest':obligation['binding_digest']}}
+            metadata=delivery_metadata(obligation,'mattermost')
             if forged:metadata.update(forged)
             try:
                 result=delivery_result(await adapter.send(chat,content or obligation['content'],obligation['reply_to'],metadata))

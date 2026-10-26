@@ -17,7 +17,7 @@ def main():
     root=Path(sys.argv[1]).resolve();sys.path.insert(0,str(root))
     from aiohttp import web
     from slack_bolt.async_app import AsyncApp
-    from haos.gateway_runtime import build_adapter
+    from haos.gateway_runtime import build_adapter,delivery_metadata
     from haos.gateway import GatewayPolicy,GatewayEngine
     from haos.gateway_delivery import delivery_result
     from haos.store import MissionStore
@@ -72,8 +72,8 @@ def main():
                     await engine.receive(policy,'bot',{'platform':'slack','sender':'U42','chat':'C123','scope':'T999','thread':thread,
                         'message_id':f'{int(time.time())}.000011','is_bot':False,'text':'fixture mission'},None)
                     delivery=engine.next_delivery(policy)
-                    metadata={'notify':True,'haos_scope':'T999','slack_team_id':'T998' if case=='wrong-team' else 'T999'}
-                    if thread:metadata['thread_id']=thread
+                    metadata=delivery_metadata(delivery,'slack')
+                    if case=='wrong-team':metadata['slack_team_id']='T998'
                     with socket.socket() as unused:
                         if case=='connect-refused':
                             unused.bind(('127.0.0.1',0));client.base_url=f'http://127.0.0.1:{unused.getsockname()[1]}/api/'

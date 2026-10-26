@@ -64,7 +64,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None):
+    if platform=='homeassistant':
+        if not isinstance(homeassistant_context,dict) or set(homeassistant_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('prepared Home Assistant requires a private profile and exact independent owner authority')
+        from .gateway_homeassistant_profile import build
+        return build(credentials,**homeassistant_context)
     if platform=='ntfy':
         if not isinstance(ntfy_context,dict) or set(ntfy_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('ntfy requires a private topic profile and current owner authority')
@@ -149,6 +154,16 @@ def credential_redactor(credentials, policy):
         if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
             secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
     return Redactor(secrets)
+
+
+def delivery_metadata(delivery,platform):
+    """Carry the controller's exact owner route and stable outbox identity."""
+    metadata={'notify':True,'haos_scope':delivery['scope'],
+        'haos_binding':{key:delivery[key] for key in ('binding_id','binding_digest')}}
+    if delivery['thread']:metadata['thread_id']=delivery['thread']
+    if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
+    if platform=='homeassistant':metadata['haos_delivery_id']=delivery['id']
+    return metadata
 
 
 async def serve():
@@ -288,12 +303,7 @@ async def serve():
                     if not adapter.is_connected:
                         result = {"status": "retry", "retry_after": 5}
                     else:
-                        metadata = {"notify": True, "haos_scope": delivery["scope"],
-                            "haos_binding": {key:delivery[key] for key in ("binding_id","binding_digest")}}
-                        if delivery["thread"]:
-                            metadata["thread_id"] = delivery["thread"]
-                        if delivery["scope"] and policy.connectors[delivery["connector"]]["platform"] == "slack":
-                            metadata["slack_team_id"] = delivery["scope"]
+                        metadata=delivery_metadata(delivery,policy.connectors[delivery['connector']]['platform'])
                         try:
                             receipt = await asyncio.wait_for(adapter.send(delivery["chat"], delivery["content"], reply_to=delivery["reply_to"], metadata=metadata), 60)
                             from .gateway_delivery import delivery_result

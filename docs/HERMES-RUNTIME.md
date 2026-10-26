@@ -836,3 +836,29 @@ Source hashes, individual case receipts and limits are in
 This is local protocol validation, not actual remote delivery, live TLS/account,
 installed service/boot or artifact release acceptance. Public gateway count
 remains six; Home Assistant remains prepared.
+
+### Prepared Home Assistant shared dispatch contracts (2026-10-26)
+
+After `8a77dcaa7a0d65880765e321408931e62d9dadb6`, the common adapter factory
+accepts a prepared Home Assistant profile only with the exact private parent,
+connector, independent policy callback and native inbox context. Missing or
+arbitrary contexts fail before SDK imports/network access. Public GatewayPolicy
+still rejects Home Assistant, so this does not expose an unfinished owner setup.
+
+Common delivery metadata now carries the controller's stable outbox ID to the
+private notification capability. The native profile probe creates a real mission
+and outbox, uses the actual shared dispatch metadata, sends through the pinned
+adapter and authenticated receipt witness, acknowledges the obligation and checks
+the delivered state after reopening MissionStore. Twenty-nine profile cases
+pass, including the real shared service supervisor: a persistent auth refusal
+cannot be bypassed by reconnect, and stop joins workers/closes native sessions.
+
+Public Slack/Matrix/Mattermost delivery probes now use the same production
+metadata helper with actual persisted outboxes; all 14/21/18 cases pass. Full
+and minimal suites each pass 1190 tests and two existing skips, using the
+unchanged local backup-file exclusion; all 49 actual root/UID/socket/recovery
+checks pass. No CI skips were added. Exact source hashes and contract receipts
+are in `docs/evidence/2026-10-26/homeassistant-shared-factory-validation.json`.
+The public service policy, CLI, GUI and recovery-helper action wiring remain
+unfinished; no seventh public gateway, external notification, installed service
+or release acceptance is claimed.
