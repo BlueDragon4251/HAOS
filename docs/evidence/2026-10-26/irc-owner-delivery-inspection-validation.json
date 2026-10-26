@@ -1,0 +1,185 @@
+{
+  "parent_commit": "7d80daa6f140b421b9131f77290ada71123d32b0",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_delivery.py",
+      "sha256": "80cc1cdb8862e73bdac0c09bdfb8036dbcc8679e933ea4b2941a4c3ce4636d6e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_irc_witness.py",
+      "sha256": "1c547affb3f548788d2af5baa459555d65ed91cbd5eafd64d9a44c83660794aa"
+    },
+    {
+      "path": "linux/haos/haos/gateway_irc_recovery.py",
+      "sha256": "0664b7365c1b51a87f0f5c7f23f2e1c7e5d3944e3063f22b84e1c7baefd2674e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "766932135cb7fdd60c2bc49323affdfc8689c7a5f7952fb10c586d84f59eec56"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "a2721b903fa7fad24e08ba8ee7c5371fb93dc3f7435af6d2937d4893f0d8c0f7"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "cf8bd9ce6b1d2f2c285ba78a8da373838f156a7b269d436f9298c9b69fcbb1e4"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_delivery.py",
+      "sha256": "eeca5c309bb2ddb9ae9f33bcccb9ca3a58b71bc17a9b8787e126e6ba0aa8b4c5"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_recovery.py",
+      "sha256": "75fae36eaa3e7c9ee0c4642d8be657ddb15053bb1fa4419e5b249dce7f47e2fa"
+    }
+  ],
+  "receipts": {
+    "delivery": {
+      "passed": 38,
+      "cases": [
+        "actual_pinned_native_send_uses_markdown_builder_and_verified_correlated_server_echo_not_local_millisecond_id",
+        "same_confirmed_outbox_attempt_returns_durable_receipt_without_another_write",
+        "actual_private_journal_reopen_preserves_confirmation_without_another_native_send",
+        "real_tls_echo_inside_batch_does_not_confirm_before_withheld_batch_end",
+        "actual_tls_drop_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_silent_cannot_fabricate_native_delivery_or_trigger_resend",
+        "same_uncertain_native_outbox_attempt_is_never_resent_while_connection_remains_live",
+        "actual_tls_ack_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_wrong_sender_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_wrong_channel_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_modified_body_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_msgid_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_account_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_naive_time_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_label_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_empty_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_type_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_duplicate_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_drop_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_end_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_origin_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_sasl_account_mismatch_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_sasl_secret_msgid_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_sasl_account_and_correlated_own_account_echo_are_required_together",
+        "missing_forged_or_extra_outbox_authority_and_invalid_attempts_never_dispatch",
+        "redirected_targets_and_byte_bounded_or_control_injected_payloads_never_dispatch",
+        "current_exact_owner_route_without_read_permission_cannot_send",
+        "close_after_real_dispatch_cancels_joins_and_retains_uncertain_intent_without_resend",
+        "actual_uncertain_native_journal_reopen_cannot_repeat_the_same_mission_outbox_attempt",
+        "real_mission_outbox_uncertainty_survives_reopen_and_requires_audited_owner_decision_before_new_actual_native_attempt",
+        "actual_tls_missing_batch_cannot_enable_native_delivery",
+        "actual_tls_missing_echo-message_cannot_enable_native_delivery",
+        "actual_tls_missing_labeled-response_cannot_enable_native_delivery",
+        "actual_native_send_after_additive_legacy_schema_migration_preserves_old_intent_and_exposes_only_safe_owner_proof",
+        "actual_sqlite_intent_failure_prevents_every_native_socket_side_effect",
+        "actual_sqlite_confirmation_failure_never_fabricates_success_or_resends_accepted_message",
+        "actual_native_utf8_chunker_preserves_order_and_requires_distinct_server_ids_for_all_chunks",
+        "current_owner_revocation_after_first_confirmed_chunk_prevents_next_native_write"
+      ],
+      "actual_pinned_native_send_tls_and_private_sqlite": true,
+      "public_gateway_enabled": false,
+      "server_echo_is_not_recipient_delivery_proof": true,
+      "fixture_only_loopback_target_and_disposable_ca": true,
+      "external_account_message_or_installed_acceptance": false
+    },
+    "process": {
+      "passed": 3,
+      "cases": [
+        "actual_gateway_uid_installed_frozen_sdk_and_system_trusted_tls_write_precedes_real_sigkill",
+        "actual_agent_uid_cannot_read_or_open_the_crashed_gateway_private_journal_or_owner_secret",
+        "new_actual_gateway_process_reacquires_kernel_lease_and_preserves_writing_intent_as_uncertain_without_resend"
+      ],
+      "actual_uid_cases": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_sigkill": true,
+      "tls_verification_disabled": false,
+      "public_gateway_enabled": false,
+      "external_connections_or_recipient_acceptance": false,
+      "installed_haos_accepted": false
+    },
+    "irc_profile": {
+      "passed": 20,
+      "cases": [
+        "shared_factory_requires_exact_private_context_and_never_enables_unknown_plugin_hooks",
+        "actual_native_factory_uses_private_home_and_explicit_connection_identity",
+        "actual_kernel_lease_refuses_second_active_identity_before_any_network",
+        "actual_profile_continuous_tls_native_account_input_and_local_relay",
+        "actual_registered_private_factory_mission_outbox_native_send_correlated_echo_and_durable_ack",
+        "actual_tls_profile_readiness_preserves_reopened_mission_outbox_offline_and_first_online_attempt",
+        "actual_eof_reconnect_preserves_explicit_unrecoverable_remote_gap",
+        "concurrent_close_joins_workers_and_releases_kernel_lease_once",
+        "real_server_authentication_refusal_is_sticky_across_connect_profile_and_actual_database_reopen",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_authentication_refusal",
+        "prepared_audited_owner_recheck_is_offline_and_fresh_profile_performs_real_next_account_authentication",
+        "explicit_credential_rotation_permits_new_real_authentication_and_preserves_old_refusal_rows",
+        "actual_server_throttle_deadline_survives_cancel_close_and_database_reopen_without_early_request",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_throttle",
+        "independent_local_replay_reopens_real_failed_admission_while_live_tls_has_no_new_message",
+        "actual_shared_service_supervisor_stop_joins_private_profile_workers",
+        "owner_generation_change_revokes_running_idle_tls_profile_without_inheritance",
+        "close_during_real_tls_handshake_cancels_connect_and_releases_kernel_lease",
+        "private_profile_close_joins_actual_active_native_send_and_preserves_partial_intent_without_extra_chunk",
+        "creation_only_profile_receives_with_original_caps_and_never_gains_outbound_authority"
+      ],
+      "actual_native_profile_tls_kernel_lease_and_sqlite": true,
+      "fixture_only_loopback_destination_ca_and_short_reconnect_delay": true,
+      "public_gateway_enabled": false,
+      "unseen_remote_events_recovered": false,
+      "external_server_account_delivery_or_installed_acceptance": false
+    },
+    "ha_profile": {
+      "passed": 33,
+      "cases": [
+        "public_homeassistant_profile_requires_exact_owner_policy_and_refuses_unknown_plugins",
+        "shared_factory_requires_exact_private_context_before_native_import_or_connection",
+        "private_factory_never_connects_before_explicit_start",
+        "actual_kernel_flock_refuses_parallel_homeassistant_profile",
+        "private_native_imports_leave_unrelated_home_untouched",
+        "disconnected_profile_cannot_publish",
+        "actual_profile_native_auth_stream_durable_capture_and_relay",
+        "profile_send_requires_exact_outbox_identity_and_current_owner_route",
+        "profile_refuses_extra_binding_fields_before_native_post",
+        "profile_refuses_truthy_notification_flag_before_native_post",
+        "profile_refuses_unbounded_reply_identity_before_native_post",
+        "actual_private_profile_send_uses_native_rest_and_separate_authenticated_receipt_witness",
+        "shared_dispatch_metadata_connects_actual_mission_outbox_to_native_receipt_and_reopened_delivery_state",
+        "actual_eof_reconnect_preserves_idempotency_and_reports_unrecoverable_gap",
+        "explicit_disconnect_reconnect_retains_raw_journal_and_profile",
+        "owner_regrant_revokes_running_profile_without_automatic_inheritance",
+        "concurrent_profile_close_releases_lease_once_and_closes_sockets",
+        "authentication_refusal_is_sticky_across_connect_close_and_actual_profile_reopen",
+        "prepared_owner_auth_recheck_does_no_network_io_and_next_start_performs_real_native_auth",
+        "owner_metadata_preserves_explicit_unrecoverable_gap_after_successful_reauthentication",
+        "credential_rotation_reuses_private_home_with_new_authenticated_identity",
+        "actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event",
+        "independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle",
+        "actual_shared_service_supervisor_does_not_bypass_persisted_native_authentication_refusal",
+        "actual_shared_supervisor_stop_joins_private_profile_workers_and_closes_native_sessions",
+        "actual_http429_seconds_retry_after_survives_close_and_profile_reopen_without_early_request",
+        "actual_http429_http-date_retry_after_survives_close_and_profile_reopen_without_early_request",
+        "close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease",
+        "new_owner_binding_epoch_cannot_bypass_existing_account_retry_deadline",
+        "new_owner_binding_epoch_cannot_implicitly_clear_same_account_authentication_refusal",
+        "explicit_owner_account_recheck_is_required_after_epoch_change_and_performs_real_next_authentication",
+        "legacy_private_status_schema_migrates_additively_preserving_receipt_identity_gap_and_retry_deadline",
+        "plain_http_and_arbitrary_plugin_configuration_are_refused"
+      ],
+      "actual_native_profile_ws_kernel_lease_and_sqlite": true,
+      "loopback_target_replacement_only_in_fixture": true,
+      "public_gateway_enabled": true,
+      "reconnect_delay_shortened_only_in_fixture": true,
+      "unseen_remote_events_recovered": false,
+      "external_account_notification_tls_or_installed_acceptance": false
+    }
+  },
+  "minimal_and_full_python311": "1275 passed, 2 existing skips",
+  "actual_root_uid_socket_recovery_cases": 68,
+  "local_root_only_backup_exclusion_unchanged": true,
+  "public_irc_gateway_enabled": false,
+  "recipient_receipt_verified": false,
+  "external_or_installed_acceptance": false
+}

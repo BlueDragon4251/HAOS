@@ -25,7 +25,8 @@ def main():
     from haos.gateway_raw import NativeInbox
     from haos.redaction import Redactor
     from haos.gateway_delivery import delivery_result
-    from haos.gateway_runtime import delivery_metadata
+    from haos.gateway_runtime import delivery_metadata,credential_redactor
+    from haos.gateway_irc_recovery import outgoing
     from haos.gateway_recovery import reconcile
     from haos.store import MissionStore
     cases=[]
@@ -90,6 +91,7 @@ def main():
                     else:prefix='haos-bot!bot@server'
                     target='#other' if mode=='wrong_channel' else '#haos'
                     echoed=body+' changed' if mode=='modified_body' else body
+                    if mode=='sasl_secret_msgid':common='account=bot-account;time='+stamp+';msgid=private-sasl-fixture'
                     if mode=='missing_msgid':common='account=*;time='+stamp
                     if mode=='missing_account':common='time='+stamp+';msgid=server_'+str(index)
                     if mode=='naive_time':common='account=*;time=2026-10-26T12:00:00;msgid=server_'+str(index)
@@ -124,6 +126,11 @@ def main():
             native=NativeInbox(root/'native.db',Redactor())
             value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
             if mode.startswith('sasl_'):value.update(sasl_username='bot-account',sasl_password='private-sasl-fixture')
+            native.redactor=credential_redactor({'connectors':{'irc':value}},policy())
+            if mode=='legacy_schema':
+                native.db.execute('CREATE TABLE irc_delivery_intents(delivery_id TEXT,attempt INTEGER,connector TEXT,identity TEXT,binding_digest TEXT,content_digest TEXT,state TEXT,chunk_count INTEGER,receipts TEXT,updated_at REAL,PRIMARY KEY(delivery_id,attempt))')
+                native.db.execute('INSERT INTO irc_delivery_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
+                    (digest('legacy_intent'),1,'irc','b'*64,'c'*64,'d'*64,'uncertain',1,'[]',123))
             adapter=ingress(durable_adapter(IRCAdapter(PlatformConfig(enabled=True,extra=value))))
             adapter._haos_native=SimpleNamespace(connector='irc',policy=policy,inbox=native)
             adapter.set_durable_message_handler(lambda _:(_ for _ in ()).throw(AssertionError('own echo became incoming mission')))
@@ -173,12 +180,13 @@ def main():
             state['release'].set();assert delivery_result(await task)['status']=='delivered'
             cases.append('real_tls_echo_inside_batch_does_not_confirm_before_withheld_batch_end')
             for mode in ['drop','silent','ack','wrong_sender','wrong_channel','modified_body','missing_msgid','missing_account',
-                    'naive_time','missing_label','batch_empty','batch_wrong_type','batch_duplicate','batch_drop','batch_wrong_end','batch_wrong_origin','sasl_account_mismatch']:
+                    'naive_time','missing_label','batch_empty','batch_wrong_type','batch_duplicate','batch_drop','batch_wrong_end','batch_wrong_origin','sasl_account_mismatch','sasl_secret_msgid']:
                 adapter,publisher,metadata,_=await build(mode)
                 receipt=await adapter.send('#haos','bounded owner reply',metadata=metadata)
                 assert delivery_result(receipt)=={'status':'uncertain'},mode
                 assert state['writes']==['bounded owner reply']
                 assert publisher.db.execute('SELECT state FROM irc_delivery_intents').fetchone()[0]=='uncertain'
+                if mode=='sasl_secret_msgid':assert 'private-sasl-fixture' not in '\n'.join(publisher.db.iterdump())
                 cases.append('actual_tls_'+mode+'_cannot_fabricate_native_delivery_or_trigger_resend')
                 if mode=='silent':
                     assert delivery_result(await adapter.send('#haos','bounded owner reply',metadata=metadata))=={'status':'uncertain'}
@@ -191,7 +199,7 @@ def main():
             adapter,publisher,metadata,_=await build('direct')
             invalid=[None,{},dict(metadata,unknown=True),dict(metadata,notify=False),dict(metadata,thread_id='unapproved'),
                 dict(metadata,haos_scope='other.fixture.invalid:6697'),dict(metadata,haos_delivery_attempt=True),
-                dict(metadata,haos_delivery_attempt=0),dict(metadata,haos_delivery_id='invented'),
+                dict(metadata,haos_delivery_attempt=0),dict(metadata,haos_delivery_attempt=6),dict(metadata,haos_delivery_id='invented'),
                 dict(metadata,haos_binding={'binding_id':'forged','binding_digest':'a'*64}),
                 dict(metadata,haos_binding={'binding_id':'owner','binding_digest':'a'*64}),
                 dict(metadata,haos_binding={**metadata['haos_binding'],'extra':True})]
@@ -247,6 +255,15 @@ def main():
                 adapter,publisher,metadata,_=await build('no_cap_'+capability,connected=False)
                 assert not adapter.is_connected and not state['writes'] and publisher.db.execute('SELECT COUNT(*) FROM irc_delivery_intents').fetchone()[0]==0
                 cases.append('actual_tls_missing_'+capability+'_cannot_enable_native_delivery')
+            adapter,publisher,metadata,_=await build('legacy_schema')
+            receipt=await adapter.send('#haos','additive migration reply',metadata=metadata)
+            assert receipt.success is True
+            assert tuple(publisher.db.execute('SELECT state,updated_at,receipt FROM irc_delivery_intents WHERE delivery_id=?',(digest('legacy_intent'),)).fetchone())==('uncertain',123,'')
+            inspection=outgoing(adapter._haos_native.inbox)
+            current=next(row for row in inspection if row['delivery_id']==metadata['haos_delivery_id'])
+            assert current['server_echo_receipt']==receipt.message_id and current['recipient_receipt_verified'] is False
+            assert 'server_1' not in json.dumps(inspection) and 'additive migration reply' not in json.dumps(inspection)
+            cases.append('actual_native_send_after_additive_legacy_schema_migration_preserves_old_intent_and_exposes_only_safe_owner_proof')
             adapter,publisher,metadata,_=await build('direct')
             publisher.db.execute("CREATE TRIGGER fixture_intent_fault BEFORE INSERT ON irc_delivery_intents BEGIN SELECT RAISE(ABORT,'disposable intent storage unavailable'); END")
             try:await adapter.send('#haos','unrecorded reply',metadata=metadata)

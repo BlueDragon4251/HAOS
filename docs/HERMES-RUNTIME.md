@@ -1230,3 +1230,23 @@ All three cases pass in the pinned container image with networking disabled.
 The fixture rejects execution on installed HAOS or outside its explicit fresh
 PID-1 Docker namespace. This is process/UID/TLS/journal evidence, not an installed
 HAOS boot, external account/message or recipient-delivery acceptance.
+
+### Prepared IRC owner delivery inspection and receipt migration (2026-10-26)
+
+Native owner inspection now exposes a bounded IRC intent list containing state,
+outbox/attempt, hashes, confirmed-chunk count and the local aggregate server-echo
+reference. Message text and raw remote IDs are not returned. Recipient receipt
+remains explicitly unverified. The journal adds the receipt column without
+replacing legacy rows, and cached confirmations fill an older missing reference
+without another socket write. Native attempts obey the same maximum five attempts
+as the mission outbox. Credential-reflecting server IDs are refused before receipt
+storage; native replay/confirmation cannot turn such an ID into observer data.
+
+Thirty-eight real native send/TLS cases pass, including additive legacy migration
+and an actual SASL private-alias echo refusal. Both broad Python 3.11 suites pass
+1275 tests/two existing skips. All 68 real authority/control/recovery cases pass,
+including the three IRC owner outbox decisions under actual ledger UID 65534.
+The actual SIGKILL/UID/TLS process fixture retains three cases at the new schema;
+IRC/HA profile regressions retain 20/33 cases. IRC is still not publicly enabled,
+and these results are not external account/message, recipient or installed/boot
+acceptance.

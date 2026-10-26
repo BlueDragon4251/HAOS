@@ -85,3 +85,34 @@ def test_prepared_irc_owner_metadata_rejects_untrusted_status_values(tmp_path,fi
         inbox.db.execute('UPDATE irc_profile_status SET '+field+'=? WHERE identity=?',(value,'auth'))
         with pytest.raises(ValueError):unresolved(inbox)
     finally:inbox.close()
+
+
+def outgoing_fixture(tmp_path):
+    from haos.gateway_irc_recovery import outgoing
+    inbox=NativeInbox(tmp_path/'outgoing.db',Redactor())
+    inbox.db.execute('CREATE TABLE irc_delivery_intents(delivery_id TEXT,attempt INTEGER,connector TEXT,identity TEXT,binding_digest TEXT,content_digest TEXT,state TEXT,chunk_count INTEGER,receipts TEXT,updated_at REAL,receipt TEXT)')
+    inbox.db.execute('INSERT INTO irc_delivery_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+        ('a'*64,1,'irc','b'*64,'c'*64,'d'*64,'confirmed',1,json.dumps(['private_server_identifier']),123,'irc_echo_'+'e'*64))
+    return inbox,outgoing
+
+
+def test_irc_native_outgoing_inspection_exposes_only_bounded_hashes_and_server_confirmation_reference(tmp_path):
+    inbox,outgoing=outgoing_fixture(tmp_path)
+    try:
+        result=outgoing(inbox)
+        assert len(result)==1 and result[0]['server_echo_receipt']=='irc_echo_'+'e'*64
+        assert result[0]['confirmed_chunks']==1 and result[0]['recipient_receipt_verified'] is False
+        assert 'private_server_identifier' not in json.dumps(result)
+        assert unresolved(inbox)['native_outgoing']==result
+    finally:inbox.close()
+
+
+@pytest.mark.parametrize('field,value',[('state','untrusted vendor error'),('connector','bad\nconnector'),
+    ('attempt',0),('attempt',6),('chunk_count',65),('receipts','not-json'),('receipts','["duplicate", "duplicate"]'),
+    ('receipt','untrusted reference'),('binding_digest','forged'),('updated_at',-1)])
+def test_private_irc_outgoing_metadata_rejects_invalid_or_unbounded_fields(tmp_path,field,value):
+    inbox,outgoing=outgoing_fixture(tmp_path)
+    try:
+        inbox.db.execute('UPDATE irc_delivery_intents SET '+field+'=?',(value,))
+        with pytest.raises(ValueError):outgoing(inbox)
+    finally:inbox.close()

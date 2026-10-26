@@ -27,6 +27,8 @@ class Publisher:
             identity TEXT NOT NULL, binding_digest TEXT NOT NULL, content_digest TEXT NOT NULL,
             state TEXT NOT NULL, chunk_count INTEGER NOT NULL, receipts TEXT NOT NULL,
             updated_at REAL NOT NULL, PRIMARY KEY(delivery_id,attempt))''')
+        if 'receipt' not in {row[1] for row in self.db.execute('PRAGMA table_info(irc_delivery_intents)')}:
+            self.db.execute("ALTER TABLE irc_delivery_intents ADD COLUMN receipt TEXT NOT NULL DEFAULT ''")
         self.db.execute("UPDATE irc_delivery_intents SET state='uncertain',updated_at=? WHERE identity=? AND state='writing'",
             (time.time(),self.identity))
         self.witness=Witness(self.boundary,lambda ticket:self.current(ticket.authority))
@@ -85,7 +87,7 @@ class Publisher:
                 or not isinstance(metadata['haos_binding']['binding_digest'],str)
                 or not _HASH.fullmatch(metadata['haos_binding']['binding_digest'])
                 or not isinstance(metadata['haos_delivery_id'],str) or not _HASH.fullmatch(metadata['haos_delivery_id'])
-                or type(metadata['haos_delivery_attempt']) is not int or not 1<=metadata['haos_delivery_attempt']<=2**31-1
+                or type(metadata['haos_delivery_attempt']) is not int or not 1<=metadata['haos_delivery_attempt']<=5
                 or not isinstance(content,str) or not content.strip() or len(content.encode())>32000
                 or any(ord(c)<32 and c not in '\n\t' or ord(c)==127 for c in content) or reply_to is not None and (not isinstance(reply_to,str) or not _HASH.fullmatch(reply_to))):
             raise PermissionError('exact bounded IRC owner outbox identity and attempt required')
@@ -104,6 +106,9 @@ class Publisher:
                     raise PermissionError('IRC outbox identity, owner grant or content changed')
                 if row['state']=='confirmed':
                     receipt='irc_echo_'+digest([self.boundary.server,key,json.loads(row['receipts'])])
+                    if not row['receipt']:
+                        self.db.execute('UPDATE irc_delivery_intents SET receipt=? WHERE delivery_id=? AND attempt=?',
+                            (receipt,key,row['attempt']))
                     return self.result(True,receipt)
                 if row['attempt']==attempt:return self.result()
             if previous and attempt<=max(row['attempt'] for row in previous):
@@ -113,7 +118,8 @@ class Publisher:
             if not chunks or len(chunks)>64 or any(not chunk or len(line.encode())>510
                     or any(c in line for c in '\r\n\0') for chunk,line in zip(chunks,lines)):
                 raise PermissionError('IRC reply exceeds bounded native wire chunks')
-            self.db.execute('INSERT INTO irc_delivery_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
+            self.db.execute('INSERT INTO irc_delivery_intents '
+                '(delivery_id,attempt,connector,identity,binding_digest,content_digest,state,chunk_count,receipts,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
                 (key,attempt,self.adapter._haos_native.connector,self.identity,digest(binding),body,'writing',len(chunks),'[]',time.time()))
             state={'publisher':self,'binding':binding,'delivery':key,'attempt':attempt,'chunks':chunks,'lines':lines,
                 'receipts':[],'dispatched':False,'nonce':secrets.token_hex(32)}
@@ -126,9 +132,10 @@ class Publisher:
                 if result.success is not True or len(state['receipts'])!=len(chunks):
                     raise ConnectionError('IRC native send lacks complete correlated echoes')
                 if len(set(state['receipts']))!=len(chunks):raise ConnectionError('IRC repeated server message identity')
-                self.db.execute("UPDATE irc_delivery_intents SET state='confirmed',updated_at=? WHERE delivery_id=? AND attempt=?",
-                    (time.time(),key,attempt))
-                return self.result(True,'irc_echo_'+digest([self.boundary.server,key,state['receipts']]))
+                receipt='irc_echo_'+digest([self.boundary.server,key,state['receipts']])
+                self.db.execute("UPDATE irc_delivery_intents SET state='confirmed',receipt=?,updated_at=? WHERE delivery_id=? AND attempt=?",
+                    (receipt,time.time(),key,attempt))
+                return self.result(True,receipt)
             except BaseException as error:
                 self.db.execute("UPDATE irc_delivery_intents SET state='uncertain',updated_at=? WHERE delivery_id=? AND attempt=?",
                     (time.time(),key,attempt))

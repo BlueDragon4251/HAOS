@@ -107,6 +107,8 @@ class Witness:
             if (original.tzinfo is None or original.utcoffset() is None
                     or original.timestamp()<ticket.started_at-300 or original.timestamp()>time.time()+300):
                 raise Rejected('IRC echo has no bounded original server time')
+            if self.boundary.adapter._haos_native.inbox.redactor.text(tags['msgid'])!=tags['msgid']:
+                raise Rejected('IRC echo identity reflects private credential material')
             ticket.receipt=tags['msgid']
             if ticket.batch is None and not ticket.future.done():ticket.future.set_result(ticket.receipt)
         except Exception:self.reject(ticket)

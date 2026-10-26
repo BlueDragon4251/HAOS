@@ -103,7 +103,9 @@ def unresolved(inbox, after=0):
                         for key in ('updated_at','next_attempt','gap_since'))):
                 raise ValueError('invalid private gateway transport metadata')
             transport.append({**dict(row),'platform':platform,'unseen_remote_history_recovered':False})
-    return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
+    from .gateway_irc_recovery import outgoing
+    return {'ingress':result,'history':history,'transport':transport,'native_outgoing':outgoing(inbox),
+        'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
 def reconcile(inbox, policy, request):

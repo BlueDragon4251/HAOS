@@ -213,7 +213,7 @@ print(json.dumps({'uid':os.geteuid(),'owner_secret_denied':True,'result':result}
 
 
 @pytest.mark.parametrize("decision", ["retry", "delivered", "discard"])
-@pytest.mark.parametrize('platform',['telegram','slack','mattermost','homeassistant'])
+@pytest.mark.parametrize('platform',['telegram','slack','mattermost','homeassistant','irc'])
 def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision,platform):
     tmp_path = uid_fixture_path
     assert os.geteuid() == 0, "run this explicit UID fixture as root"
@@ -241,7 +241,11 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     if platform=='homeassistant':
         config['connectors'][0]['platform']='homeassistant'
         config['bindings'][0].update(sender='a'*32,chat='sensor.owner',homeassistant_shared_notifications=True)
-    policy = GatewayPolicy(config)
+    if platform=='irc':
+        config['connectors'][0]['platform']='irc'
+        config['bindings'][0].update(sender='owner-account',chat='#haos',scope='irc.fixture.invalid:6697',generation='a'*64,since=1)
+    from haos.gateway_irc_ingress import PreparedIRCPolicy
+    policy = PreparedIRCPolicy(config) if platform=='irc' else GatewayPolicy(config)
     engine = GatewayEngine(store)
     source=config['bindings'][0]
     mission = asyncio.run(engine.receive(policy, "first", {"platform": platform,"sender":source['sender'],"chat":source['chat'],
@@ -258,7 +262,7 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     canary.chmod(0o600)
     payload = {"path": str(path), "canary": str(canary), "policy": config,
                "request": {"delivery_id": delivery["id"], "attempt": 1, "decision": decision, "owner_uid": 1000,
-                           "note_sha256": "a" * 64, "receipt": ("haos_"+"b"*32 if platform=='homeassistant' else "1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
+                           "note_sha256": "a" * 64, "receipt": ("irc_echo_"+"b"*64 if platform=='irc' else "haos_"+"b"*32 if platform=='homeassistant' else "1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
                            "confirmed_not_delivered": decision == "retry"}}
     code = '''
 import json,os,sys
@@ -276,7 +280,9 @@ else:
 store=private_store(Path(d['path']))
 try:
     assert len(unresolved(store)['deliveries'])==1
-    result=reconcile(store,GatewayPolicy(d['policy']),d['request'])
+    from haos.gateway_irc_ingress import PreparedIRCPolicy
+    policy=PreparedIRCPolicy(d['policy']) if d['policy']['connectors'][0]['platform']=='irc' else GatewayPolicy(d['policy'])
+    result=reconcile(store,policy,d['request'])
 finally:
     store.close()
 print(json.dumps({'actual_uid':os.geteuid(),'owner_secret_denied':secret_denied,'result':result}))
