@@ -213,7 +213,7 @@ print(json.dumps({'uid':os.geteuid(),'owner_secret_denied':True,'result':result}
 
 
 @pytest.mark.parametrize("decision", ["retry", "delivered", "discard"])
-@pytest.mark.parametrize('platform',['telegram','slack','mattermost'])
+@pytest.mark.parametrize('platform',['telegram','slack','mattermost','homeassistant'])
 def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, decision,platform):
     tmp_path = uid_fixture_path
     assert os.geteuid() == 0, "run this explicit UID fixture as root"
@@ -238,6 +238,9 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     if platform=='mattermost':
         config['connectors'][0]['platform']='mattermost'
         config['bindings'][0].update(sender='u'*26,chat='c'*26,scope='s'*26)
+    if platform=='homeassistant':
+        config['connectors'][0]['platform']='homeassistant'
+        config['bindings'][0].update(sender='a'*32,chat='sensor.owner',homeassistant_shared_notifications=True)
     policy = GatewayPolicy(config)
     engine = GatewayEngine(store)
     source=config['bindings'][0]
@@ -255,7 +258,7 @@ def test_outbox_recovery_runs_as_real_unprivileged_ledger_uid(uid_fixture_path, 
     canary.chmod(0o600)
     payload = {"path": str(path), "canary": str(canary), "policy": config,
                "request": {"delivery_id": delivery["id"], "attempt": 1, "decision": decision, "owner_uid": 1000,
-                           "note_sha256": "a" * 64, "receipt": ("1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
+                           "note_sha256": "a" * 64, "receipt": ("haos_"+"b"*32 if platform=='homeassistant' else "1792800000.000042" if platform=='slack' else "m"*26 if platform=='mattermost' else "42") if decision == "delivered" else None,
                            "confirmed_not_delivered": decision == "retry"}}
     code = '''
 import json,os,sys
