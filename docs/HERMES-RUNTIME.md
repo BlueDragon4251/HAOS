@@ -1430,3 +1430,31 @@ Home Assistant (33) and IRC (20) actual native-profile regressions pass after th
 shared transaction change. Full frozen and minimal Python 3.11 suites each pass
 1,307 tests with two existing skips and the unchanged local backup-file exception.
 No external account, installed session, public TLS ingress or release is accepted.
+
+### 2026-10-26 — prepared LINE bounded owner inspection and actual Tk status
+
+Private owner inspection now accepts only LINE's reviewed hashed ingress IDs and
+bounded profile/intent metadata. Unknown platforms, raw IDs, malformed receipts,
+invalid attempts/states/timestamps and conflicting confirmed/uncertain proof
+fields are refused. Profile/output records expose no message text, raw server IDs,
+tokens, credential-scope hashes or publisher fingerprints. The existing ingress
+summary retains its bounded payload digest. Retained server-acceptance
+proofs explicitly carry `recipient_receipt_verified: false`.
+
+The actual owner recovery view distinguishes local listener readiness from
+unverified public HTTPS reachability, authentication versus bot-identity refusal,
+persisted rate deadlines, revocation and writing/confirmed/uncertain push intents.
+LINE remains absent from public setup choices. Seven actual Tk/private-SQLite
+cases pass at 1280x800 and 640x480 (system Python 3.13.5); the GUI workflow runs
+both. Existing IRC 10, Home Assistant 11, ntfy 11 and Matrix 7 GUI cases also pass
+at both resolutions. This is a backend-handoff fixture, not an installed owner
+session. Root tests separately inspect these records under the actual gateway
+UID without importing optional Hermes SDKs.
+
+Full frozen and minimal Python 3.11 suites each pass 1,321 tests with two existing
+skips and the unchanged local backup-file exception. All 73 actual Root/UID/
+credential/recovery cases pass. The new Root inspection case first exposed the
+missing LINE ingress-ID branch; the fix adds only LINE's canonical SHA-256 IDs,
+with explicit tests that unknown plugins and raw message IDs stay refused.
+Public TLS ingress/owner setup, remaining delivery recovery and media/voice are
+still incomplete. No public LINE, external account or installed acceptance.

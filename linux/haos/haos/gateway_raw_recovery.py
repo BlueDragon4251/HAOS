@@ -30,7 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
-            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc'} else
+            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line'} else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
@@ -104,7 +104,17 @@ def unresolved(inbox, after=0):
                 raise ValueError('invalid private gateway transport metadata')
             transport.append({**dict(row),'platform':platform,'unseen_remote_history_recovered':False})
     from .gateway_irc_recovery import outgoing
-    return {'ingress':result,'history':history,'transport':transport,'native_outgoing':outgoing(inbox),
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='line_profile_status'").fetchone():
+        from .gateway_line_profile import STATES as line_states
+        import math
+        for row in inbox.db.execute('SELECT connector,status,updated_at,next_attempt FROM line_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            if (not isinstance(row['connector'],str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in line_states or any(type(row[key]) not in {int,float}
+                        or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
+                raise ValueError('invalid private LINE profile inspection metadata')
+            transport.append({**dict(row),'platform':'line','external_tls_ingress_verified':False})
+    from .gateway_line_recovery import outgoing as line_outgoing
+    return {'ingress':result,'history':history,'transport':transport,'native_outgoing':outgoing(inbox)+line_outgoing(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 

@@ -591,7 +591,7 @@ import json,os,sqlite3,sys
 from pathlib import Path
 from haos.gateway_line_ingress import PreparedLINEPolicy
 from haos.gateway_raw import NativeInbox
-from haos.gateway_raw_recovery import retry_line_auth
+from haos.gateway_raw_recovery import retry_line_auth,unresolved
 from haos.redaction import Redactor
 request=json.load(sys.stdin)
 assert os.geteuid()==request['uid'] and os.getegid()==request['uid'] and os.getgroups()==[]
@@ -605,6 +605,8 @@ if request['uid']==65533:
 else:
     inbox=NativeInbox(Path(request['database']),Redactor())
     try:
+        metadata=unresolved(inbox)
+        assert len(metadata['transport'])==4 and all(row['platform']=='line' and not row['external_tls_ingress_verified'] for row in metadata['transport'])
         policy=PreparedLINEPolicy(request['policy']);params={'connector':'line','owner_uid':1000,'note_sha256':'e'*64}
         if request['storage_failure']:
             try:retry_line_auth(inbox,policy,params)

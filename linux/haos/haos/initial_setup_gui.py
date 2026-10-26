@@ -1127,7 +1127,16 @@ class Wizard:
                         'closed':'Privates IRC-Profil geschlossen; Daten erhalten',
                         'created':'Privates IRC-Profil vorbereitet',
                         'rate-limited':'IRC begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten'}
+                    line_labels={'created':'Privates LINE-Profil vorbereitet','listening':'Lokaler LINE-Listener bereit; öffentliche HTTPS-Erreichbarkeit nicht bestätigt',
+                        'disconnected':'LINE-Listener getrennt; gespeicherte Eingänge bleiben erhalten',
+                        'authentication-refused':'LINE-Anmeldung abgelehnt; privaten Channel-Token prüfen und erneute Anmeldung ausdrücklich erlauben',
+                        'identity-refused':'LINE-Bot-ID passt nicht zum Zugangstoken; gespeicherte Daten bleiben erhalten',
+                        'rate-limited':'LINE begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten',
+                        'transport-unavailable':'LINE-Identitätsprüfung oder lokaler Listener nicht verfügbar; Netzwerk, Zertifikat und Port prüfen',
+                        'revoked':'LINE-Freigabe entzogen oder geändert; keine weitere Ausführung',
+                        'closed':'Privates LINE-Profil geschlossen; Daten erhalten'}
                     labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                        else line_labels if item.get('platform')=='line'
                         else irc_labels if item.get('platform')=='irc'
                         else ha_labels if item.get('platform')=='homeassistant' else transport_labels)
                     import datetime
@@ -1141,10 +1150,10 @@ class Wizard:
                             'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
                             '':''}[item['history_error']])
                         +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
-                    if item.get('platform')=='ntfy':
+                    if item.get('platform') in {'ntfy','line'}:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
-                            +(' · letzter Fehler: '+ntfy_labels[item['last_error']] if item.get('last_error') else ''))
+                            +(' · letzter Fehler: '+labels[item['last_error']] if item.get('last_error') else ''))
                     if item.get('platform') in {'homeassistant','irc'}:
                         deadline=item.get('next_attempt',0);gap=item.get('gap_since',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
@@ -1156,6 +1165,11 @@ class Wizard:
                     self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
                         size=10, color=self.MUTED).pack(anchor="w", pady=3)
                 for outgoing in value.get('native_outgoing',[]):
+                    if outgoing.get('platform')=='line':
+                        self._label(recovery_frame,'LINE-Ausgang · '+outgoing['delivery_id']+' · '+outgoing['state']
+                            +' · Versuch '+str(outgoing['attempt'])+' · keine Empfangsbestätigung'
+                            +(' · Serverannahme-Beleg '+outgoing['server_acceptance_receipt'] if outgoing.get('server_acceptance_receipt') else ''),
+                            size=10,color=self.MUTED).pack(anchor='w',pady=3)
                     if outgoing.get('platform')=='irc':
                         self._label(recovery_frame,'IRC-Ausgang · '+outgoing['delivery_id']+' · '+outgoing['state']
                             +' · Server-Echos '+str(outgoing['confirmed_chunks'])+'/'+str(outgoing['chunk_count'])

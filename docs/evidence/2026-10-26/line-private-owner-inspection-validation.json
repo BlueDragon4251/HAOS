@@ -1,0 +1,273 @@
+{
+  "parent_commit": "bbcc90b8e20f037d027c841b14aa4624b93cc4cd",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_line_recovery.py",
+      "sha256": "35fd66a084088e81d64ecac7b37c6de301943d5a30eb2bae410f97f1d8fb71ec"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "31f05d4c50cd5e19935f668a4dd1b548f848de8ec16646e8fd2d585607efbfe2"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "141f1ec484d0ea82bde04132fd7c5d2974005aafb7e4e6e4e14b8812f26ca4ee"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "6520e6f7030a930daa52435ca20088005a4131046dd96233cb3a5fb64f09e1a9"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_recovery_gui.py",
+      "sha256": "3d6b2dad12998a95be35c53cbf8828a68c4c3d665f4153c25338c4df8b936978"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_line_recovery.py",
+      "sha256": "eb3af8405ade6e5f516261a5befbf78ecb74bd03ceca5c6f937acc02dbe2d68e"
+    },
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "56dc29387a0cb7f3429f1baa1e2ec318de90d100e8ce5f6246aa93c0742fb3d3"
+    }
+  ],
+  "actual_gui_regression": [
+    {
+      "display": ":103",
+      "probe": "line_recovery",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "prepared_line_stays_absent_from_public_setup_choices",
+          "actual_sqlite_profile_listening_does_not_claim_public_tls_or_external_webhook_readiness",
+          "actual_owner_sees_distinct_authentication_and_bot_identity_refusals",
+          "actual_owner_sees_retained_throttle_deadline",
+          "actual_owner_sees_revocation_and_data_preservation",
+          "actual_private_outgoing_states_and_server_acceptance_proof_never_claim_recipient_receipt_or_expose_private_internal_hashes",
+          "actual_sqlite_invalid_retained_proof_is_refused_before_ui_rendering"
+        ],
+        "actual_tk_and_private_sqlite_metadata": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_checked_separately": true,
+        "public_line_enabled": false,
+        "external_or_installed_owner_acceptance": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "irc_owner",
+      "receipt": {
+        "passed": 10,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+          "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "homeassistant_owner",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "ntfy_owner",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "matrix_owner",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "line_recovery",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "prepared_line_stays_absent_from_public_setup_choices",
+          "actual_sqlite_profile_listening_does_not_claim_public_tls_or_external_webhook_readiness",
+          "actual_owner_sees_distinct_authentication_and_bot_identity_refusals",
+          "actual_owner_sees_retained_throttle_deadline",
+          "actual_owner_sees_revocation_and_data_preservation",
+          "actual_private_outgoing_states_and_server_acceptance_proof_never_claim_recipient_receipt_or_expose_private_internal_hashes",
+          "actual_sqlite_invalid_retained_proof_is_refused_before_ui_rendering"
+        ],
+        "actual_tk_and_private_sqlite_metadata": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_checked_separately": true,
+        "public_line_enabled": false,
+        "external_or_installed_owner_acceptance": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "irc_owner",
+      "receipt": {
+        "passed": 10,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+          "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "homeassistant_owner",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "ntfy_owner",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "matrix_owner",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    }
+  ],
+  "actual_root_uid_credential_recovery": {
+    "passed": 73,
+    "mocked_uid": false,
+    "network": "none"
+  },
+  "full_frozen_and_minimal_runtime_each": {
+    "passed": 1321,
+    "existing_skips": 2,
+    "local_exclusion": "linux/haos/tests/test_backup.py"
+  },
+  "public_line_enabled": false,
+  "public_tls_or_external_account_or_installed_owner_acceptance": false
+}
