@@ -1286,3 +1286,25 @@ probes use the public GatewayPolicy and retain all TLS, capability, account,
 replay, SASL, private-profile and delivery assertions. Root publication and
 recovery probes use actual Unix UIDs and disposable owner-protected files.
 No external message, installed owner session or release artifact is claimed.
+
+### 2026-10-26 — prepared LINE signed text admission
+
+LINE remains publicly disabled. A new independent prepared boundary verifies the
+exact raw webhook body through the actual pinned LINE HMAC verifier before JSON
+processing. It rejects duplicate JSON keys, oversized batches, wrong bot
+destinations and events outside the captured timed owner grant. Only exact
+signed user/group/room identities and active text messages reach NativeInbox;
+unknown senders, missing user identity and media cannot inherit authority.
+Single-use reply tokens are omitted from retained payloads and native decoding.
+The actual pinned text codec runs only after observable private journal commit;
+local dispatch failures retain retry deadlines across SQLite reopen. Withdrawal
+blocks pending work. Native listener, dispatch, postback, typing, media and send
+entry points remain denied in this prepared profile; no live client is admitted.
+
+The mandatory build and provider-contract workflow run the new actual native
+probe (35 cases). Eleven policy/identity cases also run in the minimal suite.
+Both frozen Python 3.11 environments passed 1,289 tests with two existing skips
+and the unchanged local backup-file exception. This establishes prepared input
+contracts only: a verified listener, outbound transport, private service profile,
+recovery, CLI/GUI and external account acceptance remain to be implemented.
+The public gateway count remains eight text paths.

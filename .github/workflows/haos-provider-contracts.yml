@@ -91,6 +91,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_irc_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-transport.json"
           "$PYTHON" linux/haos/runtime/probe_irc_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-profile.json"
           "$PYTHON" linux/haos/runtime/probe_irc_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_line_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-delivery.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-transport.json"
