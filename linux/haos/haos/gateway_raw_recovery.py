@@ -183,16 +183,18 @@ def retry_ntfy_auth(inbox,policy,request):
 
 def _retry_private_auth(inbox,policy,request,platform):
     from .gateway import digest
-    if platform not in {'homeassistant','irc'}:raise ValueError('unsupported private authentication recheck')
+    if platform not in {'homeassistant','irc','line'}:raise ValueError('unsupported private authentication recheck')
     connector=_recheck_connector(policy,request,platform);changed=0
     table=platform+'_profile_status';events=platform+'_owner_events'
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
         if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
             now=time.time()
+            refused=('authentication-refused','identity-refused') if platform=='line' else ('authentication-refused',)
+            placeholders=','.join('?' for _ in refused)
             changed=inbox.db.execute(f"UPDATE {table} SET status='created',updated_at=?,"
                 "next_attempt=CASE WHEN next_attempt>? THEN next_attempt ELSE 0 END "
-                "WHERE connector=? AND status='authentication-refused'",(now,now,connector)).rowcount
+                f"WHERE connector=? AND status IN ({placeholders})",(now,now,connector,*refused)).rowcount
         if changed:
             inbox.db.execute(f'CREATE TABLE IF NOT EXISTS {events} ('
                 'connector TEXT NOT NULL, created_at REAL NOT NULL, owner_uid INTEGER NOT NULL,'
@@ -214,6 +216,11 @@ def retry_homeassistant_auth(inbox,policy,request):
 def retry_irc_auth(inbox,policy,request):
     """Offline owner decision; retain revocation, gaps and rate limits."""
     return _retry_private_auth(inbox,policy,request,'irc')
+
+
+def retry_line_auth(inbox,policy,request):
+    """Prepared offline owner recheck; public LINE setup remains disabled."""
+    return _retry_private_auth(inbox,policy,request,'line')
 
 
 def main():

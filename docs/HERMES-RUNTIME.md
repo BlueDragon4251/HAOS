@@ -1409,3 +1409,24 @@ These are separate fixture and kernel tests, not an installed LINE acceptance.
 Public policy still excludes LINE. Public TLS ingress/certificates, owner
 CLI/GUI, authentication/delivery recovery, media/voice and external account
 acceptance remain incomplete; the public text-gateway count stays eight.
+
+### 2026-10-26 — prepared LINE offline authentication/identity recheck
+
+The shared private recovery transaction now permits a prepared LINE owner recheck
+of authentication and bot-identity refusals. It records the owner UID, current
+policy digest and note digest atomically with clearing those blocks. It performs
+no network request. Future deadlines, rate-limited/revoked rows and retained
+native inputs remain unchanged. Audit failure rolls back every status change.
+Public LINE policy, CLI and recovery dispatch remain disabled.
+
+The actual native-profile probe now passes 24 cases, including offline decisions
+followed by fresh native bot verification; a rate-limited profile remains blocked
+at its original deadline. Two additional real-UID fixture cases run both gateway
+UID 65534 and agent UID 65533 against private gateway journals and a root-only
+canary, including an actual SQLite audit trigger failure. Agent UID cannot open
+the journal; gateway UID cannot read owner data. These use the minimal runtime
+without optional Hermes imports. All 73 Root/UID/credential/recovery tests pass.
+Home Assistant (33) and IRC (20) actual native-profile regressions pass after the
+shared transaction change. Full frozen and minimal Python 3.11 suites each pass
+1,307 tests with two existing skips and the unchanged local backup-file exception.
+No external account, installed session, public TLS ingress or release is accepted.

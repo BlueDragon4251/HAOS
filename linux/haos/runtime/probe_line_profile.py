@@ -25,6 +25,7 @@ def main():
     from haos.store import MissionStore
     from haos.gateway_delivery import delivery_result
     from haos.redaction import Redactor
+    from haos.gateway_raw_recovery import retry_line_auth
     cases=[]
     async def exercise(directory):
         from aiohttp import web,ClientSession
@@ -156,6 +157,15 @@ def main():
                 assert not await adapter.connect() and len(lookups)==before
                 if error==429:assert adapter.native_health()['next_attempt']==deadline and deadline>time.time()
                 cases.append('native_identity_'+str(error)+'_blocks_listener_and_survives_owner_epoch_profile_reopen')
+                before=len(lookups)
+                decision=retry_line_auth(inbox,policy(),{'connector':'line','owner_uid':1000,'note_sha256':'f'*64})
+                assert decision['network_requested'] is False and len(lookups)==before
+                if error==429:
+                    assert decision['authentication_blocks_cleared']==0 and not await adapter.connect()
+                    assert adapter.native_health()['next_attempt']==deadline
+                else:
+                    assert decision['authentication_blocks_cleared']>0 and await adapter.connect()
+                cases.append('explicit_offline_owner_recheck_'+str(error)+'_preserves_rate_limit_and_requires_fresh_native_verification')
                 await adapter.close_profile()
             mode[0]='redirect';value['channel_access_token']='private-profile-redirect-token';adapter=create()
             assert not await adapter.connect() and adapter.native_health()['status']=='transport-unavailable'

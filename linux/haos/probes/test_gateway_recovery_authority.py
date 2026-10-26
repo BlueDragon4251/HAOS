@@ -559,3 +559,76 @@ else:
             user=uid,group=uid,extra_groups=[],umask=0o077,cwd=str(root),
             env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
         assert child.returncode==0,child.stderr
+
+
+@pytest.mark.parametrize('storage_failure',[False,True])
+def test_prepared_line_auth_identity_recheck_uses_real_gateway_uid_and_atomic_owner_audit(uid_fixture_path,storage_failure):
+    root=uid_fixture_path;root.chmod(0o755)
+    modules=root/'modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    state=root/'state';state.mkdir(mode=0o700);database=state/'native.db'
+    from haos.gateway_line_ingress import PreparedLINEPolicy
+    config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
+        'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+        'identity':'owner','capabilities':['create','read'],'generation':'b'*64,'since':1}]}
+    inbox=NativeInbox(database,Redactor())
+    source={'platform':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+        'message_id':'c'*64,'is_bot':False,'text':'retained private LINE input'}
+    inbox.admit(PreparedLINEPolicy(config),'line',source,{'event':'retained private LINE input'})
+    inbox.db.execute('CREATE TABLE line_profile_status(identity TEXT PRIMARY KEY,connector TEXT,credential_scope TEXT,status TEXT,updated_at REAL,next_attempt REAL)')
+    future=4102444800
+    for identity,status,deadline in [('auth','authentication-refused',future),('identity','identity-refused',0),('limited','rate-limited',future),('revoked','revoked',future)]:
+        inbox.db.execute('INSERT INTO line_profile_status VALUES(?,?,?,?,?,?)',(identity,'line','fixture',status,123,deadline))
+    inbox.db.execute('CREATE TABLE line_owner_events(connector TEXT,created_at REAL,owner_uid INTEGER,decision TEXT,changed INTEGER,policy_sha256 TEXT,note_sha256 TEXT)')
+    if storage_failure:inbox.db.execute("CREATE TRIGGER audit_fault BEFORE INSERT ON line_owner_events BEGIN SELECT RAISE(ABORT,'disposable audit failure'); END")
+    inbox.close();os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    canary=root/'owner-secret';canary.write_text('private-disposable-root-canary');canary.chmod(0o600)
+    code='''
+import json,os,sqlite3,sys
+from pathlib import Path
+from haos.gateway_line_ingress import PreparedLINEPolicy
+from haos.gateway_raw import NativeInbox
+from haos.gateway_raw_recovery import retry_line_auth
+from haos.redaction import Redactor
+request=json.load(sys.stdin)
+assert os.geteuid()==request['uid'] and os.getegid()==request['uid'] and os.getgroups()==[]
+try:Path(request['canary']).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('private owner data readable by unprivileged identity')
+if request['uid']==65533:
+    try:NativeInbox(Path(request['database']),Redactor())
+    except PermissionError:pass
+    else:raise AssertionError('agent opened private LINE gateway journal')
+else:
+    inbox=NativeInbox(Path(request['database']),Redactor())
+    try:
+        policy=PreparedLINEPolicy(request['policy']);params={'connector':'line','owner_uid':1000,'note_sha256':'e'*64}
+        if request['storage_failure']:
+            try:retry_line_auth(inbox,policy,params)
+            except sqlite3.IntegrityError:pass
+            else:raise AssertionError('LINE owner audit failure was swallowed')
+            assert tuple(inbox.db.execute("SELECT status,next_attempt FROM line_profile_status WHERE identity='auth'").fetchone())==('authentication-refused',4102444800)
+            assert inbox.db.execute("SELECT status FROM line_profile_status WHERE identity='identity'").fetchone()[0]=='identity-refused'
+            assert inbox.db.execute('SELECT COUNT(*) FROM line_owner_events').fetchone()[0]==0
+        else:
+            assert retry_line_auth(inbox,policy,params)=={'connector':'line','authentication_blocks_cleared':2,'network_requested':False}
+            assert tuple(inbox.db.execute("SELECT status,next_attempt FROM line_profile_status WHERE identity='auth'").fetchone())==('created',4102444800)
+            assert tuple(inbox.db.execute("SELECT status,next_attempt FROM line_profile_status WHERE identity='identity'").fetchone())==('created',0)
+            assert tuple(inbox.db.execute('SELECT owner_uid,decision,changed,note_sha256 FROM line_owner_events').fetchone())==(1000,'retry-auth',2,'e'*64)
+            assert retry_line_auth(inbox,policy,params)['authentication_blocks_cleared']==0
+        for identity,status in [('limited','rate-limited'),('revoked','revoked')]:
+            assert tuple(inbox.db.execute('SELECT status,next_attempt FROM line_profile_status WHERE identity=?',(identity,)).fetchone())==(status,4102444800)
+        assert json.loads(inbox.db.execute('SELECT payload FROM native_inbox').fetchone()[0])=={'event':'retained private LINE input'}
+        assert inbox.db.execute('SELECT state FROM native_inbox').fetchone()[0]=='pending'
+        assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+    finally:inbox.close()
+'''
+    for uid in (65533,65534):
+        child=subprocess.run([sys.executable,'-c',code],input=json.dumps({'database':str(database),'canary':str(canary),
+            'policy':config,'storage_failure':storage_failure,'uid':uid}),text=True,capture_output=True,timeout=15,
+            user=uid,group=uid,extra_groups=[],umask=0o077,cwd=str(root),
+            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
+        assert child.returncode==0,child.stderr
