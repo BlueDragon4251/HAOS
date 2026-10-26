@@ -31,7 +31,7 @@ def test_irc_prepared_owner_routes_are_exact_accounts_not_nick_or_hostmask(chang
 
 def test_irc_boundary_imports_without_hermes_or_site_packages():
     source=Path(__file__).resolve().parents[1]
-    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress,haos.gateway_irc_transport;assert "gateway.config" not in sys.modules'
+    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress,haos.gateway_irc_transport,haos.gateway_irc_profile;assert "gateway.config" not in sys.modules'
     result=subprocess.run([sys.executable,'-I','-S','-c',script],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
 
@@ -59,3 +59,17 @@ def test_private_irc_sasl_requires_paired_bounded_account_credentials(options):
     from haos.gateway_irc_transport import credentials
     with pytest.raises(ValueError):credentials({'server':'irc.fixture.invalid','port':6697,
         'nickname':'haos-bot','channel':'#haos',**options})
+
+
+@pytest.mark.parametrize('kind',['public','symlink','relative'])
+def test_prepared_irc_profile_refuses_untrusted_parent_before_optional_runtime_import(tmp_path,kind):
+    from haos.gateway_irc_profile import build
+    value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
+    parent=tmp_path/'private';parent.mkdir(mode=0o700)
+    if kind=='public':parent.chmod(0o755)
+    if kind=='symlink':
+        link=tmp_path/'alias';link.symlink_to(parent,target_is_directory=True);parent=link
+    if kind=='relative':parent=Path('relative-untrusted-parent')
+    with pytest.raises((ValueError,PermissionError)):
+        build(value,parent,'irc',lambda:PreparedIRCPolicy(config()),None)
+    assert not (tmp_path/'private/profile.lock').exists()

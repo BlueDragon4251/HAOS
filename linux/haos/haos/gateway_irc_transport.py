@@ -18,6 +18,10 @@ class AuthenticationRejected(Rejected):
     pass
 
 
+class RateLimited(Rejected):
+    retry_after=60
+
+
 def credentials(value):
     required={'server','port','nickname','channel'}
     if not isinstance(value,dict) or not required<=set(value)<=required|{'server_password','nickserv_password','sasl_username','sasl_password'}:
@@ -123,6 +127,7 @@ class Boundary:
         if msg['command']=='PING':
             if len(msg['params'])!=1:raise Rejected('invalid IRC keepalive')
             await self.write('PONG :'+msg['params'][0]);return True
+        if msg['command'] in {'263','439'}:raise RateLimited('IRC server deferred account traffic')
         if msg['command'] in {'464','465'}:
             raise AuthenticationRejected('IRC account or server access refused')
         if msg['command']=='ERROR' or re.fullmatch(r'[45][0-9]{2}',msg['command']):
@@ -202,7 +207,8 @@ class Boundary:
                     self.confirmed=True;self.status='streaming';self.adapter._mark_connected();return True
                 elif command=='PRIVMSG':raise Rejected('IRC message arrived before authenticated subscription')
         except BaseException as error:
-            if isinstance(error,AuthenticationRejected):self.status='authentication-refused'
+            if isinstance(error,RateLimited):self.status='rate-limited'
+            elif isinstance(error,AuthenticationRejected):self.status='authentication-refused'
             elif self.status!='revoked':self.status='transport-unavailable'
             await self.disconnect();raise
 
@@ -229,6 +235,8 @@ class Boundary:
                     try:key=capture(self.adapter,raw,self.authority,self.capabilities)
                     except PermissionError:self.current();continue
                     if key is not None:await dispatch_stored(self.adapter,key)
+        except RateLimited:
+            self.status='rate-limited';raise
         except AuthenticationRejected:
             self.status='authentication-refused';raise
         finally:
@@ -241,7 +249,7 @@ class Boundary:
             writer.close()
             try:await asyncio.wait_for(writer.wait_closed(),5)
             except (OSError,asyncio.TimeoutError):pass
-        if self.status not in {'revoked','authentication-refused'}:self.status='disconnected'
+        if self.status not in {'revoked','authentication-refused','rate-limited'}:self.status='disconnected'
 
 
 def install(adapter,value):

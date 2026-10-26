@@ -1073,3 +1073,28 @@ authenticated tags. Password/access refusals 464/465 now latch authentication
 refusal rather than entering generic reconnect. All prior assertions remain;
 the transport probe now passes 44 cases. Both runtime suites pass 1237 tests/two
 existing skips. No public IRC enablement or external acceptance is implied.
+
+### Prepared IRC private profile and persistent recovery (2026-10-26)
+
+The actual registered pinned IRC factory now has a prepared private HOME and
+single-link service-owned kernel lease. Continuous TLS input and local durable
+replay run independently; the shared supervisor joins both on stop. Bounded
+reconnect keeps the original grant and records status/deadlines in the private
+native inbox. Server account-access/SASL refusal persists across connect, profile
+close and real SQLite reopen. Explicit credential rotation may start a new
+account check without deleting earlier refusal rows. Changing owner generation
+or bot nickname is not credential rotation and does not bypass account refusal
+or throttling. Server 263/439 deferral uses a conservative 60-second delay;
+persisted deadlines survive shutdown and re-pairing.
+
+Fourteen actual profile/TLS/SQLite/kernel cases cover duplicate leases, continuous
+native input, EOF reconnect, concurrent close, refusal and throttle persistence,
+credential rotation, replay of failed local admission on an otherwise idle TLS
+connection, supervisor stop, owner revocation and cancellation during a real TLS
+handshake. Together with 29 ingress and 44 transport cases, these are 87 prepared
+local IRC cases. Both Python 3.11 runtime suites pass 1240 tests/two existing skips.
+The gap timestamp remains visible: no remote history mechanism is negotiated and
+no unseen outage input is claimed recovered. Prepared owner auth-recheck metadata,
+reviewed delivery/receipt/recovery and public CLI/GUI remain required. IRC stays
+publicly disabled; these fixtures prove neither external accounts nor installed
+boot/release acceptance.
