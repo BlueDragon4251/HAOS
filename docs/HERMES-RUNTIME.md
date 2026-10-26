@@ -1132,3 +1132,26 @@ regression retains 33 cases; the IRC profile expands to 15, making 89 prepared
 IRC ingress/transport/profile cases including earlier 30/44 cases. No unknown
 remote outage event, external account, public eighth gateway or installed/release
 acceptance is claimed.
+
+### Shared offline outbox readiness (2026-10-26)
+
+The private gateway service previously requested an outbox lease before checking
+whether its adapter was connected. Repeated offline polling consumed the five
+attempts and could fail a reply without ever sending it. The service now passes
+only currently connected connector IDs to the existing peer-authenticated
+`gateway.next` method. The controller validates a distinct bounded list of exact
+configured names; the mission queue selects only these connectors. Offline
+obligations remain pending at attempt zero, survive reopen, and do not block
+other connected gateways. Existing empty-parameter callers retain compatibility.
+Owner revocation and crashed-send lease expiry still run even with no ready
+adapters; readiness never converts a previously started send into a retry.
+
+The new positive ready=[] Unix-socket assertion fails against isolated exact
+`8121c3c` controller/engine source, which incorrectly returns a sending obligation.
+Current source passes that same real peer-authenticated socket fixture and all
+65 authority/control/recovery cases, including malformed selectors and withdrawn
+peer authority. Eight new queue cases cover persistence, multiple connectors,
+revocation and invalid selection. A real native IRC TLS-profile case continues
+through mission persistence, offline polling, reopen and first online lease.
+Both Python 3.11 suites pass 1264 tests/two existing skips. This repairs shared
+queue behavior, not an external delivery or installed/boot acceptance.

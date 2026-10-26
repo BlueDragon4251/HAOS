@@ -1,0 +1,60 @@
+{
+  "parent_commit": "8121c3cb37f3fbe5f4979a852b64337b21ddb88c",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/controller.py",
+      "sha256": "292606a57aa2d6296bbeb6329d970a9f4c6f6a0538d8c462f4d9a42789539a52"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "afbd54640bfa8b57f7f519b2bbf4ffc4448c44af9879581b72d8a4c1d9b904d4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "8a24822bd390b7904aac85740e2e6b50e8738e94fe9b71b975624da62fc6cfb1"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_control.py",
+      "sha256": "a2e54a915f533c3066026a8e729c0d6a4075f35280adcc85b743f62e80c7454b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_profile.py",
+      "sha256": "ea8aaf37f679afef19326fb1aa641996dcc5a8ed65496953f95bde673654c726"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway.py",
+      "sha256": "62bd7827dc7352f11cca621af0c318466595e6861262b89534120e01c49b985c"
+    }
+  ],
+  "actual_root_uid_socket_and_recovery_cases": 65,
+  "minimal_and_full_python311": "1264 passed, 2 existing skips",
+  "local_root_only_backup_exclusion_unchanged": true,
+  "isolated_exact_parent_controller_and_engine": "fails real Unix ready=[] assertion by dequeuing offline delivery; no checkout reset",
+  "native_irc_profile": {
+    "passed": 16,
+    "cases": [
+      "actual_native_factory_uses_private_home_and_explicit_connection_identity",
+      "actual_kernel_lease_refuses_second_active_identity_before_any_network",
+      "actual_profile_continuous_tls_native_account_input_and_local_relay",
+      "actual_tls_profile_readiness_preserves_reopened_mission_outbox_offline_and_first_online_attempt",
+      "actual_eof_reconnect_preserves_explicit_unrecoverable_remote_gap",
+      "concurrent_close_joins_workers_and_releases_kernel_lease_once",
+      "real_server_authentication_refusal_is_sticky_across_connect_profile_and_actual_database_reopen",
+      "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_authentication_refusal",
+      "prepared_audited_owner_recheck_is_offline_and_fresh_profile_performs_real_next_account_authentication",
+      "explicit_credential_rotation_permits_new_real_authentication_and_preserves_old_refusal_rows",
+      "actual_server_throttle_deadline_survives_cancel_close_and_database_reopen_without_early_request",
+      "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_throttle",
+      "independent_local_replay_reopens_real_failed_admission_while_live_tls_has_no_new_message",
+      "actual_shared_service_supervisor_stop_joins_private_profile_workers",
+      "owner_generation_change_revokes_running_idle_tls_profile_without_inheritance",
+      "close_during_real_tls_handshake_cancels_connect_and_releases_kernel_lease"
+    ],
+    "actual_native_profile_tls_kernel_lease_and_sqlite": true,
+    "fixture_only_loopback_destination_ca_and_short_reconnect_delay": true,
+    "public_gateway_enabled": false,
+    "unseen_remote_events_recovered": false,
+    "external_server_account_delivery_or_installed_acceptance": false
+  },
+  "external_or_installed_acceptance": false
+}

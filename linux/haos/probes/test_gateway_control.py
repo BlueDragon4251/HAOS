@@ -43,8 +43,16 @@ def test_real_kernel_peer_gateway_socket_and_persistent_admission(tmp_path):
             params["envelope"]["sender"] = "unpaired"
             assert (await request("gateway.receive", params))["ok"] is False
             assert (await request("owner.reconcile", {}))["ok"] is False
+            assert (await request("gateway.next", {"ready":[]}))=={"ok":True,"result":None}
+            assert tuple(store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone())==('pending',0)
+            for invalid in [None,True,"test-telegram",["unknown"],["test-telegram","test-telegram"],[{}]]:
+                assert (await request("gateway.next", {"ready":invalid}))["ok"] is False
+            assert (await request("gateway.next", {"ready":[],"bypass":True}))["ok"] is False
+            delivered=await request("gateway.next", {"ready":["test-telegram"]})
+            assert delivered["ok"] is True and delivered["result"]["attempt"]==1
             controller.gateway_uids = set()
             assert (await request("gateway.next", {}))["ok"] is False
+            assert (await request("gateway.next", {"ready":["test-telegram"]}))["ok"] is False
             assert len(store.list()) == 1 and store.list()[0]["actor"] == "gateway:principal-1"
             mid = first["result"]["mission_id"]
         finally:

@@ -272,15 +272,24 @@ class GatewayEngine:
                 if events:
                     self.store.db.execute("UPDATE gateway_routes SET cursor=? WHERE id=?", (events[-1]["seq"], route["id"]))
 
-    def next_delivery(self, policy: GatewayPolicy, now: float | None = None):
+    def next_delivery(self, policy: GatewayPolicy, now: float | None = None, *, ready_connectors=None):
+        if ready_connectors is not None and (not isinstance(ready_connectors,list)
+                or len(ready_connectors)>len(policy.connectors)
+                or any(not isinstance(name,str) or name not in policy.connectors for name in ready_connectors)
+                or len(set(ready_connectors))!=len(ready_connectors)):
+            raise ValueError('exact distinct configured ready connectors required')
+        ready=list(policy.connectors) if ready_connectors is None else ready_connectors
         now = time.time() if now is None else now
         self.refresh(policy)
         with self.store.transaction():
             # No transport idempotency contract: crashed sends are uncertain, never blindly repeated.
             self.store.db.execute("UPDATE gateway_outbox SET state='uncertain',error='sender lost before delivery receipt' WHERE state='sending' AND lease_until<=?", (now,))
-            row = self.store.db.execute("""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to,r.binding_id,r.binding_digest
+            if not ready:return None
+            placeholders=",".join("?" for _ in ready)
+            row = self.store.db.execute(f"""SELECT o.*,r.connector,r.chat,r.thread,r.scope,r.reply_to,r.binding_id,r.binding_digest
                 FROM gateway_outbox o JOIN gateway_routes r ON o.route_id=r.id
-                WHERE o.state='pending' AND o.next_attempt<=? ORDER BY o.rowid LIMIT 1""", (now,)).fetchone()
+                WHERE o.state='pending' AND o.next_attempt<=? AND r.connector IN ({placeholders})
+                ORDER BY o.rowid LIMIT 1""", (now,*ready)).fetchone()
             if row is None:
                 return None
             self.store.db.execute("UPDATE gateway_outbox SET state='sending',attempt=attempt+1,lease_until=? WHERE id=?", (now + 120, row["id"]))

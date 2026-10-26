@@ -20,6 +20,8 @@ def main():
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope,maintain
     from haos.redaction import Redactor
+    from haos.gateway import GatewayEngine
+    from haos.store import MissionStore
     from haos.gateway_raw_recovery import retry_irc_auth,unresolved
     cases=[]
     async def exercise(directory):
@@ -118,8 +120,21 @@ def main():
             assert accepted[0]['sender']=='owner-account' and adapter.irc_status()['status']=='streaming'
             gap=adapter.irc_status()['gap_since'];assert gap>0
             cases.append('actual_profile_continuous_tls_native_account_input_and_local_relay')
+            store=MissionStore(directory/'missions.db');engine=GatewayEngine(store)
+            await engine.receive(policy(),'irc',accepted[0],None)
+            await adapter.disconnect()
+            for _ in range(8):
+                assert engine.next_delivery(policy(),time.time()+3600,ready_connectors=['irc'] if adapter.is_connected else []) is None
+            assert tuple(store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone())==('pending',0)
+            store.close();store=MissionStore(directory/'missions.db');engine=GatewayEngine(store)
+            assert await adapter.connect()
+            delivery=engine.next_delivery(policy(),ready_connectors=['irc'] if adapter.is_connected else [])
+            assert delivery['attempt']==1 and delivery['connector']=='irc'
+            store.close()
+            cases.append('actual_tls_profile_readiness_preserves_reopened_mission_outbox_offline_and_first_online_attempt')
+            before_connections=state['connections'];before_accepted=len(accepted)
             await adapter._haos_irc_transport.disconnect()
-            await until(lambda:state['connections']>=2 and len(accepted)>=2)
+            await until(lambda:state['connections']>before_connections and len(accepted)>before_accepted)
             assert adapter.irc_status()['gap_since']==gap
             cases.append('actual_eof_reconnect_preserves_explicit_unrecoverable_remote_gap')
             await asyncio.gather(adapter.close_profile(),adapter.close_profile())

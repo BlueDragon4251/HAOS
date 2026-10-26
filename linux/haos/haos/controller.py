@@ -111,7 +111,9 @@ class Controller:
         if request.get("method") == "gateway.receive":
             return await self.gateway.receive(policy, params["connector"], params["envelope"], self)
         if request.get("method") == "gateway.next":
-            return self.gateway.next_delivery(policy)
+            if set(params)-{'ready'}:raise ValueError('unsupported gateway queue selection')
+            if 'ready' in params and params['ready'] is None:raise ValueError('explicit ready connectors must be a list')
+            return self.gateway.next_delivery(policy,ready_connectors=params.get('ready'))
         if request.get("method") == "gateway.ack":
             return self.gateway.acknowledge(policy, params["id"], params["result"])
         raise PermissionError("gateway method denied")

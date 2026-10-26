@@ -372,3 +372,45 @@ def test_slack_grant_requires_exact_native_ids(field,value):
         'identity':'principal','capabilities':['create','read']}
     row[field]=value
     with pytest.raises(ValueError):GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[row]})
+
+
+def test_offline_adapters_do_not_consume_outbox_attempts_and_ready_peer_can_dispatch_after_reopen(tmp_path,policy_config):
+    path=tmp_path/'missions.db';policy=GatewayPolicy(policy_config);store=MissionStore(path)
+    admitted(store,policy);engine=GatewayEngine(store)
+    for _ in range(8):
+        assert engine.next_delivery(policy,time.time()+3600,ready_connectors=[]) is None
+    row=store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone()
+    assert tuple(row)==('pending',0)
+    store.close();store=MissionStore(path);engine=GatewayEngine(store)
+    delivery=engine.next_delivery(policy,ready_connectors=['telegram-first'])
+    assert delivery['attempt']==1 and delivery['connector']=='telegram-first'
+    # Readiness does not replay a previously started send after a crash.
+    assert engine.next_delivery(policy,time.time()+121,ready_connectors=[]) is None
+    assert tuple(store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone())==('uncertain',1)
+    store.close()
+
+
+def test_ready_connectors_do_not_block_other_adapters_or_override_current_owner_revocation(tmp_path,policy_config):
+    value=copy.deepcopy(policy_config)
+    value['connectors'].append({'id':'telegram-second','platform':'telegram'})
+    second=copy.deepcopy(value['bindings'][0]);second.update(id='second',connector='telegram-second')
+    value['bindings'].append(second);policy=GatewayPolicy(value)
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    asyncio.run(engine.receive(policy,'telegram-first',envelope(),None))
+    asyncio.run(engine.receive(policy,'telegram-second',envelope(message_id='22'),None))
+    delivery=engine.next_delivery(policy,ready_connectors=['telegram-second'])
+    assert delivery['connector']=='telegram-second' and delivery['attempt']==1
+    assert tuple(store.db.execute("SELECT state,attempt FROM gateway_outbox WHERE id!=?",(delivery['id'],)).fetchone())==('pending',0)
+    revoked=copy.deepcopy(value);revoked['bindings']=[]
+    assert engine.next_delivery(GatewayPolicy(revoked),ready_connectors=['telegram-first','telegram-second']) is None
+    assert store.db.execute("SELECT COUNT(*) FROM gateway_outbox WHERE state='revoked'").fetchone()[0]==2
+    store.close()
+
+
+@pytest.mark.parametrize('ready',[None,True,'telegram-first',['unknown'],['telegram-first','telegram-first'],[{}]])
+def test_gateway_next_rejects_untrusted_ready_selection_without_consuming_queue(tmp_path,policy_config,ready):
+    store=MissionStore(tmp_path/'missions.db');admitted(store,GatewayPolicy(policy_config))
+    controller=Controller(store,'ws://127.0.0.1:9119',set());controller.gateway_policy=lambda:GatewayPolicy(policy_config)
+    with pytest.raises(ValueError):asyncio.run(controller.gateway_dispatch({'method':'gateway.next','params':{'ready':ready}}))
+    assert tuple(store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone())==('pending',0)
+    store.close()

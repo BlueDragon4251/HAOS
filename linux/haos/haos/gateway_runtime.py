@@ -304,7 +304,7 @@ async def serve():
                     except (OSError, ConnectionError, TimeoutError):
                         # Ingress is idempotent even if the previous response was lost.
                         inbox.retry(incoming["id"])
-                delivery = await call("gateway.next", {})
+                delivery = await call("gateway.next", {"ready":[name for name,adapter in adapters.items() if adapter.is_connected]})
                 if delivery:
                     current_policy()
                     adapter = adapters[delivery["connector"]]
