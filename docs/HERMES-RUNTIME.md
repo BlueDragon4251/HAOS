@@ -1111,3 +1111,24 @@ native pre-persistence assertion; current code passes without relaxing it.
 Thirty ingress, 44 TLS/transport and 14 private-profile cases pass (88 total),
 as do 1244 tests/two existing skips in both Python 3.11 environments. This remains
 prepared IRC work: no public enablement, external account or installed acceptance.
+
+### Prepared IRC offline owner authentication recovery (2026-10-26)
+
+Safe owner metadata now includes bounded IRC status/deadline/gap values and hashed
+source receipt IDs without raw events or credentials. The prepared auth-recheck
+function uses the same fixed-platform, atomic status/audit transaction as Home
+Assistant. It clears only authentication refusal for the exact configured
+connector, preserves future throttling, gaps, revocation, other connectors and
+retained input, and performs no network IO. A fresh private profile performs the
+next actual authentication after the explicit decision. Public IRC helper-main,
+CLI and GUI are not enabled by this prepared function.
+
+Two new real Root/kernel fixtures exercise gateway UID 65534 and deny agent UID
+65533 access to the journal, with both successful audit and actual SQLite-trigger
+storage failure/rollback. All 65 gateway authority/control/recovery cases pass.
+Twenty-four paired Home Assistant/IRC recovery unit cases pass, and both broad
+Python 3.11 environments pass 1256 tests/two existing skips. The native HA profile
+regression retains 33 cases; the IRC profile expands to 15, making 89 prepared
+IRC ingress/transport/profile cases including earlier 30/44 cases. No unknown
+remote outage event, external account, public eighth gateway or installed/release
+acceptance is claimed.

@@ -30,7 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
-            r'[0-9a-f]{64}' if row['platform']=='homeassistant' else
+            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc'} else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
@@ -89,16 +89,20 @@ def unresolved(inbox, after=0):
                     or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
                 raise ValueError('invalid ntfy transport metadata')
             transport.append({**dict(row),'platform':'ntfy'})
-    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='homeassistant_profile_status'").fetchone():
+    for platform,table in [('homeassistant','homeassistant_profile_status'),('irc','irc_profile_status')]:
+        if not inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():continue
         import math
-        from .gateway_homeassistant_profile import PROFILE_STATES
-        for row in inbox.db.execute('SELECT connector,status,updated_at,next_attempt,gap_since FROM homeassistant_profile_status ORDER BY updated_at DESC LIMIT 64'):
+        if platform=='homeassistant':
+            from .gateway_homeassistant_profile import PROFILE_STATES as states
+        else:
+            from .gateway_irc_profile import STATES as states
+        for row in inbox.db.execute(f'SELECT connector,status,updated_at,next_attempt,gap_since FROM {table} ORDER BY updated_at DESC LIMIT 64'):
             if (not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
-                    or row['status'] not in PROFILE_STATES
+                    or row['status'] not in states
                     or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0
                         for key in ('updated_at','next_attempt','gap_since'))):
-                raise ValueError('invalid Home Assistant transport metadata')
-            transport.append({**dict(row),'platform':'homeassistant','unseen_remote_history_recovered':False})
+                raise ValueError('invalid private gateway transport metadata')
+            transport.append({**dict(row),'platform':platform,'unseen_remote_history_recovered':False})
     return {'ingress':result,'history':history,'transport':transport,'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -175,28 +179,41 @@ def retry_ntfy_auth(inbox,policy,request):
     return {'connector':connector,'authentication_blocks_cleared':changed,'network_requested':False}
 
 
-def retry_homeassistant_auth(inbox,policy,request):
-    """Permit a fresh server check; never clear revocation, gaps or rate limits."""
+def _retry_private_auth(inbox,policy,request,platform):
     from .gateway import digest
-    connector=_recheck_connector(policy,request,'homeassistant');changed=0
+    if platform not in {'homeassistant','irc'}:raise ValueError('unsupported private authentication recheck')
+    connector=_recheck_connector(policy,request,platform);changed=0
+    table=platform+'_profile_status';events=platform+'_owner_events'
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
-        if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='homeassistant_profile_status'").fetchone():
+        if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
             now=time.time()
-            changed=inbox.db.execute("UPDATE homeassistant_profile_status SET status='created',updated_at=?,"
+            changed=inbox.db.execute(f"UPDATE {table} SET status='created',updated_at=?,"
                 "next_attempt=CASE WHEN next_attempt>? THEN next_attempt ELSE 0 END "
                 "WHERE connector=? AND status='authentication-refused'",(now,now,connector)).rowcount
         if changed:
-            inbox.db.execute('CREATE TABLE IF NOT EXISTS homeassistant_owner_events ('
+            inbox.db.execute(f'CREATE TABLE IF NOT EXISTS {events} ('
                 'connector TEXT NOT NULL, created_at REAL NOT NULL, owner_uid INTEGER NOT NULL,'
                 'decision TEXT NOT NULL, changed INTEGER NOT NULL, policy_sha256 TEXT NOT NULL, note_sha256 TEXT NOT NULL)')
             authority=digest([policy.publication,sorted(digest(b) for b in policy.bindings.values() if b['connector']==connector)])
-            inbox.db.execute('INSERT INTO homeassistant_owner_events VALUES(?,?,?,?,?,?,?)',
+            inbox.db.execute(f'INSERT INTO {events} VALUES(?,?,?,?,?,?,?)',
                 (connector,time.time(),request['owner_uid'],'retry-auth',changed,authority,request['note_sha256']))
         inbox.db.execute('COMMIT')
     except BaseException:
         inbox.db.execute('ROLLBACK');raise
     return {'connector':connector,'authentication_blocks_cleared':changed,'network_requested':False}
+
+
+def retry_homeassistant_auth(inbox,policy,request):
+    """Permit a fresh server check; never clear revocation, gaps or rate limits."""
+    return _retry_private_auth(inbox,policy,request,'homeassistant')
+
+
+def retry_irc_auth(inbox,policy,request):
+    """Prepared offline owner decision; public IRC setup remains unavailable."""
+    from .gateway_irc_ingress import PreparedIRCPolicy
+    if not isinstance(policy,PreparedIRCPolicy):raise ValueError('prepared independent IRC owner authority required')
+    return _retry_private_auth(inbox,policy,request,'irc')
 
 
 def main():

@@ -20,6 +20,7 @@ def main():
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope,maintain
     from haos.redaction import Redactor
+    from haos.gateway_raw_recovery import retry_irc_auth,unresolved
     cases=[]
     async def exercise(directory):
         from cryptography import x509
@@ -135,6 +136,18 @@ def main():
             value['nickname']='other-bot';adapter=build();assert not await adapter.connect() and state['connections']==before+1
             cases.append('new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_authentication_refusal')
             await adapter.close_profile()
+            before=state['connections'];metadata=unresolved(native)
+            assert metadata['transport'] and all(x['unseen_remote_history_recovered'] is False for x in metadata['transport'])
+            assert 'new-fixture-password' not in json.dumps(metadata)
+            result=retry_irc_auth(native,policy(),{'connector':'irc','owner_uid':1000,'note_sha256':'a'*64})
+            assert result['authentication_blocks_cleared']>=1 and result['network_requested'] is False and state['connections']==before
+            assert native.db.execute('SELECT owner_uid FROM irc_owner_events').fetchone()[0]==1000
+            state['mode']='good';adapter=build();assert await adapter.connect()
+            await until(lambda:state['connections']>before)
+            assert adapter.irc_status()['gap_since']>0
+            await adapter.close_profile();state['mode']='auth_refused';adapter=build();assert not await adapter.connect()
+            await adapter.close_profile()
+            cases.append('prepared_audited_owner_recheck_is_offline_and_fresh_profile_performs_real_next_account_authentication')
             # Explicit credential rotation creates a new account scope without
             # clearing or deleting the previous refusal record.
             value['server_password']='new-fixture-password';state['mode']='good'
