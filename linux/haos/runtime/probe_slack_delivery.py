@@ -32,6 +32,11 @@ def main():
         assert request.headers['Authorization']=='Bearer '+token
         payload=await request.json();state['requests'].append(payload)
         case=state['case'];attempt=len(state['requests'])
+        if case=='revoke-between-chunks' and attempt==1:
+            state['policy'].bindings['paired']['generation']='b'*64
+        if case=='revoke-before-format-fallback' and attempt==1:
+            state['policy'].bindings['paired']['generation']='b'*64
+            return web.json_response({'ok':False,'error':'invalid_blocks'})
         if case=='disconnect':request.transport.close();return web.Response()
         if case=='server-format':return web.json_response({'ok':False,'error':'invalid_blocks'},status=500)
         if case=='rate-limit':return web.json_response({'ok':False,'error':'ratelimited'},status=429,headers={'Retry-After':'120'})
@@ -51,7 +56,10 @@ def main():
                     ('rate-limit','pending',1),('forbidden','failed',1),('unknown-error','uncertain',1),
                     ('malformed','uncertain',1),('invalid-ts','uncertain',1),('wrong-receipt','uncertain',1),
                     ('disconnect','uncertain',1),('connect-refused','pending',0),('wrong-team','failed',0),
-                    ('wrong-channel','failed',0),('thread-success','delivered',1)]:
+                    ('wrong-channel','failed',0),('thread-success','delivered',1),
+                    ('forged-binding','failed',0),('missing-binding','failed',0),
+                    ('policy-unavailable','failed',0),('revoke-between-chunks','uncertain',1),
+                    ('revoke-before-format-fallback','failed',1)]:
                 state.update(case=case,requests=[],reply_ts=f'{int(time.time())}.000055')
                 adapter=build_adapter('slack',{'token':token,'app_token':app_token,'extra':{'rich_blocks':True}})
                 client=adapter._new_web_client(token,None);client.base_url=f'http://127.0.0.1:{port}/api/'
@@ -67,6 +75,11 @@ def main():
                 policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[
                     {'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':thread,
                      'identity':'principal','capabilities':['create','read']}]})
+                state['policy']=policy
+                def current():
+                    if state['case']=='policy-unavailable':raise PermissionError('fixture owner policy unavailable')
+                    return policy
+                adapter._haos_native=SimpleNamespace(connector='bot',policy=current)
                 path=directory/(case+'.db');store=MissionStore(path);engine=GatewayEngine(store)
                 try:
                     await engine.receive(policy,'bot',{'platform':'slack','sender':'U42','chat':'C123','scope':'T999','thread':thread,
@@ -74,12 +87,16 @@ def main():
                     delivery=engine.next_delivery(policy)
                     metadata=delivery_metadata(delivery,'slack')
                     if case=='wrong-team':metadata['slack_team_id']='T998'
+                    if case=='forged-binding':metadata['haos_binding']['binding_digest']='0'*64
+                    if case=='missing-binding':metadata.pop('haos_binding')
                     with socket.socket() as unused:
                         if case=='connect-refused':
                             unused.bind(('127.0.0.1',0));client.base_url=f'http://127.0.0.1:{unused.getsockname()[1]}/api/'
-                        receipt=await adapter.send('U42' if case=='wrong-channel' else 'C123',delivery['content'],
+                        receipt=await adapter.send('U42' if case=='wrong-channel' else 'C123',
+                            'r'*50000 if case=='revoke-between-chunks' else delivery['content'],
                             reply_to=delivery['reply_to'],metadata=metadata)
                     translated=delivery_result(receipt)
+                    if case in {'revoke-between-chunks','revoke-before-format-fallback'}:policy.bindings['paired'].pop('generation')
                     engine.acknowledge(policy,delivery['id'],{**translated,'attempt':delivery['attempt']})
                     actual=store.db.execute('SELECT state FROM gateway_outbox WHERE id=?',(delivery['id'],)).fetchone()['state']
                     assert actual==expected,(case,translated,actual)

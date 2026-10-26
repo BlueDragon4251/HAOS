@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import select
 
 import pytest
 
@@ -25,6 +26,62 @@ def uid_fixture_path():
     # separately created fixture tree to its deliberately demoted child.
     with tempfile.TemporaryDirectory(prefix="haos-gateway-uid-", dir="/tmp") as directory:
         yield Path(directory)
+
+
+@pytest.mark.parametrize('change',['withdraw','generation'])
+def test_native_delivery_callback_observes_atomic_owner_policy_changes_as_real_gateway_uid(uid_fixture_path,change):
+    root=uid_fixture_path;root.chmod(0o755)
+    modules=root/'modules';modules.mkdir(mode=0o755)
+    shutil.copytree(Path(__file__).resolve().parents[1]/'haos',modules/'haos',ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (modules/'haos').rglob('*.py'):path.chmod(0o644)
+    (modules/'haos').chmod(0o755)
+    config={'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[{
+        'id':'owner','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
+        'identity':'principal','capabilities':['create','read'],'generation':'a'*64}]}
+    from haos.policy import atomic_json
+    from haos.gateway import digest
+    path=root/'gateways.json';atomic_json(path,config,mode=0o640,gid=65534)
+    canary=root/'owner-secret';canary.write_text('disposable-root-owner-canary');canary.chmod(0o600)
+    payload={'policy':str(path),'canary':str(canary),'metadata':{'haos_scope':'T999',
+        'haos_binding':{'binding_id':'owner','binding_digest':digest(config['bindings'][0])}}}
+    code='''
+import json,os,sys
+from pathlib import Path
+from types import SimpleNamespace
+from haos.gateway import GatewayPolicy
+from haos.gateway_delivery_authority import current_delivery
+from haos.sandbox import trusted_json
+d=json.loads(sys.stdin.readline())
+assert os.geteuid()==65534 and os.getegid()==65534 and os.getgroups()==[]
+try:Path(d['canary']).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('gateway UID read owner secret')
+current=lambda:GatewayPolicy(trusted_json(Path(d['policy'])))
+adapter=SimpleNamespace(_haos_native=SimpleNamespace(connector='bot',policy=current))
+check=current_delivery(adapter,'slack','C123',d['metadata']);check()
+print('admitted',flush=True)
+assert sys.stdin.readline().strip()=='owner-updated'
+try:check()
+except PermissionError:print('revoked',flush=True)
+else:raise AssertionError('native operation inherited atomically changed owner authority')
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    child=subprocess.Popen([sys.executable,'-c',code],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+        text=True,user=65534,group=65534,extra_groups=[],umask=0o077,cwd=root,
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(modules)})
+    try:
+        child.stdin.write(json.dumps(payload)+'\n');child.stdin.flush()
+        assert select.select([child.stdout],[],[],5)[0], 'gateway UID did not admit initial valid owner grant'
+        assert child.stdout.readline().strip()=='admitted'
+        if change=='withdraw':config['bindings']=[]
+        else:config['bindings'][0]['generation']='b'*64
+        atomic_json(path,config,mode=0o640,gid=65534)
+        output,error=child.communicate('owner-updated\n',timeout=10)
+        assert child.returncode==0,error
+        assert output.strip()=='revoked'
+        assert 'disposable-root-owner-canary' not in output+error
+    finally:
+        if child.poll() is None:child.kill();child.wait(timeout=5)
 
 
 @pytest.mark.parametrize('decision',['retry','discard'])

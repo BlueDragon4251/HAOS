@@ -862,3 +862,34 @@ are in `docs/evidence/2026-10-26/homeassistant-shared-factory-validation.json`.
 The public service policy, CLI, GUI and recovery-helper action wiring remain
 unfinished; no seventh public gateway, external notification, installed service
 or release acceptance is claimed.
+
+### Slack current owner authority for every native write (2026-10-26)
+
+A new actual SDK/HTTP/outbox negative fixture failed on production source
+`f640a04081505dc091ef3b777b0e70f65352068e`: a forged binding digest was
+ignored by the Slack delivery wrapper and the response was marked delivered.
+Workspace/CI success on that predecessor did not establish this missing contract.
+
+Slack now requires the current independent owner connector, binding digest,
+chat/workspace/thread and read permission before native dispatch, and rechecks
+the captured capability before every SDK operation in the delivery context.
+Changing the caller's metadata cannot grant an in-flight operation a new epoch.
+Missing/invalid context fails before HTTP. Revocation after one accepted chunk
+prevents the second chunk and preserves uncertain delivery; revocation after an
+explicit formatting refusal prevents the native fallback and remains failed.
+
+Nineteen actual native Slack delivery/outbox cases pass, including missing/forged
+binding, unavailable policy, between-chunk revocation and formatting-fallback
+revocation. Ingress/history regression each pass eleven actual native cases.
+Full/minimal suites each pass 1201 tests with two existing skips and the unchanged
+local backup-file exclusion. Fifty-one actual root/UID/socket/recovery checks
+pass: two new gateway-UID processes admit the valid root-owned policy, observe
+an actual atomic owner-file replacement and reject withdrawal/epoch changes.
+The unprivileged identity cannot read the root-only canary. No CI skips were added.
+
+Exact production/fixture hashes, the failed predecessor fixture and successful
+contracts are recorded in
+`docs/evidence/2026-10-26/slack-current-delivery-authority-validation.json`.
+This does not certify live Slack credentials, external delivery, installed boot
+or release artifacts. Telegram/Discord delivery authority is a separate check;
+this change does not claim to add the same guard to those transports.

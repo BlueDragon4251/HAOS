@@ -147,7 +147,12 @@ def block_rejected(original,error):
 
 async def send_native(adapter,original,chat_id,content,reply_to=None,metadata=None):
     from gateway.platforms.base import SendResult
+    from .gateway_delivery_authority import current_delivery
     metadata=dict(metadata or {})
+    try:current=current_delivery(adapter,'slack',chat_id,metadata)
+    except PermissionError:
+        return SendResult(success=False,error='current exact owner Slack grant required',error_kind='forbidden',
+            raw_response={'haos_delivery':'refused'})
     team=metadata.get('slack_team_id');thread=metadata.get('thread_id') or ''
     if (not isinstance(team,str) or team!=metadata.get('haos_scope') or team not in adapter._team_clients
             or not isinstance(chat_id,str) or not re.fullmatch('[CGD][A-Z0-9]+',chat_id)
@@ -159,7 +164,7 @@ async def send_native(adapter,original,chat_id,content,reply_to=None,metadata=No
             raw_response={'haos_delivery':'not-dispatched'})
     metadata['thread_ts']=thread
     state=SimpleNamespace(chat=chat_id,thread=thread,started=False,successful=0,ambiguous=False,
-        error=None,refused=False,connect_failed=False)
+        error=None,refused=False,connect_failed=False,current=current)
     token=_SENDING.set(state)
     try:
         with secret_scope(adapter._haos_secrets,adapter._haos_secret_home):
@@ -221,6 +226,9 @@ async def web_call(original,client,method,*args,**kwargs):
     from slack_sdk.errors import SlackApiError
     state=_SENDING.get()
     if state is not None:
+        try:state.current()
+        except PermissionError:
+            state.refused=True;raise
         payload=kwargs.get('json')
         if (method!='chat.postMessage' or not isinstance(payload,dict) or payload.get('channel')!=state.chat
                 or (payload.get('thread_ts') or '')!=state.thread or payload.get('reply_broadcast')):
