@@ -63,6 +63,14 @@ def main():
         assert 'private-single-use-fixture' not in inbox.db.execute('SELECT payload FROM native_inbox').fetchone()[0]
         cases.append('actual_native_hmac_and_text_codec_after_observable_commit_strip_single_use_reply_capability')
         cases.append('same_signed_event_cannot_repeat_local_admission')
+        reflected={**event,'webhookEventId':'01K8'+'D'*22,'message':{**event['message'],
+            'text':' '.join([adapter.channel_secret,adapter.channel_access_token,event['replyToken']])}}
+        rb,rs=signed([reflected]);reflected_key=capture(adapter,rb,rs,authority)[0]
+        payload=inbox.db.execute('SELECT payload FROM native_inbox WHERE id=?',(reflected_key,)).fetchone()[0]
+        assert all(secret not in payload for secret in [adapter.channel_secret,adapter.channel_access_token,event['replyToken']])
+        assert await dispatch_stored(adapter,reflected_key)
+        assert accepted[-1]['text']=='[REDACTED] [REDACTED] [REDACTED]'
+        cases.append('reflected_channel_secret_access_and_single_use_reply_tokens_redacted_before_persistence_and_native_decode')
         for label,alter in [
             ('unknown_user',{'source':{**event['source'],'userId':'U'+'f'*32}}),
             ('unknown_group',{'source':{**event['source'],'groupId':'C'+'f'*32}}),
@@ -107,7 +115,7 @@ def main():
         assert not await dispatch_stored(adapter,key), 'persisted local retry deadline was ignored'
         # Advance only the disposable fixture deadline; production backoff stays intact.
         inbox.db.execute('UPDATE native_inbox SET next_attempt=0 WHERE id=?',(key,))
-        assert await dispatch_stored(adapter,key) and len(accepted)==2
+        assert await dispatch_stored(adapter,key) and len(accepted)==3
         cases.append('actual_sqlite_reopen_retries_failed_local_admission_without_external_side_effect')
         next_event={**event,'webhookEventId':'01K8'+'C'*22};b,s=signed([next_event]);key=capture(adapter,b,s,authority)[0]
         config['bindings']=[]

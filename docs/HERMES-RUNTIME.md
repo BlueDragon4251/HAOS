@@ -1326,3 +1326,15 @@ routes, a real SQLite trigger-induced storage fault and successful redelivery
 after removing that fault, plus immediate withdrawal of the owner grant.
 Build and CI run the listener probe. This does not prove external TLS reachability,
 a public listener deployment or a full LINE integration. LINE stays disabled.
+
+### 2026-10-26 — prepared LINE reflected capability redaction
+
+Before retention, the LINE boundary now removes known channel-secret,
+channel-access-token and event reply-token values reflected inside message text.
+The retained event and approved envelope use identical redacted text, so actual
+native decoding cannot reintroduce those capabilities. The single-use raw reply
+field remains omitted entirely. The updated native probe passes 36 cases; the
+same unmodified probe against `cb8dec6` fails specifically because reflected
+private values remain in its payload. Thirteen actual loopback listener cases
+still pass. Both full frozen and minimal Python 3.11 suites pass 1,289 tests with
+two existing skips and the unchanged local backup-file exception.

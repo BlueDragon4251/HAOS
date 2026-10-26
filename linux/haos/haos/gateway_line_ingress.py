@@ -89,6 +89,10 @@ def capture(adapter,body,signature,authority):
         # Reply tokens are single-use capabilities, never persisted in raw payload.
         sanitized={key:value for key,value in event.items() if key in {'type','mode','source','message','timestamp','webhookEventId'}}
         sanitized['message']={key:event['message'][key] for key in ('id','type','text')}
+        from .redaction import Redactor
+        private=Redactor([adapter.channel_secret,adapter.channel_access_token,event.get('replyToken','')])
+        source={**source,'text':private.text(source['text'])}
+        sanitized['message']['text']=source['text']
         admitted.append((source,stamp,sanitized))
     return [native.inbox.admit(policy,native.connector,source,{'event':event},received_at=stamp)
         for source,stamp,event in admitted]

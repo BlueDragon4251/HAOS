@@ -1,0 +1,92 @@
+{
+  "parent_commit": "cb8dec6f56afead920188bfdf4195cd3a6216e5a",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "7e29fc4ce08dc656d39e7a02661f299bef2ac559e2be6a33d4a63d9409918bef"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_ingress.py",
+      "sha256": "d3ce5c806760c7646e2243b52f6abe6eb4820541e24877013a85fadbea1d88b2"
+    }
+  ],
+  "actual_native_probe": {
+    "passed": 36,
+    "cases": [
+      "prepared_line_not_publicly_enabled",
+      "actual_native_hmac_and_text_codec_after_observable_commit_strip_single_use_reply_capability",
+      "same_signed_event_cannot_repeat_local_admission",
+      "reflected_channel_secret_access_and_single_use_reply_tokens_redacted_before_persistence_and_native_decode",
+      "unknown_user",
+      "unknown_group",
+      "missing_user",
+      "standby",
+      "media",
+      "missing_original_time",
+      "boolean_time",
+      "invalid_event_id",
+      "empty_text",
+      "ambiguous_source",
+      "tampered_body",
+      "invalid_signature",
+      "oversized_body",
+      "wrong_destination",
+      "stale_event",
+      "future_event",
+      "oversized_batch",
+      "duplicate_signed_json_rejected",
+      "raw_native_connect_denied",
+      "raw_native__handle_webhook_denied",
+      "raw_native__dispatch_event_denied",
+      "raw_native__handle_message_event_denied",
+      "raw_native__handle_postback_event_denied",
+      "raw_native__download_media_denied",
+      "raw_native__handle_media_denied",
+      "raw_native_send_denied",
+      "raw_native_send_typing_denied",
+      "raw_native_send_image_file_denied",
+      "raw_native_send_voice_denied",
+      "raw_native_send_video_denied",
+      "actual_sqlite_reopen_retries_failed_local_admission_without_external_side_effect",
+      "owner_withdrawal_blocks_retained_native_event"
+    ],
+    "actual_pinned_hmac_and_native_codec_and_sqlite": true,
+    "public_gateway_enabled": false,
+    "listener_or_external_message_or_account_acceptance": false
+  },
+  "actual_listener_regression": {
+    "passed": 13,
+    "cases": [
+      "actual_signed_http_200_only_after_observable_private_sqlite_commit_without_reply_capability",
+      "remote_redelivery_returns_success_without_duplicate_durable_input",
+      "missing_signature",
+      "tampered_body",
+      "duplicate_signature",
+      "oversized_request",
+      "no_native_auxiliary_route_/line/media/token/file",
+      "no_native_auxiliary_route_/line/webhook/health",
+      "no_native_auxiliary_route_/plugins/line",
+      "signed_malformed_json_is_rejected_without_admission",
+      "actual_sqlite_commit_failure_returns_503_without_private_error_or_false_ack",
+      "same_remote_event_can_be_redelivered_after_actual_storage_recovery",
+      "current_owner_withdrawal_prevents_new_http_admission_without_restart"
+    ],
+    "actual_loopback_http_and_native_hmac_and_sqlite": true,
+    "public_gateway_enabled": false,
+    "tls_ingress_proxy_or_external_webhook_or_account_acceptance": false
+  },
+  "negative_baseline": {
+    "source_commit": "cb8dec6f56afead920188bfdf4195cd3a6216e5a",
+    "same_current_native_probe": true,
+    "exit_code": 1,
+    "expected_failure": "reflected private channel/access/reply material remained in retained payload",
+    "fixture_assertions_unchanged": true
+  },
+  "minimal_and_full_runtime_each": {
+    "passed": 1289,
+    "existing_skips": 2,
+    "local_exclusion": "linux/haos/tests/test_backup.py"
+  },
+  "public_line_enabled": false,
+  "external_or_installed_acceptance": false
+}
