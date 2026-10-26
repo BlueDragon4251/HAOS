@@ -44,6 +44,8 @@ def main():
                         self.close_connection = True; return
                     if case == 'server-parser-error':
                         status=500; body={'ok': False, 'error_code': 500, 'description': 'parse upstream failed'}
+                    elif case=='redirect-307':
+                        status=307;body={'ok':False,'error_code':307,'description':'fixture redirect'}
                     elif case == 'missing-thread':
                         status=400; body={'ok': False, 'error_code': 400, 'description': 'Bad Request: message thread not found'}
                     elif case == 'rate-limit':
@@ -58,6 +60,7 @@ def main():
                             'chat': {'id': -10042, 'type': 'supergroup', 'title': 'Fixture'}, 'text': 'fixture'}}
                 else: raise AssertionError('unexpected native operation: ' + method)
                 wire=json.dumps(body).encode(); self.send_response(status); self.send_header('Content-Type','application/json')
+                if status==307:self.send_header('Location','/leak')
                 self.send_header('Content-Length',str(len(wire))); self.end_headers(); self.wfile.write(wire)
             except BaseException as error:
                 failures.append(type(error).__name__); raise
@@ -67,7 +70,7 @@ def main():
             for case, expected in [('read-disconnect','uncertain'), ('server-parser-error','uncertain'), ('missing-thread','failed'), ('rate-limit','pending'),
                     ('forbidden','failed'), ('malformed-receipt','uncertain'), ('invalid-id','uncertain'), ('parse-rejected','delivered'), ('success','delivered'),
                     ('forged-binding','failed'),('missing-binding','failed'),('policy-unavailable','failed'),('no-read-grant','failed'),
-                    ('revoke-between-chunks','uncertain'),('revoke-before-format-fallback','failed'),('connect-refused','pending')]:
+                    ('revoke-between-chunks','uncertain'),('revoke-before-format-fallback','failed'),('redirect-307','uncertain'),('connect-refused','pending')]:
                 state.update(case=case,sends=[])
                 if case=='no-read-grant':policy.bindings['paired']['capabilities']=['create']
                 store=MissionStore(Path(directory)/(case+'.db')); engine=GatewayEngine(store)

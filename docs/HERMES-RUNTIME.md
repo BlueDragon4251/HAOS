@@ -927,3 +927,28 @@ contracts are in
 These local tests do not establish external delivery, real account access,
 installed service/boot or release acceptance. Home Assistant remains prepared;
 there are still six public text-gateway paths.
+
+### Private Slack/Discord SDK redirect refusal (2026-10-26)
+
+New actual SDK cases failed on `4750a5d993385d9367057105fb962f4511163fb3`:
+Slack and Discord followed HTTP 307 to an unapproved local endpoint and accepted
+its otherwise valid-looking message receipt as delivered. Both fixtures expected
+uncertain delivery and no follow-up request. No external message was sent.
+
+The private Slack client subclass now forces `allow_redirects=False` in its real
+SDK `_request` path, preserving per-copy token/session semantics. The private
+Discord request boundary also disables redirects before invoking the actual SDK.
+All native HTTP encoding, parsing, nonce checks and current owner-grant checks
+remain active. Redirect responses remain uncertain; they never authorize an
+automatic resend or a new recipient. The frozen Telegram HTTP client already
+refused the redirect; an actual SDK regression case now preserves that contract.
+
+Sixty-two native delivery/outbox cases pass: Telegram 17, Discord 24, Slack 21,
+with zero requests observed at the redirect target. Native Telegram polling and
+Discord/Slack ingress/history regression pass. Full/minimal suites each pass
+1202 tests with two existing skips and the unchanged local backup-file exclusion.
+All 55 actual root/UID/socket/recovery cases pass; no CI skips were added.
+Source hashes and individual receipts are recorded in
+`docs/evidence/2026-10-26/private-gateway-sdk-no-redirect-validation.json`.
+These loopback protocol checks do not establish live account/TLS/external
+delivery, installed boot or final artifact acceptance.

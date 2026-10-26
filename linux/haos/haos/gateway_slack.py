@@ -215,8 +215,12 @@ def install_web_client(client):
         @wraps(base.api_call)
         async def call(self,api_method,*args,**kwargs):
             return await web_call(base.api_call,self,api_method,*args,**kwargs)
+        @wraps(base._request)
+        async def request(self,*,http_verb,api_url,req_args):
+            return await base._request(self,http_verb=http_verb,api_url=api_url,
+                req_args={**req_args,'allow_redirects':False})
         _WEB_CLIENTS[base]=type('HAOS'+base.__name__,(base,),{
-            '__module__':__name__,'_haos_delivery_guard':True,'api_call':call})
+            '__module__':__name__,'_haos_delivery_guard':True,'api_call':call,'_request':request})
     client.__class__=_WEB_CLIENTS[base]
     return client
 

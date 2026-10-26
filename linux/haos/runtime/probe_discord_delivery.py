@@ -29,6 +29,7 @@ def main():
         payload=await request.json();state['requests'].append({'channel':request.match_info['channel'],'payload':payload})
         case=state['case'];attempt=len(state['requests'])
         assert payload['enforce_nonce'] is True and payload['nonce']
+        if case=='redirect-307':return web.Response(status=307,headers={'Location':'/leak'})
         if case in {'revoke-between-chunks','revoke-before-reply-fallback','revoke-before-nonce-retry'} and attempt==1:
             state['policy'].bindings['paired']['generation']='b'*64
             if case=='revoke-before-reply-fallback':return response({'message':'Unknown Message','code':10008},status=404)
@@ -51,8 +52,14 @@ def main():
         return response({'id':'0' if case=='invalid-id' else '55','type':0,'channel_id':request.match_info['channel'],
             'content':payload['content'],'author':bot,'mentions':[],'mention_roles':[],'attachments':[],'embeds':[],
             'timestamp':'2026-10-24T00:00:00+00:00','edited_timestamp':None,'flags':0,'pinned':False,'tts':False})
+    async def leak(request):
+        state['leaked']+=1
+        return response({'id':'55','type':0,'channel_id':'123','content':'redirected fixture','author':bot,
+            'mentions':[],'mention_roles':[],'attachments':[],'embeds':[],
+            'timestamp':'2026-10-24T00:00:00+00:00','edited_timestamp':None,'flags':0,'pinned':False,'tts':False})
     async def exercise(directory):
         app=web.Application();app.router.add_get('/api/users/@me',me);app.router.add_post('/api/channels/{channel}/messages',send)
+        app.router.add_route('*','/leak',leak)
         runner=web.AppRunner(app);await runner.setup();site=web.TCPSite(runner,'127.0.0.1',0);await site.start()
         port=site._server.sockets[0].getsockname()[1]
         old_base=Route.BASE;Route.BASE=f'http://127.0.0.1:{port}/api'
@@ -66,8 +73,8 @@ def main():
                     ('thread-success','delivered',1),('wrong-thread','failed',0),('connect-refused','pending',0),
                     ('forged-binding','failed',0),('missing-binding','failed',0),('policy-unavailable','failed',0),('no-read-grant','failed',0),
                     ('revoke-between-chunks','uncertain',1),('revoke-before-reply-fallback','failed',1),
-                    ('revoke-before-nonce-retry','uncertain',1)]:
-                state.update(case=case,requests=[])
+                    ('revoke-before-nonce-retry','uncertain',1),('redirect-307','uncertain',1)]:
+                state.update(case=case,requests=[],leaked=0)
                 Route.BASE=f'http://127.0.0.1:{port}/api'
                 adapter=build_adapter('discord',{'token':'fixture-discord-private-token','extra':{'auto_thread':False,'history_backfill':False}})
                 client=discord.Client(intents=discord.Intents.none(),max_ratelimit_timeout=30)
@@ -120,6 +127,7 @@ def main():
                     row=store.db.execute('SELECT state FROM gateway_outbox WHERE id=?',(delivery['id'],)).fetchone()
                     assert row['state']==expected,(case,translated,row['state'])
                     assert len(state['requests'])==count,(case,len(state['requests']))
+                    assert state['leaked']==0,'private Discord request followed unapproved redirect'
                     if case in {'nonce-retry','ambiguous-forbidden'}:
                         assert state['requests'][0]['payload']['nonce']==state['requests'][1]['payload']['nonce']
                     if case=='reply-refused':

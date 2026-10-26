@@ -32,6 +32,7 @@ def main():
         assert request.headers['Authorization']=='Bearer '+token
         payload=await request.json();state['requests'].append(payload)
         case=state['case'];attempt=len(state['requests'])
+        if case=='redirect-307':return web.Response(status=307,headers={'Location':'/leak'})
         if case=='revoke-between-chunks' and attempt==1:
             state['policy'].bindings['paired']['generation']='b'*64
         if case=='revoke-before-format-fallback' and attempt==1:
@@ -45,10 +46,13 @@ def main():
         if case=='format-refused' and attempt==1:return web.json_response({'ok':False,'error':'invalid_blocks'})
         return web.json_response({'ok':True,'channel':'C999' if case=='wrong-receipt' else payload['channel'],
             'ts':None if case=='malformed' else 'invalid' if case=='invalid-ts' else state['reply_ts']})
+    async def leak(request):
+        state['leaked']+=1
+        return web.json_response({'ok':True,'channel':'C123','ts':state['reply_ts']})
     async def exercise(directory):
         os.environ['HERMES_HOME']=str(directory/'hermes')
         for name in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy'):os.environ.pop(name,None)
-        app=web.Application();app.router.add_route('*','/api/{method}',api)
+        app=web.Application();app.router.add_route('*','/api/{method}',api);app.router.add_route('*','/leak',leak)
         runner=web.AppRunner(app);await runner.setup();site=web.TCPSite(runner,'127.0.0.1',0);await site.start()
         port=site._server.sockets[0].getsockname()[1]
         try:
@@ -59,8 +63,8 @@ def main():
                     ('wrong-channel','failed',0),('thread-success','delivered',1),
                     ('forged-binding','failed',0),('missing-binding','failed',0),('no-read-grant','failed',0),
                     ('policy-unavailable','failed',0),('revoke-between-chunks','uncertain',1),
-                    ('revoke-before-format-fallback','failed',1)]:
-                state.update(case=case,requests=[],reply_ts=f'{int(time.time())}.000055')
+                    ('revoke-before-format-fallback','failed',1),('redirect-307','uncertain',1)]:
+                state.update(case=case,requests=[],reply_ts=f'{int(time.time())}.000055',leaked=0)
                 adapter=build_adapter('slack',{'token':token,'app_token':app_token,'extra':{'rich_blocks':True}})
                 client=adapter._new_web_client(token,None);client.base_url=f'http://127.0.0.1:{port}/api/'
                 auth=await client.auth_test();adapter._team_clients[auth['team_id']]=client
@@ -102,6 +106,7 @@ def main():
                     actual=store.db.execute('SELECT state FROM gateway_outbox WHERE id=?',(delivery['id'],)).fetchone()['state']
                     assert actual==expected,(case,translated,actual)
                     assert len(state['requests'])==count,(case,len(state['requests']))
+                    assert state['leaked']==0,'private Slack request followed unapproved redirect'
                     for payload in state['requests']:
                         assert payload['channel']=='C123' and (payload.get('thread_ts') or '')==thread
                         assert not payload.get('reply_broadcast')

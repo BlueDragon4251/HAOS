@@ -198,6 +198,7 @@ def install_delivery(client):
                 state.refused = True
                 raise PermissionError('Discord delivery cannot change its approved target or idempotency contract')
             state.started = True
+        kwargs['allow_redirects']=False
         try: return await original(route, **kwargs)
         except Exception as error:
             if state is not None: state.error = error
