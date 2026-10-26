@@ -1,0 +1,44 @@
+{
+  "parent_commit": "1e75e62d2f8aa423e48ef4401df774f58784e686",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_line_listener.py",
+      "sha256": "13778304107d447f42b890bace268a59699795ba71926a86be115f71af5f17a1"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_listener.py",
+      "sha256": "c3e17410f942cdc3397622d2f07121b5bb2b4d9516a462697a2c78ddb7042b0a"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "370d650092c37bf3050dde6e76dee9081680a14b50e29b469bca1423acb0f12b"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "aad2853df9f30269a2332974a74c97a19e871385587a4d116753952795865acc"
+    }
+  ],
+  "native_http_probe": {
+    "passed": 13,
+    "cases": [
+      "actual_signed_http_200_only_after_observable_private_sqlite_commit_without_reply_capability",
+      "remote_redelivery_returns_success_without_duplicate_durable_input",
+      "missing_signature",
+      "tampered_body",
+      "duplicate_signature",
+      "oversized_request",
+      "no_native_auxiliary_route_/line/media/token/file",
+      "no_native_auxiliary_route_/line/webhook/health",
+      "no_native_auxiliary_route_/plugins/line",
+      "signed_malformed_json_is_rejected_without_admission",
+      "actual_sqlite_commit_failure_returns_503_without_private_error_or_false_ack",
+      "same_remote_event_can_be_redelivered_after_actual_storage_recovery",
+      "current_owner_withdrawal_prevents_new_http_admission_without_restart"
+    ],
+    "actual_loopback_http_and_native_hmac_and_sqlite": true,
+    "public_gateway_enabled": false,
+    "tls_ingress_proxy_or_external_webhook_or_account_acceptance": false
+  },
+  "socket_binding": "loopback fixture only; production factory opens no sockets",
+  "public_gateway_enabled": false
+}

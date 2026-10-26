@@ -1308,3 +1308,21 @@ and the unchanged local backup-file exception. This establishes prepared input
 contracts only: a verified listener, outbound transport, private service profile,
 recovery, CLI/GUI and external account acceptance remain to be implemented.
 The public gateway count remains eight text paths.
+
+### 2026-10-26 — prepared LINE fixed-route webhook application
+
+The next prepared layer creates an aiohttp application without opening a socket;
+its caller must supply the eventual service binding and trusted TLS ingress.
+Only POST `/line/webhook` is exposed, with a 64-KiB limit, bounded read time,
+exactly one signature header and fresh independent owner-policy inspection.
+Success follows private durable admission; native decoding remains replayable
+outside the HTTP request. Storage failures return a generic 503 so the remote
+server may redeliver after recovery, without exposing errors or credentials.
+No native media, plugin or health routes are inherited.
+
+Thirteen actual loopback HTTP/HMAC/SQLite cases verify observable commit before
+200, duplicate delivery, malformed/signature/size rejection, absent auxiliary
+routes, a real SQLite trigger-induced storage fault and successful redelivery
+after removing that fault, plus immediate withdrawal of the owner grant.
+Build and CI run the listener probe. This does not prove external TLS reachability,
+a public listener deployment or a full LINE integration. LINE stays disabled.
