@@ -790,3 +790,23 @@ The new recheck function is not yet exposed by the recovery helper's main action
 dispatcher or a CLI/GUI button. Public runtime/owner setup integration and remote
 history recovery remain unfinished. There are still six public text gateways;
 these are local contracts, not live or installed acceptance.
+
+### Home Assistant HTTP-date retry deadlines (2026-10-26)
+
+After `b9d88a44ce263207493d4202f3b7ddb3ad152f03`, the private WS and
+notification paths accept both standard Retry-After forms: integer seconds and
+timezone-aware HTTP dates. The shared gateway helper uses the existing bounded
+provider parser, rejects malformed/nonfinite/control-bearing values and avoids
+publishing a reflected private credential as timing. Delays remain bounded to
+1–86400 seconds; invalid/missing values retain the route's fixed safe default.
+
+Actual loopback native probes pass 25 transport, 27 delivery and 25 profile
+cases. A future HTTP date sets the actual outbox retry and survives private
+profile close/reopen without an early network request. The two forms retain
+the existing conservative ambiguous/partial-publication behavior. Full/minimal
+suites each pass 1190 tests and two existing skips with the unchanged local
+backup-file exclusion. Forty-nine actual root/UID/socket/recovery cases pass;
+there are no additional CI skips. Exact source hashes and limits are recorded
+in `docs/evidence/2026-10-26/homeassistant-http-date-retry-validation.json`.
+Other gateway transports are not yet switched to this shared parser by this
+change. Home Assistant remains prepared, without public setup or live acceptance.

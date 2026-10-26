@@ -2,6 +2,7 @@
 """Actual pinned HA WS auth/subscription over loopback with private admission."""
 import asyncio
 from datetime import datetime,timezone
+from email.utils import formatdate
 import io
 import json
 import logging
@@ -50,6 +51,7 @@ def main():
             if mode=='redirect':return web.Response(status=302,headers={'Location':'/leak'})
             if mode=='http401':return web.Response(status=401,text=token)
             if mode=='http429':return web.Response(status=429,text=token,headers={'Retry-After':'19'})
+            if mode=='http429-date':return web.Response(status=429,text=token,headers={'Retry-After':formatdate(time.time()+3600,usegmt=True)})
             socket=web.WebSocketResponse();await socket.prepare(request);state['sockets'].append(socket)
             if mode=='silent-first':await silent.wait();return socket
             if mode=='wrong-first':await socket.send_json({'type':'auth_ok','message':token});return socket
@@ -99,7 +101,7 @@ def main():
             cases.append('actual_authenticated_loopback_ws_frame_reaches_native_codec_only_after_durable_capture')
             release.set();await asyncio.wait_for(read,3);assert not boundary.confirmed
             cases.append('actual_socket_eof_revokes_transport_health_and_stream_authority')
-            for mode in ['redirect','http401','http429','wrong-first','auth-invalid','early-event','duplicate-ack','wrong-id','bool-id']:
+            for mode in ['redirect','http401','http429','http429-date','wrong-first','auth-invalid','early-event','duplicate-ack','wrong-id','bool-id']:
                 state['mode']=mode;adapter=build();before=state['requests']
                 assert not await adapter._ws_connect() and not adapter._haos_ha_transport.confirmed
                 assert state['requests']==before+1 and state['leaked']==0 and len(accepted)==1
@@ -107,6 +109,9 @@ def main():
                 if mode=='http429':
                     assert adapter._haos_ha_transport.status=='rate-limited'
                     assert adapter._haos_ha_transport.retry_after==19
+                if mode=='http429-date':
+                    assert adapter._haos_ha_transport.status=='rate-limited'
+                    assert 3598<=adapter._haos_ha_transport.retry_after<=3600
                 await adapter._haos_ha_transport.close()
                 cases.append('actual_native_handshake_refuses_'+mode+'_without_token_log_or_input')
             for mode in ['bad-event-id','duplicate-event','oversize']:

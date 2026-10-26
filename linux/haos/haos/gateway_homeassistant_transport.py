@@ -2,10 +2,10 @@
 import asyncio
 import hashlib
 import json
-import math
 from types import MethodType
 
 from .gateway_homeassistant_ingress import snapshot,capture,dispatch_stored
+from .gateway_retry import retry_after
 
 
 class Rejected(ConnectionError):
@@ -158,9 +158,8 @@ def install(adapter):
         except Exception as error:
             limited=getattr(error,'status',None)==429
             if limited:
-                try:delay=float((getattr(error,'headers',None) or {}).get('Retry-After','60'))
-                except (ValueError,TypeError):delay=60
-                boundary.retry_after=min(86400,max(1,delay)) if math.isfinite(delay) else 60
+                boundary.retry_after=retry_after((getattr(error,'headers',None) or {}).get('Retry-After'),
+                    default=60,private_values=[adapter._hass_token])
             reason=('handshake-timeout' if isinstance(error,TimeoutError) else 'revoked' if isinstance(error,PermissionError) else 'authentication-refused' if boundary.status=='authentication-refused' or getattr(error,'status',None) in {401,403}
                 else 'rate-limited' if limited else 'handshake-refused')
             await self._cleanup_ws();boundary.revoke(reason);return False

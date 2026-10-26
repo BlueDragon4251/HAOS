@@ -2,6 +2,7 @@
 """Native HA POST plus actual native WS receipt witness, only local fixture IO."""
 import asyncio
 from datetime import datetime,timezone
+from email.utils import formatdate
 import json
 import os
 from pathlib import Path
@@ -35,7 +36,7 @@ def main():
             'capabilities':['create','read'],'generation':'a'*64,'since':int(time.time()*1000)-10000,
             'homeassistant_shared_notifications':False}]}
         policy=lambda:PreparedHomeAssistantPolicy(config)
-        state={'posts':[],'status':200,'mode':'normal','notifications':{},'gets':0,'leaks':0,'revoke':False,'partial':False}
+        state={'posts':[],'status':200,'mode':'normal','notifications':{},'gets':0,'leaks':0,'revoke':False,'partial':False,'retry_after':'19'}
         publishers=[];sockets=[];proof_waiting=asyncio.Event();release_proof=asyncio.Event()
         async def post(request):
             assert request.headers['Authorization']=='Bearer '+token
@@ -43,7 +44,7 @@ def main():
             assert data['notification_id'].startswith('haos_') and len(data['message'])<=4096
             state['posts'].append(data)
             status=429 if state['partial'] and len(state['posts'])==2 else state['status']
-            if status!=200:return web.Response(status=status,text=token,headers={'Location':'/leak','Retry-After':'19'})
+            if status!=200:return web.Response(status=status,text=token,headers={'Location':'/leak','Retry-After':state['retry_after']})
             if state['mode']!='missing':
                 saved=dict(data);saved['created_at']=datetime.now(timezone.utc).isoformat()
                 if state['mode']=='wrong-message':saved['message']='unapproved replacement'
@@ -121,6 +122,10 @@ def main():
                 result=await run('native_single_post_'+str(status),expected,outbox=status in {429,500})
                 assert len(state['posts'])==1 and state['gets']==before and not state['leaks']
                 if status==429:assert result['retry_after']==19
+            state['status']=429;state['retry_after']=formatdate(time.time()+3600,usegmt=True)
+            result=await run('native_http_date_retry_after_preserves_real_outbox_wait','retry',outbox=True)
+            assert 3598<=result['retry_after']<=3600 and len(state['posts'])==1
+            state['retry_after']='19'
             state['status']=200
             for mode in ['missing','wrong-message','wrong-id','duplicate-proof','wrong-result-id','auth-invalid','lost']:
                 state['mode']=mode

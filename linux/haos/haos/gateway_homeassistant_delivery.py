@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 import hashlib
-import math
 import re
 from types import MethodType
 
 from .gateway import digest
+from .gateway_retry import retry_after
 
 _ACTIVE=ContextVar('haos_homeassistant_notification',default=None)
 _ID=re.compile(r'[0-9a-f]{64}\Z')
@@ -63,9 +63,7 @@ class Publisher:
             async with self.client.post(self._target+'/api/services/persistent_notification/create',
                     headers=headers,json={**json,'notification_id':route['notification_id']},allow_redirects=False,timeout=timeout) as response:
                 route['status']=response.status
-                try:delay=float(response.headers.get('Retry-After','5'))
-                except ValueError:delay=5
-                route['retry_after']=min(86400,max(1,delay)) if math.isfinite(delay) else 5
+                route['retry_after']=retry_after(response.headers.get('Retry-After'),private_values=[self.adapter._hass_token])
                 length=0
                 async for chunk in response.content.iter_chunked(4096):
                     length+=len(chunk)

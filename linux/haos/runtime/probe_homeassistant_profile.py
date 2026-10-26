@@ -2,6 +2,7 @@
 """Actual isolated prepared HA profile with local WS and private SQLite journals."""
 import asyncio
 from datetime import datetime, timezone
+from email.utils import formatdate
 import json
 import os
 from pathlib import Path
@@ -47,7 +48,7 @@ def main():
             return web.json_response([])
         async def websocket(request):
             state['requests']+=1
-            if state['mode']=='rate-limit':return web.Response(status=429,text=token,headers={'Retry-After':'19'})
+            if state['mode']=='rate-limit':return web.Response(status=429,text=token,headers={'Retry-After':state['retry_header']})
             socket=web.WebSocketResponse();await socket.prepare(request);state['sockets'].append(socket)
             state['connections']+=1
             await socket.send_json({'type':'auth_required','ha_version':'fixture'})
@@ -192,20 +193,24 @@ def main():
             cases.append('actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event')
             cases.append('independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle')
             await adapter.close_profile()
-            state['mode']='rate-limit';adapter=build()
-            connecting=asyncio.create_task(adapter.connect())
-            await eventually(lambda:adapter.homeassistant_status()['status']=='rate-limited')
-            deadline=adapter.homeassistant_status()['next_attempt']
-            assert 17<deadline-time.time()<=19
-            before=state['requests'];await adapter.close_profile()
-            result=await asyncio.gather(connecting,return_exceptions=True)
-            assert isinstance(result[0],asyncio.CancelledError)
-            adapter=build();connecting=asyncio.create_task(adapter.connect())
-            await asyncio.sleep(.15)
-            assert state['requests']==before
-            assert abs(adapter.homeassistant_status()['next_attempt']-deadline)<.02
-            await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
-            cases.append('actual_http429_retry_after_survives_close_and_profile_reopen_without_early_request')
+            for name,header,minimum,maximum in [('seconds','19',17,19),
+                    ('http-date',formatdate(time.time()+3600,usegmt=True),3597,3600)]:
+                if name=='http-date':
+                    value['token']='date-specific-private-fixture-identity';token=value['token']
+                state['mode']='rate-limit';state['retry_header']=header;adapter=build()
+                connecting=asyncio.create_task(adapter.connect())
+                await eventually(lambda:adapter.homeassistant_status()['status']=='rate-limited')
+                deadline=adapter.homeassistant_status()['next_attempt']
+                assert minimum<deadline-time.time()<=maximum
+                before=state['requests'];await adapter.close_profile()
+                result=await asyncio.gather(connecting,return_exceptions=True)
+                assert isinstance(result[0],asyncio.CancelledError)
+                adapter=build();connecting=asyncio.create_task(adapter.connect())
+                await asyncio.sleep(.15)
+                assert state['requests']==before
+                assert abs(adapter.homeassistant_status()['next_attempt']-deadline)<.02
+                await adapter.close_profile();await asyncio.gather(connecting,return_exceptions=True)
+                cases.append('actual_http429_'+name+'_retry_after_survives_close_and_profile_reopen_without_early_request')
             cases.append('close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease')
             refused(lambda:profile.credentials({'server_url':'http://fixture.invalid','token':token}))
             refused(lambda:profile.credentials({'server_url':'https://fixture.invalid','token':token,'plugin':'arbitrary'}))
