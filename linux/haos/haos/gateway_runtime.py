@@ -64,7 +64,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None):
+    if platform=='irc':
+        if not isinstance(irc_context,dict) or set(irc_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('prepared IRC requires a private profile and exact independent owner authority')
+        from .gateway_irc_profile import build
+        return build(credentials,**irc_context)
     if platform=='homeassistant':
         if not isinstance(homeassistant_context,dict) or set(homeassistant_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('prepared Home Assistant requires a private profile and exact independent owner authority')

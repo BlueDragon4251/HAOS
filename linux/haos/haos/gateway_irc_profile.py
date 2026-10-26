@@ -64,15 +64,19 @@ def build(value,parent,connector,policy,inbox):
             adapter=install_ingress(durable_adapter(context.entry.adapter_factory(PlatformConfig(enabled=True,extra=value))))
             adapter._haos_native=SimpleNamespace(connector=connector,policy=current,inbox=inbox)
             boundary=install_transport(adapter,value)
+            publisher=None
+            if any('read' in binding['capabilities'] for binding in current().bindings.values() if binding['connector']==connector):
+                from .gateway_irc_delivery import Publisher
+                publisher=Publisher(adapter)
         # Nick/channel/owner epochs are not new server accounts.
         credential_scope=digest([connector,server,value.get('server_password',''),
             value.get('sasl_username',''),value.get('sasl_password','')])
         identity=digest([credential_scope,authority])
-        return _install(adapter,boundary,fd,profile,values,identity,credential_scope)
+        return _install(adapter,boundary,fd,profile,values,identity,credential_scope,publisher)
     except BaseException:os.close(fd);raise
 
 
-def _install(adapter,boundary,fd,profile,values,identity,credential_scope):
+def _install(adapter,boundary,fd,profile,values,identity,credential_scope,publisher):
     from .gateway_matrix_profile import scope
     db=adapter._haos_native.inbox.db
     connector=adapter._haos_native.connector
@@ -92,6 +96,7 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope):
         'next_attempt=MAX(next_attempt,?),gap_since=CASE WHEN gap_since=0 THEN ? ELSE MIN(gap_since,?) END WHERE identity=?',
         (blocked,'authentication-refused',deadline,gap,gap,identity))
     adapter._haos_irc_profile=profile
+    adapter._haos_irc_publisher=publisher
     adapter._haos_irc_worker=None;adapter._haos_irc_replay=None
     adapter._haos_irc_closed=False;adapter._haos_irc_connect_task=None
     adapter._haos_irc_retry_steps=(5,10,30,60)
@@ -180,12 +185,15 @@ def _install(adapter,boundary,fd,profile,values,identity,credential_scope):
                 task.cancel();await asyncio.gather(task,return_exceptions=True)
             try:await disconnect(self)
             finally:
-                boundary.closed=True
                 try:
-                    row=health(self)
-                    if row['status'] not in {'authentication-refused','revoked'}:
-                        status('closed',max(0,row['next_attempt']-time.time()))
-                finally:os.close(fd)
+                    if publisher is not None:await publisher.close()
+                finally:
+                    boundary.closed=True
+                    try:
+                        row=health(self)
+                        if row['status'] not in {'authentication-refused','revoked'}:
+                            status('closed',max(0,row['next_attempt']-time.time()))
+                    finally:os.close(fd)
 
     def no_global_status(self,*_args,**_kwargs):return None
     for name,method in {'connect':connect,'disconnect':disconnect,'close_profile':close,'irc_status':health,

@@ -18,9 +18,12 @@ def main():
     from haos.gateway_irc_ingress import PreparedIRCPolicy
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
-    from haos.gateway_runtime import adapter_envelope,maintain
+    from haos.gateway_runtime import adapter_envelope,maintain,delivery_metadata,build_adapter
+    from haos.gateway_delivery import delivery_result
+    from haos.gateway_irc_ingress import REQUIRED_CAPS
+    from haos.gateway_irc_witness import DELIVERY_CAPS
     from haos.redaction import Redactor
-    from haos.gateway import GatewayEngine
+    from haos.gateway import GatewayEngine,digest
     from haos.store import MissionStore
     from haos.gateway_raw_recovery import retry_irc_auth,unresolved
     cases=[]
@@ -70,17 +73,23 @@ def main():
                 if mode=='hang':await reader.read();return
                 if mode=='auth_refused':await put(':server 464 '+nick+' :access refused\r\n');await reader.read();return
                 if mode=='rate_limited':await put(':server 263 '+nick+' CAP :try later\r\n');await reader.read();return
-                await put(':server CAP '+nick+' LS :account-tag message-tags server-time\r\n')
-                assert await get()=='CAP REQ :account-tag message-tags server-time'
-                await put(':server CAP '+nick+' ACK :account-tag message-tags server-time\r\n')
+                caps=' '.join(sorted(REQUIRED_CAPS if mode=='incoming_only' else REQUIRED_CAPS|DELIVERY_CAPS))
+                await put(':server CAP '+nick+' LS :'+caps+'\r\n')
+                assert await get()=='CAP REQ :'+caps
+                await put(':server CAP '+nick+' ACK :'+caps+'\r\n')
                 assert await get()=='CAP END'
                 await put(':server 001 '+nick+' :welcome\r\n');assert await get()=='JOIN #haos'
                 await put(':'+nick+'!bot@host JOIN :#haos\r\n')
-                if mode=='good':
+                if mode in {'good','incoming_only'}:
                     state['message']+=1;stamp=datetime.now(timezone.utc).isoformat()
                     await put(f'@account=owner-account;time={stamp};msgid=profile_{state["message"]} :arbitrary-nick!user@host PRIVMSG #haos :{nick}: retained owner request\r\n')
                     if state.get('one_message'):state['mode']='idle'
-                await reader.read()
+                while True:
+                    outgoing=await get();tags,core=outgoing.split(' ',1)
+                    assert tags.startswith('@label=haos_') and core.startswith('PRIVMSG #haos :')
+                    label=tags.split('=',1)[1];body=core.split(' :',1)[1]
+                    state['sent']=state.get('sent',0)+1;stamp=datetime.now(timezone.utc).isoformat()
+                    await put(f'@label={label};account=*;time={stamp};msgid=accepted_{state["sent"]} :{nick}!bot@server PRIVMSG #haos :{body}\r\n')
             except (ConnectionError,asyncio.IncompleteReadError,asyncio.TimeoutError):pass
             finally:
                 writer.close()
@@ -89,7 +98,7 @@ def main():
                 state['writers'].discard(writer);state['tasks'].discard(asyncio.current_task())
         listener=await asyncio.start_server(server,'127.0.0.1',0,ssl=tls);port=listener.sockets[0].getsockname()[1]
         def build():
-            adapter=profile.build(value,parent,'irc',policy,native);adapters.append(adapter)
+            adapter=build_adapter('irc',value,irc_context={'parent':parent,'connector':'irc','policy':policy,'inbox':native});adapters.append(adapter)
             boundary=adapter._haos_irc_transport;boundary._handshake_seconds=2
             async def open_local(host,remote_port,**kwargs):
                 assert (host,remote_port)==('irc.fixture.invalid',6697)
@@ -107,6 +116,14 @@ def main():
             async with asyncio.timeout(4):
                 while not predicate():await asyncio.sleep(.01)
         try:
+            try:build_adapter('irc',value)
+            except ValueError:pass
+            else:raise AssertionError('IRC shared factory bypassed its independent private profile')
+            try:build_adapter('irc',value,irc_context={'parent':parent,'connector':'irc','policy':policy,'inbox':native,'plugin':'unapproved'})
+            except ValueError:pass
+            else:raise AssertionError('IRC factory admitted arbitrary caller extension')
+            assert state['connections']==0
+            cases.append('shared_factory_requires_exact_private_context_and_never_enables_unknown_plugin_hooks')
             adapter=build()
             assert adapter._haos_irc_profile!=home and marker.read_text()=='private unrelated owner state'
             assert adapter.server=='irc.fixture.invalid' and adapter.use_tls is True
@@ -130,6 +147,12 @@ def main():
             assert await adapter.connect()
             delivery=engine.next_delivery(policy(),ready_connectors=['irc'] if adapter.is_connected else [])
             assert delivery['attempt']==1 and delivery['connector']=='irc'
+            receipt=await adapter.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],metadata=delivery_metadata(delivery,'irc'))
+            assert delivery_result(receipt)['status']=='delivered' and receipt.raw_response['recipient_receipt_verified'] is False
+            engine.acknowledge(policy(),delivery['id'],{**delivery_result(receipt),'attempt':delivery['attempt']})
+            assert tuple(store.db.execute('SELECT state,attempt FROM gateway_outbox').fetchone())==('delivered',1)
+            assert state['sent']>0
+            cases.append('actual_registered_private_factory_mission_outbox_native_send_correlated_echo_and_durable_ack')
             store.close()
             cases.append('actual_tls_profile_readiness_preserves_reopened_mission_outbox_offline_and_first_online_attempt')
             before_connections=state['connections'];before_accepted=len(accepted)
@@ -212,6 +235,25 @@ def main():
             assert connecting.done() and adapter._haos_irc_worker is None and adapter._haos_irc_transport.writer is None
             replacement=build();await replacement.close_profile()
             cases.append('close_during_real_tls_handshake_cancels_connect_and_releases_kernel_lease')
+            state['mode']='idle';adapter=build();assert await adapter.connect()
+            before_sent=state.get('sent',0);binding=config['bindings'][0];outbox=digest(['closing',state['connections']])
+            metadata={'haos_scope':binding['scope'],'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},
+                'haos_delivery_id':outbox,'haos_delivery_attempt':1,'notify':True}
+            sending=asyncio.create_task(adapter.send('#haos','🦊'*300,metadata=metadata))
+            await until(lambda:state.get('sent',0)>before_sent)
+            await adapter.close_profile();await asyncio.gather(sending,return_exceptions=True)
+            assert sending.done() and adapter._haos_irc_publisher.closed and not adapter._haos_irc_publisher.active
+            assert native.db.execute('SELECT state FROM irc_delivery_intents WHERE delivery_id=?',(outbox,)).fetchone()[0]=='uncertain'
+            assert state['sent']==before_sent+1 and adapter._haos_irc_transport.writer is None
+            cases.append('private_profile_close_joins_actual_active_native_send_and_preserves_partial_intent_without_extra_chunk')
+            config['bindings'][0].update(capabilities=['create'],generation='e'*64,since=int(time.time()*1000))
+            state['mode']='incoming_only';state['one_message']=False;adapter=build();before=len(accepted)
+            assert adapter._haos_irc_publisher is None and adapter._haos_irc_transport.required==REQUIRED_CAPS
+            assert await adapter.connect();await until(lambda:len(accepted)>before)
+            try:await adapter.send('#haos','unapproved reply',metadata={})
+            except PermissionError:pass
+            else:raise AssertionError('creation-only IRC profile gained a sender')
+            await adapter.close_profile();cases.append('creation_only_profile_receives_with_original_caps_and_never_gains_outbound_authority')
         finally:
             for adapter in adapters:await adapter.close_profile()
             for writer in list(state['writers']):writer.close()

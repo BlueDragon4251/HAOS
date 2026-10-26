@@ -1191,3 +1191,22 @@ The implementation checks the immutable reference at IRCv3 specifications commit
 IRC factory/profile sender wiring, complete recovery metadata and owner CLI/GUI
 remain unfinished. IRC is still publicly disabled, and no external message,
 account, recipient, installed/boot or release acceptance is claimed.
+
+### Prepared IRC shared factory and profile sender lifecycle (2026-10-26)
+
+The shared factory now accepts IRC only with the exact private parent/connector/
+policy/inbox context. Public GatewayPolicy and owner setup still reject IRC.
+The registered private profile constructs the reviewed sender only for read
+bindings, negotiates its additional capabilities before connection, and owns its
+shutdown. Creation-only profiles retain the original incoming capabilities and
+no sender. Closing a profile cancels and joins active native sends before closing
+the journal/lease, preserving uncertain partial intent without another chunk.
+
+Twenty real profile/TLS/kernel/SQLite cases now pass. The actual registered
+factory continues from authenticated input through a real mission outbox, native
+send, matching server echo and durable acknowledgment. Scope-less/arbitrary
+factory contexts fail before network IO; creation-only and active-shutdown cases
+are explicit. Both runtime suites remain 1264 tests/two existing skips. Shared
+factory regressions retain HA 33, ntfy 23 and Matrix 23 native profile cases.
+Server echo still does not prove recipient delivery; no public eighth gateway,
+external account/message or installed/boot acceptance is claimed.
