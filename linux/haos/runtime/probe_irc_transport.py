@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Actual local TLS, IRCv3 handshake, native codec and private SQLite fixtures."""
 import asyncio
+import base64
 from datetime import datetime,timezone,timedelta
 import json
 import os
@@ -54,7 +55,9 @@ def main():
             async def put(value):writer.write(value.encode() if isinstance(value,str) else value);await writer.drain()
             async def get():
                 value=(await asyncio.wait_for(reader.readuntil(b'\r\n'),2)).decode().strip()
-                state['commands'].append('<private PASS>' if value.startswith('PASS ') else value);return value
+                redacted=('<private PASS>' if value.startswith('PASS ') else '<private SASL payload>'
+                    if value.startswith('AUTHENTICATE ') and value not in {'AUTHENTICATE PLAIN','AUTHENTICATE +'} else value)
+                state['commands'].append(redacted);return value
             try:
                 assert await get()=='CAP LS 302'
                 line=await get()
@@ -72,12 +75,37 @@ def main():
                 elif mode=='timeout':await asyncio.sleep(3)
                 else:
                     await put(':server CAP haos-bot LS * :account-tag server-time\r\n')
-                    await put(':server CAP haos-bot LS :message-tags\r\n')
-                    assert await get()=='CAP REQ :account-tag message-tags server-time'
+                    sasl=mode.startswith('sasl_')
+                    offered=(' sasl=EXTERNAL' if mode=='sasl_missing_mechanism' else ' sasl=PLAIN,EXTERNAL') if sasl and mode!='sasl_no_capability' else ''
+                    await put(':server CAP haos-bot LS :message-tags'+offered+'\r\n')
+                    requested='account-tag message-tags'+(' sasl' if sasl else '')+' server-time'
+                    assert await get()=='CAP REQ :'+requested
                     if mode=='cap_nak':await put(':server CAP haos-bot NAK :account-tag message-tags server-time\r\n')
                     elif mode=='partial_ack':await put(':server CAP haos-bot ACK :account-tag server-time\r\n')
                     else:
-                        await put(':server CAP haos-bot ACK :account-tag message-tags server-time\r\n')
+                        await put(':server CAP haos-bot ACK :'+requested+'\r\n')
+                        if sasl:
+                            assert await get()=='AUTHENTICATE PLAIN'
+                            if mode=='sasl_early_registration':
+                                await put(':server 001 haos-bot :premature registration\r\n');await reader.read();return
+                            await put('AUTHENTICATE '+('unexpected' if mode=='sasl_wrong_challenge' else '+')+'\r\n')
+                            if mode=='sasl_wrong_challenge':await reader.read();return
+                            chunks=[]
+                            while True:
+                                auth=await get();assert auth.startswith('AUTHENTICATE ')
+                                chunk=auth.split(' ',1)[1];assert len(chunk)<=400
+                                if chunk!='+':chunks.append(chunk)
+                                if len(chunk)<400:break
+                            decoded=base64.b64decode(''.join(chunks),validate=True)
+                            assert decoded==('bot-account\0bot-account\0'+sasl_password(mode)).encode()
+                            if mode=='sasl_exact_chunk':assert chunks and len(chunks[-1])==400 and chunk=='+'
+                            if mode=='sasl_chunked':assert len(chunks)>1
+                            if mode=='sasl_refused':
+                                await put(':server 904 haos-bot :SASL refused\r\n');await reader.read();return
+                            if mode!='sasl_missing_account_confirmation':
+                                account='other-account' if mode=='sasl_wrong_account' else 'bot-account'
+                                await put(':server 900 haos-bot haos-bot!user@host '+account+' :logged in\r\n')
+                            await put(':server 903 haos-bot :SASL success\r\n')
                         assert await get()=='CAP END'
                         await put(':server 001 '+('other-bot' if mode=='changed_nickname' else 'haos-bot')+' :welcome\r\n')
                         if mode!='changed_nickname':
@@ -93,6 +121,7 @@ def main():
                             elif mode=='kick':await put(':server KICK #haos haos-bot :removed\r\n')
                             elif mode=='part':await put(':haos-bot!bot@server PART #haos :left\r\n')
                             elif mode=='nick_change':await put(':haos-bot!bot@server NICK :unexpected\r\n')
+                            elif mode=='sasl_live_logout':await put(':server 901 haos-bot haos-bot!user@host :logged out\r\n')
                 await reader.read()
             except (ConnectionError,asyncio.IncompleteReadError,asyncio.TimeoutError):pass
             finally:
@@ -103,6 +132,7 @@ def main():
         listener=await asyncio.start_server(server,'127.0.0.1',0,ssl=tls)
         port=listener.sockets[0].getsockname()[1]
         resources=[]
+        def sasl_password(mode):return 'x'*276 if mode=='sasl_exact_chunk' else 'y'*900 if mode=='sasl_chunked' else 'disposable-private-sasl-password'
         def build(mode):
             state['mode']=mode;state['commands']=[];counter[0]+=1
             home=directory/str(counter[0]);home.mkdir(mode=0o700)
@@ -113,6 +143,7 @@ def main():
             native=NativeInbox(home/'native.db',Redactor());relay=RelayInbox(home/'relay.db',Redactor())
             value={'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}
             if mode=='server_password':value['server_password']='disposable-private-server-password'
+            if mode.startswith('sasl_'):value.update(sasl_username='bot-account',sasl_password=sasl_password(mode))
             adapter=ingress(durable_adapter(IRCAdapter(PlatformConfig(enabled=True,extra=value))))
             adapter._haos_native=SimpleNamespace(connector='irc',policy=policy,inbox=native)
             accepted=[]
@@ -179,13 +210,35 @@ def main():
             boundary._open=wrong_hostname
             await refused(boundary.connect)
             assert not accepted and boundary.writer is None
+            assert not state['commands']
             cases.append('real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames')
             boundary,adapter,config,accepted=build('eof')
             os.environ.pop('SSL_CERT_FILE',None)
             await refused(boundary.connect)
             assert not accepted and boundary.writer is None
+            assert not state['commands']
             cases.append('real_tls_untrusted_ca_refused_before_irc_credentials_or_frames')
             os.environ['SSL_CERT_FILE']=str(ca_path)
+            boundary,adapter,config,accepted=build('sasl_live_logout');assert await boundary.connect()
+            await refused(boundary.receive)
+            assert boundary.status=='authentication-refused' and not accepted and boundary.writer is None
+            before=list(state['commands']);await refused(boundary.connect);assert state['commands']==before
+            cases.append('actual_tls_sasl_logout_closes_socket_and_refuses_implicit_reauthentication')
+            for mode in ['sasl_good','sasl_chunked','sasl_exact_chunk']:
+                boundary,adapter,config,accepted=build(mode);assert await boundary.connect()
+                assert boundary._sasl_stage=='complete' and '<private SASL payload>' in state['commands']
+                assert not any(sasl_password(mode) in x for x in state['commands'])
+                await refused(lambda:boundary.write('AUTHENTICATE PLAIN'))
+                await boundary.disconnect();cases.append('actual_tls_'+mode+'_private_account_authenticated_before_registration')
+            for mode in ['sasl_refused','sasl_wrong_account','sasl_missing_account_confirmation','sasl_wrong_challenge',
+                    'sasl_missing_mechanism','sasl_no_capability','sasl_early_registration']:
+                boundary,adapter,config,accepted=build(mode);await refused(boundary.connect)
+                assert not accepted and not boundary.confirmed and boundary.writer is None
+                assert 'CAP END' not in state['commands'] and not any(x.startswith('JOIN ') for x in state['commands'])
+                if mode in {'sasl_refused','sasl_wrong_account','sasl_missing_account_confirmation','sasl_wrong_challenge','sasl_missing_mechanism'}:
+                    assert boundary.status=='authentication-refused'
+                    before=list(state['commands']);await refused(boundary.connect);assert state['commands']==before
+                cases.append('actual_tls_'+mode+'_never_authorizes_registration_or_messages')
             boundary,adapter,config,accepted=build('eof');adapter.use_tls=False
             await refused(boundary.connect);assert boundary.writer is None
             cases.append('native_plaintext_configuration_refused_before_connection')

@@ -45,3 +45,17 @@ def test_private_irc_credentials_refuse_protocol_injection_and_unreviewed_auth(c
     from haos.gateway_irc_transport import credentials
     with pytest.raises(ValueError):credentials({'server':'irc.fixture.invalid','port':6697,
         'nickname':'haos-bot','channel':'#haos',**change})
+
+
+@pytest.mark.parametrize('options',[{'sasl_username':'bot-account'}, {'sasl_password':'private-fixture'},
+    {'sasl_username':True,'sasl_password':'private-fixture'},
+    {'sasl_username':'*','sasl_password':'private-fixture'},
+    {'sasl_username':'bot-account','sasl_password':False},
+    {'sasl_username':'bot-account','sasl_password':'private\0fixture'},
+    {'sasl_username':'bot-account','sasl_password':'private\r\nfixture'},
+    {'sasl_username':'bot-account','sasl_password':'x'*4097},
+    {'sasl_username':'bot-account','sasl_password':'😀'*1025}])
+def test_private_irc_sasl_requires_paired_bounded_account_credentials(options):
+    from haos.gateway_irc_transport import credentials
+    with pytest.raises(ValueError):credentials({'server':'irc.fixture.invalid','port':6697,
+        'nickname':'haos-bot','channel':'#haos',**options})

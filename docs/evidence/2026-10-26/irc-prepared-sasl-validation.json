@@ -1,0 +1,71 @@
+{
+  "parent_commit": "49d924d567e8105380a7e3e6d6887b488bcd9d81",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_transport.py",
+      "sha256": "4f7a0102521f6fdda05356b1fd03ebc5f6ad383f5166572580bf3b6eb0e6da69"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_transport.py",
+      "sha256": "b65d90045c26121ec612b28a18dea44c834425ae945ad85f0fb54daa84706420"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_ingress.py",
+      "sha256": "b285fdf86cc385ce295a8371432bb81a47ff162c7cc5f34b8842853530a1d0ac"
+    }
+  ],
+  "fixture": {
+    "passed": 41,
+    "cases": [
+      "actual_verified_tls_multiline_cap_negotiation_join_keepalive_and_native_account_admission",
+      "raw_and_native_standalone_send_remain_denied_before_outbox_implementation",
+      "owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input",
+      "actual_tls_early_registration_never_admits_messages",
+      "actual_tls_no_account_capability_never_admits_messages",
+      "actual_tls_eof_never_admits_messages",
+      "actual_tls_oversized_never_admits_messages",
+      "actual_tls_bad_utf8_never_admits_messages",
+      "actual_tls_incomplete_frame_never_admits_messages",
+      "actual_tls_timeout_never_admits_messages",
+      "actual_tls_cap_nak_never_admits_messages",
+      "actual_tls_partial_ack_never_admits_messages",
+      "actual_tls_changed_nickname_never_admits_messages",
+      "actual_tls_wrong_join_never_admits_messages",
+      "actual_tls_cap_loss_closes_confirmed_subscription",
+      "actual_tls_live_eof_closes_confirmed_subscription",
+      "actual_tls_kick_closes_confirmed_subscription",
+      "actual_tls_part_closes_confirmed_subscription",
+      "actual_tls_nick_change_closes_confirmed_subscription",
+      "private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log",
+      "live_private_server_mutation_revokes_actual_tls_connection",
+      "live_private_port_mutation_revokes_actual_tls_connection",
+      "live_private_channel_mutation_revokes_actual_tls_connection",
+      "live_private_use_tls_mutation_revokes_actual_tls_connection",
+      "live_private_server_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickserv_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickname_mutation_revokes_actual_tls_connection",
+      "real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames",
+      "real_tls_untrusted_ca_refused_before_irc_credentials_or_frames",
+      "actual_tls_sasl_logout_closes_socket_and_refuses_implicit_reauthentication",
+      "actual_tls_sasl_good_private_account_authenticated_before_registration",
+      "actual_tls_sasl_chunked_private_account_authenticated_before_registration",
+      "actual_tls_sasl_exact_chunk_private_account_authenticated_before_registration",
+      "actual_tls_sasl_refused_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_wrong_account_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_missing_account_confirmation_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_wrong_challenge_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_missing_mechanism_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_no_capability_never_authorizes_registration_or_messages",
+      "actual_tls_sasl_early_registration_never_authorizes_registration_or_messages",
+      "native_plaintext_configuration_refused_before_connection"
+    ],
+    "actual_local_tls_ircv3_and_pinned_native_codec": true,
+    "fixture_only_loopback_destination_and_disposable_ca": true,
+    "public_gateway_enabled": false,
+    "live_server_account_nickserv_sasl_delivery_or_installed_acceptance": false
+  },
+  "minimal_and_full_python311": "1237 passed, 2 existing skips",
+  "local_root_only_backup_exclusion_unchanged": true,
+  "public_gateway_enabled": false,
+  "external_account_or_installed_acceptance": false
+}

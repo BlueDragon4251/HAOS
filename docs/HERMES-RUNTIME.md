@@ -1039,3 +1039,25 @@ is still required. Persistent profile/reconnect/rate-limit status, delivery,
 public owner setup and GUI remain unfinished, so IRC is not an eighth public
 text gateway. These are local TLS/codec contracts, not an external IRC account,
 service-authentication, installed or release acceptance.
+
+### Prepared IRC SASL account authentication (2026-10-26)
+
+Optional paired `sasl_username`/`sasl_password` credentials now negotiate SASL
+PLAIN strictly over the verified TLS transport. The capability offer must include
+SASL and, when advertised, PLAIN. An expected challenge precedes payload delivery;
+400-character base64 chunks and the required terminal `+` for exact multiples
+follow IRCv3 framing. Registration waits for both an exact expected account in
+numeric 900 and SASL completion 903. Unexpected challenges, a different account,
+missing account confirmation, unavailable mechanisms and premature registration
+never reach JOIN or input admission. Authentication refusal and live logout close
+the connection and latch refusal for that boundary, preventing implicit retries.
+NickServ nickname password delivery stays disabled; SASL does not authorize any
+new incoming account or expose a public gateway.
+
+The actual local TLS transport probe expands from 30 to 41 cases, retaining all
+earlier assertions and adding positive short/chunked/exact-boundary authentication,
+negative protocol/account cases and live logout. Private payloads are redacted in
+the fixture's command journal. Full and minimal Python 3.11 suites each pass 1237
+tests with two existing skips. Durable profile/reconnect/auth-recheck status,
+outbox witnesses/recovery and public owner setup remain unfinished. No external
+IRC service/account or installed acceptance is inferred from these fixtures.
