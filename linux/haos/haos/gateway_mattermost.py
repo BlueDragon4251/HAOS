@@ -5,6 +5,7 @@ import json
 import re
 from types import MethodType
 from urllib.parse import urlsplit
+from .gateway_retry import retry_after
 
 _ID = re.compile(r'[a-z0-9]{26}\Z')
 _SENDING = ContextVar('haos_mattermost_send', default=None)
@@ -90,15 +91,13 @@ def install_api(adapter, allow_read):
                 if method == 'POST':
                     self._last_post_status = response.status
                     route['statuses'].append(response.status)
-                    try: route['retry_after'] = min(86400,max(1,float(response.headers.get('Retry-After','5'))))
-                    except ValueError: route['retry_after'] = 5
+                    route['retry_after']=retry_after(response.headers.get('Retry-After'),private_values=[self._token])
                     if response.status >= 500:
                         route['ambiguous'] = True
                 # Never log vendor bodies, tokens or untrusted exception text.
                 if not 200 <= response.status < 300:
                     if method == 'GET':
-                        try: delay = min(86400,max(1,float(response.headers.get('Retry-After','5'))))
-                        except ValueError: delay = 5
+                        delay=retry_after(response.headers.get('Retry-After'),private_values=[self._token])
                         _READ_ERROR.set((response.status,delay))
                     return {}
                 data = bytearray()

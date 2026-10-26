@@ -3,8 +3,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 import hashlib
 import json
-import math
 from types import MethodType
+from .gateway_retry import retry_after
 
 from .gateway import digest
 from .gateway_ntfy import _EVENT, _TOPIC, credential_token
@@ -67,9 +67,7 @@ class Publisher:
             async with self.client.stream('POST', self._target+'/'+self.topic, content=content,
                     headers={**headers, 'Accept-Encoding': 'identity'}) as response:
                 route['status'] = response.status_code
-                try: delay = float(response.headers.get('Retry-After', '5'))
-                except ValueError: delay = 5
-                route['retry_after'] = min(86400, max(1, delay)) if math.isfinite(delay) else 5
+                route['retry_after']=retry_after(response.headers.get('Retry-After'),private_values=[self.adapter._token])
                 if 200 <= response.status_code < 300:
                     body = bytearray()
                     async for chunk in response.aiter_raw():

@@ -2,6 +2,7 @@
 """Actual pinned ntfy send codec over loopback HTTP; no external publication."""
 import asyncio
 import base64
+from email.utils import formatdate
 import io
 import json
 import logging
@@ -50,7 +51,7 @@ def main():
             assert request.headers['X-Tags']=='hermes-agent' and len(body)<=4096
             assert request.path=='/private'
             code=429 if state['rate_after'] and len(state['requests'])>1 else state['status']
-            if code!=200: return web.Response(status=code,text=adapter._token,headers={'Retry-After':'19','Location':'/leak'})
+            if code!=200: return web.Response(status=code,text=adapter._token,headers={'Retry-After':state.get('retry_after','19'),'Location':'/leak'})
             proof={'event':'message','id':'receipt'+str(state['index']),'topic':'private','time':int(time.time())}
             if state['revoke']: config['bindings']=[]
             if state.get('mutate_grant'): config['bindings'][0]['generation']='b'*64
@@ -87,7 +88,12 @@ def main():
                 if code==429: assert result['retry_after']==19
                 assert token not in logs.getvalue()
                 cases.append('actual_native_http_conservative_single_attempt_'+str(code))
-            state['status']=200
+            state['status']=429;state['retry_after']=formatdate(time.time()+3600,usegmt=True);state['requests']=[]
+            result=delivery_result(await publisher.send(binding,'server date limited reply'))
+            assert result['status']=='retry' and 3598<=result['retry_after']<=3600
+            assert len(state['requests'])==1
+            cases.append('actual_native_http_date_retry_after_defers_single_unpublished_reply')
+            state['retry_after']='19';state['status']=200
             for mode in ['missing','wrong-topic','malformed','oversize','lost','credential-id']:
                 state['requests']=[]; state['mode']=mode
                 result=delivery_result(await publisher.send(binding,'unclear outcome'))

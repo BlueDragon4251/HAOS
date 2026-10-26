@@ -2,6 +2,7 @@
 """Native Mattermost REST history with real HTTP/SQLite crash and authority boundaries."""
 import asyncio
 from copy import deepcopy
+from email.utils import formatdate
 import json
 import os
 from pathlib import Path
@@ -43,7 +44,7 @@ def main():
             if path.endswith('/channels/'+chat):return web.json_response({'id':chat,'team_id':team,'type':'O'})
             if path.endswith('/users/'+user):return web.json_response({'id':user,'is_bot':False})
             assert path.endswith('/channels/'+chat+'/posts') and request.query['per_page']=='100'
-            if state['status']!=200:return web.json_response({'message':'fixture refusal'},status=state['status'],headers={'Retry-After':'17'})
+            if state['status']!=200:return web.json_response({'message':'fixture refusal'},status=state['status'],headers={'Retry-After':state.get('retry_after','17')})
             if state['revoke']:config['bindings'][0]['generation']='d'*64
             ordered=sorted(state['posts'],key=lambda p:p['create_at'],reverse=True)
             before=request.query.get('before')
@@ -142,7 +143,18 @@ def main():
                     assert row['status']==kind
                     if status==429:assert row['next_attempt']==clock+17
                     cases.append('actual_http_'+kind+'_is_persisted')
-                state['status']=200;state['malformed']=True
+                state['status']=429;state['retry_after']=formatdate(time.time()+3600,usegmt=True)
+                try:await step()
+                except APIError as error:assert error.status==429
+                else:raise AssertionError('dated history rate limit unexpectedly succeeded')
+                row=dict(native.db.execute('SELECT * FROM mattermost_history').fetchone())
+                assert row['status']=='rate-limited' and 3598<=row['next_attempt']-clock<=3600
+                calls=len(state['calls']);native.close();native=NativeInbox(directory/'native.db',Redactor([token]))
+                adapter._haos_native.inbox=native;del adapter._haos_mm_history_after
+                assert await recover_one(adapter,current,'bot',now=clock+1)==0 and len(state['calls'])==calls
+                cases.append('actual_http_date_history_deadline_survives_sqlite_reopen_without_early_get')
+                clock=row['next_attempt']+1  # Advance only the fixture's explicit recovery clock.
+                state['retry_after']='17';state['status']=200;state['malformed']=True
                 before=dict(native.db.execute('SELECT * FROM mattermost_history').fetchone())
                 try:await step()
                 except ValueError:pass

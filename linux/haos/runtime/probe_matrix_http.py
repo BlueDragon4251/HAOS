@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Actual immutable Matrix client encoding through an isolated bounded HTTP boundary."""
 import asyncio
+from email.utils import formatdate
 import json
 from pathlib import Path
 import sys
+import time
 
 
 def main():
@@ -17,13 +19,14 @@ def main():
     cases=[]
     async def exercise():
         user='@haos:owner.invalid';device='LOCAL';room='!approved:owner.invalid';token='disposable-local-private-token'
-        state={'calls':[],'leaked':0,'status':200,'bad':False,'large':False,'approve_write':False}
+        state={'calls':[],'leaked':0,'status':200,'bad':False,'large':False,'approve_write':False,'retry_ms':19000,'retry_after':'19'}
         async def api(request):
             state['calls'].append((request.method,request.path))
             assert request.headers.get('Authorization')=='Bearer '+token
             if state['status']==302:return web.Response(status=302,headers={'Location':'/leak'})
             if state['status']!=200:return web.json_response({'errcode':'M_UNKNOWN_TOKEN' if state['status']==401 else 'M_LIMIT_EXCEEDED' if state['status']==429 else 'M_UNKNOWN',
-                'error':token,'retry_after_ms':19000},status=state['status'])
+                'error':token,**({'retry_after_ms':state['retry_ms']} if state['retry_ms'] is not None else {})},
+                status=state['status'],headers={'Retry-After':state['retry_after']})
             if state['bad']:return web.Response(text='{invalid')
             if state['large']:return web.Response(body=b' '*(8*1024*1024+1))
             if request.path.endswith('/account/whoami'):return web.json_response({'user_id':user,'device_id':device})
@@ -88,6 +91,16 @@ def main():
                     else:raise AssertionError('native typed refusal was lost')
                     assert len(state['calls'])==before+1 and state['leaked']==0
                     cases.append('bounded_typed_single_request_'+str(status))
+                state['status']=429;state['retry_after']=formatdate(time.time()+3600,usegmt=True)
+                for name,milliseconds in [('native-ms-priority',19000),('missing-native-ms',None),('invalid-native-ms',-1)]:
+                    state['retry_ms']=milliseconds;before=len(state['calls'])
+                    try:await client.sync(timeout=0)
+                    except MLimitExceeded as error:
+                        assert error.retry_after==19 if milliseconds==19000 else 3598<=error.retry_after<=3600
+                    else:raise AssertionError('rate limit unexpectedly accepted')
+                    assert len(state['calls'])==before+1
+                    cases.append('actual_native_retry_after_'+name+'_and_http_date')
+                state['retry_ms']=19000;state['retry_after']='19'
                 state['status']=500;before=len(state['calls'])
                 try:
                     async with asyncio.timeout(2):

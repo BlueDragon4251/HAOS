@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Actual native Mattermost posts classified into reopened real mission outbox states."""
 import asyncio
+from email.utils import formatdate
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 
 
@@ -37,7 +39,7 @@ def main():
             if state['disconnect']:request.transport.close();return web.Response()
             if state['status']==302:return web.Response(status=302,headers={'Location':'/leak'})
             status=403 if state['partial'] and state['posts']==2 else state['status']
-            if status!=201:return web.json_response({'message':'root_id missing invalid post'},status=status,headers={'Retry-After':'19'})
+            if status!=201:return web.json_response({'message':'root_id missing invalid post'},status=status,headers={'Retry-After':state.get('retry_after','19')})
             if state['revoke']:config['bindings'][0]['generation']='d'*64
             return web.json_response({'id':str(state['posts']).zfill(26),'channel_id':'w'*26 if state['wrong'] else chat,
                 'root_id':body.get('root_id','')},status=201)
@@ -77,7 +79,10 @@ def main():
                     result=await run('native_single_post_'+str(status),expected)
                     assert state['posts']==1
                     if status==429:assert result['retry_after']==19
-                state['status']=201;state['wrong']=True
+                state['status']=429;state['posts']=0;state['retry_after']=formatdate(time.time()+3600,usegmt=True)
+                result=await run('native_http_date_retry_after_retains_reopened_pending_outbox','pending')
+                assert state['posts']==1 and 3598<=result['retry_after']<=3600
+                state['retry_after']='19';state['status']=201;state['wrong']=True
                 await run('wrong_route_201_stays_uncertain','uncertain');state['wrong']=False
                 state['disconnect']=True;state['posts']=0
                 await run('lost_http_receipt_stays_uncertain','uncertain');assert state['posts']==1;state['disconnect']=False

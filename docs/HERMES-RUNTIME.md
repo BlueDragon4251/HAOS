@@ -810,3 +810,29 @@ there are no additional CI skips. Exact source hashes and limits are recorded
 in `docs/evidence/2026-10-26/homeassistant-http-date-retry-validation.json`.
 Other gateway transports are not yet switched to this shared parser by this
 change. Home Assistant remains prepared, without public setup or live acceptance.
+
+### Public gateway HTTP-date retry deadlines (2026-10-26)
+
+After `04f96b1b476ec359cfbc0c314d5c96d2b142b3f2`, ntfy subscription/publish,
+Matrix private HTTP and Mattermost read/post also use the shared bounded
+Retry-After parser. Valid native Matrix `retry_after_ms` keeps precedence;
+missing, invalid or negative native values fall back to the checked HTTP header.
+Private credential reflection cannot become public timing metadata. This changes
+timing only: partial/uncertain publication still has no automatic whole-reply retry.
+
+New actual HTTP cases verify ntfy's persisted stream deadline across reopen,
+ntfy single-post deferral, Mattermost reopened pending outbox and history SQLite
+deadline, and Matrix native-millisecond precedence/HTTP-date fallback. The history
+fixture advances only its explicit recovery clock after checking no earlier GET
+can occur; production clocks/deadline logic are unchanged.
+
+Ten affected native probes pass 212 cases: ntfy transport/delivery/profile
+21/33/23; Matrix HTTP/profile/delivery/history 20/23/21/16; Mattermost
+delivery/history/ingress 18/16/21. Full/minimal suites each pass 1190 tests and
+two existing skips with the unchanged local backup-file exclusion. Forty-nine
+actual root/UID/socket/recovery cases pass, without additional CI skips.
+Source hashes, individual case receipts and limits are in
+`docs/evidence/2026-10-26/public-gateway-http-date-retry-validation.json`.
+This is local protocol validation, not actual remote delivery, live TLS/account,
+installed service/boot or artifact release acceptance. Public gateway count
+remains six; Home Assistant remains prepared.

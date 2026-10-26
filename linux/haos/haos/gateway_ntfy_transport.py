@@ -6,6 +6,7 @@ import math
 import time
 
 from .gateway import digest
+from .gateway_retry import retry_after
 from .gateway_ntfy import _EVENT, _TOPIC, capture, dispatch_stored, snapshot, safe_event_id, credential_token
 
 
@@ -111,10 +112,7 @@ class Subscription:
                     if response.status_code == 404:
                         self.status('source-unavailable'); return False
                     if response.status_code == 429:
-                        try: delay = float(response.headers.get('Retry-After', '5'))
-                        except ValueError: delay = 5
-                        if not math.isfinite(delay): delay = 5
-                        self.status('rate-limited', min(86400, max(1, delay))); return False
+                        self.status('rate-limited',retry_after(response.headers.get('Retry-After'),private_values=[self.adapter._token]));return False
                     if response.status_code != 200:
                         self.status('transport-unavailable', 2); return False
                     if response.headers.get('Content-Type', '').split(';')[0].strip() != 'application/x-ndjson':

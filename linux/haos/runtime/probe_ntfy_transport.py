@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real loopback HTTP streaming, pinned ntfy adapter and durable source cursor."""
 import asyncio
+from email.utils import formatdate
 import json
 import os
 from pathlib import Path
@@ -52,7 +53,7 @@ def main():
             assert request.query['poll'] == 'false'
             state['calls'].append(dict(request.query))
             if state['status'] != 200:
-                return web.Response(status=state['status'], text=token, headers={'Retry-After': '19', 'Location': '/leak'})
+                return web.Response(status=state['status'], text=token, headers={'Retry-After':state.get('retry_after','19'),'Location':'/leak'})
             response = web.StreamResponse(headers={'Content-Type': 'application/x-ndjson'})
             await response.prepare(request)
             if state['mode'] == 'stream':
@@ -110,7 +111,15 @@ def main():
                 assert token not in repr(sub.state())
                 await sub.receive_once(); assert len(state['calls'])==before+1
                 cases.append('actual_http_safe_persisted_single_attempt_'+str(code))
-            state['status']=200
+            adapter._token+='date';token=adapter._token;sub=build()
+            state['status']=429;state['retry_after']=formatdate(time.time()+3600,usegmt=True)
+            before=len(state['calls']);await sub.receive_once()
+            assert sub.state()['status']=='rate-limited' and 3597<=sub.state()['next_attempt']-time.time()<=3600
+            await sub.receive_once();assert len(state['calls'])==before+1
+            await sub.close();sub=build();await sub.receive_once()
+            assert len(state['calls'])==before+1
+            cases.append('actual_http_date_retry_deadline_survives_reopen_without_early_stream_request')
+            state['retry_after']='19';state['status']=200
             for mode in ['oversize','duplicate','old','reflected']:
                 adapter._token+='x'; token=adapter._token; sub=build(); state['mode']=mode; await sub.receive_once()
                 assert accepted==['first','second']

@@ -5,6 +5,7 @@ import json
 import math
 from types import MethodType
 from urllib.parse import unquote,urlsplit
+from .gateway_retry import retry_after
 
 
 def homeserver_url(value):
@@ -124,10 +125,8 @@ class HTTPBoundary:
                         error=make_request_error(response.status,'Matrix request refused',code,'Matrix request refused')
                         milliseconds=value.get('retry_after_ms') if isinstance(value,dict) else None
                         delay=milliseconds/1000 if type(milliseconds) in {int,float} else None
-                        if delay is None:
-                            try:delay=float(response.headers.get('Retry-After','5'))
-                            except ValueError:delay=5
-                        if not math.isfinite(delay):delay=5
+                        if delay is None or not math.isfinite(delay) or delay<0:
+                            delay=retry_after(response.headers.get('Retry-After'),private_values=[self.token])
                         error.retry_after=min(86400,max(1,delay))
                         boundary.last_retry_after=error.retry_after
                         raise error
