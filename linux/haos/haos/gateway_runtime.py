@@ -186,7 +186,8 @@ def delivery_metadata(delivery,platform):
 def require_runtime_identity():
     account=pwd.getpwnam('haos-gateway')
     if (account.pw_uid==0 or account.pw_gid==0 or os.geteuid()!=account.pw_uid
-            or os.getegid()!=account.pw_gid or not set(os.getgroups())<={account.pw_gid}):
+            or os.getegid()!=account.pw_gid or set(os.getresuid())!={account.pw_uid}
+            or set(os.getresgid())!={account.pw_gid} or not set(os.getgroups())<={account.pw_gid}):
         raise PermissionError('gateway runtime requires its unprivileged service UID/GID without supplementary authority')
 
 

@@ -1,5 +1,5 @@
 {
-  "parent_commit": "7b37e02e41cf042d5df853d69975704ef0744a12",
+  "parent_commit": "a517c4feb1753604a2f891e9b79682ad67b79218",
   "source_files": [
     {
       "path": "linux/haos/haos/gateway_irc_delivery.py",
@@ -23,7 +23,7 @@
     },
     {
       "path": "linux/haos/haos/gateway_runtime.py",
-      "sha256": "8a2275dde5c3c1b9c6bafecaed02365c4f18a5b9e71db05c057846cad01bb9b8"
+      "sha256": "0377bb149463f69c4868d5a493449fea667f73a99d57b8f2640dba0193898aaa"
     },
     {
       "path": "linux/haos/haos/gateway_setup.py",
@@ -51,7 +51,7 @@
     },
     {
       "path": "linux/haos/probes/test_gateway_recovery_authority.py",
-      "sha256": "c6d53b6002fa336a88c8cc720c3251fa821662e8bdb704a4d1eae34e4194720e"
+      "sha256": "110566c7d3c2b0acc1d38b644e3f163793f00626d94f09a3862fc9362f996346"
     },
     {
       "path": "linux/haos/runtime/probe_irc_ingress.py",
@@ -544,14 +544,16 @@
     "local_exclusion": "linux/haos/tests/test_backup.py"
   },
   "actual_root_uid_credential_recovery": {
-    "passed": 79,
+    "passed": 83,
     "mocked_uid": false,
     "network": "none",
-    "owner_cli_service_stopped_inspection_fixture": true
+    "owner_cli_service_stopped_inspection_fixture": true,
+    "real_effective_saved_uid_gid_and_groups_checked": true
   },
   "public_irc_enabled": true,
   "software_scope": "owner-authorized account-bound IRCv3 channel gateway; pinned adapter has no binary media/voice transfer",
   "ci_for_exact_implementation_commit": "required separately in GitHub checks",
   "external_account_recipient_or_installed_machine_acceptance": false,
-  "iso_container_apk_or_stable_release_accepted": false
+  "iso_container_apk_or_stable_release_accepted": false,
+  "implementation_base_commit": "7b37e02e41cf042d5df853d69975704ef0744a12"
 }

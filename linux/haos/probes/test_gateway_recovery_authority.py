@@ -659,3 +659,27 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','PYTHONDONTWRITEBYTECODE':'1',
             'PYTHONPATH':str(Path(__file__).resolve().parents[1])})
     assert child.returncode==0,child.stderr
+
+
+@pytest.mark.parametrize('uids,gids',[([0,65534,0],[65534]*3),([65534,65534,0],[65534]*3),
+    ([65534]*3,[0,65534,0]),([65534]*3,[65534,65534,0])])
+def test_gateway_runtime_refuses_actual_retained_real_or_saved_root_ids(uid_fixture_path,uids,gids):
+    root=uid_fixture_path;root.chmod(0o755);(root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    code='''
+import asyncio,json,os,pwd,sys
+from haos.gateway_runtime import serve
+request=json.loads(sys.argv[2]);pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setresgid(*request['gids']);os.setresuid(*request['uids'])
+assert list(os.getresuid())==request['uids'] and list(os.getresgid())==request['gids']
+assert os.geteuid()==65534 and os.getegid()==65534 and os.getgroups()==[]
+try:asyncio.run(serve())
+except PermissionError as error:assert 'service UID/GID' in str(error)
+else:raise AssertionError('gateway retained restorable root authority')
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    child=subprocess.run([sys.executable,'-c',code,str(root),json.dumps({'uids':uids,'gids':gids})],text=True,
+        capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','PYTHONDONTWRITEBYTECODE':'1',
+            'PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    assert child.returncode==0,child.stderr

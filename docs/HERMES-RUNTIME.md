@@ -1508,7 +1508,12 @@ Local validation passes both Python 3.11 environments (1,330 tests, two existing
 skips, unchanged local backup-file exception), 151 native IRC cases (37 input,
 54 transport, 21 profile, 39 delivery), 12 IRC GUI cases at both resolutions,
 all existing gateway GUI regressions and both complete embedded GUI workflow
-programs. Actual Root/UID/credential/recovery coverage is 79 cases, plus three
+programs. Actual Root/UID/credential/recovery coverage is 83 cases, plus three
 actual installed-code/UID/TLS/SIGKILL process cases using public GatewayPolicy.
 The exact implementation commit still requires green CI; live server/account,
 recipient and installed-machine acceptance is separate. No final HAOS release.
+
+The final runtime identity guard also requires real, effective and saved UID/GID
+to match the service identity. Four additional actual setresuid/setresgid cases
+reject launchers retaining real or saved root IDs before credentials or SDK
+imports. They pass in the isolated minimal-runtime kernel fixture.
