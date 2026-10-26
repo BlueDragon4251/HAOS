@@ -60,6 +60,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_listener.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-listener-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-delivery-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-delivery-build-probe.json

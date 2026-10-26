@@ -36,6 +36,9 @@ class Publisher:
     def current(self,binding):
         native=self.adapter._haos_native;policy=native.policy()
         if self.closed or self.adapter.channel_access_token!=self.token:raise PermissionError('LINE publisher closed or identity changed')
+        if (getattr(self.adapter,'_haos_line_profile',None) is not None and (not self.adapter.is_connected
+                or self.adapter._haos_line_verified_destination!=binding['scope'])):
+            raise PermissionError('verified connected LINE bot identity required')
         policy.current_binding({'binding_id':binding['id'],'binding_digest':digest(binding)})
         if (binding['connector']!=native.connector or policy.connectors.get(native.connector,{}).get('platform')!='line'
                 or 'read' not in binding['capabilities']):raise PermissionError('current LINE read grant required')

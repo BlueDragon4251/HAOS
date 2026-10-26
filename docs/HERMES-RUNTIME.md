@@ -1371,3 +1371,41 @@ truncation or a bubble exceeding LINE's UTF-16 limit is rejected before dispatch
 It is not yet connected to a public LINE service profile, outbox factory or
 owner setup/recovery. LINE remains publicly disabled; no external message or
 account/installed acceptance is claimed.
+
+### 2026-10-26 — prepared LINE private identity, lease and service profile
+
+The prepared shared factory now requires an exact private LINE context, canonical
+channel credentials, bot destination and unprivileged local port. It registers
+only the pinned bundled adapter under a private HOME and acquires a real private,
+single-link kernel lease. No network is opened at construction. A current timed
+owner grant for that bot is required, and changed grants are refused at every
+incoming admission rather than waiting for the replay worker.
+
+Before binding, the actual pinned `_LineClient.get_bot_user_id` runs through a
+bounded fixed `/v2/bot/info` HTTP boundary with default verified TLS, no redirects,
+proxy inheritance or retries. Only the exact bot destination is accepted. Auth
+and identity refusal persist across profile/owner-epoch reopen; rate-limit
+deadlines survive closure. The prepared profile binds **127.0.0.1 only**. It does
+not provision an externally reachable HTTPS reverse proxy or certificate.
+
+The fixed webhook application and persistent replay worker share the private
+journal and current owner authority. Creation-only grants create no publisher.
+Read-capable profiles cannot send before a verified connected bot identity; their
+actual native push path requires exact current Root outbox metadata. Publisher
+and replay access are serialized. Disconnect/close joins workers and releases
+listener, sessions and kernel lease. Revocation stops the idle listener.
+
+Twenty actual native-profile cases include private paths/lease exclusion,
+no-pairing refusal, native bot lookup, signed input/RelayInbox replay, the common
+factory plus MissionStore/GatewayEngine outbox/native push/server receipt/durable
+acknowledgment, offline zero-attempt preservation, grant-epoch changes, retained
+local failures, auth/identity/throttle persistence, redirect refusal and actual
+listener port conflict/recovery. They run in build and CI. Native ingress 36,
+listener 13 and delivery 25 regressions pass. Full frozen and minimal Python 3.11
+suites each pass 1,307 tests with two existing skips and the unchanged local
+backup-file exception; 71 actual Root/UID/credential/recovery regressions pass.
+These are separate fixture and kernel tests, not an installed LINE acceptance.
+
+Public policy still excludes LINE. Public TLS ingress/certificates, owner
+CLI/GUI, authentication/delivery recovery, media/voice and external account
+acceptance remain incomplete; the public text-gateway count stays eight.

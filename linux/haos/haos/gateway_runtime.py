@@ -64,7 +64,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None):
+    if platform=='line':
+        if not isinstance(line_context,dict) or set(line_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('prepared LINE requires a private profile and exact independent owner authority')
+        from .gateway_line_profile import build
+        return build(credentials,**line_context)
     if platform=='irc':
         if not isinstance(irc_context,dict) or set(irc_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('prepared IRC requires a private profile and exact independent owner authority')
@@ -154,7 +159,7 @@ def credential_redactor(credentials, policy):
     """Register private wire aliases before SDK logging or durable admission."""
     import base64
     secrets=[item[key] for item in credentials['connectors'].values()
-        for key in ('token','app_token','recovery_key','server_password','nickserv_password','sasl_password') if item.get(key)]
+        for key in ('token','app_token','recovery_key','server_password','nickserv_password','sasl_password','channel_secret','channel_access_token') if item.get(key)]
     for name,item in credentials['connectors'].items():
         if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
             secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
@@ -172,8 +177,8 @@ def delivery_metadata(delivery,platform):
         'haos_binding':{key:delivery[key] for key in ('binding_id','binding_digest')}}
     if delivery['thread']:metadata['thread_id']=delivery['thread']
     if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
-    if platform in {'homeassistant','irc'}:metadata['haos_delivery_id']=delivery['id']
-    if platform=='irc':metadata['haos_delivery_attempt']=delivery['attempt']
+    if platform in {'homeassistant','irc','line'}:metadata['haos_delivery_id']=delivery['id']
+    if platform in {'irc','line'}:metadata['haos_delivery_attempt']=delivery['attempt']
     return metadata
 
 
