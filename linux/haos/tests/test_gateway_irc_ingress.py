@@ -31,6 +31,17 @@ def test_irc_prepared_owner_routes_are_exact_accounts_not_nick_or_hostmask(chang
 
 def test_irc_boundary_imports_without_hermes_or_site_packages():
     source=Path(__file__).resolve().parents[1]
-    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress;assert "gateway.config" not in sys.modules'
+    script='import sys;sys.path.insert(0,'+repr(str(source))+');import haos.gateway_irc_ingress,haos.gateway_irc_transport;assert "gateway.config" not in sys.modules'
     result=subprocess.run([sys.executable,'-I','-S','-c',script],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
+
+
+@pytest.mark.parametrize('change',[{'server':'IRC.fixture.invalid'},{'server':'user@irc.fixture.invalid'},
+    {'server':'irc..invalid'},{'port':True},{'port':0},{'port':65536},
+    {'nickname':'bot\nPRIVMSG'},{'nickname':'#channel'},{'channel':'#*'},
+    {'server_password':'secret\r\nPRIVMSG #other :inject'},
+    {'nickserv_password':'private-fixture'},{'use_tls':False}])
+def test_private_irc_credentials_refuse_protocol_injection_and_unreviewed_auth(change):
+    from haos.gateway_irc_transport import credentials
+    with pytest.raises(ValueError):credentials({'server':'irc.fixture.invalid','port':6697,
+        'nickname':'haos-bot','channel':'#haos',**change})

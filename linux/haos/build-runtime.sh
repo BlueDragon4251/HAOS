@@ -57,6 +57,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_homeassistant_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/homeassistant-prepared-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-ingress-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ntfy_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/ntfy-native-transport-build-probe.json

@@ -1011,3 +1011,31 @@ prove a TLS connection or actual server capability negotiation. IRC stays reject
 by public GatewayPolicy and has no public setup. TLS/account-capability negotiation,
 reconnect, delivery/recovery and GUI remain required before enabling it. The
 public text-gateway count remains seven; no live IRC/account test was performed.
+
+### Prepared IRC TLS and capability subscription (2026-10-26)
+
+The prepared transport opens bounded, hostname-verified TLS (system CA trust,
+minimum TLS 1.2), negotiates account-tag/server-time/message-tags before accepting
+registration, and waits for the exact channel join before admitting input. The
+actual pinned IRC codec decodes only retained account-authorized messages.
+Unpaired accounts, missing capabilities, malformed/incomplete/oversized frames,
+registration before capability acknowledgement and changed subscription identity
+fail closed. Idle reads recheck owner authority; withdrawal, local identity
+mutation, capability removal, kick/part/nick changes and EOF close the socket.
+The separately reviewed raw inbox remains the replay authority.
+
+Thirty real local TLS/IRC/SQLite cases include a disposable CA and hostname,
+wrong-hostname and untrusted-CA rejection, multiline capability negotiation,
+PING/PONG, a private server PASS, eight protocol/framing refusal categories and
+seven live private-identity mutation checks. Only fixture destinations and the
+disposable trust anchor change. No certificate verification is disabled.
+Build and provider CI now require the transport probe. Minimal and frozen full
+Python 3.11 suites each pass 1228 tests with two existing skips.
+
+Native sends, standalone fallbacks and application writes remain blocked pending
+reviewed outbox integration. NickServ passwords are explicitly refused rather
+than disclosed to an unauthenticated nickname; a reviewed service/SASL auth path
+is still required. Persistent profile/reconnect/rate-limit status, delivery,
+public owner setup and GUI remain unfinished, so IRC is not an eighth public
+text gateway. These are local TLS/codec contracts, not an external IRC account,
+service-authentication, installed or release acceptance.
