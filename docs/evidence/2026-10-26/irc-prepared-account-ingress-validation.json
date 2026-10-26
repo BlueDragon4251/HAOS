@@ -1,0 +1,69 @@
+{
+  "parent_commit": "1cc43ad69191837cfd884d9e7b0187e02269273e",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_ingress.py",
+      "sha256": "759f04cb2ae5952c6360ed4be1b00416178434743f301c0116b669fc2e26d16b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_ingress.py",
+      "sha256": "807d91ffe64bac4800df39a51a8257dae40882032013075f12d8484f1959acfb"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_ingress.py",
+      "sha256": "b82e9e2aa46daffe090a018e66d3a2f36dc6faa0cbcfd3f11d1d93298cd34a24"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "9cd68f5ffbad0e61d0886a42fd3efa73967d313c113a9df4993fa26d0ef165d3"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "25851c7b9effe171c6e3c9db1f3311f8dbca004f29c9593343ab4c086860a560"
+    }
+  ],
+  "fixture": {
+    "passed": 29,
+    "cases": [
+      "public_owner_policy_still_refuses_unfinished_irc_transport",
+      "actual_pinned_parser_does_not_decode_ircv3_tags_without_reviewed_boundary",
+      "actual_native_codec_after_observable_commit_uses_server_account_not_nickname",
+      "same_server_message_identity_cannot_repeat_mission_admission",
+      "nick_change_does_not_change_authenticated_account_route",
+      "nickname_impersonation_without_account",
+      "client_only_account_tag",
+      "duplicate_account_tag",
+      "missing_server_time",
+      "missing_stable_server_identity",
+      "naive_timestamp",
+      "escaped_account",
+      "wrong_command",
+      "direct_message_not_channel",
+      "unaddressed_channel_text",
+      "ctcp_not_mission",
+      "line_injection",
+      "oversized_frame",
+      "server_prefix_not_person",
+      "unnegotiated_message-tags_denied",
+      "unnegotiated_account-tag_denied",
+      "unnegotiated_server-time_denied",
+      "known_nickname_cannot_authorize_unknown_server_account",
+      "authenticated_account_on_different_server_is_not_same_owner",
+      "before_owner_grant",
+      "future_original_time",
+      "direct_native_callbacks_cannot_bypass_retained_account",
+      "actual_sqlite_reopen_replays_failed_local_admission_without_network",
+      "owner_withdrawal_blocks_retained_native_event"
+    ],
+    "actual_pinned_native_irc_codec_and_sqlite": true,
+    "public_gateway_enabled": false,
+    "network_requested": false,
+    "tls_or_capability_negotiation_accepted": false,
+    "live_account_or_installed_acceptance": false
+  },
+  "minimal_python311": "1216 passed, 2 existing skips",
+  "full_pinned_python311": "1216 passed, 2 existing skips",
+  "local_backup_exclusion_unchanged": true,
+  "public_gateway_enabled": false,
+  "tls_capability_negotiation_external_server_installed_or_release_acceptance": false
+}

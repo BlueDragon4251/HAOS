@@ -991,3 +991,23 @@ Reconnecting therefore cannot authenticate unseen events from the outage;
 `gap_since` stays visible. Retained local events can be replayed subject to current
 HAOS authorization. No remote history, account, external notification, installed
 boot, hardware or final artifact acceptance is claimed by these local tests.
+
+### Prepared IRC account admission (2026-10-26)
+
+The pinned IRC codec strips the prefix down to a nickname and does not parse
+IRCv3 message tags. A nickname allowlist cannot establish an authenticated
+account: another person can reuse a nick. The new prepared boundary requires a
+server account tag, original server timestamp, stable server message ID and an
+exact owner account/channel/server grant before durable admission. Client-only
+account tags, duplicate/escaped identity tags, hostmasks as identities, channel
+wildcards, direct messages and unaddressed channel chatter are refused. Native
+message decoding still runs through the actual pinned adapter after the private
+journal commit; its synthetic nick/time/ID are replaced only within that retained
+context. Reopened local replay checks current grants and cannot repeat admission.
+
+`probe_irc_ingress.py` now runs in runtime build and provider-contract CI. Its 29
+actual codec/SQLite cases supply capability metadata locally; they do **not**
+prove a TLS connection or actual server capability negotiation. IRC stays rejected
+by public GatewayPolicy and has no public setup. TLS/account-capability negotiation,
+reconnect, delivery/recovery and GUI remain required before enabling it. The
+public text-gateway count remains seven; no live IRC/account test was performed.
