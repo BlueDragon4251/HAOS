@@ -1,0 +1,16 @@
+[Unit]
+Description=Private bounded HAOS local speech ingress
+ConditionPathExists=/etc/haos/enabled
+ConditionPathExists=/etc/haos/speech.json
+
+[Socket]
+ListenStream=/run/haos-speech/voice.sock
+SocketUser=root
+SocketGroup=haos-gateway
+SocketMode=0660
+DirectoryMode=0755
+Service=haos-speech.service
+Backlog=8
+
+[Install]
+WantedBy=sockets.target

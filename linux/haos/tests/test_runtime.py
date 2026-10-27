@@ -28,7 +28,7 @@ def dispatch(task, provider, client, kwargs, stream=False):
     return "standard"
 ''')
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
-    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix"],
+    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix", "voice"],
               "security_versions": {"pyjwt": "2.15.1"}}
     for filename, key, root in [("pyproject.toml", "pyproject_sha256", upstream),
                                 ("uv.lock", "uv_lock_sha256", upstream),

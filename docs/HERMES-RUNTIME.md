@@ -1555,3 +1555,20 @@ The new real-backend probe transfers an actual decoded PNG and a byte-identical
 8 MiB document without a model turn. A stdlib-only disposable process probe
 checks real separate UIDs, SO_PEERCRED, private SQLite and owner epoch changes;
 both are required in provider CI, the native RPC probe also in image build.
+
+### 2026-10-27 — LINE incoming attachments and isolated speech core
+
+The earlier media-core checkpoint's open public input/GUI/retention work is now
+superseded by the actual [LINE image/document path](GATEWAY-LINE.md) and
+[separate owner storage controls](GATEWAY-MEDIA.md). Controller operations use
+its fixed private `haos-control` recovery helper; gateway cache operations use
+the actual gateway UID. Current sender grants/nonterminal missions cannot be
+silently purged, and explicit decisions retain audit/tombstones. Source-bound
+receipts record each increment, including 1399 ordinary tests and 87 actual
+root/UID/recovery cases at `e2e161d`; that exact source has six green CI runs.
+
+The next [speech increment](GATEWAY-SPEECH.md) adds the frozen upstream `voice`
+extra, bounded local decoding, actual Hermes local STT and a separate offline
+socket-activated identity. Native and real-UID probes are mandatory. It does
+not yet open LINE audio admission or claim owner GUI/model activation, outbound
+media, live accounts, installed boot or release acceptance.

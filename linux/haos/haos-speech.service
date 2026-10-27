@@ -1,0 +1,49 @@
+[Unit]
+Description=HAOS isolated offline local speech decoding
+Requires=haos-speech.socket haos-owner-ready.service
+After=haos-speech.socket haos-owner-ready.service
+ConditionPathExists=/etc/haos/speech.json
+
+[Service]
+Type=simple
+User=haos-speech
+Group=haos-speech
+WorkingDirectory=/usr/lib/haos
+ExecStart=/usr/bin/python3 -s -m haos.speech_launch
+Environment=PYTHONPATH=/usr/lib/haos:/usr/lib/haos/hermes
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONSAFEPATH=1
+Environment=HOME=/var/lib/haos-speech
+Environment=HERMES_HOME=/etc/haos-speech
+Environment=HERMES_SAFE_MODE=1
+Environment=HF_HUB_OFFLINE=1
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=OMP_NUM_THREADS=2
+Environment=OPENBLAS_NUM_THREADS=1
+StateDirectory=haos-speech
+StateDirectoryMode=0700
+UMask=0077
+KillMode=control-group
+TimeoutStopSec=10
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+InaccessiblePaths=-/var/lib/haos-agent -/var/lib/haos-control -/var/lib/haos-owner
+InaccessiblePaths=-/var/lib/haos-gateway -/var/lib/haos-provider -/var/lib/haos-provider-acp
+InaccessiblePaths=-/var/lib/haos-workspace -/etc/haos/gateway-credentials -/etc/haos/provider-credentials
+TasksMax=64
+MemoryMax=1G
+CPUQuota=200%

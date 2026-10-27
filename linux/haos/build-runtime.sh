@@ -11,7 +11,7 @@ python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
-uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix
+uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice
 uv pip install --python .venv/bin/python --require-hashes --no-deps -r "$HAOS_RUNTIME_OVERLAY/requirements.txt"
 uv pip check --python .venv/bin/python
 # Fail the build on upstream registry drift. The setup process reads only this
@@ -63,6 +63,11 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_media.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-media-build-probe.json
+HAOS_SPEECH_FIXTURE="$(mktemp -d /tmp/haos-speech-fixture.XXXXXX)"
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/fetch_speech_fixture.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE"
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_speech_backend.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/speech-native-build-probe.json
+rm -rf -- "$HAOS_SPEECH_FIXTURE"
+
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-profile-build-probe.json

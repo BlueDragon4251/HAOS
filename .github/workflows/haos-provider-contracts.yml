@@ -48,7 +48,7 @@ jobs:
           python -m pip install uv
           bash scripts/sync-upstream.sh
           python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
-          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice
           uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
       - name: Compare the generated registry and execute real local protocol probes
@@ -159,6 +159,25 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - name: Verify pinned local speech engine with reviewed public audio and model
+        run: |
+          set -euo pipefail
+          PYTHON=upstream/hermes-agent/.venv/bin/python
+          "$PYTHON" linux/haos/runtime/fetch_speech_fixture.py linux/haos "$RUNNER_TEMP/haos-speech-fixture"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_speech_backend.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/speech-native.json"
+      - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g --tmpfs /tmp:mode=1777,size=256m \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/model:/public-model:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/reference.flac:/public-input/reference.flac:ro" \
+            -e HAOS_DISPOSABLE_SPEECH_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_speech_process.py > "$RUNNER_TEMP/provider-contracts/speech-kernel-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/speech-kernel-process.json"
       - name: Verify media broker actual kernel peers and private ledger without optional SDKs
         run: |
           set -euo pipefail

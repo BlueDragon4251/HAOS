@@ -5,3 +5,4 @@ u haos-gateway - "HAOS authenticated gateway transports" /var/lib/haos-gateway /
 u haos-provider - "HAOS protected provider credentials" /var/lib/haos-provider /usr/sbin/nologin
 u haos-provider-acp - "HAOS isolated ACP subprocess" /var/lib/haos-provider-acp /usr/sbin/nologin
 u haos-viewer - "HAOS authenticated remote observation" /var/lib/haos-viewer /usr/sbin/nologin
+u haos-speech - "HAOS isolated local speech decoding" /var/lib/haos-speech /usr/sbin/nologin
