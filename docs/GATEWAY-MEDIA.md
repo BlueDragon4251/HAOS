@@ -50,13 +50,21 @@ The owner can inspect and explicitly purge controller payloads using the
 physical setup's gateway media page or the root console, with execution stopped:
 
 ```sh
+sudo haos-owner stop
 sudo haos-owner media list
 sudo haos-owner media purge --id EXACT_UPLOAD_ID --note 'Inspected unused upload' --confirm-inspected
 ```
 
 The GUI stops gateway/mission services before inspection and leaves them stopped;
 use the existing explicit runtime-start action afterward. Console operations
-require controller and Hermes to be inactive with zero main/control PIDs. Purge
+require gateway, controller and Hermes to be inactive with zero main/control
+PIDs. The fixed offline helper opens the ledger as `haos-control`, never as
+root, using the existing private-directory, owner, regular-file, single-link and
+SQLite sidecar checks. A missing ledger is refused rather than created by the
+owner UI. The child receives only exact IDs, owner UID and an inspection hash;
+no raw note, transport/provider credentials or arbitrary database path.
+Inventory includes all bounded active uploads and at most 128 recent purged
+metadata rows; older tombstones and audit remain in the private ledger. Purge
 refuses nonterminal missions and validates the whole bounded selection before
 changing any bytes. It frees chunks/quota while retaining upload tombstones,
 mission associations, owner audit and a transactionally committed purge receipt.

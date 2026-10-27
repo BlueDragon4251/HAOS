@@ -107,15 +107,10 @@ def manage_media(action,ids=None,note='',*,confirmed=False):
     if os.geteuid()!=0:raise PermissionError('authenticate as the owner with sudo or a recovery console')
     if action not in {'list','purge'}:raise ValueError('unknown owner media action')
     stopped()
-    from .gateway_media import GatewayMedia
-    store=MissionStore(Path('/var/lib/haos-control/missions.db'))
-    try:
-        media=GatewayMedia(store)
-        if action=='list':return media.inventory()
-        result=media.purge(ids,f"owner:{os.environ.get('SUDO_UID','0')}",note,confirmed=confirmed)
-        audit('gateway.media.purged',{'ids':result['ids'],'removed_payload_bytes':result['removed_payload_bytes']})
-        return result
-    finally:store.close()
+    from types import SimpleNamespace
+    from .gateway_setup import owner_delivery
+    return owner_delivery(SimpleNamespace(gateway_action='media-list' if action=='list' else 'purge-media',
+        ids=ids,note=note,confirmed=confirmed),{'version':1,'connectors':[],'bindings':[]})
 
 
 def main():

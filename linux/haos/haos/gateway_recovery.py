@@ -143,6 +143,16 @@ def main():
         GatewayEngine(store)
         if data["action"] == "deliveries" and set(data["params"]) == {"after"}:
             result = unresolved(store, data["params"]["after"])
+        elif data['action']=='media-list' and data['params']=={}:
+            result=GatewayEngine(store).media.inventory()
+        elif data['action']=='purge-media':
+            request=data['params']
+            if (set(request)!={'ids','owner_uid','note_sha256','confirmed'} or type(request['owner_uid']) is not int
+                    or request['owner_uid']<0 or not isinstance(request['note_sha256'],str)
+                    or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+                raise ValueError('exact owner media decision required')
+            result=GatewayEngine(store).media.purge(request['ids'],f"owner:{request['owner_uid']}",
+                'inspection sha256:'+request['note_sha256'],confirmed=request['confirmed'])
         elif data["action"] == "reconcile-delivery":
             result = reconcile(store, policy, data["params"])
         else:

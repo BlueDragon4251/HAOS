@@ -201,7 +201,9 @@ class GatewayMedia:
         rows=self.db.execute("""SELECT u.id,u.connector,u.binding_id,u.state,u.descriptor,u.received,
             u.created_at,u.mission_id,m.state AS mission_state,
             (SELECT COALESCE(SUM(LENGTH(data)),0) FROM gateway_media_chunks WHERE upload_id=u.id) AS stored_bytes
-            FROM gateway_media_uploads u LEFT JOIN missions m ON m.id=u.mission_id ORDER BY u.created_at,u.id""").fetchall()
+            FROM gateway_media_uploads u LEFT JOIN missions m ON m.id=u.mission_id
+            WHERE u.state!='purged' OR u.rowid IN (SELECT rowid FROM gateway_media_uploads WHERE state='purged' ORDER BY rowid DESC LIMIT 128)
+            ORDER BY u.created_at,u.id""").fetchall()
         result=[];reserved=0
         for row in rows:
             meta=descriptor(json.loads(row['descriptor']))
@@ -211,7 +213,7 @@ class GatewayMedia:
                 'admission_expired':row['mission_id'] is None and time.time()>row['created_at']+86400,
                 'purge_allowed':row['state']!='purged' and (row['mission_id'] is None or row['mission_state'] in {'completed','failed','cancelled'})})
         return {'uploads':result,'reserved_bytes':reserved,'limit_bytes':MAX_TOTAL,
-            'stored_bytes':sum(row['stored_bytes'] for row in rows),'limit_records':1024}
+            'stored_bytes':sum(row['stored_bytes'] for row in rows),'limit_records':1024,'recent_purged_limit':128}
 
     def purge(self,ids,actor,note,*,confirmed=False):
         """Explicit owner-only caller; retain tombstones, grants, missions and audit."""

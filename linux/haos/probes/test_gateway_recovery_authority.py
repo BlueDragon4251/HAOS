@@ -733,3 +733,57 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         assert observer.execute('SELECT state,data FROM native_media_cache').fetchone()==('purged',None)
         assert observer.execute('SELECT owner_uid,note_sha256 FROM native_media_owner_events').fetchone()==(1000,'e'*64)
     assert database.stat().st_uid==65534 and database.stat().st_mode&0o077==0
+
+
+@pytest.mark.parametrize('journal_exists',[False,True])
+def test_controller_media_worker_real_uid_private_default_ledger_and_no_root_creation(uid_fixture_path,journal_exists):
+    root=uid_fixture_path;root.chmod(0o755)
+    (root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-control:x:65532:65532:controller:/:/bin/false\n')
+    state=root/'var/lib/haos-control';state.mkdir(parents=True,mode=0o700);database=state/'missions.db'
+    identity=None
+    if journal_exists:
+        from haos.gateway_media import describe
+        import base64
+        config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
+            'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+            'identity':'owner','capabilities':['create'],'allow_media':True,'generation':'b'*64,'since':1}]}
+        policy=GatewayPolicy(config);store=MissionStore(database);engine=GatewayEngine(store)
+        event={'platform':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+            'message_id':'c'*64,'is_bot':False,'text':'Inspect retained document'}
+        payload=b'private controller media'
+        identity=engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(payload,'document')})['id']
+        engine.media.chunk(policy,{'id':identity,'offset':0,'data':base64.b64encode(payload).decode()});store.close()
+    os.chown(state,65532,65532)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65532,65532)
+    code='''
+import os,pwd,sys
+from haos import gateway_recovery,gateway_media
+pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+gateway_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    def request(action,params,uid=65532):
+        return subprocess.run([sys.executable,'-c',code,str(root),str(uid)],input=json.dumps({'action':action,
+            'policy':{'version':1,'connectors':[],'bindings':[]},'params':params}),text=True,capture_output=True,timeout=15,
+            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    for uid in [0,65533]:
+        denied=request('media-list',{},uid);assert denied.returncode!=0 and 'without root as the ledger service' in denied.stderr
+    listing=request('media-list',{})
+    if not journal_exists:
+        assert listing.returncode!=0 and not database.exists()
+        return
+    assert listing.returncode==0,listing.stderr
+    assert json.loads(listing.stdout)['stored_bytes']==len(b'private controller media')
+    params={'ids':[identity],'owner_uid':1000,'note_sha256':'e'*64,'confirmed':False}
+    refused=request('purge-media',params);assert refused.returncode!=0
+    assert json.loads(request('media-list',{}).stdout)['stored_bytes']==len(b'private controller media')
+    params['confirmed']=True;purged=request('purge-media',params);assert purged.returncode==0,purged.stderr
+    assert json.loads(purged.stdout)['removed_payload_bytes']==len(b'private controller media')
+    import sqlite3
+    with sqlite3.connect(database) as observer:
+        assert observer.execute('SELECT state FROM gateway_media_uploads').fetchone()[0]=='purged'
+        assert observer.execute('SELECT actor,note FROM gateway_media_purge_audit').fetchone()==('owner:1000','inspection sha256:'+'e'*64)
+    assert database.stat().st_uid==65532 and all(p.stat().st_uid==65532 for p in state.iterdir())

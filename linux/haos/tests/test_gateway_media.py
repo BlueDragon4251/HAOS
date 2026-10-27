@@ -204,3 +204,18 @@ def test_owner_purge_batch_atomic_and_terminal_mission_preserved(media):
     assert store.get(mission['id'])['state']=='cancelled' and engine.media.has_mission(mission['id'])
     with pytest.raises(Conflict):engine.media.for_mission(policy,mission['id'])
     assert store.db.execute('SELECT COUNT(*) FROM gateway_media_purge_audit').fetchone()[0]==2
+
+
+def test_owner_inventory_bounds_old_tombstones_without_losing_active_uploads_or_audit(media):
+    store,engine,policy,event=media
+    for number in range(130):
+        upload=begin(engine,policy,dict(event,message_id=f'{number:064x}'),b'x')
+        chunk(engine,policy,upload['id'],0,b'x')
+        engine.media.purge([upload['id']],'owner:1000','Inspected fixture',confirmed=True)
+    active=begin(engine,policy,dict(event,message_id='e'*64),b'pending')
+    inventory=engine.media.inventory()
+    assert len(inventory['uploads'])==129 and inventory['recent_purged_limit']==128
+    assert any(row['id']==active['id'] and row['state']=='uploading' for row in inventory['uploads'])
+    assert inventory['reserved_bytes']==len(b'pending')
+    assert store.db.execute('SELECT COUNT(*) FROM gateway_media_uploads').fetchone()[0]==131
+    assert store.db.execute('SELECT COUNT(*) FROM gateway_media_purge_audit').fetchone()[0]==130

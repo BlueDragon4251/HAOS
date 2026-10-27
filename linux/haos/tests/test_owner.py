@@ -67,7 +67,19 @@ def test_media_cli_inspect_and_explicit_purge_use_real_private_ledger(monkeypatc
     upload=engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(payload,'document')})
     engine.media.chunk(policy,{'id':upload['id'],'offset':0,'data':base64.b64encode(payload).decode()});store.close()
     monkeypatch.setattr(owner.os,'geteuid',lambda:0);monkeypatch.setattr(owner,'stopped',lambda:None)
-    monkeypatch.setattr(owner,'MissionStore',lambda ignored:MissionStore(path))
+    from haos import gateway_setup
+    from haos.gateway_media import GatewayMedia
+    def private_helper(args,public_policy):
+        assert public_policy=={'version':1,'connectors':[],'bindings':[]}
+        ledger=MissionStore(path)
+        try:
+            media=GatewayMedia(ledger)
+            if args.gateway_action=='media-list':return media.inventory()
+            result=media.purge(args.ids,'owner:1000',args.note,confirmed=args.confirmed)
+            owner.audit('gateway.media.purged',{'ids':result['ids']})
+            return result
+        finally:ledger.close()
+    monkeypatch.setattr(gateway_setup,'owner_delivery',private_helper)
     audit=[];monkeypatch.setattr(owner,'audit',lambda kind,details:audit.append((kind,details)))
     monkeypatch.setattr('sys.argv',['haos-owner','media','list']);owner.main()
     assert json.loads(capsys.readouterr().out)['stored_bytes']==len(payload)

@@ -126,6 +126,15 @@ def owner_delivery(args, policy):
     stopped()
     GatewayPolicy(policy)
     params = {"after": args.after} if args.gateway_action == "deliveries" else None
+    if args.gateway_action=='media-list':params={}
+    if args.gateway_action=='purge-media':
+        from .gateway_media import references
+        if (args.confirmed is not True or not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000):
+            raise PermissionError('explicit inspected owner media decision required')
+        ids=references(args.ids)
+        if not ids:raise ValueError('explicit media IDs required')
+        params={'ids':ids,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+            'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest(),'confirmed':True}
     if params is None:
         if not isinstance(args.note, str) or not 1 <= len(args.note.strip()) <= 2000:
             raise ValueError("bounded non-secret owner inspection evidence is required")
@@ -144,9 +153,11 @@ def owner_delivery(args, policy):
                             text=True, capture_output=True, check=False, timeout=15,
                             user=account.pw_uid, group=account.pw_gid, extra_groups=[], umask=0o077,
                             cwd="/usr/lib/haos", env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"})
-    if result.returncode or len(result.stdout) > 256 * 1024:
+    if result.returncode or len(result.stdout) > 2 * 1024 * 1024:
         raise RuntimeError("offline outbox recovery failed; inspect the private ledger and selected attempt")
     value = json.loads(result.stdout)
+    if args.gateway_action=='purge-media':
+        audit('gateway.media.purged',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == "reconcile-delivery":
         audit("gateway.delivery-reconciled", {**value, "note_sha256": params["note_sha256"]})
     return value
