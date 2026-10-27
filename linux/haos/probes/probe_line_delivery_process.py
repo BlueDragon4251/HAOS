@@ -87,6 +87,7 @@ except PermissionError:pass
 else:raise AssertionError('unprivileged identity read owner material')
 if request['action']=='agent':
     assert os.geteuid()==65533
+    assert set(request)=={'action','state','owner_canary'}
     for name in ['native.db','relay.db']:
         try:Path(request['state'],name).read_bytes()
         except PermissionError:pass
@@ -94,7 +95,7 @@ if request['action']=='agent':
     try:NativeInbox(Path(request['state'],'native.db'),Redactor())
     except PermissionError:pass
     else:raise AssertionError('agent opened private LINE journal')
-    print(json.dumps({'uid':os.geteuid(),'private_journals_denied':True}));sys.exit(0)
+    print(json.dumps({'uid':os.geteuid(),'private_journals_denied':True,'credential_payload_absent':True}));sys.exit(0)
 assert os.geteuid()==65534
 validate_snapshot(request['policy'],{'connectors':{'line':request['credentials']}})
 async def exercise():
@@ -160,7 +161,8 @@ asyncio.run(exercise())
                 user=uid,group=uid,extra_groups=[],umask=0o077,
                 env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONPATH':str(code),
                     'PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1','HERMES_HOME':str(private/'unused-home')})
-            child.stdin.write((json.dumps({**request,'action':action})+'\n').encode());await child.stdin.drain()
+            payload=({'action':action,'state':str(private),'owner_canary':str(owner)} if action=='agent' else {**request,'action':action})
+            child.stdin.write((json.dumps(payload)+'\n').encode());await child.stdin.drain()
             return child
         children=[]
         try:
@@ -191,8 +193,8 @@ asyncio.run(exercise())
             agent=await invoke(65533,'agent');children.append(agent)
             stdout,stderr=await asyncio.wait_for(agent.communicate(),10)
             assert agent.returncode==0,stderr.decode()[-2500:]
-            assert json.loads(stdout)=={'uid':65533,'private_journals_denied':True}
-            cases.append('actual_agent_uid_cannot_read_private_native_relay_or_owner_credentials_after_crash')
+            assert json.loads(stdout)=={'uid':65533,'private_journals_denied':True,'credential_payload_absent':True}
+            cases.append('actual_agent_uid_receives_no_credential_payload_and_cannot_read_private_native_relay_or_owner_credentials_after_crash')
             second=await invoke(65534,'recover');children.append(second)
             stdout,stderr=await asyncio.wait_for(second.communicate(),20)
             assert second.returncode==0,stderr.decode()[-2500:]
@@ -208,6 +210,7 @@ asyncio.run(exercise())
     asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uid_cases':[0,65533,65534],
         'actual_sigkill':True,'tls_verification_disabled':False,'public_gateway_enabled':True,
+        'agent_fixture_received_no_credentials':True,
         'fixture_only_disposable_ca_and_loopback_targets':True,
         'external_connections_or_recipient_acceptance':False,'installed_haos_accepted':False},indent=2))
 

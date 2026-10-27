@@ -1,0 +1,46 @@
+{
+  "parent_commit": "b3ac8bc42c2f3c129c44a43d145510d310b52e96",
+  "production_code_unchanged_from_parent": true,
+  "source_files": [
+    {
+      "path": "linux/haos/probes/probe_line_delivery_process.py",
+      "sha256": "e86dc790faf6601d0c821c73cf8b622fc0068764a47b33bf4731e409e7f0b189"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_profile.py",
+      "sha256": "3d2418f14e08bcf79aeb9d0096dfdaa849603870ccc5f82a6fd2734fc06dff57"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "02507dc1885a794fd0375bb7e1738f52d5bb66308883413724e39417bf6c018f"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "29e6f116b0109980c727672997163c61cb014d910e0fa3faa1dc72840f11be04"
+    }
+  ],
+  "actual_uid_process": {
+    "passed": 4,
+    "cases": [
+      "actual_unprivileged_gateway_installed_public_profile_accepts_verified_https_hmac_and_commits_native_relay",
+      "actual_gateway_uid_native_verified_https_push_has_durable_intent_before_real_sigkill",
+      "actual_agent_uid_receives_no_credential_payload_and_cannot_read_private_native_relay_or_owner_credentials_after_crash",
+      "new_gateway_process_reacquires_kernel_lease_retains_committed_input_and_never_resends_uncertain_native_push"
+    ],
+    "actual_uid_cases": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_sigkill": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": true,
+    "agent_fixture_received_no_credentials": true,
+    "fixture_only_disposable_ca_and_loopback_targets": true,
+    "external_connections_or_recipient_acceptance": false,
+    "installed_haos_accepted": false
+  },
+  "scope": "Tighten the negative agent fixture: exact path-only stdin schema, no simulated gateway credential payload; real UID/files/HTTPS/SIGKILL remain required",
+  "ci": "New exact-source provider and required regression gates must be checked separately",
+  "external_or_installed_acceptance": false
+}

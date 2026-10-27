@@ -113,6 +113,9 @@ kernel lease, preserves the committed input, marks the old write uncertain and
 does not repeat the push. CA registration and endpoint substitution are confined
 to this network-isolated fixture; this is not an installed HAOS/systemd, public
 network, LINE account or recipient test. Both provider CI runs require it.
+The tightened agent-role fixture accepts only state/canary paths, with no
+credential payload on its stdin; its rerun is recorded separately in
+`line-agent-fixture-isolation-validation.json`.
 
 **Still open:** binary files/images, voice and other media require a reviewed
 shared media broker through missions and the agent. They are not enabled by this
