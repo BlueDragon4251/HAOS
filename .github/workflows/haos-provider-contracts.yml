@@ -193,6 +193,18 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/irc-delivery-process.json"
           cat "$RUNNER_TEMP/provider-contracts/irc-delivery-process.json"
+      - name: Verify LINE ingress sender UID isolation and actual crash recovery
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_line_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_LINE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/line-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/line-delivery-process.json"
       - uses: actions/upload-artifact@v4
         with:
           name: provider-contracts-${{ github.sha }}

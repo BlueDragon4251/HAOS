@@ -92,6 +92,18 @@ or owner-seat acceptance. Tk cases use real controls with explicit backend
 handoffs. Both full and minimal Python suites and the independent kernel/UID
 regressions remain required; GitHub CI must be attributed to its exact SHA.
 
+The additional `line-actual-uid-sigkill-validation.json` receipt covers four
+actual process cases. Public HAOS code, the pinned native adapter and frozen SDK
+are installed root-owned/read-only in a fresh disposable container. UID 65534
+passes the production runtime identity guard, handles a signed HTTPS webhook and
+commits its private relay, then performs a native verified-HTTPS push. A real
+SIGKILL interrupts that request after the durable write intent. UID 65533 cannot
+read/open the journals or owner canary. A new gateway process reacquires the
+kernel lease, preserves the committed input, marks the old write uncertain and
+does not repeat the push. CA registration and endpoint substitution are confined
+to this network-isolated fixture; this is not an installed HAOS/systemd, public
+network, LINE account or recipient test. Both provider CI runs require it.
+
 **Still open:** binary files/images, voice and other media require a reviewed
 shared media broker through missions and the agent. They are not enabled by this
 text setup. This integration does not claim all 22 gateways, real LINE accounts,
