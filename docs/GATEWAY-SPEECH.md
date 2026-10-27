@@ -2,8 +2,9 @@
 
 This increment implements the bounded local decoder, actual pinned Hermes
 transcription engine, isolated worker and private socket service. **LINE voice
-admission, sender approval, owner model activation and its GUI are not connected
-yet. Existing public LINE policy continues to refuse audio.** Video, outbound
+admission and sender approval are not connected yet. Existing public LINE policy
+continues to refuse audio. Owner model/service activation is now implemented
+through the physical gateway management page and authenticated console.** Video, outbound
 media and TTS also remain open. No operator workaround or manual authorization
 bypass is needed to run the disposable contract probes.
 
@@ -43,8 +44,8 @@ including cancellation while subprocess creation is pending.
 Socket activation validates the real NSS identity, inherited descriptor,
 activation PID and exact socket path plus explicit root-owned configuration.
 The image installs the definitions and separate identity but does not enable
-the speech socket by default. Owner activation remains the next implementation
-step. The physical service profile still requires installed-system acceptance;
+the speech socket by default. Owner activation is explicit and does not grant
+a sender access. The physical service profile still requires installed-system acceptance;
 a successful disposable descriptor/UID probe is not an installed boot test.
 
 `probe_speech_backend.py` performs real FLAC decoding, AAC/M4A encoding/decoding,
@@ -58,3 +59,34 @@ peer credentials, private role canaries and process cancellation; no UID/kernel
 check is mocked. Its reference phrase is recognized by the actual pinned
 engine, not a substituted transcript. Neither probe establishes live LINE
 voice delivery, language-wide accuracy, HP performance or external accounts.
+
+
+## Owner model/service management
+
+The graphical gateway page links local speech status, model loading/activation
+and service deactivation. Console equivalents, as the authenticated owner:
+
+```sh
+sudo haos-owner speech status
+sudo haos-owner speech enable
+sudo haos-owner speech disable
+```
+
+Setup checks the actual Python 3.11/native package versions in a subprocess
+**demoted to haos-speech**, with no supplementary groups or inherited credentials.
+It does not execute the SDK as root. Only the fixed reviewed model can be loaded;
+existing mismatched assets or foreign engine settings require owner inspection.
+The root-owned publication and engine settings are atomic. Model installation
+requires the public download once, then cached verified files are reused.
+Service changes require fully inactive worker/control PIDs and a private owner
+lock. An administrator mask is not removed automatically. The ordinary owner
+setup gate still applies when systemd starts the service.
+
+Status separates installed runtime, verified model, configured activation and
+actual unit states. A listening socket is not a LINE delivery or transcription
+acceptance. Deactivation stops new processing, archives the configuration and
+preserves models and sender grants; sender revocation remains the separate
+gateway operation. Root publication tests use actual SDK metadata, public model
+bytes and filesystem ownership, with explicitly fixture-controlled service
+commands. Actual NSS/UID/socket activation/worker/kill gates run separately
+without mocked kernel checks. Neither set replaces an installed systemd test.

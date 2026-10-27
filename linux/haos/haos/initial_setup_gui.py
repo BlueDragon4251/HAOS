@@ -1394,7 +1394,35 @@ class Wizard:
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",
                         color=self.MUTED).pack(anchor="w", pady=(15, 0))
             self._button(self.content,'Gespeicherte Gateway-Medien verwalten',lambda:self.show('gateway-media')).pack(anchor='w',pady=6)
+            self._button(self.content,'Lokale Spracherkennung verwalten',lambda:self.show('gateway-speech')).pack(anchor='w',pady=6)
             self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
+        elif name=='gateway-speech':
+            self._head('Lokale Spracherkennung','Tiny · mehrsprachig · Verarbeitung auf diesem Gerät')
+            self._label(self.content,'Die Einrichtung lädt einmalig etwa 75 MiB öffentliche Modelldateien über HTTPS. '
+                'Audio wird anschließend lokal verarbeitet. Einzelne Gateway-Absender benötigen eine getrennte Freigabe. '
+                'Die LINE-Voice-Anbindung befindet sich noch in Entwicklung.',color=self.MUTED).pack(anchor='w',pady=8)
+            details=self._label(self.content,'Status noch nicht geprüft.');details.pack(anchor='w',pady=8)
+            def render(value):
+                states=' · '.join(unit+': '+state['ActiveState'] for unit,state in value['services'].items())
+                details.configure(text=('Sprachkomponente bereit' if value['runtime_ready'] else 'Lokale Sprachkomponente fehlt oder passt nicht; HAOS aktualisieren')+
+                    '\n'+('Modell vollständig geprüft' if value['model_ready'] else 'Modell noch nicht vollständig verfügbar oder nicht lesbar')+
+                    '\n'+('Lokaler Dienst konfiguriert' if value['enabled'] else 'Lokaler Dienst nicht aktiviert')+'\n'+states)
+                installed=all(state['LoadState']=='loaded' for state in value['services'].values())
+                activate.configure(state='normal' if value['runtime_ready'] and installed else 'disabled')
+                deactivate.configure(state='normal' if value['enabled'] or any(state['ActiveState']=='active' for state in value['services'].values()) else 'disabled')
+            self._button(self.content,'Spracherkennungsstatus prüfen',lambda:self._run_async(initial_setup.gateway_speech_status,
+                success='Lokale Runtime, Modell und Dienste geprüft.',result_handler=render)).pack(anchor='w',pady=5)
+            activate=self._button(self.content,'Modell laden und lokalen Dienst aktivieren',
+                lambda:self._run_async(lambda:initial_setup.configure_gateway_speech(True),
+                    success='Lokale Konfiguration gespeichert. Dienststatus und separate Absenderfreigaben beachten.',result_handler=render),primary=True)
+            activate.configure(state='disabled');activate.pack(anchor='w',pady=5)
+            deactivate=self._button(self.content,'Spracherkennungsdienst stoppen und deaktivieren',
+                lambda:self._run_async(lambda:initial_setup.configure_gateway_speech(False),
+                    success='Neue lokale Transkriptionen gestoppt; Modelle und Absenderrechte erhalten.',result_handler=render))
+            deactivate.configure(state='disabled');deactivate.pack(anchor='w',pady=5)
+            self._label(self.content,'Zum Entzug eines Absenders die Kopplung unter Gateways widerrufen. '
+                'Das Stoppen des Transkriptionsdienstes ersetzt diesen Rechteentzug nicht.',size=10,color=self.MUTED).pack(anchor='w',pady=8)
+            self._button(self.content,'Zurück zu Gateways',lambda:self.show('gateways')).pack(anchor='w',pady=5)
         elif name in {'gateway-media','gateway-cache'}:
             cache_mode=name=='gateway-cache'
             inspect_media=initial_setup.gateway_media_cache_inventory if cache_mode else initial_setup.gateway_media_inventory

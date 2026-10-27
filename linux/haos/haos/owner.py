@@ -121,6 +121,9 @@ def main():
     sub.add_parser("status")
     sub.add_parser("stop")
     sub.add_parser("start")
+    speech=sub.add_parser('speech',help='manage fixed isolated local speech, independent of gateway sender approval')
+    speech_actions=speech.add_subparsers(dest='speech_action',required=True)
+    for action in ['status','enable','disable']:speech_actions.add_parser(action)
     onboard = sub.add_parser("setup",
         help="local owner fallback for completing setup if the graphical VT8 fails")
     onboard_actions = onboard.add_subparsers(dest="setup_action", required=True)
@@ -325,7 +328,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise PermissionError("authenticate as the owner with sudo or a recovery console")
-    if args.action == "setup":
+    if args.action=='speech':
+        from . import speech_setup
+        print(json.dumps({'status':speech_setup.status,'enable':speech_setup.enable,'disable':speech_setup.disable}[args.speech_action](),indent=2))
+    elif args.action == "setup":
         # Owner-only fixed actions on the physical VT; handle sudo use_pty.
         require_physical_setup_console()
         from . import initial_setup

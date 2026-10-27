@@ -877,3 +877,16 @@ def purge_gateway_media_cache(identity,note,confirmed=False):
     from .gateway_setup import owner_gateway
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='purge-media-cache',id=identity,note=note,confirm_inspected=True))
+
+
+def gateway_speech_status():
+    require_root()
+    from .speech_setup import status
+    return status()
+
+
+def configure_gateway_speech(enabled):
+    require_root()
+    if type(enabled) is not bool:raise ValueError('explicit local speech service choice required')
+    from .speech_setup import enable,disable
+    return enable() if enabled else disable()

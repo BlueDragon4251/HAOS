@@ -175,14 +175,17 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             try:service.wait(timeout=5)
             except subprocess.TimeoutExpired:service.kill();service.wait(timeout=5)
             service.stderr.close()
+        sys.path[:0]=['/usr/lib/haos','/repo/linux/haos/runtime']
+        from speech_owner_fixture import exercise as owner_exercise
+        owner_cases=owner_exercise()
         receipt=json.loads(result.stdout)
-        print(json.dumps({'passed':6,'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+        print(json.dumps({'passed':6+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
             'actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity',
             'actual_container_network_disabled_and_reviewed_model_bytes_used_offline',
             'actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket',
             'actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path',
-            'actual_client_disconnect_kills_and_joins_native_worker_without_orphan'],
-            'native_receipt':receipt,'actual_uid':65530,'external_stt_account_or_line_voice_acceptance':False},indent=2))
+            'actual_client_disconnect_kills_and_joins_native_worker_without_orphan']+owner_cases,
+            'native_receipt':receipt,'actual_uid':65530,'owner_service_control_is_fixture':True,'external_stt_account_or_line_voice_acceptance':False},indent=2))
 
 
 if __name__=='__main__':main()

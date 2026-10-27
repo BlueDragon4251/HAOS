@@ -34,7 +34,7 @@ def request_bytes(value):
 
 def worker():
     account=pwd.getpwnam('haos-speech')
-    if os.geteuid()==0 or os.geteuid()!=account.pw_uid:raise PermissionError('private speech identity required')
+    if os.geteuid()==0 or os.geteuid()!=account.pw_uid or sys.version_info[:2]!=(3,11):raise PermissionError('private pinned speech identity required')
     resource.setrlimit(resource.RLIMIT_CPU,(45,45));resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     resource.setrlimit(resource.RLIMIT_FSIZE,(8*1024*1024,8*1024*1024))
     raw=sys.stdin.buffer.read(MAX_FRAME+1)
@@ -142,7 +142,7 @@ class Server:
 
 
 async def serve():
-    if (os.geteuid()==0 or os.geteuid()!=pwd.getpwnam('haos-speech').pw_uid
+    if (sys.version_info[:2]!=(3,11) or os.geteuid()==0 or os.geteuid()!=pwd.getpwnam('haos-speech').pw_uid
             or os.environ.get('LISTEN_PID')!=str(os.getpid()) or os.environ.get('LISTEN_FDS')!='1'):
         raise PermissionError('private socket-activated speech identity required')
     from pathlib import Path
