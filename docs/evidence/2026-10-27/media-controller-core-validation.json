@@ -1,0 +1,162 @@
+{
+  "parent_commit": "f1a0ab4d21714c080da61b831ea6884b04ef300c",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "41beaebbd7d86f91c801d7ce34f90ac53cde90a4e54a51853cf09160cea11d2a"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "1d62f62e7929eadc11462bb760b3c6ef2d6e7395627d8f0ecfdace2b265950a4"
+    },
+    {
+      "path": "linux/haos/haos/controller.py",
+      "sha256": "aba2d3fd8adafa999a8162b321fa7158906dc716bbee6386595d3fc40f985294"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "325cd60446ac17b7ff74a19b4718389720b239bb35dca00c3e8e34e21fdb8b2d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "f128c85712bf414ab71f51d9a7198c175038eea8d6633f01701cf14eb4cdab6f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "e842fea051390bb89d8d01abab650acc75ae5ffc0cb50758ddb1c460be245177"
+    },
+    {
+      "path": "linux/haos/haos/hermes_media.py",
+      "sha256": "eaeb8ed2e9282ef413fa6e7a967a10ffa8f0a23613048b6532c42c6521549a29"
+    },
+    {
+      "path": "linux/haos/probes/probe_media_control_process.py",
+      "sha256": "ebef8621ad5940be86ec526e34b66b6c591db30e6cb4f6ae761bd89b12948e62"
+    },
+    {
+      "path": "linux/haos/runtime/probe_backend.py",
+      "sha256": "3a2e447161a2eb923a92fa53daf61e71e5985f74180ffff4fcfc35ce7cb80e98"
+    },
+    {
+      "path": "linux/haos/runtime/probe_media_backend.py",
+      "sha256": "6e450d233e0d735715da87a337dc205721206350a09a76bf691fce7a4d3744e0"
+    },
+    {
+      "path": "linux/haos/tests/test_controller_media.py",
+      "sha256": "ee7bd1b55287f60e29b67265d8f3775dffa0d302b6925f84d537e2df86575c26"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media.py",
+      "sha256": "f36a9b50b52bdbefb6eb3c914d8e91cb3eb80d1e2212107ea6515b06620fd1f5"
+    }
+  ],
+  "suites": [
+    {
+      "runtime": "minimal",
+      "summary": "1380 passed, 2 skipped in 7.96s",
+      "sha256": "e37cb75000129e07b78d55edce6878d8083efaa33e3dd75eac750d06ffa0acb2"
+    },
+    {
+      "runtime": "full",
+      "summary": "1380 passed, 2 skipped in 8.22s",
+      "sha256": "4e063c9c2ee41e4ce77bf0b597869bf2e31535b4e0cc5ff3c3997f0d93a05779"
+    },
+    {
+      "runtime": "root",
+      "summary": "83 passed in 20.22s",
+      "sha256": "fc96747d04a91b9a2338792dd83146d17a2be3175703d53204e8f31fb6f116cf"
+    }
+  ],
+  "new_ordinary_cases": 32,
+  "actual_backend": {
+    "backend_healthy": true,
+    "backend_version": "0.21.5",
+    "unauthenticated_identity_denied": true,
+    "wrong_token_denied": true,
+    "authenticated_identity_matches_child": true,
+    "runtime_session_created": true,
+    "durable_session_created": true,
+    "actual_controller_upload_mission_and_pinned_attachment_rpcs": true,
+    "image_and_document_bytes_match": true,
+    "document_bytes": 8388608,
+    "maximum_document_size_exercised": true,
+    "host_paths_sent": false,
+    "model_inference_or_installed_acceptance": false,
+    "attachment_rpc_methods": [
+      "image.attach_bytes",
+      "file.attach"
+    ],
+    "limitations": [
+      "providerless API probe; no model turn",
+      "no installed systemd/sandbox proof"
+    ]
+  },
+  "actual_kernel_process": {
+    "passed": 5,
+    "cases": [
+      "actual_gateway_uid_uploads_over_kernel_peer_authenticated_socket_without_reading_controller_ledger",
+      "actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger",
+      "actual_gateway_uid_cannot_gain_owner_methods_through_forged_uid_zero_and_owner_json_fields",
+      "actual_owner_policy_withdrawal_blocks_a_later_chunk_on_the_same_connection_interface",
+      "actual_new_owner_epoch_cannot_rebind_old_upload_and_requires_new_durable_media_admission"
+    ],
+    "actual_uids": [
+      0,
+      65532,
+      65533,
+      65534
+    ],
+    "actual_kernel_so_peercred": true,
+    "socket_filesystem_permission_is_not_the_negative_gate": true,
+    "optional_hermes_sdk_imported": false,
+    "external_or_installed_acceptance": false
+  },
+  "existing_line_profile_regression": {
+    "passed": 33,
+    "cases": [
+      "no_owner_pairing_cannot_create_profile_or_start_identity_network",
+      "private_profile_rejects_symlinked_parent_before_native_or_network_use",
+      "actual_registered_adapter_uses_private_home_and_exclusive_kernel_lease_without_network_at_build",
+      "profile_publisher_cannot_send_before_verified_bot_identity_and_listener_connection",
+      "native_bot_info_verifies_exact_destination_before_fixed_loopback_listener_start",
+      "actual_profile_listener_commit_and_native_replay_worker_deliver_exact_owner_event",
+      "actual_common_factory_root_engine_outbox_native_push_remote_receipt_and_durable_ack",
+      "offline_private_profile_keeps_pending_outbox_at_zero_attempts_until_verified_reconnection",
+      "actual_profile_repeated_signed_webhook_cannot_duplicate_local_admission",
+      "private_profile_close_reopen_reacquires_kernel_lease_and_replays_retained_local_failure",
+      "owner_epoch_change_is_denied_at_http_admission_before_worker_observes_revocation",
+      "current_owner_withdrawal_stops_idle_listener_and_worker_without_inheriting_authority",
+      "creation_only_profile_has_no_publisher_or_inherited_outbound_authority",
+      "native_outbound_401_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+      "native_outbound_401_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+      "native_outbound_401_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+      "native_outbound_403_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+      "native_outbound_403_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+      "native_outbound_403_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+      "native_outbound_429_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+      "native_outbound_429_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+      "native_outbound_429_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+      "native_identity_401_blocks_listener_and_survives_owner_epoch_profile_reopen",
+      "explicit_offline_owner_recheck_401_preserves_rate_limit_and_requires_fresh_native_verification",
+      "native_identity_403_blocks_listener_and_survives_owner_epoch_profile_reopen",
+      "explicit_offline_owner_recheck_403_preserves_rate_limit_and_requires_fresh_native_verification",
+      "native_identity_wrong-bot_blocks_listener_and_survives_owner_epoch_profile_reopen",
+      "explicit_offline_owner_recheck_wrong-bot_preserves_rate_limit_and_requires_fresh_native_verification",
+      "native_identity_429_blocks_listener_and_survives_owner_epoch_profile_reopen",
+      "explicit_offline_owner_recheck_429_preserves_rate_limit_and_requires_fresh_native_verification",
+      "native_identity_redirect_never_authenticates_or_opens_listener",
+      "actual_occupied_listener_port_reports_failure_and_reconnects_after_release",
+      "closed_profile_rejects_new_network_and_releases_lease"
+    ],
+    "actual_registered_native_adapter_http_sqlite_and_kernel_lease": true,
+    "fixture_only_loopback_identity_target": true,
+    "public_gateway_enabled": true,
+    "fixture_profile_listener": "127.0.0.1 only; external verified TLS ingress not configured here",
+    "external_or_installed_acceptance": false
+  },
+  "public_line_download_relay_gui_connected": false,
+  "audio_voice_outbound_media_complete": false,
+  "external_or_installed_acceptance": false,
+  "ci": "New exact-source checks required; receipts are not live or installed acceptance"
+}

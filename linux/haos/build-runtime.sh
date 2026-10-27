@@ -29,6 +29,7 @@ test -x .venv/bin/hermes
 .venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3, 11)'
 .venv/bin/python -I -c 'import importlib.metadata,json;from pathlib import Path;s=json.loads(Path("/usr/lib/haos/runtime-provenance/source.json").read_text());assert all(importlib.metadata.version(n)==v for n,v in {**s["security_versions"],**s.get("provider_versions",{})}.items())'
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_backend.py" .venv/bin/hermes /usr/lib/haos/runtime-provenance/backend-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_media_backend.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/media-native-backend-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ui_access.py" .venv/bin/python /usr/lib/haos /usr/lib/haos/hermes /usr/lib/haos/runtime-provenance/ui-access-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-ingress-build-probe.json

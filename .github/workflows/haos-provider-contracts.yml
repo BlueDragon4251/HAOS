@@ -61,6 +61,7 @@ jobs:
           PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
           "$PYTHON" linux/haos/runtime/export_registry.py upstream/hermes-agent "$RUNNER_TEMP/provider-contracts/registry.json"
           cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
+          "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/media-native-backend.json"
           "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
           "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_discord_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-ingress.json"
@@ -157,6 +158,16 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - name: Verify media broker actual kernel peers and private ledger without optional SDKs
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
       - name: Verify LINE owner CLI publication private PEM and actual UID denial
         run: |
           set -euo pipefail

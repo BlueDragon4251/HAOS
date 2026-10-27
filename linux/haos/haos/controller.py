@@ -109,7 +109,13 @@ class Controller:
         if not isinstance(params, dict):
             raise ValueError("params must be an object")
         if request.get("method") == "gateway.receive":
-            return await self.gateway.receive(policy, params["connector"], params["envelope"], self)
+            if set(params)-{'connector','envelope','media'}:raise ValueError('unsupported gateway admission fields')
+            if 'media' in params and params['media'] is None:raise ValueError('explicit media IDs must be a list')
+            return await self.gateway.receive(policy, params["connector"], params["envelope"], self,media=params.get('media'))
+        if request.get('method')=='gateway.media.begin':
+            return self.gateway.media.begin(policy,params)
+        if request.get('method')=='gateway.media.chunk':
+            return self.gateway.media.chunk(policy,params)
         if request.get("method") == "gateway.next":
             if set(params)-{'ready'}:raise ValueError('unsupported gateway queue selection')
             if 'ready' in params and params['ready'] is None:raise ValueError('explicit ready connectors must be a list')
@@ -264,9 +270,23 @@ class Controller:
                 if self.store.get(row["id"])["cancel_requested"]:
                     self.store.settle(row["id"], "cancelled")
                     return
+                attachments=(self.gateway.media.for_mission(self.gateway_policy(),row['id'])
+                    if self.gateway.media.has_mission(row['id']) else [])
+                refs=[]
+                if attachments:
+                    from .hermes_media import attach
+                    for item in attachments:
+                        # Owner revocation between two local byte transfers also
+                        # stops the next transfer and the eventual model prompt.
+                        self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                        refs.extend(await attach(self.connection,session['session_id'],[item]))
+                    self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                if self.store.get(row['id'])['cancel_requested']:
+                    self.store.settle(row['id'],'cancelled');return
                 self.store.dispatching(row["id"])
                 reply = await self.connection.request("prompt.submit", {
-                    "session_id": session["session_id"], "text": mission_prompt(row["goal"]), "surface": "herald_os"})
+                    "session_id": session["session_id"], "text": mission_prompt(row["goal"])+
+                        ('\n\nSession attachments:\n'+'\n'.join(refs) if refs else ''), "surface": "herald_os"})
                 if not isinstance(reply, dict) or reply.get("status") != "streaming":
                     raise Conflict("Hermes did not acknowledge an exclusive streaming turn")
                 while not self.finished.is_set():

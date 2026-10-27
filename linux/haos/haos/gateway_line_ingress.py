@@ -25,6 +25,9 @@ class PreparedLINEPolicy(GatewayPolicy):
 
 
 def validate_binding(binding,*,require_epoch=False):
+    if 'allow_media' in binding and (type(binding['allow_media']) is not bool
+            or binding['allow_media'] and (not isinstance(binding['capabilities'],list) or 'create' not in binding['capabilities'])):
+        raise ValueError('LINE media needs explicit boolean approval and mission-create rights')
     if (not _USER.fullmatch(binding['sender']) or not _CHAT.fullmatch(binding['chat'])
             or not _USER.fullmatch(binding['scope']) or binding['thread']
             or binding['chat'].startswith('U') and binding['chat']!=binding['sender']):

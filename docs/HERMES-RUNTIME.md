@@ -1539,3 +1539,19 @@ There are now nine publicly configurable **text paths**, not nine complete
 platform acceptances. Media/voice require the still-missing shared media broker;
 external LINE accounts, DNS/router/firewall reachability, recipients and installed
 OS acceptance remain separate. No release artifact or live delivery is claimed.
+
+### 2026-10-27 — private mission attachment transport core
+
+The controller now persists bounded, grant/message/epoch-bound media chunks and
+atomically associates ready IDs with a new gateway mission. Revocation, changed
+bytes, altered IDs, incomplete uploads and damaged retained data fail closed.
+Existing text missions read no optional gateway policy. Actual pinned image-byte
+and file-data-URL RPCs receive only bytes and fixed names, then document refs join
+the mission prompt. [Media transport scope](GATEWAY-MEDIA.md) records bounds and
+remaining integration: public LINE download/relay, GUI opt-in, retention controls,
+audio/voice and outbound media remain open at this backend checkpoint.
+
+The new real-backend probe transfers an actual decoded PNG and a byte-identical
+8 MiB document without a model turn. A stdlib-only disposable process probe
+checks real separate UIDs, SO_PEERCRED, private SQLite and owner epoch changes;
+both are required in provider CI, the native RPC probe also in image build.

@@ -43,7 +43,7 @@ async def session(base, token, workspace):
         raise RuntimeError("real Hermes disconnected without a session receipt")
 
 
-def probe(executable: Path):
+def probe(executable: Path, *, session_probe=session):
     with tempfile.TemporaryDirectory(prefix="haos-real-backend-") as directory:
         root = Path(directory)
         workspace = root / "workspace"
@@ -83,7 +83,7 @@ def probe(executable: Path):
                 identity = request(base, token)
                 assert identity.get("ok") is True and identity.get("pid") == process.pid
                 assert identity.get("servesSpa") is False
-                proof = asyncio.run(session(base, token, workspace))
+                proof = asyncio.run(session_probe(base, token, workspace))
                 assert process.poll() is None, "API probe must not attach to an unrelated process"
                 return {"backend_healthy": True, "backend_version": health.get("version"),
                         "unauthenticated_identity_denied": True, "wrong_token_denied": True,

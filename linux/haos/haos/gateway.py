@@ -52,7 +52,8 @@ class GatewayPolicy:
             connector = self.connectors.get(binding.get('connector'))
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
-                else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant' else set())
+                else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
+                else {'allow_media'} if connector and connector['platform']=='line' else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
@@ -126,6 +127,8 @@ class GatewayPolicy:
 class GatewayEngine:
     def __init__(self, store: MissionStore):
         self.store = store
+        from .gateway_media import GatewayMedia
+        self.media=GatewayMedia(store)
         # This additive extension has its own version and preserves the v1 mission contract.
         store.db.executescript("""
             BEGIN IMMEDIATE;
@@ -168,13 +171,16 @@ class GatewayEngine:
             self.store.db.execute("INSERT OR IGNORE INTO gateway_outbox(id,route_id,content) VALUES(?,?,?)",
                                   (digest([route_id, key, part]), route_id, content[offset:offset + 1800]))
 
-    async def receive(self, policy: GatewayPolicy, connector: str, envelope: dict, controller) -> dict:
+    async def receive(self, policy: GatewayPolicy, connector: str, envelope: dict, controller, *, media=None) -> dict:
+        from .gateway_media import references,authorize as authorize_media
+        media=references([] if media is None else media)
         binding = policy.authorize(connector, envelope)
+        if media:authorize_media(policy,connector,envelope)
         text = envelope["text"]
         if not isinstance(text, str) or not 1 <= len(text.strip()) <= 32000:
             raise ValueError("gateway text must contain 1–32000 characters")
         key = digest([connector, envelope["scope"], envelope["chat"], envelope["thread"], envelope["message_id"]])
-        fingerprint = digest(envelope)
+        fingerprint = digest([envelope,media]) if media else digest(envelope)
         actor = "gateway:" + binding["identity"]
         answer_request = None
         with self.store.transaction():
@@ -226,6 +232,7 @@ class GatewayEngine:
                     raise PermissionError("gateway mission creation denied")
                 mission = self.store.create(actor, key, text)
                 mid = mission["id"]
+                self.media.attach(policy,connector,envelope,media,mid)
                 content = f"Mission {mid}: queued"
             route_id = digest([mid, binding["id"], digest(binding)])
             self.store.db.execute("""INSERT OR IGNORE INTO gateway_routes
