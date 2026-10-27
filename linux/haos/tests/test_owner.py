@@ -29,3 +29,56 @@ def test_owner_requires_no_control_process_and_checks_both_units(monkeypatch):
         stdout="LoadState=loaded\nActiveState=inactive\nMainPID=0\nControlPID=123\n"))
     with pytest.raises(PermissionError):
         stopped()
+
+
+def test_media_cli_requires_stopped_services_before_opening_ledger(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr('sys.argv',['haos-owner','media','purge','--id','a'*64,'--note','inspected','--confirm-inspected'])
+    monkeypatch.setattr(owner.os,'geteuid',lambda:0)
+    def refuse():raise PermissionError('execution still running')
+    monkeypatch.setattr(owner,'stopped',refuse)
+    def forbidden(*args,**kwargs):raise AssertionError('opened ledger before stopped gate')
+    monkeypatch.setattr(owner,'MissionStore',forbidden)
+    with pytest.raises(PermissionError,match='still running'):owner.main()
+
+
+def test_media_cli_nonroot_rejected_before_quiescence_or_ledger(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr('sys.argv',['haos-owner','media','list'])
+    monkeypatch.setattr(owner.os,'geteuid',lambda:65534)
+    def forbidden(*args,**kwargs):raise AssertionError('nonowner reached ledger or service gate')
+    monkeypatch.setattr(owner,'stopped',forbidden);monkeypatch.setattr(owner,'MissionStore',forbidden)
+    with pytest.raises(PermissionError,match='authenticate'):owner.main()
+
+
+def test_media_cli_inspect_and_explicit_purge_use_real_private_ledger(monkeypatch,tmp_path,capsys):
+    import base64,json
+    from haos import owner
+    from haos.gateway import GatewayEngine,GatewayPolicy
+    from haos.gateway_media import describe
+    from haos.store import MissionStore
+    config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
+        'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,
+        'thread':'','identity':'personal','capabilities':['create','read'],'allow_media':True,'generation':'b'*64,'since':1}]}
+    event={'platform':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+        'message_id':'c'*64,'is_bot':False,'text':'Inspect the attached document.'}
+    path=tmp_path/'missions.db';store=MissionStore(path);engine=GatewayEngine(store);policy=GatewayPolicy(config)
+    payload=b'payload retained until deliberate owner action'
+    upload=engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(payload,'document')})
+    engine.media.chunk(policy,{'id':upload['id'],'offset':0,'data':base64.b64encode(payload).decode()});store.close()
+    monkeypatch.setattr(owner.os,'geteuid',lambda:0);monkeypatch.setattr(owner,'stopped',lambda:None)
+    monkeypatch.setattr(owner,'MissionStore',lambda ignored:MissionStore(path))
+    audit=[];monkeypatch.setattr(owner,'audit',lambda kind,details:audit.append((kind,details)))
+    monkeypatch.setattr('sys.argv',['haos-owner','media','list']);owner.main()
+    assert json.loads(capsys.readouterr().out)['stored_bytes']==len(payload)
+    monkeypatch.setattr('sys.argv',['haos-owner','media','purge','--id',upload['id'],'--note','Inspected staged upload'])
+    with pytest.raises(PermissionError):owner.main()
+    assert not audit
+    monkeypatch.setattr('sys.argv',['haos-owner','media','purge','--id',upload['id'],'--note','Inspected staged upload','--confirm-inspected'])
+    owner.main();result=json.loads(capsys.readouterr().out)
+    assert result['removed_payload_bytes']==len(payload) and len(audit)==1
+    store=MissionStore(path)
+    try:
+        assert store.db.execute('SELECT state FROM gateway_media_uploads').fetchone()[0]=='purged'
+        assert store.db.execute('SELECT COUNT(*) FROM gateway_media_chunks').fetchone()[0]==0
+    finally:store.close()

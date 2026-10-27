@@ -100,7 +100,9 @@ def main():
         cases.append('duplicate_signed_json_rejected')
         for name in ['connect','_handle_webhook','_dispatch_event','_handle_message_event','_handle_postback_event',
                 '_download_media','_handle_media','send','send_typing','send_image_file','send_voice','send_video']:
-            try:await getattr(adapter,name)()
+            try:
+                if name=='_download_media':await getattr(adapter,name)('123456','image')
+                else:await getattr(adapter,name)()
             except PermissionError:pass
             else:raise AssertionError(name)
             cases.append('raw_native_'+name+'_denied')

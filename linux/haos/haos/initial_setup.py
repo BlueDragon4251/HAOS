@@ -839,3 +839,21 @@ def finalize():
     if setup_in_progress():
         IN_PROGRESS.unlink()
     return {"completed": True, "reboot_required": True}
+
+
+def gateway_media_inventory():
+    require_root()
+    quiesce_for_setup()
+    from .owner import manage_media
+    return manage_media('list')
+
+
+def purge_gateway_media(identity,note,confirmed=False):
+    require_root()
+    import re
+    if (not isinstance(identity,str) or not re.fullmatch('[0-9a-f]{64}',identity)
+            or not isinstance(note,str) or not 1<=len(note.strip())<=2000 or confirmed is not True):
+        raise PermissionError('select one exact upload and explicitly confirm inspection with a bounded note')
+    quiesce_for_setup()
+    from .owner import manage_media
+    return manage_media('purge',[identity],note,confirmed=True)

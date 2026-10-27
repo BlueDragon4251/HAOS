@@ -1393,7 +1393,50 @@ class Wizard:
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",
                         color=self.MUTED).pack(anchor="w", pady=(15, 0))
+            self._button(self.content,'Gespeicherte Gateway-Medien verwalten',lambda:self.show('gateway-media')).pack(anchor='w',pady=6)
             self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
+        elif name == 'gateway-media':
+            self._head('Gateway-Medien verwalten','Private Uploads prüfen; Missionen und Audit bleiben erhalten.')
+            self._label(self.content,'Prüfen stoppt Gateway- und Missionsdienste. Nur unzugeordnete Uploads oder Medien '
+                'abgeschlossener Missionen können bereinigt werden. Dies löscht keine Agent-Kopien oder Backups '
+                'und ist keine sichere physische Löschung.',color=self.MUTED).pack(anchor='w',pady=8)
+            summary=self._label(self.content,'Noch keine privaten Medien geprüft.');summary.pack(anchor='w')
+            selected=self._choice(self.content,'Upload auswählen',['Keine Auswahl'],'Keine Auswahl')
+            details=self._label(self.content,'');details.pack(anchor='w',pady=8)
+            note=self._field(self.content,'Prüfvermerk ohne Zugangsdaten')
+            confirmed=tk.BooleanVar(value=False)
+            tk.Checkbutton(self.content,text='Auswahl geprüft; gespeicherte Nutzdaten ausdrücklich entfernen',
+                variable=confirmed,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,
+                wraplength=self.label_wrap).pack(anchor='w',pady=8)
+            records={}
+            def changed(*_args):
+                confirmed.set(False)
+                row=records.get(selected.get())
+                details.configure(text=(f"Status: {row['state']} · Mission: {row['mission_id'] or 'keine'} · "
+                    f"Missionsstatus: {row['mission_state'] or 'keiner'} · Nutzdaten: {row['stored_bytes']} Byte · "
+                    +('Bereinigung zulässig' if row['purge_allowed'] else 'Bereinigung gesperrt')) if row else '')
+            selected.trace_add('write',changed)
+            def render(value):
+                records.clear();records.update({row['id']:row for row in value['uploads']})
+                summary.configure(text=f"Gespeichert: {value['stored_bytes']} Byte · Reserviert: {value['reserved_bytes']} / {value['limit_bytes']} Byte")
+                menu=next(w for w in self.content.winfo_children() if isinstance(w,tk.OptionMenu))
+                choices=menu['menu'];choices.delete(0,'end')
+                for identity in records or ['Keine Auswahl']:
+                    choices.add_command(label=identity,command=lambda key=identity:selected.set(key))
+                selected.set(next(iter(records),'Keine Auswahl'))
+            self._button(self.content,'Dienste stoppen und Medien prüfen',lambda:self._run_async(initial_setup.gateway_media_inventory,
+                success='Private Medien geprüft; Dienste bleiben gestoppt.',result_handler=render)).pack(anchor='w',pady=5)
+            def purge():
+                identity=selected.get();row=records.get(identity);message=note.get();approval=confirmed.get()
+                confirmed.set(False)
+                if not row or not row['purge_allowed']:
+                    def refuse():raise PermissionError('Eine bereinigbare geprüfte Auswahl ist erforderlich.')
+                    self._run(refuse);return
+                self._run_async(lambda:initial_setup.purge_gateway_media(identity,message,approval),
+                    success='Ausgewählte Nutzdaten bereinigt; Mission, Audit und Metadaten erhalten.',
+                    result_handler=lambda _:self.show('gateway-media'))
+            self._button(self.content,'Ausgewählte Medien bereinigen',purge).pack(anchor='w',pady=5)
+            self._button(self.content,'Zurück zu Gateways',lambda:self.show('gateways')).pack(anchor='w',pady=5)
         elif name == "finish":
             self._head("Einrichtung abschließen",
                        "Erst nach Administrator + Recovery kann die normale HAOS-Sitzung sicher starten.")

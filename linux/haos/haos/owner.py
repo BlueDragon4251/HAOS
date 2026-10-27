@@ -102,6 +102,22 @@ def require_physical_setup_console() -> None:
         raise PermissionError("initial setup requires an authenticated local owner")
 
 
+def manage_media(action,ids=None,note='',*,confirmed=False):
+    """Fixed local-root operation shared by CLI and physical owner GUI."""
+    if os.geteuid()!=0:raise PermissionError('authenticate as the owner with sudo or a recovery console')
+    if action not in {'list','purge'}:raise ValueError('unknown owner media action')
+    stopped()
+    from .gateway_media import GatewayMedia
+    store=MissionStore(Path('/var/lib/haos-control/missions.db'))
+    try:
+        media=GatewayMedia(store)
+        if action=='list':return media.inventory()
+        result=media.purge(ids,f"owner:{os.environ.get('SUDO_UID','0')}",note,confirmed=confirmed)
+        audit('gateway.media.purged',{'ids':result['ids'],'removed_payload_bytes':result['removed_payload_bytes']})
+        return result
+    finally:store.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="HAOS owner recovery; agent and UI policy cannot grant root authority")
     sub = parser.add_subparsers(dest="action", required=True)
@@ -296,6 +312,13 @@ def main():
     grant = sub.add_parser("volume")
     grant.add_argument("id", help="UUID:<filesystem UUID> or PARTUUID:<partition UUID>")
     grant.add_argument("mode", choices=["blocked", "read-only", "full-data-access", "system-managed"])
+    media = sub.add_parser('media',help='inspect or explicitly purge retained gateway payloads with execution stopped')
+    media_sub=media.add_subparsers(dest='media_action',required=True)
+    media_sub.add_parser('list')
+    media_purge=media_sub.add_parser('purge')
+    media_purge.add_argument('--id',action='append',required=True,help='exact upload ID; at most four, no wildcard')
+    media_purge.add_argument('--note',required=True)
+    media_purge.add_argument('--confirm-inspected',action='store_true')
     reconciler = sub.add_parser("reconcile")
     reconciler.add_argument("mission_id")
     reconciler.add_argument("--note", required=True, help="evidence from inspection of Hermes/processes/files")
@@ -388,6 +411,9 @@ def main():
         cleanup()
         atomic_json(Path("/etc/haos/volumes.json"), policy)
         audit("volume.policy", new)
+    elif args.action == 'media':
+        print(json.dumps(manage_media(args.media_action,getattr(args,'id',None),getattr(args,'note',''),
+            confirmed=getattr(args,'confirm_inspected',False)),indent=2))
     elif args.action == "reconcile":
         stopped()
         store = MissionStore(Path("/var/lib/haos-control/missions.db"))

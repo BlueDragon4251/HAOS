@@ -46,8 +46,25 @@ database. Uploads resume from a committed offset after reopen; repeated chunks
 must match exactly. Partial uploads and unadmitted ready data expire after
 24 hours for admission, while retained data remains available for owner
 inspection. Capacity refusal does not delete existing owner/recovery data.
-Management/retention controls are still required before calling the overall
-media feature complete.
+The owner can inspect and explicitly purge controller payloads using the
+physical setup's gateway media page or the root console, with execution stopped:
+
+```sh
+sudo haos-owner media list
+sudo haos-owner media purge --id EXACT_UPLOAD_ID --note 'Inspected unused upload' --confirm-inspected
+```
+
+The GUI stops gateway/mission services before inspection and leaves them stopped;
+use the existing explicit runtime-start action afterward. Console operations
+require controller and Hermes to be inactive with zero main/control PIDs. Purge
+refuses nonterminal missions and validates the whole bounded selection before
+changing any bytes. It frees chunks/quota while retaining upload tombstones,
+mission associations, owner audit and a transactionally committed purge receipt.
+The confirmation is unchecked and resets on selection changes and submission.
+This is logical payload removal, not physical secure erasure, and cannot erase
+agent copies, backups or previously transferred content. Replayed old IDs remain
+unusable, and a damaged/purged attachment never becomes a text-only mission.
+Gateway-cache inspection/retention and voice/outbound media remain open.
 
 Mission creation and media association share a transaction. A wrong-message,
 expired, changed or over-budget attachment cannot leave a partial mission or

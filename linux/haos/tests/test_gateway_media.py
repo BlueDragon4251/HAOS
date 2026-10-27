@@ -166,3 +166,41 @@ def test_noncanonical_chunk_encoding_is_rejected_before_any_write(media,raw):
     store,engine,policy,event=media;started=begin(engine,policy,event,b'data')
     with pytest.raises(ValueError):engine.media.chunk(policy,{'id':started['id'],'offset':0,'data':raw})
     assert store.db.execute('SELECT COUNT(*) FROM gateway_media_chunks').fetchone()[0]==0
+
+
+def test_owner_inventory_purge_retains_tombstone_and_audit(media):
+    store,engine,policy,event=media
+    payload=b'owner-visible retention fixture'
+    upload=begin(engine,policy,event,payload)
+    chunk(engine,policy,upload['id'],0,payload)
+    inventory=engine.media.inventory()
+    assert inventory['stored_bytes']==len(payload) and inventory['reserved_bytes']==len(payload)
+    assert payload.decode() not in str(inventory) and inventory['uploads'][0]['purge_allowed']
+    for actor,note,confirmation in [('gateway:0','inspected',True),('owner:0','',True),('owner:0','inspected',False)]:
+        with pytest.raises(PermissionError):engine.media.purge([upload['id']],actor,note,confirmed=confirmation)
+    assert engine.media.inventory()['stored_bytes']==len(payload)
+    result=engine.media.purge([upload['id']],'owner:1000','Inspected unadmitted payload',confirmed=True)
+    assert result['removed_payload_bytes']==len(payload)
+    assert engine.media.inventory()['reserved_bytes']==0 and engine.media.inventory()['stored_bytes']==0
+    assert engine.media.inventory()['uploads'][0]['state']=='purged'
+    assert store.db.execute('SELECT actor FROM gateway_media_purge_audit').fetchone()[0]=='owner:1000'
+    assert engine.media.purge([upload['id']],'owner:1000','Repeated receipt',confirmed=True)['removed_payload_bytes']==0
+    with pytest.raises(Conflict):begin(engine,policy,event,payload)
+    with pytest.raises(Conflict):chunk(engine,policy,upload['id'],0,payload)
+
+
+def test_owner_purge_batch_atomic_and_terminal_mission_preserved(media):
+    store,engine,policy,event=media
+    first=begin(engine,policy,event,b'first');chunk(engine,policy,first['id'],0,b'first')
+    event2=dict(event,message_id='d'*64)
+    second=begin(engine,policy,event2,b'second');chunk(engine,policy,second['id'],0,b'second')
+    mission=store.create('gateway:personal','media-retention-fixture','Review payload')
+    engine.media.attach(policy,'line',event2,[second['id']],mission['id'])
+    with pytest.raises(Conflict):engine.media.purge([first['id'],second['id']],'owner:0','Inspected',confirmed=True)
+    assert engine.media.inventory()['stored_bytes']==11
+    assert not next(r for r in engine.media.inventory()['uploads'] if r['id']==second['id'])['purge_allowed']
+    store.request_cancel(mission['id'],'owner:0')
+    engine.media.purge([first['id'],second['id']],'owner:0','Inspected cancelled mission',confirmed=True)
+    assert store.get(mission['id'])['state']=='cancelled' and engine.media.has_mission(mission['id'])
+    with pytest.raises(Conflict):engine.media.for_mission(policy,mission['id'])
+    assert store.db.execute('SELECT COUNT(*) FROM gateway_media_purge_audit').fetchone()[0]==2

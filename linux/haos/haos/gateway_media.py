@@ -72,7 +72,10 @@ class GatewayMedia:
             created_at REAL NOT NULL,mission_id TEXT REFERENCES missions(id));
             CREATE TABLE IF NOT EXISTS gateway_media_chunks(
             upload_id TEXT NOT NULL REFERENCES gateway_media_uploads(id),offset INTEGER NOT NULL,
-            data BLOB NOT NULL,PRIMARY KEY(upload_id,offset));''')
+            data BLOB NOT NULL,PRIMARY KEY(upload_id,offset));
+            CREATE TABLE IF NOT EXISTS gateway_media_purge_audit(
+            upload_id TEXT PRIMARY KEY REFERENCES gateway_media_uploads(id),
+            actor TEXT NOT NULL,note TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL);''')
         versions=self.db.execute('SELECT version FROM gateway_media_schema').fetchall()
         if len(versions)!=1 or versions[0][0]!=1:raise RuntimeError('unsupported private gateway media schema')
 
@@ -191,3 +194,48 @@ class GatewayMedia:
             if describe(data,meta['kind'])!=meta:raise Conflict('private mission attachment damaged')
             result.append({'id':row['id'],'descriptor':meta,'data':data})
         return result
+
+
+    def inventory(self):
+        """Owner metadata only: no payload, filenames, goals or credential values."""
+        rows=self.db.execute("""SELECT u.id,u.connector,u.binding_id,u.state,u.descriptor,u.received,
+            u.created_at,u.mission_id,m.state AS mission_state,
+            (SELECT COALESCE(SUM(LENGTH(data)),0) FROM gateway_media_chunks WHERE upload_id=u.id) AS stored_bytes
+            FROM gateway_media_uploads u LEFT JOIN missions m ON m.id=u.mission_id ORDER BY u.created_at,u.id""").fetchall()
+        result=[];reserved=0
+        for row in rows:
+            meta=descriptor(json.loads(row['descriptor']))
+            if row['state']!='purged':reserved+=meta['size']
+            result.append({key:row[key] for key in ['id','connector','binding_id','state','received','created_at',
+                'mission_id','mission_state','stored_bytes']} | {'descriptor':meta,
+                'admission_expired':row['mission_id'] is None and time.time()>row['created_at']+86400,
+                'purge_allowed':row['state']!='purged' and (row['mission_id'] is None or row['mission_state'] in {'completed','failed','cancelled'})})
+        return {'uploads':result,'reserved_bytes':reserved,'limit_bytes':MAX_TOTAL,
+            'stored_bytes':sum(row['stored_bytes'] for row in rows),'limit_records':1024}
+
+    def purge(self,ids,actor,note,*,confirmed=False):
+        """Explicit owner-only caller; retain tombstones, grants, missions and audit."""
+        if (confirmed is not True or not isinstance(actor,str) or not re.fullmatch(r'owner:[0-9]+',actor)
+                or not isinstance(note,str) or not 1<=len(note.strip())<=2000):
+            raise PermissionError('explicit authenticated owner inspection and bounded note required')
+        ids=references(ids)
+        if not ids:raise ValueError('explicit media IDs required; no wildcard purge')
+        removed=0
+        with self.store.transaction():
+            rows=[]
+            for identity in ids:
+                row=self.db.execute('SELECT * FROM gateway_media_uploads WHERE id=?',(identity,)).fetchone()
+                if row is None:raise KeyError('unknown private media ID')
+                if row['mission_id'] is not None and self.store.get(row['mission_id'])['state'] not in {'completed','failed','cancelled'}:
+                    raise Conflict('media for a nonterminal mission cannot be purged')
+                rows.append(row)
+            for row in rows:
+                if row['state']=='purged':continue
+                size=self.db.execute('SELECT COALESCE(SUM(LENGTH(data)),0) FROM gateway_media_chunks WHERE upload_id=?',(row['id'],)).fetchone()[0]
+                self.db.execute('DELETE FROM gateway_media_chunks WHERE upload_id=?',(row['id'],))
+                self.db.execute("UPDATE gateway_media_uploads SET state='purged' WHERE id=?",(row['id'],))
+                self.db.execute('INSERT INTO gateway_media_purge_audit VALUES(?,?,?,?,?)',
+                    (row['id'],actor,self.store.redactor.text(note.strip()),time.time(),size))
+                removed+=size
+        return {'ids':ids,'removed_payload_bytes':removed,'tombstones_retained':True,
+            'does_not_erase_agent_copies_or_backups':True}

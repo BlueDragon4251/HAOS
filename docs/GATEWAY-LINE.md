@@ -123,7 +123,8 @@ Incoming PNG/JPEG images (2 MiB) and documents (8 MiB) now use the shared
 unchecked option and clears pending consent on sender/chat edits or submit;
 CLI uses `gateway pair --allow-media`. Remote filenames never select host paths.
 
-**Still open:** voice, video, outbound media and owner retention controls.
+**Still open:** voice, video, outbound media and gateway-cache retention controls.
+Controller payload inspection/purge is available through the owner GUI and CLI.
 This integration does not claim all 22 gateways, real LINE accounts,
 external message delivery, installed boot, hardware tests or final ISO/container/
 APK release acceptance. No external test messages are sent by these fixtures.

@@ -20,7 +20,10 @@ def exercise(directory,tls,expired_tls):
     key=directory/'owner-key.pem';key.write_text(tls['private_key']);key.chmod(0o600)
     original_load,original_persist=gateway_setup.load,gateway_setup.persist
     real_path=Path
-    def audit_path(value):return audit if value=='/var/lib/haos-owner' else real_path(value)
+    def audit_path(value):
+        if value=='/var/lib/haos-owner':return audit
+        if value=='/var/lib/haos-control/missions.db':return directory/'media-missions.db'
+        return real_path(value)
     with patch.object(gateway_setup,'load',lambda *args:original_load(config)), \
             patch.object(gateway_setup,'persist',lambda policy,private:original_persist(policy,private,config=config,gid=0)), \
             patch.object(gateway_setup,'stopped_gateway',lambda:None), \
@@ -100,6 +103,28 @@ def exercise(directory,tls,expired_tls):
         initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'))
         policy,private=original_load(config);assert not policy['bindings'][0]['allow_media']
         cases.append('actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted')
+        from haos.store import MissionStore
+        from haos.gateway import GatewayEngine
+        from haos.gateway_media import describe
+        import base64
+        ledger=MissionStore(directory/'media-missions.db');engine=GatewayEngine(ledger)
+        media_policy=copy.deepcopy(policy);media_policy['bindings'][0]['allow_media']=True
+        media_event={'platform':'line','sender':sender,'chat':'C'+'b'*32,'scope':destination,'thread':'',
+            'message_id':'c'*64,'is_bot':False,'text':'Inspect retained document'}
+        payload=b'private owner inspected document'
+        upload=engine.media.begin(GatewayPolicy(media_policy),{'connector':'line-main','envelope':media_event,'descriptor':describe(payload,'document')})
+        engine.media.chunk(GatewayPolicy(media_policy),{'id':upload['id'],'offset':0,'data':base64.b64encode(payload).decode()});ledger.close()
+        with patch.object(owner,'stopped',lambda:None):
+            assert owner.manage_media('list')['stored_bytes']==len(payload)
+            try:owner.manage_media('purge',[upload['id']],'Inspected retained payload')
+            except PermissionError:pass
+            else:raise AssertionError('root media purge accepted without explicit confirmation')
+            assert owner.manage_media('list')['stored_bytes']==len(payload)
+            assert owner.manage_media('purge',[upload['id']],'Inspected retained payload',confirmed=True)['removed_payload_bytes']==len(payload)
+            assert owner.manage_media('list')['uploads'][0]['state']=='purged'
+        assert canary.read_text()=='preserve-owner-recovery'
+        cases.append('actual_root_shared_cli_gui_media_inspection_and_explicit_purge_keep_owner_canary_and_tombstone')
+
 
         for changes in [{'sender':destination},{'scope':'U'+'e'*32},{'thread':'unapproved'}]:
             args={'sender':sender,'scope':'','thread':''};args.update(changes)
