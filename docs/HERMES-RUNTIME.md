@@ -1572,3 +1572,18 @@ extra, bounded local decoding, actual Hermes local STT and a separate offline
 socket-activated identity. Native and real-UID probes are mandatory. It does
 not yet open LINE audio admission or claim owner GUI/model activation, outbound
 media, live accounts, installed boot or release acceptance.
+
+### 2026-10-27 — LINE incoming voice connected to private mission transcription
+
+Owner model/service setup is now available through the actual physical GUI and
+`speech status/enable/disable` console actions, independently from sender grants.
+The LINE pairing GUI/CLI has a separate `allow_voice` consent requiring create
+permission and verified local setup. Existing media grants do not include voice.
+The pinned native audio codec and verified content client feed private media
+uploads; the controller invokes the isolated STT service, caches a checked
+source/model-bound receipt and sends recognized text, never raw audio, to the
+agent. Current grants/cancellation/deadlines are checked while waiting and before
+dispatch. Corruption or refusal cannot silently produce a text-only fallback.
+See [speech operation, tests and limits](GATEWAY-SPEECH.md). Video and outbound
+media remain open; no external LINE account, LLM inference, installed/HP or
+release acceptance is claimed by the local composition/kernel probes.

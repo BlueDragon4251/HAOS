@@ -25,9 +25,10 @@ class PreparedLINEPolicy(GatewayPolicy):
 
 
 def validate_binding(binding,*,require_epoch=False):
-    if 'allow_media' in binding and (type(binding['allow_media']) is not bool
-            or binding['allow_media'] and (not isinstance(binding['capabilities'],list) or 'create' not in binding['capabilities'])):
-        raise ValueError('LINE media needs explicit boolean approval and mission-create rights')
+    for approval in ['allow_media','allow_voice']:
+        if approval in binding and (type(binding[approval]) is not bool
+                or binding[approval] and (not isinstance(binding['capabilities'],list) or 'create' not in binding['capabilities'])):
+            raise ValueError('LINE media/voice needs separate boolean approval and mission-create rights')
     if (not _USER.fullmatch(binding['sender']) or not _CHAT.fullmatch(binding['chat'])
             or not _USER.fullmatch(binding['scope']) or binding['thread']
             or binding['chat'].startswith('U') and binding['chat']!=binding['sender']):
@@ -50,7 +51,7 @@ def envelope(event,destination):
     if (not isinstance(source,dict) or not isinstance(message,dict) or type(stamp) is not int or stamp<=0
             or not isinstance(identity,str) or not re.fullmatch(r'[0-9A-HJKMNP-TV-Z]{26}',identity)
             or not _USER.fullmatch(destination) or not isinstance(source.get('userId'),str)
-            or not _USER.fullmatch(source['userId']) or message.get('type') not in {'text','image','file'}
+            or not _USER.fullmatch(source['userId']) or message.get('type') not in {'text','image','file','audio'}
             or not isinstance(message.get('id'),str) or not re.fullmatch(r'[1-9][0-9]{0,31}',message['id'])):return None
     if message['type']=='text':
         if not isinstance(message.get('text'),str) or not 1<=len(message['text'].encode())<=32000 or not message['text'].strip():return None
@@ -62,9 +63,11 @@ def envelope(event,destination):
                 or any(ord(c)<32 for c in message['fileName'])):return None
         if 'fileSize' in message and (type(message['fileSize']) is not int or not 1<=message['fileSize']<=
                 (MAX_IMAGE_BYTES if message['type']=='image' else MAX_BYTES)):return None
-        fields={key:message[key] for key in ('id','type','fileName','fileSize','contentProvider') if key in message}
-        kind='image' if message['type']=='image' else 'document'
-        text=f"Inspect the attached {kind} (LINE message {message['id']}; metadata {digest(fields)})."
+        if 'duration' in message and (message['type']!='audio' or type(message['duration']) is not int or not 1<=message['duration']<=120000):return None
+        fields={key:message[key] for key in ('id','type','fileName','fileSize','contentProvider','duration') if key in message}
+        kind={'image':'image','file':'document','audio':'voice'}[message['type']]
+        text=(f"Process the approved voice request (LINE message {message['id']}; metadata {digest(fields)})." if kind=='voice'
+            else f"Inspect the attached {kind} (LINE message {message['id']}; metadata {digest(fields)}).")
     user=source['userId'];kind=source.get('type')
     if kind=='user' and set(source)=={'type','userId'}:chat=user
     elif kind=='group' and set(source)=={'type','userId','groupId'}:chat=source['groupId']
@@ -108,12 +111,12 @@ def capture(adapter,body,signature,authority):
         is_media=event['message']['type']!='text'
         if is_media:
             from .gateway_media import authorize
-            try:authorize(policy,native.connector,source)
+            try:authorize(policy,native.connector,source,{'image':'image','file':'document','audio':'voice'}[event['message']['type']])
             except PermissionError:continue
         if stamp*1000<=binding['since'] or stamp>time.time()+300:raise PermissionError('LINE event outside timed owner grant')
         # Reply tokens are single-use capabilities, never persisted in raw payload.
         sanitized={key:value for key,value in event.items() if key in {'type','mode','source','message','timestamp','webhookEventId'}}
-        message_fields=('id','type','fileName','fileSize','contentProvider') if is_media else ('id','type','text')
+        message_fields=('id','type','fileName','fileSize','contentProvider','duration') if is_media else ('id','type','text')
         sanitized['message']={key:event['message'][key] for key in message_fields if key in event['message']}
         from .redaction import Redactor
         private=Redactor([adapter.channel_secret,adapter.channel_access_token,event.get('replyToken','')])
@@ -177,13 +180,13 @@ def install(adapter):
     async def download(self,message_id,msg_type,*,filename=None):
         state=_CURRENT.get()
         if state is None or state['adapter'] is not self:raise PermissionError('no retained LINE media event')
-        row=state['row'];message=row['payload']['event']['message'];kind='image' if msg_type=='image' else 'document'
-        if message_id!=message['id'] or msg_type!=message['type'] or msg_type not in {'image','file'}:
+        row=state['row'];message=row['payload']['event']['message'];kind={'image':'image','file':'document','audio':'voice'}.get(msg_type)
+        if message_id!=message['id'] or msg_type!=message['type'] or msg_type not in {'image','file','audio'}:
             raise PermissionError('native LINE media identity changed')
         def current():
             from .gateway_media import authorize
             policy=self._haos_native.policy();policy.current_binding(row)
-            authorize(policy,self._haos_native.connector,row['envelope'])
+            authorize(policy,self._haos_native.connector,row['envelope'],kind)
             return policy
         cache=self._haos_media_cache;policy=current();item=cache.find(policy,self._haos_native.connector,row['envelope'])
         if item is None:

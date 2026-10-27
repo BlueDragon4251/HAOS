@@ -22,12 +22,12 @@ _HASH=re.compile(r'[0-9a-f]{64}\Z')
 def descriptor(value):
     if (not isinstance(value,dict) or set(value)!={'kind','format','sha256','size'}
             or not isinstance(value['kind'],str) or not isinstance(value['format'],str)
-            or value['kind'] not in {'image','document'}
+            or value['kind'] not in {'image','document','voice'}
             or value['format'] not in ({'png','jpeg'} if value['kind']=='image' else {'bin'})
             or type(value['size']) is not int or not 1<=value['size']<=MAX_BYTES
             or value['kind']=='image' and value['size']>MAX_IMAGE_BYTES
             or not isinstance(value['sha256'],str) or not _HASH.fullmatch(value['sha256'])):
-        raise ValueError('bounded path-free image/document descriptor required')
+        raise ValueError('bounded path-free image/document/voice descriptor required')
     return dict(value)
 
 
@@ -49,10 +49,17 @@ def references(values):
     return list(values)
 
 
-def authorize(policy,connector,envelope):
+def approved(binding,kind=None):
+    if kind not in {None,'image','document','voice'}:raise ValueError('reviewed attachment kind required')
+    if kind=='voice':return binding.get('allow_voice') is True
+    if kind in {'image','document'}:return binding.get('allow_media') is True
+    return binding.get('allow_media') is True or binding.get('allow_voice') is True
+
+
+def authorize(policy,connector,envelope,kind=None):
     if not isinstance(connector,str):raise ValueError('exact configured media connector required')
     binding=policy.authorize(connector,envelope)
-    if (policy.connectors[connector]['platform']!='line' or binding.get('allow_media') is not True
+    if (policy.connectors[connector]['platform']!='line' or not approved(binding,kind)
             or 'create' not in binding['capabilities'] or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('explicit current timed media/create grant required')
     if not isinstance(envelope['text'],str) or not 1<=len(envelope['text'].strip())<=32000 or envelope['text'].lstrip().startswith('/'):
@@ -73,6 +80,9 @@ class GatewayMedia:
             CREATE TABLE IF NOT EXISTS gateway_media_chunks(
             upload_id TEXT NOT NULL REFERENCES gateway_media_uploads(id),offset INTEGER NOT NULL,
             data BLOB NOT NULL,PRIMARY KEY(upload_id,offset));
+            CREATE TABLE IF NOT EXISTS gateway_media_transcripts(
+            upload_id TEXT PRIMARY KEY REFERENCES gateway_media_uploads(id),receipt TEXT NOT NULL,
+            receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS gateway_media_purge_audit(
             upload_id TEXT PRIMARY KEY REFERENCES gateway_media_uploads(id),
             actor TEXT NOT NULL,note TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL);''')
@@ -80,10 +90,10 @@ class GatewayMedia:
         if len(versions)!=1 or versions[0][0]!=1:raise RuntimeError('unsupported private gateway media schema')
 
     def _current(self,policy,row):
-        binding=policy.current_binding(dict(row))
+        binding=policy.current_binding(dict(row));meta=descriptor(json.loads(row['descriptor']))
         if (policy.connectors.get(row['connector'],{}).get('platform')!='line'
                 or binding['connector']!=row['connector']
-                or binding.get('allow_media') is not True or 'create' not in binding['capabilities']):
+                or not approved(binding,meta['kind']) or 'create' not in binding['capabilities']):
             raise PermissionError('media grant withdrawn')
         meta=descriptor(json.loads(row['descriptor']))
         if (row['id']!=digest([row['connector'],row['binding_digest'],row['envelope_digest'],meta])
@@ -94,7 +104,7 @@ class GatewayMedia:
     def begin(self,policy,params):
         if not isinstance(params,dict) or set(params)!={'connector','envelope','descriptor'}:raise ValueError('exact media upload declaration required')
         connector=params['connector'];envelope=params['envelope'];meta=descriptor(params['descriptor'])
-        binding=authorize(policy,connector,envelope)
+        binding=authorize(policy,connector,envelope,meta['kind'])
         identity=digest([connector,digest(binding),digest(envelope),meta])
         with self.store.transaction():
             row=self.db.execute('SELECT * FROM gateway_media_uploads WHERE id=?',(identity,)).fetchone()
@@ -235,9 +245,43 @@ class GatewayMedia:
                 if row['state']=='purged':continue
                 size=self.db.execute('SELECT COALESCE(SUM(LENGTH(data)),0) FROM gateway_media_chunks WHERE upload_id=?',(row['id'],)).fetchone()[0]
                 self.db.execute('DELETE FROM gateway_media_chunks WHERE upload_id=?',(row['id'],))
+                self.db.execute('DELETE FROM gateway_media_transcripts WHERE upload_id=?',(row['id'],))
                 self.db.execute("UPDATE gateway_media_uploads SET state='purged' WHERE id=?",(row['id'],))
                 self.db.execute('INSERT INTO gateway_media_purge_audit VALUES(?,?,?,?,?)',
                     (row['id'],actor,self.store.redactor.text(note.strip()),time.time(),size))
                 removed+=size
         return {'ids':ids,'removed_payload_bytes':removed,'tombstones_retained':True,
             'does_not_erase_agent_copies_or_backups':True}
+
+
+    def transcript(self,policy,mission,identity):
+        rows=self.check_mission(policy,mission)
+        row=next((row for row in rows if row['id']==identity),None)
+        if row is None or descriptor(json.loads(row['descriptor']))['kind']!='voice':
+            raise PermissionError('voice attachment for this mission required')
+        saved=self.db.execute('SELECT receipt,receipt_sha256 FROM gateway_media_transcripts WHERE upload_id=?',(identity,)).fetchone()
+        if saved is None:return None
+        value=json.loads(saved['receipt'])
+        if digest([identity,value])!=saved['receipt_sha256']:raise Conflict('private voice transcript receipt damaged')
+        from .speech_client import result
+        return result(value,json.loads(row['descriptor'])['sha256'])
+
+    def save_transcript(self,policy,mission,identity,value):
+        from .speech_client import result
+        with self.store.transaction():
+            self.check_mission(policy,mission)
+            row=self.db.execute('SELECT descriptor,mission_id FROM gateway_media_uploads WHERE id=?',(identity,)).fetchone()
+            if row is None or row['mission_id']!=mission or json.loads(row['descriptor'])['kind']!='voice':
+                raise PermissionError('exact mission voice attachment required')
+            value=result(value,json.loads(row['descriptor'])['sha256'])
+            if any(secret in value['transcript'] for secret in self.store.redactor.secrets):
+                raise PermissionError('private credential reflection cannot become a voice transcript')
+            existing=self.transcript(policy,mission,identity)
+            if existing is not None:
+                if existing!=value:raise Conflict('retained voice transcript cannot be replaced silently')
+                return existing
+            self.db.execute('INSERT INTO gateway_media_transcripts VALUES(?,?,?,?)',
+                (identity,json.dumps(value),digest([identity,value]),time.time()))
+            self.store._event(mission,'mission.voice-transcribed',{'media_id':identity,'source_sha256':value['source_sha256'],
+                'model_revision':value['model_revision'],'samples':value['samples'],'sample_rate':value['sample_rate']})
+            return value

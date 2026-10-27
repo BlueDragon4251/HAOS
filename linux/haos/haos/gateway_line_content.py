@@ -56,7 +56,7 @@ class Content:
 
     async def fetch(self,message_id,kind,current):
         if (not isinstance(message_id,str) or not re.fullmatch(r'[1-9][0-9]{0,31}',message_id)
-                or not isinstance(kind,str) or kind not in {'image','document'} or not callable(current)):
+                or not isinstance(kind,str) or kind not in {'image','document','voice'} or not callable(current)):
             raise ValueError('exact retained LINE message and media kind required')
         if self.active is not None:raise PermissionError('native LINE content request already active')
         from plugins.platforms.line.adapter import _LineClient

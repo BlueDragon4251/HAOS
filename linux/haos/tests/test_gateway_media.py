@@ -219,3 +219,62 @@ def test_owner_inventory_bounds_old_tombstones_without_losing_active_uploads_or_
     assert inventory['reserved_bytes']==len(b'pending')
     assert store.db.execute('SELECT COUNT(*) FROM gateway_media_uploads').fetchone()[0]==131
     assert store.db.execute('SELECT COUNT(*) FROM gateway_media_purge_audit').fetchone()[0]==130
+
+
+def test_voice_requires_separate_grant_and_cannot_substitute_for_document_permission(media):
+    store,engine,policy,event=media
+    data=b'retained audio bytes'
+    with pytest.raises(PermissionError):engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(data,'voice')})
+    settings=config();settings['bindings'][0].update(allow_media=False,allow_voice=True)
+    voice=GatewayPolicy(settings)
+    started=engine.media.begin(voice,{'connector':'line','envelope':event,'descriptor':describe(data,'voice')})
+    assert chunk(engine,voice,started['id'],0,data)['ready']
+    with pytest.raises(PermissionError):begin(engine,voice,event,b'document')
+    with pytest.raises(PermissionError):engine.media.begin(voice,{'connector':'line','envelope':event,'descriptor':describe(b'\x89PNG\r\n\x1a\nfixture','image')})
+
+
+def test_voice_transcript_receipt_is_durable_bound_and_removed_only_by_explicit_terminal_purge(media):
+    import hashlib,json
+    from haos.speech_model import REVISION
+    store,engine,policy,event=media
+    settings=config();settings['bindings'][0]['allow_voice']=True;policy=GatewayPolicy(settings)
+    data=b'retained audio bytes'
+    started=engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(data,'voice')})
+    chunk(engine,policy,started['id'],0,data)
+    mission=store.create('gateway:personal','voice-receipt-fixture','Process approved voice')
+    engine.media.attach(policy,'line',event,[started['id']],mission['id'])
+    receipt={'transcript':'unit receipt fixture; actual ASR tested separately','source_sha256':hashlib.sha256(data).hexdigest(),
+        'samples':16000,'sample_rate':16000,'model_revision':REVISION,'provider':'local'}
+    assert engine.media.transcript(policy,mission['id'],started['id']) is None
+    assert engine.media.save_transcript(policy,mission['id'],started['id'],receipt)==receipt
+    assert engine.media.save_transcript(policy,mission['id'],started['id'],receipt)==receipt
+    assert engine.media.transcript(policy,mission['id'],started['id'])==receipt
+    with pytest.raises(Conflict):engine.media.save_transcript(policy,mission['id'],started['id'],dict(receipt,transcript='changed'))
+    changed=config();changed['bindings'][0].update(allow_voice=True,generation='f'*64)
+    with pytest.raises(PermissionError):engine.media.transcript(GatewayPolicy(changed),mission['id'],started['id'])
+    store.db.execute('UPDATE gateway_media_transcripts SET receipt=?',(json.dumps(dict(receipt,transcript='corrupted')),))
+    with pytest.raises(Conflict):engine.media.transcript(policy,mission['id'],started['id'])
+    store.request_cancel(mission['id'],'owner:0')
+    engine.media.purge([started['id']],'owner:0','Inspected cancelled voice fixture',confirmed=True)
+    assert store.db.execute('SELECT COUNT(*) FROM gateway_media_transcripts').fetchone()[0]==0
+    assert store.get(mission['id'])['state']=='cancelled' and engine.media.has_mission(mission['id'])
+
+
+def test_voice_transcript_survives_actual_ledger_reopen(media):
+    import hashlib
+    from pathlib import Path
+    from haos.speech_model import REVISION
+    store,engine,policy,event=media
+    settings=config();settings['bindings'][0]['allow_voice']=True;policy=GatewayPolicy(settings)
+    data=b'unit persistence audio'
+    upload=engine.media.begin(policy,{'connector':'line','envelope':event,'descriptor':describe(data,'voice')})
+    chunk(engine,policy,upload['id'],0,data)
+    mission=store.create('gateway:personal','voice-durable-fixture','Process approved voice')
+    engine.media.attach(policy,'line',event,[upload['id']],mission['id'])
+    receipt={'transcript':'unit durable transcript fixture','source_sha256':hashlib.sha256(data).hexdigest(),
+        'samples':16000,'sample_rate':16000,'model_revision':REVISION,'provider':'local'}
+    engine.media.save_transcript(policy,mission['id'],upload['id'],receipt)
+    path=Path(store.db.execute('PRAGMA database_list').fetchone()[2]);store.close()
+    reopened=MissionStore(path)
+    try:assert GatewayEngine(reopened).media.transcript(policy,mission['id'],upload['id'])==receipt
+    finally:reopened.close()

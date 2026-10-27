@@ -48,8 +48,8 @@ def adapter_envelope(event, platform: str):
         from .gateway_media_relay import event_media
         try:admitted=event_media(event,platform)
         except PermissionError:raise ValueError('attachment and voice admission require a configured media broker') from None
-        if not admitted or getattr(event.message_type,'value',None) not in {'photo','document'}:
-            raise ValueError('media requires a retained private image/document capability')
+        if not admitted or getattr(event.message_type,'value',None) not in {'photo','document','voice'}:
+            raise ValueError('media requires a retained private image/document/voice capability')
     elif getattr(event.message_type, "value", None) not in {"text", "command"}:
         raise ValueError("attachment and voice admission require a configured media broker")
     if not event.message_id or not source.user_id:

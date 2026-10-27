@@ -1,0 +1,576 @@
+{
+  "parent_commit": "06880bc74a516bfc3d35651b97c0de81d72b4d9b",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "e88db753efe338873798e5aeb19ef3acc04e690437c897f964f225e443391d2f"
+    },
+    {
+      "path": "docs/GATEWAY-LINE.md",
+      "sha256": "331aaf3c1f1debda7f4af49a37d62b5ad7b56a433e78f6a54b47f32e55a39167"
+    },
+    {
+      "path": "docs/GATEWAY-MEDIA.md",
+      "sha256": "fe1f84035d6c61ee0ca7af13237c352536a15a10b8cc36e78557903dc07f3719"
+    },
+    {
+      "path": "docs/GATEWAY-SPEECH.md",
+      "sha256": "926f2ffc71cbfba88d65ce36081a714836421f92617b5a4c678e18eb50ecff66"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "b00200c322f9fbdb4d98db1f9705c184cf5740c1fe412f74c3fa36c5e7fce968"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "542ecfb0b1243826341e7169642427c32a8e50cb2a9f6da9031551ba24bcf581"
+    },
+    {
+      "path": "linux/haos/haos/controller.py",
+      "sha256": "e5f9e4072f608cc73e8c28d0e94828036d5cb3aeea00bf004f56aaf74d463656"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "4bcbe6de1705c1e9ad555b5b6bf5471f41a0f658381ae4d123221b97760d1270"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_content.py",
+      "sha256": "3861e8e3e450723eb899f3a8264fa5cf2812ceb7def1a43be4111c392d26c900"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "c1c5bd3b1af33eb67ab2c298792ef03136066ca2bcca3747e46ac944ae55a97c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "d5b504100128e4fee968a732edc4067b32d156d9c724230676adc65a3a92bea8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "c45ef38677f5e8bd7e267f2218909fd07ef3c1dbf2b2fb02d9bc330d2fcdc316"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "a33606660f11f68d41b28aa2570037647ef7a7e9660fae4979c2fe06af0ecbce"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "3a2b7057295599a2d59a53c4765bd1de215557cb2699414c080ae8ee43a68bdb"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "446ad718413cc43303709d82f38dd8d3d67144f3e285aa70935311f8e0b2c322"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "34ae5110d49855cec03e925661b2ae70fe6472cca21108cfa035c73f02143edf"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "53ebe2f3b16c1c16c72968dfb93189c1e8fada2d04b523c625753c5fb5ed2a75"
+    },
+    {
+      "path": "linux/haos/haos/speech_client.py",
+      "sha256": "04c1dc082d76ab63e50fcde1db61e0513f4d2061ece992a52c10bc154facfc17"
+    },
+    {
+      "path": "linux/haos/haos/speech_service.py",
+      "sha256": "8f21bd542ec1e88d34ad3337342b541d3408d1ac09e5acb5ee5cc1ac513f8beb"
+    },
+    {
+      "path": "linux/haos/probes/probe_speech_process.py",
+      "sha256": "cef62d57c006f5292e07794bdaa5511b87a1dac7b89e81c89a57ba7037572a8a"
+    },
+    {
+      "path": "linux/haos/runtime/line_owner_fixture.py",
+      "sha256": "3af1f94baeda63093f5813d4fd4f641f18473259714dccad5f715ff865c20075"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_owner_gui.py",
+      "sha256": "735182654e2dfdb006a72e504e9528401f25cc148e38265b251d82276dc0ad5e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_voice.py",
+      "sha256": "44c520c0c056e2603fa700753382a80c83d36b69142882e3d4b540f571d64eb2"
+    },
+    {
+      "path": "linux/haos/runtime/probe_speech_owner_gui.py",
+      "sha256": "0e45de8b91a2ba2910e78fd01acacb866910b37a5d247ca8167ddb963a771d0e"
+    },
+    {
+      "path": "linux/haos/tests/test_controller_media.py",
+      "sha256": "d129f63e610adfd4a8fb6dca4ec63b6bb9c06f45060dc7a5710a76e9f0880374"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media.py",
+      "sha256": "81b1e381432ce9b22e76d88c1c9cf999f04d217314c76fd921b661d78c22abeb"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media_relay.py",
+      "sha256": "bc95a87ec2ea70d36866b8da414c56ef055f6dff09122d5d6b51325f4f556f01"
+    },
+    {
+      "path": "linux/haos/tests/test_speech.py",
+      "sha256": "d2f740367696fb2f7ce034346a648865bb6e86246c900c679a023d0977730333"
+    }
+  ],
+  "suites": [
+    {
+      "name": "voice-integration-minimal",
+      "summary": "1442 passed, 2 skipped in 8.25s",
+      "sha256": "acf8fd9d9e75142694aafd33668fa290cdbf3a1a44832950f8034a3e62d3c186"
+    },
+    {
+      "name": "voice-integration-full",
+      "summary": "1442 passed, 2 skipped in 8.25s",
+      "sha256": "acf8fd9d9e75142694aafd33668fa290cdbf3a1a44832950f8034a3e62d3c186"
+    },
+    {
+      "name": "voice-integration-root",
+      "summary": "87 passed in 27.09s",
+      "sha256": "2e22b5a893e16bc8d3fc133b618d11463a42b77c34af804dfac789abd8a9b9bc"
+    }
+  ],
+  "probes": {
+    "line-voice-composition": {
+      "receipt": {
+        "passed": 8,
+        "cases": [
+          "actual_signed_audio_without_separate_voice_grant_never_downloads_or_admits",
+          "actual_unknown_audio_sender_is_refused_before_content_or_local_stt",
+          "signed_audio_declared_over_duration_or_boolean_duration_refused_before_download",
+          "actual_pinned_line_voice_codec_verified_https_content_context_relay_and_controller_store_preserve_m4a_bytes",
+          "actual_local_native_stt_reaches_controller_prompt_as_text_without_raw_audio_agent_rpc_or_llm_inference",
+          "signed_voice_replay_after_durable_admission_does_not_redownload_retranscribe_or_create_another_mission",
+          "actual_invalid_audio_decode_preserves_source_and_prevents_transcript_cache_raw_agent_file_and_model_prompt",
+          "owner_voice_grant_withdrawal_after_actual_stt_prevents_cache_write_and_agent_prompt"
+        ],
+        "actual_line_codec_https_controller_and_native_local_model": true,
+        "private_speech_transport_and_agent_terminal_are_fixture": true,
+        "tls_verification_disabled": false,
+        "external_line_account_llm_inference_or_installed_acceptance": false
+      },
+      "sha256": "8d47ea37c09356c2ce0a84ecc546030394eccaf655b64e87b0ffa05cc5a8d380"
+    },
+    "voice-controller-actual-process": {
+      "receipt": {
+        "passed": 10,
+        "cases": [
+          "actual_pinned_hermes_whisper_transcription_under_separate_uid",
+          "actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity",
+          "actual_container_network_disabled_and_reviewed_model_bytes_used_offline",
+          "actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket",
+          "actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path",
+          "actual_client_disconnect_kills_and_joins_native_worker_without_orphan",
+          "actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation",
+          "actual_root_owner_activation_checks_real_frozen_sdk_and_model_then_publishes_closed_readable_config_without_redownload",
+          "actual_root_owner_disable_archives_configuration_and_preserves_all_model_data",
+          "actual_sdk_metadata_version_mismatch_refuses_owner_activation_without_mutating_retained_settings"
+        ],
+        "native_receipt": {
+          "source_sha256": "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715",
+          "model_revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+          "transcript_sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec",
+          "samples": 176000
+        },
+        "actual_uid": 65530,
+        "owner_service_control_is_fixture": true,
+        "external_stt_account_or_line_voice_acceptance": false
+      },
+      "sha256": "2c019eea2c7db95ddab50a9a350848c812f3f6fcf6144d6a88be824f807170d8"
+    },
+    "voice-line-owner": {
+      "receipt": {
+        "passed": 45,
+        "cases": [
+          "actual_x509_chain_hostname_key_time_and_system_trust_validation_accepts_explicit_fixture_ca",
+          "tls_wrong_hostname_refused_before_listener",
+          "tls_expired_refused_before_listener",
+          "tls_plaintext_public_url_refused_before_listener",
+          "tls_public_ip_url_refused_before_listener",
+          "tls_wrong_path_refused_before_listener",
+          "tls_embedded_url_credential_refused_before_listener",
+          "tls_unapproved_public_bind_refused_before_listener",
+          "tls_false_public_consent_refused_before_listener",
+          "tls_invalid_private_key_refused_before_listener",
+          "tls_oversized_chain_refused_before_listener",
+          "actual_mismatched_private_key_refused",
+          "actual_root_private_single_link_pem_descriptor_reads",
+          "actual_pem_certificate_world-readable_refused",
+          "actual_pem_certificate_symlink_refused",
+          "actual_pem_certificate_hardlink_refused",
+          "actual_pem_certificate_non-pem_refused",
+          "actual_pem_certificate_oversized_refused",
+          "actual_pem_private_key_world-readable_refused",
+          "actual_pem_private_key_symlink_refused",
+          "actual_pem_private_key_hardlink_refused",
+          "actual_pem_private_key_non-pem_refused",
+          "actual_pem_private_key_oversized_refused",
+          "actual_cli_private_prompts_verified_public_consent_and_atomic_root_publication",
+          "actual_runtime_redactor_excludes_private_pem_and_channel_credentials",
+          "actual_owner_public_listener_refuses_missing_consent_without_configuration_mutation",
+          "actual_cli_invalid_port_rejected_without_input_echo_or_credential_mutation",
+          "actual_cli_pair_derives_saved_bot_scope_and_publishes_exact_sender_grant",
+          "actual_graphical_backend_derives_bot_scope_and_publishes_fresh_timed_grant",
+          "actual_graphical_media_opt_in_persisted_and_missing_create_refused_without_mutation",
+          "actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted",
+          "actual_owner_gui_cli_voice_approval_requires_configured_speech_create_and_resets_on_default_repair",
+          "actual_pairing_refuses_self_bot_wrong_destination_and_threads_without_mutation",
+          "actual_credential_and_listener_rotation_withdraws_old_grants_without_data_deletion",
+          "actual_repairing_renews_epoch_and_publication_rejects_cross_bot_credential_mix",
+          "actual_expired_pem_remains_inspectable_but_strict_activation_refuses_it",
+          "actual_owner_can_replace_expired_certificate_without_resetting_retained_data",
+          "actual_foreign_uid_cannot_read_pem_credentials_or_invoke_owner_mutations",
+          "actual_remove_preserves_owner_canary_and_audits_no_secrets",
+          "untrusted_certificate_chain_refused",
+          "actual_private_tls_material_is_atomic_single_link_mode_600_and_reused_without_overwrite",
+          "conflicting_existing_tls_material_is_preserved_and_requires_owner_recovery",
+          "actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds",
+          "actual_profile_https_refuses_wrong_client_hostname_before_signed_admission",
+          "actual_registered_native_profile_verified_https_hmac_private_relay_and_native_decode"
+        ],
+        "actual_x509_verified_https_and_native_profile": true,
+        "fixture_only_system_ca_loopback_and_identity_target": true,
+        "tls_verification_disabled": false,
+        "public_gateway_enabled": true,
+        "actual_root_owner_lifecycle": true,
+        "service_quiescence_and_audit_location_are_fixtures": true,
+        "external_dns_router_line_acceptance_or_installed_acceptance": false
+      },
+      "sha256": "17d9eb27ec529ca73dfa4846eb1df0a1c039dd2617412eda13fbce1e602c8b66"
+    },
+    "voice-integration-media-kernel": {
+      "receipt": {
+        "passed": 5,
+        "cases": [
+          "actual_gateway_uid_uploads_over_kernel_peer_authenticated_socket_without_reading_controller_ledger",
+          "actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger",
+          "actual_gateway_uid_cannot_gain_owner_methods_through_forged_uid_zero_and_owner_json_fields",
+          "actual_owner_policy_withdrawal_blocks_a_later_chunk_on_the_same_connection_interface",
+          "actual_new_owner_epoch_cannot_rebind_old_upload_and_requires_new_durable_media_admission"
+        ],
+        "actual_uids": [
+          0,
+          65532,
+          65533,
+          65534
+        ],
+        "actual_kernel_so_peercred": true,
+        "socket_filesystem_permission_is_not_the_negative_gate": true,
+        "optional_hermes_sdk_imported": false,
+        "external_or_installed_acceptance": false
+      },
+      "sha256": "ce331cf7fabd07728dd25e0c9a4cb9461898b9e986a412bc214c9184ad10d40e"
+    },
+    "voice-integration-existing-media": {
+      "receipt": {
+        "passed": 18,
+        "cases": [
+          "actual_content_redirect_refused_without_native_attachment_or_mission",
+          "actual_content_oversize_refused_without_native_attachment_or_mission",
+          "actual_content_encoded_refused_without_native_attachment_or_mission",
+          "actual_content_secret_refused_without_native_attachment_or_mission",
+          "actual_content_tls_untrusted_ca_rejected_before_credentialed_http",
+          "actual_content_tls_wrong_hostname_rejected_before_credentialed_http",
+          "actual_signed_media_without_explicit_owner_opt_in_never_downloads",
+          "actual_signed_unknown_sender_never_downloads_or_creates_a_media_record",
+          "actual_pinned_image_codec_https_content_and_context_bound_private_relay_preserve_bytes",
+          "copied_or_later_replayed_event_objects_cannot_inherit_media_admission_context",
+          "lost_durable_chunk_receipt_resumes_without_resending_bytes_or_creating_a_duplicate_mission",
+          "only_controller_admission_ack_compacts_the_transient_copy_and_preserves_authoritative_bytes",
+          "actual_native_file_codec_ignores_pathlike_remote_filename_and_transfers_only_authorized_api_bytes",
+          "external_content_provider_urls_are_refused_before_credentialed_download",
+          "actual_content_401_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_content_403_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_content_429_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_short_http_content_never_admits_partial_file_and_recovers_from_retained_input"
+        ],
+        "actual_native_codec_https_content_relay_and_controller": true,
+        "fixture_only_loopback_and_disposable_ca": true,
+        "tls_verification_disabled": false,
+        "external_account_inference_or_installed_acceptance": false
+      },
+      "sha256": "8c2949b58ecbc3a4ab21c521ab29d25eb631681b90be7ba44df21f5e6491356d"
+    },
+    "voice-regression-line_ingress": {
+      "receipt": {
+        "passed": 36,
+        "cases": [
+          "public_line_requires_exact_independent_owner_route",
+          "actual_native_hmac_and_text_codec_after_observable_commit_strip_single_use_reply_capability",
+          "same_signed_event_cannot_repeat_local_admission",
+          "reflected_channel_secret_access_and_single_use_reply_tokens_redacted_before_persistence_and_native_decode",
+          "unknown_user",
+          "unknown_group",
+          "missing_user",
+          "standby",
+          "media",
+          "missing_original_time",
+          "boolean_time",
+          "invalid_event_id",
+          "empty_text",
+          "ambiguous_source",
+          "tampered_body",
+          "invalid_signature",
+          "oversized_body",
+          "wrong_destination",
+          "stale_event",
+          "future_event",
+          "oversized_batch",
+          "duplicate_signed_json_rejected",
+          "raw_native_connect_denied",
+          "raw_native__handle_webhook_denied",
+          "raw_native__dispatch_event_denied",
+          "raw_native__handle_message_event_denied",
+          "raw_native__handle_postback_event_denied",
+          "raw_native__download_media_denied",
+          "raw_native__handle_media_denied",
+          "raw_native_send_denied",
+          "raw_native_send_typing_denied",
+          "raw_native_send_image_file_denied",
+          "raw_native_send_voice_denied",
+          "raw_native_send_video_denied",
+          "actual_sqlite_reopen_retries_failed_local_admission_without_external_side_effect",
+          "owner_withdrawal_blocks_retained_native_event"
+        ],
+        "actual_pinned_hmac_and_native_codec_and_sqlite": true,
+        "public_gateway_enabled": true,
+        "listener_or_external_message_or_account_acceptance": false
+      },
+      "sha256": "7511ab3761eec724b57708ecc0b18110a51f243b61c6bb513d7d01d12d91236e"
+    },
+    "voice-regression-line_listener": {
+      "receipt": {
+        "passed": 13,
+        "cases": [
+          "actual_signed_http_200_only_after_observable_private_sqlite_commit_without_reply_capability",
+          "remote_redelivery_returns_success_without_duplicate_durable_input",
+          "missing_signature",
+          "tampered_body",
+          "duplicate_signature",
+          "oversized_request",
+          "no_native_auxiliary_route_/line/media/token/file",
+          "no_native_auxiliary_route_/line/webhook/health",
+          "no_native_auxiliary_route_/plugins/line",
+          "signed_malformed_json_is_rejected_without_admission",
+          "actual_sqlite_commit_failure_returns_503_without_private_error_or_false_ack",
+          "same_remote_event_can_be_redelivered_after_actual_storage_recovery",
+          "current_owner_withdrawal_prevents_new_http_admission_without_restart"
+        ],
+        "actual_loopback_http_and_native_hmac_and_sqlite": true,
+        "public_gateway_enabled": true,
+        "tls_ingress_proxy_or_external_webhook_or_account_acceptance": false
+      },
+      "sha256": "5e37ab426c0fd970ce589698578e2aef52daf7f22252a627e5772d7cd3035980"
+    },
+    "voice-regression-line_delivery": {
+      "receipt": {
+        "passed": 25,
+        "cases": [
+          "actual_native_markdown_codec_and_push_after_observable_write_intent_uses_remote_receipt_not_native_none",
+          "confirmed_same_attempt_returns_journaled_receipt_without_another_native_push",
+          "same_attempt_changed_content_refused_before_socket",
+          "actual_native_client_push_without_context_cannot_open_socket",
+          "native_http_401_classified_without_redirect_or_repeat",
+          "native_http_403_classified_without_redirect_or_repeat",
+          "native_http_429_classified_without_redirect_or_repeat",
+          "native_http_500_classified_without_redirect_or_repeat",
+          "native_http_abort_classified_without_redirect_or_repeat",
+          "native_http_redirect_classified_without_redirect_or_repeat",
+          "native_http_huge_classified_without_redirect_or_repeat",
+          "native_http_missing-request-id_classified_without_redirect_or_repeat",
+          "native_http_missing-message-id_classified_without_redirect_or_repeat",
+          "native_http_wrong-count_classified_without_redirect_or_repeat",
+          "native_http_duplicate-id_classified_without_redirect_or_repeat",
+          "native_ellipsis_truncation_and_oversized_utf16_bubble_refused_before_side_effect",
+          "actual_sqlite_intent_failure_prevents_every_native_side_effect",
+          "confirmed_receipt_survives_actual_sqlite_reopen_without_repeat",
+          "actual_sqlite_confirmation_failure_and_reopen_preserve_uncertainty_without_resend",
+          "native_reply_token_cannot_trigger_reply_then_push_fallback",
+          "actual_cancel_after_http_write_preserves_intent_and_never_reposts_same_attempt",
+          "actual_native_https_refuses_unknown_certificate_without_http_request",
+          "actual_native_https_refuses_wrong_hostname_without_http_request",
+          "actual_native_https_push_accepts_explicit_fixture_ca_with_hostname_verification",
+          "current_owner_withdrawal_prevents_native_push"
+        ],
+        "actual_pinned_native_codec_push_and_loopback_http_sqlite": true,
+        "fixture_only_loopback_target": true,
+        "fixture_only_disposable_ca": true,
+        "tls_verification_disabled": false,
+        "public_gateway_enabled": true,
+        "external_account_or_recipient_receipt_or_installed_acceptance": false
+      },
+      "sha256": "b7bdfa2a496aad24b5bffd29290d5800fc6704832e6dc8bdbcc13a95665b8c36"
+    },
+    "voice-regression-line_profile": {
+      "receipt": {
+        "passed": 33,
+        "cases": [
+          "no_owner_pairing_cannot_create_profile_or_start_identity_network",
+          "private_profile_rejects_symlinked_parent_before_native_or_network_use",
+          "actual_registered_adapter_uses_private_home_and_exclusive_kernel_lease_without_network_at_build",
+          "profile_publisher_cannot_send_before_verified_bot_identity_and_listener_connection",
+          "native_bot_info_verifies_exact_destination_before_fixed_loopback_listener_start",
+          "actual_profile_listener_commit_and_native_replay_worker_deliver_exact_owner_event",
+          "actual_common_factory_root_engine_outbox_native_push_remote_receipt_and_durable_ack",
+          "offline_private_profile_keeps_pending_outbox_at_zero_attempts_until_verified_reconnection",
+          "actual_profile_repeated_signed_webhook_cannot_duplicate_local_admission",
+          "private_profile_close_reopen_reacquires_kernel_lease_and_replays_retained_local_failure",
+          "owner_epoch_change_is_denied_at_http_admission_before_worker_observes_revocation",
+          "current_owner_withdrawal_stops_idle_listener_and_worker_without_inheriting_authority",
+          "creation_only_profile_has_no_publisher_or_inherited_outbound_authority",
+          "native_outbound_401_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+          "native_outbound_401_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+          "native_outbound_401_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+          "native_outbound_403_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+          "native_outbound_403_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+          "native_outbound_403_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+          "native_outbound_429_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+          "native_outbound_429_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+          "native_outbound_429_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+          "native_identity_401_blocks_listener_and_survives_owner_epoch_profile_reopen",
+          "explicit_offline_owner_recheck_401_preserves_rate_limit_and_requires_fresh_native_verification",
+          "native_identity_403_blocks_listener_and_survives_owner_epoch_profile_reopen",
+          "explicit_offline_owner_recheck_403_preserves_rate_limit_and_requires_fresh_native_verification",
+          "native_identity_wrong-bot_blocks_listener_and_survives_owner_epoch_profile_reopen",
+          "explicit_offline_owner_recheck_wrong-bot_preserves_rate_limit_and_requires_fresh_native_verification",
+          "native_identity_429_blocks_listener_and_survives_owner_epoch_profile_reopen",
+          "explicit_offline_owner_recheck_429_preserves_rate_limit_and_requires_fresh_native_verification",
+          "native_identity_redirect_never_authenticates_or_opens_listener",
+          "actual_occupied_listener_port_reports_failure_and_reconnects_after_release",
+          "closed_profile_rejects_new_network_and_releases_lease"
+        ],
+        "actual_registered_native_adapter_http_sqlite_and_kernel_lease": true,
+        "fixture_only_loopback_identity_target": true,
+        "public_gateway_enabled": true,
+        "fixture_profile_listener": "127.0.0.1 only; external verified TLS ingress not configured here",
+        "external_or_installed_acceptance": false
+      },
+      "sha256": "90eda032b85b86c40ac882e85aa7417c0278ae19f3b92c517bd7b6ed8c454c90"
+    },
+    "voice-regression-line_media": {
+      "receipt": {
+        "passed": 18,
+        "cases": [
+          "actual_content_redirect_refused_without_native_attachment_or_mission",
+          "actual_content_oversize_refused_without_native_attachment_or_mission",
+          "actual_content_encoded_refused_without_native_attachment_or_mission",
+          "actual_content_secret_refused_without_native_attachment_or_mission",
+          "actual_content_tls_untrusted_ca_rejected_before_credentialed_http",
+          "actual_content_tls_wrong_hostname_rejected_before_credentialed_http",
+          "actual_signed_media_without_explicit_owner_opt_in_never_downloads",
+          "actual_signed_unknown_sender_never_downloads_or_creates_a_media_record",
+          "actual_pinned_image_codec_https_content_and_context_bound_private_relay_preserve_bytes",
+          "copied_or_later_replayed_event_objects_cannot_inherit_media_admission_context",
+          "lost_durable_chunk_receipt_resumes_without_resending_bytes_or_creating_a_duplicate_mission",
+          "only_controller_admission_ack_compacts_the_transient_copy_and_preserves_authoritative_bytes",
+          "actual_native_file_codec_ignores_pathlike_remote_filename_and_transfers_only_authorized_api_bytes",
+          "external_content_provider_urls_are_refused_before_credentialed_download",
+          "actual_content_401_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_content_403_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_content_429_pauses_profile_and_preserves_reopen_owner_recheck_and_throttle_rules",
+          "actual_short_http_content_never_admits_partial_file_and_recovers_from_retained_input"
+        ],
+        "actual_native_codec_https_content_relay_and_controller": true,
+        "fixture_only_loopback_and_disposable_ca": true,
+        "tls_verification_disabled": false,
+        "external_account_inference_or_installed_acceptance": false
+      },
+      "sha256": "8c2949b58ecbc3a4ab21c521ab29d25eb631681b90be7ba44df21f5e6491356d"
+    },
+    "voice-integration-line_owner-1280x800": {
+      "receipt": {
+        "passed": 17,
+        "cases": [
+          "actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token",
+          "actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits",
+          "actual_file_buttons_load_separate_private_pem_without_showing_bytes",
+          "actual_setup_handoff_captures_all_inputs_then_clears_tokens_and_pem",
+          "actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights",
+          "actual_explicit_line_image_document_consent_reaches_owner_backend_and_clears_after_submit",
+          "actual_sender_edit_withdraws_pending_media_consent",
+          "actual_no_create_permission_disables_media_without_restoring_earlier_consent",
+          "actual_separate_voice_consent_reaches_owner_backend_without_media_and_resets_on_submit_sender_edit_and_create_withdrawal",
+          "actual_auth_recheck_uses_real_owner_backend_without_sending",
+          "actual_endpoint_edit_discards_private_tokens_and_certificate_material",
+          "actual_background_pem_import_is_discarded_after_context_revision",
+          "actual_public_bind_requires_separate_captured_consent_and_clears_it_after_submit",
+          "actual_invalid_port_never_reaches_backend_or_echoes_raw_input",
+          "actual_connector_edit_withdraws_stale_private_inputs",
+          "actual_platform_change_clears_and_hides_line_credentials",
+          "actual_owner_controls_fit_available_screen_width"
+        ],
+        "actual_tk": true,
+        "backend_handoffs_are_fixtures": true,
+        "external_or_installed_acceptance": false
+      },
+      "sha256": "ff3d8e8bded8166a82f34f09c84133d0afac9b55a23a678a0e48c511d7d02c3e"
+    },
+    "voice-integration-line_owner-640x480": {
+      "receipt": {
+        "passed": 17,
+        "cases": [
+          "actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token",
+          "actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits",
+          "actual_file_buttons_load_separate_private_pem_without_showing_bytes",
+          "actual_setup_handoff_captures_all_inputs_then_clears_tokens_and_pem",
+          "actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights",
+          "actual_explicit_line_image_document_consent_reaches_owner_backend_and_clears_after_submit",
+          "actual_sender_edit_withdraws_pending_media_consent",
+          "actual_no_create_permission_disables_media_without_restoring_earlier_consent",
+          "actual_separate_voice_consent_reaches_owner_backend_without_media_and_resets_on_submit_sender_edit_and_create_withdrawal",
+          "actual_auth_recheck_uses_real_owner_backend_without_sending",
+          "actual_endpoint_edit_discards_private_tokens_and_certificate_material",
+          "actual_background_pem_import_is_discarded_after_context_revision",
+          "actual_public_bind_requires_separate_captured_consent_and_clears_it_after_submit",
+          "actual_invalid_port_never_reaches_backend_or_echoes_raw_input",
+          "actual_connector_edit_withdraws_stale_private_inputs",
+          "actual_platform_change_clears_and_hides_line_credentials",
+          "actual_owner_controls_fit_available_screen_width"
+        ],
+        "actual_tk": true,
+        "backend_handoffs_are_fixtures": true,
+        "external_or_installed_acceptance": false
+      },
+      "sha256": "ff3d8e8bded8166a82f34f09c84133d0afac9b55a23a678a0e48c511d7d02c3e"
+    },
+    "voice-integration-speech_owner-1280x800": {
+      "receipt": {
+        "passed": 3,
+        "cases": [
+          "actual_tk_missing_pinned_runtime_prevents_activation_without_backend_mutation",
+          "actual_tk_explicit_model_download_activation_reaches_owner_backend_and_preserves_separate_sender_approval",
+          "actual_tk_deactivation_keeps_model_and_explains_sender_grant_revocation_is_separate"
+        ],
+        "actual_tk": true,
+        "backend_handoff_only_os_authority_is_separate": true,
+        "line_voice_or_installed_acceptance": false
+      },
+      "sha256": "de4dce4dcb03189887f99c6bd6467674f444a22fdc53f3de827a284899e60797"
+    },
+    "voice-integration-speech_owner-640x480": {
+      "receipt": {
+        "passed": 3,
+        "cases": [
+          "actual_tk_missing_pinned_runtime_prevents_activation_without_backend_mutation",
+          "actual_tk_explicit_model_download_activation_reaches_owner_backend_and_preserves_separate_sender_approval",
+          "actual_tk_deactivation_keeps_model_and_explains_sender_grant_revocation_is_separate"
+        ],
+        "actual_tk": true,
+        "backend_handoff_only_os_authority_is_separate": true,
+        "line_voice_or_installed_acceptance": false
+      },
+      "sha256": "de4dce4dcb03189887f99c6bd6467674f444a22fdc53f3de827a284899e60797"
+    }
+  },
+  "boundaries": [
+    "Separate allow_voice/create/timed sender approval; image/document flag cannot authorize audio and voice cannot authorize raw document/image export",
+    "Original audio stays private in controller ledger; only locally recognized text reaches normal agent prompt",
+    "Source/model/sample/transcript receipt checksum and actual ledger reopen protect persisted transcript cache; terminal owner purge removes derived transcript too",
+    "Actual private client runs under real controller UID against root-activated socket, validates root ownership/group/peer and cancels/joins on permission callback refusal",
+    "Composition uses actual native LINE/HTTPS/media/controller/local STT with explicit fixture speech transport and agent terminal; actual UID/socket/native worker gates are separate and not mocked",
+    "No external LINE messages/accounts, LLM inference, installed systemd/HP or release acceptance; video/outbound media remain open",
+    "Exact parent06880bc has six green GitHub runs; subsequent voice source requires its own CI"
+  ]
+}

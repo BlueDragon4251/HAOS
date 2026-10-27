@@ -7,7 +7,7 @@ import re
 import time
 
 from .gateway import digest,Conflict
-from .gateway_media import authorize,describe,descriptor,references,CHUNK_BYTES
+from .gateway_media import authorize,approved,describe,descriptor,references,CHUNK_BYTES
 
 _EVENT=ContextVar('haos_admitted_media_event',default=None)
 
@@ -54,7 +54,7 @@ class MediaCache:
         row=self.db.execute('SELECT id,connector,envelope_digest,binding_id,binding_digest,descriptor,state FROM native_media_cache WHERE id=?',(identity,)).fetchone()
         if row is None or row['state']!='cached':raise Conflict('retained media bytes unavailable')
         binding=policy.current_binding(dict(row));meta=descriptor(json.loads(row['descriptor']))
-        if (binding['connector']!=row['connector'] or binding.get('allow_media') is not True or 'create' not in binding['capabilities']
+        if (binding['connector']!=row['connector'] or not approved(binding,meta['kind']) or 'create' not in binding['capabilities']
                 or row['id']!=digest([row['connector'],row['binding_digest'],row['envelope_digest'],meta])):
             raise PermissionError('retained media grant changed')
         return row
@@ -74,7 +74,7 @@ class MediaCache:
         if count>=128 or size>=64*1024*1024:raise Conflict('private media relay capacity reached')
 
     def put(self,policy,connector,envelope,data,kind):
-        binding=authorize(policy,connector,envelope);meta=describe(data,kind)
+        binding=authorize(policy,connector,envelope,kind);meta=describe(data,kind)
         if any(secret.encode('utf-8') in data for secret in self.inbox.redactor.secrets):
             raise PermissionError('private credentials cannot become media input')
         identity=digest([connector,digest(binding),digest(envelope),meta])

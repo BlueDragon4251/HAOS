@@ -38,7 +38,7 @@ def main():
         config=state/'.hermes';config.mkdir(mode=0o700);os.chown(config,65530,65530)
         settings=config/'config.yaml';settings.write_text('stt:\n  provider: local\n  local:\n    device: cpu\n    compute_type: int8\nsecurity:\n  allow_lazy_installs: false\n');settings.chmod(0o644)
         canaries=[]
-        for uid,name in [(0,'owner'),(65531,'provider'),(65534,'gateway')]:
+        for uid,name in [(0,'owner'),(65531,'provider'),(65532,'controller'),(65534,'gateway')]:
             private=root/name;private.mkdir(mode=0o700);os.chown(private,uid,uid)
             canary=private/'private-canary';canary.write_text('disposable-private-'+name);canary.chmod(0o600);os.chown(canary,uid,uid)
             canaries.append(str(canary))
@@ -69,7 +69,7 @@ print(json.dumps({'source_sha256':result['source_sha256'],'model_revision':resul
             text=True,capture_output=True,timeout=45,user=65530,group=65530,extra_groups=[],umask=0o077,cwd=str(state),env=env)
         assert result.returncode==0,result.stderr[-3000:]
         with Path('/etc/passwd').open('a') as accounts:
-            accounts.write('haos-speech:x:65530:65530:fixture speech:/var/lib/haos-speech:/usr/sbin/nologin\nhaos-gateway:x:65534:65534:fixture gateway:/nonexistent:/usr/sbin/nologin\n')
+            accounts.write('haos-speech:x:65530:65530:fixture speech:/var/lib/haos-speech:/usr/sbin/nologin\nhaos-gateway:x:65534:65534:fixture gateway:/nonexistent:/usr/sbin/nologin\nhaos-control:x:65532:65532:fixture controller:/nonexistent:/usr/sbin/nologin\n')
         worker_home=Path('/var/lib/haos-speech');worker_home.mkdir(mode=0o700);os.chown(worker_home,65530,65530)
         engine_config=Path('/etc/haos-speech');engine_config.mkdir(mode=0o755)
         (engine_config/'config.yaml').write_text(settings.read_text());(engine_config/'config.yaml').chmod(0o644)
@@ -132,7 +132,7 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             assert result['ok'] is True and result['result']['source_sha256']==params['sha256']
             assert 'ask not what your country can do for you' in result['result']['transcript'].lower()
 """
-            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal')]:
+            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal'),(65532,'normal')]:
                 client=subprocess.run([sys.executable,'-s','-c',client_code],input=json.dumps({'socket':str(endpoint),'mode':mode}),
                     text=True,capture_output=True,timeout=50,user=uid,group=uid,extra_groups=[],env=env)
                 assert client.returncode==0,client.stderr[-2000:]
@@ -170,6 +170,34 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             finally:
                 if client.poll() is None:client.kill();client.wait(timeout=5)
                 client.stdout.close();client.stderr.close()
+            with Path('/etc/group').open('a') as groups:groups.write('haos-gateway:x:65534:haos-control\n')
+            os.chown(endpoint,0,65534);endpoint.chmod(0o660)
+            checked_client="""
+import asyncio,hashlib,sys
+from pathlib import Path
+from haos.speech_client import transcribe
+async def main():
+    data=Path('/public-audio/reference.flac').read_bytes();checks=[]
+    def current():checks.append(True)
+    result=await transcribe(data,current)
+    assert result['source_sha256']==hashlib.sha256(data).hexdigest() and len(checks)>1
+    assert 'ask not what your country can do for you' in result['transcript'].lower()
+    count=[0]
+    def withdrawn():
+        count[0]+=1
+        if count[0]>3:raise PermissionError('fixture owner grant withdrawn')
+    try:await transcribe(data,withdrawn)
+    except PermissionError:pass
+    else:raise AssertionError('withdrawn local transcription returned a result')
+asyncio.run(main())
+"""
+            checked=subprocess.run([sys.executable,'-s','-c',checked_client],text=True,capture_output=True,timeout=50,
+                user=65532,group=65532,extra_groups=[65534],env=env)
+            assert checked.returncode==0,checked.stderr[-2000:]
+            deadline=time.monotonic()+5
+            while children():
+                assert time.monotonic()<deadline,'revoked checked-client worker was not joined'
+                time.sleep(.02)
         finally:
             service.terminate()
             try:service.wait(timeout=5)
@@ -179,12 +207,13 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
         from speech_owner_fixture import exercise as owner_exercise
         owner_cases=owner_exercise()
         receipt=json.loads(result.stdout)
-        print(json.dumps({'passed':6+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+        print(json.dumps({'passed':7+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
             'actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity',
             'actual_container_network_disabled_and_reviewed_model_bytes_used_offline',
             'actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket',
             'actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path',
-            'actual_client_disconnect_kills_and_joins_native_worker_without_orphan']+owner_cases,
+            'actual_client_disconnect_kills_and_joins_native_worker_without_orphan',
+            'actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation']+owner_cases,
             'native_receipt':receipt,'actual_uid':65530,'owner_service_control_is_fixture':True,'external_stt_account_or_line_voice_acceptance':False},indent=2))
 
 

@@ -40,3 +40,19 @@ def test_private_voice_request_has_no_caller_paths_commands_or_unbounded_data(ch
     if change=='oversize':value['data']='a'*(speech.MAX_AUDIO_BYTES*4//3+5)
     if change=='path':value={'path':'/owner/private'}
     with pytest.raises(speech.SpeechRefused):request_bytes(value)
+
+
+@pytest.mark.parametrize('change',['source','model','samples','rate','provider','empty','extra'])
+def test_private_transcription_receipt_is_bound_to_source_model_and_decode_bounds(change):
+    from haos.speech_client import result
+    from haos.speech_model import REVISION
+    value={'transcript':'unit protocol fixture','source_sha256':'a'*64,'model_revision':REVISION,
+        'samples':16000,'sample_rate':16000,'provider':'local'}
+    if change=='source':value['source_sha256']='b'*64
+    if change=='model':value['model_revision']='b'*40
+    if change=='samples':value['samples']=speech.MAX_SAMPLES+1
+    if change=='rate':value['sample_rate']=True
+    if change=='provider':value['provider']='cloud'
+    if change=='empty':value['transcript']=''
+    if change=='extra':value['path']='/owner/private'
+    with pytest.raises(speech.SpeechRefused):result(value,'a'*64)

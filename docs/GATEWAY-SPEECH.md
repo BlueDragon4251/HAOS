@@ -1,12 +1,12 @@
 # Local gateway speech — private core, integration in progress
 
-This increment implements the bounded local decoder, actual pinned Hermes
-transcription engine, isolated worker and private socket service. **LINE voice
-admission and sender approval are not connected yet. Existing public LINE policy
-continues to refuse audio. Owner model/service activation is now implemented
-through the physical gateway management page and authenticated console.** Video, outbound
-media and TTS also remain open. No operator workaround or manual authorization
-bypass is needed to run the disposable contract probes.
+The bounded local decoder, pinned Hermes transcription engine, isolated worker
+and private socket service now connect to LINE's signed audio input and the
+mission controller. Owner model/service setup and a separate per-sender
+`allow_voice` approval are available in the physical GUI and authenticated
+console. Existing text/image/document grants do not approve audio. Video,
+outbound media and TTS remain open; fixture success is not external delivery,
+LLM inference, installed systemd or HP acceptance.
 
 The runtime adds only the pinned upstream `voice` extra to the existing frozen
 extras and unchanged hashed security/provider overlay. This supplies
@@ -34,7 +34,7 @@ fails with bounded diagnostics. Transcripts are at most 16000 characters.
 The new `haos-speech` identity is separate from the gateway, provider,
 controller and agent. The service has no loaded credentials, network, GPU
 access or ambient capabilities. Its root-bound Unix socket admits only the
-actual gateway peer UID before reading a frame. The request consists only of
+actual gateway/controller peer UIDs before reading a frame. The request consists only of
 canonical base64 and a source SHA-256; paths, commands and extra authority
 fields are refused. The parent permits one active worker and at most four
 pending clients. Worker CPU time, output, wall time, file size, service memory
@@ -45,7 +45,8 @@ Socket activation validates the real NSS identity, inherited descriptor,
 activation PID and exact socket path plus explicit root-owned configuration.
 The image installs the definitions and separate identity but does not enable
 the speech socket by default. Owner activation is explicit and does not grant
-a sender access. The physical service profile still requires installed-system acceptance;
+a sender access. The controller already has the gateway socket group; peer UID
+authorization remains mandatory even when filesystem connection is permitted. The physical service profile still requires installed-system acceptance;
 a successful disposable descriptor/UID probe is not an installed boot test.
 
 `probe_speech_backend.py` performs real FLAC decoding, AAC/M4A encoding/decoding,
@@ -90,3 +91,40 @@ gateway operation. Root publication tests use actual SDK metadata, public model
 bytes and filesystem ownership, with explicitly fixture-controlled service
 commands. Actual NSS/UID/socket activation/worker/kill gates run separately
 without mocked kernel checks. Neither set replaces an installed systemd test.
+
+
+## LINE voice mission path and recovery
+
+First configure the local engine, then separately approve one LINE route with
+mission-create permission using its graphical voice checkbox or `gateway pair
+--allow-voice`. Pairing refuses missing/disabled/unverified local speech setup;
+image/document approval is a separate checkbox. Both consents reset on sender,
+chat, destination/platform changes, lost create rights and submit. Re-pairing
+without the flag withdraws earlier voice permission through a fresh owner epoch.
+
+The actual pinned LINE adapter emits its native voice event after a bounded,
+verified fixed-endpoint content fetch. Signed duration metadata is checked before
+download; the decoder also limits actual samples. No external content URL is
+followed. Grant-bound opaque media IDs and chunk upload retain the original audio
+in the private controller ledger. **The original audio is never attached to the
+agent.** The controller invokes the isolated local service and appends only the
+recognized request text to the normal mission prompt. Voice cannot substitute
+for image/document file permission or execute a gateway slash command.
+
+The controller checks the exact current grant, cancellation, stop and deadline
+while waiting for STT and again before caching/dispatch. A closed or revoked
+caller cancels the local worker. Receipts bind source hash, pinned model,
+sample bounds and transcript checksum to the upload ID, persist across ledger
+reopen, and cannot be silently overwritten. Damaged receipts refuse dispatch.
+A retry before prompt submission can reuse an intact receipt; a started or
+uncertain model turn keeps the existing no-replay rules. Explicit terminal media
+purge removes original chunks and derived transcripts, retaining audit/tombstones.
+
+`probe_line_voice.py` composes actual signed LINE/native codec/verified HTTPS,
+private media relay/controller and actual local STT with a fixture speech
+transport and agent terminal. It checks real M4A words, separate/unknown sender
+refusal, duration limits, signed replay, invalid-audio refusal and revocation
+before prompt. It does not fabricate a transcript or claim LLM inference. The
+separate kernel probe exercises the actual checked client under controller UID,
+root-activated socket ownership, both allowed UIDs and cancellation/worker join.
+These mandatory complementary probes do not replace installed/live acceptance.

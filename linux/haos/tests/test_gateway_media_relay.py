@@ -101,7 +101,7 @@ def test_real_chunk_receipt_loss_resumes_and_changed_private_receipts_never_reac
     finally:store.close()
 
 
-@pytest.mark.parametrize('message_id,kind',[('../owner','document'),('1','voice'),('1',[]),('', 'image')])
+@pytest.mark.parametrize('message_id,kind',[('../owner','document'),('1','video'),('1',[]),('', 'image')])
 def test_invalid_content_request_fails_before_any_optional_sdk_import(message_id,kind):
     from haos.gateway_line_content import Content
     content=Content('private-fixture-access',Redactor())

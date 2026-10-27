@@ -340,7 +340,14 @@ def owner_gateway(args):
             if binding['sender']==destination:raise ValueError('LINE sender must differ from the bot destination')
             binding['scope']=destination
             binding['allow_media']=getattr(args,'allow_media',False)
-        elif getattr(args,'allow_media',False):raise ValueError('media approval applies only to LINE images/documents')
+            binding['allow_voice']=getattr(args,'allow_voice',False)
+            if binding['allow_voice']:
+                if 'create' not in binding['capabilities']:raise ValueError('LINE voice approval requires mission-create rights')
+                from .speech_setup import status as speech_status
+                speech=speech_status()
+                if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
+                    raise PermissionError('configure the reviewed local speech model/service before approving LINE voice')
+        elif getattr(args,'allow_media',False) or getattr(args,'allow_voice',False):raise ValueError('media approval applies only to LINE images/documents')
         devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
         unmentioned=getattr(args,'no_require_mention',False)
         if selected and selected['platform']=='matrix':

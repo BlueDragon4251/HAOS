@@ -47,7 +47,7 @@ def main():
         activate.invoke();settle();assert changes==[True]
         labels=' '.join(w.cget('text') for w in widgets(wizard.content) if isinstance(w,tk.Label))
         assert '75 MiB' in labels and 'Modell vollständig geprüft' in labels and 'haos-speech.socket: active' in labels
-        assert 'getrennte Freigabe' in labels and 'noch in Entwicklung' in labels
+        assert 'getrennte Freigabe' in labels and 'separater Absenderfreigabe' in labels
         cases.append('actual_tk_explicit_model_download_activation_reaches_owner_backend_and_preserves_separate_sender_approval')
         button('Spracherkennungsdienst stoppen und deaktivieren').invoke();settle()
         assert changes==[True,False] and states['model_ready'] is True

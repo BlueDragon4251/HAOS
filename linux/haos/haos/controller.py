@@ -282,7 +282,23 @@ class Controller:
                         # Owner revocation between two local byte transfers also
                         # stops the next transfer and the eventual model prompt.
                         self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
-                        refs.extend(await attach(self.connection,session['session_id'],[item]))
+                        if item['descriptor']['kind']=='voice':
+                            def current_voice():
+                                self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                                current=self.store.get(row['id'])
+                                if current['state'] not in ACTIVE or current['cancel_requested'] or time.time()>=current['deadline'] or self.stop.is_set():
+                                    raise Conflict('voice mission is no longer dispatchable')
+                            current_voice()
+                            transcript=self.gateway.media.transcript(self.gateway_policy(),row['id'],item['id'])
+                            if transcript is None:
+                                from .speech_client import transcribe
+                                transcript=await transcribe(item['data'],current_voice)
+                                current_voice()
+                                transcript=self.gateway.media.save_transcript(self.gateway_policy(),row['id'],item['id'],transcript)
+                            current_voice()
+                            refs.append('Approved sender voice request (locally transcribed):\n'+transcript['transcript'])
+                        else:
+                            refs.extend(await attach(self.connection,session['session_id'],[item]))
                     self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
                 if self.store.get(row['id'])['cancel_requested']:
                     self.store.settle(row['id'],'cancelled');return
@@ -312,7 +328,10 @@ class Controller:
         except Exception as exc:
             if self.store.get(row["id"])["state"] in ACTIVE:
                 # Do not put the URL (which contains an authentication token) in the ledger.
-                self.store.unavailable(row["id"], type(exc).__name__)
+                from .speech import SpeechRefused
+                reason=('Local voice transcription unavailable: inspect the local model/service and audio format/duration'
+                    if isinstance(exc,SpeechRefused) else type(exc).__name__)
+                self.store.unavailable(row["id"], reason)
         finally:
             if self.connection:
                 await self.connection.close()

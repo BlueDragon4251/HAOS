@@ -513,7 +513,7 @@ def configure_irc_gateway(connector,server,port,nickname,channel,*,server_passwo
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
                         identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = "",
                         matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url="",
-                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False,irc_server="",irc_port=None,irc_channel="",allow_media=False):
+                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False,irc_server="",irc_port=None,irc_channel="",allow_media=False,allow_voice=False):
     """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
@@ -532,8 +532,15 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
         if sender==destination:raise ValueError('LINE sender must differ from the bot destination')
         item['scope']=destination
         if type(allow_media) is not bool:raise ValueError('explicit boolean LINE media approval required')
-        item['allow_media']=allow_media
-    elif allow_media:raise ValueError('media approval applies only to the reviewed LINE image/document path')
+        if type(allow_voice) is not bool:raise ValueError('explicit boolean LINE voice approval required')
+        item['allow_media']=allow_media;item['allow_voice']=allow_voice
+        if allow_voice:
+            if 'create' not in item['capabilities']:raise ValueError('LINE voice approval requires mission-create rights')
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
+                raise PermissionError('configure the reviewed local speech model/service before approving LINE voice')
+    elif allow_media or allow_voice:raise ValueError('media approval applies only to the reviewed LINE image/document path')
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
     elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True:

@@ -165,6 +165,7 @@ jobs:
           PYTHON=upstream/hermes-agent/.venv/bin/python
           "$PYTHON" linux/haos/runtime/fetch_speech_fixture.py linux/haos "$RUNNER_TEMP/haos-speech-fixture"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_speech_backend.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/speech-native.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_line_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/line-voice.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail

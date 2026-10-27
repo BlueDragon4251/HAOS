@@ -100,6 +100,29 @@ def exercise(directory,tls,expired_tls):
         initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'))
         policy,private=original_load(config);assert not policy['bindings'][0]['allow_media']
         cases.append('actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted')
+        from haos import speech_setup
+        before=(config/'gateways.json').read_bytes()
+        with patch.object(speech_setup,'status',lambda:{'enabled':False,'runtime_ready':True,'model_ready':True}):
+            try:initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'),allow_voice=True)
+            except PermissionError:pass
+            else:raise AssertionError('voice approved before local speech configuration')
+        assert (config/'gateways.json').read_bytes()==before
+        with patch.object(speech_setup,'status',lambda:{'enabled':True,'runtime_ready':True,'model_ready':True}):
+            initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'),allow_voice=True)
+            voiced,_=original_load(config)
+            assert voiced['bindings'][0]['allow_voice'] is True and voiced['bindings'][0]['allow_media'] is False
+            gateway_setup.owner_gateway(SimpleNamespace(gateway_action='pair',binding='owner',connector='line-main',
+                sender=sender,chat=sender,scope='',thread='',identity='personal',capabilities=['create','read'],allow_voice=True))
+            voiced,_=original_load(config);assert voiced['bindings'][0]['allow_voice'] is True
+            before=(config/'gateways.json').read_bytes()
+            try:initial_setup.pair_gateway_sender('owner','line-main',sender,sender,'personal',('read',),allow_voice=True)
+            except ValueError:pass
+            else:raise AssertionError('voice approved without create permission')
+            assert (config/'gateways.json').read_bytes()==before
+        initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'))
+        policy,private=original_load(config);assert policy['bindings'][0]['allow_voice'] is False
+        cases.append('actual_owner_gui_cli_voice_approval_requires_configured_speech_create_and_resets_on_default_repair')
+
         for changes in [{'sender':destination},{'scope':'U'+'e'*32},{'thread':'unapproved'}]:
             args={'sender':sender,'scope':'','thread':''};args.update(changes)
             before=(config/'gateways.json').read_bytes()

@@ -5,7 +5,8 @@ Signed LINE input now connects the actual pinned image/file adapter and private
 HTTPS content client to this path. The owner must explicitly approve incoming
 images/documents for each sender/chat grant, using the graphical setup or
 `haos-owner gateway pair --allow-media`. Existing grants remain text-only.
-Voice, video and outbound media remain open; local fixtures do not establish
+Voice now uses a separate explicit grant and isolated local transcription;
+video and outbound media remain open; local fixtures do not establish
 live account delivery or model inference.
 
 The private gateway cache is bounded to 64 MiB/128 records. The exact native
@@ -27,7 +28,8 @@ The gateway UID cannot read the controller's private ledger and cannot gain
 owner methods with forged UID-zero/role fields.
 
 Every upload requires an exact current LINE sender/chat/bot grant, a timed owner
-epoch, `create` permission and an explicit boolean `allow_media`. Existing grants
+epoch, `create` permission and explicit per-kind approval: `allow_media` for
+images/documents or `allow_voice` for local audio transcription. Existing grants
 have no such approval and remain text-only. No field contains a host path or an
 arbitrary download URL. The ID binds connector, grant digest, message envelope
 and a strict descriptor (kind, format, SHA-256 and byte count). New grants cannot
@@ -91,7 +93,7 @@ sudo haos-owner gateway purge-media-cache --id EXACT_CACHE_ID --note 'Inspected 
 
 The graphical media page links both independent stores. Cache inspection stops
 only the gateway; controller inspection stops mission services as described
-above. None of these operations restarts services automatically. Voice/video
+above. None of these operations restarts services automatically. Incoming voice is described in [local speech](GATEWAY-SPEECH.md); video
 and outbound media remain open.
 
 Mission creation and media association share a transaction. A wrong-message,

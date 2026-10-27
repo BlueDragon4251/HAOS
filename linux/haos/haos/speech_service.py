@@ -99,17 +99,19 @@ async def invoke(request):
 
 
 class Server:
-    def __init__(self,gateway_uid):
-        if type(gateway_uid) is not int or gateway_uid<=0 or gateway_uid==os.geteuid():
-            raise PermissionError('separate unprivileged speech and gateway identities required')
-        self.gateway_uid=gateway_uid;self.slot=asyncio.Semaphore(1);self.pending=0
+    def __init__(self,gateway_uid,controller_uid=None):
+        values=[gateway_uid] if controller_uid is None else [gateway_uid,controller_uid]
+        if (any(type(uid) is not int or uid<=0 or uid==os.geteuid() for uid in values)
+                or len(set(values))!=len(values)):
+            raise PermissionError('separate unprivileged speech and caller identities required')
+        self.allowed_uids=frozenset(values);self.slot=asyncio.Semaphore(1);self.pending=0
 
     async def client(self,reader,writer):
         work=None;disconnect=None;counted=False
         try:
             peer=writer.get_extra_info('socket')
             _pid,uid,_gid=struct.unpack('3i',peer.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
-            if uid!=self.gateway_uid:raise PermissionError('speech peer denied')
+            if uid not in self.allowed_uids:raise PermissionError('speech peer denied')
             if self.pending>=4:raise SpeechRefused('local speech queue full')
             self.pending+=1;counted=True
             raw=await asyncio.wait_for(reader.readline(),10)
@@ -155,7 +157,7 @@ async def serve():
     if (inherited.family!=socket.AF_UNIX or inherited.type&socket.SOCK_STREAM!=socket.SOCK_STREAM
             or inherited.getsockname()!='/run/haos-speech/voice.sock'):
         raise PermissionError('fixed private speech socket required')
-    handler=Server(pwd.getpwnam('haos-gateway').pw_uid)
+    handler=Server(pwd.getpwnam('haos-gateway').pw_uid,pwd.getpwnam('haos-control').pw_uid)
     async with await asyncio.start_unix_server(handler.client,sock=inherited,limit=MAX_FRAME+1) as server:
         await server.serve_forever()
 

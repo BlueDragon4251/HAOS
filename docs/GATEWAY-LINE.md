@@ -123,7 +123,9 @@ Incoming PNG/JPEG images (2 MiB) and documents (8 MiB) now use the shared
 unchecked option and clears pending consent on sender/chat edits or submit;
 CLI uses `gateway pair --allow-media`. Remote filenames never select host paths.
 
-**Still open:** voice, video and outbound media.
+**Still open:** video and outbound media. Incoming voice uses the
+[isolated local speech path](GATEWAY-SPEECH.md) with separate `allow_voice`
+approval; the agent receives the transcript, not the raw audio.
 Controller payload and separate private gateway-cache inspection/purge are
 available through the owner GUI and CLI; cache purge additionally requires
 withdrawal/change of the sender grant.

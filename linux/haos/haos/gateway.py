@@ -53,7 +53,7 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media'} if connector and connector['platform']=='line' else set())
+                else {'allow_media','allow_voice'} if connector and connector['platform']=='line' else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
