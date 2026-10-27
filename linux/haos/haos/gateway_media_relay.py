@@ -3,6 +3,8 @@ import base64
 from contextlib import contextmanager
 from contextvars import ContextVar
 import json
+import re
+import time
 
 from .gateway import digest,Conflict
 from .gateway_media import authorize,describe,descriptor,references,CHUNK_BYTES
@@ -91,6 +93,43 @@ class MediaCache:
             self.db.execute('COMMIT')
         except BaseException:self.db.execute('ROLLBACK');raise
         return self.get(policy,identity)
+
+    def owner_inventory(self,policy):
+        rows=self.db.execute("SELECT id,connector,binding_id,binding_digest,descriptor,LENGTH(data) AS stored_bytes FROM native_media_cache WHERE state='cached' ORDER BY id").fetchall()
+        uploads=[]
+        for row in rows:
+            try:policy.current_binding(dict(row));revoked=False
+            except PermissionError:revoked=True
+            uploads.append({'id':row['id'],'connector':row['connector'],'binding_id':row['binding_id'],
+                'descriptor':descriptor(json.loads(row['descriptor'])),'stored_bytes':row['stored_bytes'] or 0,
+                'state':'cached','mission_id':None,'mission_state':None,'purge_allowed':revoked})
+        size=sum(row['stored_bytes'] for row in uploads)
+        return {'uploads':uploads,'stored_bytes':size,'reserved_bytes':size,'limit_bytes':64*1024*1024,'limit_records':128}
+
+    def owner_purge(self,policy,request):
+        if (not isinstance(request,dict) or set(request)!={'id','owner_uid','note_sha256','confirmed'}
+                or request['confirmed'] is not True or type(request['owner_uid']) is not int or request['owner_uid']<0
+                or not isinstance(request['note_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+            raise PermissionError('exact inspected owner cache decision required')
+        identity=references([request['id']])[0]
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('SELECT * FROM native_media_cache WHERE id=?',(identity,)).fetchone()
+            if row is None:raise KeyError('unknown private cache ID')
+            try:policy.current_binding(dict(row))
+            except PermissionError:pass
+            else:raise PermissionError('withdraw or change the sender grant before purging its retained cache')
+            if row['state'] not in {'cached','purged'}:raise Conflict('only retained unacknowledged cache bytes can be purged')
+            size=len(row['data']) if row['data'] is not None else 0
+            if row['state']!='purged':
+                self.db.execute('CREATE TABLE IF NOT EXISTS native_media_owner_events(id TEXT PRIMARY KEY,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL)')
+                self.db.execute("UPDATE native_media_cache SET state='purged',data=NULL WHERE id=?",(identity,))
+                self.db.execute('INSERT INTO native_media_owner_events VALUES(?,?,?,?,?)',
+                    (identity,request['owner_uid'],request['note_sha256'],time.time(),size))
+            self.db.execute('COMMIT')
+        except BaseException:self.db.execute('ROLLBACK');raise
+        return {'ids':[identity],'removed_payload_bytes':size,'tombstones_retained':True,
+            'does_not_erase_controller_agent_copies_or_backups':True}
 
     def transferred(self,ids):
         # Only called after durable controller admission recorded in RelayInbox.

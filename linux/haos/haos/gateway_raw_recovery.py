@@ -254,6 +254,9 @@ def main():
     policy = GatewayPolicy(data['policy'])
     try:DATABASE.lstat()
     except FileNotFoundError:
+        if data['action']=='media-cache' and data['params']=={}:
+            print(json.dumps({'uploads':[],'stored_bytes':0,'reserved_bytes':0,'limit_bytes':64*1024*1024,'limit_records':128,'native_journal_created':False}))
+            return
         if data['action']=='ingress' and set(data['params'])=={'after'}:
             after=data['params']['after']
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
@@ -270,6 +273,13 @@ def main():
     try:
         if data['action'] == 'ingress' and set(data['params']) == {'after'}:
             result = unresolved(inbox,data['params']['after'])
+        elif data['action'] in {'media-cache','purge-media-cache'}:
+            from .gateway_media_relay import MediaCache
+            cache=MediaCache(inbox)
+            if data['action']=='media-cache':
+                if data['params']!={}:raise ValueError('cache inventory takes no selectors')
+                result=cache.owner_inventory(policy)
+            else:result=cache.owner_purge(policy,data['params'])
         elif data['action'] == 'retry-ntfy-auth':
             result=retry_ntfy_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-irc-auth':

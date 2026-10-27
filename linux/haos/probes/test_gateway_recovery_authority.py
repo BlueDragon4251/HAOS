@@ -683,3 +683,53 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','PYTHONDONTWRITEBYTECODE':'1',
             'PYTHONPATH':str(Path(__file__).resolve().parents[1])})
     assert child.returncode==0,child.stderr
+
+
+@pytest.mark.parametrize('journal_exists',[False,True])
+def test_media_cache_owner_worker_real_uid_nss_private_path_and_audited_revocation(uid_fixture_path,journal_exists):
+    root=uid_fixture_path;root.chmod(0o755)
+    (root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    state=root/'var/lib/haos-gateway';state.mkdir(parents=True,mode=0o700);database=state/'native-inbox.db'
+    config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
+        'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+        'identity':'owner','capabilities':['create'],'allow_media':True,'generation':'b'*64,'since':1}]}
+    identity=None
+    if journal_exists:
+        from haos.gateway_media_relay import MediaCache
+        inbox=NativeInbox(database,Redactor())
+        event={'platform':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+            'message_id':'c'*64,'is_bot':False,'text':'Inspect retained document'}
+        identity=MediaCache(inbox).put(GatewayPolicy(config),'line',event,b'private gateway media','document')['id'];inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    code='''
+import os,pwd,sys
+from haos import gateway_raw_recovery,gateway_media_relay,gateway_line_ingress
+pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    def request(action,params,policy,uid=65534):
+        return subprocess.run([sys.executable,'-c',code,str(root),str(uid)],input=json.dumps({'action':action,'policy':policy,'params':params}),
+            text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
+                'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    denied=request('media-cache',{},config,65533);assert denied.returncode!=0 and 'unprivileged gateway UID' in denied.stderr
+    listing=request('media-cache',{},config);assert listing.returncode==0,listing.stderr
+    metadata=json.loads(listing.stdout)
+    if not journal_exists:
+        assert metadata['uploads']==[] and metadata['native_journal_created'] is False and not database.exists()
+        return
+    assert metadata['stored_bytes']==len(b'private gateway media') and metadata['uploads'][0]['purge_allowed'] is False
+    params={'id':identity,'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True}
+    active=request('purge-media-cache',params,config);assert active.returncode!=0 and 'withdraw or change' in active.stderr
+    config['bindings']=[]
+    purged=request('purge-media-cache',params,config);assert purged.returncode==0,purged.stderr
+    assert json.loads(purged.stdout)['removed_payload_bytes']==len(b'private gateway media')
+    import sqlite3
+    with sqlite3.connect(database) as observer:
+        assert observer.execute('SELECT state,data FROM native_media_cache').fetchone()==('purged',None)
+        assert observer.execute('SELECT owner_uid,note_sha256 FROM native_media_owner_events').fetchone()==(1000,'e'*64)
+    assert database.stat().st_uid==65534 and database.stat().st_mode&0o077==0

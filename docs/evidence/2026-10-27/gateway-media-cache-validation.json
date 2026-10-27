@@ -1,0 +1,110 @@
+{
+  "parent_commit": "b5d981f58660dc7cf9c8092d93bf02d3e0f0b6aa",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-LINE.md",
+      "sha256": "72cc3311206dd38ad4feab03d566bf1d6ebdb40ba93bd999a57296dbf4b7aad2"
+    },
+    {
+      "path": "docs/GATEWAY-MEDIA.md",
+      "sha256": "d5523af8b7a6bcaf97c9f79a2eca2c75054b944bd9071c412dfa36162ec318fd"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "87e61c36b733467376f7bf5438d81b59e6fa38828af660e64459ae312d7014f2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "9c30d731cbd02d1f86a70f1a14b8962bf5bbc73749fb8b3f61526f7264af5f09"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "907d82289a31f4c10772e6ff2bfed3fe41afab3d1c9e8a5854e1de0b1a339036"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "5c9653e7332e9675762cc1a6d2f70607a700c7b04a0c6f06bce474ccabc8731d"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "884dbf75d87de220c3f9f5f43314b8ed7ef74aac7322b9e9154d9f1698f93b79"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "454ccb9d3da51b5d9a593193e4f33d66c6f3dbd8164a18248463015dbd643d72"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "7890cef847a9c55852693b680f0ac6d00948e0457244e6e7a11e28a110a8de7f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_media_owner_gui.py",
+      "sha256": "23236c519e7855f2bad5d08d4fbb0955a145f4894f4628bb7ca11c6c7ea70277"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media_relay.py",
+      "sha256": "88b44a5b7a4ac94a96d306675877dbc60301520d3bb33f183a9822fe7aad2d3a"
+    }
+  ],
+  "suites": [
+    {
+      "name": "cache-minimal",
+      "summary": "1398 passed, 2 skipped in 9.50s",
+      "sha256": "23019054be6f4578972a29ff783c447e485b8d691ea8afc0d62ff230a7f36a49"
+    },
+    {
+      "name": "cache-full",
+      "summary": "1398 passed, 2 skipped in 9.32s",
+      "sha256": "d2cbcbf7f2b27457a00b7d294ae58fecac5c68e559c3f0a6a868b879802b7d77"
+    },
+    {
+      "name": "cache-root",
+      "summary": "85 passed in 18.53s",
+      "sha256": "cbea6b9e19221d725cbc1b464f3a6ba33e50416265a5853714d4dee8c84ee4ec"
+    }
+  ],
+  "probes": {
+    "cache-media-owner-1280x800": {
+      "receipt": {
+        "passed": 6,
+        "cases": [
+          "actual_tk_inspection_shows_private_ledger_usage_without_payload",
+          "actual_tk_default_unchecked_purge_refuses_without_deleting_bytes",
+          "actual_tk_selection_change_clears_pending_deletion_confirmation",
+          "actual_tk_explicit_purge_keeps_tombstone_and_blocks_already_purged_selection",
+          "actual_tk_private_cache_current_grant_blocks_purge_before_backend_dispatch",
+          "actual_tk_withdrawn_grant_cache_purge_uses_separate_private_backend_and_confirmation"
+        ],
+        "actual_tk_and_sqlite": true,
+        "service_and_root_authority_are_separate_tests": true,
+        "installed_or_live_acceptance": false
+      },
+      "sha256": "edd42876164b7b50df15f14c4bcf35e632c4b4bbe67e6b8505231697ba30a77e"
+    },
+    "cache-media-owner-640x480": {
+      "receipt": {
+        "passed": 6,
+        "cases": [
+          "actual_tk_inspection_shows_private_ledger_usage_without_payload",
+          "actual_tk_default_unchecked_purge_refuses_without_deleting_bytes",
+          "actual_tk_selection_change_clears_pending_deletion_confirmation",
+          "actual_tk_explicit_purge_keeps_tombstone_and_blocks_already_purged_selection",
+          "actual_tk_private_cache_current_grant_blocks_purge_before_backend_dispatch",
+          "actual_tk_withdrawn_grant_cache_purge_uses_separate_private_backend_and_confirmation"
+        ],
+        "actual_tk_and_sqlite": true,
+        "service_and_root_authority_are_separate_tests": true,
+        "installed_or_live_acceptance": false
+      },
+      "sha256": "edd42876164b7b50df15f14c4bcf35e632c4b4bbe67e6b8505231697ba30a77e"
+    }
+  },
+  "boundaries": [
+    "Gateway private journal is opened only by the existing fixed offline helper under actual gateway UID, with real NSS/chroot UID tests",
+    "Current sender grant blocks purge; changed/withdrawn grant and explicit confirmation required",
+    "Atomic note-hash/owner audit and tombstone prevent unreviewed recreation under an old grant",
+    "No existing owner/recovery data removed; all mutating tests use disposable fixtures",
+    "Voice/video/outbound media and live/installed/release acceptance remain open"
+  ]
+}

@@ -857,3 +857,23 @@ def purge_gateway_media(identity,note,confirmed=False):
     quiesce_for_setup()
     from .owner import manage_media
     return manage_media('purge',[identity],note,confirmed=True)
+
+
+def gateway_media_cache_inventory():
+    require_root()
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='media-cache'))
+
+
+def purge_gateway_media_cache(identity,note,confirmed=False):
+    require_root()
+    import re
+    if (not isinstance(identity,str) or not re.fullmatch('[0-9a-f]{64}',identity)
+            or not isinstance(note,str) or not 1<=len(note.strip())<=2000 or confirmed is not True):
+        raise PermissionError('select one exact retained cache item and explicitly confirm inspection')
+    from types import SimpleNamespace
+    from .gateway_setup import owner_gateway
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='purge-media-cache',id=identity,note=note,confirm_inspected=True))

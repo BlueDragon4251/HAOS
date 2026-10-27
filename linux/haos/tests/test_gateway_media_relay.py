@@ -107,3 +107,37 @@ def test_invalid_content_request_fails_before_any_optional_sdk_import(message_id
     content=Content('private-fixture-access',Redactor())
     with pytest.raises(ValueError):asyncio.run(content.fetch(message_id,kind,lambda:None))
     assert content.active is None and content.client is None
+
+
+def test_cache_owner_purge_requires_revocation_and_explicit_inspection(cache):
+    inbox,media,policy,event=cache
+    item=media.put(policy,'line',event,b'private retained document','document')
+    request={'id':item['id'],'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True}
+    assert not media.owner_inventory(policy)['uploads'][0]['purge_allowed']
+    with pytest.raises(PermissionError):media.owner_purge(policy,request)
+    assert media.get(policy,item['id'])['data']==b'private retained document'
+    changed=config();changed['bindings']=[];revoked=GatewayPolicy(changed)
+    assert media.owner_inventory(revoked)['uploads'][0]['purge_allowed']
+    for invalid in [dict(request,confirmed=False),dict(request,owner_uid=True),dict(request,note_sha256='raw note')]:
+        with pytest.raises(PermissionError):media.owner_purge(revoked,invalid)
+    result=media.owner_purge(revoked,request)
+    assert result['removed_payload_bytes']==len(b'private retained document')
+    assert media.owner_inventory(revoked)['stored_bytes']==0
+    row=inbox.db.execute('SELECT state,data FROM native_media_cache').fetchone()
+    assert row['state']=='purged' and row['data'] is None
+    assert inbox.db.execute('SELECT owner_uid FROM native_media_owner_events').fetchone()[0]==1000
+    assert media.owner_purge(revoked,request)['removed_payload_bytes']==0
+    with pytest.raises(Conflict):media.put(policy,'line',event,b'private retained document','document')
+    fresh=config();fresh['bindings'][0]['generation']='f'*64
+    assert media.put(GatewayPolicy(fresh),'line',event,b'private retained document','document')['id']!=item['id']
+
+
+def test_cache_owner_audit_failure_rolls_back_payload_removal(cache):
+    inbox,media,policy,event=cache
+    item=media.put(policy,'line',event,b'retain on audit failure','document')
+    inbox.db.execute('CREATE TABLE native_media_owner_events(id TEXT PRIMARY KEY,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL)')
+    inbox.db.execute("CREATE TRIGGER failed_media_audit BEFORE INSERT ON native_media_owner_events BEGIN SELECT RAISE(ABORT,'fixture audit failure'); END")
+    changed=config();changed['bindings']=[]
+    with pytest.raises(sqlite3.IntegrityError):media.owner_purge(GatewayPolicy(changed),{'id':item['id'],'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True})
+    assert media.get(policy,item['id'])['data']==b'retain on audit failure'
+    assert inbox.db.execute('SELECT COUNT(*) FROM native_media_owner_events').fetchone()[0]==0

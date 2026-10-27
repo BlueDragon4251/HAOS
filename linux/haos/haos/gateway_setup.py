@@ -68,6 +68,14 @@ def owner_ingress(args, policy):
     stopped_gateway()
     GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
+    if args.gateway_action=='media-cache':params={}
+    if args.gateway_action=='purge-media-cache':
+        if (not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000 or args.confirm_inspected is not True):
+            raise PermissionError('explicit non-secret cache inspection and confirmation required')
+        from .gateway_media import references
+        references([args.id])
+        params={'id':args.id,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+            'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest(),'confirmed':True}
     if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
         platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line'}[args.gateway_action]
         if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
@@ -102,6 +110,8 @@ def owner_ingress(args, policy):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
     if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
         audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
+    if args.gateway_action=='purge-media-cache':
+        audit('gateway.media-cache-purged',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
     return value
@@ -230,7 +240,7 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','media-cache','purge-media-cache'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":

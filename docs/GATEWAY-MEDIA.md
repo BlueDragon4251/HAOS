@@ -64,7 +64,27 @@ The confirmation is unchecked and resets on selection changes and submission.
 This is logical payload removal, not physical secure erasure, and cannot erase
 agent copies, backups or previously transferred content. Replayed old IDs remain
 unusable, and a damaged/purged attachment never becomes a text-only mission.
-Gateway-cache inspection/retention and voice/outbound media remain open.
+The separate gateway-cache view opens its private journal only in the real
+unprivileged gateway identity, using the existing fixed offline recovery helper.
+It never hands that journal to the agent or changes its owner to root. Cache
+cleanup requires a withdrawn/changed sender grant **and** explicit inspection
+confirmation; current grants cannot lose their pending bytes. The helper stores
+an atomic owner UID/note-hash decision and a tombstone, so an old grant cannot
+silently download/reintroduce the removed payload. A newly approved grant uses a
+new media ID. Existing retained signed inputs are preserved; use their separate
+owner recovery path if they need an explicit discard decision.
+
+```sh
+sudo haos-owner gateway stop
+sudo haos-owner gateway media-cache
+# Withdraw/change the selected sender grant before cleanup.
+sudo haos-owner gateway purge-media-cache --id EXACT_CACHE_ID --note 'Inspected revoked input' --confirm-inspected
+```
+
+The graphical media page links both independent stores. Cache inspection stops
+only the gateway; controller inspection stops mission services as described
+above. None of these operations restarts services automatically. Voice/video
+and outbound media remain open.
 
 Mission creation and media association share a transaction. A wrong-message,
 expired, changed or over-budget attachment cannot leave a partial mission or

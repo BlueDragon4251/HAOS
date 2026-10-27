@@ -1395,10 +1395,19 @@ class Wizard:
                         color=self.MUTED).pack(anchor="w", pady=(15, 0))
             self._button(self.content,'Gespeicherte Gateway-Medien verwalten',lambda:self.show('gateway-media')).pack(anchor='w',pady=6)
             self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
-        elif name == 'gateway-media':
-            self._head('Gateway-Medien verwalten','Private Uploads prüfen; Missionen und Audit bleiben erhalten.')
-            self._label(self.content,'Prüfen stoppt Gateway- und Missionsdienste. Nur unzugeordnete Uploads oder Medien '
-                'abgeschlossener Missionen können bereinigt werden. Dies löscht keine Agent-Kopien oder Backups '
+        elif name in {'gateway-media','gateway-cache'}:
+            cache_mode=name=='gateway-cache'
+            inspect_media=initial_setup.gateway_media_cache_inventory if cache_mode else initial_setup.gateway_media_inventory
+            purge_media=initial_setup.purge_gateway_media_cache if cache_mode else initial_setup.purge_gateway_media
+            self._head('Gateway-Zwischenspeicher' if cache_mode else 'Gateway-Medien verwalten',
+                'Private Uploads prüfen; Missionen und Audit bleiben erhalten.')
+            if cache_mode:
+                self._label(self.content,'Vor einer Bereinigung zuerst die zugehörige Absenderfreigabe unter Gateways '
+                    'entziehen oder ändern. Der private Gateway-Prozess prüft den Entzug erneut; bestehende Eingänge '
+                    'und Audit bleiben erhalten.',color=self.MUTED).pack(anchor='w',pady=8)
+            self._label(self.content,('Prüfen stoppt den Gateway-Dienst. Nur Cache-Einträge mit entzogener Freigabe können bereinigt werden. ' if cache_mode else
+                'Prüfen stoppt Gateway- und Missionsdienste. Nur unzugeordnete Uploads oder Medien abgeschlossener Missionen können bereinigt werden. ') +
+                'Dies löscht keine Agent-Kopien oder Backups '
                 'und ist keine sichere physische Löschung.',color=self.MUTED).pack(anchor='w',pady=8)
             summary=self._label(self.content,'Noch keine privaten Medien geprüft.');summary.pack(anchor='w')
             selected=self._choice(self.content,'Upload auswählen',['Keine Auswahl'],'Keine Auswahl')
@@ -1424,7 +1433,7 @@ class Wizard:
                 for identity in records or ['Keine Auswahl']:
                     choices.add_command(label=identity,command=lambda key=identity:selected.set(key))
                 selected.set(next(iter(records),'Keine Auswahl'))
-            self._button(self.content,'Dienste stoppen und Medien prüfen',lambda:self._run_async(initial_setup.gateway_media_inventory,
+            self._button(self.content,'Dienste stoppen und Medien prüfen',lambda:self._run_async(inspect_media,
                 success='Private Medien geprüft; Dienste bleiben gestoppt.',result_handler=render)).pack(anchor='w',pady=5)
             def purge():
                 identity=selected.get();row=records.get(identity);message=note.get();approval=confirmed.get()
@@ -1432,10 +1441,12 @@ class Wizard:
                 if not row or not row['purge_allowed']:
                     def refuse():raise PermissionError('Eine bereinigbare geprüfte Auswahl ist erforderlich.')
                     self._run(refuse);return
-                self._run_async(lambda:initial_setup.purge_gateway_media(identity,message,approval),
+                self._run_async(lambda:purge_media(identity,message,approval),
                     success='Ausgewählte Nutzdaten bereinigt; Mission, Audit und Metadaten erhalten.',
-                    result_handler=lambda _:self.show('gateway-media'))
+                    result_handler=lambda _:self.show(name))
             self._button(self.content,'Ausgewählte Medien bereinigen',purge).pack(anchor='w',pady=5)
+            self._button(self.content,'Controller-Speicher anzeigen' if cache_mode else 'Gateway-Zwischenspeicher anzeigen',
+                lambda:self.show('gateway-media' if cache_mode else 'gateway-cache')).pack(anchor='w',pady=5)
             self._button(self.content,'Zurück zu Gateways',lambda:self.show('gateways')).pack(anchor='w',pady=5)
         elif name == "finish":
             self._head("Einrichtung abschließen",
