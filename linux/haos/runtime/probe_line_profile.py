@@ -39,7 +39,7 @@ def main():
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
         policy=lambda:GatewayPolicy(config);inbox=NativeInbox(directory/'native.db',Redactor())
         relay=RelayInbox(directory/'relay.db',Redactor())
-        mode=['success'];lookups=[];pushed=[]
+        mode=['success'];push_mode=[None];lookups=[];pushed=[]
         async def identity(request):
             lookups.append(True);assert request.headers['Authorization']=='Bearer '+value['channel_access_token']
             if isinstance(mode[0],int):return web.Response(status=mode[0],headers={'Retry-After':'21'})
@@ -49,6 +49,7 @@ def main():
             assert request.headers['Authorization']=='Bearer '+value['channel_access_token']
             payload=await request.json();assert payload['to']==user
             pushed.append(payload)
+            if push_mode[0] is not None:return web.Response(status=push_mode[0],headers={'Retry-After':'21'})
             return web.json_response({'sentMessages':[{'id':str(123456+i)} for i in range(len(payload['messages']))]},
                 headers={'X-Line-Request-Id':'f1bc265e-e9a2-4855-a59f-6ded11cb7e3c'})
         app=web.Application();app.router.add_get('/info',identity);app.router.add_post('/push',push)
@@ -146,6 +147,56 @@ def main():
             assert await adapter.connect()
             cases.append('creation_only_profile_has_no_publisher_or_inherited_outbound_authority')
             await adapter.close_profile()
+            for error in [401,403,429]:
+                config['bindings'][0]['capabilities']=['create','read']
+                value['channel_access_token']='private-profile-send-'+str(error)
+                mode[0]='success';push_mode[0]=error;adapter=create();assert await adapter.connect()
+                store=MissionStore(directory/('outbound-'+str(error)+'.db'));engine=GatewayEngine(store)
+                try:
+                    for number in [1,2]:
+                        await engine.receive(policy(),'line',{**accepted[0],'message_id':'outbound-'+str(number)},None)
+                    delivery=engine.next_delivery(policy(),ready_connectors=['line']);before=len(pushed)
+                    receipt=await adapter.send(delivery['chat'],delivery['content'],metadata=delivery_metadata(delivery,'line'))
+                    result=delivery_result(receipt)
+                    assert result['status']==('retry' if error==429 else 'failed') and len(pushed)==before+1
+                    engine.acknowledge(policy(),delivery['id'],{**result,'attempt':delivery['attempt']})
+                    assert not adapter.is_connected,'native outbound HTTP '+str(error)+' did not pause connector'
+                    expected='rate-limited' if error==429 else 'authentication-refused'
+                    assert adapter.native_health()['status']==expected
+                    deadline=adapter.native_health()['next_attempt']
+                    if error==429:assert time.time()<deadline<=time.time()+21
+                    assert engine.next_delivery(policy(),ready_connectors=[]) is None
+                    assert store.db.execute('SELECT COUNT(*) FROM gateway_outbox WHERE attempt=0').fetchone()[0]==1
+                    assert len(pushed)==before+1
+                    cases.append('native_outbound_'+str(error)+'_pauses_listener_preserves_unsent_queue_and_persists_profile_block')
+                finally:store.close()
+                await adapter.close_profile();adapter=create();push_mode[0]=None;before=len(lookups)
+                assert not await adapter.connect() and len(lookups)==before
+                decision=retry_line_auth(inbox,policy(),{'connector':'line','owner_uid':1000,'note_sha256':'f'*64})
+                assert decision['network_requested'] is False
+                if error==429:
+                    assert decision['authentication_blocks_cleared']==0 and adapter.native_health()['next_attempt']==deadline
+                    assert not await adapter.connect() and len(lookups)==before
+                    # Advance only this disposable journal's throttle deadline.
+                    # Native credentials, HTTP, codec, owner checks and wall clock stay real.
+                    from haos.gateway import digest
+                    credential_scope=digest(['line',value['channel_secret'],value['channel_access_token'],destination])
+                    inbox.db.execute('UPDATE line_profile_status SET next_attempt=? WHERE credential_scope=?',(time.time()-1,credential_scope))
+                else:assert decision['authentication_blocks_cleared']>0
+                assert await adapter.connect() and len(lookups)==before+1
+                cases.append('native_outbound_'+str(error)+'_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry')
+                resumed=MissionStore(directory/('outbound-'+str(error)+'.db'));resumed_engine=GatewayEngine(resumed)
+                try:
+                    remaining=resumed_engine.next_delivery(policy(),ready_connectors=['line'])
+                    assert remaining['attempt']==1 and remaining['id']!=delivery['id']
+                    sent_before=len(pushed)
+                    receipt=await adapter.send(remaining['chat'],remaining['content'],metadata=delivery_metadata(remaining,'line'))
+                    assert delivery_result(receipt)['status']=='delivered' and len(pushed)==sent_before+1
+                    resumed_engine.acknowledge(policy(),remaining['id'],{**delivery_result(receipt),'attempt':remaining['attempt']})
+                    assert tuple(resumed.db.execute('SELECT state,attempt FROM gateway_outbox WHERE id=?',(remaining['id'],)).fetchone())==('delivered',1)
+                finally:resumed.close()
+                cases.append('native_outbound_'+str(error)+'_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget')
+                await adapter.close_profile()
             for error,state in [(401,'authentication-refused'),(403,'authentication-refused'),('wrong-bot','identity-refused'),(429,'rate-limited')]:
                 mode[0]=error;value['channel_access_token']='private-profile-access-'+str(error)
                 adapter=create();before=len(lookups)

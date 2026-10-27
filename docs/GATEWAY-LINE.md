@@ -65,6 +65,16 @@ After correcting channel login/destination errors, the graphical recheck or
 an offline owner decision. It preserves throttle deadlines, revocation and
 retained inputs; restart must still pass actual native account verification.
 
+Native outbound HTTP 401/403 also pauses the connector and persists an account
+authentication block; 429 pauses it until the private stored Retry-After deadline.
+Other unsent obligations retain attempt zero while the connector is not ready.
+Sends, reconnect and close are serialized so another request cannot escape while
+the listener is being stopped. These blocks survive profile reopen. An owner
+authentication recheck cannot shorten a rate deadline; after correction/expiry,
+fresh native bot verification precedes sending previously unsent replies. See
+`line-outbound-block-validation.json` for the reproduced prior 401 defect and
+actual HTTP/mission-outbox/reopen recovery cases.
+
 Replacing credentials, listener settings or certificate material withdraws old
 sender grants. Re-pair explicitly and restart; old events cannot inherit a new
 grant epoch. Secret/PEM inputs clear after submission and context changes. A late

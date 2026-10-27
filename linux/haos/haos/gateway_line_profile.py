@@ -189,9 +189,21 @@ def _install(adapter,fd,profile,value,authority,publisher):
     async def send(self,chat_id,content,reply_to=None,metadata=None):
         from .gateway_delivery_authority import current_delivery
         if publisher is None:raise PermissionError('LINE creation-only profile has no outbound authority')
-        current_delivery(self,'line',chat_id,metadata)()
-        binding=self._haos_native.policy().current_binding(metadata['haos_binding'])
-        return await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content)
+        # Serialize reconnect/close and queued sends with the transition to an
+        # account-wide block. No second request may escape during listener cleanup.
+        async with lifecycle:
+            current_delivery(self,'line',chat_id,metadata)()
+            binding=self._haos_native.policy().current_binding(metadata['haos_binding'])
+            receipt=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content)
+            from .gateway_delivery import delivery_result
+            result=delivery_result(receipt)
+            if result['status']=='failed' and receipt.error_kind=='forbidden':
+                try:status('authentication-refused')
+                finally:await stop()
+            elif result['status']=='retry' and receipt.error_kind=='rate_limited':
+                try:status('rate-limited',result['retry_after'])
+                finally:await stop()
+            return receipt
     async def close(self):
         async with lifecycle:
             if self._haos_line_closed:return
