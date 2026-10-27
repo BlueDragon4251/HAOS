@@ -84,6 +84,23 @@ def exercise(directory,tls,expired_tls):
         policy,private=original_load(config);epoch=policy['bindings'][0]['generation']
         assert policy['bindings'][0]['scope']==destination and policy['bindings'][0]['since']>0
         cases.append('actual_graphical_backend_derives_bot_scope_and_publishes_fresh_timed_grant')
+        assert not policy['bindings'][0].get('allow_media',False)
+        initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'),allow_media=True)
+        policy,private=original_load(config)
+        assert policy['bindings'][0]['allow_media'] is True and policy['bindings'][0]['generation']!=epoch
+        before=(config/'gateways.json').read_bytes()
+        try:initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('read',),allow_media=True)
+        except ValueError:pass
+        else:raise AssertionError('media without create permission accepted')
+        assert (config/'gateways.json').read_bytes()==before
+        cases.append('actual_graphical_media_opt_in_persisted_and_missing_create_refused_without_mutation')
+        gateway_setup.owner_gateway(SimpleNamespace(gateway_action='pair',binding='owner',connector='line-main',
+            sender=sender,chat=sender,scope='',thread='',identity='personal',capabilities=['create','read'],allow_media=True))
+        policy,private=original_load(config);assert policy['bindings'][0]['allow_media'] is True
+        initial_setup.pair_gateway_sender('owner','line-main',sender,'C'+'b'*32,'personal',('create','read'))
+        policy,private=original_load(config);assert not policy['bindings'][0]['allow_media']
+        cases.append('actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted')
+
         for changes in [{'sender':destination},{'scope':'U'+'e'*32},{'thread':'unapproved'}]:
             args={'sender':sender,'scope':'','thread':''};args.update(changes)
             before=(config/'gateways.json').read_bytes()

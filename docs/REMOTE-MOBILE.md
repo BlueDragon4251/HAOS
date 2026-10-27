@@ -4,6 +4,34 @@ HAOS verwendet **einen separaten TLS-1.3-Server mit verpflichtendem Client-
 Zertifikat**, nicht die ungeschützte Hermes-API. Standardmäßig ist der
 Beobachtungsserver ausgeschaltet. Das Netzwerk muss bereits erreichbar sein.
 
+## Netzwerkstand für die spätere Fernsteuerungsphase (Owner-Angabe, 27.10.2026)
+
+Dieses Update ändert weder die Roadmap-Reihenfolge noch den Implementierungs-
+oder Abnahmestand. Drei hat laut Owner „Open Internet“ aktiviert: öffentliche
+**dynamische** IPv4 statt CGNAT, keine statische Adresse und kein zusätzliches
+IP-Paket. Die aktuelle WAN-Adresse ist kein dauerhafter Verbindungsparameter.
+ZTE G5TC, Firmware BD_G5TCV1.0.0B22: Portweiterleitung aktiviert, höchstens zehn
+Regeln, TCP/UDP/TCP+UDP. Lease-Dauer und Einschränkungen eingehender Verbindungen
+sind noch beim Provider angefragt.
+
+Topologie: Drei 5G → ZTE G5TC → LAN → A1 Mesh Disc 1 → drahtloses Mesh →
+A1 Mesh Disc 2 → LAN → USB-Ethernet → HP EliteBook 830 G11. Exakte Mesh- und
+USB-Adaptermodelle sind noch unbekannt. Die spätere Lösung soll bestehende
+mTLS-/Rollen-/Entzugsfunktionen erhalten und direkte verschlüsselte Verbindung,
+Dynamic DNS, Wiederverbindung nach Adresswechsel, kontinuierlichen Desktopstream
+und Eingaben im optionalen App-Onboarding berücksichtigen. VPS oder fremde
+Vermittlungsdienste sollen keine Pflicht werden. Dies ist keine aktuelle
+Erreichbarkeits-, Stream- oder Android-Abnahme.
+
+**Wake-on-WAN bleibt ungeprüft.** Eine aktive USB-Ethernet-LED im ausgeschalteten
+Zustand belegt weder Wake-on-LAN noch S5-Unterstützung. Später real zu prüfen:
+BIOS/UEFI und Adapter einschließlich S5, Magic-Packet-Transport durch beide
+Mesh-Discs, UDP-Weiterleitung/Broadcast bzw. statisches ARP des Routers sowie
+Verhalten nach längerer Ausschaltzeit. Antworten von Drei zu diesen Punkten,
+Mesh-Einschränkungen und IP-Wechseln stehen aus. Keine ungeschützte öffentliche
+Verwaltung und keine Funktionszusage vor erfolgreichem Hardwaretest; sichere
+Alternativen sind bei fehlender Router-/Hardware-Unterstützung zu bewerten.
+
 ## Einmalige Einrichtung am vertrauenswürdigen HAOS-PC
 
 Als angemeldeter Eigentümer mit eigener Passwortbestätigung:

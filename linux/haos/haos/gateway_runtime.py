@@ -30,6 +30,8 @@ async def call(method: str, params: dict):
             raise ConnectionError("invalid controller response")
         reply = json.loads(line)
         if reply.get("ok") is not True:
+            if method in {'gateway.media.begin','gateway.media.chunk'} and reply.get('media_retryable') is True:
+                raise ConnectionError('private media admission deferred for recovery')
             raise PermissionError("controller rejected gateway request")
         return reply["result"]
     finally:
@@ -42,7 +44,13 @@ def adapter_envelope(event, platform: str):
     if source is None or getattr(source.platform, "value", None) != platform or event.internal:
         raise PermissionError("invalid native adapter source")
     # Never admit paths from adapter metadata as files in the agent's namespace.
-    if event.media_urls or getattr(event.message_type, "value", None) not in {"text", "command"}:
+    if event.media_urls:
+        from .gateway_media_relay import event_media
+        try:admitted=event_media(event,platform)
+        except PermissionError:raise ValueError('attachment and voice admission require a configured media broker') from None
+        if not admitted or getattr(event.message_type,'value',None) not in {'photo','document'}:
+            raise ValueError('media requires a retained private image/document capability')
+    elif getattr(event.message_type, "value", None) not in {"text", "command"}:
         raise ValueError("attachment and voice admission require a configured media broker")
     if not event.message_id or not source.user_id:
         raise PermissionError("stable sender and message identity required")
@@ -211,9 +219,14 @@ async def serve():
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
+    media_cache=None
     if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
+        from .gateway_media_relay import MediaCache
+        media_cache=MediaCache(native_inbox)
+        for row in inbox.db.execute("SELECT media FROM inbox WHERE state='admitted' AND mission_id IS NOT NULL AND media!='[]'"):
+            media_cache.transferred(json.loads(row['media']))
     stop = asyncio.Event()
     def current_policy():
         current = GatewayPolicy(trusted_json(config / "gateways.json"))
@@ -244,7 +257,8 @@ async def serve():
                 current = current_policy()
                 # Commit before returning from native dispatch; transport-level
                 # acknowledgement ordering also needs platform-specific SDK proof.
-                inbox.admit(current, connector["id"], envelope)
+                from .gateway_media_relay import event_media
+                inbox.admit(current, connector["id"], envelope,media=event_media(event,connector['platform']))
                 return True
             except (PermissionError, ValueError):
                 logging.warning("Gateway message refused")
@@ -320,11 +334,13 @@ async def serve():
                 incoming = inbox.next(current)
                 if incoming:
                     try:
-                        response = await call("gateway.receive", {"connector": incoming["connector"], "envelope": incoming["envelope"]})
+                        from .gateway_media_relay import forward
+                        response=await forward(current_policy,incoming['connector'],incoming['envelope'],incoming['media'],media_cache,call)
                         inbox.admitted(incoming["id"], response["mission_id"])
+                        if incoming['media']:media_cache.transferred(incoming['media'])
                     except PermissionError:
                         inbox.denied(incoming["id"])
-                    except (OSError, ConnectionError, TimeoutError):
+                    except (OSError, ConnectionError, TimeoutError,Conflict):
                         # Ingress is idempotent even if the previous response was lost.
                         inbox.retry(incoming["id"])
                 delivery = await call("gateway.next", {"ready":[name for name,adapter in adapters.items() if adapter.is_connected]})

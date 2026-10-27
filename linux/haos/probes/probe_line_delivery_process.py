@@ -77,6 +77,7 @@ from haos.gateway_runtime import build_adapter,require_runtime_identity,adapter_
 from haos.gateway_delivery import delivery_result
 from haos.gateway_raw import NativeInbox
 from haos.gateway_relay import RelayInbox
+from haos.gateway_media_relay import event_media,MediaCache
 from haos.gateway_publication import validate_snapshot
 from haos.redaction import Redactor
 assert os.getgroups()==[]
@@ -107,7 +108,8 @@ async def exercise():
     adapter=build_adapter('line',request['credentials'],line_context={'parent':parent,'connector':'line','policy':policy,'inbox':inbox})
     adapter._haos_line_identity._target=request['api']+'/info'
     adapter._haos_line_publisher._target=request['api']+'/push'
-    def receive(event):relay.admit(policy(),'line',adapter_envelope(event,'line'));return True
+    adapter._haos_line_content._target=request['api']+'/content/{message_id}'
+    def receive(event):relay.admit(policy(),'line',adapter_envelope(event,'line'),media=event_media(event,'line'));return True
     adapter.set_durable_message_handler(receive)
     try:
         assert await adapter.connect() and adapter.native_health()['status']=='listening-tls'
@@ -122,6 +124,8 @@ async def exercise():
         assert result=={'status':'uncertain'}
         after=inbox.db.execute('SELECT state FROM line_delivery_intents').fetchone()[0]
         assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==1
+        media_ids=json.loads(relay.db.execute('SELECT media FROM inbox').fetchone()[0])
+        assert len(media_ids)==1 and MediaCache(inbox).get(policy(),media_ids[0])['data']==b'private retained process document'
         print(json.dumps({'uid':os.geteuid(),'prior_state':before[0] if before else None,'state':after,
             'result':result,'private_owner_denied':True,'kernel_lease_reacquired':True,'retained_relay_count':1}),flush=True)
     finally:await adapter.close_profile();relay.close();inbox.close()
@@ -141,7 +145,10 @@ asyncio.run(exercise())
                 assert observer.execute('SELECT state FROM line_delivery_intents').fetchone()==('writing',)
             state['pushes']+=1;state['seen'].set();await state['release'].wait()
             return web.json_response({'sentMessages':[{'id':'1234'}]},headers={'X-Line-Request-Id':'12345678-1234-1234-1234-123456789abc'})
-        app=web.Application();app.router.add_get('/info',info);app.router.add_post('/push',push)
+        async def content(request):
+            assert request.headers['Authorization']=='Bearer private-line-process-access' and request.match_info['id']=='1234'
+            return web.Response(body=b'private retained process document')
+        app=web.Application();app.router.add_get('/info',info);app.router.add_post('/push',push);app.router.add_get('/content/{id}',content)
         runner=web.AppRunner(app,access_log=None,shutdown_timeout=2);await runner.setup()
         site=web.TCPSite(runner,'127.0.0.1',0,ssl_context=tls);await site.start()
         api='https://localhost:'+str(site._server.sockets[0].getsockname()[1])
@@ -153,7 +160,7 @@ asyncio.run(exercise())
                     'bind_host':'127.0.0.1','public_listener':False}},
             'policy':{'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
                 'id':'owner','connector':'line','sender':user,'chat':user,'scope':destination,
-                'thread':'','identity':'owner','capabilities':['create','read'],'generation':'a'*64,
+                'thread':'','identity':'owner','capabilities':['create','read'],'allow_media':True,'generation':'a'*64,
                 'since':int((time.time()-60)*1000)}]}}
         async def invoke(uid,action):
             child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),str(script),
@@ -173,7 +180,7 @@ asyncio.run(exercise())
             assert json.loads(ready)=={'listening':True,'uid':65534}
             body=json.dumps({'destination':destination,'events':[{'type':'message','mode':'active','timestamp':int(time.time()*1000),
                 'webhookEventId':'01K8'+'A'*22,'source':{'type':'user','userId':user},
-                'message':{'type':'text','id':'1234','text':'private retained process mission'}}]}).encode()
+                'message':{'type':'file','id':'1234','fileName':'../../owner-secret','fileSize':len(b'private retained process document')}}]}).encode()
             signature=base64.b64encode(hmac.new(('c'*32).encode(),body,hashlib.sha256).digest()).decode()
             async with ClientSession(connector=TCPConnector(ssl=ssl.create_default_context())) as client:
                 async with client.post(f'https://localhost:{port}/line/webhook',data=body,headers={'X-Line-Signature':signature}) as response:
@@ -184,7 +191,7 @@ asyncio.run(exercise())
                         row=observer.execute('SELECT state FROM native_inbox').fetchone()
                     if row==('committed',):break
                     await asyncio.sleep(.02)
-            cases.append('actual_unprivileged_gateway_installed_public_profile_accepts_verified_https_hmac_and_commits_native_relay')
+            cases.append('actual_gateway_uid_verifies_https_hmac_and_native_https_document_download_before_private_media_relay_commit')
             first.stdin.write(b'SEND\n');await first.stdin.drain()
             await asyncio.wait_for(state['seen'].wait(),10)
             assert state['pushes']==1 and first.returncode is None
@@ -211,6 +218,7 @@ asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uid_cases':[0,65533,65534],
         'actual_sigkill':True,'tls_verification_disabled':False,'public_gateway_enabled':True,
         'agent_fixture_received_no_credentials':True,
+        'incoming_document_bytes_verified_after_process_restart':True,
         'fixture_only_disposable_ca_and_loopback_targets':True,
         'external_connections_or_recipient_acceptance':False,'installed_haos_accepted':False},indent=2))
 

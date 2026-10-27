@@ -50,10 +50,21 @@ def envelope(event,destination):
     if (not isinstance(source,dict) or not isinstance(message,dict) or type(stamp) is not int or stamp<=0
             or not isinstance(identity,str) or not re.fullmatch(r'[0-9A-HJKMNP-TV-Z]{26}',identity)
             or not _USER.fullmatch(destination) or not isinstance(source.get('userId'),str)
-            or not _USER.fullmatch(source['userId']) or message.get('type')!='text'
-            or not isinstance(message.get('id'),str) or not re.fullmatch(r'[1-9][0-9]{0,31}',message['id'])
-            or not isinstance(message.get('text'),str) or not 1<=len(message['text'].encode())<=32000
-            or not message['text'].strip()):return None
+            or not _USER.fullmatch(source['userId']) or message.get('type') not in {'text','image','file'}
+            or not isinstance(message.get('id'),str) or not re.fullmatch(r'[1-9][0-9]{0,31}',message['id'])):return None
+    if message['type']=='text':
+        if not isinstance(message.get('text'),str) or not 1<=len(message['text'].encode())<=32000 or not message['text'].strip():return None
+        text=message['text']
+    else:
+        from .gateway_media import MAX_BYTES,MAX_IMAGE_BYTES
+        if message.get('contentProvider',{'type':'line'})!={'type':'line'}:return None
+        if 'fileName' in message and (not isinstance(message['fileName'],str) or not 1<=len(message['fileName'].encode())<=512
+                or any(ord(c)<32 for c in message['fileName'])):return None
+        if 'fileSize' in message and (type(message['fileSize']) is not int or not 1<=message['fileSize']<=
+                (MAX_IMAGE_BYTES if message['type']=='image' else MAX_BYTES)):return None
+        fields={key:message[key] for key in ('id','type','fileName','fileSize','contentProvider') if key in message}
+        kind='image' if message['type']=='image' else 'document'
+        text=f"Inspect the attached {kind} (LINE message {message['id']}; metadata {digest(fields)})."
     user=source['userId'];kind=source.get('type')
     if kind=='user' and set(source)=={'type','userId'}:chat=user
     elif kind=='group' and set(source)=={'type','userId','groupId'}:chat=source['groupId']
@@ -61,7 +72,7 @@ def envelope(event,destination):
     else:return None
     if not isinstance(chat,str) or not _CHAT.fullmatch(chat) or chat[0]!={'user':'U','group':'C','room':'R'}[kind]:return None
     return {'platform':'line','sender':user,'chat':chat,'scope':destination,'thread':'',
-        'message_id':digest([destination,identity]),'is_bot':False,'text':message['text']},stamp/1000
+        'message_id':digest([destination,identity]),'is_bot':False,'text':text},stamp/1000
 
 
 def _object(pairs):
@@ -94,14 +105,20 @@ def capture(adapter,body,signature,authority):
         try:binding=policy.authorize(native.connector,source)
         except PermissionError:continue
         validate_binding(binding,require_epoch=True)
+        is_media=event['message']['type']!='text'
+        if is_media:
+            from .gateway_media import authorize
+            try:authorize(policy,native.connector,source)
+            except PermissionError:continue
         if stamp*1000<=binding['since'] or stamp>time.time()+300:raise PermissionError('LINE event outside timed owner grant')
         # Reply tokens are single-use capabilities, never persisted in raw payload.
         sanitized={key:value for key,value in event.items() if key in {'type','mode','source','message','timestamp','webhookEventId'}}
-        sanitized['message']={key:event['message'][key] for key in ('id','type','text')}
+        message_fields=('id','type','fileName','fileSize','contentProvider') if is_media else ('id','type','text')
+        sanitized['message']={key:event['message'][key] for key in message_fields if key in event['message']}
         from .redaction import Redactor
         private=Redactor([adapter.channel_secret,adapter.channel_access_token,event.get('replyToken','')])
         source={**source,'text':private.text(source['text'])}
-        sanitized['message']['text']=source['text']
+        if not is_media:sanitized['message']['text']=source['text']
         admitted.append((source,stamp,sanitized))
     return [native.inbox.admit(policy,native.connector,source,{'event':event},received_at=stamp)
         for source,stamp,event in admitted]
@@ -117,7 +134,7 @@ async def dispatch_stored(adapter,key):
             decoded=envelope(row['payload']['event'],row['envelope']['scope'])
             if decoded is None or decoded[0]!=row['envelope']:raise PermissionError('retained LINE event changed')
             if adapter._client is not None:raise PermissionError('prepared LINE decoder must have no live client')
-            state={'adapter':adapter,'row':row,'accepted':False};token=_CURRENT.set(state)
+            state={'adapter':adapter,'row':row,'accepted':False,'media':None};token=_CURRENT.set(state)
             await adapter._haos_line_decode(adapter,row['payload']['event'])
             native.policy().current_binding(row);native.inbox.complete(key,state['accepted'])
             return state['accepted']
@@ -144,11 +161,42 @@ def install(adapter):
         if state is None or state['adapter'] is not self:raise PermissionError('no retained LINE event')
         self._haos_native.policy().current_binding(state['row'])
         event.message_id=state['row']['envelope']['message_id'];event.timestamp=datetime.fromtimestamp(state['row']['created_at'],timezone.utc)
-        if adapter_envelope(event,'line')!=state['row']['envelope']:raise PermissionError('LINE native codec changed approved source')
-        await original_handle(event);state['accepted']=event._gateway_accepted is True
+        if state['media'] is not None:
+            from .gateway_media_relay import event_scope
+            expected=state['row']['payload']['event']['message']['type']
+            if event.text!='['+expected+']':raise PermissionError('LINE native media codec changed retained kind')
+            event.text=state['row']['envelope']['text']
+            item=state['media'];mime='image/'+item['descriptor']['format'] if item['descriptor']['kind']=='image' else 'application/octet-stream'
+            with event_scope(event,[item['id']],[mime]):
+                if adapter_envelope(event,'line')!=state['row']['envelope']:raise PermissionError('LINE native media source changed')
+                await original_handle(event)
+        else:
+            if adapter_envelope(event,'line')!=state['row']['envelope']:raise PermissionError('LINE native codec changed approved source')
+            await original_handle(event)
+        state['accepted']=event._gateway_accepted is True
+    async def download(self,message_id,msg_type,*,filename=None):
+        state=_CURRENT.get()
+        if state is None or state['adapter'] is not self:raise PermissionError('no retained LINE media event')
+        row=state['row'];message=row['payload']['event']['message'];kind='image' if msg_type=='image' else 'document'
+        if message_id!=message['id'] or msg_type!=message['type'] or msg_type not in {'image','file'}:
+            raise PermissionError('native LINE media identity changed')
+        def current():
+            from .gateway_media import authorize
+            policy=self._haos_native.policy();policy.current_binding(row)
+            authorize(policy,self._haos_native.connector,row['envelope'])
+            return policy
+        cache=self._haos_media_cache;policy=current();item=cache.find(policy,self._haos_native.connector,row['envelope'])
+        if item is None:
+            cache.capacity()
+            data=await self._haos_line_content.fetch(message_id,kind,current)
+            item=cache.put(current(),self._haos_native.connector,row['envelope'],data,kind)
+        state['media']=item
+        mime='image/'+item['descriptor']['format'] if kind=='image' else 'application/octet-stream'
+        return 'haos-media:'+item['id'],mime
     for name in ('connect','_handle_webhook','_dispatch_event','_handle_message_event','_handle_postback_event',
             '_download_media','_handle_media','send','send_typing','send_image','send_image_file','send_document',
             'send_voice','send_video','send_multiple_images'):
         setattr(adapter,name,MethodType(deny,adapter))
     adapter.build_source=MethodType(source,adapter);adapter.handle_message=MethodType(handle,adapter)
+    adapter._download_media=MethodType(download,adapter)
     return adapter

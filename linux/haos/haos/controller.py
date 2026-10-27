@@ -244,6 +244,9 @@ class Controller:
         except (ValueError, KeyError, PermissionError, Conflict, TimeoutError) as exc:
             print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
             reply = {"ok": False, "error": self.store.redactor.text(str(exc))}
+            if (isinstance(exc,Conflict) and isinstance(locals().get('request'),dict)
+                    and request.get('method') in {'gateway.media.begin','gateway.media.chunk'}):
+                reply['media_retryable']=True
         except Exception:
             # Exceptions can embed request text, URLs and credentials; journal only their type.
             print(json.dumps({"event": "control.error", "actor": actor}), flush=True)

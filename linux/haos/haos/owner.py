@@ -187,6 +187,7 @@ def main():
     pair.add_argument('--homeassistant-shared-notifications',action='store_true',help='approve mission replies visible to every Home Assistant instance user')
     pair.add_argument('--homeassistant-trust-system',action='store_true',help='explicitly trust system/automation events for the exact Home Assistant entity; sender must be system')
     pair.add_argument('--allow-plaintext',action='store_true',help='explicit Matrix plaintext approval')
+    pair.add_argument('--allow-media',action='store_true',help='explicit LINE incoming PNG/JPEG/document approval; requires create, not voice or outbound media')
     pair.add_argument('--no-require-mention',action='store_true',help='explicit Matrix mention exemption')
     pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer", "pause", "resume"], default=["create", "read", "cancel", "answer"])
     revoke = gateway_sub.add_parser("revoke")

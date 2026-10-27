@@ -1,9 +1,20 @@
 # Gateway media transport — private backend, integration in progress
 
-The controller now has a real bounded byte-upload and native Hermes attachment
-path. This is a backend increment. **LINE's signed public input still admits
-text only at this checkpoint; its download/relay and owner GUI opt-in are not yet
-connected. Audio/voice and outbound media are not implemented by this increment.**
+The controller provides bounded byte uploads and native Hermes attachments.
+Signed LINE input now connects the actual pinned image/file adapter and private
+HTTPS content client to this path. The owner must explicitly approve incoming
+images/documents for each sender/chat grant, using the graphical setup or
+`haos-owner gateway pair --allow-media`. Existing grants remain text-only.
+Voice, video and outbound media remain open; local fixtures do not establish
+live account delivery or model inference.
+
+The private gateway cache is bounded to 64 MiB/128 records. The exact native
+callback carries opaque IDs rather than host paths. Current approval is checked
+before downloads, every read/upload chunk and mission admission. Downloads keep
+TLS hostname verification, disallow redirects and encoded bodies, enforce byte
+limits and reject known credential reflection. A lost upload receipt resumes
+from the controller offset. Temporary gateway bytes are compacted only after
+durable mission acknowledgement; authoritative controller bytes remain retained.
 
 ## Boundaries and persistence
 

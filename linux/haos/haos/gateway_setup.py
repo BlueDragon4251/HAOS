@@ -318,6 +318,8 @@ def owner_gateway(args):
             if binding['scope'] and binding['scope']!=destination:raise ValueError('LINE scope differs from the saved bot destination')
             if binding['sender']==destination:raise ValueError('LINE sender must differ from the bot destination')
             binding['scope']=destination
+            binding['allow_media']=getattr(args,'allow_media',False)
+        elif getattr(args,'allow_media',False):raise ValueError('media approval applies only to LINE images/documents')
         devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
         unmentioned=getattr(args,'no_require_mention',False)
         if selected and selected['platform']=='matrix':

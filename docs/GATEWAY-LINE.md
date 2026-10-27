@@ -117,8 +117,13 @@ The tightened agent-role fixture accepts only state/canary paths, with no
 credential payload on its stdin; its rerun is recorded separately in
 `line-agent-fixture-isolation-validation.json`.
 
-**Still open:** binary files/images, voice and other media require a reviewed
-shared media broker through missions and the agent. They are not enabled by this
-text setup. This integration does not claim all 22 gateways, real LINE accounts,
+Incoming PNG/JPEG images (2 MiB) and documents (8 MiB) now use the shared
+[bounded media transport](GATEWAY-MEDIA.md), only with an explicit per-sender
+`allow_media` grant and mission-create permission. The GUI offers a separate
+unchecked option and clears pending consent on sender/chat edits or submit;
+CLI uses `gateway pair --allow-media`. Remote filenames never select host paths.
+
+**Still open:** voice, video, outbound media and owner retention controls.
+This integration does not claim all 22 gateways, real LINE accounts,
 external message delivery, installed boot, hardware tests or final ISO/container/
 APK release acceptance. No external test messages are sent by these fixtures.

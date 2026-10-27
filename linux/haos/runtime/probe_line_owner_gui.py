@@ -61,7 +61,8 @@ def main():
         assert str(field('Bereich').cget('state'))==str(field('Thread-ID').cget('state'))=='disabled'
         cases.append('actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token')
         labels=' '.join(w.cget('text') for w in widgets(wizard.content) if isinstance(w,tk.Label))
-        assert 'CGNAT' in labels and 'Port 443' in labels and 'Medien und Voice sind noch nicht freigegeben' in labels
+        assert 'CGNAT' in labels and 'Port 443' in labels and 'Voice, Video und ausgehende Medien sind noch nicht freigegeben' in labels
+        assert 'höchstens 2 MiB' in labels and 'höchstens 8 MiB' in labels
         assert 'keinen Empfang' in labels and 'alle Mitglieder' in labels
         cases.append('actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits')
         load_material()
@@ -84,8 +85,22 @@ def main():
         fill('Absender-ID',sender);fill('Chat-ID','C'+'b'*32)
         button('Absender mit ausgewählten Rechten').invoke();settle()
         assert pairs[-1][0][:4]==('my-device','line-main',sender,'C'+'b'*32)
-        assert pairs[-1][1]=={'scope':destination,'thread':''}
+        assert pairs[-1][1]=={'scope':destination,'thread':'','allow_media':False}
         cases.append('actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights')
+        media=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Eingehende LINE-Bilder'))
+        assert not wizard.root.getvar(media.cget('variable'))
+        media.invoke();button('Absender mit ausgewählten Rechten').invoke();settle()
+        assert pairs[-1][1]['allow_media'] is True and not wizard.root.getvar(media.cget('variable'))
+        cases.append('actual_explicit_line_image_document_consent_reaches_owner_backend_and_clears_after_submit')
+        media.invoke();fill('Absender-ID','U'+'b'*32)
+        assert not wizard.root.getvar(media.cget('variable'))
+        fill('Absender-ID',sender)
+        cases.append('actual_sender_edit_withdraws_pending_media_consent')
+        create=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text')=='Missionen erstellen')
+        media.invoke();create.invoke()
+        assert not wizard.root.getvar(media.cget('variable')) and str(media.cget('state'))=='disabled'
+        create.invoke();assert str(media.cget('state'))=='normal' and not wizard.root.getvar(media.cget('variable'))
+        cases.append('actual_no_create_permission_disables_media_without_restoring_earlier_consent')
         button('LINE-Konto nach Korrektur erneut prüfen').invoke();settle()
         assert retries==['line-main']
         cases.append('actual_auth_recheck_uses_real_owner_backend_without_sending')

@@ -74,6 +74,8 @@ def build(value,parent,connector,policy,inbox):
         from .redaction import Redactor
         inbox.redactor=Redactor([*inbox.redactor.secrets,value['channel_secret'],value['channel_access_token'],
             *([value['tls']['private_key']] if 'tls' in value else [])])
+        from .gateway_media_relay import MediaCache
+        from .gateway_line_content import Content
         values={'LINE_CHANNEL_SECRET':value['channel_secret'],'LINE_CHANNEL_ACCESS_TOKEN':value['channel_access_token'],
             'LINE_ALLOW_ALL_USERS':'false','LINE_ALLOWED_USERS':'','LINE_ALLOWED_GROUPS':'','LINE_ALLOWED_ROOMS':''}
         os.environ['HERMES_SAFE_MODE']='1'
@@ -92,6 +94,8 @@ def build(value,parent,connector,policy,inbox):
                     raise PermissionError('captured LINE profile grants changed')
                 return result
             adapter._haos_native=SimpleNamespace(connector=connector,policy=pinned,inbox=inbox)
+            adapter._haos_media_cache=MediaCache(inbox)
+            adapter._haos_line_content=Content(value['channel_access_token'],inbox.redactor)
             publisher=None
             if any('read' in b['capabilities'] for b in current().bindings.values() if b['connector']==connector):
                 from .gateway_line_delivery import Publisher
@@ -146,15 +150,22 @@ def _install(adapter,fd,profile,value,authority,publisher):
                         else:
                             async with publisher.lock:check();await dispatch_stored(adapter,key)
                     except PermissionError:check()
-                    except Exception:pass  # Persistent retry/expiry belong to NativeInbox.
+                    except Exception as error:
+                        from .gateway_line_content import Refused
+                        if isinstance(error,Refused) and error.status in {401,403,429}:
+                            try:status('rate-limited' if error.status==429 else 'authentication-refused',error.delay)
+                            finally:
+                                adapter._mark_disconnected()
+                                async with lifecycle:await stop()
+                            return
+                        # Persistent retry/expiry belong to NativeInbox.
                 await asyncio.sleep(.2)
         except PermissionError:
             status('revoked')
-            # Shut down incoming network without cancelling the worker itself.
-            runner=adapter._haos_line_runner;adapter._haos_line_runner=None
-            if runner is not None:await runner.cleanup()
-            adapter._haos_line_verified_destination=None
             adapter._mark_disconnected()
+            # Serialize cleanup with owner close/reconnect; stop() recognizes
+            # this worker and never tries to cancel/await itself.
+            async with lifecycle:await stop()
     async def connect(self,**_kwargs):
         from aiohttp import web
         from .gateway_line_listener import application
@@ -210,6 +221,7 @@ def _install(adapter,fd,profile,value,authority,publisher):
             self._haos_line_closed=True;await stop()
             if publisher is not None:await publisher.close()
             await self._haos_line_identity.close()
+            await self._haos_line_content.close()
             os.close(fd)
             if health(self)['status'] not in {'authentication-refused','identity-refused','rate-limited','tls-refused'}:status('closed')
     adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter)
