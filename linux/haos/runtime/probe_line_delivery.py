@@ -16,7 +16,8 @@ from types import SimpleNamespace
 
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
-    from haos.gateway_line_ingress import PreparedLINEPolicy,install
+    from haos.gateway import GatewayPolicy
+    from haos.gateway_line_ingress import install
     from haos.gateway_line_delivery import Publisher
     from haos.gateway_ingress import durable_adapter
     from haos.gateway_raw import NativeInbox
@@ -36,7 +37,7 @@ def main():
         config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
             'id':'owner','connector':'line','sender':user,'chat':user,'scope':destination,'thread':'',
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-        inbox=NativeInbox(directory/'native.db',Redactor());policy=lambda:PreparedLINEPolicy(config)
+        inbox=NativeInbox(directory/'native.db',Redactor());policy=lambda:GatewayPolicy(config)
         adapter=install(durable_adapter(LineAdapter(PlatformConfig(enabled=True,extra={
             'channel_secret':'private-disposable-channel-secret','channel_access_token':'private-disposable-access-token'}))))
         adapter._haos_native=SimpleNamespace(connector='line',policy=policy,inbox=inbox)
@@ -181,7 +182,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-line-send-') as temporary:asyncio.run(exercise(Path(temporary)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_native_codec_push_and_loopback_http_sqlite':True,
         'fixture_only_loopback_target':True,'fixture_only_disposable_ca':True,'tls_verification_disabled':False,
-        'public_gateway_enabled':False,
+        'public_gateway_enabled':True,
         'external_account_or_recipient_receipt_or_installed_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(text)

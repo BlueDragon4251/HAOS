@@ -428,6 +428,62 @@ def configure_gateway(connector: str, platform: str, token: str, app_token: str 
     return {"configured": True, "platform": platform, "restart_required": True, "sender_pairing_required": True}
 
 
+def import_line_tls_file(filename,kind):
+    require_root()
+    from .initial_setup_gui import session_allowed
+    if not session_allowed():raise PermissionError('LINE PEM import requires the trusted local setup seat')
+    return read_line_tls_file(filename,kind)
+
+
+def read_line_tls_file(filename,kind):
+    """Read owner-selected PEM data; never return an arbitrary privileged file."""
+    require_root()
+    import stat
+    if kind not in {'certificate','private_key'}:raise ValueError('select certificate or private_key PEM data')
+    limit=16384 if kind=='certificate' else 8192
+    descriptor=os.open(filename,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        info=os.fstat(descriptor)
+        allowed={0}|{owner['uid'] for owner in owners()}
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in allowed or info.st_mode&0o077
+                or info.st_nlink!=1 or not 1<=info.st_size<=limit):
+            raise PermissionError('select a private single-link PEM file owned by the enrolled owner or root')
+        raw=os.read(descriptor,limit+1)
+        if len(raw)!=info.st_size or len(raw)>limit:raise ValueError('LINE PEM file changed or exceeds its bound')
+    finally:os.close(descriptor)
+    try:
+        value=raw.decode('ascii')
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        if kind=='certificate':x509.load_pem_x509_certificates(raw)
+        else:serialization.load_pem_private_key(raw,password=None)
+    except Exception:raise ValueError('select a valid unencrypted PEM certificate chain or private key') from None
+    return value
+
+
+def configure_line_gateway(connector,channel_secret,channel_access_token,destination,port,tls):
+    """Publish verified LINE HTTPS credentials; no listener or external message here."""
+    require_root()
+    from .gateway_line_profile import credentials as line_credentials
+    value=line_credentials({'channel_secret':channel_secret,'channel_access_token':channel_access_token,
+        'destination':destination,'port':port,'tls':tls})
+    from .gateway_setup import load,persist
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy,private=load()
+    if any(row['id']!=connector and row['platform']=='line' for row in policy['connectors']):
+        raise ValueError('one isolated adapter per platform is currently supported')
+    if any(row['id']==connector and row['platform']!='line' for row in policy['connectors']):
+        policy['bindings']=[row for row in policy['bindings'] if row['connector']!=connector]
+    policy['connectors']=[row for row in policy['connectors'] if row['id']!=connector]+[{'id':connector,'platform':'line'}]
+    GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
+    private['connectors'][connector]=value;persist(policy,private)
+    audit('setup.gateway',{'connector':connector,'platform':'line'})
+    return {'configured':True,'platform':'line','restart_required':True,'sender_pairing_required':True,
+        'external_reachability_verified':False}
+
+
 def configure_irc_gateway(connector,server,port,nickname,channel,*,server_password='',channel_password='',sasl_username='',sasl_password='',anonymous=False):
     """Owner-only real TLS IRC configuration; validate before stopping services."""
     require_root()
@@ -470,6 +526,11 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
+    if selected and selected['platform']=='line':
+        destination=credentials['connectors'][connector]['destination']
+        if scope and scope!=destination:raise ValueError('LINE scope must match the saved bot destination')
+        if sender==destination:raise ValueError('LINE sender must differ from the bot destination')
+        item['scope']=destination
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
     elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True:
@@ -535,6 +596,11 @@ def gateway_configuration():
     irc={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('server','port','nickname','channel')}
         for row in policy['connectors'] if row['platform']=='irc'}
     if irc:result['irc']=irc
+    line={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('destination','port')}
+        |{'public_url':_credentials['connectors'][row['id']]['tls']['public_url'],
+          'bind_host':_credentials['connectors'][row['id']]['tls']['bind_host']}
+        for row in policy['connectors'] if row['platform']=='line'}
+    if line:result['line']=line
     return result
 
 
@@ -590,6 +656,18 @@ def retry_irc_gateway_auth(connector):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='retry-irc-auth',connector=connector,
         note='Owner requested a new IRC authentication check'))
+
+
+def retry_line_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='line' for row in configured['connectors']):
+        raise ValueError('select one configured LINE connector')
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-line-auth',connector=connector,
+        note='Owner requested a new LINE authentication check'))
 
 
 def retry_homeassistant_gateway_auth(connector):

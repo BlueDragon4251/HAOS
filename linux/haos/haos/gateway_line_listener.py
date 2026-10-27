@@ -1,4 +1,4 @@
-"""Prepared fixed-route LINE webhook application; caller owns binding and TLS."""
+"""Fixed-route LINE webhook application; private profile owns binding and TLS."""
 import asyncio
 import json
 

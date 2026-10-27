@@ -1517,3 +1517,25 @@ The final runtime identity guard also requires real, effective and saved UID/GID
 to match the service identity. Four additional actual setresuid/setresgid cases
 reject launchers retaining real or saved root IDs before credentials or SDK
 imports. They pass in the isolated minimal-runtime kernel fixture.
+### 2026-10-27 — public LINE owner text setup
+
+The earlier prepared-only LINE state is superseded by actual owner GUI/CLI
+setup, private bounded PEM import, verified HTTPS listener parameters, explicit
+public-bind consent and exact sender/chat grants scoped to the saved bot ID.
+The regular GatewayPolicy, credential publication, runtime factory, delivery
+metadata and offline authentication/delivery recovery now admit LINE through
+the same independent HAOS boundaries. System Python explicitly depends on
+`python3-cryptography` for local PEM/certificate validation; provider SDKs are
+not imported in the root GUI.
+
+Native LINE probes now use the regular policy instead of a prepared-policy
+exception. The TLS probe also checks an expired profile remains inspectable,
+refuses activation before any HTTP and reports a retained safe diagnostic.
+Disposable actual-root owner lifecycle and both-resolution Tk setup/recovery
+checks are required in CI. See [operation and evidence boundaries](GATEWAY-LINE.md)
+and `docs/evidence/2026-10-27/line-owner-setup-validation.json`.
+
+There are now nine publicly configurable **text paths**, not nine complete
+platform acceptances. Media/voice require the still-missing shared media broker;
+external LINE accounts, DNS/router/firewall reachability, recipients and installed
+OS acceptance remain separate. No release artifact or live delivery is claimed.

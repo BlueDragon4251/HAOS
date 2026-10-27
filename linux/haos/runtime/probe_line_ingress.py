@@ -18,7 +18,7 @@ from types import SimpleNamespace
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from haos.gateway import GatewayPolicy
-    from haos.gateway_line_ingress import PreparedLINEPolicy,snapshot,capture,dispatch_stored,install
+    from haos.gateway_line_ingress import snapshot,capture,dispatch_stored,install
     from haos.gateway_ingress import durable_adapter
     from haos.gateway_raw import NativeInbox
     from haos.gateway_runtime import adapter_envelope
@@ -32,11 +32,9 @@ def main():
         config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
             'id':'owner','connector':'line','sender':user,'chat':group,'scope':destination,'thread':'',
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-        policy=lambda:PreparedLINEPolicy(config)
-        try:GatewayPolicy(config)
-        except ValueError:pass
-        else:raise AssertionError('prepared LINE publicly enabled')
-        cases.append('prepared_line_not_publicly_enabled')
+        policy=lambda:GatewayPolicy(config)
+        assert policy().connectors['line']['platform']=='line'
+        cases.append('public_line_requires_exact_independent_owner_route')
         inbox=NativeInbox(directory/'native.db',Redactor())
         adapter=install(durable_adapter(LineAdapter(PlatformConfig(enabled=True,extra={'channel_secret':'disposable-line-secret','channel_access_token':'disposable-private-access'}))))
         adapter._haos_native=SimpleNamespace(connector='line',policy=policy,inbox=inbox)
@@ -124,7 +122,7 @@ def main():
         inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-line-native-') as temporary:asyncio.run(exercise(Path(temporary)))
     receipt={'passed':len(cases),'cases':cases,'actual_pinned_hmac_and_native_codec_and_sqlite':True,
-        'public_gateway_enabled':False,'listener_or_external_message_or_account_acceptance':False}
+        'public_gateway_enabled':True,'listener_or_external_message_or_account_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(text)
     print(text,end='')

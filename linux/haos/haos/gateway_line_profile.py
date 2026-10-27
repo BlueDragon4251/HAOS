@@ -1,4 +1,4 @@
-"""Prepared private LINE identity and explicitly configured webhook lifecycle."""
+"""Private LINE identity and explicitly configured HTTPS webhook lifecycle."""
 import asyncio
 import fcntl
 import os
@@ -9,13 +9,13 @@ import time
 from types import MethodType,SimpleNamespace
 
 from .gateway import digest
-from .gateway_line_ingress import PreparedLINEPolicy,snapshot,install,dispatch_stored
+from .gateway_line_ingress import snapshot,install,dispatch_stored,validate_binding
 
-STATES=frozenset({'created','listening','listening-tls','disconnected','transport-unavailable','revoked','closed',
+STATES=frozenset({'created','listening','listening-tls','disconnected','transport-unavailable','tls-refused','revoked','closed',
     'authentication-refused','identity-refused','rate-limited'})
 
 
-def credentials(value):
+def credentials(value,*,verify_tls=True):
     required={'channel_secret','channel_access_token','destination','port'}
     if not isinstance(value,dict) or set(value) not in (required,required|{'tls'}):
         raise ValueError('exact LINE channel credentials, bot destination and local port required')
@@ -28,7 +28,7 @@ def credentials(value):
     result=dict(value)
     if 'tls' in result:
         from .gateway_line_tls import material
-        result['tls']=material(result['tls'])
+        result['tls']=material(result['tls'],verify=verify_tls)
     return result
 
 
@@ -39,11 +39,15 @@ def _directory(path):
 
 
 def build(value,parent,connector,policy,inbox):
-    value=credentials(value)
+    # Retained certificates can expire without taking other connectors down.
+    # Actual activation validates system trust/time before any network access.
+    value=credentials(value,verify_tls=False)
     def current():
         result=policy()
         authority=snapshot(result,connector,value['destination'])
         if not authority['bindings']:raise PermissionError('exact LINE owner grant required before profile use')
+        for binding in result.bindings.values():
+            if binding['connector']==connector:validate_binding(binding,require_epoch=True)
         if any(b['connector']==connector and b['scope']!=value['destination'] for b in result.bindings.values()):
             raise PermissionError('LINE profile cannot inherit grants for another bot identity')
         return result
@@ -68,7 +72,8 @@ def build(value,parent,connector,policy,inbox):
         from .gateway_matrix_profile import scope
         from .gateway_ingress import durable_adapter
         from .redaction import Redactor
-        inbox.redactor=Redactor([*inbox.redactor.secrets,value['channel_secret'],value['channel_access_token']])
+        inbox.redactor=Redactor([*inbox.redactor.secrets,value['channel_secret'],value['channel_access_token'],
+            *([value['tls']['private_key']] if 'tls' in value else [])])
         values={'LINE_CHANNEL_SECRET':value['channel_secret'],'LINE_CHANNEL_ACCESS_TOKEN':value['channel_access_token'],
             'LINE_ALLOW_ALL_USERS':'false','LINE_ALLOWED_USERS':'','LINE_ALLOWED_GROUPS':'','LINE_ALLOWED_ROOMS':''}
         os.environ['HERMES_SAFE_MODE']='1'
@@ -158,16 +163,19 @@ def _install(adapter,fd,profile,value,authority,publisher):
             await stop();check()
             health_row=health(self)
             if health_row['status'] in {'authentication-refused','identity-refused'} or health_row['next_attempt']>time.time():return False
+            tls=None;host='127.0.0.1'
+            if 'tls' in value:
+                try:
+                    from .gateway_line_tls import context
+                    tls=context(value['tls'],profile);host=value['tls']['bind_host']
+                except Exception:
+                    status('tls-refused');return False
             verified,delay=await self._haos_line_identity.verify();check()
             if verified!='verified':status(verified,delay);return False
             runner=web.AppRunner(application(self,value['destination']),access_log=None,shutdown_timeout=5)
             self._haos_line_runner=runner
             try:
                 await runner.setup()
-                tls=None;host='127.0.0.1'
-                if 'tls' in value:
-                    from .gateway_line_tls import context
-                    tls=context(value['tls'],profile);host=value['tls']['bind_host']
                 site=web.TCPSite(runner,host,value['port'],ssl_context=tls);await site.start();check()
                 self._haos_line_verified_destination=value['destination'];self._mark_connected();status('listening-tls' if tls else 'listening')
                 self._haos_line_replay=asyncio.create_task(replay());return True
@@ -177,7 +185,7 @@ def _install(adapter,fd,profile,value,authority,publisher):
     async def disconnect(self):
         async with lifecycle:
             await stop()
-            if health(self)['status'] not in {'revoked','closed','authentication-refused','identity-refused','rate-limited'}:status('disconnected')
+            if health(self)['status'] not in {'revoked','closed','authentication-refused','identity-refused','rate-limited','tls-refused'}:status('disconnected')
     async def send(self,chat_id,content,reply_to=None,metadata=None):
         from .gateway_delivery_authority import current_delivery
         if publisher is None:raise PermissionError('LINE creation-only profile has no outbound authority')
@@ -191,7 +199,7 @@ def _install(adapter,fd,profile,value,authority,publisher):
             if publisher is not None:await publisher.close()
             await self._haos_line_identity.close()
             os.close(fd)
-            if health(self)['status'] not in {'authentication-refused','identity-refused','rate-limited'}:status('closed')
+            if health(self)['status'] not in {'authentication-refused','identity-refused','rate-limited','tls-refused'}:status('closed')
     adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter)
     adapter.close_profile=MethodType(close,adapter);adapter.native_health=MethodType(health,adapter)
     adapter.send=MethodType(send,adapter)

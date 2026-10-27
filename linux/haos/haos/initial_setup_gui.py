@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -734,11 +734,72 @@ class Wizard:
                 'Der gepinnte IRC-Adapter überträgt Text und HTTPS-Links, keine binären Datei- oder Voice-Uploads. '
                 'Keine NickServ-Passwortweitergabe oder DCC-Freigabe. Unbekannte Offline-Ereignisse werden nicht als wiederhergestellt behauptet. '
                 'Beim Speichern Zugangsdaten erneut eingeben; ohne SASL ist eine ausdrückliche Freigabe nötig.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            line_credentials=tk.Frame(self.content,bg=self.PANEL)
+            line_destination=self._field(line_credentials,'LINE Bot-Destination · U und 32 kleine Hex-Zeichen')
+            line_port=self._field(line_credentials,'LINE lokaler HTTPS-Port · 1024 bis 65535','8646')
+            line_url=self._field(line_credentials,'LINE öffentliche HTTPS-Adresse · https://hostname/line/webhook')
+            line_bind=self._choice(line_credentials,'LINE Listener-Adresse',['127.0.0.1','0.0.0.0','::'],'127.0.0.1')
+            line_public=tk.BooleanVar(value=False)
+            tk.Checkbutton(line_credentials,text='Öffentlichen LINE-Listener ausdrücklich freigeben',variable=line_public,
+                bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w',pady=6)
+            line_secret=self._field(line_credentials,'LINE Channel-Secret · geschützt',secret=True)
+            line_access=self._field(line_credentials,'LINE Channel-Access-Token · geschützt',secret=True)
+            line_pem={};line_revision=[0]
+            line_pem_status=self._label(line_credentials,'Noch kein privates TLS-Material geladen.',size=10,color=self.MUTED)
+            line_pem_status.pack(anchor='w',pady=4)
+            def reset_line(*_args):
+                line_secret.delete(0,tk.END);line_access.delete(0,tk.END);line_public.set(False)
+                line_pem.clear();line_revision[0]+=1
+                line_pem_status.configure(text='Noch kein privates TLS-Material geladen.')
+            def import_line_pem(kind):
+                from tkinter import filedialog
+                selected=filedialog.askopenfilename(parent=self.root,title='Private LINE-PEM-Datei auswählen')
+                if not selected:return
+                revision=line_revision[0]
+                def loaded(value):
+                    if platform.get()!='line' or line_revision[0]!=revision:
+                        self.status.configure(text='LINE-Konfiguration geändert; TLS-Material erneut laden.');return
+                    line_pem[kind]=value
+                    line_pem_status.configure(text='Privat geladen: '+', '.join('Zertifikatskette' if key=='certificate' else 'Schlüssel' for key in sorted(line_pem)))
+                self._run_async(lambda:initial_setup.import_line_tls_file(selected,kind),
+                    success='PEM-Datei privat geladen; noch nicht gespeichert oder im Netzwerk verwendet.',result_handler=loaded)
+            self._button(line_credentials,'LINE-Zertifikatskette laden',lambda:import_line_pem('certificate')).pack(anchor='w',pady=4)
+            self._button(line_credentials,'LINE-TLS-Schlüssel laden',lambda:import_line_pem('private_key')).pack(anchor='w',pady=4)
+            self._label(line_credentials,'In der LINE Developers Console Messaging API und Webhook einschalten, Channel-Secret, '
+                'Access-Token und exakte Bot-Destination übernehmen. Der feste Pfad ist /line/webhook. '
+                'Eine öffentliche HTTPS-DNS-Adresse auf Port 443 mit gültiger Zertifikatskette und passendem privaten PEM-Schlüssel ist erforderlich. '
+                'Router oder TCP-Proxy müssen Port 443 auf diesen lokalen TLS-Port weiterleiten; HAOS richtet keine Portfreigabe ein. '
+                'Auch die Host-Firewall muss den lokalen Listener-Port ausdrücklich erlauben. '
+                'Loopback ist nur über einen entsprechend eingerichteten lokalen TCP-Proxy erreichbar. Hinter CGNAT ist zusätzliche öffentliche Erreichbarkeit erforderlich. '
+                'Privates PEM-Material muss dem eingeschriebenen Owner oder root gehören und darf keine Gruppen-/Weltrechte besitzen. '
+                'Der Dienst prüft die tatsächliche Bot-Identität. Kanal-/Token-/Zertifikatswechsel entzieht alte Absenderfreigaben. '
+                'Einzelnutzer, Gruppen und Räume nur mit exakten U-/C-/R-IDs freigeben. Antworten in Gruppen sehen alle Mitglieder. '
+                'Text und Missionsbefehle sind integriert; Medien und Voice sind noch nicht freigegeben. '
+                'LINE-Serverannahme beweist keinen Empfang beim Empfänger. Die öffentliche Erreichbarkeit ist separat zu prüfen.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def retry_line():
+                selected_connector=connector.get()
+                self._run_async(lambda:initial_setup.retry_line_gateway_auth(selected_connector),
+                    success='Lokale LINE-Auth-Sperre geprüft; nach Korrektur manuell starten. Keine Nachricht versendet.')
+            self._button(line_credentials,'LINE-Konto nach Korrektur erneut prüfen',retry_line).pack(anchor='w',pady=4)
+            for field in (line_destination,line_port,line_url):
+                variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
+                variable.trace_add('write',reset_line)
+            line_bind.trace_add('write',reset_line);connector_value.trace_add('write',reset_line)
+            def line_port_number(text):
+                if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1024<=int(text)<=65535:
+                    raise ValueError('LINE HTTPS-Port muss eine ganze Zahl von 1024 bis 65535 sein')
+                return int(text)
             def irc_port_number(text):
                 if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1<=int(text)<=65535:
                     raise ValueError('IRC TLS-Port muss eine ganze Zahl von 1 bis 65535 sein')
                 return int(text)
             def configure():
+                line_values={'channel_secret':line_secret.get(),'channel_access_token':line_access.get(),
+                    'destination':line_destination.get(),'port':line_port.get(),'tls':{'public_url':line_url.get(),
+                        'bind_host':line_bind.get(),'public_listener':line_public.get(),**line_pem}}
+                reset_line()
                 secret, app_secret = token.get(), app_token.get()
                 matrix_values={'homeserver':matrix_server.get(),'user_id':matrix_user.get(),'device_id':matrix_device.get(),
                     'recovery_key':matrix_recovery.get()}
@@ -756,7 +817,8 @@ class Wizard:
                 if platform.get()=='ntfy':trust_publishers.set(False)
                 if platform.get()=='homeassistant':reset_ha_consent()
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
-                self._run_async(lambda: (initial_setup.configure_irc_gateway(selected_connector,**{**irc_values,'port':irc_port_number(irc_values['port'])})
+                self._run_async(lambda: (initial_setup.configure_line_gateway(selected_connector,**{**line_values,'port':line_port_number(line_values['port'])})
+                    if selected_platform=='line' else initial_setup.configure_irc_gateway(selected_connector,**{**irc_values,'port':irc_port_number(irc_values['port'])})
                     if selected_platform=='irc' else initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
                     else initial_setup.configure_gateway(selected_connector,selected_platform,secret,app_secret,**matrix_values)
@@ -769,6 +831,7 @@ class Wizard:
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
+                reset_line()
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
@@ -782,9 +845,11 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                elif platform.get()=='line':
+                    irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
@@ -808,6 +873,14 @@ class Wizard:
                 else:ha_credentials.pack_forget()
                 if platform.get()=='matrix':matrix_credentials.pack(fill='x',before=configure_button)
                 else:matrix_credentials.pack_forget()
+                if platform.get()=='line':
+                    line_credentials.pack(fill='x',before=configure_button)
+                    existing=configured_gateways.get('line',{}).get(connector.get())
+                    if existing:
+                        for field,key in ((line_destination,'destination'),(line_port,'port'),(line_url,'public_url')):
+                            field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                        line_bind.set(existing['bind_host'])
+                else:line_credentials.pack_forget()
                 self.root.after_idle(irc_pair_changed)
             def reset_irc_secrets(*_args):
                 irc_server_password.delete(0,tk.END);irc_channel_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
@@ -1015,6 +1088,28 @@ class Wizard:
             irc_channel_value=tk.StringVar(value=irc_channel.get());irc_channel.configure(textvariable=irc_channel_value);irc_channel._haos_public_value=irc_channel_value
             irc_channel_value.trace_add('write',lambda *_args:irc_channel_password.delete(0,tk.END))
             irc_channel_value.trace_add('write',irc_pair_changed)
+            line_pair=tk.Frame(self.content,bg=self.PANEL)
+            self._label(line_pair,'LINE: Absender als exakte U-ID, Chat als U-ID derselben Person oder C-/R-ID der Gruppe/des Raums. '
+                'Bereich ist die gespeicherte Bot-Destination. Threads werden nicht freigegeben. '
+                'Bei Gruppen/Räumen sehen alle Mitglieder die Antworten; nur die ausdrücklich gekoppelten Personen dürfen Missionen steuern.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            previous_line=[False]
+            def line_pair_changed(*_args):
+                active=platform.get()=='line'
+                if active:
+                    line_pair.pack(fill='x',before=pairing_note)
+                    for field in (scope,thread):field.configure(state='normal');field.delete(0,tk.END)
+                    scope.insert(0,line_destination.get())
+                    for field in (scope,thread):field.configure(state='disabled')
+                    if not previous_line[0]:
+                        for field in (sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                else:
+                    line_pair.pack_forget()
+                    if previous_line[0] and platform.get() not in {'homeassistant','ntfy','irc'}:
+                        for field in (scope,thread,sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                previous_line[0]=active
+            platform.trace_add('write',line_pair_changed)
+            line_destination._haos_public_value.trace_add('write',line_pair_changed)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1139,6 +1234,7 @@ class Wizard:
                         'identity-refused':'LINE-Bot-ID passt nicht zum Zugangstoken; gespeicherte Daten bleiben erhalten',
                         'rate-limited':'LINE begrenzt Anfragen; gespeicherte Wartefrist bleibt erhalten',
                         'transport-unavailable':'LINE-Identitätsprüfung oder lokaler Listener nicht verfügbar; Netzwerk, Zertifikat und Port prüfen',
+                        'tls-refused':'LINE-TLS-Material abgelehnt; gültige Zertifikatskette und passenden privaten Schlüssel laden. Gespeicherte Daten bleiben erhalten',
                         'revoked':'LINE-Freigabe entzogen oder geändert; keine weitere Ausführung',
                         'closed':'Privates LINE-Profil geschlossen; Daten erhalten'}
                     labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'

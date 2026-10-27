@@ -20,11 +20,26 @@ def test_prepared_line_requires_exact_user_conversation_destination_and_owner_ep
     with pytest.raises(ValueError):PreparedLINEPolicy(config)
 
 
-def test_line_has_no_public_execution_or_cross_connector_authority():
+def test_public_line_keeps_exact_destination_and_cross_connector_authority():
     config=configuration()
-    with pytest.raises(ValueError):GatewayPolicy(config)
+    assert snapshot(GatewayPolicy(config),'line','U'+'d'*32)['bindings']
     with pytest.raises(PermissionError):snapshot(PreparedLINEPolicy(config),'unknown','U'+'d'*32)
     assert snapshot(PreparedLINEPolicy(config),'line','U'+'d'*32)['bindings']
+
+
+@pytest.mark.parametrize('change',[{'sender':'nickname'},{'chat':'group-name'},{'scope':''},{'thread':'thread'},
+    {'chat':'U'+'b'*32}])
+def test_public_line_cannot_bypass_native_route_validation(change):
+    config=configuration();config['bindings'][0].update(change)
+    with pytest.raises(ValueError):GatewayPolicy(config)
+
+
+def test_public_line_publication_refuses_unverified_plain_listener_without_optional_sdk():
+    from haos.gateway_publication import validate_snapshot
+    config=configuration()
+    private={'connectors':{'line':{'channel_secret':'a'*32,'channel_access_token':'private-publication-fixture',
+        'destination':'U'+'d'*32,'port':8646}}}
+    with pytest.raises(ValueError,match='verified HTTPS'):validate_snapshot(config,private)
 
 
 @pytest.mark.parametrize('kind,prefix',[('user','U'),('group','C'),('room','R')])

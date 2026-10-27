@@ -346,3 +346,14 @@ configuration metadata, diagnostics and agent/relay data. Changing the channel
 clears the graphical key input; changing credentials withdraws old grants.
 See [IRC software scope and acceptance](GATEWAY-IRC.md) for the complete operator
 flow, diagnostics, protocol boundaries and source-linked validation.
+
+### LINE text setup (2026-10-27)
+
+LINE is now selectable in actual owner GUI and CLI. It requires private channel
+secret/token, exact bot destination, private certificate-chain/key PEM files,
+verified public HTTPS URL, an unprivileged local TLS port and explicit public-
+listener consent. Host firewall and router/TCP-proxy ingress must be configured
+separately. Exact user/chat grants derive the saved bot scope; no sender gets
+automatic permission. See [LINE setup and recovery](GATEWAY-LINE.md). Media/voice
+and external/installed acceptance remain open; public text setup is not full
+platform completion.

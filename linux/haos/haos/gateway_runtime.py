@@ -162,6 +162,8 @@ def credential_redactor(credentials, policy):
     secrets=[item[key] for item in credentials['connectors'].values()
         for key in ('token','app_token','recovery_key','server_password','channel_password','nickserv_password','sasl_password','channel_secret','channel_access_token') if item.get(key)]
     for name,item in credentials['connectors'].items():
+        if policy.connectors[name]['platform']=='line' and 'tls' in item:
+            secrets.append(item['tls']['private_key'])
         if policy.connectors[name]['platform']=='ntfy' and ':' in item['token']:
             secrets.append(base64.b64encode(item['token'].encode('utf-8')).decode('ascii'))
         if policy.connectors[name]['platform']=='irc':
@@ -209,7 +211,7 @@ async def serve():
     logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
     stop = asyncio.Event()
@@ -226,11 +228,11 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
-        if connector['platform'] in {'homeassistant','irc'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
+        if connector['platform'] in {'homeassistant','irc','line'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
             logging.warning('Gateway connector remains inactive until exact owner pairing')
             continue
         context=None
-        if connector['platform'] in {'matrix','ntfy','homeassistant','irc'}:
+        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line'}:
             parent=Path('/var/lib/haos-gateway')/connector['platform'];parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
         adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})

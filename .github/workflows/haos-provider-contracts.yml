@@ -157,6 +157,18 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
           "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
           "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - name: Verify LINE owner CLI publication private PEM and actual UID denial
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --read-only --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g --tmpfs /tmp:mode=1777,size=128m \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" -w /repo \
+            -e PYTHONPATH=/repo/upstream/hermes-agent:/deps -e PYTHONDONTWRITEBYTECODE=1 \
+            -e HERMES_HOME=/tmp/line-owner-home -e HERMES_SAFE_MODE=1 -e HAOS_DISPOSABLE_LINE_OWNER=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 linux/haos/runtime/probe_line_tls.py linux/haos > "$RUNNER_TEMP/provider-contracts/line-owner-authority.json"
+          cat "$RUNNER_TEMP/provider-contracts/line-owner-authority.json"
       - name: Execute Matrix account helper under actual gateway UID and local TLS
         run: |
           set -euo pipefail

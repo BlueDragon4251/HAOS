@@ -68,8 +68,8 @@ def owner_ingress(args, policy):
     stopped_gateway()
     GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
-        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc'}[args.gateway_action]
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
+        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line'}[args.gateway_action]
         if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
             raise ValueError('select one configured connector for this authentication recheck')
         if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
@@ -100,7 +100,7 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
         audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
@@ -230,12 +230,29 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
-        if args.platform not in {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc"}:
-            raise ValueError("currently provisioned transports: telegram, discord, slack, mattermost, matrix, ntfy, homeassistant, irc")
+        if args.platform not in GatewayPolicy.platforms:
+            raise ValueError("select an implemented transport")
+        if args.platform=='line':
+            from .initial_setup import configure_line_gateway,read_line_tls_file
+            secret=getpass.getpass('Private LINE channel secret: ')
+            access=getpass.getpass('Private LINE channel access token: ')
+            destination=input('Exact LINE bot destination (U + 32 lowercase hex digits): ')
+            raw_port=input('Local HTTPS listener port [8646]: ') or '8646'
+            if not raw_port.isascii() or not raw_port.isdecimal() or len(raw_port)>5 or not 1024<=int(raw_port)<=65535:
+                raise ValueError('LINE local listener port must contain digits from 1024 to 65535')
+            url=input('Public HTTPS URL (https://hostname/line/webhook): ')
+            certificate=read_line_tls_file(input('Private certificate-chain PEM file: '),'certificate')
+            key=read_line_tls_file(input('Private unencrypted key PEM file: '),'private_key')
+            bind=input('Listener bind host [127.0.0.1] (0.0.0.0 or :: requires public consent): ') or '127.0.0.1'
+            consent=False
+            if bind!='127.0.0.1':
+                consent=input('Explicitly approve public listener by typing PUBLIC: ')=='PUBLIC'
+            return configure_line_gateway(args.connector,secret,access,destination,int(raw_port),
+                {'public_url':url,'certificate':certificate,'private_key':key,'bind_host':bind,'public_listener':consent})
         if any(c["id"] != args.connector and c["platform"] == args.platform for c in policy["connectors"]):
             raise ValueError("one isolated adapter per platform is currently supported")
         if any(c['id']==args.connector and c['platform']!=args.platform for c in policy['connectors']):
@@ -296,6 +313,11 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
+        if selected and selected['platform']=='line':
+            destination=credentials['connectors'][args.connector]['destination']
+            if binding['scope'] and binding['scope']!=destination:raise ValueError('LINE scope differs from the saved bot destination')
+            if binding['sender']==destination:raise ValueError('LINE sender must differ from the bot destination')
+            binding['scope']=destination
         devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
         unmentioned=getattr(args,'no_require_mention',False)
         if selected and selected['platform']=='matrix':

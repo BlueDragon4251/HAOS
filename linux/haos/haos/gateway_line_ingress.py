@@ -1,4 +1,4 @@
-"""Prepared LINE signed text admission; no public listener or outbound authority."""
+"""Signed LINE text admission behind independent timed owner grants."""
 import asyncio
 from contextvars import ContextVar
 from datetime import datetime,timezone
@@ -21,15 +21,20 @@ class PreparedLINEPolicy(GatewayPolicy):
         super().__init__(config)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']!='line':continue
-            if (not _USER.fullmatch(binding['sender']) or not _CHAT.fullmatch(binding['chat'])
-                    or not _USER.fullmatch(binding['scope']) or binding['thread']
-                    or binding['chat'].startswith('U') and binding['chat']!=binding['sender']
-                    or not binding.get('generation') or type(binding.get('since')) is not int):
-                raise ValueError('LINE requires exact user/chat/destination and a timed owner grant')
+            validate_binding(binding,require_epoch=True)
+
+
+def validate_binding(binding,*,require_epoch=False):
+    if (not _USER.fullmatch(binding['sender']) or not _CHAT.fullmatch(binding['chat'])
+            or not _USER.fullmatch(binding['scope']) or binding['thread']
+            or binding['chat'].startswith('U') and binding['chat']!=binding['sender']):
+        raise ValueError('LINE requires exact user/chat/destination IDs; threads do not apply')
+    if require_epoch and (not binding.get('generation') or type(binding.get('since')) is not int):
+        raise ValueError('LINE transport requires an explicit timed owner grant')
 
 
 def snapshot(policy,connector,destination):
-    if (not isinstance(policy,PreparedLINEPolicy) or not _USER.fullmatch(destination)
+    if (not isinstance(policy,GatewayPolicy) or not _USER.fullmatch(destination)
             or policy.connectors.get(connector,{}).get('platform')!='line'):
         raise PermissionError('prepared LINE destination authority required')
     return {'connector':connector,'destination':destination,
@@ -85,6 +90,7 @@ def capture(adapter,body,signature,authority):
         source,stamp=decoded
         try:binding=policy.authorize(native.connector,source)
         except PermissionError:continue
+        validate_binding(binding,require_epoch=True)
         if stamp*1000<=binding['since'] or stamp>time.time()+300:raise PermissionError('LINE event outside timed owner grant')
         # Reply tokens are single-use capabilities, never persisted in raw payload.
         sanitized={key:value for key,value in event.items() if key in {'type','mode','source','message','timestamp','webhookEventId'}}

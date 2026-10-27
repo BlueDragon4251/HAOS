@@ -236,7 +236,7 @@ def retry_irc_auth(inbox,policy,request):
 
 
 def retry_line_auth(inbox,policy,request):
-    """Prepared offline owner recheck; public LINE setup remains disabled."""
+    """Offline owner recheck; preserve rate limits, retained input and revocation."""
     return _retry_private_auth(inbox,policy,request,'line')
 
 
@@ -259,8 +259,8 @@ def main():
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
             print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
             return
-        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth'}:
-            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc'}[data['action']]
+        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
+            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line'}[data['action']]
             connector=_recheck_connector(policy,data['params'],platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,
                 'network_requested':False,'native_journal_created':False}))
@@ -274,6 +274,8 @@ def main():
             result=retry_ntfy_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-irc-auth':
             result=retry_irc_auth(inbox,policy,data['params'])
+        elif data['action'] == 'retry-line-auth':
+            result=retry_line_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-homeassistant-auth':
             result=retry_homeassistant_auth(inbox,policy,data['params'])
         elif data['action'] == 'reconcile-ingress':

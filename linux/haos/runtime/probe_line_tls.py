@@ -22,7 +22,7 @@ def main():
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.x509.oid import NameOID,ExtendedKeyUsageOID
     from haos.gateway_line_tls import material,context
-    from haos.gateway_line_ingress import PreparedLINEPolicy
+    from haos.gateway import GatewayPolicy
     from haos.gateway_runtime import build_adapter,adapter_envelope
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
@@ -76,6 +76,9 @@ def main():
             except ValueError:pass
             else:raise AssertionError('certificate/private key mismatch accepted')
             cases.append('actual_mismatched_private_key_refused')
+            if os.environ.get('HAOS_DISPOSABLE_LINE_OWNER')=='1':
+                from line_owner_fixture import exercise as owner_exercise
+                cases.extend(owner_exercise(directory,tls,{**tls,'certificate':leaf(True).public_bytes(serialization.Encoding.PEM).decode()}))
             os.environ['SSL_CERT_FILE']=str(directory/'missing-ca')
             try:material(tls)
             except ValueError:pass
@@ -103,14 +106,24 @@ def main():
             inbox=NativeInbox(directory/'native.db',Redactor());relay=RelayInbox(directory/'relay.db',Redactor())
             parent=directory/'profiles';parent.mkdir(mode=0o700)
             accepted=[];requests=[]
-            async def identity(request):return web.json_response({'userId':destination})
+            async def identity(request):requests.append(request.path);return web.json_response({'userId':destination})
             info=web.Application();info.router.add_get('/info',identity);runner=web.AppRunner(info,access_log=None)
             await runner.setup();site=web.TCPSite(runner,'127.0.0.1',0);await site.start()
+            expired_adapter=build_adapter('line',{'channel_secret':'c'*32,'channel_access_token':'private-tls-profile-access',
+                'destination':destination,'port':port,'tls':{**tls,'certificate':leaf(True).public_bytes(serialization.Encoding.PEM).decode()}},
+                line_context={'parent':parent,'connector':'line','policy':lambda:GatewayPolicy(config),'inbox':inbox})
+            expired_adapter._haos_line_identity._target=f'http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}/info'
+            try:
+                assert await expired_adapter.connect() is False
+                assert expired_adapter.native_health()['status']=='tls-refused' and requests==[]
+                assert not expired_adapter.is_connected and expired_adapter._haos_line_runner is None
+                cases.append('actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds')
+            finally:await expired_adapter.close_profile()
             adapter=build_adapter('line',{'channel_secret':'c'*32,'channel_access_token':'private-tls-profile-access',
-                'destination':destination,'port':port,'tls':tls},line_context={'parent':parent,'connector':'line','policy':lambda:PreparedLINEPolicy(config),'inbox':inbox})
+                'destination':destination,'port':port,'tls':tls},line_context={'parent':parent,'connector':'line','policy':lambda:GatewayPolicy(config),'inbox':inbox})
             adapter._haos_line_identity._target=f'http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}/info'
             def receive(event):
-                source=adapter_envelope(event,'line');relay.admit(PreparedLINEPolicy(config),'line',source);accepted.append(source);return True
+                source=adapter_envelope(event,'line');relay.admit(GatewayPolicy(config),'line',source);accepted.append(source);return True
             adapter.set_durable_message_handler(receive)
             try:
                 assert await adapter.connect() and adapter.native_health()['status']=='listening-tls'
@@ -140,7 +153,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-line-tls-') as td:asyncio.run(exercise(Path(td)))
     receipt={'passed':len(cases),'cases':cases,'actual_x509_verified_https_and_native_profile':True,
         'fixture_only_system_ca_loopback_and_identity_target':True,'tls_verification_disabled':False,
-        'public_gateway_enabled':False,'external_dns_router_line_acceptance_or_installed_acceptance':False}
+        'public_gateway_enabled':True,'actual_root_owner_lifecycle':os.environ.get('HAOS_DISPOSABLE_LINE_OWNER')=='1',
+        'service_quiescence_and_audit_location_are_fixtures':True,
+        'external_dns_router_line_acceptance_or_installed_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(text)
     print(text,end='')

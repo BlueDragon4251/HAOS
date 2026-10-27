@@ -11,7 +11,7 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-def material(value):
+def material(value,*,verify=True):
     required={'public_url','certificate','private_key','bind_host','public_listener'}
     if not isinstance(value,dict) or set(value)!=required:raise ValueError('exact LINE HTTPS material and listener consent required')
     if (not isinstance(value['bind_host'],str) or value['bind_host'] not in {'127.0.0.1','0.0.0.0','::'} or type(value['public_listener']) is not bool
@@ -39,9 +39,10 @@ def material(value):
                 or isinstance(key,(ed25519.Ed25519PrivateKey,ed448.Ed448PrivateKey))):raise ValueError
         encode=lambda public:public.public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
         if encode(key.public_key())!=encode(chain[0].public_key()):raise ValueError
-        roots=[x509.load_der_x509_certificate(raw) for raw in ssl.create_default_context().get_ca_certs(binary_form=True)]
-        verifier=PolicyBuilder().store(Store(roots)).time(datetime.now(timezone.utc)).build_server_verifier(x509.DNSName(host))
-        verifier.verify(chain[0],chain[1:])
+        if verify:
+            roots=[x509.load_der_x509_certificate(raw) for raw in ssl.create_default_context().get_ca_certs(binary_form=True)]
+            verifier=PolicyBuilder().store(Store(roots)).time(datetime.now(timezone.utc)).build_server_verifier(x509.DNSName(host))
+            verifier.verify(chain[0],chain[1:])
         certificate=''.join(cert.public_bytes(serialization.Encoding.PEM).decode('ascii') for cert in chain)
         private=key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode('ascii')
     except Exception:

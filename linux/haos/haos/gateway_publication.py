@@ -23,6 +23,15 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='line':
+            from .gateway_line_profile import credentials as line_credentials
+            # Retained expired certificates must remain inspectable/replaceable.
+            # New setup and every profile activation independently verify trust/time.
+            if line_credentials(row,verify_tls=False)!=row or 'tls' not in row:
+                raise ValueError('canonical private LINE credentials and verified HTTPS material required')
+            if any(b['connector']==name and (b['scope']!=row['destination'] or b['sender']==row['destination']) for b in policy['bindings']):
+                raise ValueError('LINE sender must differ from the configured bot and bind its exact destination')
+            continue
         if platforms[name]=='homeassistant':
             from .gateway_homeassistant_profile import credentials as ha_credentials
             if ha_credentials(row)!=row:raise ValueError('Home Assistant HTTPS server must use its canonical owner representation')

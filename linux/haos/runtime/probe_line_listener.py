@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
-    from haos.gateway_line_ingress import PreparedLINEPolicy
+    from haos.gateway import GatewayPolicy
     from haos.gateway_line_listener import application
     from haos.gateway_raw import NativeInbox
     from haos.redaction import Redactor
@@ -31,7 +31,7 @@ def main():
             'id':'owner','connector':'line','sender':user,'chat':user,'scope':destination,'thread':'',
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
         inbox=NativeInbox(directory/'native.db',Redactor());adapter=LineAdapter(PlatformConfig(enabled=True,extra={'channel_secret':'disposable-webhook-secret'}))
-        adapter._haos_native=SimpleNamespace(connector='line',policy=lambda:PreparedLINEPolicy(config),inbox=inbox)
+        adapter._haos_native=SimpleNamespace(connector='line',policy=lambda:GatewayPolicy(config),inbox=inbox)
         runner=web.AppRunner(application(adapter,destination),access_log=None);await runner.setup()
         site=web.TCPSite(runner,'127.0.0.1',0);await site.start()
         port=site._server.sockets[0].getsockname()[1];url=f'http://127.0.0.1:{port}/line/webhook'
@@ -81,7 +81,7 @@ def main():
         finally:await runner.cleanup();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-line-http-') as temporary:asyncio.run(exercise(Path(temporary)))
     receipt={'passed':len(cases),'cases':cases,'actual_loopback_http_and_native_hmac_and_sqlite':True,
-        'public_gateway_enabled':False,'tls_ingress_proxy_or_external_webhook_or_account_acceptance':False}
+        'public_gateway_enabled':True,'tls_ingress_proxy_or_external_webhook_or_account_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(text)
     print(text,end='')

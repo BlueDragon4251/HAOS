@@ -17,7 +17,7 @@ import time
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from haos.gateway_line_profile import build,credentials
-    from haos.gateway_line_ingress import PreparedLINEPolicy
+    from haos.gateway import GatewayPolicy
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope,build_adapter,delivery_metadata
@@ -37,7 +37,7 @@ def main():
         config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
             'id':'owner','connector':'line','sender':user,'chat':user,'scope':destination,'thread':'',
             'identity':'owner','capabilities':['create','read'],'generation':'a'*64,'since':int((time.time()-10)*1000)}]}
-        policy=lambda:PreparedLINEPolicy(config);inbox=NativeInbox(directory/'native.db',Redactor())
+        policy=lambda:GatewayPolicy(config);inbox=NativeInbox(directory/'native.db',Redactor())
         relay=RelayInbox(directory/'relay.db',Redactor())
         mode=['success'];lookups=[];pushed=[]
         async def identity(request):
@@ -66,7 +66,7 @@ def main():
             result.set_durable_message_handler(receive);return result
         try:
             empty=copy.deepcopy(config);empty['bindings']=[]
-            try:build(value,parent,'line',lambda:PreparedLINEPolicy(empty),inbox)
+            try:build(value,parent,'line',lambda:GatewayPolicy(empty),inbox)
             except PermissionError:pass
             else:raise AssertionError('LINE profile created without owner grants')
             assert not list(parent.iterdir()) and not lookups
@@ -186,7 +186,7 @@ def main():
             await runner.cleanup();inbox.close();relay.close()
     with tempfile.TemporaryDirectory(prefix='haos-line-profile-') as temporary:asyncio.run(exercise(Path(temporary)))
     receipt={'passed':len(cases),'cases':cases,'actual_registered_native_adapter_http_sqlite_and_kernel_lease':True,
-        'fixture_only_loopback_identity_target':True,'public_gateway_enabled':False,
+        'fixture_only_loopback_identity_target':True,'public_gateway_enabled':True,
         'fixture_profile_listener':'127.0.0.1 only; external verified TLS ingress not configured here',
         'external_or_installed_acceptance':False}
     text=json.dumps(receipt,indent=2)+'\n'
