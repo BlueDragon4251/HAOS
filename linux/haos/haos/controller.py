@@ -116,6 +116,11 @@ class Controller:
             return self.gateway.media.begin(policy,params)
         if request.get('method')=='gateway.media.chunk':
             return self.gateway.media.chunk(policy,params)
+        if request.get('method') in {'gateway.output.begin','gateway.output.chunk'}:
+            from .gateway_outbound import Exports
+            if not hasattr(self,'gateway_exports'):self.gateway_exports=Exports(self)
+            if request['method']=='gateway.output.begin':return await self.gateway_exports.begin(params)
+            return self.gateway_exports.chunk(params)
         if request.get("method") == "gateway.next":
             if set(params)-{'ready'}:raise ValueError('unsupported gateway queue selection')
             if 'ready' in params and params['ready'] is None:raise ValueError('explicit ready connectors must be a list')

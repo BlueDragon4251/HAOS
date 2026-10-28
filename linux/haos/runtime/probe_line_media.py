@@ -70,7 +70,7 @@ def main():
             if mode[0]=='secret':return web.Response(body=value['channel_access_token'].encode())
             if mode[0]=='oversize':return web.Response(body=b'x'*(2*1024*1024+1))
             if mode[0]=='encoded':return web.Response(body=b'not-gzip',headers={'Content-Encoding':'gzip'})
-            data=png if request.match_info['id'].startswith('1') else document
+            data=png if request.match_info['id'].startswith('1') else video if request.match_info['id'].startswith('3') else document
             if mode[0]=='abort':
                 response=web.StreamResponse(headers={'Content-Length':str(len(data))});await response.prepare(request)
                 await response.write(data[:5]);request.transport.close();return response
@@ -100,12 +100,22 @@ def main():
         async def until(predicate):
             async with asyncio.timeout(8):
                 while not predicate():await asyncio.sleep(.02)
+        import av
+        video_buffer=BytesIO()
+        with av.open(video_buffer,'w',format='mp4') as target:
+            stream=target.add_stream('mpeg4',rate=5);stream.width=16;stream.height=16;stream.pix_fmt='yuv420p'
+            for index in range(5):
+                frame=av.VideoFrame(16,16,'yuv420p')
+                for plane in frame.planes:plane.update(bytes([64+index])*plane.buffer_size)
+                for packet in stream.encode(frame):target.mux(packet)
+            for packet in stream.encode(None):target.mux(packet)
+        video=video_buffer.getvalue()
         counter=[0]
         async def post(kind='image',sender=user,**changes):
             counter[0]+=1
             event={'type':'message','mode':'active','timestamp':int(time.time()*1000),
                 'webhookEventId':'01K8'+'A'*18+f'{counter[0]:04d}',
-                'source':{'type':'user','userId':sender},'message':{'type':kind,'id':('1' if kind=='image' else '2')+str(counter[0])},
+                'source':{'type':'user','userId':sender},'message':{'type':kind,'id':('1' if kind=='image' else '3' if kind=='video' else '2')+str(counter[0])},
                 'replyToken':'private-unused-reply-capability'}
             if kind=='image':event['message']['contentProvider']={'type':'line'}
             else:event['message'].update(fileName='../../owner-secret',fileSize=len(document))
@@ -184,6 +194,17 @@ def main():
             assert owner.read_bytes()==b'preserve-owner-canary' and 'owner-secret' not in store.get(response['mission_id'])['goal']
             relay.admitted(queued['id'],response['mission_id']);cache.transferred(queued['media'])
             cases.append('actual_native_file_codec_ignores_pathlike_remote_filename_and_transfers_only_authorized_api_bytes')
+            before=len(downloads);await post('video');await asyncio.sleep(.25)
+            assert len(downloads)==before
+            cases.append('video_requires_its_own_approval_not_existing_image_document_consent')
+            await adapter.close_profile();config['bindings'][0]['allow_video']=True
+            adapter=create();assert await adapter.connect()
+            await post('video',duration=1000);await until(lambda:len(accepted)==3)
+            queued=relay.next(policy());response=await forward(policy,'line',queued['envelope'],queued['media'],adapter._haos_media_cache,bridge)
+            item=controller.gateway.media.for_mission(policy(),response['mission_id'])[0]
+            assert item['data']==video and item['descriptor']['kind']=='video' and events[-1].message_type.value=='video'
+            relay.admitted(queued['id'],response['mission_id']);adapter._haos_media_cache.transferred(queued['media'])
+            cases.append('actual_mp4_signed_native_video_event_private_upload_and_mission_bytes')
             before=len(downloads);await post(contentProvider={'type':'external','originalContentUrl':'http://127.0.0.1/private'})
             await asyncio.sleep(.25);assert len(downloads)==before
             cases.append('external_content_provider_urls_are_refused_before_credentialed_download')

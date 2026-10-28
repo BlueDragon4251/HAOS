@@ -202,6 +202,8 @@ def main():
     pair.add_argument('--homeassistant-trust-system',action='store_true',help='explicitly trust system/automation events for the exact Home Assistant entity; sender must be system')
     pair.add_argument('--allow-plaintext',action='store_true',help='explicit Matrix plaintext approval')
     pair.add_argument('--allow-media',action='store_true',help='explicit LINE incoming PNG/JPEG/document approval; requires create, not voice or outbound media')
+    pair.add_argument('--allow-video',action='store_true',help='separate LINE incoming MP4 approval; requires create; no video analysis guarantee')
+    pair.add_argument('--allow-outbound-media',action='store_true',help='separate LINE generated output file export approval; requires read')
     pair.add_argument('--allow-voice',action='store_true',help='explicit LINE incoming audio-to-text approval; requires create and configured isolated local speech')
     pair.add_argument('--no-require-mention',action='store_true',help='explicit Matrix mention exemption')
     pair.add_argument("--capabilities", nargs="+", choices=["create", "read", "cancel", "answer", "pause", "resume"], default=["create", "read", "cancel", "answer"])

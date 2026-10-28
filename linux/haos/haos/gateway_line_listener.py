@@ -41,4 +41,6 @@ def application(adapter,destination):
 
     app=web.Application(client_max_size=MAX_BODY)
     app.router.add_post('/line/webhook',receive)
+    if hasattr(adapter,'_haos_line_output'):
+        app.router.add_get('/line/output/{token}',adapter._haos_line_output.receive)
     return app

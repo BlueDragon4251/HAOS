@@ -736,6 +736,7 @@ class Wizard:
                 'Beim Speichern Zugangsdaten erneut eingeben; ohne SASL ist eine ausdrückliche Freigabe nötig.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
             line_credentials=tk.Frame(self.content,bg=self.PANEL)
             line_allow_media=tk.BooleanVar(value=False);line_allow_voice=tk.BooleanVar(value=False)
+            line_allow_video=tk.BooleanVar(value=False);line_allow_outbound=tk.BooleanVar(value=False)
             line_destination=self._field(line_credentials,'LINE Bot-Destination · U und 32 kleine Hex-Zeichen')
             line_port=self._field(line_credentials,'LINE lokaler HTTPS-Port · 1024 bis 65535','8646')
             line_url=self._field(line_credentials,'LINE öffentliche HTTPS-Adresse · https://hostname/line/webhook')
@@ -750,7 +751,7 @@ class Wizard:
             line_pem_status=self._label(line_credentials,'Noch kein privates TLS-Material geladen.',size=10,color=self.MUTED)
             line_pem_status.pack(anchor='w',pady=4)
             def reset_line(*_args):
-                line_allow_media.set(False);line_allow_voice.set(False)
+                line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 line_secret.delete(0,tk.END);line_access.delete(0,tk.END);line_public.set(False)
                 line_pem.clear();line_revision[0]+=1
                 line_pem_status.configure(text='Noch kein privates TLS-Material geladen.')
@@ -778,7 +779,7 @@ class Wizard:
                 'Der Dienst prüft die tatsächliche Bot-Identität. Kanal-/Token-/Zertifikatswechsel entzieht alte Absenderfreigaben. '
                 'Einzelnutzer, Gruppen und Räume nur mit exakten U-/C-/R-IDs freigeben. Antworten in Gruppen sehen alle Mitglieder. '
                 'Text und Missionsbefehle sind integriert; Bilder und Dokumente benötigen unten eine eigene Freigabe mit Erstellrecht. '
-                'Sprachnachrichten benötigen eine eigene Freigabe; Video und ausgehende Medien sind noch nicht freigegeben. '
+                'Sprachnachrichten benötigen eine eigene Freigabe; Video und ausgehende Ergebnisdateien benötigen jeweils eine eigene Freigabe. '
                 'LINE-Serverannahme beweist keinen Empfang beim Empfänger. Die öffentliche Erreichbarkeit ist separat zu prüfen.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
             def retry_line():
@@ -1107,13 +1108,28 @@ class Wizard:
             self._label(line_pair,'Benötigt den eingerichteten lokalen Spracherkennungsdienst und das Recht zum Erstellen von Missionen. '
                 'Bis 8 MiB / zwei Minuten; die Originalaudiodatei bleibt privat, der Agent erhält das lokale Transkript.',
                 size=10,color=self.MUTED).pack(anchor='w',pady=5)
+            line_video_box=tk.Checkbutton(line_pair,text='Eingehende LINE-MP4-Videos für diesen Absender ausdrücklich freigeben',
+                variable=line_allow_video,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,wraplength=self.label_wrap)
+            line_video_box.pack(anchor='w',pady=5)
+            self._label(line_pair,'Bis 8 MiB / gemeldete zwei Minuten. Die MP4-Datei geht als Datei in die Mission; '
+                'eine erfolgreiche Videoanalyse hängt von den freigegebenen Agent-Werkzeugen ab.',size=10,color=self.MUTED).pack(anchor='w',pady=5)
+            line_output_box=tk.Checkbutton(line_pair,text='Explizit markierte Ergebnisdateien dieser Missionen an diesen Chat senden',
+                variable=line_allow_outbound,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,wraplength=self.label_wrap)
+            line_output_box.pack(anchor='w',pady=5)
+            self._label(line_pair,'Benötigt Antworten lesen und eine öffentliche HTTPS-Adresse. Höchstens 8 MiB pro Datei; '
+                'Bilder höchstens 1 MiB. Dateien werden eine Stunde über nicht erratbare Download-Links bereitgestellt. '
+                'Entzug sperrt neue Abrufe sofort; bereits heruntergeladene Kopien bleiben beim Empfänger.',size=10,color=self.MUTED).pack(anchor='w',pady=5)
             def line_media_rights(*_args):
-                if not rights['create'].get():line_allow_media.set(False);line_allow_voice.set(False)
+                if not rights['create'].get():line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 line_media_box.configure(state='normal' if rights['create'].get() else 'disabled')
                 line_voice_box.configure(state='normal' if rights['create'].get() else 'disabled')
+                line_video_box.configure(state='normal' if rights['create'].get() else 'disabled')
+                if not rights['read'].get():line_allow_outbound.set(False)
+                line_output_box.configure(state='normal' if rights['read'].get() else 'disabled')
             rights['create'].trace_add('write',line_media_rights)
+            rights['read'].trace_add('write',line_media_rights)
             def reset_line_voice_consent(*_args):
-                line_allow_media.set(False);line_allow_voice.set(False)
+                line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
             for field in (sender,chat):
                 variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
                 variable.trace_add('write',reset_line_voice_consent)
@@ -1123,7 +1139,7 @@ class Wizard:
                 size=10,color=self.MUTED).pack(anchor='w',pady=6)
             previous_line=[False]
             def line_pair_changed(*_args):
-                line_allow_media.set(False);line_allow_voice.set(False)
+                line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 active=platform.get()=='line'
                 if active:
                     line_pair.pack(fill='x',before=pairing_note)
@@ -1162,10 +1178,10 @@ class Wizard:
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
-                    else {'allow_media':line_allow_media.get(),'allow_voice':line_allow_voice.get()} if platform.get()=='line'
+                    else {'allow_media':line_allow_media.get(),'allow_voice':line_allow_voice.get(),'allow_video':line_allow_video.get(),'allow_outbound_media':line_allow_outbound.get()} if platform.get()=='line'
                     else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
                         'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
-                line_allow_media.set(False);line_allow_voice.set(False)
+                line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
@@ -1186,6 +1202,8 @@ class Wizard:
                         + (" · Antworten für ALLE Instanzbenutzer sichtbar" if row.get('homeassistant_shared_notifications') else "")
                         + (" · System-/Automationsquellen dieser Entity ausdrücklich freigegeben" if row.get('homeassistant_trust_system') else ""))
                     if row.get('allow_media'):binding_details.configure(text=binding_details.cget('text')+' · LINE-Bilder/Dokumente ausdrücklich freigegeben')
+                    if row.get('allow_video'):binding_details.configure(text=binding_details.cget('text')+' · MP4-Eingang freigegeben')
+                    if row.get('allow_outbound_media'):binding_details.configure(text=binding_details.cget('text')+' · Ergebnisdateien für diesen Chat freigegeben')
                     if row.get('allow_voice'):binding_details.configure(text=binding_details.cget('text')+' · LINE-Sprachnachrichten ausdrücklich freigegeben')
                 revoked_binding.trace_add("write", show_binding_details)
                 show_binding_details()
@@ -1372,7 +1390,10 @@ class Wizard:
                 selected=self._choice(delivery_frame,"Gespeicherte Zustellung",list(choices),next(iter(choices)),width=24 if self.compact else 48)
                 details=self._label(delivery_frame,"",size=10,color=self.MUTED);details.pack(anchor="w",pady=4)
                 def delivery_details(*_args):
-                    details.configure(text='Mission: '+choices[selected.get()]['mission_id'])
+                    row=choices[selected.get()]
+                    reason={'media-export-unavailable':'Ergebnisdatei vor dem Senden nicht verfügbar: lokalen Hermes-Dienst und Quellsitzung prüfen.',
+                        'media-export-or-format-refused':'Keine Medien gesendet: separate Dateifreigabe, Quellpfad, Größen-/Formatgrenzen und öffentliche HTTPS-Einrichtung prüfen.'}.get(row.get('reason'),'')
+                    details.configure(text='Mission: '+row['mission_id']+(' · '+reason if reason else ''))
                 selected.trace_add('write',delivery_details);delivery_details()
                 receipt=self._field(delivery_frame,"Nur für bestätigt zugestellt · tatsächliche Plattform-Nachrichten-ID")
                 note=self._field(delivery_frame,"Prüfnotiz ohne Geheimnisse · gespeichert wird nur der Hash")

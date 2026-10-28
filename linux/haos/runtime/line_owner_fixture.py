@@ -123,6 +123,23 @@ def exercise(directory,tls,expired_tls):
         policy,private=original_load(config);assert policy['bindings'][0]['allow_voice'] is False
         cases.append('actual_owner_gui_cli_voice_approval_requires_configured_speech_create_and_resets_on_default_repair')
 
+        initial_setup.pair_gateway_sender('owner','line-main',sender,sender,'personal',('create','read'),allow_video=True,allow_outbound_media=True)
+        public,_=original_load(config)
+        assert public['bindings'][0]['allow_video'] is True and public['bindings'][0]['allow_outbound_media'] is True
+        for rights,options in [(('read',),{'allow_video':True}),(('create',),{'allow_outbound_media':True})]:
+            before=(config/'gateways.json').read_bytes()
+            try:initial_setup.pair_gateway_sender('owner','line-main',sender,sender,'personal',rights,**options)
+            except ValueError:pass
+            else:raise AssertionError('media granted without the corresponding create/read right')
+            assert (config/'gateways.json').read_bytes()==before
+        cases.append('actual_owner_video_and_output_opt_ins_persist_and_require_separate_create_read_rights')
+        gateway_setup.owner_gateway(SimpleNamespace(gateway_action='pair',binding='owner',connector='line-main',
+            sender=sender,chat=sender,scope='',thread='',identity='personal',capabilities=['create','read'],allow_video=True,allow_outbound_media=True))
+        public,_=original_load(config);assert public['bindings'][0]['allow_video'] and public['bindings'][0]['allow_outbound_media']
+        initial_setup.pair_gateway_sender('owner','line-main',sender,sender,'personal',('create','read'))
+        public,_=original_load(config);assert not public['bindings'][0]['allow_video'] and not public['bindings'][0]['allow_outbound_media']
+        cases.append('actual_cli_video_output_opt_ins_and_default_repair_withdrawal')
+
         for changes in [{'sender':destination},{'scope':'U'+'e'*32},{'thread':'unapproved'}]:
             args={'sender':sender,'scope':'','thread':''};args.update(changes)
             before=(config/'gateways.json').read_bytes()

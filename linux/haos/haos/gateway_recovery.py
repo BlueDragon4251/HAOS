@@ -45,7 +45,7 @@ def private_store(path: Path) -> MissionStore:
 def unresolved(store: MissionStore, after: int = 0) -> dict:
     if type(after) is not int or after < 0:
         raise ValueError("after must be a nonnegative cursor")
-    rows = store.db.execute("""SELECT o.rowid AS cursor,o.id,o.state,o.attempt,o.content,r.mission_id
+    rows = store.db.execute("""SELECT o.rowid AS cursor,o.id,o.state,o.attempt,o.content,o.error,r.mission_id
         FROM gateway_outbox o JOIN gateway_routes r ON r.id=o.route_id
         WHERE o.state IN ('sending','uncertain','failed') AND o.rowid>? ORDER BY o.rowid LIMIT 100""", (after,)).fetchall()
     deliveries = []
@@ -59,6 +59,8 @@ def unresolved(store: MissionStore, after: int = 0) -> dict:
         deliveries.append({"cursor": row["cursor"], "delivery_id": row["id"], "mission_id": row["mission_id"],
                            "state": row["state"], "attempt": row["attempt"],
                            "content_sha256": hashlib.sha256(row["content"].encode()).hexdigest()})
+        if row['error'] in {'media-export-unavailable','media-export-or-format-refused'}:
+            deliveries[-1]['reason']=row['error']
     return {"deliveries": deliveries, "next_cursor": rows[-1]["cursor"] if rows else after}
 
 

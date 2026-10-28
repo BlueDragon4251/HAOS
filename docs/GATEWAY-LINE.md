@@ -1,10 +1,13 @@
-# LINE owner setup — text integration, not complete platform acceptance
+# LINE owner setup and bounded media integration
 
-HAOS now exposes the prepared pinned Hermes LINE text path through actual owner
-CLI and graphical setup. This replaces the earlier **publicly disabled** state.
-It does **not** complete LINE media/voice support, external account/recipient
-acceptance or installed OS acceptance. Nine platforms now have public text setup
-paths; that count is not nine complete gateway acceptances.
+HAOS connects the actual pinned Hermes LINE adapter to independent timed owner
+grants, private credentials, graphical/CLI setup, a verified HTTPS webhook and
+persistent delivery/recovery. Text, incoming images/documents/voice/MP4 and
+outgoing images/M4A/MP4/download links have implemented software paths.
+Local fixtures use actual SDKs and loopback HTTPS; external LINE accounts,
+recipient playback, public DNS/router reachability and installed OS acceptance
+remain separate. Nine public text paths still do not mean nine fully accepted
+gateways or all 22 integrations.
 
 ## Configure the real listener
 
@@ -123,7 +126,7 @@ Incoming PNG/JPEG images (2 MiB) and documents (8 MiB) now use the shared
 unchecked option and clears pending consent on sender/chat edits or submit;
 CLI uses `gateway pair --allow-media`. Remote filenames never select host paths.
 
-**Still open:** video and outbound media. Incoming voice uses the
+Incoming voice uses the
 [isolated local speech path](GATEWAY-SPEECH.md) with separate `allow_voice`
 approval; the agent receives the transcript, not the raw audio.
 Controller payload and separate private gateway-cache inspection/purge are
@@ -139,9 +142,80 @@ session ID. It never opens the supplied path on the controller host, follows
 redirects, uses proxies or retries a request. Reads check the caller's current
 grant callback between bounded socket reads and before returning bytes; responses
 have an 8 MiB decoded limit and a 30-second deadline (5-second socket timeout).
-The primitive does **not** itself authorize an outbound attachment and is not yet
-connected to LINE delivery. Output provenance, owner approval, durable delivery
-and revocable public media serving remain required before that connection.
+The primitive does **not** itself authorize an outbound attachment. The connected
+LINE path below adds independent output provenance, owner approval, durable
+delivery and revocable public media serving.
 `probe_artifact_backend.py` exercises the actual pinned authenticated HTTP API,
 including an exact 8 MiB read, oversized refusal and unknown-session refusal.
 Its persisted session is explicitly a database fixture, not a model turn.
+
+
+## Video and outgoing results (2026-10-28)
+
+Incoming video has a **separate**, initially unchecked owner approval:
+`gateway pair --allow-video`, requiring mission-create rights. Existing
+`--allow-media` image/document permission does not expand. Signed native video
+messages download only from LINE's fixed content API, then pass through the
+private resumable upload into the exact mission. MP4 bytes are bounded to 8 MiB;
+a reported duration, when supplied, must not exceed two minutes. The actual
+`file.attach` RPC creates a `.mp4` attachment inside the agent namespace. This is
+a file attachment, not proof of model video understanding or frame analysis.
+
+Outgoing results need **another separate** option, `--allow-outbound-media`,
+requiring reply/read rights and configured public HTTPS. Both flags have real
+GUI checkboxes, default false; sender/context edits and submit clear pending
+consent. Re-pairing without the flags withdraws them with a new grant generation.
+The agent is instructed to put each selected `MEDIA:/absolute/agent/path.ext`
+on its own line outside code. Bare paths, quoted examples, JSON tool logs and
+arbitrary remote URLs confer no export authority. At most four distinct files
+are accepted per result/delivery. The pinned native extension catalog is checked
+in CI; formats unsupported by LINE's media API use a download attachment link.
+
+The controller independently requires that the path occurs in both the immutable
+outbox part and the completed, uncancelled mission result, with a valid durable
+source session, current exact grant and in-flight delivery attempt. It requests
+bytes from the authenticated agent HTTP API, never opens that path on the host.
+Private snapshots are checksummed and reused across restart/retry; a changed
+agent file cannot replace an existing snapshot. Known credential reflections are
+refused. The ledger permits 128 active output snapshots / 64 MiB, separately
+from the 256 MiB incoming reservation budget. Owner media inspection/purge covers
+both, preserving terminal missions and output/audit tombstones. An unresolved
+pending/sending output cannot be purged behind an in-flight sender.
+
+The gateway independently checks the current output grant, verifies every
+bounded chunk/hash and stores a private byte-only copy. Incoming and outgoing
+cached payloads share 64 MiB. URLs contain a random 256-bit capability, expire
+after one hour and recheck the exact grant before each bounded write. Download
+responses disable caching and support single byte ranges, with four concurrent
+reads and bounded transfer time. The webhook listener exposes only its fixed
+webhook and output-capability routes, with access logging disabled. No private
+host path is served. Owner revocation/closure blocks further reads; already
+received copies cannot be recalled. Expired derived gateway copies may be removed
+automatically, while the controller's snapshot remains until explicit owner purge.
+Owner cache inspection/purge includes output copies; purge requires withdrawal or
+change of the sender grant, records an audit and prevents republishing that copy.
+
+The actual pinned `send_image_file`, `send_voice`, `send_video` and text builders
+construct one push containing at most five messages including the caption.
+PNG/JPEG output images are bounded to 1 MiB (including LINE preview constraints).
+Native audio uses M4A with a parsed bounded movie duration; native video uses MP4
+and the pinned public fallback PNG preview. Other file types are download links,
+not falsely labelled native voice/video. This integration does not synthesize
+speech or transcode arbitrary formats. Agent tools may generate a supported file;
+TTS service/provider entitlement remains its own setup requirement.
+
+All media pushes retain the existing durable write-intent/remote-receipt rules.
+Confirmed or ambiguous same-attempt writes are never resent; a real process
+SIGKILL is tested for both text and native image output. Explicit rate refusals
+permit a new bounded attempt, with distinct capability URLs. Failures before any
+LINE send can be distinguished from ambiguous writes: owner delivery inspection
+shows `media-export-unavailable` or `media-export-or-format-refused`. Inspect the
+source file/size/format, local backend/session, output approval and HTTPS setup;
+then use the existing explicit delivery recovery or create a corrected mission.
+A purged snapshot is not silently recreated.
+
+Validation and exact source hashes are recorded in
+`docs/evidence/2026-10-28/line-media-output-validation.json`. These proofs include
+actual native backend/LINE/HTTPS compositions, independent owner publication,
+separate UID/kernel tests and GUI handoffs. A fixture-completed mission is never
+represented as actual inference or external recipient acceptance.

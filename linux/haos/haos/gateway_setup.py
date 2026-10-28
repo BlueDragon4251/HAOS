@@ -341,13 +341,17 @@ def owner_gateway(args):
             binding['scope']=destination
             binding['allow_media']=getattr(args,'allow_media',False)
             binding['allow_voice']=getattr(args,'allow_voice',False)
+            binding['allow_video']=getattr(args,'allow_video',False)
+            binding['allow_outbound_media']=getattr(args,'allow_outbound_media',False)
+            if binding['allow_outbound_media'] and 'tls' not in credentials['connectors'][args.connector]:
+                raise ValueError('configure public HTTPS/TLS before approving LINE output files')
             if binding['allow_voice']:
                 if 'create' not in binding['capabilities']:raise ValueError('LINE voice approval requires mission-create rights')
                 from .speech_setup import status as speech_status
                 speech=speech_status()
                 if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
                     raise PermissionError('configure the reviewed local speech model/service before approving LINE voice')
-        elif getattr(args,'allow_media',False) or getattr(args,'allow_voice',False):raise ValueError('media approval applies only to LINE images/documents')
+        elif getattr(args,'allow_media',False) or getattr(args,'allow_voice',False) or getattr(args,'allow_video',False) or getattr(args,'allow_outbound_media',False):raise ValueError('media approval applies only to LINE images/documents')
         devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
         unmentioned=getattr(args,'no_require_mention',False)
         if selected and selected['platform']=='matrix':

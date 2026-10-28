@@ -4,12 +4,12 @@ The controller provides bounded byte uploads and native Hermes attachments.
 Signed LINE input now connects the actual pinned image/file adapter and private
 HTTPS content client to this path. The owner must explicitly approve incoming
 images/documents for each sender/chat grant, using the graphical setup or
-`haos-owner gateway pair --allow-media`. Existing grants remain text-only.
+`haos-owner gateway pair --allow-media`. Existing text-only grants remain text-only; permissions do not expand.
 Voice now uses a separate explicit grant and isolated local transcription;
-video and outbound media remain open; local fixtures do not establish
+video and output results use the separately approved paths in [LINE setup](GATEWAY-LINE.md); local fixtures do not establish
 live account delivery or model inference.
 
-The private gateway cache is bounded to 64 MiB/128 records. The exact native
+The private gateway cache shares a 64 MiB byte budget across incoming and outgoing copies (up to 128 active records of each kind). The exact native
 callback carries opaque IDs rather than host paths. Current approval is checked
 before downloads, every read/upload chunk and mission admission. Downloads keep
 TLS hostname verification, disallow redirects and encoded bodies, enforce byte
@@ -93,8 +93,7 @@ sudo haos-owner gateway purge-media-cache --id EXACT_CACHE_ID --note 'Inspected 
 
 The graphical media page links both independent stores. Cache inspection stops
 only the gateway; controller inspection stops mission services as described
-above. None of these operations restarts services automatically. Incoming voice is described in [local speech](GATEWAY-SPEECH.md); video
-and outbound media remain open.
+above. None of these operations restarts services automatically. Incoming voice is described in [local speech](GATEWAY-SPEECH.md); video and output files are described in [LINE setup](GATEWAY-LINE.md).
 
 Mission creation and media association share a transaction. A wrong-message,
 expired, changed or over-budget attachment cannot leave a partial mission or
@@ -133,3 +132,18 @@ Exact source hashes and local receipts are recorded in
 be associated separately with its exact commit. Neither fixture success nor
 this backend increment is complete LINE media/voice, live account/recipient,
 installed systemd/OS, hardware or release-artifact acceptance.
+
+
+## LINE video and output extension (2026-10-28)
+
+The current implementation adds separately approved incoming MP4 file attachment
+and outgoing PNG/JPEG, M4A, MP4 and bounded download links. See
+[the exact owner setup and limits](GATEWAY-LINE.md#video-and-outgoing-results-2026-10-28).
+Incoming snapshots reserve up to 256 MiB; independent outgoing snapshots permit
+128 active records / 64 MiB. The existing owner media interface inspects and
+purges both without opening the controller ledger as root. Both kinds of
+transient gateway copies share the 64 MiB private cache; output URLs expire in
+one hour and are checked against current grants during transfer. An owner purge
+preserves tombstones and audit; it does not erase received agent/recipient copies
+or backups. Source-bound receipts distinguish native fixtures, kernel/UID checks
+and real external/installed acceptance.

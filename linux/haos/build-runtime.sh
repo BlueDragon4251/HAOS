@@ -63,6 +63,7 @@ test -x .venv/bin/hermes
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_listener.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-listener-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-delivery-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-profile-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_output.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/line-output-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_media.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-media-build-probe.json
 HAOS_SPEECH_FIXTURE="$(mktemp -d /tmp/haos-speech-fixture.XXXXXX)"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/fetch_speech_fixture.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE"

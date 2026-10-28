@@ -24,7 +24,7 @@ async def attach(connection,session_id,items):
             if not isinstance(result,dict) or result.get('attached') is not True or result.get('bytes')!=len(data):
                 raise ValueError('native image attachment was not acknowledged')
         else:
-            result=await connection.request('file.attach',{'session_id':session_id,'data_url':'data:application/octet-stream;base64,'+encoded,'name':name})
+            result=await connection.request('file.attach',{'session_id':session_id,'data_url':('data:video/mp4;base64,' if meta['kind']=='video' else 'data:application/octet-stream;base64,')+encoded,'name':name})
             ref=result.get('ref_text') if isinstance(result,dict) else None
             allocated=result.get('name') if isinstance(result,dict) else None
             if (not isinstance(result,dict) or result.get('attached') is not True or result.get('uploaded') is not True

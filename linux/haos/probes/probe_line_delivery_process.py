@@ -22,6 +22,7 @@ def main():
             or not Path('/.dockerenv').exists() or Path('/usr/lib/haos').exists()
             or not os.statvfs('/repo').f_flag&os.ST_RDONLY):
         raise PermissionError('fresh explicit disposable Docker namespace required; never run on installed HAOS')
+    media_mode=os.environ.get('HAOS_LINE_PROCESS_MEDIA')=='1'
     code=Path('/usr/lib/haos');code.mkdir(mode=0o755)
     subprocess.run([sys.executable,'/repo/linux/haos/runtime/install_package.py','/repo/linux/haos/haos',str(code/'haos')],check=True)
     subprocess.run([sys.executable,'/repo/linux/haos/runtime/install_package.py','/deps','/sdk'],check=True)
@@ -119,6 +120,11 @@ async def exercise():
         binding=request['policy']['bindings'][0]
         metadata={'haos_scope':binding['scope'],'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},
             'haos_delivery_id':digest('private-line-process-obligation'),'haos_delivery_attempt':1,'notify':True}
+        if request['media_mode']:
+            from plugins.platforms.line.adapter import _FALLBACK_PNG_PREVIEW
+            output=adapter._haos_line_output
+            item=output.put(binding,metadata['haos_delivery_id'],digest('process-output-fixture'),_FALLBACK_PNG_PREVIEW,'image','image/png')
+            metadata['haos_output']={'items':[{'kind':'image','url':output.url(item),'duration':0}],'text':'private process reply'}
         receipt=await adapter.send(binding['chat'],'private process reply',metadata=metadata)
         result=delivery_result(receipt)
         assert result=={'status':'uncertain'}
@@ -140,7 +146,13 @@ asyncio.run(exercise())
             state['lookups']+=1;return web.json_response({'userId':destination})
         async def push(request):
             assert request.headers['Authorization']=='Bearer private-line-process-access'
-            assert await request.json()=={'to':user,'messages':[{'type':'text','text':'private process reply'}]}
+            payload=await request.json()
+            if media_mode:
+                assert payload['to']==user and [m['type'] for m in payload['messages']]==['image','text']
+                assert payload['messages'][1]=={'type':'text','text':'private process reply'}
+                url=payload['messages'][0]['originalContentUrl']
+                assert url==payload['messages'][0]['previewImageUrl'] and url.startswith('https://line.fixture.invalid/line/output/')
+            else:assert payload=={'to':user,'messages':[{'type':'text','text':'private process reply'}]}
             with sqlite3.connect('file:'+str(private/'native.db')+'?mode=ro',uri=True) as observer:
                 assert observer.execute('SELECT state FROM line_delivery_intents').fetchone()==('writing',)
             state['pushes']+=1;state['seen'].set();await state['release'].wait()
@@ -154,13 +166,13 @@ asyncio.run(exercise())
         api='https://localhost:'+str(site._server.sockets[0].getsockname()[1])
         import socket
         with socket.socket() as reservation:reservation.bind(('127.0.0.1',0));port=reservation.getsockname()[1]
-        request={'state':str(private),'owner_canary':str(owner),'api':api,
+        request={'state':str(private),'owner_canary':str(owner),'api':api,'media_mode':media_mode,
             'credentials':{'channel_secret':'c'*32,'channel_access_token':'private-line-process-access','destination':destination,'port':port,
                 'tls':{'public_url':'https://line.fixture.invalid/line/webhook','certificate':chain,'private_key':private_key,
                     'bind_host':'127.0.0.1','public_listener':False}},
             'policy':{'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
                 'id':'owner','connector':'line','sender':user,'chat':user,'scope':destination,
-                'thread':'','identity':'owner','capabilities':['create','read'],'allow_media':True,'generation':'a'*64,
+                'thread':'','identity':'owner','capabilities':['create','read'],'allow_media':True,'allow_outbound_media':media_mode,'generation':'a'*64,
                 'since':int((time.time()-60)*1000)}]}}
         async def invoke(uid,action):
             child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),str(script),
@@ -195,6 +207,18 @@ asyncio.run(exercise())
             first.stdin.write(b'SEND\n');await first.stdin.drain()
             await asyncio.wait_for(state['seen'].wait(),10)
             assert state['pushes']==1 and first.returncode is None
+            if media_mode:
+                import ast
+                source=ast.parse((upstream/'plugins/platforms/line/adapter.py').read_text())
+                declaration=next(node for node in source.body if isinstance(node,ast.Assign)
+                    and any(isinstance(target,ast.Name) and target.id=='_FALLBACK_PNG_PREVIEW' for target in node.targets))
+                expected_preview=bytes.fromhex(ast.literal_eval(declaration.value.args[0]))
+                with sqlite3.connect('file:'+str(private/'native.db')+'?mode=ro',uri=True) as observer:
+                    token=observer.execute('SELECT token FROM line_output_media').fetchone()[0]
+                async with ClientSession(connector=TCPConnector(ssl=ssl.create_default_context())) as client:
+                    async with client.get(f'https://localhost:{port}/line/output/'+token) as response:
+                        assert response.status==200 and await response.read()==expected_preview
+                cases.append('actual_gateway_uid_serves_only_private_byte_backed_output_over_verified_https_before_crash')
             first.kill();await asyncio.wait_for(first.wait(),5);assert first.returncode==-9
             cases.append('actual_gateway_uid_native_verified_https_push_has_durable_intent_before_real_sigkill')
             agent=await invoke(65533,'agent');children.append(agent)
@@ -218,7 +242,7 @@ asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uid_cases':[0,65533,65534],
         'actual_sigkill':True,'tls_verification_disabled':False,'public_gateway_enabled':True,
         'agent_fixture_received_no_credentials':True,
-        'incoming_document_bytes_verified_after_process_restart':True,
+        'incoming_document_bytes_verified_after_process_restart':True,'outgoing_native_media_process_case':media_mode,
         'fixture_only_disposable_ca_and_loopback_targets':True,
         'external_connections_or_recipient_acceptance':False,'installed_haos_accepted':False},indent=2))
 

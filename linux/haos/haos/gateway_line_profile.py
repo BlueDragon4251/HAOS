@@ -121,6 +121,9 @@ def _install(adapter,fd,profile,value,authority,publisher):
     db.execute('UPDATE line_profile_status SET next_attempt=MAX(next_attempt,?),status=CASE WHEN ? THEN ? ELSE status END WHERE identity=?',
         (deadline,blocked is not None,blocked or 'created',identity))
     adapter._haos_line_profile=profile;adapter._haos_line_publisher=publisher
+    adapter._haos_line_public_url=value.get('tls',{}).get('public_url','')
+    from .gateway_line_output import Output
+    adapter._haos_line_output=Output(adapter)
     adapter._haos_line_verified_destination=None
     adapter._haos_line_runner=None;adapter._haos_line_replay=None;adapter._haos_line_closed=False
     adapter._haos_line_identity=Identity(value['channel_access_token'],value['destination'])
@@ -205,7 +208,7 @@ def _install(adapter,fd,profile,value,authority,publisher):
         async with lifecycle:
             current_delivery(self,'line',chat_id,metadata)()
             binding=self._haos_native.policy().current_binding(metadata['haos_binding'])
-            receipt=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content)
+            receipt=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,prepared=metadata.get('haos_output'))
             from .gateway_delivery import delivery_result
             result=delivery_result(receipt)
             if result['status']=='failed' and receipt.error_kind=='forbidden':

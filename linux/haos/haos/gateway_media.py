@@ -22,8 +22,8 @@ _HASH=re.compile(r'[0-9a-f]{64}\Z')
 def descriptor(value):
     if (not isinstance(value,dict) or set(value)!={'kind','format','sha256','size'}
             or not isinstance(value['kind'],str) or not isinstance(value['format'],str)
-            or value['kind'] not in {'image','document','voice'}
-            or value['format'] not in ({'png','jpeg'} if value['kind']=='image' else {'bin'})
+            or value['kind'] not in {'image','document','voice','video'}
+            or value['format'] not in ({'png','jpeg'} if value['kind']=='image' else {'mp4'} if value['kind']=='video' else {'bin'})
             or type(value['size']) is not int or not 1<=value['size']<=MAX_BYTES
             or value['kind']=='image' and value['size']>MAX_IMAGE_BYTES
             or not isinstance(value['sha256'],str) or not _HASH.fullmatch(value['sha256'])):
@@ -38,6 +38,10 @@ def describe(data,kind):
         if data.startswith(b'\x89PNG\r\n\x1a\n'):fmt='png'
         elif data.startswith(b'\xff\xd8\xff'):fmt='jpeg'
         else:raise ValueError('only PNG/JPEG image bytes are supported')
+    if kind=='video':
+        if len(data)<16 or data[4:8]!=b'ftyp' or int.from_bytes(data[:4],'big') not in range(16,min(len(data),4096)+1):
+            raise ValueError('bounded ISO MP4 video bytes required')
+        fmt='mp4'
     return descriptor({'kind':kind,'format':fmt,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
 
 
@@ -50,10 +54,11 @@ def references(values):
 
 
 def approved(binding,kind=None):
-    if kind not in {None,'image','document','voice'}:raise ValueError('reviewed attachment kind required')
+    if kind not in {None,'image','document','voice','video'}:raise ValueError('reviewed attachment kind required')
+    if kind=='video':return binding.get('allow_video') is True
     if kind=='voice':return binding.get('allow_voice') is True
     if kind in {'image','document'}:return binding.get('allow_media') is True
-    return binding.get('allow_media') is True or binding.get('allow_voice') is True
+    return binding.get('allow_media') is True or binding.get('allow_voice') is True or binding.get('allow_video') is True
 
 
 def authorize(policy,connector,envelope,kind=None):
@@ -222,8 +227,21 @@ class GatewayMedia:
                 'mission_id','mission_state','stored_bytes']} | {'descriptor':meta,
                 'admission_expired':row['mission_id'] is None and time.time()>row['created_at']+86400,
                 'purge_allowed':row['state']!='purged' and (row['mission_id'] is None or row['mission_state'] in {'completed','failed','cancelled'})})
-        return {'uploads':result,'reserved_bytes':reserved,'limit_bytes':MAX_TOTAL,
-            'stored_bytes':sum(row['stored_bytes'] for row in rows),'limit_records':1024,'recent_purged_limit':128}
+        if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gateway_output_files'").fetchone():
+            for row in self.db.execute('''SELECT f.*,r.connector,r.mission_id,m.state AS mission_state,o.state AS delivery_state
+                    FROM gateway_output_files f JOIN gateway_outbox o ON o.id=f.delivery_id
+                    JOIN gateway_routes r ON r.id=o.route_id JOIN missions m ON m.id=r.mission_id
+                    WHERE length(f.data)>0 OR f.rowid IN
+                        (SELECT rowid FROM gateway_output_files WHERE length(data)=0 ORDER BY rowid DESC LIMIT 128)
+                    ORDER BY f.created_at'''):
+                size=len(row['data']);reserved+=size
+                result.append({'id':row['id'],'connector':row['connector'],'binding_id':row['binding_id'],
+                    'state':'output-ready' if size else 'purged','received':size,'created_at':row['created_at'],
+                    'mission_id':row['mission_id'],'mission_state':row['mission_state'],'stored_bytes':size,
+                    'descriptor':{'kind':'document','format':'bin','sha256':row['sha256'],'size':row['size']},
+                    'admission_expired':False,'purge_allowed':bool(size) and row['delivery_state'] not in {'pending','sending'}})
+        return {'uploads':result,'reserved_bytes':reserved,'limit_bytes':MAX_TOTAL+64*1024*1024,
+            'stored_bytes':sum(row['stored_bytes'] for row in result),'limit_records':1152,'recent_purged_limit':128,'output_recent_purged_limit':128}
 
     def purge(self,ids,actor,note,*,confirmed=False):
         """Explicit owner-only caller; retain tombstones, grants, missions and audit."""
@@ -237,11 +255,26 @@ class GatewayMedia:
             rows=[]
             for identity in ids:
                 row=self.db.execute('SELECT * FROM gateway_media_uploads WHERE id=?',(identity,)).fetchone()
+                if row is None and self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gateway_output_files'").fetchone():
+                    output=self.db.execute('''SELECT f.*,o.state AS delivery_state FROM gateway_output_files f
+                        JOIN gateway_outbox o ON o.id=f.delivery_id WHERE f.id=?''',(identity,)).fetchone()
+                    if output is not None:
+                        if output['delivery_state'] in {'pending','sending'}:raise Conflict('output delivery must be resolved before purge')
+                        rows.append(('output',output));continue
                 if row is None:raise KeyError('unknown private media ID')
                 if row['mission_id'] is not None and self.store.get(row['mission_id'])['state'] not in {'completed','failed','cancelled'}:
                     raise Conflict('media for a nonterminal mission cannot be purged')
                 rows.append(row)
             for row in rows:
+                if isinstance(row,tuple):
+                    output=row[1];size=len(output['data'])
+                    if size:
+                        self.db.execute('CREATE TABLE IF NOT EXISTS gateway_output_purge_audit(id TEXT PRIMARY KEY,actor TEXT NOT NULL,note TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL)')
+                        self.db.execute("UPDATE gateway_output_files SET data=X'' WHERE id=?",(output['id'],))
+                        self.db.execute('INSERT INTO gateway_output_purge_audit VALUES(?,?,?,?,?)',
+                            (output['id'],actor,self.store.redactor.text(note.strip()),time.time(),size))
+                        removed+=size
+                    continue
                 if row['state']=='purged':continue
                 size=self.db.execute('SELECT COALESCE(SUM(LENGTH(data)),0) FROM gateway_media_chunks WHERE upload_id=?',(row['id'],)).fetchone()[0]
                 self.db.execute('DELETE FROM gateway_media_chunks WHERE upload_id=?',(row['id'],))

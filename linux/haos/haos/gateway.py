@@ -53,7 +53,7 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media','allow_voice'} if connector and connector['platform']=='line' else set())
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform']=='line' else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
@@ -167,9 +167,16 @@ class GatewayEngine:
     def _queue(self, route_id: str, key: str, content: str):
         content = self.store.redactor.text(content)
         # Bound native platform chunks; each part has a stable durable identity.
-        for part, offset in enumerate(range(0, len(content), 1800)):
+        chunks=[]
+        while content:
+            end=min(1800,len(content))
+            if end<len(content):
+                line=content.rfind('\n',0,end)+1
+                if line and content[line:end].lstrip().startswith('MEDIA:'):end=line
+            chunks.append(content[:end]);content=content[end:]
+        for part, chunk in enumerate(chunks):
             self.store.db.execute("INSERT OR IGNORE INTO gateway_outbox(id,route_id,content) VALUES(?,?,?)",
-                                  (digest([route_id, key, part]), route_id, content[offset:offset + 1800]))
+                                  (digest([route_id, key, part]), route_id, chunk))
 
     async def receive(self, policy: GatewayPolicy, connector: str, envelope: dict, controller, *, media=None) -> dict:
         from .gateway_media import references,authorize as authorize_media
@@ -321,6 +328,9 @@ class GatewayEngine:
                 raise Conflict("delivery is not in flight")
             if result.get("attempt") != row["attempt"]:
                 raise Conflict("stale delivery attempt")
+            reason=result.get('reason')
+            if reason is not None and reason not in {'media-export-unavailable','media-export-or-format-refused'}:
+                raise ValueError('unknown public delivery failure reason')
             status = result.get("status")
             if status == "delivered":
                 identifier(result.get("message_id"))
@@ -335,6 +345,6 @@ class GatewayEngine:
             if type(delay) not in {int, float} or not 0 <= delay <= 86400:
                 raise ValueError("invalid delivery retry delay")
             self.store.db.execute("UPDATE gateway_outbox SET state=?,receipt=?,next_attempt=?,error=? WHERE id=?",
-                                  (state, receipt, time.time() + delay, None if state == "delivered" else status, delivery_id))
+                                  (state, receipt, time.time() + delay, None if state == "delivered" else reason or status, delivery_id))
             self.store._event(row["mission_id"], "gateway.delivery", {"delivery": delivery_id, "state": state, "receipt": receipt})
             return {"state": state}

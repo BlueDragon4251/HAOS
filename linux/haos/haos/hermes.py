@@ -81,7 +81,7 @@ class HermesConnection:
 def mission_prompt(goal: str) -> str:
     return (f"Mission: {goal}\n\nPlan with the todo tool, execute real steps, update the plan and report "
             "the actual result with evidence and any unresolved work. Do not claim success for failed "
-            "tools or missing credentials. Owner storage and system policy cannot be changed by an agent.")
+            "tools or missing credentials. Owner storage and system policy cannot be changed by an agent. To return an output file, place MEDIA:/absolute/agent/path.ext on its own line outside code blocks. Never mark credentials or unrelated files. File delivery requires separate owner approval; supported files are bounded to 8 MiB and images to 1 MiB.")
 
 
 def outcome(payload: dict, cancel_requested: bool) -> tuple[str, str | None]:

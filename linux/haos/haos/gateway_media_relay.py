@@ -86,6 +86,8 @@ class MediaCache:
                 self.db.execute('COMMIT');return item
             self.capacity()
             size=self.db.execute("SELECT COALESCE(SUM(LENGTH(data)),0) FROM native_media_cache WHERE state='cached'").fetchone()[0]
+            if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='line_output_media'").fetchone():
+                size+=self.db.execute('SELECT COALESCE(SUM(length(data)),0) FROM line_output_media').fetchone()[0]
             if size+len(data)>64*1024*1024:raise Conflict('private media relay byte budget exceeded')
             self.db.execute('INSERT OR IGNORE INTO native_media_cache VALUES(?,?,?,?,?,?,?,?)',
                 (identity,connector,digest(envelope),binding['id'],digest(binding),json.dumps(meta),data,'cached'))
@@ -103,8 +105,15 @@ class MediaCache:
             uploads.append({'id':row['id'],'connector':row['connector'],'binding_id':row['binding_id'],
                 'descriptor':descriptor(json.loads(row['descriptor'])),'stored_bytes':row['stored_bytes'] or 0,
                 'state':'cached','mission_id':None,'mission_state':None,'purge_allowed':revoked})
+        if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='line_output_media'").fetchone():
+            for row in self.db.execute('SELECT * FROM line_output_media WHERE length(data)>0'):
+                try:binding=policy.current_binding(dict(row));revoked=False
+                except PermissionError:binding=policy.bindings.get(row['binding_id'],{});revoked=True
+                uploads.append({'id':row['id'],'connector':binding.get('connector','withdrawn-line'),
+                    'binding_id':row['binding_id'],'descriptor':{'kind':'document','format':'bin','sha256':row['sha256'],'size':len(row['data'])},
+                    'stored_bytes':len(row['data']),'state':'output-cached','mission_id':None,'mission_state':None,'purge_allowed':revoked})
         size=sum(row['stored_bytes'] for row in uploads)
-        return {'uploads':uploads,'stored_bytes':size,'reserved_bytes':size,'limit_bytes':64*1024*1024,'limit_records':128}
+        return {'uploads':uploads,'stored_bytes':size,'reserved_bytes':size,'limit_bytes':64*1024*1024,'limit_records':256}
 
     def owner_purge(self,policy,request):
         if (not isinstance(request,dict) or set(request)!={'id','owner_uid','note_sha256','confirmed'}
@@ -115,15 +124,19 @@ class MediaCache:
         self.db.execute('BEGIN IMMEDIATE')
         try:
             row=self.db.execute('SELECT * FROM native_media_cache WHERE id=?',(identity,)).fetchone()
+            output=False
+            if row is None and self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='line_output_media'").fetchone():
+                row=self.db.execute('SELECT * FROM line_output_media WHERE id=?',(identity,)).fetchone();output=row is not None
             if row is None:raise KeyError('unknown private cache ID')
             try:policy.current_binding(dict(row))
             except PermissionError:pass
             else:raise PermissionError('withdraw or change the sender grant before purging its retained cache')
-            if row['state'] not in {'cached','purged'}:raise Conflict('only retained unacknowledged cache bytes can be purged')
+            if not output and row['state'] not in {'cached','purged'}:raise Conflict('only retained unacknowledged cache bytes can be purged')
             size=len(row['data']) if row['data'] is not None else 0
-            if row['state']!='purged':
+            if output and size or not output and row['state']!='purged':
                 self.db.execute('CREATE TABLE IF NOT EXISTS native_media_owner_events(id TEXT PRIMARY KEY,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,purged_at REAL NOT NULL,removed_bytes INTEGER NOT NULL)')
-                self.db.execute("UPDATE native_media_cache SET state='purged',data=NULL WHERE id=?",(identity,))
+                if output:self.db.execute("UPDATE line_output_media SET data=X'',expires=0 WHERE id=?",(identity,))
+                else:self.db.execute("UPDATE native_media_cache SET state='purged',data=NULL WHERE id=?",(identity,))
                 self.db.execute('INSERT INTO native_media_owner_events VALUES(?,?,?,?,?)',
                     (identity,request['owner_uid'],request['note_sha256'],time.time(),size))
             self.db.execute('COMMIT')

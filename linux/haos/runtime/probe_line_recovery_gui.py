@@ -70,6 +70,16 @@ def main():
             except ValueError:pass
             else:raise AssertionError('invalid retained LINE proof exposed to owner as confirmed')
             cases.append('actual_sqlite_invalid_retained_proof_is_refused_before_ui_rendering')
+            initial_setup.gateway_deliveries=lambda after=0:{'deliveries':[{'delivery_id':'f'*64,
+                'mission_id':'00000000-0000-4000-8000-000000000001','state':'failed','attempt':1,
+                'reason':'media-export-or-format-refused','content_sha256':'a'*64}],'next_cursor':1}
+            button=next(w for w in widgets(wizard.content) if isinstance(w,tk.Button) and w.cget('text').startswith('Missionsdienste stoppen und ungeklärte Zustellungen prüfen'))
+            button.invoke();end=time.time()+5
+            while wizard.running and time.time()<end:wizard.root.update();time.sleep(.01)
+            wizard.root.update();assert not wizard.running
+            labels=' '.join(str(w.cget('text')) for w in widgets(wizard.content) if isinstance(w,tk.Label))
+            assert 'Keine Medien gesendet' in labels and 'Quellpfad' in labels and 'öffentliche HTTPS-Einrichtung' in labels
+            cases.append('actual_media_failure_guidance_explains_pre_send_refusal_without_private_vendor_details')
         finally:wizard.root.destroy();inbox.close()
     receipt={'passed':len(cases),'cases':cases,'actual_tk_and_private_sqlite_metadata':True,'python':platform.python_version(),
         'backend_handoff_fixture_only':True,'root_authority_checked_separately':True,

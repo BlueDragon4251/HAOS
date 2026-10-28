@@ -222,3 +222,12 @@ def test_owner_wrapper_checks_stopped_services_before_reading_or_delegating(monk
     with pytest.raises(PermissionError, match="active"):
         owner_delivery(None, {})
     assert calls == (["gateway"] if guard == "gateway" else ["gateway", "runtime"])
+
+
+@pytest.mark.parametrize('reason',['media-export-unavailable','media-export-or-format-refused','private-vendor-body-with-credentials'])
+def test_recovery_exposes_only_reviewed_public_media_failure_codes(outbox,reason):
+    store,_,_,_=outbox
+    store.db.execute("UPDATE gateway_outbox SET state='failed',error=?",(reason,))
+    row=unresolved(store)['deliveries'][0]
+    if reason.startswith('media-export-'):assert row['reason']==reason
+    else:assert 'reason' not in row and reason not in str(row)

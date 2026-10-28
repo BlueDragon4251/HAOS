@@ -32,6 +32,77 @@ class Publisher:
         self.db.execute("UPDATE line_delivery_intents SET state='uncertain' WHERE state='writing'")
         async def deny(_self,*_args,**_kwargs):raise PermissionError('native LINE send requires current outbox capability')
         adapter.send=MethodType(deny,adapter)
+        original_messages=type(adapter)._send_messages
+        async def messages(_self,chat_id,messages,**kwargs):
+            route=_ACTIVE.get()
+            if route is not None and route.get('building') and route['publisher'] is self:
+                self.current(route['binding'])
+                if chat_id!=route['binding']['chat']:raise PermissionError('native output chat changed')
+                route['messages'].extend(messages)
+                from gateway.platforms.base import SendResult
+                return SendResult(success=True)
+            return await original_messages(_self,chat_id,messages,**kwargs)
+        def check_file(_self,kind,path):
+            from pathlib import Path
+            route=_ACTIVE.get()
+            if (route is None or not route.get('building') or route['publisher'] is not self
+                    or route['kind']!=kind or path!='/haos-approved-output'):
+                raise PermissionError('no byte-backed native output capability')
+            return Path(path),None
+        def serve(_self,path):
+            route=_ACTIVE.get()
+            if route is None or not route.get('building') or route['publisher'] is not self:
+                raise PermissionError('no native output URL capability')
+            if str(path)=='/haos-approved-output':return route['url']
+            if str(path)==route.get('preview_path'):return route['preview']
+            raise PermissionError('native media path changed')
+        adapter._send_messages=MethodType(messages,adapter)
+        adapter._check_media_file=MethodType(check_file,adapter)
+        adapter._serve_file=MethodType(serve,adapter)
+
+    async def compile(self,binding,delivery_id,prepared):
+        from gateway.platforms.base import SendResult
+        from plugins.platforms.line.adapter import _FALLBACK_PNG_PREVIEW
+        import tempfile
+        from pathlib import Path
+        if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list)
+                or not 0<=len(prepared['items'])<=4 or not isinstance(prepared['text'],str)):
+            raise ValueError('bounded byte-backed output messages required')
+        messages=[];output=self.adapter._haos_line_output
+        route={'publisher':self,'building':True,'binding':binding,'messages':messages}
+        token=_ACTIVE.set(route);previous=self.adapter._client;self.adapter._client=self.native
+        try:
+            # Native video builder checks its preview's existence. Only this
+            # freshly created public constant is ever passed as a real path.
+            with tempfile.TemporaryDirectory(prefix='haos-line-public-preview-') as root:
+                preview=Path(root)/'preview.png';preview.write_bytes(_FALLBACK_PNG_PREVIEW)
+                for item in prepared['items']:
+                    if (not isinstance(item,dict) or set(item) not in ({'kind','url','duration'},{'kind','url','duration','preview'})
+                            or item['kind'] not in {'image','audio','video','document'}):raise ValueError('reviewed native output kind required')
+                    stored=output.checked_url(binding,delivery_id,item['url'],item['kind'])
+                    if type(item['duration']) is not int or item['duration']!=stored['duration']:raise PermissionError('output duration changed')
+                    route.update(kind=item['kind'],url=item['url'])
+                    if item['kind']=='image':
+                        receipt=await type(self.adapter).send_image_file(self.adapter,binding['chat'],'/haos-approved-output')
+                    elif item['kind']=='audio':
+                        route['kind']='audio'
+                        receipt=await type(self.adapter).send_voice(self.adapter,binding['chat'],'/haos-approved-output',duration_ms=item['duration'])
+                    elif item['kind']=='video':
+                        output.checked_url(binding,delivery_id,item.get('preview'),'preview')
+                        route.update(preview=item['preview'],preview_path=str(preview))
+                        receipt=await type(self.adapter).send_video(self.adapter,binding['chat'],'/haos-approved-output',preview_path=str(preview))
+                    else:
+                        # LINE has no native file message. Its actual text builder
+                        # sends the bounded, revocable HTTPS download capability.
+                        receipt=await self.original(self.adapter,binding['chat'],'Result file: '+item['url'])
+                    if receipt.success is not True:raise ValueError('native output builder refused')
+                if prepared['text'].strip():
+                    receipt=await self.original(self.adapter,binding['chat'],prepared['text'])
+                    if receipt.success is not True:raise ValueError('native output caption refused')
+            if not 1<=len(messages)<=5:raise ValueError('single native LINE push requires at most five messages')
+            return messages
+        finally:self.adapter._client=previous;_ACTIVE.reset(token)
+
 
     def current(self,binding):
         native=self.adapter._haos_native;policy=native.policy()
@@ -95,7 +166,7 @@ class Publisher:
         except Exception:pass
         yield safe
 
-    async def send(self,binding,delivery_id,attempt,content):
+    async def send(self,binding,delivery_id,attempt,content,*,prepared=None):
         from gateway.platforms.base import SendResult
         from plugins.platforms.line.adapter import _text_messages,strip_markdown_preserving_urls
         if (not isinstance(delivery_id,str) or not _HASH.fullmatch(delivery_id)
@@ -103,9 +174,10 @@ class Publisher:
         binding=deepcopy(binding);self.current(binding)
         if not isinstance(content,str) or not content.strip() or len(content.encode())>65536:
             return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
-        messages=_text_messages(content)
+        try:messages=await self.compile(binding,delivery_id,prepared) if prepared is not None else _text_messages(content)
+        except ValueError:return SendResult(success=False,error_kind='bad_format',raw_response={'haos_delivery':'refused'})
         # One native push only. A later batch may not consume an unjournaled side effect.
-        if (not 1<=len(messages)<=5
+        if prepared is None and (not 1<=len(messages)<=5
                 or any(len(m['text'].encode('utf-16-le'))//2>5000 for m in messages)
                 or ''.join(strip_markdown_preserving_urls(content).split())!=''.join(''.join(m['text'].split()) for m in messages)):
             return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
@@ -132,7 +204,8 @@ class Publisher:
             try:
                 self.adapter._client=self.native
                 if self.adapter._reply_tokens or self.adapter._pending_buttons:raise PermissionError('unapproved LINE reply/postback capability')
-                native=await self.original(self.adapter,binding['chat'],content)
+                if prepared is None:native=await self.original(self.adapter,binding['chat'],content)
+                else:native=await type(self.adapter)._send_messages(self.adapter,binding['chat'],messages,force_push=True)
                 confirmed=native.success is True and route['receipt'] is not None
                 state='confirmed' if confirmed else 'uncertain'
                 self.db.execute('UPDATE line_delivery_intents SET state=?,receipt=?,updated_at=? WHERE delivery_id=? AND attempt=?',

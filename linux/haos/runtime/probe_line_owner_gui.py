@@ -61,7 +61,7 @@ def main():
         assert str(field('Bereich').cget('state'))==str(field('Thread-ID').cget('state'))=='disabled'
         cases.append('actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token')
         labels=' '.join(w.cget('text') for w in widgets(wizard.content) if isinstance(w,tk.Label))
-        assert 'CGNAT' in labels and 'Port 443' in labels and 'Video und ausgehende Medien sind noch nicht freigegeben' in labels and 'Sprachnachrichten benötigen eine eigene Freigabe' in labels
+        assert 'CGNAT' in labels and 'Port 443' in labels and 'Video und ausgehende Ergebnisdateien benötigen jeweils eine eigene Freigabe' in labels and 'Sprachnachrichten benötigen eine eigene Freigabe' in labels
         assert 'höchstens 2 MiB' in labels and 'höchstens 8 MiB' in labels
         assert 'keinen Empfang' in labels and 'alle Mitglieder' in labels
         cases.append('actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits')
@@ -85,7 +85,7 @@ def main():
         fill('Absender-ID',sender);fill('Chat-ID','C'+'b'*32)
         button('Absender mit ausgewählten Rechten').invoke();settle()
         assert pairs[-1][0][:4]==('my-device','line-main',sender,'C'+'b'*32)
-        assert pairs[-1][1]=={'scope':destination,'thread':'','allow_media':False,'allow_voice':False}
+        assert pairs[-1][1]=={'scope':destination,'thread':'','allow_media':False,'allow_voice':False,'allow_video':False,'allow_outbound_media':False}
         cases.append('actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights')
         media=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Eingehende LINE-Bilder'))
         assert not wizard.root.getvar(media.cget('variable'))
@@ -101,6 +101,17 @@ def main():
         assert not wizard.root.getvar(media.cget('variable')) and str(media.cget('state'))=='disabled'
         create.invoke();assert str(media.cget('state'))=='normal' and not wizard.root.getvar(media.cget('variable'))
         cases.append('actual_no_create_permission_disables_media_without_restoring_earlier_consent')
+        video=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Eingehende LINE-MP4'))
+        outgoing=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Explizit markierte Ergebnisdateien'))
+        assert not wizard.root.getvar(video.cget('variable')) and not wizard.root.getvar(outgoing.cget('variable'))
+        video.invoke();outgoing.invoke();button('Absender mit ausgewählten Rechten').invoke();settle()
+        assert pairs[-1][1]['allow_video'] is True and pairs[-1][1]['allow_outbound_media'] is True
+        assert not wizard.root.getvar(video.cget('variable')) and not wizard.root.getvar(outgoing.cget('variable'))
+        cases.append('actual_separate_video_and_output_approvals_reach_backend_and_clear_after_submit')
+        video.invoke();outgoing.invoke();fill('Absender-ID','U'+'b'*32)
+        assert not wizard.root.getvar(video.cget('variable')) and not wizard.root.getvar(outgoing.cget('variable'))
+        fill('Absender-ID',sender)
+        cases.append('actual_sender_edit_withdraws_both_new_pending_media_approvals')
         voice=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Eingehende LINE-Sprachnachrichten'))
         assert not wizard.root.getvar(voice.cget('variable'))
         voice.invoke();button('Absender mit ausgewählten Rechten').invoke();settle()

@@ -98,6 +98,13 @@ asyncio.run(run())
         refused=request(65533,'gateway.media.begin',params)
         assert refused['ok'] is False and 'peer is not authorized' in refused['error']
         cases.append('actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger')
+        for method in ['gateway.output.begin','gateway.output.chunk']:
+            refused=request(65533,method,{'delivery':'f'*64,'attempt':1,'path':'/owner/private.png'})
+            assert refused['ok'] is False and 'peer is not authorized' in refused['error']
+        refused=request(65534,'gateway.output.begin',{'delivery':'f'*64,'attempt':1,'path':'/owner/private.png'})
+        assert refused['ok'] is False and 'not currently in flight' in refused['error']
+        cases.append('actual_agent_peer_cannot_request_output_exports_and_gateway_cannot_invent_a_host_path_export')
+
         assert request(65534,'missions.list',{})['ok'] is False
         cases.append('actual_gateway_uid_cannot_gain_owner_methods_through_forged_uid_zero_and_owner_json_fields')
         config['bindings'][0]['allow_media']=False;publish()

@@ -25,7 +25,7 @@ async def call(method: str, params: dict):
     try:
         writer.write(json.dumps({"method": method, "params": params}).encode() + b"\n")
         await writer.drain()
-        line = await asyncio.wait_for(reader.readline(), 15)
+        line = await asyncio.wait_for(reader.readline(), 40 if method=='gateway.output.begin' else 15)
         if len(line) > 131072 or not line.endswith(b"\n"):
             raise ConnectionError("invalid controller response")
         reply = json.loads(line)
@@ -48,7 +48,7 @@ def adapter_envelope(event, platform: str):
         from .gateway_media_relay import event_media
         try:admitted=event_media(event,platform)
         except PermissionError:raise ValueError('attachment and voice admission require a configured media broker') from None
-        if not admitted or getattr(event.message_type,'value',None) not in {'photo','document','voice'}:
+        if not admitted or getattr(event.message_type,'value',None) not in {'photo','document','voice','video'}:
             raise ValueError('media requires a retained private image/document/voice capability')
     elif getattr(event.message_type, "value", None) not in {"text", "command"}:
         raise ValueError("attachment and voice admission require a configured media broker")
@@ -351,10 +351,19 @@ async def serve():
                         result = {"status": "retry", "retry_after": 5}
                     else:
                         metadata=delivery_metadata(delivery,policy.connectors[delivery['connector']]['platform'])
+                        preparing=True
                         try:
+                            if policy.connectors[delivery['connector']]['platform']=='line':
+                                output=await adapter._haos_line_output.prepare(delivery,call)
+                                if output is not None:metadata['haos_output']=output
+                            preparing=False
                             receipt = await asyncio.wait_for(adapter.send(delivery["chat"], delivery["content"], reply_to=delivery["reply_to"], metadata=metadata), 60)
                             from .gateway_delivery import delivery_result
                             result = delivery_result(receipt, redactor)
+                        except (OSError,ConnectionError,TimeoutError):
+                            result = {"status":"retry","retry_after":5,"reason":"media-export-unavailable"} if preparing else {"status":"uncertain"}
+                        except (ValueError,PermissionError,Conflict):
+                            result = {"status":"failed","reason":"media-export-or-format-refused"} if preparing else {"status":"uncertain"}
                         except Exception:
                             result = {"status": "uncertain"}
                     await call("gateway.ack", {"id": delivery["id"], "result": {**result, "attempt": delivery["attempt"]}})
