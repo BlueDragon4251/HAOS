@@ -1,0 +1,63 @@
+{
+  "parent_commit": "5209d247aa69487f9e5773a4886baf9a52298460",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "1e33922c79e00ae3ff92515efdd41f2515d587af399cedf8575e8a37af0f946d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "5fec9685c98a47ae379ed805f9a170591c124e64551acd170516e0f202a6ddcb"
+    },
+    {
+      "path": "docs/GATEWAY-LINE.md",
+      "sha256": "3986e846e039e73602c03cd49444f23e2303f6ef8d960c2e1f3ac0970dd0263a"
+    },
+    {
+      "path": "linux/haos/haos/hermes_artifact.py",
+      "sha256": "3e95ff9202d89572e6241baf8f845d51a2dd4bada497967c8623d74733b57a3b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_artifact_backend.py",
+      "sha256": "5bf9b0115f3fe2e2896f35d96c5af923415dc4fcf517a647647ba20ec3f152d5"
+    },
+    {
+      "path": "linux/haos/tests/test_hermes_artifact.py",
+      "sha256": "bd1960bebf86ab5ea1e832346d55e0c4f5392a4b6a66dc899c1d379365d588b7"
+    }
+  ],
+  "minimal_runtime": {
+    "passed": 1456,
+    "existing_skips": 2,
+    "excluded": "test_backup.py; actual-root mandatory CI unchanged"
+  },
+  "full_frozen_runtime": {
+    "passed": 1456,
+    "existing_skips": 2
+  },
+  "new_http_contract_cases": 14,
+  "actual_backend": {
+    "backend_healthy": true,
+    "backend_version": "0.21.5",
+    "unauthenticated_identity_denied": true,
+    "wrong_token_denied": true,
+    "authenticated_identity_matches_child": true,
+    "runtime_session_created": true,
+    "durable_session_created": true,
+    "actual_session_artifact_bytes": true,
+    "artifact_unknown_session_denied": true,
+    "maximum_eight_mib_byte_read": true,
+    "native_oversized_artifact_denied": true,
+    "limitations": [
+      "providerless API probe; no model turn",
+      "no installed systemd/sandbox proof"
+    ],
+    "persisted_session_is_fixture_not_model_turn": true
+  },
+  "limitations": [
+    "artifact primitive not wired into LINE outgoing delivery",
+    "no model inference, external LINE recipient or installed acceptance",
+    "new CI pending; preceding source 5209d247 all six CI runs green"
+  ]
+}

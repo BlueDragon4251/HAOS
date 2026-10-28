@@ -62,6 +62,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/export_registry.py upstream/hermes-agent "$RUNNER_TEMP/provider-contracts/registry.json"
           cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
           "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/media-native-backend.json"
+          "$PYTHON" linux/haos/runtime/probe_artifact_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/artifact-native-backend.json"
           "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
           "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_discord_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-ingress.json"

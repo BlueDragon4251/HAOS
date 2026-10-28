@@ -132,3 +132,16 @@ withdrawal/change of the sender grant.
 This integration does not claim all 22 gateways, real LINE accounts,
 external message delivery, installed boot, hardware tests or final ISO/container/
 APK release acceptance. No external test messages are sent by these fixtures.
+
+Outbound-media groundwork now includes `haos.hermes_artifact`: bounded byte reads
+from the authenticated literal-loopback Hermes API with a required durable
+session ID. It never opens the supplied path on the controller host, follows
+redirects, uses proxies or retries a request. Reads check the caller's current
+grant callback between bounded socket reads and before returning bytes; responses
+have an 8 MiB decoded limit and a 30-second deadline (5-second socket timeout).
+The primitive does **not** itself authorize an outbound attachment and is not yet
+connected to LINE delivery. Output provenance, owner approval, durable delivery
+and revocable public media serving remain required before that connection.
+`probe_artifact_backend.py` exercises the actual pinned authenticated HTTP API,
+including an exact 8 MiB read, oversized refusal and unknown-session refusal.
+Its persisted session is explicitly a database fixture, not a model turn.
