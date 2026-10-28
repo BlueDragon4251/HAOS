@@ -74,7 +74,7 @@ class Publisher:
                     if not re.fullmatch('smtp_accept_[0-9a-f]{64}',row['receipt']):raise Conflict('damaged SMTP acceptance receipt')
                     return SendResult(success=True,message_id=row['receipt'],raw_response={'recipient_receipt_verified':False})
                 if row['state'] in {'writing','uncertain'}:return SendResult(success=False,raw_response={'haos_delivery':'uncertain'})
-                if row['state']!='rejected' or row['receipt']:raise Conflict('damaged email delivery intent')
+                if row['state'] not in {'rejected','owner-retry-approved'} or row['receipt']:raise Conflict('damaged email delivery intent')
                 if row['attempt']==attempt:return SendResult(success=False,raw_response={'haos_delivery':'refused'})
             pages=self.db.execute('PRAGMA page_count').fetchone()[0]-self.db.execute('PRAGMA freelist_count').fetchone()[0]
             if len(previous)>=5 or self.db.execute('SELECT COUNT(*) FROM email_delivery_intents').fetchone()[0]>=65536 or pages*self.db.execute('PRAGMA page_size').fetchone()[0]>=64*1024*1024:

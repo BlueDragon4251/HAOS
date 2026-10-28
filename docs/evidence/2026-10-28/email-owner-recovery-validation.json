@@ -1,0 +1,91 @@
+{
+  "parent_commit": "21fa7f1bd0208f83408392b3eed3f414bf48d8c0",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "03c0fea3d4538b7d5aee2bde20a80dda409fb5a05648a8bf5606b453968ba54f"
+    },
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "90379e8a2fd87881dbfb0fb58aa77bb3e0daa0cc2feb3bfaf93a7a95d55d16ee"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_cache.py",
+      "sha256": "a6e61c4b822802efd9ff2004ee2ca574d65194c4ce757e4793b892e21b4a359b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_delivery.py",
+      "sha256": "10003e1106ac798d27f841fd3c5f97dff3d9d15b282f120aadf3dfe01cb270fe"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_journal.py",
+      "sha256": "a76041b460bfd760cf54d2a920425a1705e07f95bde0d1630840b92ecef8c73e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_recovery.py",
+      "sha256": "5afc9062f61746a20927ace718ce00e64b682ca2659cb948abc2f4df043be884"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "2ed8d28b50b0b8637893c4b994419484e880ad2379dd789d25f8172d460e431b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "a2ba4a4fd89aed2c13540bc71bd036766618286b61c043e4e9beb68eb9110d5f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "fcb799b7688cf114c154603b9de7fd9e616dcb8fee2d0722de910af380766107"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "d3d4e0a8d7006b75d4262c086754e6719a721ef20a60bbc3be28a1a81de54b5f"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_process.py",
+      "sha256": "806e82b1cdbbb8cd636f7384336d5c2a4a90a64dbafc8b796cd2a92afba15f77"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_recovery_process.py",
+      "sha256": "52bd21fd31c0dac2bf7b01e8d8a70a89179a8dec4cdce33ff6e5a2fa183112d6"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email_cache.py",
+      "sha256": "1d90cd46c92a4259d5fff7d497460747458bebf8ac87483d74c6750e9b6f2330"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email_recovery.py",
+      "sha256": "81669bf539823a45de69339365d9460a6ea2b81826937f571962e305f911c82c"
+    }
+  ],
+  "checks": {
+    "minimal_python311": "1720 passed, 2 existing skips",
+    "full_pinned_runtime": "1720 passed, 2 existing skips",
+    "real_kernel_uid_socket_authority": "89 passed",
+    "private_native_mail_process": "19 passed",
+    "offline_gateway_controller_recovery_process": "6 passed"
+  },
+  "log_sha256": {
+    "email-owner-recovery-minimal.log": "f3c4b619bfc274505b436f807b3db115895e472415ba70fc8cf3cd39b56eed29",
+    "email-owner-recovery-full.log": "f3c4b619bfc274505b436f807b3db115895e472415ba70fc8cf3cd39b56eed29",
+    "email-owner-recovery-kernel.log": "5d40da5ce9a246eb5d52c338446753798614800f5cb62c99b2c86e8ac87e2d52",
+    "email-recovery-native-process.log": "585a27aebdb18f07ea0ac8c50c9db627cebb4e29681585ab10785e99dffae095",
+    "email-owner-recovery-process.log": "4b0dbc41b8d0ae815364c66e088304bfeb969b555f7269aacc3c70d56438f904"
+  },
+  "contracts": [
+    "append-only mailbox scan epochs and stale-journal rejection",
+    "snapshot-checked explicit owner decisions and audit",
+    "pending raw input custody and terminal-only inspected logical BLOB disposal",
+    "uncertain SMTP remains blocked until separate gateway and controller owner decisions",
+    "confirmed SMTP acceptance cannot be released for another write",
+    "real process UID denials without optional SDK imports"
+  ],
+  "limits": [
+    "Email remains publicly disabled pending complete account setup and GUI.",
+    "Loopback mail accounts, owner service control and controller attempt scheduling are fixtures.",
+    "No external email, recipient delivery, installed owner, hardware, ISO, container release or APK acceptance.",
+    "Logical source disposal is not secure erasure of SQLite pages or backups.",
+    "Existing backup test file exclusion unchanged; real kernel checks run separately."
+  ]
+}

@@ -110,6 +110,7 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
                 r'irc_echo_[0-9a-f]{64}' if platform=='irc' else
                 r'line_push_[0-9a-f]{64}' if platform=='line' else
                 r'sms_push_[0-9a-f]{64}' if platform=='sms' else
+                r'smtp_accept_[0-9a-f]{64}' if platform=='email' else
                 r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
             from .gateway_matrix_policy import opaque
             valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)
@@ -140,7 +141,10 @@ def main():
     data = json.loads(raw)
     if not isinstance(data, dict) or set(data) != {"action", "policy", "params"} or not isinstance(data["params"], dict):
         raise ValueError("invalid owner recovery request")
-    policy = GatewayPolicy(data["policy"])
+    if any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
+        from .gateway_email import PreparedEmailPolicy
+        policy=PreparedEmailPolicy(data['policy'])
+    else:policy=GatewayPolicy(data['policy'])
     store = private_store(DATABASE)
     try:
         GatewayEngine(store)

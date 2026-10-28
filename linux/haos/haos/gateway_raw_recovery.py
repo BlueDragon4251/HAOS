@@ -30,7 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
-            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line'} else
+            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line','email'} else
             r'(?:SM|MM)[0-9a-fA-F]{32}' if row['platform']=='sms' else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
@@ -148,7 +148,9 @@ def unresolved(inbox, after=0):
                 raise ValueError('invalid private SMS recovery refusal receipt')
             rejected.append({'platform':'sms',**dict(row)})
     from .gateway_line_recovery import outgoing as line_outgoing
-    return {'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms'),
+    from .gateway_email_recovery import outgoing as email_outgoing,transport as email_transport,mailboxes
+    transport.extend(email_transport(inbox))
+    return {'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -227,14 +229,14 @@ def retry_ntfy_auth(inbox,policy,request):
 
 def _retry_private_auth(inbox,policy,request,platform):
     from .gateway import digest
-    if platform not in {'homeassistant','irc','line','sms'}:raise ValueError('unsupported private authentication recheck')
+    if platform not in {'homeassistant','irc','line','sms','email'}:raise ValueError('unsupported private authentication recheck')
     connector=_recheck_connector(policy,request,platform);changed=0
     table=platform+'_profile_status';events=platform+'_owner_events'
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
         if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
             now=time.time()
-            refused=('authentication-refused','identity-refused') if platform in {'line','sms'} else ('authentication-refused',)
+            refused=('smtp-authentication-refused',) if platform=='email' else ('authentication-refused','identity-refused') if platform in {'line','sms'} else ('authentication-refused',)
             placeholders=','.join('?' for _ in refused)
             changed=inbox.db.execute(f"UPDATE {table} SET status='created',updated_at=?,"
                 "next_attempt=CASE WHEN next_attempt>? THEN next_attempt ELSE 0 END "
@@ -271,6 +273,10 @@ def retry_sms_auth(inbox,policy,request):
     return _retry_private_auth(inbox,policy,request,'sms')
 
 
+def retry_email_auth(inbox,policy,request):
+    return _retry_private_auth(inbox,policy,request,'email')
+
+
 def main():
     account = pwd.getpwnam('haos-gateway')
     if os.geteuid() == 0 or os.geteuid() != account.pw_uid:
@@ -282,19 +288,26 @@ def main():
     data = json.loads(raw)
     if not isinstance(data,dict) or set(data) != {'action','policy','params'} or not isinstance(data['params'],dict):
         raise ValueError('invalid ingress recovery request')
-    policy = GatewayPolicy(data['policy'])
+    if any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
+        from .gateway_email import PreparedEmailPolicy
+        policy=PreparedEmailPolicy(data['policy'])
+    else:policy=GatewayPolicy(data['policy'])
     try:DATABASE.lstat()
     except FileNotFoundError:
         if data['action']=='media-cache' and data['params']=={}:
             print(json.dumps({'uploads':[],'stored_bytes':0,'reserved_bytes':0,'limit_bytes':64*1024*1024,'limit_records':128,'native_journal_created':False}))
+            return
+        if data['action']=='email-sources' and data['params']=={'profile':None}:
+            from .gateway_email_recovery import sources
+            print(json.dumps({**sources(None,policy),'native_journal_created':False}))
             return
         if data['action']=='ingress' and set(data['params'])=={'after'}:
             after=data['params']['after']
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
             print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
             return
-        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
-            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms'}[data['action']]
+        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth'}:
+            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms','retry-email-auth':'email'}[data['action']]
             connector=_recheck_connector(policy,data['params'],platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,
                 'network_requested':False,'native_journal_created':False}))
@@ -315,6 +328,21 @@ def main():
             result=retry_ntfy_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-irc-auth':
             result=retry_irc_auth(inbox,policy,data['params'])
+        elif data['action']=='retry-email-auth':
+            result=retry_email_auth(inbox,policy,data['params'])
+        elif data['action']=='recover-email-mailbox':
+            from .gateway_email_recovery import recover_mailbox
+            result=recover_mailbox(inbox,policy,data['params'])
+        elif data['action']=='email-sources':
+            if set(data['params'])!={'profile'}:raise ValueError('exact private email source selector required')
+            from .gateway_email_recovery import sources
+            result=sources(inbox,policy,data['params']['profile'])
+        elif data['action']=='purge-email-source':
+            from .gateway_email_recovery import purge_source
+            result=purge_source(inbox,policy,data['params'])
+        elif data['action']=='approve-email-retry':
+            from .gateway_email_recovery import approve_retry
+            result=approve_retry(inbox,policy,data['params'])
         elif data['action'] == 'retry-sms-auth':
             result=retry_sms_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-line-auth':

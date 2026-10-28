@@ -182,5 +182,34 @@ shields creation, obtains the real handle, kills and joins the child before
 returning. The parent timeout covers creation and pipe feeding as well as the
 network operation. The worker's kernel parent-death guard remains independent.
 Outgoing TLS/mail accounts and completed mission/session state are fixtures;
-these contracts do not establish external mail delivery. Audited recovery, raw
-source inventory/purge and the full owner setup/GUI remain to be connected.
+these contracts do not establish external mail delivery. The full owner
+account setup and GUI remain to be connected before public activation.
+
+
+Offline recovery now uses the stopped-gateway owner path and a separate
+unprivileged gateway helper. Changed UIDVALIDITY or regressed UIDNEXT requires
+inspection of the exact inventory snapshot and an explicit owner decision.
+Recovery appends a new local scan epoch and atomically switches its pointer;
+old cursors, receipts and decisions remain intact. Stale running journal objects
+refuse further work. The next connection must independently verify server state.
+Authentication rechecks preserve mailbox fences, withdrawn grants and retry
+backoff; they grant no new sender or thread authority.
+
+Source inventory contains bounded metadata and opaque profile identifiers,
+never raw messages or passwords. Explicit inspected source disposal is permitted
+only after a terminal input decision, or for an orphan whose grant was revoked.
+Pending or recoverable inputs remain protected. Disposal leaves immutable
+metadata and an audited tombstone; replay cannot repopulate the old source.
+This is logical removal of the selected live-cache BLOB, not a promise to erase
+SQLite free pages, backups or controller history. No existing owner data was
+deleted during development; these tests use disposable ledgers.
+
+An uncertain SMTP write remains blocked across reconnects and controller
+attempts. Only an inspected owner decision, with independent confirmation of
+non-delivery, can approve a later private attempt. The controller outbox requires
+its own separate reconciliation under the controller UID. Neither decision sends
+mail. Confirmed SMTP acceptance cannot be released this way and does not prove
+recipient delivery. A real gateway-UID loopback test exercises the explicit
+release followed by one new controller attempt, then suppression of its replay.
+A separate network-disabled process test exercises gateway/controller UID
+separation and rejects root and unrelated peer identities without optional SDKs.

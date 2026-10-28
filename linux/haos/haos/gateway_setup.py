@@ -66,7 +66,10 @@ def owner_ingress(args, policy):
     if os.geteuid() != 0:
         raise PermissionError('native ingress recovery requires authenticated owner authority')
     stopped_gateway()
-    GatewayPolicy(policy)
+    if any(row.get('platform')=='email' for row in policy['connectors']):
+        from .gateway_email import PreparedEmailPolicy
+        PreparedEmailPolicy(policy)
+    else:GatewayPolicy(policy)
     params = {'after':args.after} if args.gateway_action == 'ingress' else None
     if args.gateway_action=='media-cache':params={}
     if args.gateway_action=='purge-media-cache':
@@ -76,14 +79,23 @@ def owner_ingress(args, policy):
         references([args.id])
         params={'id':args.id,'owner_uid':int(os.environ.get('SUDO_UID','0')),
             'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest(),'confirmed':True}
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
-        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms'}[args.gateway_action]
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth'}:
+        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms','retry-email-auth':'email'}[args.gateway_action]
         if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
             raise ValueError('select one configured connector for this authentication recheck')
         if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
             raise ValueError('bounded non-secret owner action context required')
         params={'connector':args.connector,'owner_uid':int(os.environ.get('SUDO_UID','0')),
             'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest()}
+    if args.gateway_action=='email-sources':params={'profile':args.profile}
+    if args.gateway_action in {'recover-email-mailbox','purge-email-source','approve-email-retry'}:
+        if (not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000 or args.confirm_inspected is not True):
+            raise PermissionError('explicit inspected email decision and non-secret context required')
+        params={'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest(),
+            'confirmed':True,'snapshot_sha256':args.snapshot_sha256}
+        if args.gateway_action=='recover-email-mailbox':params['identity']=args.identity
+        elif args.gateway_action=='purge-email-source':params.update(profile=args.profile,id=args.id)
+        else:params.update(connector=args.connector,delivery_id=args.delivery_id,attempt=args.attempt,confirmed_not_delivered=args.confirm_not_delivered)
     if params is None:
         if not isinstance(args.note,str) or not 1 <= len(args.note.strip()) <= 2000:
             raise ValueError('bounded non-secret owner inspection evidence required')
@@ -108,12 +120,14 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth'}:
         audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action=='purge-media-cache':
         audit('gateway.media-cache-purged',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action == 'reconcile-ingress':
         audit('gateway.ingress-reconciled',{**value,'note_sha256':params['note_sha256']})
+    if args.gateway_action in {'recover-email-mailbox','purge-email-source','approve-email-retry'}:
+        audit('gateway.'+args.gateway_action,{**value,'note_sha256':params['note_sha256']})
     return value
 
 
@@ -124,7 +138,10 @@ def owner_delivery(args, policy):
         raise PermissionError("outbox reconciliation requires authenticated owner authority")
     stopped_gateway()
     stopped()
-    GatewayPolicy(policy)
+    if any(row.get('platform')=='email' for row in policy['connectors']):
+        from .gateway_email import PreparedEmailPolicy
+        PreparedEmailPolicy(policy)
+    else:GatewayPolicy(policy)
     params = {"after": args.after} if args.gateway_action == "deliveries" else None
     if args.gateway_action=='media-list':params={}
     if args.gateway_action=='purge-media':
@@ -251,7 +268,7 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','media-cache','purge-media-cache'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth','recover-email-mailbox','email-sources','purge-email-source','approve-email-retry','media-cache','purge-media-cache'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":

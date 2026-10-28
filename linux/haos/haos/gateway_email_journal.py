@@ -28,6 +28,18 @@ class Journal:
             reason TEXT NOT NULL,native_id TEXT,PRIMARY KEY(identity,uid_validity,uid))''')
 
         self.db.execute('CREATE TABLE IF NOT EXISTS email_native_scopes (native_id TEXT PRIMARY KEY,connector TEXT NOT NULL,scope TEXT NOT NULL)')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS email_mailbox_current(
+            connector TEXT NOT NULL,scope TEXT NOT NULL,identity TEXT NOT NULL UNIQUE,PRIMARY KEY(connector,scope))''')
+        self.db.execute('INSERT OR IGNORE INTO email_mailbox_current VALUES(?,?,?)',(connector,scope,self.identity))
+        pointer=self.db.execute('SELECT identity FROM email_mailbox_current WHERE connector=? AND scope=?',(connector,scope)).fetchone()
+        if pointer is None or not isinstance(pointer['identity'],str) or not _HASH.fullmatch(pointer['identity']):
+            raise Conflict('private mailbox scan identity is damaged')
+        self.identity=pointer['identity'];owner_current=current
+        def active():
+            owner_current()
+            latest=self.db.execute('SELECT identity FROM email_mailbox_current WHERE connector=? AND scope=?',(connector,scope)).fetchone()
+            if latest is None or latest['identity']!=self.identity:raise PermissionError('mailbox scan was replaced by owner recovery')
+        self.current=active
 
     def remember_capture(self,native_id):
         self.current()
