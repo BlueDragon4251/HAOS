@@ -13,11 +13,12 @@ _EVENT=ContextVar('haos_admitted_media_event',default=None)
 
 
 @contextmanager
-def event_scope(event,ids,types):
+def event_scope(event,ids,types,*,platform='line'):
+    if platform not in {'line','sms'}:raise PermissionError('reviewed retained media platform required')
     ids=references(ids)
     if not ids or event.media_urls!=['haos-media:'+identity for identity in ids] or event.media_types!=types:
         raise PermissionError('native media must match the private retained copy')
-    token=_EVENT.set((event,ids))
+    token=_EVENT.set((event,ids,types,platform))
     try:yield
     finally:_EVENT.reset(token)
 
@@ -25,7 +26,7 @@ def event_scope(event,ids,types):
 def event_media(event,platform):
     proof=_EVENT.get()
     if not event.media_urls:return []
-    if (platform!='line' or proof is None or proof[0] is not event
+    if (platform not in {'line','sms'} or proof is None or proof[0] is not event or proof[3]!=platform
             or event.media_urls!=['haos-media:'+identity for identity in proof[1]]):
         raise PermissionError('no independent retained media admission')
     return list(proof[1])
@@ -43,21 +44,29 @@ class MediaCache:
             binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,descriptor TEXT NOT NULL,
             data BLOB,state TEXT NOT NULL DEFAULT 'cached')''')
 
-    def find(self,policy,connector,envelope):
+    def find(self,policy,connector,envelope,*,retained=False):
         binding=authorize(policy,connector,envelope)
         rows=self.db.execute('SELECT id FROM native_media_cache WHERE connector=? AND envelope_digest=? AND binding_digest=?',
             (connector,digest(envelope),digest(binding))).fetchall()
         if len(rows)>1:raise Conflict('LINE message has conflicting retained media')
-        return self.get(policy,rows[0]['id']) if rows else None
+        return (self.replay(policy,rows[0]['id']) if retained else self.get(policy,rows[0]['id'])) if rows else None
 
-    def check(self,policy,identity):
+    def check(self,policy,identity,*,retained=False):
         row=self.db.execute('SELECT id,connector,envelope_digest,binding_id,binding_digest,descriptor,state FROM native_media_cache WHERE id=?',(identity,)).fetchone()
-        if row is None or row['state']!='cached':raise Conflict('retained media bytes unavailable')
+        if row is None or row['state'] not in ({'cached','transferred'} if retained else {'cached'}):raise Conflict('retained media bytes unavailable')
         binding=policy.current_binding(dict(row));meta=descriptor(json.loads(row['descriptor']))
         if (binding['connector']!=row['connector'] or not approved(binding,meta['kind']) or 'create' not in binding['capabilities']
                 or row['id']!=digest([row['connector'],row['binding_digest'],row['envelope_digest'],meta])):
             raise PermissionError('retained media grant changed')
+        if policy.connectors[row['connector']]['platform']=='line' and meta['kind']=='video' and meta['format']!='mp4':
+            raise PermissionError('existing LINE video consent is restricted to MP4')
         return row
+
+    def replay(self,policy,identity):
+        row=self.check(policy,identity,retained=True)
+        if row['state']=='cached':return self.get(policy,identity)
+        return {'id':row['id'],'descriptor':descriptor(json.loads(row['descriptor'])),'data':None,
+            'envelope_digest':row['envelope_digest'],'connector':row['connector']}
 
     def get(self,policy,identity):
         row=self.check(policy,identity);meta=descriptor(json.loads(row['descriptor']))
@@ -75,6 +84,8 @@ class MediaCache:
 
     def put(self,policy,connector,envelope,data,kind):
         binding=authorize(policy,connector,envelope,kind);meta=describe(data,kind)
+        if policy.connectors[connector]['platform']=='line' and kind=='video' and meta['format']!='mp4':
+            raise PermissionError('existing LINE video consent is restricted to MP4')
         if any(secret.encode('utf-8') in data for secret in self.inbox.redactor.secrets):
             raise PermissionError('private credentials cannot become media input')
         identity=digest([connector,digest(binding),digest(envelope),meta])

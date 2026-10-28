@@ -23,7 +23,7 @@ def descriptor(value):
     if (not isinstance(value,dict) or set(value)!={'kind','format','sha256','size'}
             or not isinstance(value['kind'],str) or not isinstance(value['format'],str)
             or value['kind'] not in {'image','document','voice','video'}
-            or value['format'] not in ({'png','jpeg'} if value['kind']=='image' else {'mp4'} if value['kind']=='video' else {'bin'})
+            or value['format'] not in ({'png','jpeg'} if value['kind']=='image' else {'mp4','3gp','3g2'} if value['kind']=='video' else {'bin'})
             or type(value['size']) is not int or not 1<=value['size']<=MAX_BYTES
             or value['kind']=='image' and value['size']>MAX_IMAGE_BYTES
             or not isinstance(value['sha256'],str) or not _HASH.fullmatch(value['sha256'])):
@@ -41,7 +41,8 @@ def describe(data,kind):
     if kind=='video':
         if len(data)<16 or data[4:8]!=b'ftyp' or int.from_bytes(data[:4],'big') not in range(16,min(len(data),4096)+1):
             raise ValueError('bounded ISO MP4 video bytes required')
-        fmt='mp4'
+        brand=data[8:12].lower()
+        fmt='3gp' if brand.startswith(b'3gp') else '3g2' if brand.startswith(b'3g2') else 'mp4'
     return descriptor({'kind':kind,'format':fmt,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
 
 
@@ -64,7 +65,7 @@ def approved(binding,kind=None):
 def authorize(policy,connector,envelope,kind=None):
     if not isinstance(connector,str):raise ValueError('exact configured media connector required')
     binding=policy.authorize(connector,envelope)
-    if (policy.connectors[connector]['platform']!='line' or not approved(binding,kind)
+    if (policy.connectors[connector]['platform'] not in {'line','sms'} or not approved(binding,kind)
             or 'create' not in binding['capabilities'] or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('explicit current timed media/create grant required')
     if not isinstance(envelope['text'],str) or not 1<=len(envelope['text'].strip())<=32000 or envelope['text'].lstrip().startswith('/'):
@@ -96,11 +97,13 @@ class GatewayMedia:
 
     def _current(self,policy,row):
         binding=policy.current_binding(dict(row));meta=descriptor(json.loads(row['descriptor']))
-        if (policy.connectors.get(row['connector'],{}).get('platform')!='line'
+        if (policy.connectors.get(row['connector'],{}).get('platform') not in {'line','sms'}
                 or binding['connector']!=row['connector']
                 or not approved(binding,meta['kind']) or 'create' not in binding['capabilities']):
             raise PermissionError('media grant withdrawn')
         meta=descriptor(json.loads(row['descriptor']))
+        if policy.connectors[row['connector']]['platform']=='line' and meta['kind']=='video' and meta['format']!='mp4':
+            raise PermissionError('existing LINE video approval is restricted to MP4')
         if (row['id']!=digest([row['connector'],row['binding_digest'],row['envelope_digest'],meta])
                 or type(row['received']) is not int or not 0<=row['received']<=meta['size']):
             raise Conflict('private media declaration damaged')
@@ -110,6 +113,8 @@ class GatewayMedia:
         if not isinstance(params,dict) or set(params)!={'connector','envelope','descriptor'}:raise ValueError('exact media upload declaration required')
         connector=params['connector'];envelope=params['envelope'];meta=descriptor(params['descriptor'])
         binding=authorize(policy,connector,envelope,meta['kind'])
+        if policy.connectors[connector]['platform']=='line' and meta['kind']=='video' and meta['format']!='mp4':
+            raise PermissionError('existing LINE video approval is restricted to MP4')
         identity=digest([connector,digest(binding),digest(envelope),meta])
         with self.store.transaction():
             row=self.db.execute('SELECT * FROM gateway_media_uploads WHERE id=?',(identity,)).fetchone()

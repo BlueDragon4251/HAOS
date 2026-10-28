@@ -53,7 +53,7 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform']=='line' else set())
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms'} else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):
@@ -85,6 +85,9 @@ class GatewayPolicy:
                 validate_binding(binding)
             if connector and connector['platform']=='line':
                 from .gateway_line_ingress import validate_binding
+                validate_binding(binding)
+            if connector and connector['platform']=='sms':
+                from .gateway_sms import validate_binding
                 validate_binding(binding)
             if connector and connector['platform']=='homeassistant':
                 from .gateway_homeassistant_ingress import validate_binding
@@ -167,13 +170,25 @@ class GatewayEngine:
     def _queue(self, route_id: str, key: str, content: str, *, limit=1800):
         content = self.store.redactor.text(content)
         # Bound native platform chunks; each part has a stable durable identity.
+        groups=[content]
+        if limit==1600:
+            from .gateway_outbound import marked
+            try:paths,caption=marked(content)
+            except ValueError:paths,caption=[],content
+            if paths:
+                # Keep full caption text in its own durable text obligations;
+                # media-only obligations reserve room for up to four URLs even
+                # at the maximum accepted DNS hostname length.
+                groups=([caption] if caption else [])+['\n'.join('MEDIA:'+path for path in paths)]
         chunks=[]
-        while content:
-            end=min(limit,len(content))
-            if end<len(content):
-                line=content.rfind('\n',0,end)+1
-                if line and content[line:end].lstrip().startswith('MEDIA:'):end=line
-            chunks.append(content[:end]);content=content[end:]
+        for group in groups:
+            remaining=group
+            while remaining:
+                end=min(limit,len(remaining))
+                if end<len(remaining):
+                    line=remaining.rfind('\n',0,end)+1
+                    if line and remaining[line:end].lstrip().startswith('MEDIA:'):end=line
+                chunks.append(remaining[:end]);remaining=remaining[end:]
         for part, chunk in enumerate(chunks):
             self.store.db.execute("INSERT OR IGNORE INTO gateway_outbox(id,route_id,content) VALUES(?,?,?)",
                                   (digest([route_id, key, part]), route_id, chunk))

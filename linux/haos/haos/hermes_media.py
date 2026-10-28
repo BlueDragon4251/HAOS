@@ -14,6 +14,7 @@ async def attach(connection,session_id,items):
     refs=[]
     for item in items:
         meta=descriptor(item['descriptor']);data=item['data']
+        if meta['kind']=='voice':raise ValueError('raw voice must use isolated transcription, never agent file attachment')
         if describe(data,meta['kind'])!=meta:raise ValueError('mission attachment bytes changed')
         stem='attachment-'+meta['sha256']+'-'+hashlib.sha256(session_id.encode()).hexdigest()[:16]
         extension='jpg' if meta['format']=='jpeg' else meta['format']
@@ -24,7 +25,7 @@ async def attach(connection,session_id,items):
             if not isinstance(result,dict) or result.get('attached') is not True or result.get('bytes')!=len(data):
                 raise ValueError('native image attachment was not acknowledged')
         else:
-            result=await connection.request('file.attach',{'session_id':session_id,'data_url':('data:video/mp4;base64,' if meta['kind']=='video' else 'data:application/octet-stream;base64,')+encoded,'name':name})
+            result=await connection.request('file.attach',{'session_id':session_id,'data_url':('data:'+{'mp4':'video/mp4','3gp':'video/3gpp','3g2':'video/3gpp2'}[meta['format']]+';base64,' if meta['kind']=='video' else 'data:application/octet-stream;base64,')+encoded,'name':name})
             ref=result.get('ref_text') if isinstance(result,dict) else None
             allocated=result.get('name') if isinstance(result,dict) else None
             if (not isinstance(result,dict) or result.get('attached') is not True or result.get('uploaded') is not True

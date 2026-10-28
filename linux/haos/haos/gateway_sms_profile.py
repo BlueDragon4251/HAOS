@@ -1,5 +1,6 @@
 """Prepared private Twilio identity, HTTPS receiver, replay and lifecycle."""
 import asyncio
+import base64
 import fcntl
 import os
 from pathlib import Path
@@ -13,6 +14,9 @@ from .gateway_sms import credentials,scope,snapshot,validate_binding
 from .gateway_sms_ingress import install,capture,dispatch_stored
 from .gateway_sms_rest import Rest,Refused
 
+
+STATES=frozenset({'created','listening-tls','rate-limited','authentication-refused','identity-refused',
+    'transport-unavailable','tls-refused','revoked','closed','disconnected'})
 
 def build(value,*,parent,connector,policy,inbox):
     value=credentials(value);current=policy();authority=snapshot(current,connector,value)
@@ -41,7 +45,8 @@ def build(value,*,parent,connector,policy,inbox):
         from .gateway_matrix_profile import scope as secret_scope
         from .gateway_ingress import durable_adapter
         from .redaction import Redactor
-        inbox.redactor=Redactor([*inbox.redactor.secrets,value['auth_token'],value['tls']['private_key']])
+        basic=base64.b64encode((value['account_sid']+':'+value['auth_token']).encode()).decode()
+        inbox.redactor=Redactor([*inbox.redactor.secrets,value['auth_token'],basic,'Basic '+basic,value['tls']['private_key']])
         values={'TWILIO_ACCOUNT_SID':value['account_sid'],'TWILIO_AUTH_TOKEN':value['auth_token'],
             'TWILIO_PHONE_NUMBER':value['from_number'],'SMS_WEBHOOK_PORT':str(value['port']),
             'SMS_WEBHOOK_HOST':'127.0.0.1','SMS_WEBHOOK_URL':value['tls']['public_url'],
@@ -72,11 +77,12 @@ def application(adapter):
         signatures=request.headers.getall('X-Twilio-Signature',[])
         if len(signatures)!=1:return web.Response(status=403)
         try:
-            raw=await asyncio.wait_for(request.read(),5)
-            await capture(adapter,raw,signatures[0])
+            async with asyncio.timeout(12):
+                raw=await asyncio.wait_for(request.read(),5)
+                await capture(adapter,raw,signatures[0])
         except web.HTTPRequestEntityTooLarge:return web.Response(status=413)
         except Refused as exc:
-            if exc.status in {401,403,429}:
+            if exc.status==429 or exc.status in {401,403} and exc.account_auth:
                 adapter._haos_sms_pause('rate-limited' if exc.status==429 else 'authentication-refused',exc.delay)
             return web.Response(status=503)
         except PermissionError:return web.Response(status=403)
@@ -87,6 +93,7 @@ def application(adapter):
         from plugins.platforms.sms.adapter import _twiml_response
         return _twiml_response()
     app=web.Application(client_max_size=65536);app.router.add_post('/webhooks/twilio',receive)
+    app.router.add_get('/sms/output/{token}',adapter._haos_sms_output.receive)
     return app
 
 
@@ -113,6 +120,9 @@ def _install(adapter,fd,profile,value,authority):
                 or adapter._from_number!=value['from_number'] or adapter._webhook_url!=value['tls']['public_url']):
             raise PermissionError('SMS profile closed or owner identity changed')
     adapter._haos_sms_check=check
+    adapter._haos_sms_profile=profile;adapter._haos_sms_public_url=value['tls']['public_url']
+    from .gateway_line_output import Output
+    adapter._haos_sms_output=Output(adapter,platform='sms')
     from .gateway_sms_delivery import Publisher
     publisher=Publisher(adapter) if any('read' in b['capabilities'] for b in adapter._haos_native.policy().bindings.values() if b['connector']==connector) else None
     adapter._haos_sms_publisher=publisher
@@ -128,15 +138,35 @@ def _install(adapter,fd,profile,value,authority):
         adapter._mark_disconnected();task=asyncio.create_task(pause_work(state,delay));workers.add(task);task.add_done_callback(workers.discard)
     adapter._haos_sms_pause=pause
     async def replay():
+        recovery_at=time.monotonic()+30
         try:
             while True:
                 check();key=adapter._haos_native.inbox.due(connector)
+                if time.monotonic()>=recovery_at:
+                    recovery_at=time.monotonic()+30
+                    try:
+                        from .gateway_sms_recovery import recover
+                        async with asyncio.timeout(30):await recover(adapter)
+                    except asyncio.CancelledError:raise
+                    except Refused as exc:
+                        if exc.status==429 or exc.status in {401,403} and exc.account_auth:
+                            status('rate-limited' if exc.status==429 else 'authentication-refused',exc.delay)
+                            async with lifecycle:await stop()
+                            return
+                    except PermissionError:raise
+                    except Exception:pass  # Persisted page is retried, never advanced on failure.
+
                 if key is not None:
                     try:
                         if publisher is None:await dispatch_stored(adapter,key)
                         else:
                             async with publisher.lock:check();await dispatch_stored(adapter,key)
                     except asyncio.CancelledError:raise
+                    except Refused as exc:
+                        if exc.status==429 or exc.status in {401,403} and exc.account_auth:
+                            status('rate-limited' if exc.status==429 else 'authentication-refused',exc.delay)
+                            async with lifecycle:await stop()
+                            return
                     except PermissionError:raise
                     except Exception:pass  # Retained retry/backoff, never raw errors or text.
                 await asyncio.sleep(.1)
@@ -152,7 +182,9 @@ def _install(adapter,fd,profile,value,authority):
             from .gateway_line_tls import context
             try:tls=context(value['tls'],profile,webhook_path='/webhooks/twilio')
             except Exception:status('tls-refused');return False
-            try:capabilities=await self._haos_sms_rest.verify(check);check()
+            try:
+                capabilities=await self._haos_sms_rest.verify(check);check()
+                self._haos_sms_capabilities=dict(capabilities)
             except Refused as exc:
                 status('authentication-refused' if exc.status in {401,403} else 'rate-limited' if exc.status==429 else 'transport-unavailable',exc.delay);return False
             except PermissionError:
@@ -177,7 +209,7 @@ def _install(adapter,fd,profile,value,authority):
         async with lifecycle:
             current_delivery(self,'sms',chat_id,metadata)()
             binding=self._haos_native.policy().current_binding(metadata['haos_binding'])
-            result=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content)
+            result=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,prepared=metadata.get('haos_output'))
             if result.error_kind=='forbidden':status('authentication-refused');await stop()
             elif result.error_kind=='rate_limited':status('rate-limited',result.retry_after);await stop()
             return result

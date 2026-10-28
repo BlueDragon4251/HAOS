@@ -30,7 +30,7 @@ def main():
     from webhook_tls_fixture import create
     cases=[]
     async def exercise(root):
-        from aiohttp import web,ClientSession,TCPConnector
+        from aiohttp import web,ClientSession,TCPConnector,DummyCookieJar
         os.environ.update(HERMES_HOME=str(root/'hermes'),HERMES_SAFE_MODE='1')
         tls=create(root,'sms.fixture.invalid');os.environ['SSL_CERT_FILE']=str(root/'ca.pem')
         trusted=ssl.create_default_context();assert trusted.check_hostname and trusted.verify_mode==ssl.CERT_REQUIRED
@@ -47,7 +47,7 @@ def main():
         policy=lambda:PreparedSMSPolicy(config)
         profiles=root/'profiles';profiles.mkdir(mode=0o700)
         inbox=NativeInbox(root/'native.db',Redactor());relay=RelayInbox(root/'relay.db',Redactor());accepted=[];lookups=[];pushes=[]
-        messages={};mode=['success'];delivery=['e'*64]
+        messages={};resources={};downloads=[];recovery_rows=[];recovery_next=[None];mode=['success'];delivery=['e'*64]
         auth='Basic '+base64.b64encode((value['account_sid']+':'+value['auth_token']).encode()).decode()
         async def account(request):
             assert request.headers['Authorization']==auth;lookups.append('account')
@@ -58,9 +58,34 @@ def main():
         async def message(request):
             assert request.headers['Authorization']==auth;sid=request.match_info['message'];lookups.append(sid)
             item=messages[sid];body=item['Body'] if mode[0]!='mismatch' else 'different body'
-            stamp=time.time()-3600 if mode[0]=='old' else time.time()
+            stamp=time.time()-3600 if mode[0]=='old' else item.get('__created',time.time())
             return web.json_response({'sid':sid,'account_sid':value['account_sid'],'from':item['From'],'to':item['To'],
-                'body':body,'direction':'inbound','status':'received','num_media':'0','date_created':formatdate(stamp,usegmt=True)})
+                'body':body,'direction':'inbound','status':'received','num_media':item.get('NumMedia','0'),'date_created':formatdate(stamp,usegmt=True)})
+        async def message_list(request):
+            assert request.headers['Authorization']==auth
+            assert request.query['From']==sender and request.query['To']==value['from_number'] and request.query['PageSize']=='10'
+            return web.json_response({'messages':recovery_rows,'next_page_uri':recovery_next[0]})
+        async def media_list(request):
+            assert request.headers['Authorization']==auth
+            sid=request.match_info['message'];lookups.append('media:'+sid)
+            return web.json_response({'media_list':[{'sid':item['id'],'parent_sid':sid,'account_sid':value['account_sid'],
+                'content_type':item['mime']} for item in resources[sid]],'next_page_uri':None})
+        async def media_bytes(request):
+            assert request.headers['Authorization']==auth
+            item=next(item for items in resources.values() for item in items if item['id']==request.match_info['media'])
+            downloads.append(('api',item['id']))
+            if mode[0]=='foreign-cdn':return web.Response(status=307,headers={'Location':'http://127.0.0.1/private-owner'})
+            if mode[0]=='cdn':return web.Response(status=307,headers={'Location':'https://mms.twiliocdn.com/cdn/'+item['id'],'Set-Cookie':'private=never-forward'})
+            if mode[0]=='encoded':return web.Response(body=b'not-gzip',headers={'Content-Encoding':'gzip'})
+            if mode[0]=='oversized':return web.Response(body=b'x'*500001)
+            if mode[0]=='partial':
+                response=web.StreamResponse(headers={'Content-Length':str(len(item['data']))});await response.prepare(request)
+                await response.write(item['data'][:5]);request.transport.close();return response
+            return web.Response(body=item['data'],headers={'Content-Type':item['mime'],'Content-Disposition':'attachment; filename="../../owner-private"'})
+        async def cdn_bytes(request):
+            assert 'Authorization' not in request.headers and 'Cookie' not in request.headers
+            item=next(item for items in resources.values() for item in items if item['id']==request.match_info['media'])
+            downloads.append(('cdn',item['id']));return web.Response(body=item['data'],headers={'Content-Type':item['mime']})
         async def push(request):
             assert request.headers['Authorization']==auth
             body=dict(await request.post());pushes.append(body)
@@ -74,19 +99,28 @@ def main():
             return web.json_response({'userId':line_destination})
         app=web.Application();app.router.add_get('/line-info',line_info);app.router.add_get('/accounts/{account}.json',account)
         app.router.add_get('/accounts/{account}/IncomingPhoneNumbers.json',phones)
+        app.router.add_get('/accounts/{account}/Messages.json',message_list)
         app.router.add_get('/accounts/{account}/Messages/{message}.json',message)
+        app.router.add_get('/accounts/{account}/Messages/{message}/Media.json',media_list)
+        app.router.add_get('/accounts/{account}/Messages/{message}/Media/{media}',media_bytes)
+        app.router.add_get('/cdn/{media}',cdn_bytes)
         app.router.add_post('/accounts/{account}/Messages.json',push)
         runner=web.AppRunner(app,access_log=None);await runner.setup();site=web.TCPSite(runner,'127.0.0.1',0,ssl_context=context);await site.start()
         origin='https://localhost:'+str(site._server.sockets[0].getsockname()[1])
-        adapter=build(value,parent=profiles,connector='sms',policy=policy,inbox=inbox)
-        adapter._haos_sms_rest._fixture_origin=origin+'/accounts/'
-        adapter._haos_sms_rest.client=ClientSession(connector=TCPConnector(ssl=trusted),trust_env=False)
-        adapter._haos_sms_rest.client._retry_connection=False
-        publisher=adapter._haos_sms_publisher;publisher._target=origin+'/accounts/'+value['account_sid']+'/Messages.json'
-        publisher.client=ClientSession(connector=TCPConnector(ssl=trusted),trust_env=False);publisher.client._retry_connection=False
+        from haos.gateway_media_relay import event_media,forward
         def receive(event):
-            env=adapter_envelope(event,'sms');relay.admit(policy(),'sms',env);accepted.append(event);return True
-        adapter.set_durable_message_handler(receive)
+            env=adapter_envelope(event,'sms');relay.admit(policy(),'sms',env,media=event_media(event,'sms'));accepted.append(event);return True
+        def create_sms():
+            result=build(value,parent=profiles,connector='sms',policy=policy,inbox=inbox)
+            result._haos_sms_rest._fixture_origin=origin+'/accounts/'
+            result._haos_sms_rest._cdn_fixture_origin=origin
+            result._haos_sms_rest.client=ClientSession(connector=TCPConnector(ssl=trusted),trust_env=False,cookie_jar=DummyCookieJar())
+            result._haos_sms_rest.client._retry_connection=False
+            result._haos_sms_publisher._target=origin+'/accounts/'+value['account_sid']+'/Messages.json'
+            result._haos_sms_publisher.client=ClientSession(connector=TCPConnector(ssl=trusted),trust_env=False,cookie_jar=DummyCookieJar())
+            result._haos_sms_publisher.client._retry_connection=False
+            result.set_durable_message_handler(receive);return result
+        adapter=create_sms();publisher=adapter._haos_sms_publisher
         from haos.gateway_line_profile import build as build_line
         line_value={'channel_secret':'c'*32,'channel_access_token':'private-shared-line-token','destination':line_destination,
             'port':port,'tls':{**tls,'public_url':tls['public_url'].replace('/webhooks/twilio','/line/webhook')}}
@@ -103,11 +137,15 @@ def main():
             async with asyncio.timeout(5):
                 while not predicate():await asyncio.sleep(.01)
         counter=[0]
-        async def post(client,*,who=sender,body='A real local SMS mission',valid=True,extra=None):
+        async def post(client,*,who=sender,body='A real local SMS mission',valid=True,extra=None,assets=None):
             counter[0]+=1;sid='SM'+f'{counter[0]:032x}'
             fields={'AccountSid':value['account_sid'],'MessageSid':sid,'From':who,'To':value['from_number'],'Body':body,'NumMedia':'0'}
+            if assets is not None:
+                fields['NumMedia']=str(len(assets))
+                resources[sid]=[{'id':'ME'+f'{counter[0]*10+index:032x}','mime':mime,'data':data} for index,(data,mime) in enumerate(assets)]
+                for index in range(len(assets)):fields['MediaUrl'+str(index)]='http://127.0.0.1/never-trust-this-remote-url'
             if extra:fields.update(extra)
-            messages[sid]=dict(fields)
+            messages[sid]={**fields,'__created':time.time()}
             raw=urlencode(fields).encode();signed=value['tls']['public_url']+''.join(key+fields[key] for key in sorted(fields))
             signature=base64.b64encode(hmac.new(value['auth_token'].encode(),signed.encode(),hashlib.sha1).digest()).decode() if valid else 'A'*27+'='
             async with client.post(f'https://localhost:{port}/webhooks/twilio',data=raw,
@@ -166,6 +204,108 @@ def main():
                         else:raise AssertionError('old SMS admitted under a new grant')
                     cases.append('authenticated_provider_'+scenario+'_cannot_create_mission')
                 mode[0]='success'
+                from io import BytesIO
+                from PIL import Image
+                import av,wave
+                image=BytesIO();Image.new('RGB',(4,4),(20,40,60)).save(image,format='PNG');png=image.getvalue()
+                wav=BytesIO()
+                with wave.open(wav,'wb') as audio:
+                    audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(16000);audio.writeframes(b'\0\0'*16000)
+                movie=BytesIO()
+                with av.open(movie,'w',format='3gp') as output:
+                    stream=output.add_stream('mpeg4',rate=5);stream.width=16;stream.height=16;stream.pix_fmt='yuv420p'
+                    frame=av.VideoFrame(16,16,'yuv420p')
+                    for plane in frame.planes:plane.update(bytes([70])*plane.buffer_size)
+                    for packet in stream.encode(frame):output.mux(packet)
+                    for packet in stream.encode(None):output.mux(packet)
+                before=len(lookups);ignored=await post(client,body='',assets=[(png,'image/png')])
+                assert ignored[0]==200 and len(lookups)==before and not downloads
+                cases.append('signed_mms_without_separate_media_consent_performs_no_private_lookup_or_download')
+                await adapter.close_profile()
+                config['bindings'][0].update(allow_media=True,allow_voice=True,allow_video=True,generation='7'*64,since=int(time.time()*1000))
+                adapter=create_sms();publisher=adapter._haos_sms_publisher;assert await adapter.connect()
+                async with client.post(f'https://localhost:{port}/webhooks/twilio',data=ignored[2],headers={'Content-Type':'application/x-www-form-urlencoded','X-Twilio-Signature':ignored[3]}) as response:assert response.status==403
+                cases.append('previously_ignored_old_mms_cannot_gain_authority_from_a_fresh_owner_grant')
+                await asyncio.sleep(1.05)  # Provider timestamps have one-second precision.
+                before=len(accepted)
+                files=[(png,'image/png'),(b'private document fixture','application/pdf'),(wav.getvalue(),'audio/wav'),(movie.getvalue(),'video/3gpp')]
+                from haos import gateway_sms_media
+                original_download=gateway_sms_media.download;decode_errors=[]
+                async def observed_download(*args):
+                    try:return await original_download(*args)
+                    except Exception as error:decode_errors.append(type(error).__name__+': '+str(error));raise
+                gateway_sms_media.download=observed_download
+                mode[0]='cdn';status,media_sid,*_=await post(client,body='',assets=files)
+                assert status==200
+                try:await until(lambda:len(accepted)==before+1 or decode_errors)
+                except TimeoutError:
+                    print({'diagnostic':adapter.native_health(),'inbox':[(r['platform'],r['state'],r['attempt']) for r in inbox.db.execute('SELECT platform,state,attempt FROM native_inbox')],'downloads':downloads,'lookup_count':len(lookups)},flush=True)
+                    raise
+                finally:gateway_sms_media.download=original_download
+                assert not decode_errors,decode_errors
+
+                current=relay.next(policy())
+                # Earlier text receipts are not the media obligation under test.
+                while current and current['envelope']['message_id']!=media_sid:
+                    relay.admitted(current['id'],'00000000-0000-4000-8000-000000000001');current=relay.next(policy())
+                assert current and len(current['media'])==4
+                from haos.gateway_media_relay import MediaCache
+                cache=MediaCache(inbox)
+                received=[cache.get(policy(),identity) for identity in current['media']]
+                assert [item['data'] for item in received]==[data for data,mime in files]
+                assert [item['descriptor']['kind'] for item in received]==['image','document','voice','video']
+                assert received[-1]['descriptor']['format']=='3gp'
+                assert all(url.startswith('haos-media:') for url in accepted[-1].media_urls)
+                assert len([x for x in downloads if x[0]=='cdn'])==4
+                cases.append('actual_mms_empty_body_native_decoder_and_four_private_media_kinds_with_no_remote_paths')
+                cases.append('verified_official_cdn_redirect_never_forwards_account_auth_or_cookies')
+                from haos.controller import Controller
+                from haos.store import MissionStore
+                store=MissionStore(root/'controller.db');controller=Controller(store,'unused-local-fixture',set());controller.gateway_policy=policy
+                async def bridge(method,params):return await controller.gateway_dispatch({'method':method,'params':params})
+                try:
+                    admitted=await forward(policy,'sms',current['envelope'],current['media'],cache,bridge)
+                    assert [item['data'] for item in controller.gateway.media.for_mission(policy(),admitted['mission_id'])]==[data for data,mime in files]
+                    relay.admitted(current['id'],admitted['mission_id']);cache.transferred(current['media'])
+                    cases.append('actual_controller_chunked_mms_admission_preserves_image_document_voice_and_3gp_bytes')
+                finally:store.close()
+                first_resource=resources[media_sid][0]
+                from haos.gateway_sms_media import metadata as media_metadata
+                checked=media_metadata({'sid':first_resource['id'],'account_sid':value['account_sid'],'parent_sid':media_sid,'content_type':'image/png'},value['account_sid'],media_sid)
+                mode[0]='foreign-cdn';before_cdn=len([x for x in downloads if x[0]=='cdn'])
+                try:await adapter._haos_sms_rest.content(media_sid,checked,lambda:None)
+                except __import__('haos.gateway_sms_rest',fromlist=['Refused']).Refused:pass
+                else:raise AssertionError('foreign MMS redirect accepted')
+                assert len([x for x in downloads if x[0]=='cdn'])==before_cdn
+                cases.append('foreign_or_plaintext_mms_redirect_is_refused_without_a_second_request')
+                bounded={**checked,'mime':'audio/wav','kind':'voice'}
+                for failure in ['encoded','oversized','partial']:
+                    mode[0]=failure
+                    try:await adapter._haos_sms_rest.content(media_sid,bounded,lambda:None)
+                    except (__import__('haos.gateway_sms_rest',fromlist=['Refused']).Refused,__import__('aiohttp').ClientError):pass
+                    else:raise AssertionError('unbounded or incomplete MMS bytes accepted: '+failure)
+                    cases.append('mms_'+failure+'_content_is_refused_without_partial_admission')
+                mode[0]='success'
+            from haos.gateway_sms_recovery import recover
+            missed='SM'+'e'*32
+            fields={'AccountSid':value['account_sid'],'MessageSid':missed,'From':sender,'To':value['from_number'],
+                'Body':'Recovered without a webhook','NumMedia':'0','__created':time.time()}
+            messages[missed]=fields
+            recovery_rows.append({'sid':missed,'account_sid':value['account_sid'],'from':sender,'to':value['from_number'],
+                'body':fields['Body'],'direction':'inbound','status':'received','num_media':'0','date_created':formatdate(fields['__created'],usegmt=True)})
+            before=len(accepted);await recover(adapter);await until(lambda:len(accepted)==before+1)
+            retained=inbox.db.execute('SELECT origin FROM sms_input_origins WHERE identity=?',(inbox.key('sms',adapter_envelope(accepted[-1],'sms')),)).fetchone()
+            assert retained['origin']=='authenticated-api-recovery'
+            cases.append('missed_webhook_is_recovered_from_authenticated_filtered_api_and_actual_native_decoder_with_explicit_origin')
+            await recover(adapter);await asyncio.sleep(.1);assert len(accepted)==before+1
+            cases.append('repeated_recovery_sweep_deduplicates_the_same_provider_message')
+            recovery_next[0]='https://foreign.invalid/private-owner'
+            try:await recover(adapter)
+            except PermissionError:pass
+            else:raise AssertionError('foreign recovery page accepted')
+            assert inbox.db.execute('SELECT continuation FROM sms_recovery_pages').fetchone()[0] is None
+            recovery_next[0]=None
+            cases.append('foreign_provider_pagination_is_refused_without_advancing_durable_recovery_cursor')
             binding=copy.deepcopy(config['bindings'][0]);metadata={'haos_scope':binding['scope'],
                 'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},'haos_delivery_id':delivery[0],'haos_delivery_attempt':1}
             result=await adapter.send(sender,'**Actual SMS** reply',metadata=metadata)

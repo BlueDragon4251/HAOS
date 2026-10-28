@@ -41,6 +41,7 @@ def test_context_proof_cannot_be_forged_by_uri_or_a_copied_event(cache):
         assert event_media(native,'line')==[item['id']]
         with pytest.raises(PermissionError):event_media(copy.copy(native),'line')
         with pytest.raises(PermissionError):event_media(native,'telegram')
+        with pytest.raises(PermissionError):event_media(native,'sms')
     with pytest.raises(PermissionError):event_media(native,'line')
 
 
@@ -141,3 +142,15 @@ def test_cache_owner_audit_failure_rolls_back_payload_removal(cache):
     with pytest.raises(sqlite3.IntegrityError):media.owner_purge(GatewayPolicy(changed),{'id':item['id'],'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True})
     assert media.get(policy,item['id'])['data']==b'retain on audit failure'
     assert inbox.db.execute('SELECT COUNT(*) FROM native_media_owner_events').fetchone()[0]==0
+
+
+def test_compacted_metadata_can_finish_retained_native_replay_without_recreating_bytes(cache):
+    inbox,media,policy,event=cache
+    item=media.put(policy,'line',event,b'private original document','document')
+    media.transferred([item['id']])
+    with pytest.raises(Conflict):media.get(policy,item['id'])
+    replay=media.replay(policy,item['id'])
+    assert replay['data'] is None and replay['descriptor']==item['descriptor']
+    assert media.find(policy,'line',event,retained=True)['id']==item['id']
+    changed=config();changed['bindings'][0]['generation']='f'*64
+    with pytest.raises(PermissionError):media.replay(GatewayPolicy(changed),item['id'])

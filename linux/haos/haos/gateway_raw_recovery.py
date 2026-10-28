@@ -30,7 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
-            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line'} else
+            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line','sms'} else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
@@ -120,8 +120,17 @@ def unresolved(inbox, after=0):
                         or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
                 raise ValueError('invalid private LINE profile inspection metadata')
             transport.append({**dict(row),'platform':'line','external_tls_ingress_verified':False})
+    if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sms_profile_status'").fetchone():
+        from .gateway_sms_profile import STATES as sms_states
+        import math
+        for row in inbox.db.execute('SELECT connector,status,updated_at,next_attempt FROM sms_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            if (not isinstance(row['connector'],str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in sms_states or any(type(row[key]) not in {int,float}
+                        or not math.isfinite(row[key]) or row[key]<0 for key in ('updated_at','next_attempt'))):
+                raise ValueError('invalid private SMS profile inspection metadata')
+            transport.append({**dict(row),'platform':'sms','external_tls_ingress_verified':False})
     from .gateway_line_recovery import outgoing as line_outgoing
-    return {'ingress':result,'history':history,'transport':transport,'native_outgoing':outgoing(inbox)+line_outgoing(inbox),
+    return {'ingress':result,'history':history,'transport':transport,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms'),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -200,14 +209,14 @@ def retry_ntfy_auth(inbox,policy,request):
 
 def _retry_private_auth(inbox,policy,request,platform):
     from .gateway import digest
-    if platform not in {'homeassistant','irc','line'}:raise ValueError('unsupported private authentication recheck')
+    if platform not in {'homeassistant','irc','line','sms'}:raise ValueError('unsupported private authentication recheck')
     connector=_recheck_connector(policy,request,platform);changed=0
     table=platform+'_profile_status';events=platform+'_owner_events'
     inbox.db.execute('BEGIN IMMEDIATE')
     try:
         if inbox.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
             now=time.time()
-            refused=('authentication-refused','identity-refused') if platform=='line' else ('authentication-refused',)
+            refused=('authentication-refused','identity-refused') if platform in {'line','sms'} else ('authentication-refused',)
             placeholders=','.join('?' for _ in refused)
             changed=inbox.db.execute(f"UPDATE {table} SET status='created',updated_at=?,"
                 "next_attempt=CASE WHEN next_attempt>? THEN next_attempt ELSE 0 END "
@@ -240,6 +249,10 @@ def retry_line_auth(inbox,policy,request):
     return _retry_private_auth(inbox,policy,request,'line')
 
 
+def retry_sms_auth(inbox,policy,request):
+    return _retry_private_auth(inbox,policy,request,'sms')
+
+
 def main():
     account = pwd.getpwnam('haos-gateway')
     if os.geteuid() == 0 or os.geteuid() != account.pw_uid:
@@ -262,8 +275,8 @@ def main():
             if type(after) is not int or after<0:raise ValueError('invalid ingress cursor')
             print(json.dumps({'ingress':[],'history':[],'next_cursor':after,'native_journal_created':False}))
             return
-        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
-            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line'}[data['action']]
+        if data['action'] in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
+            platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms'}[data['action']]
             connector=_recheck_connector(policy,data['params'],platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,
                 'network_requested':False,'native_journal_created':False}))
@@ -284,6 +297,8 @@ def main():
             result=retry_ntfy_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-irc-auth':
             result=retry_irc_auth(inbox,policy,data['params'])
+        elif data['action'] == 'retry-sms-auth':
+            result=retry_sms_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-line-auth':
             result=retry_line_auth(inbox,policy,data['params'])
         elif data['action'] == 'retry-homeassistant-auth':

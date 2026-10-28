@@ -2,7 +2,7 @@
 
 This is not a public HAOS gateway setup path yet. The ordinary policy/menu still
 rejects SMS. `PreparedSMSPolicy` and the explicit private factory let the actual
-pinned Hermes adapter be tested while media, owner setup and recovery are finished.
+pinned Hermes adapter be tested while owner setup and recovery integration are finished.
 No external SMS, account authentication, charges or recipient acceptance are
 claimed by the local fixtures.
 
@@ -47,7 +47,39 @@ endpoints are explicit disposable fixtures. `test_gateway_sms.py` also runs with
 no Hermes source in PYTHONPATH. Current source-bound evidence is in
 `docs/evidence/2026-10-28/sms-prepared-transport-validation.json`.
 
-Remaining work before public setup: separately approved MMS/media paths, actual
+Prepared MMS now supports separately approved private PNG/JPEG images, bounded
+documents, audio and MP4/3GP video. Empty-body MMS uses the actual native decoder
+only after original signature, private resource and current grant checks. URLs
+from webhooks are never fetched. Media is read from exact authenticated parent/SID
+resources; one HTTPS redirect to the reviewed Twilio CDN hosts is allowed without
+forwarding account credentials or cookies. Partial, encoded and oversized responses
+are refused. Audio remains private for transcription and is never attached raw to
+the model. The SMS-specific voice composition proof is still open.
+
+Outgoing completed-session artifacts use the same bounded controller export and
+grant-bound HTTPS capability service as LINE. The actual pinned native SMS sender
+adds only checked MediaUrl fields for supported MMS; other files and SMS-only
+numbers receive expiring download links. Revocation immediately blocks downloads.
+`probe_sms_output.py` exercises the actual authenticated Hermes backend, completed
+fixture session, controller export, native sender and HTTPS file reads. It does
+not run model inference or contact an external Twilio account.
+
+A private filtered message-list sweep recovers missed webhooks, one bounded page
+per current sender grant every 30 seconds. Pagination stays within the exact
+account resource and unchanged sender/receiver/date filters. A persisted cursor
+advances only after durable admission; every recovered message is independently
+verified against its exact private resource and grant epoch. Admission records
+explicitly distinguish authenticated API recovery from a signed webhook. Repeated
+sweeps reuse the message SID instead of creating another mission. Offline private
+auth recheck and receipt inspection are implemented internally; they preserve rate
+limits, revoked grants and ambiguous writes, with owner audit context.
+
+The public protocol reference used for media limits, message timestamps, resource
+identities and filtered pagination is `twilio/twilio-oai` commit
+`d9775142962ea67d5f3d50c5021a23ae6d330c5b`,
+`spec/json/twilio_api_v2010.json`. This is API-schema evidence, not live acceptance.
+
+Remaining work before public setup: actual
 owner CLI and GUI, service lifecycle/recovery inspection and decisions, full
 negative/reconnect/crash/UID proofs and current CI. Provider accounts and recipient
 handsets are only needed for the later real acceptance, not this implementation.

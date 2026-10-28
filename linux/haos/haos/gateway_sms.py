@@ -41,6 +41,12 @@ def validate_binding(binding,*,require_epoch=False):
             or not re.fullmatch(r'AC[0-9a-fA-F]{32}:\+[1-9][0-9]{7,14}',binding['scope'])
             or binding['scope'].split(':',1)[1]==binding['sender']):
         raise ValueError('SMS requires exact distinct sender/receiver E.164 numbers, account scope and no thread')
+    for approval in ['allow_media','allow_voice','allow_video']:
+        if approval in binding and (type(binding[approval]) is not bool or binding[approval] and 'create' not in binding['capabilities']):
+            raise ValueError('SMS media needs separate boolean consent and mission-create rights')
+    if 'allow_outbound_media' in binding and (type(binding['allow_outbound_media']) is not bool
+            or binding['allow_outbound_media'] and 'read' not in binding['capabilities']):
+        raise ValueError('SMS output files need separate boolean consent and read rights')
     if require_epoch and (not binding.get('generation') or type(binding.get('since')) is not int):
         raise ValueError('SMS requires an explicit timed owner grant')
 
@@ -72,9 +78,14 @@ def envelope(values,value):
         raise ValueError('complete Twilio message identity required')
     if (values['AccountSid']!=value['account_sid'] or not MESSAGE.fullmatch(values['MessageSid'])
             or values['To']!=value['from_number'] or not PHONE.fullmatch(values['From'])
-            or values['From']==values['To'] or not 1<=len(values['Body'].strip())<=1600):
+            or values['From']==values['To'] or len(values['Body'].strip())>1600):
         raise ValueError('exact Twilio account, sender, receiver and bounded text required')
-    if values.get('NumMedia','0')!='0' or any(key.startswith('MediaUrl') for key in values):
-        raise ValueError('SMS media requires its separate reviewed transport')
+    count=values.get('NumMedia','0')
+    if (not re.fullmatch('[0-4]',count) or count=='0' and (not values['Body'].strip()
+            or any(key.startswith('MediaUrl') for key in values))):
+        raise ValueError('bounded SMS text or up to four MMS attachments required')
+    text=values['Body'].strip()
+    if count!='0':
+        text='Process the approved SMS attachments (message '+values['MessageSid']+'; metadata '+digest([values['MessageSid'],count,text])+').'+(' Caption: '+text if text else '')
     return {'platform':'sms','sender':values['From'],'chat':values['From'],'scope':scope(value),'thread':'',
-        'message_id':values['MessageSid'],'is_bot':False,'text':values['Body'].strip()}
+        'message_id':values['MessageSid'],'is_bot':False,'text':text}

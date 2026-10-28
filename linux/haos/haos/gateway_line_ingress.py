@@ -191,7 +191,7 @@ def install(adapter):
             policy=self._haos_native.policy();policy.current_binding(row)
             authorize(policy,self._haos_native.connector,row['envelope'],kind)
             return policy
-        cache=self._haos_media_cache;policy=current();item=cache.find(policy,self._haos_native.connector,row['envelope'])
+        cache=self._haos_media_cache;policy=current();item=cache.find(policy,self._haos_native.connector,row['envelope'],retained=True)
         if item is None:
             cache.capacity()
             data=await self._haos_line_content.fetch(message_id,kind,current)

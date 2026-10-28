@@ -44,8 +44,31 @@ def mp4_duration(data):
     return duration
 
 
+def sms_kind(data,suffix,as_document=False):
+    """Native MMS types within pinned Twilio byte limits, otherwise a real link."""
+    mime={'.pdf':'application/pdf','.txt':'text/plain','.md':'text/plain','.json':'application/json',
+        '.csv':'text/csv','.zip':'application/zip','.flac':'audio/flac','.ogg':'audio/ogg','.opus':'audio/ogg',
+        '.mp3':'audio/mpeg','.wav':'audio/wav','.m4a':'audio/mp4','.mp4':'video/mp4','.3gp':'video/3gpp',
+        '.3g2':'video/3gpp2','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif'}.get(suffix,'application/octet-stream')
+    if not as_document and suffix in {'.png','.jpg','.jpeg'}:
+        fmt=describe(data,'image')['format']
+        if len(data)<=1024*1024:return 'image','image/'+fmt
+    if not as_document and suffix=='.gif' and data.startswith((b'GIF87a',b'GIF89a')) and len(data)<=1024*1024:
+        return 'image','image/gif'
+    if not as_document and len(data)<=500_000:
+        if suffix in {'.mp4','.3gp','.3g2'}:
+            fmt=describe(data,'video')['format'];return 'video',{'mp4':'video/mp4','3gp':'video/3gpp','3g2':'video/3gpp2'}[fmt]
+        if (suffix=='.mp3' and (data.startswith(b'ID3') or len(data)>1 and data[0]==255 and data[1]&224==224)
+                or suffix=='.wav' and data.startswith(b'RIFF') and data[8:12]==b'WAVE'
+                or suffix=='.m4a' and len(data)>12 and data[4:8]==b'ftyp'):
+            return 'audio',mime
+    return 'document',mime
+
+
 class Output:
-    def __init__(self,adapter):
+    def __init__(self,adapter,*,platform='line'):
+        if platform not in {'line','sms'}:raise PermissionError('reviewed output transport required')
+        self.platform=platform
         self.adapter=adapter;self.db=adapter._haos_native.inbox.db;self.readers=asyncio.Semaphore(4)
         self.db.execute('''CREATE TABLE IF NOT EXISTS line_output_media(
             id TEXT PRIMARY KEY,delivery_id TEXT NOT NULL,binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,
@@ -53,9 +76,10 @@ class Output:
             data BLOB NOT NULL,token TEXT NOT NULL UNIQUE,expires REAL NOT NULL)''')
 
     def current(self,row):
-        if getattr(self.adapter,'_haos_line_closed',False):raise PermissionError('LINE profile closed')
-        if hasattr(self.adapter,'_haos_line_profile') and not self.adapter.is_connected:raise PermissionError('connected LINE identity required')
-        binding=approved(self.adapter._haos_native.policy(),row)
+        if getattr(self.adapter,'_haos_'+self.platform+'_closed',False):raise PermissionError('LINE profile closed')
+        if hasattr(self.adapter,'_haos_'+self.platform+'_profile') and not self.adapter.is_connected:raise PermissionError('connected LINE identity required')
+        policy=self.adapter._haos_native.policy();binding=approved(policy,row)
+        if policy.connectors[binding['connector']]['platform']!=self.platform:raise PermissionError('output transport changed')
         if binding['connector']!=self.adapter._haos_native.connector:raise PermissionError('output connector changed')
         return binding
 
@@ -83,9 +107,10 @@ class Output:
     def url(self,item):
         # Profile configuration already verifies TLS hostname/publication. Keep
         # URLs under its exact HTTPS origin; no user-supplied artifact URL.
-        base=self.adapter._haos_line_public_url.removesuffix('/line/webhook')
+        suffix='/line/webhook' if self.platform=='line' else '/webhooks/twilio'
+        base=getattr(self.adapter,'_haos_'+self.platform+'_public_url').removesuffix(suffix)
         if not base.startswith('https://'):raise PermissionError('public HTTPS LINE origin required')
-        return base+'/line/output/'+item['token']
+        return base+'/'+self.platform+'/output/'+item['token']
 
     def checked_url(self,binding,delivery_id,url,kind):
         if not isinstance(url,str) or len(url)>2048:raise PermissionError('private output URL required')
@@ -125,7 +150,7 @@ class Output:
             status=206;headers['Content-Range']=f'bytes {start}-{end}/{len(data)}'
         response=web.StreamResponse(status=status,headers={**headers,'Content-Type':row['mime'],'Content-Length':str(end-start+1),
             'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff',
-            'Content-Disposition':'attachment; filename="haos-output.'+('png' if row['kind']=='preview' else 'bin')+'"'})
+            'Content-Disposition':'attachment; filename="haos-output.'+{'image/png':'png','image/jpeg':'jpg','image/gif':'gif','audio/mpeg':'mp3','audio/wav':'wav','audio/mp4':'m4a','video/mp4':'mp4','video/3gpp':'3gp','application/pdf':'pdf','text/plain':'txt','application/json':'json','application/zip':'zip'}.get(row['mime'],'bin')+'"'})
         await response.prepare(request)
         try:
             for offset in range(start,end+1,CHUNK_BYTES):
@@ -149,7 +174,7 @@ class Output:
         if binding.get('allow_outbound_media') is not True:
             return {'items':[],'text':cleaned+'\n[Result files require separate owner approval.]'}
         self.current(delivery)
-        if not self.adapter._haos_line_public_url:raise PermissionError('public HTTPS origin required for media delivery')
+        if not getattr(self.adapter,'_haos_'+self.platform+'_public_url'):raise PermissionError('public HTTPS origin required for media delivery')
         items=[]
         for path in paths:
             self.current(delivery)
@@ -167,18 +192,21 @@ class Output:
             data=bytes(data)
             if hashlib.sha256(data).hexdigest()!=offer['sha256']:raise ValueError('artifact checksum changed')
             suffix=PurePosixPath(path).suffix.lower();duration=0
-            if suffix in {'.jpg','.jpeg','.png'} and '[[as_document]]' not in delivery['content']:
+            if self.platform=='sms':
+                kind,mime=sms_kind(data,suffix,'[[as_document]]' in delivery['content'])
+            elif suffix in {'.jpg','.jpeg','.png'} and '[[as_document]]' not in delivery['content']:
                 fmt=describe(data,'image')['format']
                 if len(data)>1024*1024:raise ValueError('LINE image preview requires at most 1 MiB')
                 kind='image';mime='image/'+fmt
             elif suffix=='.mp4':
-                describe(data,'video');mp4_duration(data);kind='video';mime='video/mp4'
+                if describe(data,'video')['format']!='mp4':raise ValueError('LINE native video requires MP4')
+                mp4_duration(data);kind='video';mime='video/mp4'
             elif suffix=='.m4a':
                 describe(data,'video');duration=mp4_duration(data);kind='audio';mime='audio/mp4'
             else:kind='document';mime='application/octet-stream'
             item=self.put(binding,delivery['id'],offer['id'],data,kind,mime,duration,attempt=delivery['attempt'])
             prepared={'kind':kind,'url':self.url(item),'duration':duration}
-            if kind=='video':
+            if kind=='video' and self.platform=='line':
                 from plugins.platforms.line.adapter import _FALLBACK_PNG_PREVIEW
                 preview=self.put(binding,delivery['id'],offer['id']+'-preview',_FALLBACK_PNG_PREVIEW,'preview','image/png',attempt=delivery['attempt'])
                 prepared['preview']=self.url(preview)

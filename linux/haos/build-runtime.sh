@@ -73,6 +73,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/sms-prepared-native-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_output.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/sms-output-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-profile-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_delivery.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-delivery-build-probe.json

@@ -50,6 +50,10 @@ class Publisher:
             fields[key]=value
         if fields!={'From':self.value['from_number'],'To':route['binding']['chat'],'Body':route['body']}:
             raise PermissionError('SMS sender, recipient or body changed')
+        for url in route['media']:
+            # Only already checked private capability URLs extend the native
+            # text-only form; no caller path or arbitrary external URL is used.
+            data.add_field('MediaUrl',url)
         if self.client is None:
             self.client=aiohttp.ClientSession(trust_env=False,cookie_jar=aiohttp.DummyCookieJar(),timeout=aiohttp.ClientTimeout(total=30));self.client._retry_connection=False
         class Safe:
@@ -71,7 +75,10 @@ class Publisher:
                             or proof.get('body')!=route['body'] or proof.get('status') not in {'accepted','queued','sending','sent','delivered'}
                             or self.adapter._haos_native.inbox.redactor.text(sid)!=sid):
                         raise ValueError('exact SMS server receipt required')
-                    route['receipt']='sms_push_'+digest([sid,self.value['account_sid']])
+                    if route['media'] and (proof.get('num_media') not in {str(n) for n in range(len(route['media'])+1)}
+                            or proof['status'] in {'sent','delivered'} and proof.get('num_media')!=str(len(route['media']))):
+                        raise ValueError('bounded queued or complete MMS media count required')
+                    route['receipt']='sms_push_'+digest([sid,self.value['account_sid'],route['media']])
                     async def receipt():return {'sid':sid}
                     safe.json=receipt
                 safe.status=response.status
@@ -79,17 +86,40 @@ class Publisher:
         except Exception:pass
         yield safe
 
-    async def send(self,binding,identity,attempt,content):
+    def compile(self,binding,identity,prepared):
+        if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list)
+                or not 0<=len(prepared['items'])<=4 or not isinstance(prepared['text'],str)):
+            raise ValueError('bounded private MMS output required')
+        output=self.adapter._haos_sms_output;media=[];links=[];size=0
+        capable=getattr(self.adapter,'_haos_sms_capabilities',{}).get('mms') is True
+        for item in prepared['items']:
+            if not isinstance(item,dict) or set(item)!={'kind','url','duration'} or item['kind'] not in {'image','audio','video','document'}:
+                raise ValueError('reviewed MMS output kind required')
+            row=output.checked_url(binding,identity,item['url'],item['kind'])
+            if type(item['duration']) is not int or item['duration']!=row['duration']:raise PermissionError('MMS metadata changed')
+            bound=5_000_000 if row['mime'] in {'image/jpeg','image/png','image/gif'} else 500_000
+            if capable and item['kind']!='document' and len(row['data'])<=bound:
+                size+=len(row['data']);media.append(item['url'])
+            else:links.append('Result file: '+item['url'])
+        if size>5_000_000:raise ValueError('native MMS aggregate byte budget exceeded')
+        body='\n'.join([part for part in [prepared['text'],*links] if part.strip()])
+        if not body:body='Result files attached.'
+        return body,media
+
+    async def send(self,binding,identity,attempt,content,*,prepared=None):
         from gateway.platforms.base import SendResult
         if (not isinstance(identity,str) or not re.fullmatch('[0-9a-f]{64}',identity)
                 or type(attempt) is not int or not 1<=attempt<=5):raise ValueError('exact bounded SMS outbox attempt required')
         binding=deepcopy(binding);self.current(binding)
         if not isinstance(content,str) or not content.strip() or len(content)>1800:
             return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
-        chunks=self.adapter.truncate_message(self.adapter.format_message(content))
+        try:wire,media=self.compile(binding,identity,prepared) if prepared is not None else (content,[])
+        except ValueError:return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
+        chunks=self.adapter.truncate_message(self.adapter.format_message(wire))
         if not isinstance(chunks,list) or len(chunks)!=1 or not 1<=len(chunks[0])<=1600:
             return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
-        fingerprint=digest([digest(binding),self.value['account_sid'],self.value['auth_token'],content,chunks])
+        material=[digest(binding),self.value['account_sid'],self.value['auth_token'],content,chunks]
+        fingerprint=digest(material if prepared is None else material+[media])
         async with self.lock:
             self.current(binding)
             old=self.db.execute('SELECT * FROM sms_delivery_intents WHERE delivery_id=? AND attempt=?',(identity,attempt)).fetchone()
@@ -103,10 +133,10 @@ class Publisher:
             if self.db.execute('SELECT COUNT(*) FROM sms_delivery_intents').fetchone()[0]>=65536 or pages*self.db.execute('PRAGMA page_size').fetchone()[0]>=64*1024*1024:
                 raise PermissionError('private SMS delivery capacity reached')
             self.db.execute('INSERT INTO sms_delivery_intents VALUES(?,?,?,?,?,?)',(identity,attempt,fingerprint,'writing','',time.time()))
-            route={'publisher':self,'binding':binding,'body':chunks[0],'dispatched':False,'status':None,'receipt':None,'delay':5}
+            route={'publisher':self,'binding':binding,'body':chunks[0],'dispatched':False,'status':None,'receipt':None,'delay':5,'media':media}
             active=_ACTIVE.set(route);previous=self.adapter._http_session;self.adapter._http_session=self
             try:
-                result=await self.original(self.adapter,binding['chat'],content)
+                result=await self.original(self.adapter,binding['chat'],wire)
                 confirmed=result.success is True and route['receipt'] is not None
                 self.db.execute('UPDATE sms_delivery_intents SET state=?,receipt=?,updated_at=? WHERE delivery_id=? AND attempt=?',
                     ('confirmed' if confirmed else 'uncertain',route['receipt'] if confirmed else '',time.time(),identity,attempt))

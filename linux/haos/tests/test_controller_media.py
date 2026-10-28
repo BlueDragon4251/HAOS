@@ -132,3 +132,13 @@ def test_controller_voice_uses_bound_local_transcript_never_raw_agent_file_and_s
                 if mode=='cancelled':assert store.get(row['id'])['state']=='cancelled'
         finally:store.close()
     asyncio.run(exercise())
+
+
+def test_raw_gateway_voice_cannot_be_accidentally_forwarded_by_attachment_helper():
+    from haos.hermes_media import attach
+    from haos.gateway_media import describe
+    class Connection:
+        async def request(self,*_args,**_kwargs):raise AssertionError('raw voice reached agent RPC')
+    data=b'private audio source'
+    with pytest.raises(ValueError,match='isolated transcription'):
+        asyncio.run(attach(Connection(),'native-session',[{'descriptor':describe(data,'voice'),'data':data}]))
