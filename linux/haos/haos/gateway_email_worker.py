@@ -11,19 +11,26 @@ import sys
 def main():
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity()
+    # A killed service must not leave a credential-bearing network worker alive.
+    import ctypes
+    parent=os.getppid();libc=ctypes.CDLL(None,use_errno=True)
+    if libc.prctl(1,signal.SIGKILL,0,0,0)!=0 or os.getppid()!=parent:
+        raise PermissionError('private mail worker parent lifetime guard required')
     resource.setrlimit(resource.RLIMIT_CORE,(0,0));resource.setrlimit(resource.RLIMIT_CPU,(10,10))
     resource.setrlimit(resource.RLIMIT_AS,(512*1024*1024,512*1024*1024))
     resource.setrlimit(resource.RLIMIT_NOFILE,(64,64))
     signal.signal(signal.SIGALRM,lambda *_args:os._exit(124));signal.alarm(30)
-    raw=sys.stdin.buffer.read(32769)
-    if len(raw)>32768:raise ValueError('bounded private mail worker request required')
+    raw=sys.stdin.buffer.read(262145)
+    if len(raw)>262144:raise ValueError('bounded private mail worker request required')
     from .gateway_line_ingress import _object
     def constant(_value):raise ValueError('finite JSON required')
     request=json.loads(raw,object_pairs_hook=_object,parse_constant=constant)
-    if not isinstance(request,dict) or not isinstance(request.get('action'),str) or request['action'] not in {'probe','mailbox','headers','search','message'}:
+    if not isinstance(request,dict) or not isinstance(request.get('action'),str) or request['action'] not in {'probe','mailbox','headers','search','message','smtp'}:
         raise ValueError('closed private email worker action required')
-    extra={'probe':set(),'mailbox':set(),'headers':{'uid','uid_validity'},'search':{'page'},'message':{'uid','uid_validity','header_sha256','binding_id','binding_digest'}}[request['action']]
-    if (set(request)!=({'action','connector','credentials','policy_sha256'}|extra)
+    if request['action']!='smtp' and len(raw)>32768:raise ValueError('bounded private mail reader request required')
+    extra={'smtp':{'reply'},'probe':set(),'mailbox':set(),'headers':{'uid','uid_validity'},'search':{'page'},'message':{'uid','uid_validity','header_sha256','binding_id','binding_digest'}}[request['action']]
+    if (set(request)!=({'action','connector','credentials','policy_sha256','parent_pid'}|extra)
+            or type(request.get('parent_pid')) is not int or request['parent_pid']!=parent or os.getppid()!=parent
             or not isinstance(request['connector'],str) or not isinstance(request['policy_sha256'],str)
             or not re.fullmatch(r'[0-9a-f]{64}',request['policy_sha256'])):
         raise ValueError('exact closed private email worker request required')
@@ -54,7 +61,14 @@ def main():
             adapter=EmailAdapter(PlatformConfig(enabled=True,extra={'skip_attachments':True,
                 'require_authenticated_sender':True,'authserv_id':value['authserv_id']}))
         transport=Transport(adapter,value,current)
-        if request['action']=='probe':result=transport.probe()
+        if request['action']=='smtp':
+            from .gateway_email import PreparedEmailPolicy
+            from .gateway_email_smtp import publish
+            from .sandbox import trusted_json
+            def policy():
+                current();return PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+            result=publish(adapter,value,policy,request['connector'],request['reply'],current)
+        elif request['action']=='probe':result=transport.probe()
         elif request['action']=='mailbox':
             with transport.imap() as connection:
                 result={'uid_validity':transport.number(connection,'UIDVALIDITY'),'uid_next':transport.number(connection,'UIDNEXT')}

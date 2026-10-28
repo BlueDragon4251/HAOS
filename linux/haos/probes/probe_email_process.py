@@ -59,7 +59,7 @@ if request['action']=='profile':
     from haos.gateway_email import PreparedEmailPolicy
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
-    from haos.gateway_runtime import adapter_envelope
+    from haos.gateway_runtime import adapter_envelope,delivery_metadata
     from haos.sandbox import trusted_json
     from haos.redaction import Redactor
     async def run_profile():
@@ -77,11 +77,53 @@ if request['action']=='profile':
             assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==1
             pending=relay.next(policy());assert 'Actual scoped private mail body.' in pending['envelope']['text']
             assert adapter.native_health()['status']=='receiving'
-            print(json.dumps({'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True}))
+            from haos.gateway import digest
+            latest=policy();binding=latest.bindings['owner']
+            metadata=delivery_metadata({'binding_id':'owner','binding_digest':digest(binding),'scope':binding['scope'],
+                'thread':binding['thread'],'id':'d'*64,'attempt':1},'email')
+            source_id=pending['envelope']['message_id']
+            result=await adapter.send(binding['chat'],'A supervised native SMTP fixture reply.',reply_to=source_id,metadata=metadata)
+            assert result.success and result.message_id.startswith('smtp_accept_') and result.raw_response['recipient_receipt_verified'] is False
+            confirmed_receipt=result.message_id
+            repeated=await adapter.send(binding['chat'],'A supervised native SMTP fixture reply.',reply_to=source_id,
+                metadata={**metadata,'haos_delivery_attempt':2})
+            assert repeated.success and repeated.message_id==result.message_id
+            uncertain_metadata={**metadata,'haos_delivery_id':'e'*64}
+            result=await adapter.send(binding['chat'],'Lost SMTP result fixture.',reply_to=source_id,metadata=uncertain_metadata)
+            assert not result.success and result.raw_response=={'haos_delivery':'uncertain'}
+            repeated=await adapter.send(binding['chat'],'Lost SMTP result fixture.',reply_to=source_id,
+                metadata={**uncertain_metadata,'haos_delivery_attempt':2})
+            assert not repeated.success and repeated.raw_response=={'haos_delivery':'uncertain'}
+            from haos.gateway import Conflict
+            try:await adapter.send(binding['chat'],'Changed body must not be resent.',reply_to=source_id,metadata=metadata)
+            except Conflict:pass
+            else:raise AssertionError('one email delivery changed its immutable body')
+            await adapter.close_profile()
+            adapter=build(request['credentials'],parent=parent,connector='email',policy=policy,inbox=inbox)
+            adapter.set_durable_message_handler(receive);assert await adapter.connect()
+            replayed=await adapter.send(binding['chat'],'A supervised native SMTP fixture reply.',reply_to=source_id,
+                metadata={**metadata,'haos_delivery_attempt':3})
+            assert replayed.success and replayed.message_id==confirmed_receipt
+            replayed=await adapter.send(binding['chat'],'Lost SMTP result fixture.',reply_to=source_id,
+                metadata={**uncertain_metadata,'haos_delivery_attempt':3})
+            assert not replayed.success and replayed.raw_response=={'haos_delivery':'uncertain'}
+            rate_metadata={**metadata,'haos_delivery_id':'f'*64}
+            refused=await adapter.send(binding['chat'],'Temporarily rejected SMTP fixture.',reply_to=source_id,metadata=rate_metadata)
+            assert not refused.success and refused.error_kind=='rate_limited' and refused.raw_response['haos_delivery']=='refused'
+            assert not adapter.is_connected and adapter.native_health()['status']=='rate-limited'
+            deadline=adapter.native_health()['next_attempt'];assert deadline>__import__('time').time()
+            await adapter.close_profile()
+            adapter=build(request['credentials'],parent=parent,connector='email',policy=policy,inbox=inbox)
+            adapter.set_durable_message_handler(receive)
+            assert not await adapter.connect() and adapter.native_health()['status']=='rate-limited'
+            assert adapter.native_health()['next_attempt']==deadline
+            print(json.dumps({'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True,
+                'confirmed_and_uncertain_never_repeated':True,'native_supervised_smtp':True,'reopen_preserves_reply_and_intents':True,
+                'backoff_survives_reopen':True}))
         finally:await adapter.close_profile();relay.close();inbox.close()
     asyncio.run(run_profile());sys.exit(0)
 from haos.gateway_email_process import probe,headers,search,message
-if request['action'] in {'revoke','cancel','deadline'}:
+if request['action'] in {'revoke','cancel','deadline','parentdeath'}:
     original_spawn=asyncio.create_subprocess_exec
     async def observed_spawn(*args,**kwargs):
         process=await original_spawn(*args,**kwargs)
@@ -109,7 +151,7 @@ async def exercise():
 asyncio.run(exercise())
 ''');script.chmod(0o644)
     config=Path('/etc/haos');config.mkdir(mode=0o755)
-    active=asyncio.Event();closed=asyncio.Event();mode=['success'];verbs=[];cases=[]
+    active=asyncio.Event();closed=asyncio.Event();mode=['success'];verbs=[];cases=[];sent=[]
     header=b'From: owner@example.invalid\r\nMessage-ID: <mail-9@example.invalid>\r\nDate: Fri, 1 Jan 1999 00:00:00 +0000\r\nAuthentication-Results: mx.example.invalid; dmarc=pass\r\n\r\n'
     async def imap(reader,writer):
         active.set()
@@ -149,6 +191,29 @@ asyncio.run(exercise())
                 elif verb==b'AUTH':
                     assert base64.b64decode(line.split()[2])==b'\0haos@example.invalid\0private-email-fixture'
                     writer.write(b'235 2.7.0 authenticated\r\n')
+                elif verb==b'MAIL':
+                    assert mode[0]=='profile' and line.lower()==b'mail from:<haos@example.invalid>\r\n'
+                    writer.write(b'250 sender accepted\r\n')
+                elif verb==b'RCPT':
+                    assert mode[0]=='profile' and line.lower()==b'rcpt to:<owner@example.invalid>\r\n'
+                    writer.write(b'250 recipient accepted\r\n')
+                elif verb==b'RSET':
+                    assert mode[0]=='profile' and sent and sent[-1]=='Temporarily rejected SMTP fixture.'
+                    writer.write(b'250 transaction reset\r\n')
+                elif verb==b'DATA':
+                    assert mode[0]=='profile';writer.write(b'354 data\r\n');await writer.drain();data=bytearray()
+                    while (part:=await reader.readline())!=b'.\r\n':
+                        assert part and len(data)<65536;data.extend(part[1:] if part.startswith(b'..') else part)
+                    from email.parser import BytesParser
+                    from email import policy as mail_policy
+                    parsed=BytesParser(policy=mail_policy.default).parsebytes(bytes(data))
+                    assert str(parsed['From'])=='haos@example.invalid' and str(parsed['To'])=='owner@example.invalid'
+                    assert str(parsed['In-Reply-To'])=='<mail-9@example.invalid>'
+                    body=parsed.get_payload()[0].get_payload(decode=True).decode('utf-8');sent.append(body)
+                    if body=='Lost SMTP result fixture.':return
+                    if body=='Temporarily rejected SMTP fixture.':writer.write(b'451 try later\r\n')
+                    else:
+                        assert body=='A supervised native SMTP fixture reply.';writer.write(b'250 accepted\r\n')
                 else:raise AssertionError('mail probe attempted message delivery')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
@@ -212,7 +277,11 @@ asyncio.run(exercise())
             assert result['approval']['binding_id']=='owner' and result['approval']['envelope']['text']==''
             cases.append('actual_gateway_uid_streams_exact_large_approved_body_over_private_bounded_binary_ipc_without_model_or_smtp_send')
             mode[0]='profile';profile_child=await invoke(65534,'profile');children.append(profile_child)
-            assert await finish(profile_child)=={'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True}
+            assert await finish(profile_child)=={'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True,
+                'confirmed_and_uncertain_never_repeated':True,'native_supervised_smtp':True,'reopen_preserves_reply_and_intents':True,'backoff_survives_reopen':True}
+            assert sent==['A supervised native SMTP fixture reply.','Lost SMTP result fixture.','Temporarily rejected SMTP fixture.']
+            cases.append('actual_native_smtp_temporary_refusal_disconnects_profile_and_persistent_retry_deadline_cannot_be_reset_by_reopening')
+            cases.append('actual_gateway_uid_durable_reply_context_native_smtp_intent_and_acceptance_never_repeat_confirmed_or_uncertain_writes_across_attempts')
             cases.append('actual_gateway_uid_receiver_runs_native_account_search_header_body_capture_replay_and_durable_private_relay')
             mode[0]='success'
             denied=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s','-m','haos.gateway_email_worker',
@@ -224,7 +293,9 @@ asyncio.run(exercise())
             assert denied.returncode!=0 and not stdout and b'gateway runtime requires its unprivileged service UID/GID' in stderr
             assert len(verbs)==before
             cases.append('actual_agent_uid_cannot_invoke_the_private_worker_even_with_direct_installed_module_execution')
-            for action in ['revoke','cancel','deadline']:
+            smtp_writes=sum(verb in {'MAIL','RCPT','DATA'} for protocol,verb in verbs)
+            assert smtp_writes==9
+            for action in ['revoke','cancel','parentdeath','deadline']:
                 active.clear();closed.clear();mode[0]='stall';started=time.monotonic()
                 child=await invoke(65534,action);children.append(child)
                 pid=await worker(child);await asyncio.wait_for(active.wait(),10)
@@ -236,6 +307,15 @@ asyncio.run(exercise())
                     policy['bindings'][0]['generation']='c'*64;publish()
                     assert await finish(child)=={'owner_revocation_refused':True}
                     cases.append('actual_root_policy_change_kills_and_joins_blocked_native_worker_during_imap_greeting')
+                elif action=='parentdeath':
+                    child.kill();await child.wait()
+                    async with asyncio.timeout(5):
+                        while True:
+                            reaped,status=os.waitpid(pid,os.WNOHANG)
+                            if reaped:break
+                            await asyncio.sleep(.02)
+                    assert reaped==pid and os.WIFSIGNALED(status) and os.WTERMSIG(status)==9
+                    cases.append('actual_parent_sigkill_immediately_kills_credential_worker_and_pid1_reaps_it_without_waiting_for_network_deadline')
                 elif action=='cancel':
                     child.stdin.write(b'CANCEL\n');await child.stdin.drain()
                     assert await finish(child)=={'cancelled_and_joined':True}
@@ -246,7 +326,8 @@ asyncio.run(exercise())
                     cases.append('actual_worker_hard_deadline_terminates_blocking_native_constructor_and_parent_joins_it')
                 assert not Path('/proc',str(pid)).exists()
                 await asyncio.wait_for(closed.wait(),5)
-                assert not any(verb in {'MAIL','RCPT','DATA','STORE','EXPUNGE','CLOSE'} for protocol,verb in verbs)
+                assert sum(verb in {'MAIL','RCPT','DATA'} for protocol,verb in verbs)==smtp_writes
+                assert not any(verb in {'STORE','EXPUNGE','CLOSE'} for protocol,verb in verbs)
         finally:
             for child in children:
                 if child.returncode is None:child.kill();await child.wait()

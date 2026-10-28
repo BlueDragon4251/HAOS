@@ -1,7 +1,7 @@
 # Email — prepared private transport, not public setup
 
-Email remains absent from public HAOS setup until ingress, persistent delivery,
-media, recovery and real owner configuration are connected. Bundled upstream
+Email remains absent from public HAOS setup until media, owner recovery and
+real owner configuration join the prepared receiving and delivery paths. Bundled upstream
 code or a passing connection probe does not constitute a completed gateway.
 
 The prepared account contract requires exact lowercase mailbox identities, fixed
@@ -37,8 +37,8 @@ received-date-filtered UID searches and independently approved complete-message 
 private stdin rather than argv or environment; result/error schemas exclude
 provider bodies and credentials. The prepared receiver now joins these workers to durable native input and relay dispatch; public setup remains disabled.
 
-Remaining: bounded persistent attachments/local voice, native SMTP write intent
-and recovery, credential
+Remaining: bounded persistent attachments/local voice, audited owner SMTP/mailbox
+recovery, credential
 redaction/rotation/status, actual owner CLI/GUI and complete process/replay tests.
 No external account, SMTP delivery, installed service or hardware acceptance is
 claimed by these fixtures.
@@ -53,7 +53,7 @@ commits cursor/dispositions together. Every searched UID needs a durable outcome
 captured outcomes require an existing native input from the same mailbox, whose
 scope proof survives payload compaction. Actual SQLite fault tests verify rollback.
 These are receiving-service components, not yet the connected full-message inbox
-or a public owner setup path. Full body/media and SMTP publication remain open.
+or a public owner setup path. This receipt describes that earlier increment; the receiving lifecycle below now connects full-body text. Media and public setup remain open.
 
 
 The prepared receiver rechecks exact owner sender/mailbox/thread and server
@@ -79,4 +79,33 @@ Same-credential authentication blocks and retry deadlines survive profile reopen
 A fresh disposable real-UID process fixture exercises the connected receiver
 through native verified TLS into retained input and relay. Separate actual native
 dispatch fixtures reach controller missions without inference or SMTP delivery.
-This remains receiving-side implementation, not a finished public email gateway.
+These private receiving and reply components do not constitute a finished public email gateway.
+
+
+Prepared SMTP replies now use the actual pinned native MIME builder and native
+login/send_message/cleanup lifecycle inside the supervised gateway-UID worker.
+Each reply uses the specific durably admitted source, not the adapter's mutable
+last-thread cache. Current read/reply permission fixes the recipient and mailbox;
+In-Reply-To fixes the source, References retains the approved root thread. Native
+headers, Unicode body, stable per-attempt Message-ID and creation time are checked
+before a single explicit SMTP envelope is admitted. Unknown recipient/header
+changes and reflected account credentials cannot gain a send capability.
+
+A synchronous-FULL SQLite intent precedes worker launch. Completed acceptance is
+recorded as an opaque SMTP acceptance receipt, never a recipient delivery/read
+receipt. Explicit server rejections have finite private diagnostics; temporary
+rejection disconnects the profile and persists a retry deadline across reopen.
+Connection loss or cancellation after a possible write remains uncertain. Both
+confirmed and uncertain deliveries suppress further writes even if another
+attempt is requested or the profile is reopened; changing a delivery's source,
+body or authority is refused. A hard-killed parent also kills its private worker
+through a kernel parent-death signal, verified with real UID/process termination.
+Owner review/reconciliation and safe clearing of auth/mailbox fences remain to be
+connected before public setup. These SMTP tests send only to disposable local
+TLS fixtures, with no external account or mail delivery.
+
+SMTP reply lines, multiline count and aggregate response bytes are bounded.
+Only a complete validated remote rejection can release a write as rejected;
+a local smtplib error such as an oversized response must remain unknown. Owner
+authority is checked between response lines as well as commands. Native TLS
+fixtures cover oversized single/multiline terminal responses after DATA.

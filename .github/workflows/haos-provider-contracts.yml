@@ -106,6 +106,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
           "$PYTHON" linux/haos/runtime/probe_email_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/email-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_email_smtp.py linux/haos "$RUNNER_TEMP/provider-contracts/email-smtp.json"
           "$PYTHON" linux/haos/runtime/probe_sms_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-output.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-delivery.json"

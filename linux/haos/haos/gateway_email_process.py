@@ -4,13 +4,14 @@ import base64
 import hashlib
 import math
 import json
+import os
 from pathlib import Path
 import stat
 import time
 
 from .gateway_email import credentials,authority
 
-ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed','unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused'})
+ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed','unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','smtp-temporary-refusal','smtp-permanent-refusal','smtp-outcome-unknown'})
 
 
 def command():
@@ -134,6 +135,21 @@ async def mailbox(value,connector,current):
     return await _run(value,connector,current,'mailbox')
 
 
+def smtp_response(result,value,item):
+    if isinstance(result,dict) and set(result)=={'error'}:return response(result)
+    from .gateway import digest
+    from .gateway_email_smtp import identity
+    expected='smtp_accept_'+digest([identity(value,item),item['delivery_id'],item['attempt']])
+    if (not isinstance(result,dict) or set(result)!={'accepted','receipt','recipient_receipt_verified'}
+            or result['accepted'] is not True or result['receipt']!=expected or result['recipient_receipt_verified'] is not False):
+        raise ValueError('exact SMTP acceptance receipt required; recipient delivery is not verified')
+    return result
+
+
+async def smtp(value,connector,current,item):
+    return await _run(value,connector,current,'smtp',item=item)
+
+
 async def probe(value,connector,current):
     return await _run(value,connector,current,'probe')
 
@@ -144,14 +160,15 @@ async def headers(value,connector,current,uid,validity):
     return await _run(value,connector,current,'headers',uid=uid,validity=validity)
 
 
-async def _run(value,connector,current,action,*,uid=None,validity=None,page=None,header_sha256=None,route=None):
+async def _run(value,connector,current,action,*,uid=None,validity=None,page=None,header_sha256=None,route=None,item=None):
     value=credentials(value);current();identity=authority(connector,value)
-    payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity}
+    payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity,'parent_pid':os.getpid()}
     if action=='headers':payload.update(uid=uid,uid_validity=validity)
     elif action=='search':payload['page']=page
     elif action=='message':payload.update(uid=uid,uid_validity=validity,header_sha256=header_sha256,**route)
-    request=json.dumps(payload).encode()
-    if len(request)>32768:raise ValueError('bounded private mail worker request required')
+    elif action=='smtp':payload['reply']=item
+    request=json.dumps(payload,ensure_ascii=False).encode()
+    if len(request)>(262144 if action=='smtp' else 32768):raise ValueError('bounded private mail worker request required')
     process=None;tasks=[]
     async def collect(stream,limit):
         result=bytearray()
@@ -187,6 +204,7 @@ async def _run(value,connector,current,action,*,uid=None,validity=None,page=None
                     current();authority(connector,value,identity)
                 return result
             decoded=json.loads(raw,object_pairs_hook=_object)
+            if action=='smtp':return smtp_response(decoded,value,item)
             if action=='mailbox':return mailbox_response(decoded)
             if action=='search':return search_response(decoded,page)
             return response(decoded) if action=='probe' else header_response(decoded,uid,validity)

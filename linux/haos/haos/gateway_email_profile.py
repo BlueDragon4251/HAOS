@@ -1,4 +1,4 @@
-"""Prepared private email receiver lifecycle; SMTP publication is still disabled."""
+"""Prepared private email receiver and supervised durable SMTP reply lifecycle."""
 import asyncio
 import base64
 import os
@@ -16,7 +16,7 @@ from .gateway_email_journal import Journal
 from . import gateway_email_process as process
 
 STATES=frozenset({'created','connecting','receiving','source-unavailable','storage-unavailable','tls-refused',
-    'smtp-authentication-refused','imap-unavailable','uid-state-changed','revoked','disconnected','closed'})
+    'smtp-authentication-refused','rate-limited','imap-unavailable','uid-state-changed','revoked','disconnected','closed'})
 
 
 class Deferred(Exception):
@@ -96,6 +96,9 @@ def _install(adapter,fd,profile,identity):
             if getattr(adapter,'_'+key)!=value[key]:raise PermissionError('native email identity changed')
         if adapter._imap_tls_verify is not True or adapter._smtp_tls_verify is not True:raise PermissionError('verified email TLS required')
     adapter._haos_email_check=current
+    from .gateway_email_delivery import Publisher
+    publisher=Publisher(adapter) if any(row['connector']==connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
+    adapter._haos_email_publisher=publisher
     journal=Journal(native.inbox,connector,mailbox_scope(value),current);adapter._haos_email_journal=journal
     def status(state,delay=0):
         if state not in STATES:raise ValueError('finite private email profile status required')
@@ -189,15 +192,28 @@ def _install(adapter,fd,profile,identity):
     async def disconnect(self):
         async with lifecycle:
             await stop()
-            if health(self)['status'] not in {'revoked','smtp-authentication-refused','tls-refused','uid-state-changed','source-unavailable','storage-unavailable','imap-unavailable'}:status('disconnected')
+            if health(self)['status'] not in {'revoked','smtp-authentication-refused','tls-refused','uid-state-changed','source-unavailable','storage-unavailable','imap-unavailable','rate-limited'}:status('disconnected')
+    async def send(self,chat_id,content,reply_to=None,metadata=None):
+        from .gateway_delivery_authority import current_delivery
+        if publisher is None:raise PermissionError('creation-only email profile has no reply authority')
+        async with lifecycle:
+            authority=current_delivery(self,'email',chat_id,metadata)
+            binding=native.policy().current_binding(metadata['haos_binding'])
+            result=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority)
+            if result.error_kind=='forbidden':
+                status('tls-refused' if result.raw_response.get('email_error')=='tls-refused' else 'smtp-authentication-refused');await stop()
+            elif result.error_kind=='rate_limited':status('rate-limited',result.retry_after);await stop()
+            return result
     async def close(self):
         async with lifecycle:
             if self._haos_email_closed:return
             self._haos_email_closed=True
             try:
-                await stop();self._haos_email_raw.close()
-                if health(self)['status'] not in {'revoked','smtp-authentication-refused','tls-refused','uid-state-changed','source-unavailable','storage-unavailable','imap-unavailable'}:status('closed')
+                await stop()
+                if publisher is not None:await publisher.close()
+                self._haos_email_raw.close()
+                if health(self)['status'] not in {'revoked','smtp-authentication-refused','tls-refused','uid-state-changed','source-unavailable','storage-unavailable','imap-unavailable','rate-limited'}:status('closed')
             finally:os.close(fd)
-    adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter)
+    adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter);adapter.send=MethodType(send,adapter)
     adapter.close_profile=MethodType(close,adapter);adapter.native_health=MethodType(health,adapter)
     return adapter
