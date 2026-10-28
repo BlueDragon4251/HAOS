@@ -1,14 +1,34 @@
 """One exact native reply over verified SMTP; never a general mail capability."""
 from copy import deepcopy
 from email.utils import formatdate
+import hashlib
+import os
+from pathlib import Path
 import re
 import smtplib
+import stat
 import time
 from types import MethodType
 
 from .gateway import digest
 from .gateway_email import address,message_id,scope
 from .gateway_email_transport import Transport
+from .gateway_media import MAX_BYTES
+
+
+def descriptors(values):
+    from .gateway_outbound import EXTENSIONS
+    if not isinstance(values,list) or len(values)>4:raise ValueError('at most four exact SMTP attachment snapshots required')
+    identities=set()
+    for index,item in enumerate(values):
+        if (not isinstance(item,dict) or set(item)!={'id','sha256','size','name'}
+                or any(not isinstance(item[key],str) or not re.fullmatch('[0-9a-f]{64}',item[key]) for key in ('id','sha256'))
+                or type(item['size']) is not int or not 1<=item['size']<=MAX_BYTES
+                or not isinstance(item['name'],str) or not re.fullmatch('result-'+str(index)+r'\.[a-z0-9]{1,16}',item['name'])
+                or Path(item['name']).suffix not in EXTENSIONS or item['id'] in identities):
+            raise ValueError('exact bounded path-free SMTP snapshot metadata required')
+        identities.add(item['id'])
+    return deepcopy(values)
 
 
 class ReplyReader:
@@ -31,7 +51,7 @@ class ReplyReader:
 
 def specification(value,policy,connector,item):
     fields={'binding_id','binding_digest','delivery_id','attempt','source_id','rfc_message_id',
-        'root_message_id','subject','body','created_at','recipient'}
+        'root_message_id','subject','body','created_at','recipient','files'}
     if not isinstance(item,dict) or set(item)!=fields:raise ValueError('exact private native email reply required')
     for key in ('binding_digest','delivery_id','source_id'):
         if not isinstance(item[key],str) or not re.fullmatch('[0-9a-f]{64}',item[key]):raise ValueError('exact opaque email reply identity required')
@@ -45,7 +65,9 @@ def specification(value,policy,connector,item):
         raise ValueError('exact retained email reply references required')
     if (not isinstance(item['subject'],str) or len(item['subject'])>1024
             or any(c in item['subject'] for c in '\r\n\0')):raise ValueError('bounded native reply subject required')
-    if (not isinstance(item['body'],str) or not 1<=len(item['body'].strip())<=32000
+    files=descriptors(item['files'])
+    if files and binding.get('allow_outbound_media') is not True:raise PermissionError('separate current SMTP output-file approval required')
+    if (not isinstance(item['body'],str) or len(item['body'])>32000 or not item['body'].strip() and not files
             or len(item['body'].encode())>128000 or '\0' in item['body']):raise ValueError('bounded native reply body required')
     if type(item['created_at']) is not int or not 0<item['created_at']<=int(time.time())+300:raise ValueError('fixed reply creation time required')
     import base64
@@ -62,7 +84,7 @@ def identity(value,item):
     return '<haos-'+digest([item['delivery_id'],item['attempt'],item['binding_digest']])+'@'+domain+'>'
 
 
-def build(adapter,value,item):
+def build(adapter,value,item,paths=()):
     """Keep the actual pinned builder; give it only this retained reply context."""
     from plugins.platforms.email.adapter import EmailAdapter
     saved=adapter._thread_context
@@ -74,13 +96,23 @@ def build(adapter,value,item):
     references=[item['rfc_message_id']]
     if item['root_message_id'] and item['root_message_id']!=references[0]:references.insert(0,item['root_message_id'])
     msg.replace_header('References',' '.join(references))
+    if len(paths)!=len(item['files']):raise ValueError('every SMTP snapshot needs its private byte file')
+    from plugins.platforms.email.adapter import _attach_file
+    for path,meta in zip(paths,item['files']):
+        path=Path(path);own=path.lstat()
+        if (not stat.S_ISREG(own.st_mode) or own.st_uid!=os.geteuid() or own.st_nlink!=1
+                or own.st_mode&0o077 or own.st_size!=meta['size'] or path.name!=meta['name']
+                or hashlib.sha256(path.read_bytes()).hexdigest()!=meta['sha256']):
+            raise PermissionError('exact private SMTP snapshot file required')
+        _attach_file(msg,path,meta['name'])  # Actual pinned attachment encoder.
     return msg
 
 
-def publish(adapter,value,policy,connector,item,current):
+def publish(adapter,value,policy,connector,item,current,paths=()):
     """Called only in the supervised private worker after durable write intent."""
     from plugins.platforms.email.adapter import EmailAdapter
-    item=specification(value,policy(),connector,item);expected=build(adapter,value,item)
+    item=specification(value,policy(),connector,item);expected=build(adapter,value,item,paths)
+    expected_sha256=hashlib.sha256(expected.as_bytes()).hexdigest()
     transport=Transport(adapter,value,current);state={'opened':False,'accepted':False,'rejections':[]}
     def check():
         transport.check();specification(value,policy(),connector,item)
@@ -111,7 +143,7 @@ def publish(adapter,value,policy,connector,item,current):
             result=self.connection.login(username,password);check();self.authenticated=True;return result
         def send_message(self,msg):
             check()
-            if not self.authenticated or self.used or msg.as_bytes()!=expected.as_bytes():
+            if not self.authenticated or self.used or hashlib.sha256(msg.as_bytes()).hexdigest()!=expected_sha256:
                 raise PermissionError('exact single native SMTP MIME reply required')
             self.used=True;state['rejections']=[]
             refused=self.connection.send_message(msg,from_addr=value['address'],to_addrs=[item['recipient']])

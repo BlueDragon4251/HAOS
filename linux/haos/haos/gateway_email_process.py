@@ -148,8 +148,10 @@ def smtp_response(result,value,item):
     return result
 
 
-async def smtp(value,connector,current,item):
-    return await _run(value,connector,current,'smtp',item=item)
+async def smtp(value,connector,current,item,*,files=()):
+    from .gateway_email_frame import validate
+    validate(item['files'],files)
+    return await _run(value,connector,current,'smtp',item=item,files=files)
 
 
 async def probe(value,connector,current):
@@ -162,7 +164,7 @@ async def headers(value,connector,current,uid,validity):
     return await _run(value,connector,current,'headers',uid=uid,validity=validity)
 
 
-async def _run(value,connector,current,action,*,uid=None,validity=None,page=None,header_sha256=None,route=None,item=None):
+async def _run(value,connector,current,action,*,uid=None,validity=None,page=None,header_sha256=None,route=None,item=None,files=()):
     value=credentials(value);current();identity=authority(connector,value)
     payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity,'parent_pid':os.getpid()}
     if action=='headers':payload.update(uid=uid,uid_validity=validity)
@@ -170,6 +172,7 @@ async def _run(value,connector,current,action,*,uid=None,validity=None,page=None
     elif action=='message':payload.update(uid=uid,uid_validity=validity,header_sha256=header_sha256,**route)
     elif action=='smtp':payload['reply']=item
     request=json.dumps(payload,ensure_ascii=False).encode()
+    request+=b'\n'
     if len(request)>(262144 if action=='smtp' else 32768):raise ValueError('bounded private mail worker request required')
     process=None;tasks=[]
     async def collect(stream,limit):
@@ -178,20 +181,35 @@ async def _run(value,connector,current,action,*,uid=None,validity=None,page=None
             result.extend(chunk)
             if len(result)>limit:raise ValueError('bounded mail worker output exceeded')
         return bytes(result)
+    async def feed():
+        try:
+            process.stdin.write(request);await process.stdin.drain()
+            for data in files:
+                for offset in range(0,len(data),49152):
+                    current();authority(connector,value,identity)
+                    process.stdin.write(memoryview(data)[offset:offset+49152]);await process.stdin.drain()
+            current();authority(connector,value,identity)
+        finally:process.stdin.close()
     try:
-        process=await asyncio.create_subprocess_exec(*command(),cwd='/usr/lib/haos',
-            stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,limit=16384,
-            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'})
-        output=asyncio.create_task(collect(process.stdout,48*1024*1024+16385 if action=='message' else 131072 if action=='headers' else 16384));errors=asyncio.create_task(collect(process.stderr,16384))
-        ended=asyncio.create_task(process.wait());tasks=[output,errors,ended]
-        process.stdin.write(request);await process.stdin.drain();process.stdin.close()
         async with asyncio.timeout(35):
+            spawn=asyncio.create_task(asyncio.create_subprocess_exec(*command(),cwd='/usr/lib/haos',
+                stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,limit=16384,
+                env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'}))
+            try:process=await asyncio.shield(spawn)
+            except BaseException:
+                # Creation may already have started a real child. Cancellation must
+                # obtain its handle before the finally block kills and joins it.
+                process=await spawn
+                raise
+            output=asyncio.create_task(collect(process.stdout,48*1024*1024+16385 if action=='message' else 131072 if action=='headers' else 16384));errors=asyncio.create_task(collect(process.stderr,16384))
+            ended=asyncio.create_task(process.wait());tasks=[output,errors,ended]
+            feeder=asyncio.create_task(feed());tasks.append(feeder)
             while not ended.done():
                 current();authority(connector,value,identity)
-                for task in [output,errors]:
+                for task in [output,errors,feeder]:
                     if task.done() and task.exception() is not None:task.result()
                 await asyncio.wait({ended},timeout=.1)
-            raw=await output;await errors
+            raw=await output;await errors;await feeder
             if ended.result()!=0:raise ConnectionError('private mail worker unavailable; inspect account, TLS and retained status')
             current();authority(connector,value,identity)
             from .gateway_line_ingress import _object

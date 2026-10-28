@@ -99,6 +99,8 @@ def _install(adapter,fd,profile,identity):
     from .gateway_email_delivery import Publisher
     publisher=Publisher(adapter) if any(row['connector']==connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
     adapter._haos_email_publisher=publisher
+    from .gateway_email_output import Output
+    adapter._haos_email_output=Output(adapter) if publisher is not None else None
     journal=Journal(native.inbox,connector,mailbox_scope(value),current);adapter._haos_email_journal=journal
     def status(state,delay=0):
         if state not in STATES:raise ValueError('finite private email profile status required')
@@ -199,7 +201,7 @@ def _install(adapter,fd,profile,identity):
         async with lifecycle:
             authority=current_delivery(self,'email',chat_id,metadata)
             binding=native.policy().current_binding(metadata['haos_binding'])
-            result=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority)
+            result=await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority,prepared=metadata.get('haos_output'))
             if result.error_kind=='forbidden':
                 status('tls-refused' if result.raw_response.get('email_error')=='tls-refused' else 'smtp-authentication-refused');await stop()
             elif result.error_kind=='rate_limited':status('rate-limited',result.retry_after);await stop()

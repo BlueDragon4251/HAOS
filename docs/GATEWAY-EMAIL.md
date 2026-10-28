@@ -1,7 +1,6 @@
 # Email — prepared private transport, not public setup
 
-Email remains absent from public HAOS setup until outbound attachment delivery,
-owner recovery and real owner configuration join the prepared receiving paths. Bundled upstream
+Email remains absent from public HAOS setup until owner recovery and real owner configuration join the prepared receiving paths. Bundled upstream
 code or a passing connection probe does not constitute a completed gateway.
 
 The prepared account contract requires exact lowercase mailbox identities, fixed
@@ -37,7 +36,7 @@ received-date-filtered UID searches and independently approved complete-message 
 private stdin rather than argv or environment; result/error schemas exclude
 provider bodies and credentials. The prepared receiver now joins these workers to durable native input and relay dispatch; public setup remains disabled.
 
-Remaining: outbound attachments, audited owner SMTP/mailbox recovery, credential
+Remaining: audited owner SMTP/mailbox recovery, credential
 redaction/rotation/status, actual owner CLI/GUI and complete process/replay tests.
 No external account, SMTP delivery, installed service or hardware acceptance is
 claimed by these fixtures.
@@ -155,3 +154,33 @@ JSON before connecting. The 131072-byte limit is unchanged. A real distinct-UID
 controller/socket regression reproduces failure before the fix and transfers
 32000 four-byte characters with an exact envelope digest afterward; LINE and
 prepared-email peer-denial tests retain their real SO_PEERCRED checks.
+
+
+Outgoing artifacts now enter the prepared private reply through the actual
+controller export API and authenticated backend byte reader. Only standalone
+MEDIA directives in the immutable completed mission/current outbox/source
+session can export a file; no gateway process opens the agent's host path.
+Offers/chunks are bounded, canonical and checksum-checked. The controller's
+durable snapshot is reused if the original agent file later changes. Missing
+separate outbound-file consent strips paths and publishes no attachment;
+withdrawn authority rejects the old delivery before further reads.
+
+The private worker receives a bounded newline-delimited JSON header followed by
+exact binary snapshots, with current-authority checks between chunks and strict
+EOF/hash/count validation. It materializes only canonical files in a newly
+created private temporary home, invokes the actual native attachment encoder
+and SMTP lifecycle, and seals the compiled MIME digest before connection. A
+real gateway-UID fixture transfers four attachments including the maximum
+8 MiB document, PNG, actual WAV and encoded MP4, verifies exact decoded bytes
+and suppression of a confirmed replay. Account-specific server message-size
+limits still apply. Older secured text-only confirmation fingerprints remain
+valid; no journal history is rewritten or owner/recovery data deleted.
+
+Cancellation during process creation is separately reproduced with an actual
+child already started but its creation future still pending. The parent now
+shields creation, obtains the real handle, kills and joins the child before
+returning. The parent timeout covers creation and pipe feeding as well as the
+network operation. The worker's kernel parent-death guard remains independent.
+Outgoing TLS/mail accounts and completed mission/session state are fixtures;
+these contracts do not establish external mail delivery. Audited recovery, raw
+source inventory/purge and the full owner setup/GUI remain to be connected.

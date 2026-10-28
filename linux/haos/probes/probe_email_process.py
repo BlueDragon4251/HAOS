@@ -88,6 +88,42 @@ if request['action']=='profile':
             repeated=await adapter.send(binding['chat'],'A supervised native SMTP fixture reply.',reply_to=source_id,
                 metadata={**metadata,'haos_delivery_attempt':2})
             assert repeated.success and repeated.message_id==result.message_id
+            # A secured text-only receipt from before attachment support must
+            # remain usable without rewriting history or issuing another mail.
+            legacy_content='A historically confirmed native SMTP fixture.'
+            source=adapter._haos_email_publisher.source(binding,source_id)
+            legacy_fingerprint=digest([request['credentials'],digest(binding),source_id,source['rfc_message_id'],source['subject'],legacy_content])
+            from haos.gateway_email_smtp import identity as smtp_identity
+            legacy_item={'delivery_id':'b'*64,'attempt':1,'binding_digest':digest(binding)}
+            legacy_receipt='smtp_accept_'+digest([smtp_identity(request['credentials'],legacy_item),'b'*64,1])
+            inbox.db.execute('INSERT INTO email_delivery_intents VALUES(?,?,?,?,?,?,?)',
+                ('b'*64,1,legacy_fingerprint,'confirmed',legacy_receipt,int(__import__('time').time()),__import__('time').time()))
+            old=await adapter.send(binding['chat'],legacy_content,reply_to=source_id,
+                metadata={**metadata,'haos_delivery_id':'b'*64})
+            assert old.success and old.message_id==legacy_receipt
+            file_prefix=b'A bounded native SMTP attachment.'
+            file_data=file_prefix+b'x'*(8*1024*1024-len(file_prefix))
+            import io,wave,av
+            file_audio=io.BytesIO()
+            with wave.open(file_audio,'wb') as out:
+                out.setnchannels(1);out.setsampwidth(2);out.setframerate(16000);out.writeframes(bytes(3200))
+            file_video=io.BytesIO()
+            with av.open(file_video,'w',format='mp4') as out:
+                stream=out.add_stream('mpeg4',rate=5);stream.width=16;stream.height=16;stream.pix_fmt='yuv420p'
+                frame=av.VideoFrame(16,16,'yuv420p')
+                for plane in frame.planes:plane.update(bytes([80])*plane.buffer_size)
+                for packet in stream.encode(frame):out.mux(packet)
+                for packet in stream.encode(None):out.mux(packet)
+            file_png=bytes.fromhex('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082')
+            assets=[(file_data,'txt'),(file_png,'png'),(file_audio.getvalue(),'wav'),(file_video.getvalue(),'mp4')]
+            file_items=[{'id':str(index)*64,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data),'name':f'result-{index}.'+suffix,'data':data}
+                for index,(data,suffix) in enumerate(assets)]
+            file_metadata={**metadata,'haos_delivery_id':'a'*64,'haos_output':{'text':'A supervised native SMTP attachment fixture.','items':file_items}}
+            attached=await adapter.send(binding['chat'],'A private artifact reply fixture.',reply_to=source_id,metadata=file_metadata)
+            assert attached.success and attached.raw_response['recipient_receipt_verified'] is False
+            attached_replay=await adapter.send(binding['chat'],'A private artifact reply fixture.',reply_to=source_id,
+                metadata={**file_metadata,'haos_delivery_attempt':2})
+            assert attached_replay.success and attached_replay.message_id==attached.message_id
             uncertain_metadata={**metadata,'haos_delivery_id':'e'*64}
             result=await adapter.send(binding['chat'],'Lost SMTP result fixture.',reply_to=source_id,metadata=uncertain_metadata)
             assert not result.success and result.raw_response=={'haos_delivery':'uncertain'}
@@ -123,11 +159,13 @@ if request['action']=='profile':
         finally:await adapter.close_profile();relay.close();inbox.close()
     asyncio.run(run_profile());sys.exit(0)
 from haos.gateway_email_process import probe,headers,search,message
-if request['action'] in {'revoke','cancel','deadline','parentdeath'}:
+if request['action'] in {'revoke','cancel','deadline','parentdeath','cancelspawn'}:
     original_spawn=asyncio.create_subprocess_exec
+    spawn_gate=asyncio.Event();spawned_processes=[]
     async def observed_spawn(*args,**kwargs):
-        process=await original_spawn(*args,**kwargs)
+        process=await original_spawn(*args,**kwargs);spawned_processes.append(process)
         print(json.dumps({'actual_worker_pid':process.pid}),flush=True)
+        if request['action']=='cancelspawn':await spawn_gate.wait()
         return process
     asyncio.create_subprocess_exec=observed_spawn
 async def exercise():
@@ -136,11 +174,14 @@ async def exercise():
         else search(request['credentials'],'email',lambda:None,{'uid_validity':77,'after':0,'through':9}) if request['action']=='search'
         else probe(request['credentials'],'email',lambda:None))
     job=asyncio.create_task(operation)
-    if request['action']=='cancel':
+    if request['action'] in {'cancel','cancelspawn'}:
         assert await asyncio.to_thread(sys.stdin.readline)=='CANCEL\\n'
-        job.cancel()
+        job.cancel();await asyncio.sleep(0)
+        if request['action']=='cancelspawn':spawn_gate.set()
         try:await job
-        except asyncio.CancelledError:print(json.dumps({'cancelled_and_joined':True}))
+        except asyncio.CancelledError:
+            assert all(process.returncode is not None and not Path('/proc',str(process.pid)).exists() for process in spawned_processes)
+            print(json.dumps({'cancelled_and_joined':True}))
         else:raise AssertionError('mail cancellation ignored')
         return
     try:result=await job
@@ -212,17 +253,29 @@ asyncio.run(exercise())
                 elif verb==b'DATA':
                     assert mode[0]=='profile';writer.write(b'354 data\r\n');await writer.drain();data=bytearray()
                     while (part:=await reader.readline())!=b'.\r\n':
-                        assert part and len(data)<65536;data.extend(part[1:] if part.startswith(b'..') else part)
+                        assert part and len(data)<16*1024*1024;data.extend(part[1:] if part.startswith(b'..') else part)
                     from email.parser import BytesParser
                     from email import policy as mail_policy
                     parsed=BytesParser(policy=mail_policy.default).parsebytes(bytes(data))
                     assert str(parsed['From'])=='haos@example.invalid' and str(parsed['To'])=='owner@example.invalid'
                     assert str(parsed['In-Reply-To'])=='<mail-9@example.invalid>'
                     body=parsed.get_payload()[0].get_payload(decode=True).decode('utf-8');sent.append(body)
+                    attachments=[part for part in parsed.walk() if part.get_content_disposition()=='attachment']
+                    if body=='A supervised native SMTP attachment fixture.':
+                        assert [part.get_filename() for part in attachments]==['result-0.txt','result-1.png','result-2.wav','result-3.mp4']
+                        payloads=[part.get_payload(decode=True) for part in attachments]
+                        prefix=b'A bounded native SMTP attachment.'
+                        assert payloads[0]==prefix+b'x'*(8*1024*1024-len(prefix))
+                        assert payloads[1]==bytes.fromhex('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082')
+                        import io,wave,av
+                        with wave.open(io.BytesIO(payloads[2])) as actual:assert actual.getframerate()==16000 and actual.getnframes()==1600
+                        with av.open(io.BytesIO(payloads[3])) as actual:
+                            frame=next(actual.decode(video=0));assert (frame.width,frame.height)==(16,16)
+                    else:assert not attachments
                     if body=='Lost SMTP result fixture.':return
                     if body=='Temporarily rejected SMTP fixture.':writer.write(b'451 try later\r\n')
                     else:
-                        assert body=='A supervised native SMTP fixture reply.';writer.write(b'250 accepted\r\n')
+                        assert body in {'A supervised native SMTP fixture reply.','A supervised native SMTP attachment fixture.'};writer.write(b'250 accepted\r\n')
                 else:raise AssertionError('mail probe attempted message delivery')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
@@ -239,7 +292,7 @@ asyncio.run(exercise())
         from haos.gateway_email import scope
         policy={'version':1,'connectors':[{'id':'email','platform':'email'}],'bindings':[{
             'id':'owner','connector':'email','sender':'owner@example.invalid','chat':'owner@example.invalid','scope':scope(value),
-            'thread':'','identity':'personal','capabilities':['create','read'],'generation':'b'*64,'since':1}]}
+            'thread':'','identity':'personal','capabilities':['create','read'],'generation':'b'*64,'since':1,'allow_outbound_media':True}]}
         def publish():
             temporary=config/'next.json';temporary.write_text(json.dumps(policy));temporary.chmod(0o644);temporary.replace(config/'gateways.json')
         publish()
@@ -302,7 +355,9 @@ asyncio.run(exercise())
             mode[0]='profile';profile_child=await invoke(65534,'profile');children.append(profile_child)
             assert await finish(profile_child)=={'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True,
                 'confirmed_and_uncertain_never_repeated':True,'native_supervised_smtp':True,'reopen_preserves_reply_and_intents':True,'backoff_survives_reopen':True}
-            assert sent==['A supervised native SMTP fixture reply.','Lost SMTP result fixture.','Temporarily rejected SMTP fixture.']
+            assert sent==['A supervised native SMTP fixture reply.','A supervised native SMTP attachment fixture.','Lost SMTP result fixture.','Temporarily rejected SMTP fixture.']
+            cases.append('actual_gateway_uid_streams_four_private_outputs_including_maximum_document_png_wav_and_mp4_into_native_smtp_without_host_paths_or_duplicate_replay')
+            cases.append('secured_legacy_text_only_confirmation_remains_readable_without_journal_rewrite_or_another_smtp_write')
             cases.append('actual_native_smtp_temporary_refusal_disconnects_profile_and_persistent_retry_deadline_cannot_be_reset_by_reopening')
             cases.append('actual_gateway_uid_durable_reply_context_native_smtp_intent_and_acceptance_never_repeat_confirmed_or_uncertain_writes_across_attempts')
             cases.append('actual_gateway_uid_receiver_runs_native_account_search_header_body_capture_replay_and_durable_private_relay')
@@ -317,11 +372,12 @@ asyncio.run(exercise())
             assert len(verbs)==before
             cases.append('actual_agent_uid_cannot_invoke_the_private_worker_even_with_direct_installed_module_execution')
             smtp_writes=sum(verb in {'MAIL','RCPT','DATA'} for protocol,verb in verbs)
-            assert smtp_writes==9
-            for action in ['revoke','cancel','parentdeath','deadline']:
+            assert smtp_writes==12
+            for action in ['revoke','cancel','cancelspawn','parentdeath','deadline']:
                 active.clear();closed.clear();mode[0]='stall';started=time.monotonic()
                 child=await invoke(65534,action);children.append(child)
-                pid=await worker(child);await asyncio.wait_for(active.wait(),10)
+                pid=await worker(child)
+                if action!='cancelspawn':await asyncio.wait_for(active.wait(),10)
                 assert Path('/proc',str(pid)).stat().st_uid==65534
                 if action=='revoke':
                     agent=await invoke(65533,'agent',private_secret=str(secret),worker_pid=pid,parent_pid=child.pid);children.append(agent)
@@ -339,16 +395,18 @@ asyncio.run(exercise())
                             await asyncio.sleep(.02)
                     assert reaped==pid and os.WIFSIGNALED(status) and os.WTERMSIG(status)==9
                     cases.append('actual_parent_sigkill_immediately_kills_credential_worker_and_pid1_reaps_it_without_waiting_for_network_deadline')
-                elif action=='cancel':
+                elif action in {'cancel','cancelspawn'}:
                     child.stdin.write(b'CANCEL\n');await child.stdin.drain()
                     assert await finish(child)=={'cancelled_and_joined':True}
-                    cases.append('actual_parent_cancellation_kills_and_joins_blocked_private_worker_before_returning')
+                    cases.append('actual_cancellation_during_pending_process_creation_waits_for_spawn_then_kills_and_joins_before_parent_returns' if action=='cancelspawn'
+                        else 'actual_parent_cancellation_kills_and_joins_blocked_private_worker_before_returning')
                 else:
                     assert await finish(child)=={'private_worker_unavailable':True}
                     elapsed=time.monotonic()-started;assert 25<elapsed<38,elapsed
                     cases.append('actual_worker_hard_deadline_terminates_blocking_native_constructor_and_parent_joins_it')
                 assert not Path('/proc',str(pid)).exists()
-                await asyncio.wait_for(closed.wait(),5)
+                if action!='cancelspawn':await asyncio.wait_for(closed.wait(),5)
+                else:assert not active.is_set()
                 assert sum(verb in {'MAIL','RCPT','DATA'} for protocol,verb in verbs)==smtp_writes
                 assert not any(verb in {'STORE','EXPUNGE','CLOSE'} for protocol,verb in verbs)
         finally:

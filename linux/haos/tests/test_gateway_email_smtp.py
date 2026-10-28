@@ -16,7 +16,7 @@ def fixture():
     config={'version':1,'connectors':[{'id':'email','platform':'email'}],'bindings':[binding]}
     item={'binding_id':'owner','binding_digest':digest(binding),'delivery_id':'d'*64,'attempt':1,'source_id':'e'*64,
         'rfc_message_id':'<source@example.invalid>','root_message_id':binding['thread'],'subject':'Retained subject',
-        'body':'A bounded actual reply. Grüße!','created_at':int(time.time()),'recipient':binding['chat']}
+        'body':'A bounded actual reply. Grüße!','created_at':int(time.time()),'recipient':binding['chat'],'files':[]}
     return value,config,item
 
 

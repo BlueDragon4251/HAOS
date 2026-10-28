@@ -364,7 +364,7 @@ async def serve():
                         metadata=delivery_metadata(delivery,policy.connectors[delivery['connector']]['platform'])
                         preparing=True
                         try:
-                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms'}:
+                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms','email'}:
                                 output=await getattr(adapter,'_haos_'+policy.connectors[delivery['connector']]['platform']+'_output').prepare(delivery,call)
                                 if output is not None:metadata['haos_output']=output
                             preparing=False

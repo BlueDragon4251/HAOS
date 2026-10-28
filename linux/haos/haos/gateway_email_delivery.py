@@ -35,7 +35,7 @@ class Publisher:
         if len(rows)!=1:raise PermissionError('one durably admitted email reply context required')
         return dict(rows[0])
 
-    async def send(self,binding,delivery_id,attempt,content,source_id,authority):
+    async def send(self,binding,delivery_id,attempt,content,source_id,authority,*,prepared=None):
         from gateway.platforms.base import SendResult
         if (not isinstance(delivery_id,str) or not re.fullmatch('[0-9a-f]{64}',delivery_id)
                 or type(attempt) is not int or not 1<=attempt<=5):raise ValueError('exact bounded email outbox attempt required')
@@ -45,7 +45,26 @@ class Publisher:
         if (not isinstance(content,str) or not 1<=len(content.strip())<=32000 or len(content.encode())>128000
                 or '\0' in content):return SendResult(success=False,error_kind='too_long',raw_response={'haos_delivery':'refused'})
         if self.native.inbox.redactor.text(content)!=content:raise PermissionError('private email credential reflection refused')
-        fingerprint=digest([self.value,digest(binding),source_id,source['rfc_message_id'],source['subject'],content])
+        files=[];body=content;parts=[]
+        if prepared is not None:
+            if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list)
+                    or not isinstance(prepared['text'],str)):raise ValueError('exact private email output preparation required')
+            body=prepared['text']
+            for entry in prepared['items']:
+                if not isinstance(entry,dict) or set(entry)!={'id','sha256','size','name','data'}:raise ValueError('exact SMTP snapshot bytes required')
+                files.append({key:value for key,value in entry.items() if key!='data'});parts.append(entry['data'])
+        from .gateway_email_frame import validate
+        validate(files,parts)
+        if any(secret.encode() in part for secret in self.native.inbox.redactor.secrets for part in parts):
+            raise PermissionError('private email credential reflection refused')
+        from .gateway_email_smtp import specification
+        blueprint={'binding_id':binding['id'],'binding_digest':digest(binding),'delivery_id':delivery_id,'attempt':attempt,
+            'source_id':source_id,'rfc_message_id':source['rfc_message_id'],'root_message_id':binding['thread'],
+            'subject':source['subject'],'body':body,'created_at':int(time.time()),'recipient':binding['chat'],'files':files}
+        specification(self.value,self.native.policy(),self.native.connector,blueprint)
+        material=[self.value,digest(binding),source_id,source['rfc_message_id'],source['subject'],content]
+        # Preserve secured text-only receipts from the preceding private schema.
+        fingerprint=digest(material if prepared is None else material+[body,files])
         async with self.lock:
             current();self.source(binding,source_id)
             previous=self.db.execute('SELECT * FROM email_delivery_intents WHERE delivery_id=? ORDER BY attempt',(delivery_id,)).fetchall()
@@ -62,11 +81,9 @@ class Publisher:
                 raise Conflict('private email delivery capacity reached')
             now=int(time.time())
             self.db.execute('INSERT INTO email_delivery_intents VALUES(?,?,?,?,?,?,?)',(delivery_id,attempt,fingerprint,'writing','',now,time.time()))
-            item={'binding_id':binding['id'],'binding_digest':digest(binding),'delivery_id':delivery_id,'attempt':attempt,
-                'source_id':source_id,'rfc_message_id':source['rfc_message_id'],'root_message_id':binding['thread'],
-                'subject':source['subject'],'body':content,'created_at':now,'recipient':binding['chat']}
+            item={**blueprint,'created_at':now}
             try:
-                result=await process.smtp(self.value,self.native.connector,current,item);current()
+                result=await process.smtp(self.value,self.native.connector,current,item,files=parts);current()
                 accepted=result.get('accepted') is True;error=result.get('error')
                 rejected=error in {'smtp-authentication-refused','smtp-temporary-refusal','smtp-permanent-refusal','tls-refused'}
                 self.db.execute('UPDATE email_delivery_intents SET state=?,receipt=?,updated_at=? WHERE delivery_id=? AND attempt=?',

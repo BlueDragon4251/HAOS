@@ -20,8 +20,8 @@ def main():
     resource.setrlimit(resource.RLIMIT_AS,(512*1024*1024,512*1024*1024))
     resource.setrlimit(resource.RLIMIT_NOFILE,(64,64))
     signal.signal(signal.SIGALRM,lambda *_args:os._exit(124));signal.alarm(30)
-    raw=sys.stdin.buffer.read(262145)
-    if len(raw)>262144:raise ValueError('bounded private mail worker request required')
+    raw=sys.stdin.buffer.readline(262145)
+    if len(raw)>262144 or not raw.endswith(b'\n'):raise ValueError('bounded newline-delimited private mail worker header required')
     from .gateway_line_ingress import _object
     def constant(_value):raise ValueError('finite JSON required')
     request=json.loads(raw,object_pairs_hook=_object,parse_constant=constant)
@@ -61,13 +61,27 @@ def main():
             adapter=EmailAdapter(PlatformConfig(enabled=True,extra={'skip_attachments':True,
                 'require_authenticated_sender':True,'authserv_id':value['authserv_id']}))
         transport=Transport(adapter,value,current)
+        if request['action']!='smtp' and sys.stdin.buffer.read(1):raise ValueError('unexpected private mail reader payload')
         if request['action']=='smtp':
             from .gateway_email import PreparedEmailPolicy
-            from .gateway_email_smtp import publish
+            from .gateway_email_smtp import publish,specification
             from .sandbox import trusted_json
             def policy():
                 current();return PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
-            result=publish(adapter,value,policy,request['connector'],request['reply'],current)
+            item=specification(value,policy(),request['connector'],request['reply'])
+            from .gateway_email_frame import read
+            parts=read(sys.stdin.buffer,item['files'],current)
+            import tempfile,base64
+            aliases=[value['password'].encode(),base64.b64encode(value['password'].encode())]
+            if any(secret in part for secret in aliases for part in parts):raise PermissionError('private mail credential reflection refused')
+            with tempfile.TemporaryDirectory(prefix='smtp-',dir=home) as temporary:
+                paths=[]
+                for meta,data in zip(item['files'],parts):
+                    current();path=Path(temporary)/meta['name']
+                    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+                    with os.fdopen(fd,'wb') as stream:stream.write(data)
+                    paths.append(path)
+                current();result=publish(adapter,value,policy,request['connector'],item,current,paths)
         elif request['action']=='probe':result=transport.probe()
         elif request['action']=='mailbox':
             with transport.imap() as connection:

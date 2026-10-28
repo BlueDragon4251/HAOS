@@ -83,6 +83,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_media.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-media-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_smtp.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-smtp-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_output.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/email-output-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_output.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/sms-output-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_irc_profile.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/irc-prepared-profile-build-probe.json

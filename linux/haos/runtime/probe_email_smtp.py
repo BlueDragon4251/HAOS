@@ -82,7 +82,7 @@ def main():
                 'require_authenticated_sender':True,'authserv_id':value['authserv_id']}))
             item={'binding_id':'owner','binding_digest':digest(binding),'delivery_id':'d'*64,'attempt':1,'source_id':'e'*64,
                 'rfc_message_id':'<specific-source@example.invalid>','root_message_id':binding['thread'],'subject':'Specific retained source',
-                'body':'A native reply. Grüße!\n.Line beginning with a dot.','created_at':int(time.time()),'recipient':binding['chat']}
+                'body':'A native reply. Grüße!\n.Line beginning with a dot.','created_at':int(time.time()),'recipient':binding['chat'],'files':[]}
             def current():
                 if not allowed[0]:raise PermissionError('fixture owner grant withdrawn')
             try:
