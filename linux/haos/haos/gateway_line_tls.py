@@ -11,7 +11,8 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-def material(value,*,verify=True):
+def material(value,*,verify=True,webhook_path='/line/webhook'):
+    if webhook_path not in {'/line/webhook','/webhooks/twilio'}:raise ValueError('reviewed webhook TLS path required')
     required={'public_url','certificate','private_key','bind_host','public_listener'}
     if not isinstance(value,dict) or set(value)!=required:raise ValueError('exact LINE HTTPS material and listener consent required')
     if (not isinstance(value['bind_host'],str) or value['bind_host'] not in {'127.0.0.1','0.0.0.0','::'} or type(value['public_listener']) is not bool
@@ -21,7 +22,7 @@ def material(value,*,verify=True):
         address=urlsplit(value['public_url']);host=address.hostname
         if (address.scheme!='https' or not host or not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?',host)
                 or '.' not in host or host.endswith('.') or address.username or address.password
-                or address.port not in {None,443} or address.path!='/line/webhook' or address.query or address.fragment):raise ValueError
+                or address.port not in {None,443} or address.path!=webhook_path or address.query or address.fragment):raise ValueError
         try:ipaddress.ip_address(host)
         except ValueError:pass
         else:raise ValueError
@@ -47,7 +48,7 @@ def material(value,*,verify=True):
         private=key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode('ascii')
     except Exception:
         raise ValueError('LINE HTTPS certificate must be locally trusted, current, match the public hostname and private key') from None
-    return {'public_url':'https://'+host+'/line/webhook','certificate':certificate,'private_key':private,
+    return {'public_url':'https://'+host+webhook_path,'certificate':certificate,'private_key':private,
         'bind_host':value['bind_host'],'public_listener':value['public_listener']}
 
 
@@ -79,8 +80,8 @@ def _retain(directory,name,data):
     return target
 
 
-def context(value,profile):
-    value=material(value);profile=Path(profile);_private(profile)
+def context(value,profile,*,webhook_path='/line/webhook'):
+    value=material(value,webhook_path=webhook_path);profile=Path(profile);_private(profile)
     directory=profile/'tls'
     try:directory.mkdir(mode=0o700)
     except FileExistsError:pass

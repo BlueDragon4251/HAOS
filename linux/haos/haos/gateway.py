@@ -164,12 +164,12 @@ class GatewayEngine:
                 store.db.execute("ALTER TABLE gateway_inbox ADD COLUMN binding_digest TEXT")
                 store.db.execute("UPDATE gateway_schema SET version=2")
 
-    def _queue(self, route_id: str, key: str, content: str):
+    def _queue(self, route_id: str, key: str, content: str, *, limit=1800):
         content = self.store.redactor.text(content)
         # Bound native platform chunks; each part has a stable durable identity.
         chunks=[]
         while content:
-            end=min(1800,len(content))
+            end=min(limit,len(content))
             if end<len(content):
                 line=content.rfind('\n',0,end)+1
                 if line and content[line:end].lstrip().startswith('MEDIA:'):end=line
@@ -253,7 +253,8 @@ class GatewayEngine:
                 VALUES(?,?,?,?,?,?,?,?)""",
                 (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply), digest(binding)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
-            self._queue(route_id, key, content)
+            if policy.connectors[connector]['platform']=='sms':self._queue(route_id,key,content,limit=1600)
+            else:self._queue(route_id,key,content)
         # Commit admission BEFORE a network response to Hermes. A replay never repeats that side effect.
         if answer_request is not None:
             try:
@@ -288,7 +289,8 @@ class GatewayEngine:
                         content = f"Mission {route['mission_id']}: {kind.removeprefix('mission.')}\n{payload.get('result') or payload.get('error') or ''}"
                     else:
                         continue
-                    self._queue(route["id"], str(event["seq"]), content)
+                    if policy.connectors[route['connector']]['platform']=='sms':self._queue(route['id'],str(event['seq']),content,limit=1600)
+                    else:self._queue(route['id'],str(event['seq']),content)
                 if events:
                     self.store.db.execute("UPDATE gateway_routes SET cursor=? WHERE id=?", (events[-1]["seq"], route["id"]))
 

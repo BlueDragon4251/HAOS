@@ -100,6 +100,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_line_media.py linux/haos "$RUNNER_TEMP/provider-contracts/line-media.json"
           "$PYTHON" linux/haos/runtime/probe_line_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/line-output.json"
           "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
+          "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-delivery.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-transport.json"
