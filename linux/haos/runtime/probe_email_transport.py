@@ -39,12 +39,21 @@ def main():
                         writer.write(tag.encode()+(b' NO authentication refused\r\n' if mode[0]=='imap-auth-refused' else b' OK authenticated\r\n'))
                     elif verb=='EXAMINE':
                         assert parts[2:] == ['INBOX']
-                        writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT 3] next\r\n'+tag.encode()+b' OK [READ-ONLY] examined\r\n')
+                        writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY '+(b'88' if mode[0]=='changed-validity' else b'77')+b'] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','changed-uid','changed-validity','search','search-outside','search-duplicate'} else b'3')+b'] next\r\n'+tag.encode()+b' OK [READ-ONLY] examined\r\n')
                     elif verb=='UID':
-                        assert parts[2:]==['FETCH','1','(BODY.PEEK[HEADER])']
-                        # Deliberately no literal bytes: refusal must happen on
-                        # its announced length, before a blocking allocation/read.
-                        writer.write(b'* 1 FETCH (BODY[HEADER] {'+str(MAX_HEADERS+1).encode()+b'}\r\n')
+                        if mode[0] in {'search','search-outside','search-duplicate'}:
+                            assert parts[2:]==['SEARCH','UID','1:9','SINCE','31-Dec-1969']
+                            numbers=b'9 1 3' if mode[0]=='search' else b'1 10' if mode[0]=='search-outside' else b'1 1'
+                            writer.write(b'* SEARCH '+numbers+b'\r\n'+tag.encode()+b' OK searched\r\n')
+                        elif mode[0] in {'headers','changed-uid'}:
+                            assert parts[2:]==['FETCH','9','(UID','INTERNALDATE','RFC822.SIZE','BODY.PEEK[HEADER])']
+                            raw=b'Date: Fri, 1 Jan 1999 00:00:00 +0000\r\nFrom: owner@example.invalid\r\nMessage-ID: <mail-9@example.invalid>\r\n\r\n'
+                            uid=b'9' if mode[0]=='headers' else b'10'
+                            writer.write(b'* 1 FETCH (UID '+uid+b' INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE 1000 BODY[HEADER] {'+str(len(raw)).encode()+b'}\r\n'+raw+b')\r\n'+tag.encode()+b' OK fetched\r\n')
+                        else:
+                            assert parts[2:]==['FETCH','1','(BODY.PEEK[HEADER])']
+                            # No literal bytes: refusal must precede allocation/read.
+                            writer.write(b'* 1 FETCH (BODY[HEADER] {'+str(MAX_HEADERS+1).encode()+b'}\r\n')
                     else:raise AssertionError('unexpected IMAP command; no STORE/CLOSE/EXPUNGE permitted')
                     await writer.drain()
             except (ConnectionError,ssl.SSLError):pass
@@ -144,6 +153,36 @@ def main():
                     except (__import__('imaplib').IMAP4.error,__import__('smtplib').SMTPAuthenticationError):pass
                     else:raise AssertionError('native account authentication refusal ignored')
                     cases.append(security+'_'+failure+'_preserved_as_failure_without_outgoing_message')
+                mode[0]='headers'
+                from haos.gateway_email_imap import get_headers
+                from datetime import datetime,timezone
+                result=await asyncio.to_thread(get_headers,Transport(adapter,value,current),9,77)
+                assert result['internal_at']==datetime(2026,10,28,11,tzinfo=timezone.utc).timestamp()
+                assert b'1999' in result['content'] and result['uid']==9
+                cases.append(security+'_actual_native_header_fetch_uses_authenticated_internaldate_and_body_peek_not_sender_date_or_read_flags')
+                mode[0]='changed-uid'
+                try:await asyncio.to_thread(get_headers,Transport(adapter,value,current),9,77)
+                except ValueError:pass
+                else:raise AssertionError('server changed requested UID without refusal')
+                cases.append(security+'_changed_private_uid_resource_is_refused_before_header_admission')
+                mode[0]='changed-validity';before=sum(verb=='UID' for protocol,verb in commands)
+                from haos.gateway_email_imap import MailboxChanged
+                try:await asyncio.to_thread(get_headers,Transport(adapter,value,current),9,77)
+                except MailboxChanged:pass
+                else:raise AssertionError('reset mailbox epoch reused for a header resource')
+                assert sum(verb=='UID' for protocol,verb in commands)==before
+                cases.append(security+'_mailbox_epoch_change_is_refused_before_any_private_uid_header_fetch')
+                from haos.gateway_email_imap import search
+                page={'uid_validity':77,'after':0,'through':9};mode[0]='search'
+                result=await asyncio.to_thread(search,Transport(adapter,value,current),page,1)
+                assert result=={**page,'uid_next':10,'uids':[1,3,9]}
+                cases.append(security+'_actual_native_bounded_uid_search_uses_server_since_date_and_preserves_all_ordered_resources')
+                for failure in ['search-outside','search-duplicate']:
+                    mode[0]=failure
+                    try:await asyncio.to_thread(search,Transport(adapter,value,current),page,1)
+                    except ValueError:pass
+                    else:raise AssertionError('foreign or duplicate search resources accepted')
+                    cases.append(security+'_'+failure+'_is_refused_before_cursor_advance')
                 mode[0]='success'
             finally:
                 imap_server.close();smtp_server.close();await imap_server.wait_closed();await smtp_server.wait_closed()

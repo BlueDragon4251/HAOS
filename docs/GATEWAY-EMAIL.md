@@ -32,7 +32,8 @@ exercised with disposable loopback servers; no external mailbox is contacted.
 A separate private worker runs only as the real gateway UID. Its parent enforces
 bounded input/output, fixed root-owned runtime code, current root publication,
 revocation monitoring, cancellation kill/join and a hard child deadline. Its
-closed action currently permits account probing only. Account values travel in
+closed actions currently permit account probing, bounded header reads and
+received-date-filtered UID searches only. Account values travel in
 private stdin rather than argv or environment; result/error schemas exclude
 provider bodies and credentials. This is not yet a message-processing service.
 
@@ -42,3 +43,15 @@ attachments/local voice, native SMTP write intent and recovery, credential
 redaction/rotation/status, actual owner CLI/GUI and complete process/replay tests.
 No external account, SMTP delivery, installed service or hardware acceptance is
 claimed by these fixtures.
+
+
+The next increment adds exact INTERNALDATE/UID/literal verification over the real
+native IMAP client, with same-connection UIDVALIDITY/UIDNEXT checks. The private
+worker transfers bounded, checksum-verified headers and complete ordered search
+results. A private journal starts at cursor zero, fences UIDVALIDITY changes or
+UIDNEXT regressions without deleting receipts or automatically re-enabling, and
+commits cursor/dispositions together. Every searched UID needs a durable outcome;
+captured outcomes require an existing native input from the same mailbox, whose
+scope proof survives payload compaction. Actual SQLite fault tests verify rollback.
+These are receiving-service components, not yet the connected full-message inbox
+or a public owner setup path. Full body/media and SMTP publication remain open.

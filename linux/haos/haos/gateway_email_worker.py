@@ -20,10 +20,13 @@ def main():
     from .gateway_line_ingress import _object
     def constant(_value):raise ValueError('finite JSON required')
     request=json.loads(raw,object_pairs_hook=_object,parse_constant=constant)
-    if (not isinstance(request,dict) or set(request)!={'action','connector','credentials','policy_sha256'}
-            or request['action']!='probe' or not isinstance(request['connector'],str)
-            or not isinstance(request['policy_sha256'],str) or not re.fullmatch(r'[0-9a-f]{64}',request['policy_sha256'])):
-        raise ValueError('exact closed private email worker action required')
+    if not isinstance(request,dict) or not isinstance(request.get('action'),str) or request['action'] not in {'probe','headers','search'}:
+        raise ValueError('closed private email worker action required')
+    extra={'probe':set(),'headers':{'uid','uid_validity'},'search':{'page'}}[request['action']]
+    if (set(request)!=({'action','connector','credentials','policy_sha256'}|extra)
+            or not isinstance(request['connector'],str) or not isinstance(request['policy_sha256'],str)
+            or not re.fullmatch(r'[0-9a-f]{64}',request['policy_sha256'])):
+        raise ValueError('exact closed private email worker request required')
     from .gateway_email import credentials,authority,scope as mailbox_scope
     value=credentials(request['credentials'])
     def current():return authority(request['connector'],value,request['policy_sha256'])
@@ -41,13 +44,30 @@ def main():
     env.update(EMAIL_AUTHSERV_ID=value['authserv_id'],EMAIL_IMAP_TLS_VERIFY='true',EMAIL_SMTP_TLS_VERIFY='true',
         EMAIL_TRUST_FROM_HEADER='false',EMAIL_ALLOW_ALL_USERS='false',GATEWAY_ALLOW_ALL_USERS='false',
         EMAIL_ALLOWED_USERS='',GATEWAY_ALLOWED_USERS='')
+    from .gateway_email_imap import MailboxChanged
     try:
         with scope(home,env):
             from gateway.config import PlatformConfig
             from plugins.platforms.email.adapter import EmailAdapter
             adapter=EmailAdapter(PlatformConfig(enabled=True,extra={'skip_attachments':True,
                 'require_authenticated_sender':True,'authserv_id':value['authserv_id']}))
-        result=Transport(adapter,value,current).probe();current()
+        transport=Transport(adapter,value,current)
+        if request['action']=='probe':result=transport.probe()
+        elif request['action']=='search':
+            from .gateway_email import PreparedEmailPolicy
+            from .gateway_email_imap import search
+            from .sandbox import trusted_json
+            policy=PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+            times=[row['since'] for row in policy.bindings.values() if row['connector']==request['connector']]
+            if not times:raise PermissionError('email scan requires an explicit timed sender grant')
+            current();result=search(transport,request['page'],min(times))
+        else:
+            import base64,hashlib
+            from .gateway_email_imap import get_headers
+            fetched=get_headers(transport,request['uid'],request['uid_validity']);content=fetched.pop('content')
+            result={**fetched,'content_base64':base64.b64encode(content).decode(),'sha256':hashlib.sha256(content).hexdigest()}
+        current()
+    except MailboxChanged:result={'error':'uid-state-changed'}
     except PermissionError:result={'error':'authority-or-protocol-refused'}
     except __import__('ssl').SSLCertVerificationError:result={'error':'tls-refused'}
     except __import__('smtplib').SMTPAuthenticationError:result={'error':'smtp-authentication-refused'}

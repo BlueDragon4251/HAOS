@@ -52,7 +52,7 @@ class Transport:
                     raise PermissionError('private mail mutations are not authorized')
                 if verb==b'UID':
                     command=parts[2].rstrip(b'\r\n') if len(parts)==3 else b''
-                    if not (re.fullmatch(rb'SEARCH UID [1-9][0-9]{0,9}:[1-9][0-9]{0,9}',command)
+                    if not (re.fullmatch(rb'SEARCH UID [1-9][0-9]{0,9}:[1-9][0-9]{0,9} SINCE [1-9][0-9]?-[A-Z][a-z]{2}-[0-9]{4}',command)
                             or re.fullmatch(rb'FETCH [1-9][0-9]{0,9} \((?:UID |INTERNALDATE |RFC822.SIZE |FLAGS )*BODY.PEEK\[(?:HEADER)?\]\)',command)):
                         raise PermissionError('bounded read-only mail UID command required')
                 return send(data)

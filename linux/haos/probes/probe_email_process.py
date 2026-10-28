@@ -39,7 +39,7 @@ def main():
     secret=state/'account-secret';secret.write_text('private-email-fixture');secret.chmod(0o600);os.chown(secret,65534,65534)
     script=directory/'parent.py'
     script.write_text('''
-import asyncio,json,os,sys
+import asyncio,hashlib,json,os,sys
 from pathlib import Path
 request=json.loads(sys.stdin.readline())
 assert os.getgroups()==[]
@@ -54,8 +54,8 @@ if request['action']=='agent':
         raise AssertionError('agent accessed private credential or process channel')
     print(json.dumps({'agent_private_data_denied':True,'credential_payload_absent':True}));sys.exit(0)
 assert os.geteuid()==65534
-from haos.gateway_email_process import probe
-if request['action']!='probe':
+from haos.gateway_email_process import probe,headers,search
+if request['action'] in {'revoke','cancel','deadline'}:
     original_spawn=asyncio.create_subprocess_exec
     async def observed_spawn(*args,**kwargs):
         process=await original_spawn(*args,**kwargs)
@@ -63,7 +63,10 @@ if request['action']!='probe':
         return process
     asyncio.create_subprocess_exec=observed_spawn
 async def exercise():
-    job=asyncio.create_task(probe(request['credentials'],'email',lambda:None))
+    operation=(headers(request['credentials'],'email',lambda:None,9,77) if request['action']=='headers'
+        else search(request['credentials'],'email',lambda:None,{'uid_validity':77,'after':0,'through':9}) if request['action']=='search'
+        else probe(request['credentials'],'email',lambda:None))
+    job=asyncio.create_task(operation)
     if request['action']=='cancel':
         assert await asyncio.to_thread(sys.stdin.readline)=='CANCEL\\n'
         job.cancel()
@@ -74,11 +77,13 @@ async def exercise():
     try:result=await job
     except PermissionError:result={'owner_revocation_refused':True}
     except ConnectionError:result={'private_worker_unavailable':True}
+    if 'content' in result:result['content_sha256']=hashlib.sha256(result.pop('content')).hexdigest()
     print(json.dumps(result))
 asyncio.run(exercise())
 ''');script.chmod(0o644)
     config=Path('/etc/haos');config.mkdir(mode=0o755)
     active=asyncio.Event();closed=asyncio.Event();mode=['success'];verbs=[];cases=[]
+    header=b'From: owner@example.invalid\r\nMessage-ID: <mail-9@example.invalid>\r\nDate: Fri, 1 Jan 1999 00:00:00 +0000\r\nAuthentication-Results: mx.example.invalid; dmarc=pass\r\n\r\n'
     async def imap(reader,writer):
         active.set()
         try:
@@ -89,7 +94,14 @@ asyncio.run(exercise())
                 pieces=line.split();tag,verb=pieces[:2];verbs.append(('imap',verb.decode()))
                 if verb==b'CAPABILITY':writer.write(b'* CAPABILITY IMAP4rev1\r\n'+tag+b' OK capabilities\r\n')
                 elif verb==b'LOGIN':writer.write(tag+b' OK authenticated\r\n')
-                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT 3] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
+                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','search'} else b'3')+b'] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
+                elif verb==b'UID':
+                    if mode[0]=='search':
+                        assert b'UID SEARCH UID 1:9 SINCE 31-Dec-1969' in line
+                        writer.write(b'* SEARCH 9 1 3\r\n'+tag+b' OK searched\r\n')
+                    else:
+                        assert b'UID FETCH 9 (UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER])' in line
+                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE 1000 BODY[HEADER] {'+str(len(header)).encode()+b'}\r\n'+header+b')\r\n'+tag+b' OK fetched\r\n')
                 else:raise AssertionError('mail worker attempted unsupported remote command')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
@@ -151,6 +163,15 @@ asyncio.run(exercise())
             child=await invoke(65534,'probe');children.append(child);result=await finish(child)
             assert result=={'imap_authenticated':True,'smtp_authenticated':True,'uid_validity':77,'uid_next':3,'smtp_message_sent':False}
             cases.append('actual_gateway_uid_private_worker_imports_root_owned_runtime_and_authenticates_native_verified_tls_without_sending')
+            mode[0]='headers';header_child=await invoke(65534,'headers');children.append(header_child)
+            result=await finish(header_child)
+            assert result['uid']==9 and result['uid_validity']==77 and result['uid_next']==10
+            assert result['content_sha256']==__import__('hashlib').sha256(header).hexdigest() and result['size']==1000
+            cases.append('actual_gateway_uid_worker_transfers_exact_bounded_header_bytes_with_same_connection_uidvalidity_and_internaldate')
+            mode[0]='search';search_child=await invoke(65534,'search');children.append(search_child)
+            assert await finish(search_child)=={'uid_validity':77,'uid_next':10,'after':0,'through':9,'uids':[1,3,9]}
+            cases.append('actual_gateway_uid_worker_search_uses_current_root_grant_date_and_returns_all_sorted_bounded_uid_resources')
+            mode[0]='success'
             denied=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s','-m','haos.gateway_email_worker',
                 stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
                 user=65533,group=65533,extra_groups=[],cwd=str(code),
