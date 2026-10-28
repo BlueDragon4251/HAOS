@@ -22,6 +22,14 @@ def main():
     config={'version':1,'connectors':[{'id':'line','platform':'line'}],'bindings':[{
         'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,
         'thread':'','identity':'personal','capabilities':['create','read'],'allow_media':True,'generation':'b'*64,'since':1}]}
+    platform=os.environ.get('HAOS_MEDIA_CONTROL_PLATFORM','line')
+    if platform not in {'line','email'}:raise ValueError('reviewed private media peer fixture platform required')
+    if platform=='email':
+        sys.path.insert(0,'/usr/lib/haos')
+        from haos.gateway_email import scope
+        binding=config['bindings'][0];binding.update(connector='email',sender='owner@example.invalid',chat='owner@example.invalid',
+            scope=scope({'address':'haos@example.invalid','imap_host':'imap.example.invalid','imap_port':993}))
+        config['connectors']=[{'id':'email','platform':'email'}]
     def publish():
         tmp=root/'policy.next';tmp.write_text(json.dumps(config));os.chown(tmp,0,65532);tmp.chmod(0o640);tmp.replace(policy)
     publish()
@@ -39,7 +47,9 @@ async def run():
     if request['role']=='control':
         assert set(os.getresuid())=={65532} and set(os.getresgid())=={65532}
         store=MissionStore(Path(request['database']));controller=Controller(store,'unused-private-origin',set())
-        controller.gateway_uids={65534};controller.gateway_policy=lambda:GatewayPolicy(trusted_json(Path(request['policy'])))
+        controller.gateway_uids={65534}
+        from haos.gateway_email import PreparedEmailPolicy
+        controller.gateway_policy=lambda:(PreparedEmailPolicy if request['platform']=='email' else GatewayPolicy)(trusted_json(Path(request['policy'])))
         async def incoming(reader,writer):await controller.client(reader,writer,gateway=True)
         stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
         server=await asyncio.start_unix_server(incoming,path=request['socket'])
@@ -71,7 +81,7 @@ asyncio.run(run())
     common={'socket':str(socket),'database':str(database)}
     try:
         stdout,stderr=None,None
-        server.stdin.write(json.dumps({**common,'role':'control','policy':str(policy)}));server.stdin.close()
+        server.stdin.write(json.dumps({**common,'role':'control','policy':str(policy),'platform':platform}));server.stdin.close()
         # A bounded pipe read also reports an early child failure without ever
         # printing the private byte payload from a producer request.
         import select
@@ -88,9 +98,10 @@ asyncio.run(run())
         sys.path.insert(0,'/usr/lib/haos')
         from haos.gateway_media import describe
         data=b'disposable private media payload'
-        event={'platform':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,'thread':'',
+        binding=config['bindings'][0]
+        event={'platform':platform,'sender':binding['sender'],'chat':binding['chat'],'scope':binding['scope'],'thread':'',
             'message_id':'c'*64,'is_bot':False,'text':'Inspect the attached document.'}
-        params={'connector':'line','envelope':event,'descriptor':describe(data,'document')}
+        params={'connector':platform,'envelope':event,'descriptor':describe(data,'document')}
         started=request(65534,'gateway.media.begin',params);assert started['ok']
         identity=started['result']['id'];payload={'id':identity,'offset':0,'data':base64.b64encode(data).decode()}
         assert request(65534,'gateway.media.chunk',payload)['result']['ready']
@@ -111,12 +122,12 @@ asyncio.run(run())
         assert request(65534,'gateway.media.chunk',payload)['ok'] is False
         cases.append('actual_owner_policy_withdrawal_blocks_a_later_chunk_on_the_same_connection_interface')
         config['bindings'][0].update(allow_media=True,generation='e'*64);publish()
-        old=request(65534,'gateway.receive',{'connector':'line','envelope':event,'media':[identity]})
+        old=request(65534,'gateway.receive',{'connector':platform,'envelope':event,'media':[identity]})
         assert old['ok'] is False
         with sqlite3.connect(database) as observer:assert observer.execute('SELECT COUNT(*) FROM missions').fetchone()[0]==0
         fresh=request(65534,'gateway.media.begin',params);assert fresh['ok'] and fresh['result']['id']!=identity
         payload['id']=fresh['result']['id'];assert request(65534,'gateway.media.chunk',payload)['result']['ready']
-        admitted=request(65534,'gateway.receive',{'connector':'line','envelope':event,'media':[payload['id']]})
+        admitted=request(65534,'gateway.receive',{'connector':platform,'envelope':event,'media':[payload['id']]})
         assert admitted['ok']
         with sqlite3.connect(database) as observer:
             assert observer.execute('SELECT COUNT(*) FROM missions').fetchone()[0]==1
@@ -125,6 +136,7 @@ asyncio.run(run())
         assert database.stat().st_uid==65532 and database.stat().st_mode&0o077==0
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65532,65533,65534],
             'actual_kernel_so_peercred':True,'socket_filesystem_permission_is_not_the_negative_gate':True,
+            'gateway_platform':platform,'prepared_email_policy_is_fixture':platform=='email',
             'optional_hermes_sdk_imported':False,'external_or_installed_acceptance':False},indent=2))
     finally:
         if server.poll() is None:

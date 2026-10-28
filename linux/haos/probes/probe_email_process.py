@@ -153,6 +153,14 @@ asyncio.run(exercise())
     config=Path('/etc/haos');config.mkdir(mode=0o755)
     active=asyncio.Event();closed=asyncio.Event();mode=['success'];verbs=[];cases=[];sent=[]
     header=b'From: owner@example.invalid\r\nMessage-ID: <mail-9@example.invalid>\r\nDate: Fri, 1 Jan 1999 00:00:00 +0000\r\nAuthentication-Results: mx.example.invalid; dmarc=pass\r\n\r\n'
+    from email.message import EmailMessage
+    from email import policy as mail_policy
+    mime_message=EmailMessage();mime_message['From']='owner@example.invalid';mime_message['To']='haos@example.invalid'
+    mime_message['Message-ID']='<mail-9@example.invalid>';mime_message['Authentication-Results']='mx.example.invalid; dmarc=pass'
+    mime_message.set_content('Actual scoped private mail body.')
+    mime_data=b'A native approved attachment.'
+    mime_message.add_attachment(mime_data,maintype='application',subtype='pdf',filename='../../owner-secret.pdf')
+    mime_whole=mime_message.as_bytes(policy=mail_policy.SMTP);mime_header=mime_whole[:mime_whole.index(b'\r\n\r\n')+4]
     async def imap(reader,writer):
         active.set()
         try:
@@ -163,18 +171,19 @@ asyncio.run(exercise())
                 pieces=line.split();tag,verb=pieces[:2];verbs.append(('imap',verb.decode()))
                 if verb==b'CAPABILITY':writer.write(b'* CAPABILITY IMAP4rev1\r\n'+tag+b' OK capabilities\r\n')
                 elif verb==b'LOGIN':writer.write(tag+b' OK authenticated\r\n')
-                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','search','message','profile'} else b'3')+b'] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
+                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','search','message','profile','mime'} else b'3')+b'] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
                 elif verb==b'UID':
                     if mode[0]=='search' or mode[0]=='profile' and b'UID SEARCH' in line:
                         assert b'UID SEARCH UID 1:9 SINCE 31-Dec-1969' in line
                         writer.write((b'* SEARCH 9\r\n' if mode[0]=='profile' else b'* SEARCH 9 1 3\r\n')+tag+b' OK searched\r\n')
                     else:
                         assert b'UID FETCH 9 (UID INTERNALDATE RFC822.SIZE BODY.PEEK[' in line
-                        whole=header+b'Actual scoped private mail body.\r\n'+(b'' if mode[0]=='profile' else b'x'*1048576)
+                        selected_header=mime_header if mode[0]=='mime' else header
+                        whole=mime_whole if mode[0]=='mime' else header+b'Actual scoped private mail body.\r\n'+(b'' if mode[0]=='profile' else b'x'*1048576)
                         full=b'BODY.PEEK[])' in line
-                        if full:assert mode[0] in {'message','profile'}
-                        payload=whole if full else header;section=b'' if full else b'HEADER'
-                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE '+str(len(whole) if mode[0] in {'message','profile'} else 1000).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag+b' OK fetched\r\n')
+                        if full:assert mode[0] in {'message','profile','mime'}
+                        payload=whole if full else selected_header;section=b'' if full else b'HEADER'
+                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE '+str(len(whole) if mode[0] in {'message','profile','mime'} else 1000).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag+b' OK fetched\r\n')
                 else:raise AssertionError('mail worker attempted unsupported remote command')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
@@ -276,6 +285,20 @@ asyncio.run(exercise())
             assert result['content_sha256']==__import__('hashlib').sha256(expected).hexdigest() and result['size']==len(expected)
             assert result['approval']['binding_id']=='owner' and result['approval']['envelope']['text']==''
             cases.append('actual_gateway_uid_streams_exact_large_approved_body_over_private_bounded_binary_ipc_without_model_or_smtp_send')
+            mode[0]='mime'
+            refused=await invoke(65534,'message',header_sha256=__import__('hashlib').sha256(mime_header).hexdigest(),
+                route={'binding_id':'owner','binding_digest':digest(policy['bindings'][0])});children.append(refused)
+            assert await finish(refused)=={'error':'media-not-approved'}
+            cases.append('actual_uid_worker_refuses_unapproved_mime_after_bounded_inspection_without_transferring_full_source_to_parent')
+            policy['bindings'][0]['allow_media']=True;publish()
+            approved=await invoke(65534,'message',header_sha256=__import__('hashlib').sha256(mime_header).hexdigest(),
+                route={'binding_id':'owner','binding_digest':digest(policy['bindings'][0])});children.append(approved)
+            result=await finish(approved)
+            assert result['content_sha256']==__import__('hashlib').sha256(mime_whole).hexdigest()
+            assert len(result['mime'])==1 and result['mime'][0]['kind']=='document'
+            assert result['mime'][0]['sha256']==__import__('hashlib').sha256(mime_data).hexdigest()
+            cases.append('actual_uid_worker_returns_exact_bounded_mime_manifest_and_binary_source_only_under_current_explicit_media_grant')
+            del policy['bindings'][0]['allow_media'];publish()
             mode[0]='profile';profile_child=await invoke(65534,'profile');children.append(profile_child)
             assert await finish(profile_child)=={'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True,
                 'confirmed_and_uncertain_never_repeated':True,'native_supervised_smtp':True,'reopen_preserves_reply_and_intents':True,'backoff_survives_reopen':True}

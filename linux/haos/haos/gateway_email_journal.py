@@ -8,7 +8,7 @@ from .gateway import Conflict,digest
 from .gateway_email_imap import uid_number
 
 _HASH=re.compile(r'[0-9a-f]{64}\Z')
-_REASONS=frozenset({'unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','source-unavailable'})
+_REASONS=frozenset({'unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','source-unavailable','media-not-approved'})
 
 
 class Journal:

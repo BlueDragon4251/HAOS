@@ -134,7 +134,7 @@ def _install(adapter,fd,profile,identity):
                     resource=await process.message(value,connector,current,uid,page['uid_validity'],approval['header_sha256'],
                         {'binding_id':approval['binding_id'],'binding_digest':approval['binding_digest']})
                     if 'error' in resource:
-                        if resource['error'] in {'unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused'}:
+                        if resource['error'] in {'unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','media-not-approved'}:
                             raise Refused(resource['error'])
                         raise Deferred(resource['error'])
                     key=capture(adapter,resource)

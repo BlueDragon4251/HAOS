@@ -25,6 +25,8 @@ def capture(adapter,resource):
     native=adapter._haos_native;adapter._haos_email_check();policy=native.policy()
     approval=approve(policy,native.connector,adapter._haos_email_value,resource)
     if approval!=resource['approval']:raise Conflict('email body differs from current independent source approval')
+    from .gateway_email_media import manifest,permit
+    media=manifest(resource['content'])
     try:parsed=decode(adapter,resource['content'],adapter._haos_email_value,str(resource['uid']).encode())
     except ValueError:raise Refused('unsupported-content') from None
     if parsed is None:raise Refused('self-or-automated')
@@ -32,6 +34,8 @@ def capture(adapter,resource):
     if any(native.inbox.redactor.text(value)!=value for value in [goal,codec_text,parsed['sender_name']]):
         raise Refused('unsupported-content')
     envelope={**approval['envelope'],'text':goal}
+    permit(policy,native.connector,envelope,media)
+    if 'mime' in resource and resource['mime']!=media:raise Conflict('email source MIME manifest changed')
     latest=native.policy();latest.current_binding({'binding_id':approval['binding_id'],'binding_digest':approval['binding_digest']})
     identity=adapter._haos_email_raw.put(latest,native.connector,resource)
     latest=native.policy();latest.current_binding({'binding_id':approval['binding_id'],'binding_digest':approval['binding_digest']})
@@ -41,7 +45,7 @@ def capture(adapter,resource):
     values=(envelope['message_id'],approval['binding_digest'],parsed['message_id'],parsed['subject'])
     if old is None:native.inbox.db.execute('INSERT INTO email_source_context VALUES(?,?,?,?)',values)
     elif tuple(old)!=values:raise Conflict('email source replay changed reply context or recipient authority')
-    key=native.inbox.admit(latest,native.connector,envelope,{'raw_id':identity},received_at=approval['received_at'])
+    key=native.inbox.admit(latest,native.connector,envelope,{'raw_id':identity,'media':media},received_at=approval['received_at'])
     from .gateway_email_journal import Journal
     Journal(native.inbox,native.connector,envelope['scope'],adapter._haos_email_check).remember_capture(key)
     return key
@@ -55,12 +59,18 @@ async def dispatch_stored(adapter,key):
         state={'adapter':adapter,'row':row,'accepted':False};token=_CURRENT.set(state)
         try:
             adapter._haos_email_check();native.policy().current_binding(row)
-            if set(row['payload'])!={'raw_id'}:raise ValueError('exact retained email resource required')
+            if set(row['payload']) not in ({'raw_id'},{'raw_id','media'}):raise ValueError('exact retained email resource required')
             resource=adapter._haos_email_raw.get(native.policy(),row['payload']['raw_id'])
             approval=approve(native.policy(),native.connector,adapter._haos_email_value,resource)
             parsed=decode(adapter,resource['content'],adapter._haos_email_value,str(resource['uid']).encode())
             if parsed is None:raise PermissionError('retained native email codec no longer accepts source')
             codec_text,goal=text(parsed);state.update(codec_text=codec_text,rfc_message_id=parsed['message_id'])
+            from .gateway_email_media import retained
+            media=retained(adapter,row,resource)
+            parsed['attachments']=[{'path':'haos-email-part:'+str(item['metadata']['index']),
+                'filename':item['metadata']['native_filename'],'type':'image' if item['metadata']['kind']=='image' else 'document',
+                'media_type':item['metadata']['mime']} for item in media]
+            state['media']=media
             if {**approval['envelope'],'text':goal}!=row['envelope']:raise Conflict('retained native email source changed')
             from .gateway_matrix_profile import scope
             with scope(adapter._haos_email_home,adapter._haos_email_environment):
@@ -91,13 +101,25 @@ def install(adapter):
         return original_build(**kwargs)
     async def handle(self,event):
         state=current(self);row=state['row']
-        if event.text!=state['codec_text'] or event.message_id!=state['rfc_message_id'] or event.media_urls:
+        expected=['haos-email-part:'+str(item['metadata']['index']) for item in state['media']]
+        types=[item['metadata']['mime'] for item in state['media']]
+        if (event.text!=state['codec_text'] or event.message_id!=state['rfc_message_id']
+                or event.media_urls!=expected or event.media_types!=types):
             raise PermissionError('native email codec changed retained text, identity or media')
         event.text=row['envelope']['text'];event.message_id=row['envelope']['message_id']
         event.timestamp=datetime.fromtimestamp(row['created_at'],timezone.utc)
         from .gateway_runtime import adapter_envelope
-        if adapter_envelope(event,'email')!=row['envelope']:raise PermissionError('native email source differs from approved route')
-        await original_handle(event);state['accepted']=event._gateway_accepted is True
+        if state['media']:
+            ids=[item['item']['id'] for item in state['media']]
+            event.media_urls=['haos-media:'+identity for identity in ids]
+            from .gateway_media_relay import event_scope
+            with event_scope(event,ids,types,platform='email'):
+                if adapter_envelope(event,'email')!=row['envelope']:raise PermissionError('native email source differs from approved media route')
+                await original_handle(event)
+        else:
+            if adapter_envelope(event,'email')!=row['envelope']:raise PermissionError('native email source differs from approved route')
+            await original_handle(event)
+        state['accepted']=event._gateway_accepted is True
     async def deny(_self,*_args,**_kwargs):raise PermissionError('email requires retained independent admission and supervised native transport')
     for name in ['connect','_check_inbox','_dispatch_message','send','send_image','send_multiple_images','send_document','send_voice','send_video','send_typing']:
         setattr(adapter,name,MethodType(deny,adapter))

@@ -19,7 +19,7 @@ def headers(raw,value):
     if header.defects or len(header.items())>256:raise ValueError('well-formed bounded mail headers required')
     sources=header.get_all('From',[]);ids=header.get_all('Message-ID',[])
     if (len(sources)!=1 or len(ids)!=1 or sources[0].defects or ids[0].defects
-            or len(sources[0].addresses)!=1 or not message_id(str(ids[0]))):
+            or len(sources[0].addresses)!=1 or not message_id(str(ids[0]).strip(' \t\r\n'))):
         raise ValueError('one exact From mailbox and Message-ID required')
     sender=address(sources[0].addresses[0].addr_spec.lower())
     results=header.get_all('Authentication-Results',[])
@@ -36,7 +36,7 @@ def headers(raw,value):
     isolated=EmailMessage();isolated['From']=str(sources[0]);isolated['Authentication-Results']=first
     accepted,_reason=_verify_sender_authentication(isolated,sender,authserv_id=value['authserv_id'])
     if accepted is not True:raise PermissionError('receiving server did not authenticate the sender domain')
-    return {'sender':sender,'message_id':str(ids[0]),'headers':header}
+    return {'sender':sender,'message_id':str(ids[0]).strip(' \t\r\n'),'headers':header}
 
 
 def decode(adapter,raw,value,uid):
@@ -47,9 +47,9 @@ def decode(adapter,raw,value,uid):
         raise PermissionError('bounded UID and isolated authenticated native email codec required')
     result=adapter._parse_fetched_message(uid,raw)
     if result is None:return None  # Native automated-mail refusal is preserved.
-    if (result['sender_addr']!=checked['sender'] or result['message_id']!=checked['message_id']
+    if (result['sender_addr']!=checked['sender'] or not isinstance(result['message_id'],str) or result['message_id'].strip(' \t\r\n')!=checked['message_id']
             or result.get('sender_authenticated') is not True or result.get('attachments')!=[]
             or len(result['body'])>50000 or len(result['subject'])>1024
             or any(c in result['subject'] for c in '\r\n\0')):
         raise ValueError('native email source, authentication or bounded text changed')
-    return {**result,'raw_sha256':hashlib.sha256(raw).hexdigest()}
+    return {**result,'message_id':checked['message_id'],'raw_sha256':hashlib.sha256(raw).hexdigest()}

@@ -1,7 +1,7 @@
 # Email — prepared private transport, not public setup
 
-Email remains absent from public HAOS setup until media, owner recovery and
-real owner configuration join the prepared receiving and delivery paths. Bundled upstream
+Email remains absent from public HAOS setup until outbound attachment delivery,
+owner recovery and real owner configuration join the prepared receiving paths. Bundled upstream
 code or a passing connection probe does not constitute a completed gateway.
 
 The prepared account contract requires exact lowercase mailbox identities, fixed
@@ -37,8 +37,7 @@ received-date-filtered UID searches and independently approved complete-message 
 private stdin rather than argv or environment; result/error schemas exclude
 provider bodies and credentials. The prepared receiver now joins these workers to durable native input and relay dispatch; public setup remains disabled.
 
-Remaining: bounded persistent attachments/local voice, audited owner SMTP/mailbox
-recovery, credential
+Remaining: outbound attachments, audited owner SMTP/mailbox recovery, credential
 redaction/rotation/status, actual owner CLI/GUI and complete process/replay tests.
 No external account, SMTP delivery, installed service or hardware acceptance is
 claimed by these fixtures.
@@ -109,3 +108,43 @@ Only a complete validated remote rejection can release a write as rejected;
 a local smtplib error such as an oversized response must remain unknown. Owner
 authority is checked between response lines as well as commands. Native TLS
 fixtures cover oversized single/multiline terminal responses after DATA.
+
+
+Incoming MIME is now inspected inside the resource-limited private worker before
+full bytes reach its parent. The parent rederives the exact manifest. At most
+128 MIME parts, depth 16 and four attachments are accepted; nested attached
+messages/archives are not expanded. Each file is at most 8 MiB, with PNG/JPEG
+images limited to 2 MiB in aggregate. Audio needs separate voice consent, video
+separate video consent, and all incoming files require create permission. Mixed
+messages are refused as a whole if a part lacks consent. Attachments cannot
+reinterpret exact body control commands. GIF/WebP and other binary files remain
+documents under the existing PNG/JPEG model-image contract; unsupported video
+containers are refused rather than silently omitted.
+
+The original pinned attachment helper runs in a newly created private temporary
+cache home, with canonical per-part filenames, only after all metadata and
+permissions pass. The returned regular single-link files must stay inside that
+context and match exact approved bytes. Only these newly created temporary files
+are removed after copying; existing owner/recovery files are not touched. Original
+filenames are recorded as hashes and never become host paths. Native dispatch
+uses opaque media placeholders, then exact event-bound capabilities into the
+existing durable private media cache and controller uploads. Acknowledged cache
+bytes compact while replay metadata remains. The separate 64 MiB raw-source store
+remains bounded and still needs audited owner inventory/purge integration.
+
+Actual native MIME and relay now reach the real pinned agent backend through
+image.attach_bytes/file.attach, including an 8 MiB document and a real encoded
+MP4. No host path is sent to the backend. Separate email composition fixtures use
+the actual pinned offline local speech engine and reviewed model: raw voice
+remains outside agent file APIs, its transcript reaches the controller prompt as
+text, replay does not transcribe again, malformed audio stays pending, and owner
+withdrawal after ASR blocks transcript publication and prompting. The private
+speech transport and agent terminal are fixtures in that composition; real
+UID/socket service acceptance is a separate mandatory kernel gate. No inference,
+external delivery, installed graphical setup or hardware acceptance follows from
+these local contracts. Outgoing MIME files and owner CLI/GUI remain open.
+
+Native compat32 SMTP can fold a long Message-ID after the header colon. The
+receiving codec now canonicalizes only outer ASCII folding whitespace while
+retaining exact identifier contents; multiple IDs and internal controls stay
+forbidden. Actual pinned codec fixtures cover the folded native-builder form.

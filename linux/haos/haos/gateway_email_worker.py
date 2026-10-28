@@ -88,6 +88,9 @@ def main():
                 current();return PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
             complete=message(transport,request['uid'],request['uid_validity'],request['header_sha256'],policy,
                 request['connector'],value,{'binding_id':request['binding_id'],'binding_digest':request['binding_digest']})
+            from .gateway_email_media import manifest,permit
+            complete['mime']=manifest(complete['content'])
+            permit(policy(),request['connector'],complete['approval']['envelope'],complete['mime'])
             content=complete.pop('content');current();streaming=True
             sys.stdout.buffer.write((json.dumps(complete)+'\n').encode());sys.stdout.buffer.flush()
             for offset in range(0,len(content),49152):

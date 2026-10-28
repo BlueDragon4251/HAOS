@@ -63,6 +63,7 @@ jobs:
           cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
           "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/media-native-backend.json"
           "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-media-native-backend.json" --sms
+          "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/email-media-native-backend.json" --email
           "$PYTHON" linux/haos/runtime/probe_artifact_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/artifact-native-backend.json"
           "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
           "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
@@ -106,6 +107,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
           "$PYTHON" linux/haos/runtime/probe_email_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/email-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_email_media.py linux/haos "$RUNNER_TEMP/provider-contracts/email-media.json"
           "$PYTHON" linux/haos/runtime/probe_email_smtp.py linux/haos "$RUNNER_TEMP/provider-contracts/email-smtp.json"
           "$PYTHON" linux/haos/runtime/probe_sms_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-output.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
@@ -177,6 +179,7 @@ jobs:
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_speech_backend.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/speech-native.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_line_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/line-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_sms_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/sms-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_email_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/email-voice.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail
@@ -200,6 +203,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
           cat "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 -e HAOS_MEDIA_CONTROL_PLATFORM=email \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
       - name: Verify LINE owner CLI publication private PEM and actual UID denial
         run: |
           set -euo pipefail

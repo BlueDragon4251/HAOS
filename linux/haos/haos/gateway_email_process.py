@@ -11,7 +11,7 @@ import time
 
 from .gateway_email import credentials,authority
 
-ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed','unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','smtp-temporary-refusal','smtp-permanent-refusal','smtp-outcome-unknown'})
+ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed','unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused','smtp-temporary-refusal','smtp-permanent-refusal','smtp-outcome-unknown','media-not-approved'})
 
 
 def command():
@@ -92,7 +92,7 @@ def message_response(raw,uid,validity,header_sha256,route):
     if isinstance(metadata,dict) and set(metadata)=={'error'}:
         if content:raise ValueError('mail refusal cannot include body data')
         return response(metadata)
-    if (not isinstance(metadata,dict) or set(metadata)!={'uid','uid_validity','uid_next','internal_at','size','approval','sha256'}
+    if (not isinstance(metadata,dict) or set(metadata)!={'uid','uid_validity','uid_next','internal_at','size','approval','sha256','mime'}
             or type(metadata['uid']) is not int or metadata['uid']!=uid
             or type(metadata['uid_validity']) is not int or metadata['uid_validity']!=validity
             or type(metadata['uid_next']) is not int or not uid<metadata['uid_next']<2**32
@@ -100,6 +100,8 @@ def message_response(raw,uid,validity,header_sha256,route):
             or type(metadata['internal_at']) not in {int,float} or not math.isfinite(metadata['internal_at'])
             or not 0<metadata['internal_at']<=time.time()+300 or hashlib.sha256(content).hexdigest()!=metadata['sha256']):
         raise ValueError('complete immutable private email resource required')
+    from .gateway_email_media import manifest
+    if manifest(content)!=metadata['mime']:raise ValueError('exact bounded MIME manifest required')
     approval=metadata['approval']
     if (not isinstance(approval,dict) or set(approval)!={'envelope','binding_id','binding_digest','received_at','header_sha256','rfc_message_id'}
             or approval['binding_id']!=route['binding_id'] or approval['binding_digest']!=route['binding_digest']

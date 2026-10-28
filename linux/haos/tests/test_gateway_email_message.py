@@ -11,7 +11,7 @@ def packet(**changes):
     end=content.index(b'\r\n\r\n')+4;head=hashlib.sha256(content[:end]).hexdigest();stamp=time.time()-1
     route={'binding_id':'owner','binding_digest':'b'*64}
     metadata={'uid':9,'uid_validity':77,'uid_next':10,'internal_at':stamp,'size':len(content),
-        'sha256':hashlib.sha256(content).hexdigest(),'approval':{'binding_id':'owner','binding_digest':'b'*64,
+        'sha256':hashlib.sha256(content).hexdigest(),'mime':[],'approval':{'binding_id':'owner','binding_digest':'b'*64,
             'received_at':stamp,'header_sha256':head,'envelope':{},'rfc_message_id':'<goal@example.invalid>'}}
     metadata.update(changes)
     return json.dumps(metadata).encode()+b'\n'+content,head,route

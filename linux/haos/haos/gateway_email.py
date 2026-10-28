@@ -52,6 +52,12 @@ def validate_binding(binding):
     if binding['chat']!=binding['sender'] or not re.fullmatch(r'mailbox:[0-9a-f]{64}',binding['scope']):
         raise ValueError('email requires the same exact sender/chat address and configured mailbox scope')
     if binding['thread'] and not message_id(binding['thread']):raise ValueError('exact bounded email root Message-ID required; no wildcard thread')
+    for flag in ['allow_media','allow_voice','allow_video']:
+        if flag in binding and (type(binding[flag]) is not bool or binding[flag] and 'create' not in binding['capabilities']):
+            raise ValueError('email media requires separate boolean approval and create rights')
+    if 'allow_outbound_media' in binding and (type(binding['allow_outbound_media']) is not bool
+            or binding['allow_outbound_media'] and 'read' not in binding['capabilities']):
+        raise ValueError('email output files require separate boolean approval and read rights')
     if not binding.get('generation') or type(binding.get('since')) is not int:
         raise ValueError('email requires an explicit timed owner grant')
 

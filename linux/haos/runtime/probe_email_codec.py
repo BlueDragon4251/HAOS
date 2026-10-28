@@ -48,6 +48,19 @@ def main():
         assert result['attachments']==[]
         assert not list(Path(name).rglob('*.pdf'))
         cases.append('native_header_body_pass_never_writes_or_exposes_unapproved_attachment_paths')
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        folded=MIMEMultipart();folded['From']='owner@example.invalid';folded['Authentication-Results']='mx.example.invalid; dmarc=pass'
+        source_id='<'+('a'*64)+'@example.invalid>';folded['Message-ID']=source_id;folded.attach(MIMEText('A native folded ID goal.','plain','utf-8'))
+        raw_folded=folded.as_bytes(policy=policy.compat32.clone(linesep='\r\n'))
+        assert b'Message-ID: \r\n '+source_id.encode() in raw_folded
+        parsed=decode(adapter,raw_folded,value,b'5');assert parsed['message_id']==source_id
+        cases.append('actual_native_compat32_folded_message_id_is_canonicalized_only_at_outer_header_whitespace')
+        bad_id=raw_folded.replace(source_id.encode(),source_id.encode()+b' <other@example.invalid>')
+        try:decode(adapter,bad_id,value,b'6')
+        except ValueError:pass
+        else:raise AssertionError('fold normalization admitted a second message identifier')
+        cases.append('folded_message_id_normalization_cannot_admit_multiple_ids_or_internal_control_syntax')
         raw=wire(['mx.example.invalid; dmarc=pass']).replace(b'From: Owner',b'From: forged@example.invalid\r\nFrom: Owner',1)
         try:decode(adapter,raw,value,b'4')
         except ValueError:pass
