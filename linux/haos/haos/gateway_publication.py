@@ -23,6 +23,12 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='sms':
+            from .gateway_sms import credentials as sms_credentials,scope
+            if sms_credentials(row,verify_tls=False)!=row:raise ValueError('canonical private SMS HTTPS credentials required')
+            if any(binding['connector']==name and binding['scope']!=scope(row) for binding in policy['bindings']):
+                raise ValueError('SMS grant differs from configured account and receiving number')
+            continue
         if platforms[name]=='line':
             from .gateway_line_profile import credentials as line_credentials
             # Retained expired certificates must remain inspectable/replaceable.

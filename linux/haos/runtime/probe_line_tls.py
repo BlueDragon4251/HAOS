@@ -79,6 +79,10 @@ def main():
             if os.environ.get('HAOS_DISPOSABLE_LINE_OWNER')=='1':
                 from line_owner_fixture import exercise as owner_exercise
                 cases.extend(owner_exercise(directory,tls,{**tls,'certificate':leaf(True).public_bytes(serialization.Encoding.PEM).decode()}))
+                from sms_owner_fixture import exercise as sms_owner_exercise
+                sms_directory=directory/'sms-owner';sms_directory.mkdir(mode=0o700)
+                sms_tls={**tls,'public_url':tls['public_url'].replace('/line/webhook','/webhooks/twilio')}
+                cases.extend('sms_'+case for case in sms_owner_exercise(sms_directory,sms_tls,{**sms_tls,'certificate':leaf(True).public_bytes(serialization.Encoding.PEM).decode()}))
             os.environ['SSL_CERT_FILE']=str(directory/'missing-ca')
             try:material(tls)
             except ValueError:pass

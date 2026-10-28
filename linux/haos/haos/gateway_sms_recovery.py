@@ -5,10 +5,11 @@ import base64
 import hashlib
 import hmac
 import re
+import time
 from urllib.parse import parse_qsl,urlencode,urlsplit
 
 from .gateway import digest
-from .gateway_sms import envelope,validate_binding
+from .gateway_sms import envelope,validate_binding,MESSAGE
 
 
 def query(value,binding,continuation=None):
@@ -47,6 +48,20 @@ def list_path(path,value):
 
 
 async def recover(adapter):
+    db=adapter._haos_native.inbox.db;connector=adapter._haos_native.connector
+    db.execute('CREATE TABLE IF NOT EXISTS sms_recovery_status (connector TEXT PRIMARY KEY,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)')
+    try:
+        await _recover(adapter)
+    except BaseException:
+        db.execute('INSERT OR REPLACE INTO sms_recovery_status VALUES(?,?,?,?)',
+            (connector,'backfill-unavailable',time.time(),time.time()+30))
+        raise
+    else:
+        db.execute('INSERT OR REPLACE INTO sms_recovery_status VALUES(?,?,?,?)',
+            (connector,'backfill-ready',time.time(),time.time()+30))
+
+
+async def _recover(adapter):
     """One persisted page per grant per sweep. Advance only after durable admission."""
     native=adapter._haos_native;db=native.inbox.db;value=adapter._haos_sms_value
     db.execute('CREATE TABLE IF NOT EXISTS sms_recovery_pages (identity TEXT PRIMARY KEY, continuation TEXT)')
@@ -73,7 +88,26 @@ async def recover(adapter):
             if created.timestamp()*1000<=binding['since']:continue
             values={'AccountSid':item.get('account_sid'),'MessageSid':item.get('sid'),'From':item.get('from'),
                 'To':item.get('to'),'Body':item.get('body'),'NumMedia':item.get('num_media')}
-            source=envelope(values,value)
+            if (values['AccountSid']!=value['account_sid'] or values['From']!=binding['sender']
+                    or values['To']!=value['from_number'] or not isinstance(values['MessageSid'],str)
+                    or not MESSAGE.fullmatch(values['MessageSid']) or not isinstance(values['Body'],str)
+                    or not isinstance(values['NumMedia'],str) or not re.fullmatch(r'(?:[0-9]|10)',values['NumMedia'])):
+                raise PermissionError('authenticated recovery resource changed exact source')
+            try:source=envelope(values,value)
+            except ValueError:
+                # An authenticated but unsupported message must not starve later
+                # supported messages. Keep a bounded refusal receipt, never a
+                # truncated text fallback or an implied mission admission.
+                await adapter._haos_sms_rest.message(values,binding,current)
+                db.execute('CREATE TABLE IF NOT EXISTS sms_recovery_rejections (identity TEXT PRIMARY KEY,message_sid TEXT NOT NULL,binding_digest TEXT NOT NULL,reason TEXT NOT NULL,created_at REAL NOT NULL)')
+                refused=digest([identity,values['MessageSid']])
+                if not db.execute('SELECT 1 FROM sms_recovery_rejections WHERE identity=?',(refused,)).fetchone():
+                    if db.execute('SELECT COUNT(*) FROM sms_recovery_rejections').fetchone()[0]>=1024:
+                        raise PermissionError('bounded SMS recovery refusal inventory is full')
+                    db.execute('INSERT INTO sms_recovery_rejections VALUES(?,?,?,?,?)',
+                        (refused,values['MessageSid'],digest(binding),'unsupported-content',time.time()))
+                continue
+
             if source['sender']!=binding['sender']:raise PermissionError('provider recovery changed exact sender filter')
             # Local decoder adaptation is explicitly recorded. The original
             # evidence is the authenticated REST resource, never a remote HMAC.

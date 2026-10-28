@@ -76,8 +76,8 @@ class Output:
             data BLOB NOT NULL,token TEXT NOT NULL UNIQUE,expires REAL NOT NULL)''')
 
     def current(self,row):
-        if getattr(self.adapter,'_haos_'+self.platform+'_closed',False):raise PermissionError('LINE profile closed')
-        if hasattr(self.adapter,'_haos_'+self.platform+'_profile') and not self.adapter.is_connected:raise PermissionError('connected LINE identity required')
+        if getattr(self.adapter,'_haos_'+self.platform+'_closed',False):raise PermissionError('private output profile closed')
+        if hasattr(self.adapter,'_haos_'+self.platform+'_profile') and not self.adapter.is_connected:raise PermissionError('connected output identity required')
         policy=self.adapter._haos_native.policy();binding=approved(policy,row)
         if policy.connectors[binding['connector']]['platform']!=self.platform:raise PermissionError('output transport changed')
         if binding['connector']!=self.adapter._haos_native.connector:raise PermissionError('output connector changed')
@@ -96,7 +96,7 @@ class Output:
             count,size=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM line_output_media').fetchone()
             if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_media_cache'").fetchone():
                 size+=self.db.execute("SELECT COALESCE(SUM(length(data)),0) FROM native_media_cache WHERE state='cached'").fetchone()[0]
-            if count>=128 or size+len(data)>64*1024*1024:raise PermissionError('private LINE output cache capacity reached')
+            if count>=128 or size+len(data)>64*1024*1024:raise PermissionError('private output cache capacity reached')
             self.db.execute('INSERT INTO line_output_media VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (scope,delivery_id,binding['id'],digest(binding),checksum,mime,kind,duration,data,secrets.token_urlsafe(32),time.time()+3600))
             old=self.db.execute('SELECT * FROM line_output_media WHERE id=?',(scope,)).fetchone()

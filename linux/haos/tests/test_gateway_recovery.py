@@ -76,6 +76,29 @@ def test_line_owner_recovery_checks_server_acceptance_receipt_without_resending(
     finally:store.close()
 
 
+@pytest.mark.parametrize('receipt',['sms_push_'+'a'*64,'1234','irc_echo_'+'a'*64,'sms_push_'+'z'*64])
+def test_sms_owner_recovery_checks_server_acceptance_receipt_without_resending(tmp_path,receipt):
+    sender='+12025550101';scope='AC'+'a'*32+':+12025550100'
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'sms'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':sender,'chat':sender,'scope':scope,'thread':'',
+         'identity':'principal','capabilities':['create','read'],'generation':'b'*64,'since':1}]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'bot',{'platform':'sms','sender':sender,'chat':sender,'scope':scope,'thread':'',
+            'message_id':'a'*64,'is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy)
+        engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request=decision(delivery,decision='delivered',receipt=receipt,confirmed_not_delivered=False)
+        if receipt=='sms_push_'+'a'*64:
+            assert reconcile(store,policy,request)['state']=='delivered'
+            assert engine.next_delivery(policy) is None
+            assert store.db.execute('SELECT receipt FROM gateway_outbox').fetchone()[0]==receipt
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()
+
+
 def decision(delivery, **changes):
     return {"delivery_id": delivery["id"], "attempt": 1, "decision": "retry", "owner_uid": 1000,
             "note_sha256": hashlib.sha256(b"Inspected the remote transport").hexdigest(), "receipt": None,

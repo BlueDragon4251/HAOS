@@ -76,8 +76,8 @@ def owner_ingress(args, policy):
         references([args.id])
         params={'id':args.id,'owner_uid':int(os.environ.get('SUDO_UID','0')),
             'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest(),'confirmed':True}
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
-        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line'}[args.gateway_action]
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
+        platform={'retry-ntfy-auth':'ntfy','retry-homeassistant-auth':'homeassistant','retry-irc-auth':'irc','retry-line-auth':'line','retry-sms-auth':'sms'}[args.gateway_action]
         if not any(row['id']==args.connector and row['platform']==platform for row in policy['connectors']):
             raise ValueError('select one configured connector for this authentication recheck')
         if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:
@@ -108,7 +108,7 @@ def owner_ingress(args, policy):
     names = {digest(row):row['id'] for row in policy['bindings']}
     for row in value.get('history',[]):
         row['binding_id'] = names.get(row['binding_digest'],'widerrufene Freigabe')
-    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth'}:
+    if args.gateway_action in {'retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth'}:
         audit('gateway.'+platform+'-auth-retry',{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action=='purge-media-cache':
         audit('gateway.media-cache-purged',{**value,'note_sha256':params['note_sha256']})
@@ -251,12 +251,29 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','media-cache','purge-media-cache'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','media-cache','purge-media-cache'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
         if args.platform not in GatewayPolicy.platforms:
             raise ValueError("select an implemented transport")
+        if args.platform=='sms':
+            from .initial_setup import configure_sms_gateway,read_line_tls_file
+            account=input('Exact Twilio Account SID (AC + 32 hex digits): ')
+            token=getpass.getpass('Private Twilio auth token: ')
+            number=input('Owned Twilio receiving number (E.164): ')
+            raw_port=input('Local HTTPS listener port [8647]: ') or '8647'
+            if not raw_port.isascii() or not raw_port.isdecimal() or len(raw_port)>5 or not 1024<=int(raw_port)<=65535:
+                raise ValueError('SMS local listener port must contain digits from 1024 to 65535')
+            url=input('Public HTTPS URL (https://hostname/webhooks/twilio): ')
+            certificate=read_line_tls_file(input('Private certificate-chain PEM file: '),'certificate')
+            key=read_line_tls_file(input('Private unencrypted key PEM file: '),'private_key')
+            bind=input('Listener bind host [127.0.0.1] (0.0.0.0 or :: requires public consent): ') or '127.0.0.1'
+            consent=False
+            if bind!='127.0.0.1':
+                consent=input('Explicitly approve public listener by typing PUBLIC: ')=='PUBLIC'
+            return configure_sms_gateway(args.connector,account,token,number,int(raw_port),
+                {'public_url':url,'certificate':certificate,'private_key':key,'bind_host':bind,'public_listener':consent})
         if args.platform=='line':
             from .initial_setup import configure_line_gateway,read_line_tls_file
             secret=getpass.getpass('Private LINE channel secret: ')
@@ -334,24 +351,25 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
-        if selected and selected['platform']=='line':
-            destination=credentials['connectors'][args.connector]['destination']
-            if binding['scope'] and binding['scope']!=destination:raise ValueError('LINE scope differs from the saved bot destination')
-            if binding['sender']==destination:raise ValueError('LINE sender must differ from the bot destination')
+        if selected and selected['platform'] in {'line','sms'}:
+            saved=credentials['connectors'][args.connector]
+            destination=saved['destination'] if selected['platform']=='line' else saved['account_sid']+':'+saved['from_number']
+            if binding['scope'] and binding['scope']!=destination:raise ValueError('Gateway scope differs from the saved receiving identity')
+            if binding['sender']==destination:raise ValueError('Gateway sender must differ from its receiving identity')
             binding['scope']=destination
             binding['allow_media']=getattr(args,'allow_media',False)
             binding['allow_voice']=getattr(args,'allow_voice',False)
             binding['allow_video']=getattr(args,'allow_video',False)
             binding['allow_outbound_media']=getattr(args,'allow_outbound_media',False)
             if binding['allow_outbound_media'] and 'tls' not in credentials['connectors'][args.connector]:
-                raise ValueError('configure public HTTPS/TLS before approving LINE output files')
+                raise ValueError('configure public HTTPS/TLS before approving gateway output files')
             if binding['allow_voice']:
-                if 'create' not in binding['capabilities']:raise ValueError('LINE voice approval requires mission-create rights')
+                if 'create' not in binding['capabilities']:raise ValueError('Gateway voice approval requires mission-create rights')
                 from .speech_setup import status as speech_status
                 speech=speech_status()
                 if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
-                    raise PermissionError('configure the reviewed local speech model/service before approving LINE voice')
-        elif getattr(args,'allow_media',False) or getattr(args,'allow_voice',False) or getattr(args,'allow_video',False) or getattr(args,'allow_outbound_media',False):raise ValueError('media approval applies only to LINE images/documents')
+                    raise PermissionError('configure the reviewed local speech model/service before approving gateway voice')
+        elif getattr(args,'allow_media',False) or getattr(args,'allow_voice',False) or getattr(args,'allow_video',False) or getattr(args,'allow_outbound_media',False):raise ValueError('media approval applies only to reviewed LINE/SMS paths')
         devices=getattr(args,'matrix_device',[]);plain=getattr(args,'allow_plaintext',False)
         unmentioned=getattr(args,'no_require_mention',False)
         if selected and selected['platform']=='matrix':

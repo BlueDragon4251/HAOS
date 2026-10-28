@@ -153,7 +153,7 @@ def _install(adapter,fd,profile,value,authority):
                             status('rate-limited' if exc.status==429 else 'authentication-refused',exc.delay)
                             async with lifecycle:await stop()
                             return
-                    except PermissionError:raise
+                    except PermissionError:check()  # Refused source is retained; only lost owner authority revokes the profile.
                     except Exception:pass  # Persisted page is retried, never advanced on failure.
 
                 if key is not None:
@@ -167,7 +167,7 @@ def _install(adapter,fd,profile,value,authority):
                             status('rate-limited' if exc.status==429 else 'authentication-refused',exc.delay)
                             async with lifecycle:await stop()
                             return
-                    except PermissionError:raise
+                    except PermissionError:check()  # Refused source is retained; only lost owner authority revokes the profile.
                     except Exception:pass  # Retained retry/backoff, never raw errors or text.
                 await asyncio.sleep(.1)
         except PermissionError:

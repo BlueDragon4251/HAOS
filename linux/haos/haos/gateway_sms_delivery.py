@@ -61,8 +61,10 @@ class Publisher:
             async def json(self):return {'message':'private SMS request outcome unknown'}
         safe=Safe();route['dispatched']=True
         try:
-            async with self.client.post(self._target or url,data=data,headers=headers,allow_redirects=False) as response:
-                route['status']=response.status;route['delay']=retry_after(response.headers.get('Retry-After'),private_values=[self.value['auth_token']])
+            async with self.client.post(self._target or url,data=data,headers={**headers,'Accept-Encoding':'identity'},allow_redirects=False,auto_decompress=False) as response:
+                route['status']=response.status
+                if response.headers.get('Content-Encoding','identity').lower()!='identity':raise ValueError('encoded SMS receipt refused')
+                route['delay']=retry_after(response.headers.get('Retry-After'),private_values=[self.value['auth_token']])
                 raw=bytearray()
                 async for block in response.content.iter_chunked(4096):
                     raw.extend(block)

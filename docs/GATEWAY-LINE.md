@@ -6,7 +6,7 @@ persistent delivery/recovery. Text, incoming images/documents/voice/MP4 and
 outgoing images/M4A/MP4/download links have implemented software paths.
 Local fixtures use actual SDKs and loopback HTTPS; external LINE accounts,
 recipient playback, public DNS/router reachability and installed OS acceptance
-remain separate. Nine public text paths still do not mean nine fully accepted
+remain separate. Ten public text paths still do not mean ten fully accepted
 gateways or all 22 integrations.
 
 ## Configure the real listener

@@ -20,7 +20,8 @@ from urllib.parse import urlencode
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     from haos.gateway_sms import PreparedSMSPolicy,scope
-    from haos.gateway_sms_profile import build
+    from haos.gateway_runtime import build_adapter
+    def build(value,**context):return build_adapter('sms',value,sms_context=context)
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope
@@ -92,6 +93,7 @@ def main():
             assert inbox.db.execute('SELECT state FROM sms_delivery_intents WHERE delivery_id=?',(delivery[0],)).fetchone()[0]=='writing'
             if type(mode[0]) is int:return web.json_response({'message':'private-provider-error'},status=mode[0],headers={'Retry-After':'7'})
             if mode[0]=='abort':request.transport.close();return web.Response()
+            if mode[0]=='encoded-receipt':return web.Response(body=b'not-gzip',status=201,headers={'Content-Encoding':'gzip'})
             return web.json_response({'sid':'SM'+'f'*32,'account_sid':value['account_sid'],'from':value['from_number'],
                 'to':sender,'body':body['Body'],'status':'queued'},status=201)
         async def line_info(request):
@@ -133,8 +135,8 @@ def main():
             env=adapter_envelope(event,'line');relay.admit(policy(),'line-shared',env);line_events.append(event);return True
         line.set_durable_message_handler(line_receive)
 
-        async def until(predicate):
-            async with asyncio.timeout(5):
+        async def until(predicate,timeout=5):
+            async with asyncio.timeout(timeout):
                 while not predicate():await asyncio.sleep(.01)
         counter=[0]
         async def post(client,*,who=sender,body='A real local SMS mission',valid=True,extra=None,assets=None):
@@ -293,7 +295,17 @@ def main():
             messages[missed]=fields
             recovery_rows.append({'sid':missed,'account_sid':value['account_sid'],'from':sender,'to':value['from_number'],
                 'body':fields['Body'],'direction':'inbound','status':'received','num_media':'0','date_created':formatdate(fields['__created'],usegmt=True)})
+            unsupported='MM'+'0'*31+'9'
+            messages[unsupported]={**fields,'MessageSid':unsupported,'Body':'Too many MMS attachments','NumMedia':'5'}
+            recovery_rows.insert(0,{'sid':unsupported,'account_sid':value['account_sid'],'from':sender,'to':value['from_number'],
+                'body':messages[unsupported]['Body'],'direction':'inbound','status':'received','num_media':'5','date_created':formatdate(fields['__created'],usegmt=True)})
             before=len(accepted);await recover(adapter);await until(lambda:len(accepted)==before+1)
+            refused=inbox.db.execute('SELECT message_sid,reason FROM sms_recovery_rejections').fetchone()
+            assert tuple(refused)==(unsupported,'unsupported-content')
+            from haos.gateway_raw_recovery import unresolved
+            assert unresolved(inbox)['recovery_rejections'][0]['message_sid']==unsupported
+            cases.append('authenticated_unsupported_mms_keeps_bounded_refusal_receipt_without_starving_later_supported_messages')
+
             retained=inbox.db.execute('SELECT origin FROM sms_input_origins WHERE identity=?',(inbox.key('sms',adapter_envelope(accepted[-1],'sms')),)).fetchone()
             assert retained['origin']=='authenticated-api-recovery'
             cases.append('missed_webhook_is_recovered_from_authenticated_filtered_api_and_actual_native_decoder_with_explicit_origin')
@@ -304,8 +316,18 @@ def main():
             except PermissionError:pass
             else:raise AssertionError('foreign recovery page accepted')
             assert inbox.db.execute('SELECT continuation FROM sms_recovery_pages').fetchone()[0] is None
+            assert inbox.db.execute('SELECT status FROM sms_recovery_status').fetchone()[0]=='backfill-unavailable'
             recovery_next[0]=None
             cases.append('foreign_provider_pagination_is_refused_without_advancing_durable_recovery_cursor')
+            await recover(adapter)
+            assert inbox.db.execute('SELECT status FROM sms_recovery_status').fetchone()[0]=='backfill-ready'
+            cases.append('recovery_failure_and_success_are_persisted_without_claiming_complete_remote_history')
+            started=time.time();recovery_next[0]='https://foreign.invalid/private-owner'
+            await until(lambda:inbox.db.execute('SELECT updated_at FROM sms_recovery_status').fetchone()[0]>started,timeout=35)
+            assert adapter.is_connected and adapter.native_health()['status']=='listening-tls'
+            assert inbox.db.execute('SELECT status FROM sms_recovery_status').fetchone()[0]=='backfill-unavailable'
+            recovery_next[0]=None
+            cases.append('actual_periodic_recovery_refusal_retains_cursor_and_listener_without_falsely_claiming_owner_revocation')
             binding=copy.deepcopy(config['bindings'][0]);metadata={'haos_scope':binding['scope'],
                 'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},'haos_delivery_id':delivery[0],'haos_delivery_attempt':1}
             result=await adapter.send(sender,'**Actual SMS** reply',metadata=metadata)
@@ -314,15 +336,15 @@ def main():
             duplicate=await adapter.send(sender,'**Actual SMS** reply',metadata=metadata)
             assert duplicate.message_id==result.message_id and len(pushes)==1
             cases.append('confirmed_same_attempt_never_repeats_native_sms_http_write')
-            for scenario,expected in [('abort','uncertain'),(429,'retry')]:
+            for scenario,expected in [('abort','uncertain'),('encoded-receipt','uncertain'),(429,'retry')]:
                 mode[0]=scenario;delivery[0]=digest(str(scenario));metadata['haos_delivery_id']=delivery[0]
                 result=await adapter.send(sender,'A bounded fixture SMS',metadata=metadata)
                 assert delivery_result(result)['status']==expected
-                if scenario=='abort':
+                if scenario in {'abort','encoded-receipt'}:
                     before=len(pushes)
                     repeated=await adapter.send(sender,'A bounded fixture SMS',metadata=metadata)
                     assert delivery_result(repeated)['status']=='uncertain' and len(pushes)==before
-                    cases.append('aborted_native_sms_write_is_uncertain_and_same_attempt_is_never_repeated')
+                    cases.append(str(scenario)+'_native_sms_write_is_uncertain_and_same_attempt_is_never_repeated')
                 if scenario==429:
                     assert not adapter.is_connected and adapter.native_health()['status']=='rate-limited'
                     assert not await adapter.connect()
@@ -340,7 +362,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-sms-native-') as name:
         root=Path(name);root.chmod(0o700);asyncio.run(exercise(root))
     result={'passed':len(cases),'cases':cases,'actual_pinned_sms_and_verified_loopback_https':True,
-        'prepared_only_not_public_setup_yet':True,'tls_verification_disabled':False,'external_sms_charges_accounts_or_delivery':False}
+        'public_sms_owner_policy_supported':True,'tls_verification_disabled':False,'external_sms_charges_accounts_or_delivery':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result))
 

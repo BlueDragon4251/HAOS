@@ -109,6 +109,7 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
                 r'haos_[0-9a-f]{32}' if platform=='homeassistant' else
                 r'irc_echo_[0-9a-f]{64}' if platform=='irc' else
                 r'line_push_[0-9a-f]{64}' if platform=='line' else
+                r'sms_push_[0-9a-f]{64}' if platform=='sms' else
                 r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
             from .gateway_matrix_policy import opaque
             valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)

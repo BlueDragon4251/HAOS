@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 

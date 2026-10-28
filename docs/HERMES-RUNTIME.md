@@ -1587,3 +1587,19 @@ dispatch. Corruption or refusal cannot silently produce a text-only fallback.
 See [speech operation, tests and limits](GATEWAY-SPEECH.md). Video and outbound
 media remain open; no external LINE account, LLM inference, installed/HP or
 release acceptance is claimed by the local composition/kernel probes.
+
+
+### 2026-10-28 — SMS/Twilio owner setup, MMS and recovery connected
+
+The actual pinned SMS adapter now has an independent public HAOS setup path,
+exact timed E.164/account-number grants, private account/message/media reads,
+verified shared HTTPS ingress, durable decoding and limited controller media
+exports. Incoming audio uses actual local STT without raw agent attachments.
+Outgoing supported MMS uses native formatter/form/sender; other files use
+revocable HTTPS links. Private API catch-up has persisted bounded pagination,
+source/grant checks, distinct status and explicit unsupported-content receipts.
+Owner CLI/GUI, finite recovery, Root publication and real UID/SIGKILL tests are
+connected. Source-bound evidence accompanies the increment; see [SMS operation
+and limits](GATEWAY-SMS.md). Ten public text paths do not establish ten fully
+accepted gateways or all 22 integrations. Account/carrier/handset, public network,
+installed system and release acceptance remain separate.

@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -799,10 +799,69 @@ class Wizard:
                 if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1<=int(text)<=65535:
                     raise ValueError('IRC TLS-Port muss eine ganze Zahl von 1 bis 65535 sein')
                 return int(text)
+            sms_credentials=tk.Frame(self.content,bg=self.PANEL)
+            sms_allow_media=tk.BooleanVar(value=False);sms_allow_voice=tk.BooleanVar(value=False)
+            sms_allow_video=tk.BooleanVar(value=False);sms_allow_outbound=tk.BooleanVar(value=False)
+            sms_account=self._field(sms_credentials,'Twilio Account SID · AC und 32 Hex-Zeichen')
+            sms_number=self._field(sms_credentials,'Eigene Twilio-Empfangsnummer · E.164, zum Beispiel +43123456789')
+            sms_port=self._field(sms_credentials,'SMS lokaler HTTPS-Port · 1024 bis 65535','8647')
+            sms_url=self._field(sms_credentials,'SMS öffentliche HTTPS-Adresse · https://hostname/webhooks/twilio')
+            sms_bind=self._choice(sms_credentials,'SMS Listener-Adresse',['127.0.0.1','0.0.0.0','::'],'127.0.0.1')
+            sms_public=tk.BooleanVar(value=False)
+            tk.Checkbutton(sms_credentials,text='Öffentlichen SMS-Listener ausdrücklich freigeben',variable=sms_public,
+                bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w').pack(anchor='w',pady=6)
+            sms_secret=self._field(sms_credentials,'Twilio Auth-Token · geschützt',secret=True)
+            sms_pem={};sms_revision=[0]
+            sms_pem_status=self._label(sms_credentials,'Noch kein privates TLS-Material geladen.',size=10,color=self.MUTED)
+            sms_pem_status.pack(anchor='w',pady=4)
+            def reset_sms(*_args):
+                sms_allow_media.set(False);sms_allow_voice.set(False);sms_allow_video.set(False);sms_allow_outbound.set(False)
+                sms_secret.delete(0,tk.END);sms_public.set(False)
+                sms_pem.clear();sms_revision[0]+=1
+                sms_pem_status.configure(text='Noch kein privates TLS-Material geladen.')
+            def import_sms_pem(kind):
+                from tkinter import filedialog
+                selected=filedialog.askopenfilename(parent=self.root,title='Private SMS-PEM-Datei auswählen')
+                if not selected:return
+                revision=sms_revision[0]
+                def loaded(value):
+                    if platform.get()!='sms' or sms_revision[0]!=revision:
+                        self.status.configure(text='SMS-Konfiguration geändert; TLS-Material erneut laden.');return
+                    sms_pem[kind]=value
+                    sms_pem_status.configure(text='Privat geladen: '+', '.join('Zertifikatskette' if key=='certificate' else 'Schlüssel' for key in sorted(sms_pem)))
+                self._run_async(lambda:initial_setup.import_line_tls_file(selected,kind),
+                    success='PEM-Datei privat geladen; noch nicht gespeichert oder im Netzwerk verwendet.',result_handler=loaded)
+            self._button(sms_credentials,'SMS-Zertifikatskette laden',lambda:import_sms_pem('certificate')).pack(anchor='w',pady=4)
+            self._button(sms_credentials,'SMS-TLS-Schlüssel laden',lambda:import_sms_pem('private_key')).pack(anchor='w',pady=4)
+            self._label(sms_credentials,'In Twilio die eigene SMS-fähige Nummer auswählen und eingehende Nachrichten als HTTPS-POST an '
+                'https://hostname/webhooks/twilio konfigurieren. Account SID und Auth-Token stammen aus dem zugehörigen Konto. '
+                'Zertifikat, DNS und Weiterleitung müssen die öffentliche HTTPS-Adresse erreichbar machen. '
+                'LINE und SMS können mit gleichem Zertifikat und gleicher Listener-Adresse denselben lokalen Port teilen. '
+                'SMS/MMS können Kosten verursachen; MMS hängt zusätzlich von Nummer, Land und Mobilfunkanbieter ab. '
+                'Ohne MMS-Unterstützung werden freigegebene Ergebnisdateien als zeitlich begrenzte Download-Links gesendet. '
+                'Das Speichern sendet keine Nachricht und bestätigt keine externe Erreichbarkeit.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            def retry_sms():
+                selected_connector=connector.get()
+                self._run_async(lambda:initial_setup.retry_sms_gateway_auth(selected_connector),
+                    success='Lokale SMS-Auth-Sperre geprüft; nach Korrektur manuell starten. Keine Nachricht versendet.')
+            self._button(sms_credentials,'SMS-Konto nach Korrektur erneut prüfen',retry_sms).pack(anchor='w',pady=4)
+            for field in (sms_account,sms_number,sms_port,sms_url):
+                variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
+                variable.trace_add('write',reset_sms)
+            sms_bind.trace_add('write',reset_sms);connector_value.trace_add('write',reset_sms)
+            def sms_port_number(text):
+                if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1024<=int(text)<=65535:
+                    raise ValueError('SMS HTTPS-Port muss eine ganze Zahl von 1024 bis 65535 sein')
+                return int(text)
             def configure():
                 line_values={'channel_secret':line_secret.get(),'channel_access_token':line_access.get(),
                     'destination':line_destination.get(),'port':line_port.get(),'tls':{'public_url':line_url.get(),
                         'bind_host':line_bind.get(),'public_listener':line_public.get(),**line_pem}}
+                sms_values={'account_sid':sms_account.get(),'auth_token':sms_secret.get(),
+                    'from_number':sms_number.get(),'port':sms_port.get(),'tls':{'public_url':sms_url.get(),
+                        'bind_host':sms_bind.get(),'public_listener':sms_public.get(),**sms_pem}}
+                reset_sms()
                 reset_line()
                 secret, app_secret = token.get(), app_token.get()
                 matrix_values={'homeserver':matrix_server.get(),'user_id':matrix_user.get(),'device_id':matrix_device.get(),
@@ -821,7 +880,8 @@ class Wizard:
                 if platform.get()=='ntfy':trust_publishers.set(False)
                 if platform.get()=='homeassistant':reset_ha_consent()
                 selected_connector, selected_platform, selected_server = connector.get(), platform.get(), mm_server.get()
-                self._run_async(lambda: (initial_setup.configure_line_gateway(selected_connector,**{**line_values,'port':line_port_number(line_values['port'])})
+                self._run_async(lambda: (initial_setup.configure_sms_gateway(selected_connector,**{**sms_values,'port':sms_port_number(sms_values['port'])})
+                    if selected_platform=='sms' else initial_setup.configure_line_gateway(selected_connector,**{**line_values,'port':line_port_number(line_values['port'])})
                     if selected_platform=='line' else initial_setup.configure_irc_gateway(selected_connector,**{**irc_values,'port':irc_port_number(irc_values['port'])})
                     if selected_platform=='irc' else initial_setup.configure_gateway(
                     selected_connector, selected_platform, secret, app_secret, selected_server) if selected_platform=='mattermost'
@@ -835,7 +895,7 @@ class Wizard:
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
-                reset_line()
+                reset_sms();reset_line()
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
@@ -849,11 +909,11 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
-                elif platform.get()=='line':
+                elif platform.get() in {'line','sms'}:
                     irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
@@ -885,6 +945,14 @@ class Wizard:
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
                         line_bind.set(existing['bind_host'])
                 else:line_credentials.pack_forget()
+                if platform.get()=='sms':
+                    sms_credentials.pack(fill='x',before=configure_button)
+                    existing=configured_gateways.get('sms',{}).get(connector.get())
+                    if existing:
+                        for field,key in ((sms_account,'account_sid'),(sms_number,'from_number'),(sms_port,'port'),(sms_url,'public_url')):
+                            field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                        sms_bind.set(existing['bind_host'])
+                else:sms_credentials.pack_forget()
                 self.root.after_idle(irc_pair_changed)
             def reset_irc_secrets(*_args):
                 irc_server_password.delete(0,tk.END);irc_channel_password.delete(0,tk.END);irc_password.delete(0,tk.END);irc_anonymous.set(False)
@@ -1150,11 +1218,75 @@ class Wizard:
                         for field in (sender,chat):field.configure(state='normal');field.delete(0,tk.END)
                 else:
                     line_pair.pack_forget()
-                    if previous_line[0] and platform.get() not in {'homeassistant','ntfy','irc'}:
+                    if previous_line[0] and platform.get() not in {'homeassistant','ntfy','irc','sms'}:
                         for field in (scope,thread,sender,chat):field.configure(state='normal');field.delete(0,tk.END)
                 previous_line[0]=active
             platform.trace_add('write',line_pair_changed)
             line_destination._haos_public_value.trace_add('write',line_pair_changed)
+            sms_pair=tk.Frame(self.content,bg=self.PANEL)
+            sms_media_box=tk.Checkbutton(sms_pair,text='Eingehende SMS-Bilder und Dokumente für diesen Absender ausdrücklich freigeben',
+                variable=sms_allow_media,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=max(180,self.label_wrap-50),justify='left',anchor='w')
+            sms_media_box.pack(anchor='w',pady=6)
+            self._label(sms_pair,'Benötigt Missionen erstellen. PNG/JPEG: insgesamt höchstens 2 MiB; Dokument: höchstens 500 KB. '
+                'Dateiinhalte gehen in den Agenten innerhalb der bestehenden Owner-Dateisystemgrenzen. Keine Gateway-Pfade oder Tokens werden freigegeben. '
+                'Bildanalyse benötigt ein bildfähiges freigegebenes Modell. Voice/Video und ausgehende Medien sind nicht enthalten.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            sms_voice_box=tk.Checkbutton(sms_pair,text='Eingehende SMS-Sprachnachrichten für diesen Absender ausdrücklich freigeben',
+                variable=sms_allow_voice,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,
+                wraplength=self.label_wrap)
+            sms_voice_box.pack(anchor='w',pady=5)
+            self._label(sms_pair,'Benötigt den eingerichteten lokalen Spracherkennungsdienst und das Recht zum Erstellen von Missionen. '
+                'Bis 500 KB / zwei Minuten; die Originalaudiodatei bleibt privat, der Agent erhält das lokale Transkript.',
+                size=10,color=self.MUTED).pack(anchor='w',pady=5)
+            sms_video_box=tk.Checkbutton(sms_pair,text='Eingehende SMS-MP4-/3GP-Videos für diesen Absender ausdrücklich freigeben',
+                variable=sms_allow_video,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,wraplength=self.label_wrap)
+            sms_video_box.pack(anchor='w',pady=5)
+            self._label(sms_pair,'Bis 500 KB. Die Videodatei geht als Datei in die Mission; '
+                'eine erfolgreiche Videoanalyse hängt von den freigegebenen Agent-Werkzeugen ab.',size=10,color=self.MUTED).pack(anchor='w',pady=5)
+            sms_output_box=tk.Checkbutton(sms_pair,text='Explizit markierte Ergebnisdateien dieser Missionen an diesen Chat senden',
+                variable=sms_allow_outbound,bg=self.PANEL,fg=self.TEXT,selectcolor=self.BG,activebackground=self.PANEL,wraplength=self.label_wrap)
+            sms_output_box.pack(anchor='w',pady=5)
+            self._label(sms_pair,'Benötigt Antworten lesen und eine öffentliche HTTPS-Adresse. Höchstens 8 MiB pro Datei; '
+                'Bilder höchstens 1 MiB. Dateien werden eine Stunde über nicht erratbare Download-Links bereitgestellt. '
+                'Entzug sperrt neue Abrufe sofort; bereits heruntergeladene Kopien bleiben beim Empfänger.',size=10,color=self.MUTED).pack(anchor='w',pady=5)
+            def sms_media_rights(*_args):
+                if not rights['create'].get():sms_allow_media.set(False);sms_allow_voice.set(False);sms_allow_video.set(False);sms_allow_outbound.set(False)
+                sms_media_box.configure(state='normal' if rights['create'].get() else 'disabled')
+                sms_voice_box.configure(state='normal' if rights['create'].get() else 'disabled')
+                sms_video_box.configure(state='normal' if rights['create'].get() else 'disabled')
+                if not rights['read'].get():sms_allow_outbound.set(False)
+                sms_output_box.configure(state='normal' if rights['read'].get() else 'disabled')
+            rights['create'].trace_add('write',sms_media_rights)
+            rights['read'].trace_add('write',sms_media_rights)
+            def reset_sms_voice_consent(*_args):
+                sms_allow_media.set(False);sms_allow_voice.set(False);sms_allow_video.set(False);sms_allow_outbound.set(False)
+            for field in (sender,chat):
+                field._haos_public_value.trace_add('write',reset_sms_voice_consent)
+            self._label(sms_pair,'SMS: Absender und Chat sind dieselbe exakte E.164-Rufnummer. '
+                'Bereich ist Account SID und eigene Empfangsnummer; Threads sind nicht freigegeben. '
+                'Eine Rufnummernfreigabe ist keine unabhängige Prüfung der tatsächlichen Person. '
+                'MMS: höchstens vier Anhänge, PNG/JPEG insgesamt 2 MiB; andere Mediendateien höchstens 500 KB. '
+                'Spracherkennung erfolgt lokal; rohe Audiodaten gehen nicht zum Agenten.',size=10,color=self.MUTED).pack(anchor='w',pady=6)
+            previous_sms=[False]
+            def sms_pair_changed(*_args):
+                sms_allow_media.set(False);sms_allow_voice.set(False);sms_allow_video.set(False);sms_allow_outbound.set(False)
+                active=platform.get()=='sms'
+                if active:
+                    sms_pair.pack(fill='x',before=pairing_note)
+                    for field in (scope,thread):field.configure(state='normal');field.delete(0,tk.END)
+                    scope.insert(0,sms_account.get()+':'+sms_number.get())
+                    for field in (scope,thread):field.configure(state='disabled')
+                    if not previous_sms[0]:
+                        for field in (sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                else:
+                    sms_pair.pack_forget()
+                    if previous_sms[0] and platform.get() not in {'homeassistant','ntfy','irc','line'}:
+                        for field in (scope,thread,sender,chat):field.configure(state='normal');field.delete(0,tk.END)
+                previous_sms[0]=active
+            platform.trace_add('write',sms_pair_changed)
+            sms_account._haos_public_value.trace_add('write',sms_pair_changed)
+            sms_number._haos_public_value.trace_add('write',sms_pair_changed)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1178,9 +1310,11 @@ class Wizard:
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
+                    else {'allow_media':sms_allow_media.get(),'allow_voice':sms_allow_voice.get(),'allow_video':sms_allow_video.get(),'allow_outbound_media':sms_allow_outbound.get()} if platform.get()=='sms'
                     else {'allow_media':line_allow_media.get(),'allow_voice':line_allow_voice.get(),'allow_video':line_allow_video.get(),'allow_outbound_media':line_allow_outbound.get()} if platform.get()=='line'
                     else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
                         'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
+                reset_sms_voice_consent()
                 line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
@@ -1289,6 +1423,11 @@ class Wizard:
                         'revoked':'LINE-Freigabe entzogen oder geändert; keine weitere Ausführung',
                         'closed':'Privates LINE-Profil geschlossen; Daten erhalten'}
                     labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                        else {**{key:value.replace('LINE','SMS/Twilio') for key,value in line_labels.items()},
+                            'authentication-refused':'SMS/Twilio-Anmeldung abgelehnt; Account SID und privaten Auth-Token prüfen',
+                            'identity-refused':'SMS/Twilio-Konto oder eigene Empfangsnummer passt nicht; gespeicherte Daten bleiben erhalten',
+                            'backfill-ready':'SMS/Twilio-Nachholen: letzte API-Seite geprüft; kein Beleg für vollständigen Anbieter-Verlauf',
+                            'backfill-unavailable':'SMS/Twilio-Nachholen nicht verfügbar; gespeicherter Cursor bleibt erhalten. Konto, Netzwerk und Anbieterantwort prüfen'} if item.get('platform')=='sms'
                         else line_labels if item.get('platform')=='line'
                         else irc_labels if item.get('platform')=='irc'
                         else ha_labels if item.get('platform')=='homeassistant' else transport_labels)
@@ -1303,7 +1442,7 @@ class Wizard:
                             'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
                             '':''}[item['history_error']])
                         +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
-                    if item.get('platform') in {'ntfy','line'}:
+                    if item.get('platform') in {'ntfy','line','sms'}:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · letzter Fehler: '+labels[item['last_error']] if item.get('last_error') else ''))
@@ -1339,9 +1478,13 @@ class Wizard:
                 for history in value.get('history',[]):
                     self._label(recovery_frame, "Verlauf · " + history.get('binding_id',history['binding_digest'][:12]) + " · " + history_labels[history['status']],
                         size=10, color=self.MUTED).pack(anchor="w", pady=3)
+                for refused in value.get('recovery_rejections',[]):
+                    self._label(recovery_frame,'SMS/Twilio-Eingang '+refused['message_sid']+
+                        ' abgelehnt: Text- oder Anhanggrenze überschritten bzw. leerer Inhalt. Keine Mission erstellt; spätere zulässige Nachrichten werden weiter nachgeladen.',
+                        size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 for outgoing in value.get('native_outgoing',[]):
-                    if outgoing.get('platform')=='line':
-                        self._label(recovery_frame,'LINE-Ausgang · '+outgoing['delivery_id']+' · '+outgoing['state']
+                    if outgoing.get('platform') in {'line','sms'}:
+                        self._label(recovery_frame,('LINE' if outgoing['platform']=='line' else 'SMS/Twilio')+'-Ausgang · '+outgoing['delivery_id']+' · '+outgoing['state']
                             +' · Versuch '+str(outgoing['attempt'])+' · keine Empfangsbestätigung'
                             +(' · Serverannahme-Beleg '+outgoing['server_acceptance_receipt'] if outgoing.get('server_acceptance_receipt') else ''),
                             size=10,color=self.MUTED).pack(anchor='w',pady=3)

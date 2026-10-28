@@ -231,3 +231,17 @@ These contracts use disposable accounts/keys and loopback HTTP. They confirm no
 external Matrix delivery, physical device trust, installed service/boot or
 release. Full media/voice, the remaining 17 adapters, Android, phone firstboot
 and installed OS/artifact acceptance remain unfinished.
+
+
+## SMS / Twilio gateway
+
+The Gateways page now includes real SMS/Twilio setup: protected Auth Token, exact
+Account SID/owned E.164 number, verified public HTTPS URL, private PEM import and
+explicit public listener consent. Pair an exact sender/chat number and select
+rights; image/document, voice, video and result-file approval are separate and
+unchecked. Local speech must be configured before voice can be approved. Context
+changes discard private inputs and pending approvals. Auth recheck, retained
+inputs, API catch-up failures/refusals and uncertain outgoing attempts use the
+existing owner recovery controls. See [SMS requirements and operation](GATEWAY-SMS.md).
+No external message, public reachability or handset receipt is established by
+saving configuration or by the Tk/loopback fixtures.

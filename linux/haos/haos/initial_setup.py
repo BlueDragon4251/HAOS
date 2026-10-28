@@ -484,6 +484,28 @@ def configure_line_gateway(connector,channel_secret,channel_access_token,destina
         'external_reachability_verified':False}
 
 
+def configure_sms_gateway(connector,account_sid,auth_token,from_number,port,tls):
+    """Publish verified SMS HTTPS credentials; no listener or external message here."""
+    require_root()
+    from .gateway_sms import credentials as sms_credentials
+    value=sms_credentials({'account_sid':account_sid,'auth_token':auth_token,'from_number':from_number,'port':port,'tls':tls})
+    from .gateway_setup import load,persist
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy,private=load()
+    if any(row['id']!=connector and row['platform']=='sms' for row in policy['connectors']):
+        raise ValueError('one isolated adapter per platform is currently supported')
+    if any(row['id']==connector and row['platform']!='sms' for row in policy['connectors']):
+        policy['bindings']=[row for row in policy['bindings'] if row['connector']!=connector]
+    policy['connectors']=[row for row in policy['connectors'] if row['id']!=connector]+[{'id':connector,'platform':'sms'}]
+    GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
+    private['connectors'][connector]=value;persist(policy,private)
+    audit('setup.gateway',{'connector':connector,'platform':'sms'})
+    return {'configured':True,'platform':'sms','restart_required':True,'sender_pairing_required':True,
+        'external_reachability_verified':False}
+
+
 def configure_irc_gateway(connector,server,port,nickname,channel,*,server_password='',channel_password='',sasl_username='',sasl_password='',anonymous=False):
     """Owner-only real TLS IRC configuration; validate before stopping services."""
     require_root()
@@ -526,25 +548,26 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform']=='line':
-        destination=credentials['connectors'][connector]['destination']
-        if scope and scope!=destination:raise ValueError('LINE scope must match the saved bot destination')
-        if sender==destination:raise ValueError('LINE sender must differ from the bot destination')
+    if selected and selected['platform'] in {'line','sms'}:
+        saved=credentials['connectors'][connector]
+        destination=saved['destination'] if selected['platform']=='line' else saved['account_sid']+':'+saved['from_number']
+        if scope and scope!=destination:raise ValueError('Gateway scope must match the saved receiving identity')
+        if sender==destination:raise ValueError('Gateway sender must differ from its receiving identity')
         item['scope']=destination
-        if type(allow_media) is not bool:raise ValueError('explicit boolean LINE media approval required')
-        if type(allow_voice) is not bool:raise ValueError('explicit boolean LINE voice approval required')
-        if type(allow_video) is not bool or type(allow_outbound_media) is not bool:raise ValueError('explicit boolean LINE video/output approval required')
+        if type(allow_media) is not bool:raise ValueError('explicit boolean gateway media approval required')
+        if type(allow_voice) is not bool:raise ValueError('explicit boolean gateway voice approval required')
+        if type(allow_video) is not bool or type(allow_outbound_media) is not bool:raise ValueError('explicit boolean gateway video/output approval required')
         item['allow_media']=allow_media;item['allow_voice']=allow_voice
         item['allow_video']=allow_video;item['allow_outbound_media']=allow_outbound_media
         if allow_outbound_media and 'tls' not in credentials['connectors'][connector]:
-            raise ValueError('configure public HTTPS/TLS before approving LINE output files')
+            raise ValueError('configure public HTTPS/TLS before approving gateway output files')
         if allow_voice:
-            if 'create' not in item['capabilities']:raise ValueError('LINE voice approval requires mission-create rights')
+            if 'create' not in item['capabilities']:raise ValueError('Gateway voice approval requires mission-create rights')
             from .speech_setup import status as speech_status
             speech=speech_status()
             if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
-                raise PermissionError('configure the reviewed local speech model/service before approving LINE voice')
-    elif allow_media or allow_voice or allow_video or allow_outbound_media:raise ValueError('media approval applies only to the reviewed LINE image/document path')
+                raise PermissionError('configure the reviewed local speech model/service before approving gateway voice')
+    elif allow_media or allow_voice or allow_video or allow_outbound_media:raise ValueError('media approval applies only to reviewed LINE/SMS paths')
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
     elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True:
@@ -615,6 +638,11 @@ def gateway_configuration():
           'bind_host':_credentials['connectors'][row['id']]['tls']['bind_host']}
         for row in policy['connectors'] if row['platform']=='line'}
     if line:result['line']=line
+    sms={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ('account_sid','from_number','port')}
+        |{'public_url':_credentials['connectors'][row['id']]['tls']['public_url'],
+          'bind_host':_credentials['connectors'][row['id']]['tls']['bind_host']}
+        for row in policy['connectors'] if row['platform']=='sms'}
+    if sms:result['sms']=sms
     return result
 
 
@@ -682,6 +710,18 @@ def retry_line_gateway_auth(connector):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='retry-line-auth',connector=connector,
         note='Owner requested a new LINE authentication check'))
+
+
+def retry_sms_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='sms' for row in configured['connectors']):
+        raise ValueError('select one configured SMS connector')
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-sms-auth',connector=connector,
+        note='Owner requested a new SMS authentication check'))
 
 
 def retry_homeassistant_gateway_auth(connector):

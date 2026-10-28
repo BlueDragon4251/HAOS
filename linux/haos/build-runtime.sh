@@ -30,6 +30,7 @@ test -x .venv/bin/hermes
 .venv/bin/python -I -c 'import importlib.metadata,json;from pathlib import Path;s=json.loads(Path("/usr/lib/haos/runtime-provenance/source.json").read_text());assert all(importlib.metadata.version(n)==v for n,v in {**s["security_versions"],**s.get("provider_versions",{})}.items())'
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_backend.py" .venv/bin/hermes /usr/lib/haos/runtime-provenance/backend-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_media_backend.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/media-native-backend-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_media_backend.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/sms-media-native-backend-build-probe.json --sms
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_artifact_backend.py" /tmp/herald-os/linux/haos .venv/bin/hermes /usr/lib/haos/runtime-provenance/artifact-native-backend-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_ui_access.py" .venv/bin/python /usr/lib/haos /usr/lib/haos/hermes /usr/lib/haos/runtime-provenance/ui-access-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_gateway.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/gateway-build-probe.json
@@ -69,6 +70,7 @@ HAOS_SPEECH_FIXTURE="$(mktemp -d /tmp/haos-speech-fixture.XXXXXX)"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/fetch_speech_fixture.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE"
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_speech_backend.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/speech-native-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/line-voice-build-probe.json
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/sms-voice-build-probe.json
 rm -rf -- "$HAOS_SPEECH_FIXTURE"
 
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json

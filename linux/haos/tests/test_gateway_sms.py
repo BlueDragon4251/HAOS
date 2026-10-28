@@ -16,9 +16,9 @@ def config():
         'chat':'+12025550101','scope':scope(values()),'thread':'','identity':'personal','capabilities':['create','read'],'generation':'c'*64,'since':1}]}
 
 
-def test_prepared_sms_is_not_automatically_public_and_requires_exact_phone_scope():
+def test_public_sms_still_requires_exact_owner_phone_scope():
     from haos.gateway import GatewayPolicy
-    with pytest.raises(ValueError):GatewayPolicy(config())
+    assert GatewayPolicy(config()).connectors['sms']['platform']=='sms'
     policy=PreparedSMSPolicy(config());source=envelope(message(),values())
     assert source['text']=='a real SMS goal' and source['scope']==scope(values())
     assert policy.authorize('sms',source)['id']=='owner'
