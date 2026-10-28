@@ -10,7 +10,7 @@ import time
 
 from .gateway_email import credentials,authority
 
-ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed'})
+ERRORS=frozenset({'authority-or-protocol-refused','tls-refused','smtp-authentication-refused','imap-unavailable','transport-unavailable','uid-state-changed','unapproved-sender','unapproved-thread','pre-grant','self-or-automated','unsupported-content','authentication-refused'})
 
 
 def command():
@@ -81,6 +81,59 @@ async def search(value,connector,current,page):
     return await _run(value,connector,current,'search',page=dict(page))
 
 
+def message_response(raw,uid,validity,header_sha256,route):
+    from .gateway_email_codec import MAX_RAW,MAX_HEADERS
+    from .gateway_line_ingress import _object
+    if not isinstance(raw,bytes):raise ValueError('bounded private mail binary frame required')
+    marker=raw.find(b'\n')
+    if not 0<marker<=16384:raise ValueError('bounded private mail binary frame required')
+    metadata=json.loads(raw[:marker],object_pairs_hook=_object);content=raw[marker+1:]
+    if isinstance(metadata,dict) and set(metadata)=={'error'}:
+        if content:raise ValueError('mail refusal cannot include body data')
+        return response(metadata)
+    if (not isinstance(metadata,dict) or set(metadata)!={'uid','uid_validity','uid_next','internal_at','size','approval','sha256'}
+            or type(metadata['uid']) is not int or metadata['uid']!=uid
+            or type(metadata['uid_validity']) is not int or metadata['uid_validity']!=validity
+            or type(metadata['uid_next']) is not int or not uid<metadata['uid_next']<2**32
+            or type(metadata['size']) is not int or not 1<=metadata['size']==len(content)<=MAX_RAW
+            or type(metadata['internal_at']) not in {int,float} or not math.isfinite(metadata['internal_at'])
+            or not 0<metadata['internal_at']<=time.time()+300 or hashlib.sha256(content).hexdigest()!=metadata['sha256']):
+        raise ValueError('complete immutable private email resource required')
+    approval=metadata['approval']
+    if (not isinstance(approval,dict) or set(approval)!={'envelope','binding_id','binding_digest','received_at','header_sha256','rfc_message_id'}
+            or approval['binding_id']!=route['binding_id'] or approval['binding_digest']!=route['binding_digest']
+            or type(approval['received_at']) not in {int,float} or approval['received_at']!=metadata['internal_at'] or approval['header_sha256']!=header_sha256):
+        raise PermissionError('private email body approval changed')
+    boundary=content.find(b'\r\n\r\n')
+    if not 0<boundary<=MAX_HEADERS or hashlib.sha256(content[:boundary+4]).hexdigest()!=header_sha256:
+        raise ValueError('full email changed the previously approved headers')
+    return {**metadata,'content':content}
+
+
+async def message(value,connector,current,uid,validity,header_sha256,route):
+    from .gateway_email_imap import uid_number
+    import re
+    uid_number(uid);uid_number(validity)
+    if (not isinstance(header_sha256,str) or not re.fullmatch(r'[0-9a-f]{64}',header_sha256)
+            or not isinstance(route,dict) or set(route)!={'binding_id','binding_digest'}
+            or not isinstance(route['binding_id'],str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',route['binding_id'])
+            or not isinstance(route['binding_digest'],str) or not re.fullmatch(r'[0-9a-f]{64}',route['binding_digest'])):
+        raise ValueError('exact approved private email body route required')
+    return await _run(value,connector,current,'message',uid=uid,validity=validity,header_sha256=header_sha256,route=dict(route))
+
+
+def mailbox_response(value):
+    if isinstance(value,dict) and set(value)=={'error'}:return response(value)
+    if (not isinstance(value,dict) or set(value)!={'uid_validity','uid_next'}
+            or any(type(value[key]) is not int or not 0<value[key]<2**32 for key in value)):
+        raise ValueError('exact private mailbox state required')
+    return value
+
+
+async def mailbox(value,connector,current):
+    return await _run(value,connector,current,'mailbox')
+
+
 async def probe(value,connector,current):
     return await _run(value,connector,current,'probe')
 
@@ -91,11 +144,12 @@ async def headers(value,connector,current,uid,validity):
     return await _run(value,connector,current,'headers',uid=uid,validity=validity)
 
 
-async def _run(value,connector,current,action,*,uid=None,validity=None,page=None):
+async def _run(value,connector,current,action,*,uid=None,validity=None,page=None,header_sha256=None,route=None):
     value=credentials(value);current();identity=authority(connector,value)
     payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity}
     if action=='headers':payload.update(uid=uid,uid_validity=validity)
     elif action=='search':payload['page']=page
+    elif action=='message':payload.update(uid=uid,uid_validity=validity,header_sha256=header_sha256,**route)
     request=json.dumps(payload).encode()
     if len(request)>32768:raise ValueError('bounded private mail worker request required')
     process=None;tasks=[]
@@ -109,7 +163,7 @@ async def _run(value,connector,current,action,*,uid=None,validity=None,page=None
         process=await asyncio.create_subprocess_exec(*command(),cwd='/usr/lib/haos',
             stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,limit=16384,
             env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'})
-        output=asyncio.create_task(collect(process.stdout,131072 if action=='headers' else 16384));errors=asyncio.create_task(collect(process.stderr,16384))
+        output=asyncio.create_task(collect(process.stdout,48*1024*1024+16385 if action=='message' else 131072 if action=='headers' else 16384));errors=asyncio.create_task(collect(process.stderr,16384))
         ended=asyncio.create_task(process.wait());tasks=[output,errors,ended]
         process.stdin.write(request);await process.stdin.drain();process.stdin.close()
         async with asyncio.timeout(35):
@@ -122,7 +176,18 @@ async def _run(value,connector,current,action,*,uid=None,validity=None,page=None
             if ended.result()!=0:raise ConnectionError('private mail worker unavailable; inspect account, TLS and retained status')
             current();authority(connector,value,identity)
             from .gateway_line_ingress import _object
+            if action=='message':
+                result=message_response(raw,uid,validity,header_sha256,route)
+                if 'error' not in result:
+                    from .gateway_email import PreparedEmailPolicy
+                    from .gateway_email_admission import approve
+                    from .sandbox import trusted_json
+                    expected=approve(PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json'))),connector,value,result)
+                    if expected!=result['approval']:raise PermissionError('email body differs from its fresh independent source approval')
+                    current();authority(connector,value,identity)
+                return result
             decoded=json.loads(raw,object_pairs_hook=_object)
+            if action=='mailbox':return mailbox_response(decoded)
             if action=='search':return search_response(decoded,page)
             return response(decoded) if action=='probe' else header_response(decoded,uid,validity)
     finally:

@@ -20,9 +20,9 @@ def main():
     from .gateway_line_ingress import _object
     def constant(_value):raise ValueError('finite JSON required')
     request=json.loads(raw,object_pairs_hook=_object,parse_constant=constant)
-    if not isinstance(request,dict) or not isinstance(request.get('action'),str) or request['action'] not in {'probe','headers','search'}:
+    if not isinstance(request,dict) or not isinstance(request.get('action'),str) or request['action'] not in {'probe','mailbox','headers','search','message'}:
         raise ValueError('closed private email worker action required')
-    extra={'probe':set(),'headers':{'uid','uid_validity'},'search':{'page'}}[request['action']]
+    extra={'probe':set(),'mailbox':set(),'headers':{'uid','uid_validity'},'search':{'page'},'message':{'uid','uid_validity','header_sha256','binding_id','binding_digest'}}[request['action']]
     if (set(request)!=({'action','connector','credentials','policy_sha256'}|extra)
             or not isinstance(request['connector'],str) or not isinstance(request['policy_sha256'],str)
             or not re.fullmatch(r'[0-9a-f]{64}',request['policy_sha256'])):
@@ -45,6 +45,8 @@ def main():
         EMAIL_TRUST_FROM_HEADER='false',EMAIL_ALLOW_ALL_USERS='false',GATEWAY_ALLOW_ALL_USERS='false',
         EMAIL_ALLOWED_USERS='',GATEWAY_ALLOWED_USERS='')
     from .gateway_email_imap import MailboxChanged
+    from .gateway_email_admission import Refused as AdmissionRefused
+    streaming=False
     try:
         with scope(home,env):
             from gateway.config import PlatformConfig
@@ -53,6 +55,9 @@ def main():
                 'require_authenticated_sender':True,'authserv_id':value['authserv_id']}))
         transport=Transport(adapter,value,current)
         if request['action']=='probe':result=transport.probe()
+        elif request['action']=='mailbox':
+            with transport.imap() as connection:
+                result={'uid_validity':transport.number(connection,'UIDVALIDITY'),'uid_next':transport.number(connection,'UIDNEXT')}
         elif request['action']=='search':
             from .gateway_email import PreparedEmailPolicy
             from .gateway_email_imap import search
@@ -61,18 +66,35 @@ def main():
             times=[row['since'] for row in policy.bindings.values() if row['connector']==request['connector']]
             if not times:raise PermissionError('email scan requires an explicit timed sender grant')
             current();result=search(transport,request['page'],min(times))
+        elif request['action']=='message':
+            from .gateway_email import PreparedEmailPolicy
+            from .gateway_email_imap import message
+            from .sandbox import trusted_json
+            def policy():
+                current();return PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+            complete=message(transport,request['uid'],request['uid_validity'],request['header_sha256'],policy,
+                request['connector'],value,{'binding_id':request['binding_id'],'binding_digest':request['binding_digest']})
+            content=complete.pop('content');current();streaming=True
+            sys.stdout.buffer.write((json.dumps(complete)+'\n').encode());sys.stdout.buffer.flush()
+            for offset in range(0,len(content),49152):
+                current();sys.stdout.buffer.write(memoryview(content)[offset:offset+49152])
+            sys.stdout.buffer.flush();current();return
         else:
             import base64,hashlib
             from .gateway_email_imap import get_headers
             fetched=get_headers(transport,request['uid'],request['uid_validity']);content=fetched.pop('content')
             result={**fetched,'content_base64':base64.b64encode(content).decode(),'sha256':hashlib.sha256(content).hexdigest()}
         current()
-    except MailboxChanged:result={'error':'uid-state-changed'}
-    except PermissionError:result={'error':'authority-or-protocol-refused'}
-    except __import__('ssl').SSLCertVerificationError:result={'error':'tls-refused'}
-    except __import__('smtplib').SMTPAuthenticationError:result={'error':'smtp-authentication-refused'}
-    except __import__('imaplib').IMAP4.error:result={'error':'imap-unavailable'}
-    except Exception:result={'error':'transport-unavailable'}
+    except Exception as error:
+        if streaming:os._exit(1)  # Partial binary output never becomes another JSON record.
+        if isinstance(error,MailboxChanged):code='uid-state-changed'
+        elif isinstance(error,AdmissionRefused):code=error.reason
+        elif isinstance(error,PermissionError):code='authority-or-protocol-refused'
+        elif isinstance(error,__import__('ssl').SSLCertVerificationError):code='tls-refused'
+        elif isinstance(error,__import__('smtplib').SMTPAuthenticationError):code='smtp-authentication-refused'
+        elif isinstance(error,__import__('imaplib').IMAP4.error):code='imap-unavailable'
+        else:code='transport-unavailable'
+        result={'error':code}
     # No exception strings, protocol responses, addresses, passwords or aliases.
     sys.stdout.write(json.dumps(result)+'\n')
 

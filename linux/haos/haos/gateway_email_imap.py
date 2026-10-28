@@ -93,3 +93,37 @@ def search(transport,page,since):
         if len(set(uids))!=len(uids) or any(not page['after']<uid<=page['through'] for uid in uids):
             raise ValueError('mail search returned duplicate or out-of-range UID resources')
         return {'uid_validity':validity,'uid_next':next_uid,'after':page['after'],'through':page['through'],'uids':sorted(uids)}
+
+
+def message(transport,uid,validity,header_sha256,policy,connector,value,route):
+    """Retrieve one immutable full resource only after independent header approval."""
+    from .gateway import digest,Conflict
+    from .gateway_email_admission import approve
+    import hashlib
+    uid_number(uid);uid_number(validity)
+    if (not isinstance(header_sha256,str) or not re.fullmatch(r'[0-9a-f]{64}',header_sha256)
+            or not isinstance(route,dict) or set(route)!={'binding_id','binding_digest'}):
+        raise ValueError('exact current email header and binding proof required')
+    with transport.imap() as connection:
+        actual_validity=transport.number(connection,'UIDVALIDITY');next_uid=transport.number(connection,'UIDNEXT')
+        if actual_validity!=validity or uid>=next_uid:raise MailboxChanged('mailbox changed before full email admission')
+        transport.check()
+        status,data=connection.uid('FETCH',str(uid),'(UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER])')
+        if status!='OK':raise ConnectionError('email header resource unavailable')
+        metadata=fetched(data,uid)
+        if hashlib.sha256(metadata['content']).hexdigest()!=header_sha256:raise Conflict('email headers changed since current source approval')
+        approval=approve(policy(),connector,value,metadata)
+        if approval['binding_id']!=route['binding_id'] or approval['binding_digest']!=route['binding_digest']:
+            raise PermissionError('email recipient or owner binding changed before body fetch')
+        policy().current_binding(route);transport.check();connection._haos_literal_limit=MAX_RAW
+        status,data=connection.uid('FETCH',str(uid),'(UID INTERNALDATE RFC822.SIZE BODY.PEEK[])')
+        if status!='OK':raise ConnectionError('approved email body resource unavailable')
+        complete=fetched(data,uid,section='')
+        if complete['size']!=len(complete['content']) or any(complete[key]!=metadata[key] for key in ('uid','internal_at','size')):
+            raise Conflict('email full resource size or creation metadata changed')
+        boundary=complete['content'].find(b'\r\n\r\n')
+        if not 0<boundary<=MAX_HEADERS or hashlib.sha256(complete['content'][:boundary+4]).hexdigest()!=header_sha256:
+            raise Conflict('email body resource changed its approved headers')
+        policy().current_binding(route);transport.check()
+        return {**complete,'uid_validity':validity,'uid_next':next_uid,'approval':approval,
+            'sha256':hashlib.sha256(complete['content']).hexdigest()}

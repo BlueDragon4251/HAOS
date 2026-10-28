@@ -32,14 +32,13 @@ exercised with disposable loopback servers; no external mailbox is contacted.
 A separate private worker runs only as the real gateway UID. Its parent enforces
 bounded input/output, fixed root-owned runtime code, current root publication,
 revocation monitoring, cancellation kill/join and a hard child deadline. Its
-closed actions currently permit account probing, bounded header reads and
-received-date-filtered UID searches only. Account values travel in
+closed actions permit account probing, bounded header reads, mailbox state,
+received-date-filtered UID searches and independently approved complete-message reads. Account values travel in
 private stdin rather than argv or environment; result/error schemas exclude
-provider bodies and credentials. This is not yet a message-processing service.
+provider bodies and credentials. The prepared receiver now joins these workers to durable native input and relay dispatch; public setup remains disabled.
 
-Remaining: durable UIDVALIDITY/cursor handling with authoritative INTERNALDATE,
-independent sender/thread admission before body/media use, bounded persistent
-attachments/local voice, native SMTP write intent and recovery, credential
+Remaining: bounded persistent attachments/local voice, native SMTP write intent
+and recovery, credential
 redaction/rotation/status, actual owner CLI/GUI and complete process/replay tests.
 No external account, SMTP delivery, installed service or hardware acceptance is
 claimed by these fixtures.
@@ -55,3 +54,29 @@ captured outcomes require an existing native input from the same mailbox, whose
 scope proof survives payload compaction. Actual SQLite fault tests verify rollback.
 These are receiving-service components, not yet the connected full-message inbox
 or a public owner setup path. Full body/media and SMTP publication remain open.
+
+
+The prepared receiver rechecks exact owner sender/mailbox/thread and server
+INTERNALDATE before requesting BODY.PEEK[]. It compares the full-message headers
+to their approved digest, rechecks epoch and policy in child and parent, and sends
+large bodies as bounded binary IPC instead of giant JSON/base64 frames. Complete
+messages remain in a private 64 MiB / 128-message SQLite custody store; the agent
+receives no raw pathname or account credential. Capacity exhaustion retains the
+cursor and reports storage failure. Owner purge/compaction is still pending.
+
+Actual native MIME parsing and native dispatch feed durable input, private relay
+and independent controller admission. Reply source context is retained before
+input admission; replay after input compaction cannot create a second mission.
+Authenticated body commands reach the exact controller parser without Subject
+rewriting them. Unsupported oversized text or reflected private credentials are
+explicit source refusals so they do not poison all later mail in a search page.
+Attachments remain disabled until their separate custody and approval paths exist.
+
+The prepared lifecycle supervises account connection, mailbox search/header/body
+capture and replay, persists finite status and retry deadlines, fences mailbox
+identity changes, and kills/joins workers on cancellation or owner withdrawal.
+Same-credential authentication blocks and retry deadlines survive profile reopening.
+A fresh disposable real-UID process fixture exercises the connected receiver
+through native verified TLS into retained input and relay. Separate actual native
+dispatch fixtures reach controller missions without inference or SMTP delivery.
+This remains receiving-side implementation, not a finished public email gateway.

@@ -54,7 +54,33 @@ if request['action']=='agent':
         raise AssertionError('agent accessed private credential or process channel')
     print(json.dumps({'agent_private_data_denied':True,'credential_payload_absent':True}));sys.exit(0)
 assert os.geteuid()==65534
-from haos.gateway_email_process import probe,headers,search
+if request['action']=='profile':
+    from haos.gateway_email_profile import build
+    from haos.gateway_email import PreparedEmailPolicy
+    from haos.gateway_raw import NativeInbox
+    from haos.gateway_relay import RelayInbox
+    from haos.gateway_runtime import adapter_envelope
+    from haos.sandbox import trusted_json
+    from haos.redaction import Redactor
+    async def run_profile():
+        root=Path('/var/lib/haos-gateway');inbox=NativeInbox(root/'profile-native.db',Redactor());relay=RelayInbox(root/'profile-relay.db',Redactor())
+        parent=root/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
+        policy=lambda:PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+        adapter=build(request['credentials'],parent=parent,connector='email',policy=policy,inbox=inbox)
+        def receive(event):relay.admit(policy(),'email',adapter_envelope(event,'email'));return True
+        adapter.set_durable_message_handler(receive)
+        try:
+            assert await adapter.connect(),adapter.native_health()
+            async with asyncio.timeout(25):
+                while inbox.db.execute("SELECT COUNT(*) FROM native_inbox WHERE state='committed'").fetchone()[0]!=1:
+                    await asyncio.sleep(.05)
+            assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==1
+            pending=relay.next(policy());assert 'Actual scoped private mail body.' in pending['envelope']['text']
+            assert adapter.native_health()['status']=='receiving'
+            print(json.dumps({'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True}))
+        finally:await adapter.close_profile();relay.close();inbox.close()
+    asyncio.run(run_profile());sys.exit(0)
+from haos.gateway_email_process import probe,headers,search,message
 if request['action'] in {'revoke','cancel','deadline'}:
     original_spawn=asyncio.create_subprocess_exec
     async def observed_spawn(*args,**kwargs):
@@ -64,6 +90,7 @@ if request['action'] in {'revoke','cancel','deadline'}:
     asyncio.create_subprocess_exec=observed_spawn
 async def exercise():
     operation=(headers(request['credentials'],'email',lambda:None,9,77) if request['action']=='headers'
+        else message(request['credentials'],'email',lambda:None,9,77,request['header_sha256'],request['route']) if request['action']=='message'
         else search(request['credentials'],'email',lambda:None,{'uid_validity':77,'after':0,'through':9}) if request['action']=='search'
         else probe(request['credentials'],'email',lambda:None))
     job=asyncio.create_task(operation)
@@ -94,14 +121,18 @@ asyncio.run(exercise())
                 pieces=line.split();tag,verb=pieces[:2];verbs.append(('imap',verb.decode()))
                 if verb==b'CAPABILITY':writer.write(b'* CAPABILITY IMAP4rev1\r\n'+tag+b' OK capabilities\r\n')
                 elif verb==b'LOGIN':writer.write(tag+b' OK authenticated\r\n')
-                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','search'} else b'3')+b'] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
+                elif verb==b'EXAMINE':writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY 77] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','search','message','profile'} else b'3')+b'] next\r\n'+tag+b' OK [READ-ONLY] selected\r\n')
                 elif verb==b'UID':
-                    if mode[0]=='search':
+                    if mode[0]=='search' or mode[0]=='profile' and b'UID SEARCH' in line:
                         assert b'UID SEARCH UID 1:9 SINCE 31-Dec-1969' in line
-                        writer.write(b'* SEARCH 9 1 3\r\n'+tag+b' OK searched\r\n')
+                        writer.write((b'* SEARCH 9\r\n' if mode[0]=='profile' else b'* SEARCH 9 1 3\r\n')+tag+b' OK searched\r\n')
                     else:
-                        assert b'UID FETCH 9 (UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER])' in line
-                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE 1000 BODY[HEADER] {'+str(len(header)).encode()+b'}\r\n'+header+b')\r\n'+tag+b' OK fetched\r\n')
+                        assert b'UID FETCH 9 (UID INTERNALDATE RFC822.SIZE BODY.PEEK[' in line
+                        whole=header+b'Actual scoped private mail body.\r\n'+(b'' if mode[0]=='profile' else b'x'*1048576)
+                        full=b'BODY.PEEK[])' in line
+                        if full:assert mode[0] in {'message','profile'}
+                        payload=whole if full else header;section=b'' if full else b'HEADER'
+                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE '+str(len(whole) if mode[0] in {'message','profile'} else 1000).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag+b' OK fetched\r\n')
                 else:raise AssertionError('mail worker attempted unsupported remote command')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
@@ -144,7 +175,7 @@ asyncio.run(exercise())
                 user=uid,group=uid,extra_groups=[],umask=0o077,cwd=str(code),
                 env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'})
             request={'action':action,'owner_canary':str(owner)}
-            request.update(extra if action=='agent' else {'credentials':value})
+            request.update(extra if action=='agent' else {'credentials':value,**extra})
             child.stdin.write((json.dumps(request)+'\n').encode());await child.stdin.drain();return child
         children=[]
         async def worker(child):
@@ -171,6 +202,18 @@ asyncio.run(exercise())
             mode[0]='search';search_child=await invoke(65534,'search');children.append(search_child)
             assert await finish(search_child)=={'uid_validity':77,'uid_next':10,'after':0,'through':9,'uids':[1,3,9]}
             cases.append('actual_gateway_uid_worker_search_uses_current_root_grant_date_and_returns_all_sorted_bounded_uid_resources')
+            mode[0]='message'
+            from haos.gateway import digest
+            message_child=await invoke(65534,'message',header_sha256=__import__('hashlib').sha256(header).hexdigest(),
+                route={'binding_id':'owner','binding_digest':digest(policy['bindings'][0])});children.append(message_child)
+            result=await finish(message_child)
+            expected=header+b'Actual scoped private mail body.\r\n'+b'x'*1048576
+            assert result['content_sha256']==__import__('hashlib').sha256(expected).hexdigest() and result['size']==len(expected)
+            assert result['approval']['binding_id']=='owner' and result['approval']['envelope']['text']==''
+            cases.append('actual_gateway_uid_streams_exact_large_approved_body_over_private_bounded_binary_ipc_without_model_or_smtp_send')
+            mode[0]='profile';profile_child=await invoke(65534,'profile');children.append(profile_child)
+            assert await finish(profile_child)=={'native_inputs':1,'relay_inputs':1,'private_receiver_connected':True,'full_body_retained':True}
+            cases.append('actual_gateway_uid_receiver_runs_native_account_search_header_body_capture_replay_and_durable_private_relay')
             mode[0]='success'
             denied=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s','-m','haos.gateway_email_worker',
                 stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,

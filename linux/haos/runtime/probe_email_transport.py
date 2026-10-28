@@ -9,6 +9,7 @@ import shlex
 import ssl
 import sys
 import tempfile
+import time
 
 
 def main():
@@ -25,6 +26,10 @@ def main():
         create(root,'mail.fixture.invalid');os.environ['SSL_CERT_FILE']=str(root/'ca.pem');os.environ['HERMES_SAFE_MODE']='1'
         tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(root/'certificate.pem',root/'key.pem')
         commands=[];mode=['success'];allowed=[True]
+        message_header=(b'From: owner@example.invalid\r\nTo: haos@example.invalid\r\nMessage-ID: <goal-1@example.invalid>\r\n'
+            b'Authentication-Results: mx.example.invalid; dmarc=pass\r\nSubject: Approved goal\r\n'
+            b'Date: Fri, 1 Jan 1999 00:00:00 +0000\r\n\r\n')
+        message_body=b'Actual scoped email body.\r\n';body_downloads=[]
         async def imap(reader,writer):
             encrypted=bool(writer.get_extra_info('ssl_object'))
             try:
@@ -39,9 +44,18 @@ def main():
                         writer.write(tag.encode()+(b' NO authentication refused\r\n' if mode[0]=='imap-auth-refused' else b' OK authenticated\r\n'))
                     elif verb=='EXAMINE':
                         assert parts[2:] == ['INBOX']
-                        writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY '+(b'88' if mode[0]=='changed-validity' else b'77')+b'] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','changed-uid','changed-validity','search','search-outside','search-duplicate'} else b'3')+b'] next\r\n'+tag.encode()+b' OK [READ-ONLY] examined\r\n')
+                        writer.write(b'* 0 EXISTS\r\n* OK [UIDVALIDITY '+(b'88' if mode[0]=='changed-validity' else b'77')+b'] stable\r\n* OK [UIDNEXT '+(b'10' if mode[0] in {'headers','changed-uid','changed-validity','search','search-outside','search-duplicate'} or mode[0].startswith('message') else b'3')+b'] next\r\n'+tag.encode()+b' OK [READ-ONLY] examined\r\n')
                     elif verb=='UID':
-                        if mode[0] in {'search','search-outside','search-duplicate'}:
+                        if mode[0].startswith('message'):
+                            header=message_header.replace(b'owner@example.invalid',b'other@example.invalid') if mode[0]=='message-unknown' else message_header
+                            whole=header+message_body
+                            if 'BODY.PEEK[HEADER])' in parts:
+                                payload=header;section=b'HEADER'
+                            else:
+                                assert 'BODY.PEEK[])' in parts;payload=whole;section=b'';body_downloads.append(True)
+                                if mode[0]=='message-mutated':payload=whole.replace(b'Approved goal',b'Approved hoax')
+                            writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE '+str(len(whole)).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag.encode()+b' OK fetched\r\n')
+                        elif mode[0] in {'search','search-outside','search-duplicate'}:
                             assert parts[2:]==['SEARCH','UID','1:9','SINCE','31-Dec-1969']
                             numbers=b'9 1 3' if mode[0]=='search' else b'1 10' if mode[0]=='search-outside' else b'1 1'
                             writer.write(b'* SEARCH '+numbers+b'\r\n'+tag.encode()+b' OK searched\r\n')
@@ -183,6 +197,39 @@ def main():
                     except ValueError:pass
                     else:raise AssertionError('foreign or duplicate search resources accepted')
                     cases.append(security+'_'+failure+'_is_refused_before_cursor_advance')
+                from haos.gateway_email_imap import message
+                from haos.gateway_email import PreparedEmailPolicy,scope as mailbox_scope
+                from haos.gateway import digest,Conflict
+                from haos.gateway_email_admission import Refused
+                import hashlib
+                binding={'id':'owner','connector':'email','sender':'owner@example.invalid','chat':'owner@example.invalid',
+                    'scope':mailbox_scope(value),'thread':'','identity':'personal','capabilities':['create','read'],'generation':'b'*64,'since':1}
+                config={'version':1,'connectors':[{'id':'email','platform':'email'}],'bindings':[binding]}
+                policy=lambda:PreparedEmailPolicy(config)
+                route={'binding_id':'owner','binding_digest':digest(binding)};mode[0]='message'
+                complete=await asyncio.to_thread(message,Transport(adapter,value,current),9,77,hashlib.sha256(message_header).hexdigest(),policy,'email',value,route)
+                assert complete['content']==message_header+message_body and complete['approval']['binding_id']=='owner'
+                from haos.gateway_email_codec import decode
+                assert decode(adapter,complete['content'],value,b'9')['body'].strip()=='Actual scoped email body.'
+                cases.append(security+'_actual_full_message_and_native_body_decode_follow_independent_timed_source_approval')
+                mode[0]='message-unknown';before=len(body_downloads)
+                foreign=message_header.replace(b'owner@example.invalid',b'other@example.invalid')
+                try:await asyncio.to_thread(message,Transport(adapter,value,current),9,77,hashlib.sha256(foreign).hexdigest(),policy,'email',value,route)
+                except Refused as error:assert error.reason=='unapproved-sender'
+                else:raise AssertionError('unapproved sender gained full body access')
+                assert len(body_downloads)==before
+                cases.append(security+'_unapproved_sender_is_refused_before_full_message_or_attachment_download')
+                mode[0]='message';binding['since']=int(time.time()*1000)
+                try:await asyncio.to_thread(message,Transport(adapter,value,current),9,77,hashlib.sha256(message_header).hexdigest(),policy,'email',value,route)
+                except Refused as error:assert error.reason=='pre-grant'
+                else:raise AssertionError('old received email gained a fresh grant')
+                assert len(body_downloads)==before;binding['since']=1
+                cases.append(security+'_new_grant_does_not_download_old_body_even_with_an_authenticated_sender')
+                mode[0]='message-mutated'
+                try:await asyncio.to_thread(message,Transport(adapter,value,current),9,77,hashlib.sha256(message_header).hexdigest(),policy,'email',value,route)
+                except Conflict:pass
+                else:raise AssertionError('full message silently changed approved header resource')
+                cases.append(security+'_changed_full_resource_headers_are_refused_before_durable_admission')
                 mode[0]='success'
             finally:
                 imap_server.close();smtp_server.close();await imap_server.wait_closed();await smtp_server.wait_closed()
