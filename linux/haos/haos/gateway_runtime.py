@@ -18,15 +18,18 @@ from .sandbox import trusted_json
 from .store import Conflict
 
 SOCKET = "/run/haos-gateway-control/gateway.sock"
+MAX_FRAME = 131072
 
 
 async def call(method: str, params: dict):
-    reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET, limit=131072), 10)
+    payload=json.dumps({"method":method,"params":params},ensure_ascii=False,allow_nan=False).encode()+b"\n"
+    if len(payload)>MAX_FRAME:raise ValueError("controller request exceeds its fixed byte limit")
+    reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET, limit=MAX_FRAME), 10)
     try:
-        writer.write(json.dumps({"method": method, "params": params}).encode() + b"\n")
+        writer.write(payload)
         await writer.drain()
         line = await asyncio.wait_for(reader.readline(), 40 if method=='gateway.output.begin' else 15)
-        if len(line) > 131072 or not line.endswith(b"\n"):
+        if len(line) > MAX_FRAME or not line.endswith(b"\n"):
             raise ConnectionError("invalid controller response")
         reply = json.loads(line)
         if reply.get("ok") is not True:

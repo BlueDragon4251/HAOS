@@ -148,3 +148,10 @@ Native compat32 SMTP can fold a long Message-ID after the header colon. The
 receiving codec now canonicalizes only outer ASCII folding whitespace while
 retaining exact identifier contents; multiple IDs and internal controls stay
 forbidden. Actual pinned codec fixtures cover the folded native-builder form.
+
+The shared private gateway client now encodes request frames directly as UTF-8
+instead of expanding Unicode to ASCII escapes, and refuses oversized or nonfinite
+JSON before connecting. The 131072-byte limit is unchanged. A real distinct-UID
+controller/socket regression reproduces failure before the fix and transfers
+32000 four-byte characters with an exact envelope digest afterward; LINE and
+prepared-email peer-denial tests retain their real SO_PEERCRED checks.

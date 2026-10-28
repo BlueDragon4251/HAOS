@@ -37,7 +37,7 @@ def main():
     script.write_text('''
 import asyncio,json,os,signal,sys
 from pathlib import Path
-from haos.controller import Controller
+from haos.controller import Controller,MAX_FRAME
 from haos.gateway import GatewayPolicy
 from haos.store import MissionStore
 from haos.sandbox import trusted_json
@@ -52,7 +52,7 @@ async def run():
         controller.gateway_policy=lambda:(PreparedEmailPolicy if request['platform']=='email' else GatewayPolicy)(trusted_json(Path(request['policy'])))
         async def incoming(reader,writer):await controller.client(reader,writer,gateway=True)
         stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
-        server=await asyncio.start_unix_server(incoming,path=request['socket'])
+        server=await asyncio.start_unix_server(incoming,path=request['socket'],limit=MAX_FRAME)
         # Deliberately permit filesystem connection: the negative test must
         # reach SO_PEERCRED, rather than rely only on socket directory modes.
         os.chmod(request['socket'],0o666)
@@ -64,6 +64,11 @@ async def run():
     try:Path(request['database']).read_bytes()
     except PermissionError:pass
     else:raise AssertionError('non-controller UID read private media ledger')
+    if request['role']=='client-runtime':
+        from haos import gateway_runtime
+        gateway_runtime.SOCKET=request['socket']
+        result=await gateway_runtime.call(request['method'],request['params'])
+        print(json.dumps({'ok':True,'result':result}),flush=True);return
     reader,writer=await asyncio.open_unix_connection(request['socket'])
     frame={'method':request['method'],'params':request['params'],'uid':0,'role':'owner'}
     # An unauthorized peer is refused before a request is read. Do not race
@@ -89,8 +94,8 @@ asyncio.run(run())
         ready=server.stdout.readline()
         if not ready:raise AssertionError('private media controller failed: '+server.stderr.read()[-2000:])
         assert json.loads(ready)=={'ready':True,'uid':65532}
-        def request(uid,method,params):
-            value={**common,'role':'client','uid':uid,'method':method,'params':params}
+        def request(uid,method,params,*,runtime=False):
+            value={**common,'role':'client-runtime' if runtime else 'client','uid':uid,'method':method,'params':params}
             child=subprocess.run([sys.executable,str(script)],input=json.dumps(value),capture_output=True,text=True,timeout=15,
                 user=uid,group=uid,extra_groups=[],umask=0o077,env=env)
             assert child.returncode==0,child.stderr[-2000:]
@@ -106,6 +111,13 @@ asyncio.run(run())
         identity=started['result']['id'];payload={'id':identity,'offset':0,'data':base64.b64encode(data).decode()}
         assert request(65534,'gateway.media.chunk',payload)['result']['ready']
         cases=['actual_gateway_uid_uploads_over_kernel_peer_authenticated_socket_without_reading_controller_ledger']
+        from haos.gateway import digest
+        unicode_event={**event,'message_id':'d'*64,'text':'😀'*32000}
+        unicode_params={**params,'envelope':unicode_event}
+        large=request(65534,'gateway.media.begin',unicode_params,runtime=True);assert large['ok']
+        with sqlite3.connect(database) as observer:
+            assert observer.execute('SELECT envelope_digest FROM gateway_media_uploads WHERE id=?',(large['result']['id'],)).fetchone()[0]==digest(unicode_event)
+        cases.append('actual_gateway_runtime_client_transfers_32000_multibyte_characters_over_real_kernel_socket_without_truncation_or_frame_limit_increase')
         refused=request(65533,'gateway.media.begin',params)
         assert refused['ok'] is False and 'peer is not authorized' in refused['error']
         cases.append('actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger')
