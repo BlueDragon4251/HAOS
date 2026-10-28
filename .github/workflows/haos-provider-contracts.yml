@@ -102,6 +102,8 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_line_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/line-output.json"
           "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
           "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
+          "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
+          "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_sms_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-output.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
           "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-delivery.json"
@@ -273,6 +275,18 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
           cat "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
+      - name: Verify private email worker UID isolation revocation cancellation and hard deadline
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_email_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_EMAIL_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-worker-process.json"
       - uses: actions/upload-artifact@v4
         with:
           name: provider-contracts-${{ github.sha }}
