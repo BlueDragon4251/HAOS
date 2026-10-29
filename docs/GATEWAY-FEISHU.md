@@ -263,3 +263,27 @@ corrections retained assertions: native protobuf needs SeqID/LogID; the fixture
 ACK inspector itself must also inspect SQLite on its owning loop, rather than
 reading the connection from the simulated socket thread. SQLite thread checks
 remain enabled. Public Feishu registry/GUI remains disabled.
+
+The private native WS discovery guard now confines the actual SDK's AppID/
+AppSecret POST to the selected fixed Feishu/Lark HTTPS endpoint. It requires an
+explicit private connection scope, verifies TLS, refuses HTTP redirects/errors,
+limits response bytes/deadline, validates native configuration and admits only
+returned WSS URLs under the selected official brand. Caller URLs, userinfo,
+alternate ports, ambiguous query IDs, unsafe paths and plaintext WS are refused.
+Native SDK URL parsing and HTTP model decoding remain in use. Actual WSS uses
+verified TLS, bounded messages/queues, disabled compression and no redirects;
+caller proxy/TLS/socket options cannot override those limits. Only the SDK's
+module aliases are wrapped, not the process-wide requests/websockets modules.
+Native WS diagnostics retain severity without raw payload/URI/exception text.
+Endpoint URLs and opaque query capabilities are registered for redaction;
+public device/service routing IDs are deliberately not credential values.
+
+The actual SDK discovery/WSS probe checks verified loopback HTTP and WSS,
+Native protobuf→original/input SQLite→actual wire ACK, untrusted WSS issuer,
+HTTP/WSS redirects, status errors, malformed/oversized endpoint data, withdrawal
+and diagnostic secrecy. A goal containing digit `1` and restoration of its
+opaque original prove that public routing ID `service_id=1` does not poison
+redaction or input receipts. Brand origins, allowed fixture hosts/ports and CA
+trust are changed only inside this disposable contract probe. This is not yet
+the private kernel-UID WS profile, its process supervision/reconnection or a
+live Feishu account. The public registry/GUI remains disabled.
