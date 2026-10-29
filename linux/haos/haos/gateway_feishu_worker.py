@@ -23,8 +23,8 @@ def main():
     raw=sys.stdin.buffer.readline(2097153)
     if len(raw)>2097152 or not raw.endswith(b'\n'):raise ValueError('bounded private Feishu header required')
     request=json.loads(raw,object_pairs_hook=_object,parse_constant=finite)
-    if (not isinstance(request,dict) or set(request)!=({'action','connector','credentials','policy_sha256','parent_pid'}|({request['action']} if request.get('action') in {'reply','resource'} else set()))
-            or not isinstance(request['action'],str) or request['action'] not in {'account','reply','resource'} or type(request['parent_pid']) is not int or request['parent_pid']!=parent
+    if (not isinstance(request,dict) or set(request)!=({'action','connector','credentials','policy_sha256','parent_pid'}|({request['action']} if request.get('action') in {'reply','resource','media_reply'} else set()))
+            or not isinstance(request['action'],str) or request['action'] not in {'account','reply','resource','media_reply'} or type(request['parent_pid']) is not int or request['parent_pid']!=parent
             or os.getppid()!=parent or not isinstance(request['connector'],str)
             or not isinstance(request['policy_sha256'],str) or not re.fullmatch(r'[0-9a-f]{64}',request['policy_sha256'])):
         raise ValueError('closed private Feishu account read required')
@@ -46,6 +46,10 @@ def main():
     from .gateway_runtime import SafeFormatter
     handler=logging.StreamHandler();handler.setFormatter(SafeFormatter(redactor))
     logging.basicConfig(level=logging.WARNING,handlers=[handler],force=True)
+    if request['action']=='media_reply':
+        from .gateway_feishu_media_reply import send
+        result=send(request,value,home,current,redactor)
+        sys.stdout.write(json.dumps(result)+'\n');return
     if request['action']=='resource':
         from .gateway_feishu_resource import fetch
         try:result=fetch(request,value,home,current,redactor)

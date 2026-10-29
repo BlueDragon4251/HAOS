@@ -185,6 +185,9 @@ def credential_redactor(credentials, policy):
     for name,item in credentials['connectors'].items():
         if policy.connectors[name]['platform'] in {'line','sms'} and 'tls' in item:
             secrets.append(item['tls']['private_key'])
+        if policy.connectors[name]['platform']=='feishu':
+            secrets.extend(item.get(key,'') for key in ('app_secret','verification_token','encrypt_key'))
+            if 'tls' in item:secrets.append(item['tls']['private_key'])
         if policy.connectors[name]['platform']=='email':
             secrets.extend([base64.b64encode(item['password'].encode()).decode(),
                 base64.b64encode(('\0'+item['address']+'\0'+item['password']).encode()).decode()])
@@ -207,8 +210,8 @@ def delivery_metadata(delivery,platform):
         'haos_binding':{key:delivery[key] for key in ('binding_id','binding_digest')}}
     if delivery['thread']:metadata['thread_id']=delivery['thread']
     if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
-    if platform in {'homeassistant','irc','line','sms','email'}:metadata['haos_delivery_id']=delivery['id']
-    if platform in {'irc','line','sms','email'}:metadata['haos_delivery_attempt']=delivery['attempt']
+    if platform in {'homeassistant','irc','line','sms','email','feishu'}:metadata['haos_delivery_id']=delivery['id']
+    if platform in {'irc','line','sms','email','feishu'}:metadata['haos_delivery_attempt']=delivery['attempt']
     return metadata
 
 
@@ -372,7 +375,7 @@ async def serve():
                         metadata=delivery_metadata(delivery,policy.connectors[delivery['connector']]['platform'])
                         preparing=True
                         try:
-                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms','email'}:
+                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms','email','feishu'}:
                                 output=await getattr(adapter,'_haos_'+policy.connectors[delivery['connector']]['platform']+'_output').prepare(delivery,call)
                                 if output is not None:metadata['haos_output']=output
                             preparing=False

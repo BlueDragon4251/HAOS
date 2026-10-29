@@ -86,6 +86,10 @@ def _install(adapter,fd,profile,identity):
     from .gateway_feishu_delivery import Publisher
     publisher=Publisher(adapter) if any(row['connector']==native.connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
     adapter._haos_feishu_publisher=publisher
+    from .gateway_feishu_output import Output
+    from .gateway_feishu_media_delivery import MediaPublisher
+    adapter._haos_feishu_output=Output(adapter) if publisher is not None else None
+    adapter._haos_feishu_media_publisher=MediaPublisher(adapter) if publisher is not None else None
     scope=digest([native.connector,value]);lifecycle=asyncio.Lock();adapter._haos_feishu_runner=None;adapter._haos_feishu_task=None
     db.execute('''CREATE TABLE IF NOT EXISTS feishu_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,
         credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)''')
@@ -197,17 +201,24 @@ def _install(adapter,fd,profile,identity):
     async def send(self,chat_id,content,reply_to=None,metadata=None):
         from .gateway_delivery_authority import current_delivery
         if self._haos_feishu_publisher is None:raise PermissionError('creation-only Feishu profile has no outbound authority')
-        if isinstance(metadata,dict) and metadata.get('haos_output') is not None:
-            raise PermissionError('Feishu output media is not connected to a private reviewed byte path')
         async with lifecycle:
             authority=current_delivery(self,'feishu',chat_id,metadata)
             binding=native.policy().current_binding(metadata['haos_binding'])
+            prepared=metadata.get('haos_output')
+            if prepared is not None:
+                if not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list):
+                    raise ValueError('exact prepared Feishu output batch required')
+                if prepared['items']:
+                    return await self._haos_feishu_media_publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),
+                        reply_to,prepared,authority)
+                content=prepared['text']
             return await self._haos_feishu_publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),
                 content,reply_to,authority)
     async def close(self):
         async with lifecycle:
             if self._haos_feishu_closed:return
             self._haos_feishu_closed=True;await stop()
+            if self._haos_feishu_media_publisher is not None:await self._haos_feishu_media_publisher.close()
             if self._haos_feishu_publisher is not None:await self._haos_feishu_publisher.close()
             if self._haos_feishu_receiver is not None:self._haos_feishu_receiver.close()
             self._haos_feishu_raw.close();os.close(fd)

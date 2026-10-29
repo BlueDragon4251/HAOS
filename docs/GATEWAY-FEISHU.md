@@ -375,3 +375,38 @@ proofs above. Private speech transport and agent terminal are fixtures, so the
 result is not live Feishu, LLM inference, installed service or hardware
 acceptance. Outgoing media, owner GUI, source disposal and final activation
 remain open; the public Feishu registry remains disabled.
+
+
+Private outgoing files now come from the controller's authenticated, immutable
+completed-session artifact exports. Native MEDIA extraction must agree with the
+explicit markers. Separate output/read consent is required; without consent the
+paths are stripped and no artifact is read. Only bounded bytes/checksums and
+sanitized names enter the private native image/file upload worker.
+
+Actual pinned multipart builders and SDK uploads are checked against the exact
+wire artifact. A FULL-synchronous per-part intent precedes each API write.
+Confirmed upload keys are retained privately and reused across attempts; dropped
+connections, malformed success or missing IDs become uncertain and never trigger
+a second upload. Native media replies use the actual uploaded-key helper and SDK,
+with fixed original recipient/topic and stable UUID, and their own durable
+per-part journal. Confirmed replies replay locally; uncertain replies do not
+resend. Native retries, post/route fallback and new-topic creation remain closed.
+The prepared profile and generic delivery metadata/export path are connected,
+while public registry activation remains disabled.
+
+Local probes establish authenticated backend artifact reads, native SDK/TLS
+uploads and replies, real gateway/agent/root UID checks, cancellation/revocation,
+write intent before a withheld response, SIGKILL/restart quarantine and no second
+write on confirmed or uncertain replay. Their source/connection declarations are
+fixtures, not live tenant or recipient acceptance. Existing Opus and native
+file/image/video formats are routed by the pinned codec. General non-Opus voice
+conversion, multi-part owner adjudication, source disposal and complete owner
+setup/GUI still need completion before activation.
+
+An actual encoding-negotiation fixture reproduced a valid gzip response being
+mistaken for truncation when compressed Content-Length was compared with decoded
+bytes. The private JSON boundary now requests identity encoding and refuses
+unexpected compression. A separate actual SDK DEBUG fixture reproduced escaped
+app-secret text in serialized authentication diagnostics; the boundary now
+registers JSON/repr spellings in addition to the original secret. Neither fix
+weakens byte limits or negative assertions.

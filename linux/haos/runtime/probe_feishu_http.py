@@ -4,6 +4,7 @@ import asyncio
 from contextlib import redirect_stderr
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import io
+import gzip
 import json
 import logging
 import os
@@ -30,6 +31,8 @@ def main():
         def log_message(self,*_args):pass
         def reply(self,status,body,**headers):
             raw=body if isinstance(body,bytes) else json.dumps(body).encode()
+            if state['mode']=='unexpected-encoding' or state['mode']=='encoding-negotiation' and 'gzip' in self.headers.get('Accept-Encoding',''):
+                raw=gzip.compress(raw);headers={**headers,'Content-Encoding':'gzip'}
             self.send_response(status);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(raw)))
             for key,item in headers.items():self.send_header(key,item)
@@ -98,6 +101,10 @@ def main():
                         assert json.loads(account().raw.content)['code']==0
                     assert len([row for row in seen if row[0]=='auth'])==1
                     cases.append('actual_native_SDK_verifies_TLS_obtains_private_token_and_reuses_account_scoped_cache')
+                    state['mode']='encoding-negotiation'
+                    with boundary.operation(client._config,'account',{}):assert json.loads(account().raw.content)['code']==0
+                    state['mode']='ok'
+                    cases.append('actual_native_SDK_identity_encoding_negotiation_preserves_valid_response_and_wire_length')
                     with boundary.operation(client._config,'message',{'message_id':message}):
                         assert read().data.items[0].message_id==message
                         assert refused(account,'unapproved-operation')==0
@@ -105,7 +112,7 @@ def main():
                     assert refused(lambda:boundary.operation(client._config,'message',{'message_id':'om_'+'c'*32}).__enter__(),'withdrawn-grant')==0
                     cases.append('unapproved_message_is_rejected_before_token_or_network_access')
                     for mode,kind in [('redirect','redirect-refused'),('401','authentication-refused'),('429','rate-limited'),
-                        ('500','server-refused'),('oversize','response-too-large'),('duplicate','invalid-response'),
+                        ('500','server-refused'),('unexpected-encoding','invalid-response'),('oversize','response-too-large'),('duplicate','invalid-response'),
                         ('infinite','invalid-response'),('malformed','invalid-response'),('truncated','transport-unavailable')]:
                         state['mode']=mode
                         with boundary.operation(client._config,'account',{}):assert refused(account,kind)==1
@@ -127,6 +134,16 @@ def main():
                             assert json.loads(other_client.request(native._tenant_get_request('/open-apis/bot/v3/info')).raw.content)['code']==0
                         assert len([row for row in seen if row[0]=='auth'])==before+1
                     cases.append('same_app_id_rotated_secret_and_other_brand_cannot_reuse_first_account_token')
+                    special={**value,'app_secret':value['app_secret']+'"\\escaped-fixture'}
+                    previous_secret=value['app_secret'];value['app_secret']=special['app_secret']
+                    encoded=Boundary(special,current,authorize,Redactor([special['app_secret']]))
+                    encoded_client=native._build_lark_client(special['app_id'],special['app_secret'],origin)
+                    logger.setLevel(10)
+                    with encoded.operation(encoded_client._config,'account',{}):
+                        assert json.loads(encoded_client.request(native._tenant_get_request('/open-apis/bot/v3/info')).raw.content)['code']==0
+                    value['app_secret']=previous_secret
+                    assert json.dumps(special['app_secret'])[1:-1] not in capture.getvalue()
+                    cases.append('actual_native_SDK_JSON_escaped_app_secret_is_redacted_from_debug_authentication_body')
                     with boundary.operation(client._config,'account',{}):
                         for headers in [{'Authorization':'Bearer unregistered-fixture-token'},{'Cookie':'fixture=1'},{'Host':'unapproved.invalid'},{'Transfer-Encoding':'chunked'},
                             {'Authorization':'Bearer x','authorization':'Bearer y'}]:

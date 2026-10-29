@@ -42,6 +42,10 @@ async def account(value,connector,current):
     return await _run(value,connector,current,'account')
 
 
+async def media_reply(value,connector,current,item):
+    return await _run(value,connector,current,'media_reply',item)
+
+
 async def resource(value,connector,current,item):
     return await _run(value,connector,current,'resource',item)
 
@@ -65,9 +69,9 @@ async def _run(value,connector,current,action,item=None):
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity();value=credentials(value,verify_tls=False);current();identity=authority(connector,value)
     payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity,'parent_pid':os.getpid()}
-    if action in {'reply','resource'}:payload[action]=item
+    if action in {'reply','resource','media_reply'}:payload[action]=item
     request=(json.dumps(payload,ensure_ascii=False)+'\n').encode()
-    if len(request)>(2097152 if action in {'reply','resource'} else 32768):raise ValueError('bounded private Feishu request required')
+    if len(request)>(2097152 if action in {'reply','resource','media_reply'} else 32768):raise ValueError('bounded private Feishu request required')
     process=None;tasks=[]
     async def collect(stream,limit=16384):
         data=bytearray()
@@ -99,7 +103,7 @@ async def _run(value,connector,current,action,item=None):
             if action=='resource':
                 from .gateway_feishu_resource import response as resource_response
                 return resource_response(result,item,value)
-            return reply_response(result) if action=='reply' else response(result,value)
+            return reply_response(result) if action in {'reply','media_reply'} else response(result,value)
     finally:
         if process is not None:
             if process.returncode is None:

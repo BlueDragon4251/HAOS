@@ -69,7 +69,7 @@ class Boundary:
         self.remember(self.value['app_secret'])
 
     def remember(self,value):
-        self.redactor.secrets=sorted(set([*self.redactor.secrets,value]),key=len,reverse=True)
+        self.redactor.secrets=sorted(set([*self.redactor.secrets,value,json.dumps(value,ensure_ascii=False)[1:-1],json.dumps(value,ensure_ascii=True)[1:-1],repr(value)[1:-1]]),key=len,reverse=True)
 
     def check(self,state):
         self.current()
@@ -139,6 +139,7 @@ class Boundary:
             if self.tokens.get(token,0)<=time.time():raise Failure('unknown-private-token')
         self.check(state)
         if write:state['write_started']=True
+        headers['Accept-Encoding']='identity'
         try:
             response=real(method,url,headers=headers,data=data,params=params,timeout=(3,10),
                 stream=True,allow_redirects=False,verify=True)
@@ -152,6 +153,7 @@ class Boundary:
             if response.status_code==429:raise Failure('rate-limited')
             if response.status_code in {401,403}:raise Failure('authentication-refused')
             if not 200<=response.status_code<300:raise Failure('server-refused')
+            if response.headers.get('Content-Encoding','identity').lower()!='identity':raise Failure('invalid-response')
             limit=16384 if auth else 1024*1024
             length=response.headers.get('Content-Length')
             if length is not None and (not length.isascii() or not length.isdecimal() or not 0<int(length)<=limit):

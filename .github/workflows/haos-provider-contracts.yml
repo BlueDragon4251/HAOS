@@ -109,6 +109,9 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_feishu_ws_frames.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ws-frames.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_send_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-codec.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_reply_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_upload_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-upload-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_media_reply_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-media-reply-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/feishu-output.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_webhook.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-authenticated-webhook.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-private-http.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ingress.json"
@@ -329,6 +332,14 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
           cat "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_upload_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_UPLOAD_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-upload-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-upload-process.json"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
             -v "$PWD/linux/haos/probes/probe_feishu_recovery_process.py:/probe.py:ro" \
