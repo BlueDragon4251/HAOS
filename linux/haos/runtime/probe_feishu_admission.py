@@ -27,6 +27,7 @@ def main():
                 'content':json.dumps({'text':'Actual native text: ä 🤖'})}}}
     def raw(item):return json.dumps(item,ensure_ascii=False).encode()
     redactor=Redactor([value['app_secret']]);cases=[]
+    image_key='img_v3_'+'0'*32
     def decode(item,configured=None):
         policy=PreparedFeishuPolicy(config if configured is None else configured);data=raw(item)
         approval=approve(policy,'feishu',value,data)
@@ -54,10 +55,10 @@ def main():
                 [{'tag':'code_block','language':'python','text':'print(1)'}]]}})
             text=decode(post)['envelope']['text'];assert '**bold**' in text and 'print(1)' in text and 'Report' in text
             cases.append('actual_native_rich_post_markdown_and_code_codec_runs_after_independent_owner_route_approval')
-            message['content']=json.dumps({'zh_cn':{'title':'Image','content':[[{'tag':'img','image_key':'img_v3_fixture'}]]}})
+            message['content']=json.dumps({'zh_cn':{'title':'Image','content':[[{'tag':'img','image_key':image_key}]]}})
             refused(post,'media-not-approved')
             approved=deepcopy(config);approved['bindings'][0]['allow_media']=True
-            assert decode(post,approved)['resources']==[{'key':'img_v3_fixture','type':'image','name':'','permissions':['allow_media']}]
+            assert decode(post,approved)['resources']==[{'key':image_key,'type':'image','name':'','permissions':['allow_media']}]
             cases.append('native_post_hidden_images_require_separate_media_consent_before_any_resource_download')
             file=deepcopy(event);message=file['event']['message'];message['message_type']='file'
             message['content']=json.dumps({'file_key':'file_v3_fixture','file_name':'source.txt'})

@@ -1,0 +1,40 @@
+{
+  "parent_commit": "cc6567b9d42f29ec1cef106ab705a88c96c397cd",
+  "source_files": [
+    {
+      "path": ".gitleaksignore",
+      "sha256": "0abd94d1d1c466d208358553affe75756077aba14192d7d9c3908b62f83b069c"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_admission.py",
+      "sha256": "9c8e9eb0700d69e58868618c3faaf632e6e5b1dfa535e8575cb5fecc047c0813"
+    },
+    {
+      "path": "scripts/check-secrets.sh",
+      "sha256": "9fe477f8db0480f71f0c21ec858097ca7e8253821c310eafe94fae9b73ea1bad"
+    }
+  ],
+  "checks": {
+    "actual_native_Feishu_admission_codec": "14 passed after deterministic fixture ID replacement",
+    "secret_scan_script_syntax": "bash -n passed"
+  },
+  "reviewed_findings": {
+    "rule": "generic-api-key",
+    "historical_commit": "cc6567b9d42f29ec1cef106ab705a88c96c397cd",
+    "file": "linux/haos/runtime/probe_feishu_admission.py",
+    "lines": [
+      57,
+      60
+    ],
+    "classification": "Invented offline image resource identifier; not an account, token or credential.",
+    "scope": "Two exact historical fingerprints only. No path-wide or rule-wide exception."
+  },
+  "correction": "The prior commit was saved before the staged scanner failure was evaluated. The fixture now uses an explicit zero-filled resource ID, and staged/worktree scan failures print redacted finding details. Scan completion and exit status must be checked before the next commit.",
+  "log_sha256": {
+    "feishu-native-admission-scan-fix.json": "90ac850167df7fa821f560d0c39001dfd3a4d1b8190aa50e462f4eb151c0629d",
+    "feishu-native-admission-scan-fix.log": "90ac850167df7fa821f560d0c39001dfd3a4d1b8190aa50e462f4eb151c0629d",
+    "feishu-admission-history-findings.log": "d0577c6e21d2dc83cd2284f4dae8601a8a4e4c3b67e21e4ea4c7dd968b410e7b"
+  },
+  "production_authorization_code_changed": false,
+  "external_messages_or_real_credentials": false
+}
