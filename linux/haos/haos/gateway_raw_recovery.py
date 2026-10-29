@@ -148,6 +148,16 @@ def unresolved(inbox, after=0):
                     or not math.isfinite(row['created_at']) or row['created_at']<0):
                 raise ValueError('invalid private SMS recovery refusal receipt')
             rejected.append({'platform':'sms',**dict(row)})
+    if inbox.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='feishu_profile_status'").fetchone():
+        from .gateway_feishu_profile import STATES as feishu_states
+        import math
+        for record in inbox.db.execute('SELECT connector,status,updated_at,next_attempt FROM feishu_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            row=dict(record)
+            if (not isinstance(row['connector'],str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in feishu_states
+                    or any(type(row[k]) not in {int,float} or not math.isfinite(row[k]) or row[k]<0 for k in ['updated_at','next_attempt'])):
+                raise Conflict('damaged Feishu profile status')
+            transport.append({**row,'platform':'feishu','external_delivery_verified':False})
     from .gateway_line_recovery import outgoing as line_outgoing
     from .gateway_email_recovery import outgoing as email_outgoing,transport as email_transport,mailboxes
     transport.extend(email_transport(inbox))
@@ -299,8 +309,22 @@ def main():
         from .gateway_email import PreparedEmailPolicy
         policy=PreparedEmailPolicy(data['policy'])
     else:policy=GatewayPolicy(data['policy'])
+    if data['action']=='feishu-sources':
+        if set(data['params'])!={'profile','kind'}:raise ValueError('exact private Feishu source selectors required')
+        from .gateway_feishu_source_recovery import sources
+        print(json.dumps(sources(policy,**data['params'])));return
+    if data['action']=='purge-feishu-source':
+        from .gateway_feishu_source_recovery import purge
+        print(json.dumps(purge(policy,data['params'])));return
     try:DATABASE.lstat()
     except FileNotFoundError:
+        if data['action']=='retry-feishu-auth':
+            params=data['params']
+            if set(params)!={'connector','owner_uid','note_sha256','credential_scope','account_scope'} or any(
+                    not isinstance(params[k],str) or not re.fullmatch('[0-9a-f]{64}',params[k]) for k in ['credential_scope','account_scope']):
+                raise ValueError('exact current private Feishu account recheck required')
+            connector=_recheck_connector(policy,{k:params[k] for k in ['connector','owner_uid','note_sha256']},'feishu')
+            print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,'network_requested':False,'native_journal_created':False}));return
         if data['action']=='media-cache' and data['params']=={}:
             print(json.dumps({'uploads':[],'stored_bytes':0,'reserved_bytes':0,'limit_bytes':64*1024*1024,'limit_records':128,'native_journal_created':False}))
             return
@@ -347,13 +371,9 @@ def main():
         elif data['action']=='purge-email-source':
             from .gateway_email_recovery import purge_source
             result=purge_source(inbox,policy,data['params'])
-        elif data['action']=='feishu-sources':
-            if set(data['params'])!={'profile','kind'}:raise ValueError('exact private Feishu source selectors required')
-            from .gateway_feishu_source_recovery import sources
-            result=sources(policy,**data['params'])
-        elif data['action']=='purge-feishu-source':
-            from .gateway_feishu_source_recovery import purge
-            result=purge(policy,data['params'])
+        elif data['action']=='retry-feishu-auth':
+            from .gateway_feishu_recovery import retry_auth
+            result=retry_auth(inbox,policy,data['params'])
         elif data['action']=='approve-feishu-part-retry':
             from .gateway_feishu_media_recovery import approve_retry
             result=approve_retry(inbox,policy,data['params'])

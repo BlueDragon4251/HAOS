@@ -580,3 +580,54 @@ else:raise AssertionError('unprivileged identity gained owner CLI authority')
         result=subprocess.run([sys.executable,'-c',code],user=uid,group=uid,extra_groups=[],
             capture_output=True,text=True,timeout=10,env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(modules),'PYTHONDONTWRITEBYTECODE':'1'})
         assert result.returncode==0,result.stderr
+
+
+def test_actual_feishu_owner_setup_pairing_rotation_and_cross_uid_denial(tmp_path,monkeypatch):
+    from haos import initial_setup,gateway_setup,owner,feishu_owner_setup
+    from haos.gateway_feishu import scope
+    assert os.geteuid()==0,'actual root publication and kernel UID gates required'
+    config=tmp_path/'configuration';config.mkdir(mode=0o700)
+    original_load,original_persist=gateway_setup.load,gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args:original_load(config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:original_persist(p,c,config=config,gid=0))
+    # Only service control and audit sink are declared fixtures; UID and publication are actual.
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:None)
+    monkeypatch.setattr(gateway_setup,'stopped_gateway',lambda:None)
+    audit=[];monkeypatch.setattr(owner,'audit',lambda action,fields:audit.append((action,fields)))
+    value={'app_id':'cli_0123456789abcdef','app_secret':'private-feishu-owner-fixture','domain':'feishu',
+        'tenant_key':'tenant_fixture_01','bot_open_id':'ou_'+'a'*32,'connection_mode':'websocket'}
+    canary=config/'owner-recovery-canary';canary.write_bytes(b'preserve existing owner evidence');canary.chmod(0o600)
+    assert feishu_owner_setup.configure('feishu-main',value)['sender_pairing_required']
+    assert stat.S_IMODE((config/'gateways.json').stat().st_mode)==0o640
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    assert value['app_secret'] not in (config/'gateways.json').read_text()
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','feishu-main',value['bot_open_id'],'oc_'+'c'*32,'personal')
+    initial_setup.pair_gateway_sender('owner','feishu-main','ou_'+'b'*32,'oc_'+'c'*32,'personal',
+        thread='omt_'+'d'*32,allow_media=True,allow_outbound_media=True,require_mention=False)
+    policy,private=original_load(config);b=policy['bindings'][0]
+    assert b['scope']==scope(value) and b['thread']=='omt_'+'d'*32 and b['require_mention'] is False
+    assert b['allow_media'] is True and b['allow_outbound_media'] is True and b['allow_voice'] is False
+    assert len(b['generation'])==64 and type(b['since']) is int and b['since']>123
+    public=initial_setup.gateway_configuration()
+    assert value['app_secret'] not in str(public) and public['feishu']['feishu-main']['app_id']==value['app_id']
+    pid=os.fork()
+    if pid==0:
+        try:
+            os.setgroups([]);os.setgid(65534);os.setuid(65534)
+            for action in [lambda:feishu_owner_setup.configure('feishu-main',value),lambda:feishu_owner_setup.inspect('feishu-main'),
+                    lambda:feishu_owner_setup.sources(),lambda:feishu_owner_setup.retry_auth('feishu-main'),
+                    lambda:initial_setup.pair_gateway_sender('owner','feishu-main','ou_'+'b'*32,'oc_'+'c'*32,'personal')]:
+                try:action()
+                except PermissionError:pass
+                else:raise AssertionError('non-owner UID performed Feishu owner action')
+            try:(config/'gateway-credentials').read_bytes()
+            except PermissionError:pass
+            else:raise AssertionError('gateway UID read root credential store')
+            os._exit(0)
+        except BaseException as error:
+            os.write(2,('Feishu owner UID fixture: '+type(error).__name__+'\n').encode());os._exit(1)
+    _,status=os.waitpid(pid,0);assert os.waitstatus_to_exitcode(status)==0
+    assert feishu_owner_setup.configure('feishu-main',{**value,'app_secret':'rotated-feishu-owner-fixture'})['configured']
+    assert original_load(config)[0]['bindings']==[]
+    assert canary.read_bytes()==b'preserve existing owner evidence'
+    assert value['app_secret'] not in str(audit) and any(event[0]=='setup.gateway-pair' for event in audit)

@@ -155,7 +155,7 @@ def main():
             cases.append('actual_native_redelivery_after_owner_purge_preserves_tombstone_and_refuses_automatic_byte_restoration')
     report={'passed':len(cases),'cases':cases,'actual_pinned_codec_and_private_SQLite':True,
         'transport_authentication_owner_publication_and_service_identity_are_fixtures':True,
-        'network_resources_agent_missions_or_external_messages':False,'public_feishu_enabled':False,
+        'network_resources_agent_missions_or_external_messages':False,'public_registry_activation_established_by_this_probe':False,
         'installed_owner_or_hardware_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))

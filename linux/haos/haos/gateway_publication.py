@@ -23,6 +23,12 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='feishu':
+            from .gateway_feishu import credentials as feishu_credentials,scope
+            if feishu_credentials(row,verify_tls=False)!=row:raise ValueError('canonical private Feishu account required')
+            if any(b['connector']==name and (b['scope']!=scope(row) or b['sender']==row['bot_open_id']) for b in policy['bindings']):
+                raise ValueError('Feishu grant differs from saved account or approves its own bot')
+            continue
         if platforms[name]=='email':
             from .gateway_email import credentials as email_credentials,scope
             if email_credentials(row)!=row:raise ValueError('canonical private TLS email account required')

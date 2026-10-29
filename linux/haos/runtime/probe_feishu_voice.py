@@ -142,7 +142,7 @@ def main():
         finally:speech_client.transcribe=saved;store.close();relay.close();raw.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-feishu-voice-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_native_Feishu_decode_retained_media_dispatch_controller_and_local_model':True,
-        'source_transport_resource_retrieval_private_speech_transport_and_agent_terminal_are_fixtures':True,'public_registry_enabled':False,
+        'source_transport_resource_retrieval_private_speech_transport_and_agent_terminal_are_fixtures':True,'public_registry_activation_established_by_this_probe':False,
         'external_Feishu_account_delivery_llm_inference_or_installed_acceptance':False}
     if len(sys.argv)>3:Path(sys.argv[3]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

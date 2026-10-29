@@ -71,7 +71,7 @@ def main():
             cases.append('changed_source_digest_original_identity_grant_credentials_size_and_attempt_refused')
     report={'passed':len(cases),'cases':cases,'actual_pinned_native_formatter_send_and_SDK_builders':True,
         'API_client_response_is_fixture_no_network':True,'durable_delivery_worker_or_public_send_connected':False,
-        'public_feishu_enabled':False,'external_messages_or_live_acceptance':False}
+        'public_registry_activation_established_by_this_probe':False,'external_messages_or_live_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 

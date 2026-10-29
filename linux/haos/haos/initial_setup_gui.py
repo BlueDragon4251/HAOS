@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -857,7 +857,12 @@ class Wizard:
             from .email_owner_gui import AccountForm
             email_form=AccountForm(self,self.content,connector.get)
             connector_value.trace_add('write',email_form.clear_secret)
+            from .feishu_owner_gui import AccountForm as FeishuAccountForm
+            feishu_form=FeishuAccountForm(self,self.content,connector.get)
+            connector_value.trace_add('write',feishu_form.clear_secret)
             def configure():
+                if platform.get()=='feishu':
+                    feishu_form.configure();return
                 if platform.get()=='email':
                     email_form.configure();return
                 line_values={'channel_secret':line_secret.get(),'channel_access_token':line_access.get(),
@@ -900,7 +905,8 @@ class Wizard:
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
-                reset_sms();reset_line();email_form.reset()
+                reset_sms();reset_line();email_form.reset();feishu_form.reset()
+                feishu_form.frame.pack_forget()
                 email_form.frame.pack_forget()
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
@@ -915,17 +921,20 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
-                elif platform.get() in {'line','sms','email'}:
+                elif platform.get() in {'line','sms','email','feishu'}:
                     irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main','feishu-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                if platform.get()=='feishu':
+                    feishu_form.reset(configured_gateways.get('feishu',{}).get(connector.get()))
+                    feishu_form.frame.pack(fill='x',before=configure_button)
                 if platform.get()=='email':
                     email_form.reset(configured_gateways.get('email',{}).get(connector.get()))
                     email_form.frame.pack(fill='x',before=configure_button)
@@ -1299,6 +1308,9 @@ class Wizard:
             from .email_owner_gui import PairForm
             email_pair=PairForm(self,self.content,platform,email_form,sender,chat,scope,thread,rights,pairing_note)
             connector_value.trace_add('write',email_pair.clear)
+            from .feishu_owner_gui import PairForm as FeishuPairForm
+            feishu_pair=FeishuPairForm(self,self.content,platform,feishu_form,sender,chat,scope,thread,rights,pairing_note)
+            connector_value.trace_add('write',feishu_pair.clear)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1322,12 +1334,13 @@ class Wizard:
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
+                    else feishu_pair.options() if platform.get()=='feishu'
                     else email_pair.options() if platform.get()=='email'
                     else {'allow_media':sms_allow_media.get(),'allow_voice':sms_allow_voice.get(),'allow_video':sms_allow_video.get(),'allow_outbound_media':sms_allow_outbound.get()} if platform.get()=='sms'
                     else {'allow_media':line_allow_media.get(),'allow_voice':line_allow_voice.get(),'allow_video':line_allow_video.get(),'allow_outbound_media':line_allow_outbound.get()} if platform.get()=='line'
                     else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
                         'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
-                reset_sms_voice_consent();email_pair.clear()
+                reset_sms_voice_consent();email_pair.clear();feishu_pair.clear()
                 line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
@@ -1349,7 +1362,7 @@ class Wizard:
                         + (" · Antworten für ALLE Instanzbenutzer sichtbar" if row.get('homeassistant_shared_notifications') else "")
                         + (" · System-/Automationsquellen dieser Entity ausdrücklich freigegeben" if row.get('homeassistant_trust_system') else ""))
                     media_platform=next((c['platform'] for c in configured_gateways['connectors'] if c['id']==row['connector']),'Gateway')
-                    media_label={'line':'LINE','sms':'SMS','email':'E-Mail'}.get(media_platform,'Gateway')
+                    media_label={'line':'LINE','sms':'SMS','email':'E-Mail','feishu':'Feishu'}.get(media_platform,'Gateway')
                     if row.get('allow_media'):binding_details.configure(text=binding_details.cget('text')+' · '+media_label+'-Bilder/Dokumente ausdrücklich freigegeben')
                     if row.get('allow_video'):binding_details.configure(text=binding_details.cget('text')+' · MP4-Eingang freigegeben')
                     if row.get('allow_outbound_media'):binding_details.configure(text=binding_details.cget('text')+' · Ergebnisdateien für diesen Chat freigegeben')
@@ -1438,7 +1451,8 @@ class Wizard:
                         'revoked':'LINE-Freigabe entzogen oder geändert; keine weitere Ausführung',
                         'closed':'Privates LINE-Profil geschlossen; Daten erhalten'}
                     from .email_owner_gui import LABELS as email_labels
-                    labels=(email_labels if item.get('platform')=='email' else matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                    from .feishu_owner_gui import LABELS as feishu_labels
+                    labels=(feishu_labels if item.get('platform')=='feishu' else email_labels if item.get('platform')=='email' else matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
                         else {**{key:value.replace('LINE','SMS/Twilio') for key,value in line_labels.items()},
                             'authentication-refused':'SMS/Twilio-Anmeldung abgelehnt; Account SID und privaten Auth-Token prüfen',
                             'identity-refused':'SMS/Twilio-Konto oder eigene Empfangsnummer passt nicht; gespeicherte Daten bleiben erhalten',
@@ -1458,7 +1472,7 @@ class Wizard:
                             'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
                             '':''}[item['history_error']])
                         +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
-                    if item.get('platform') in {'ntfy','line','sms','email'}:
+                    if item.get('platform') in {'ntfy','line','sms','email','feishu'}:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · letzter Fehler: '+labels[item['last_error']] if item.get('last_error') else ''))
@@ -1512,6 +1526,8 @@ class Wizard:
                             size=10,color=self.MUTED).pack(anchor='w',pady=3)
                 from .email_owner_gui import recovery as email_recovery
                 email_recovery(self,recovery_frame,value,load_ingress,connector.get)
+                from .feishu_owner_gui import recovery as feishu_recovery
+                feishu_recovery(self,recovery_frame,value,load_ingress)
                 rows = value["ingress"]
                 if not rows:
                     self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
@@ -1586,10 +1602,14 @@ class Wizard:
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",
                         color=self.MUTED).pack(anchor="w", pady=(15, 0))
+            self._button(self.content,'Gespeicherte Feishu-Quellen verwalten',lambda:self.show('gateway-feishu-sources')).pack(anchor='w',pady=6)
             self._button(self.content,'Gespeicherte E-Mail-Originale verwalten',lambda:self.show('gateway-email-sources')).pack(anchor='w',pady=6)
             self._button(self.content,'Gespeicherte Gateway-Medien verwalten',lambda:self.show('gateway-media')).pack(anchor='w',pady=6)
             self._button(self.content,'Lokale Spracherkennung verwalten',lambda:self.show('gateway-speech')).pack(anchor='w',pady=6)
             self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
+        elif name=='gateway-feishu-sources':
+            from .feishu_owner_gui import sources
+            sources(self)
         elif name=='gateway-email-sources':
             from .email_owner_gui import sources
             sources(self)

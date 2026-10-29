@@ -166,7 +166,7 @@ def main():
     cases.append('actual_native_SDK_debug_connection_diagnostics_do_not_persist_app_secret_endpoint_URL_or_session_ticket')
     report={'passed':len(cases),'cases':cases,'actual_native_SDK_endpoint_HTTP_verified_WSS_protobuf_and_SQLite':True,
         'all_network_targets_loopback_fixtures':True,'owner_grant_and_transport_account_are_fixtures':True,
-        'kernel_WS_profile_identity_reconnection_GUI_or_live_acceptance_verified':False,'public_feishu_enabled':False}
+        'kernel_WS_profile_identity_reconnection_GUI_or_live_acceptance_verified':False,'public_registry_activation_established_by_this_probe':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 

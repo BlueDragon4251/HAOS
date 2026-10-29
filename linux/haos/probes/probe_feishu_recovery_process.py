@@ -78,6 +78,8 @@ else:
     webhook.db.execute('INSERT INTO feishu_webhook_receipts VALUES(?,?,?,?,?,?,?,?,?)',
         ('c'*64,publisher.credential_scope,'{}',payload,checksum,json.dumps(approval),'captured','d'*64,now))
     webhook.close()
+    inbox.db.execute('CREATE TABLE feishu_profile_status(identity TEXT PRIMARY KEY,connector TEXT,credential_scope TEXT,status TEXT,updated_at REAL,next_attempt REAL)')
+    inbox.db.execute('INSERT INTO feishu_profile_status VALUES(?,?,?,?,?,?)',('a'*64,'feishu',publisher.credential_scope,'authentication-refused',now,now+600))
     print(json.dumps({'seeded':True}));inbox.close()
 ''');seed.chmod(0o644)
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'};cases=[]
@@ -129,6 +131,18 @@ else:
         permission={**selectors,'id':entry['id'],'snapshot_sha256':entry['snapshot_sha256'],
             'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True}
         raw(65534,'purge-feishu-source',permission,False)
+    from haos.gateway import digest
+    auth={'connector':'feishu','credential_scope':digest(['feishu',value]),
+        'account_scope':digest([value[key] for key in ['domain','app_id','app_secret','tenant_key','bot_open_id']]),
+        'owner_uid':1000,'note_sha256':'f'*64}
+    for uid in [0,65532,65533]:raw(uid,'retry-feishu-auth',auth,False)
+    before=raw(65534,'ingress',{'after':0})
+    assert raw(65534,'retry-feishu-auth',auth)['authentication_blocks_cleared']==1
+    assert raw(65534,'retry-feishu-auth',auth)['authentication_blocks_cleared']==0
+    after=raw(65534,'ingress',{'after':0})
+    assert after['feishu_accounts']==before['feishu_accounts'] and after['native_outgoing']==before['native_outgoing']
+    assert after['transport'][0]['status']=='created' and after['transport'][0]['next_attempt']==before['transport'][0]['next_attempt']
+    cases.append('actual_gateway_UID_auth_retry_is_account_scoped_audited_and_preserves_rate_deadline_and_uncertain_writes_without_optional_SDK')
     config['bindings']=[]
     for kind in ['original','webhook']:
         selectors={'profile':'feishu-'+'a'*64,'kind':kind}

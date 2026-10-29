@@ -129,7 +129,7 @@ def main():
         finally:DOMAINS['feishu']=old;server.shutdown();server.server_close();thread.join(timeout=5)
     report={'passed':len(cases),'cases':cases,'actual_native_send_and_SDK_verified_TLS':True,
         'only_loopback_fixture_replies_no_external_messages':True,'owner_grant_callbacks_are_fixtures':True,
-        'durable_media_worker_upload_journal_and_public_send_connected':False,'public_feishu_enabled':False,'live_account_acceptance':False}
+        'durable_media_worker_upload_journal_and_public_send_connected':False,'public_registry_activation_established_by_this_probe':False,'live_account_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 

@@ -67,3 +67,24 @@ def test_private_raw_error_or_damaged_account_metadata_is_never_returned_to_owne
     with pytest.raises(Conflict):outgoing(inbox)
     inbox.db.execute("UPDATE feishu_delivery_backoff SET next_attempt=-1")
     with pytest.raises(Conflict):accounts(inbox)
+
+
+def test_auth_recheck_is_exact_account_scoped_preserves_waits_and_uncertain_writes(ledger):
+    from haos.gateway_feishu_recovery import retry_auth
+    inbox,policy=ledger;now=time.time();future=now+600
+    inbox.db.execute('CREATE TABLE feishu_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)')
+    for identity,scope,status in [('a','a'*64,'authentication-refused'),('b','b'*64,'authentication-refused'),('c','a'*64,'rate-limited')]:
+        inbox.db.execute('INSERT INTO feishu_profile_status VALUES(?,?,?,?,?,?)',(identity,'feishu',scope,status,now,future))
+    account=inbox.db.execute('SELECT account_scope FROM feishu_delivery_backoff').fetchone()[0]
+    inbox.db.execute("UPDATE feishu_delivery_backoff SET status='authentication-refused',next_attempt=?",(future,))
+    request={'connector':'feishu','credential_scope':'a'*64,'account_scope':account,'owner_uid':1000,'note_sha256':'e'*64}
+    before=outgoing(inbox)
+    assert retry_auth(inbox,policy,request)['authentication_blocks_cleared']==2
+    assert retry_auth(inbox,policy,request)['authentication_blocks_cleared']==0
+    rows={row['identity']:dict(row) for row in inbox.db.execute('SELECT * FROM feishu_profile_status')}
+    assert rows['a']['status']=='created' and rows['b']['status']=='authentication-refused' and rows['c']['status']=='rate-limited'
+    assert all(row['next_attempt']==future for row in rows.values())
+    assert accounts(inbox)[0]['status']=='ready' and accounts(inbox)[0]['next_attempt']==future
+    assert outgoing(inbox)==before and inbox.db.execute('SELECT COUNT(*) FROM feishu_auth_owner_events').fetchone()[0]==1
+    from haos.gateway_raw_recovery import unresolved
+    assert len([row for row in unresolved(inbox)['transport'] if row['platform']=='feishu'])==3

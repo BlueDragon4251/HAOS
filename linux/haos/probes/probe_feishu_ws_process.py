@@ -57,14 +57,17 @@ def main():
 import asyncio,json,os,sys
 from pathlib import Path
 from haos.gateway_feishu import PreparedFeishuPolicy
-from haos.gateway_feishu_profile import build
+from haos.gateway_runtime import build_adapter
+def build(value,**context):return build_adapter('feishu',value,feishu_context=context)
 from haos.gateway_raw import NativeInbox
 from haos.gateway_relay import RelayInbox
 from haos.gateway_runtime import adapter_envelope
 from haos.redaction import Redactor
 async def main():
     value=json.loads(Path(sys.argv[1]).read_text());base=Path('/var/lib/haos-gateway')
-    def policy():return PreparedFeishuPolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))
+    def policy():
+        from haos.gateway import GatewayPolicy
+        return GatewayPolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))
     inbox=NativeInbox(base/'ws-inbox.db',Redactor());relay=RelayInbox(base/'ws-relay.db',Redactor())
     parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
     adapter=build(value,parent=parent,connector='feishu',policy=policy,inbox=inbox)

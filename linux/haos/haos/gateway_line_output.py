@@ -96,6 +96,9 @@ class Output:
             count,size=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM line_output_media').fetchone()
             if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_media_cache'").fetchone():
                 size+=self.db.execute("SELECT COALESCE(SUM(length(data)),0) FROM native_media_cache WHERE state='cached'").fetchone()[0]
+            if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='feishu_output_voice'").fetchone():
+                other=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM feishu_output_voice WHERE length(data)>0').fetchone()
+                count+=other[0];size+=other[1]
             if count>=128 or size+len(data)>64*1024*1024:raise PermissionError('private output cache capacity reached')
             self.db.execute('INSERT INTO line_output_media VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (scope,delivery_id,binding['id'],digest(binding),checksum,mime,kind,duration,data,secrets.token_urlsafe(32),time.time()+3600))

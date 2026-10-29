@@ -2,10 +2,10 @@
 
 The pinned Hermes catalog contains 22 adapters. Loading an upstream adapter is
 not HAOS integration or authorization. Current public HAOS text setup paths are
-Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio and E-Mail.
+Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail and Feishu/Lark.
 Each uses the independent peer-authenticated mission queue, exact owner grants
 and its checked transport/delivery path. Unknown senders and plugins receive no
-automatic HAOS identity or owner rights. These eleven text paths are not eleven
+automatic HAOS identity or owner rights. These twelve software paths are not twelve
 fully accepted platforms or a completed 22-gateway implementation.
 
 LINE additionally connects incoming PNG/JPEG/documents, isolated local voice
@@ -29,7 +29,13 @@ Receiving-server Authentication-Results custody must be independently verified.
 SMTP acceptance is not recipient delivery; uncertain writes never auto-repeat.
 See [E-Mail owner setup and limits](GATEWAY-EMAIL.md).
 
-The remaining HAOS integrations are a2a, buzz, dingtalk, feishu,
+Feishu/Lark connects verified native WebSocket or signed/encrypted HTTPS events,
+private SDK account/media/reply workers, separately scoped input/output, local
+voice conversion and inspected per-part/source recovery. See
+[Feishu/Lark setup and evidence](GATEWAY-FEISHU.md) for required app rights, exact
+identities, TLS configuration and explicit live-acceptance limits.
+
+The remaining HAOS integrations are a2a, buzz, dingtalk,
 google_chat, photon, raft, simplex, teams, wecom and whatsapp. Their bundled
 upstream modules alone do not count as working HAOS gateways. Complete each
 transport's owner provisioning, sender/chat/thread scopes, durable input/output,

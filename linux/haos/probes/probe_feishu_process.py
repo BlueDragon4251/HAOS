@@ -32,6 +32,7 @@ def main():
     runtime=code/'hermes/.venv';subprocess.run([sys.executable,'-m','venv','--without-pip',str(runtime)],check=True)
     (runtime/'lib/python3.11/site-packages/feishu_fixture.pth').write_text('/sdk\n/usr/lib/haos\n/usr/lib/haos/hermes-source\n')
     with Path('/etc/passwd').open('a') as stream:stream.write('haos-gateway:x:65534:65534:Disposable private Feishu identity:/nonexistent:/usr/sbin/nologin\n')
+    with Path('/etc/group').open('a') as stream:stream.write('haos-gateway:x:65534:\n')
     base=Path('/var/lib/haos-gateway');base.mkdir(mode=0o700);os.chown(base,65534,65534)
     work=Path(tempfile.mkdtemp(prefix='haos-feishu-process-'));work.chmod(0o755)
     sys.path[:0]=['/deps',str(code),'/repo/linux/haos/runtime']
@@ -133,14 +134,16 @@ if request['mode']=='agent':
     print(json.dumps({'agent_denied':True}));sys.exit(0)
 async def run():
     if request['mode'] in {'profile','crashreply','resume-reply'}:
-        from haos.gateway_feishu_profile import build
+        from haos.gateway_runtime import build_adapter
+        def build(value,**context):return build_adapter('feishu',value,feishu_context=context)
         from haos.gateway_feishu import PreparedFeishuPolicy
         from haos.gateway_raw import NativeInbox
         from haos.gateway_relay import RelayInbox
         from haos.gateway_runtime import adapter_envelope
         from haos.redaction import Redactor
         from haos.sandbox import trusted_json
-        policy=lambda:PreparedFeishuPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+        from haos.gateway import GatewayPolicy
+        policy=lambda:GatewayPolicy(trusted_json(Path('/etc/haos/gateways.json')))
         base=Path('/var/lib/haos-gateway');parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
         inbox=NativeInbox(base/'profile-native.db',Redactor());relay=RelayInbox(base/'profile-relay.db',Redactor())
         adapter=build(request['credentials'],parent=parent,connector='feishu',policy=policy,inbox=inbox)
@@ -391,6 +394,25 @@ print(json.dumps(asyncio.run(run())))
             cwd='/usr/lib/haos',env={'PATH':'/usr/bin:/bin'},timeout=10)
         assert direct.returncode!=0 and len(seen)==before
         cases.append('actual_root_identity_is_refused_before_worker_reads_or_network')
+        from unittest.mock import patch
+        from haos import initial_setup,gateway_setup,feishu_owner_setup
+        secret_path=config/'gateway-credentials';secret_path.write_text(json.dumps({'connectors':{'feishu':value}}));secret_path.chmod(0o600)
+        state['parent_pid']=os.getpid();before=seen.count('reply')
+        # Service-manager availability is fixture-only; root handoff, SDK, TLS,
+        # actual gateway UID, parent lifetime and finite owner result are real.
+        with patch.object(initial_setup,'quiesce_for_setup',lambda **kwargs:None),patch.object(gateway_setup,'stopped_gateway',lambda:None):
+            assert feishu_owner_setup.configure('feishu',value)['configured']
+            assert secret_path.stat().st_uid==0 and secret_path.stat().st_mode&0o777==0o600
+            assert value['app_secret'] not in policy_path.read_text() and value['tls']['private_key'] not in policy_path.read_text()
+            checked=feishu_owner_setup.inspect('feishu')
+            assert checked['bot_identity_verified'] and not checked['tenant_identity_verified'] and checked['message_sent'] is False
+            state['mode']='wrong-bot';refused=feishu_owner_setup.inspect('feishu')
+            assert refused['error']=='identity-refused' and refused['sender_grants_changed'] is False
+        assert seen.count('reply')==before and value['app_secret'] not in json.dumps(checked)+json.dumps(refused)
+        assert value['app_secret'] not in Path('/var/lib/haos-owner/audit.jsonl').read_text()
+        cases.append('actual_root_webhook_owner_setup_verifies_real_trusted_certificate_and_publishes_matched_private_credentials')
+        cases.append('actual_root_owner_no_send_account_handoff_drops_to_gateway_UID_and_checks_real_native_SDK_TLS_bot_receipt')
+        cases.append('actual_owner_account_failure_remains_finite_without_tenant_or_delivery_claim_or_secret_in_audit')
     finally:
         release.set();write_release.set()
         for child in children:
@@ -399,7 +421,7 @@ print(json.dumps(asyncio.run(run())))
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65533,65534],
         'actual_native_SDK_verified_TLS_private_process_and_kernel_termination':True,
         'fixed_API_domain_redirected_only_by_disposable_container_hosts':True,
-        'owner_publication_and_account_are_fixtures':True,'public_feishu_enabled':False,
+        'owner_publication_and_account_are_fixtures':True,'public_registry_activation_established_by_this_probe':False,
         'external_messages_live_account_or_installed_acceptance':False},indent=2))
 
 

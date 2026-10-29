@@ -1,4 +1,57 @@
-# Feishu / Lark — private integration in progress
+# Feishu / Lark
+
+The current software path connects the pinned native adapter through the HAOS
+public registry, owner GUI/CLI, private account worker, authenticated WebSocket
+or HTTPS webhook, independent timed grants, durable input/output, incoming
+media/voice, sealed outgoing files/audio, revocation and inspected recovery.
+This is the twelfth public software integration. External tenant permissions,
+real recipients, installed boot and hardware acceptance remain separate.
+
+In **Verwaltung → Gateways**, select `feishu`, choose the fixed Feishu or Lark
+brand and enter the app ID, private app secret, exact tenant key and bot open ID.
+Configure the platform app's `im.message.receive_v1` event and required bot,
+message and media permissions. WebSocket uses outgoing verified HTTPS/WSS and
+requires no incoming port. HTTPS webhook additionally requires verification
+token, encrypt key, trusted matching certificate/private key, local listener
+port and public `https://hostname/feishu/webhook` route. External forwarding and
+reachability must be checked separately. The GUI imports only private, single
+link, bounded PEM files; it never displays saved private credentials.
+
+Save, run **Feishu-Konto ohne Nachricht prüfen**, then grant an exact sender
+`ou_…`, chat `oc_…` and optional native topic `omt_…`. An empty topic approves
+only unthreaded input. Bot mention is required in groups unless explicitly
+changed. Account scope is derived from the saved app/brand/tenant/bot identity;
+bot self-grants and changed unsaved identity are refused. Account/secret changes
+withdraw prior grants. Media, voice, video and outbound files have separate
+permissions. Local speech setup is required for incoming voice and non-Opus
+outgoing audio conversion. The no-send check verifies the bot ID and deliberately
+does not claim tenant identity or external delivery.
+
+Start the gateway after pairing. The management window displays finite transport
+states and retained deadlines. Authentication retry requires an explicit owner
+action; it preserves rate deadlines, source custody and unclear delivery intents.
+Owner inspection stops the service. Upload and reply recovery is per exact part
+and attempt, requires independent non-acceptance evidence and leaves controller
+outbox reconciliation as a separate decision. Confirmed parts cannot be released
+and are reused. Source management independently disposes selected original or
+webhook bytes only after the original grant changes/withdraws, retaining audit
+and replay tombstones. Controller/agent copies and backups are unaffected.
+
+Owner CLI provides `gateway setup CONNECTOR feishu`, `feishu-account`,
+`retry-feishu-auth`, `feishu-sources`, `purge-feishu-source`,
+`approve-feishu-retry` and `approve-feishu-part-retry`; `--help` describes exact
+selectors and explicit inspection flags. Existing owner authentication,
+stopped-service gates and separate unprivileged ledger identities remain in use.
+
+The development notes below retain earlier private implementation checkpoints
+and their individual fixture limits. Statements about activation still being
+pending describe those historical checkpoints; the current entry points and
+requirements are the ones above. Exact combined validation is recorded in the
+[activation receipt](evidence/2026-10-29/feishu-public-activation-validation.json). No fixture establishes
+live account, external delivery, inference, installed OS or release acceptance.
+
+## Historical private implementation and boundary evidence
+
 
 Feishu remains outside the public HAOS gateway registry and GUI. Installing the
 bundled adapter or SDK is not a working authorized HAOS gateway. Eleven other

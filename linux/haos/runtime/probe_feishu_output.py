@@ -114,7 +114,7 @@ async def session(base,token,workspace):
         cases.append('fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads')
     finally:speech_client.opus=actual_opus;inbox.close();store.close()
     return {'passed':len(cases),'cases':cases,'actual_authenticated_backend_artifact_reader':True,
-        'completed_session_and_connected_Feishu_transport_are_fixtures':True,'speech_RPC_transport_is_fixture_actual_codec':True,'public_registry_enabled':False,
+        'completed_session_and_connected_Feishu_transport_are_fixtures':True,'speech_RPC_transport_is_fixture_actual_codec':True,'public_registry_activation_established_by_this_probe':False,
         'upload_or_reply_worker_external_Feishu_or_inference_acceptance':False}
 
 

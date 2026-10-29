@@ -76,7 +76,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None):
+    if platform=='feishu':
+        if not isinstance(feishu_context,dict) or set(feishu_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('Feishu requires a private profile and exact independent owner authority')
+        from .gateway_feishu_profile import build
+        return build(credentials,**feishu_context)
     if platform=='email':
         if not isinstance(email_context,dict) or set(email_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('email requires a private profile and exact independent owner authority')
@@ -242,7 +247,7 @@ async def serve():
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
     media_cache=None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email','feishu'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
         from .gateway_media_relay import MediaCache
@@ -263,12 +268,12 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
-        if connector['platform'] in {'homeassistant','irc','line','sms','email'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
+        if connector['platform'] in {'homeassistant','irc','line','sms','email','feishu'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
             logging.warning('Gateway connector remains inactive until exact owner pairing')
             continue
         context=None
-        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email'}:
-            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform']=='email' else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
+        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email','feishu'}:
+            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform'] in {'email','feishu'} else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
         adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})
             if context else build_adapter(connector["platform"], credentials["connectors"][connector["id"]]))

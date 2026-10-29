@@ -109,7 +109,7 @@ def main():
             cases.append('pure_native_decode_and_manifest_validation_create_no_local_media_or_credential_files')
     report={'passed':len(cases),'cases':cases,'actual_pinned_Hermes_normalizer_and_Lark_models':True,
         'transport_authentication_and_input_events_are_fixtures':True,'resource_downloads_or_agent_missions':False,
-        'public_feishu_enabled':False,'live_accounts_external_messages_or_installed_acceptance':False}
+        'public_registry_activation_established_by_this_probe':False,'live_accounts_external_messages_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 

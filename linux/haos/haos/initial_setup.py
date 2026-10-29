@@ -572,7 +572,22 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform']=='email':
+    if selected and selected['platform']=='feishu':
+        from .gateway_feishu import scope as feishu_scope,validate_binding
+        import secrets,time
+        saved=credentials['connectors'][connector];expected=feishu_scope(saved)
+        if scope and scope!=expected:raise ValueError('Feishu-Bereich muss zum gespeicherten App-/Tenant-/Bot-Konto gehören')
+        if sender==saved['bot_open_id']:raise ValueError('Feishu-Bot darf sich nicht selbst freigeben')
+        item.update(scope=expected,generation=secrets.token_hex(32),since=time.time_ns()//1_000_000,require_mention=require_mention)
+        for key,value in [('allow_media',allow_media),('allow_voice',allow_voice),('allow_video',allow_video),('allow_outbound_media',allow_outbound_media)]:
+            if type(value) is not bool:raise ValueError('explicit boolean Feishu media approval required')
+            item[key]=value
+        validate_binding(item)
+        if allow_voice:
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):raise PermissionError('Lokalen Sprachdienst vor Feishu-Voice-Freigabe einrichten')
+    elif selected and selected['platform']=='email':
         from .gateway_email import scope as mailbox_scope
         saved=credentials['connectors'][connector];destination=mailbox_scope(saved)
         if scope and scope!=destination:raise ValueError('email scope must match the saved IMAP mailbox')
@@ -610,7 +625,7 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     elif allow_media or allow_voice or allow_video or allow_outbound_media:raise ValueError('media approval applies only to reviewed LINE/SMS paths')
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
-    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True:
+    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True and (not selected or selected['platform']!='feishu'):
         raise ValueError('Matrix device and encryption options apply only to Matrix')
     if selected and selected['platform']=='ntfy':
         configured=credentials['connectors'][connector]
@@ -686,6 +701,13 @@ def gateway_configuration():
     email={row['id']:{key:value for key,value in _credentials['connectors'][row['id']].items() if key!='password'}
         for row in policy['connectors'] if row['platform']=='email'}
     if email:result['email']=email
+    feishu={}
+    for row in policy['connectors']:
+        if row['platform']!='feishu':continue
+        saved=_credentials['connectors'][row['id']]
+        feishu[row['id']]={key:saved[key] for key in ['app_id','tenant_key','bot_open_id','domain','connection_mode']}
+        if saved['connection_mode']=='webhook':feishu[row['id']].update(port=saved['port'],public_url=saved['tls']['public_url'],bind_host=saved['tls']['bind_host'])
+    if feishu:result['feishu']=feishu
     return result
 
 

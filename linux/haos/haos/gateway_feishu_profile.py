@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from types import MethodType,SimpleNamespace
 
-from .gateway import digest
+from .gateway import digest,GatewayPolicy
 from .gateway_feishu import credentials,scope as account_scope,PreparedFeishuPolicy,authority
 from .gateway_feishu_admission import Refused
 from .gateway_feishu_cache import RawEvents
@@ -23,7 +23,7 @@ def build(value,*,parent,connector,policy,inbox):
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity();value=credentials(value,verify_tls=False)
     def snapshot(latest):
-        if not isinstance(latest,PreparedFeishuPolicy) or latest.connectors.get(connector,{}).get('platform')!='feishu':
+        if not isinstance(latest,GatewayPolicy) or latest.connectors.get(connector,{}).get('platform')!='feishu':
             raise PermissionError('prepared independent Feishu policy required')
         bindings=[row for row in latest.bindings.values() if row['connector']==connector]
         if not bindings or any(row['scope']!=account_scope(value) or row['sender']==value['bot_open_id'] for row in bindings):
@@ -98,6 +98,8 @@ def _install(adapter,fd,profile,identity):
     deadline=max([row['next_attempt'] for row in prior]+[0])
     db.execute('INSERT OR IGNORE INTO feishu_profile_status VALUES(?,?,?,?,?,?)',
         (identity,native.connector,scope,blocked or 'created',time.time(),deadline))
+    db.execute('UPDATE feishu_profile_status SET next_attempt=MAX(next_attempt,?),status=CASE WHEN ? THEN ? ELSE status END WHERE identity=?',
+        (deadline,blocked is not None,blocked or 'created',identity))
     def status(state,delay=0):
         if state not in STATES:raise ValueError('finite private Feishu status required')
         db.execute('UPDATE feishu_profile_status SET status=?,updated_at=?,next_attempt=? WHERE identity=?',

@@ -163,7 +163,7 @@ def main():
         finally:
             DOMAINS.clear();DOMAINS.update(old);server.shutdown();server.server_close();thread.join(timeout=5)
     report={'passed':len(cases),'cases':cases,'actual_native_SDK_and_verified_TLS':True,
-        'all_targets_loopback_fixtures':True,'public_feishu_enabled':False,
+        'all_targets_loopback_fixtures':True,'public_registry_activation_established_by_this_probe':False,
         'kernel_identity_publication_transport_delivery_GUI_or_live_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))

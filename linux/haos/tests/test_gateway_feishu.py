@@ -12,9 +12,9 @@ def binding():return {'id':'owner','connector':'feishu','sender':'ou_'+'b'*32,'c
     'generation':'d'*64,'since':123,'require_mention':True}
 
 
-def test_feishu_remains_private_until_transport_delivery_recovery_and_gui_are_connected():
+def test_feishu_public_policy_keeps_the_same_exact_independent_grant_validation():
     policy={'version':1,'connectors':[{'id':'feishu','platform':'feishu'}],'bindings':[binding()]}
-    with pytest.raises(ValueError):GatewayPolicy(policy)
+    assert GatewayPolicy(policy).bindings['owner']==binding()
     assert PreparedFeishuPolicy(policy).bindings['owner']==binding()
     assert credentials(account())==account()
 

@@ -1644,3 +1644,24 @@ are refused. This foundation enables no public Feishu connector, mission,
 external message, live account or installed acceptance. The remaining native
 retry/fallback, token-cache, listener/socket, durability/recovery and GUI paths
 must be sealed and tested before activation.
+
+Feishu/Lark public software integration (2026-10-29)
+-------------------------------------------------
+
+The public policy, owner CLI/GUI and runtime factory now connect the previously
+private pinned Feishu adapter. This is public path 12 of the 22 pinned gateways;
+provider status and the ten remaining gateway implementations are separate.
+The owner configures exact app/brand/tenant/bot identity and selects supervised
+native WebSocket or verified signed/encrypted HTTPS webhook. Fresh timed
+sender/chat/topic grants, independent media/output permissions and credential
+rotation remain controlled by HAOS. No upstream allow-all or plugin identity is
+accepted. Account inspection drops root to the private gateway UID and checks
+native SDK/TLS bot identity without sending; tenant identity remains unverified.
+
+GUI management connects finite status, retained waits, explicit account-specific
+authentication recheck, per-part inspected upload/reply retry and independent
+original/webhook source disposal. Recovery preserves rate deadlines, confirmed
+parts, uncertain-write quarantine and the independent controller reconciliation
+obligation. Root/private-store and cross-UID probes are separate from Tk handoff
+fixtures. See `GATEWAY-FEISHU.md` for prerequisites, exact limits, operation paths
+and the distinction between local contract evidence and live acceptance.

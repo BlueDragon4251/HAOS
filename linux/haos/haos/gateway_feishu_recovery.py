@@ -97,3 +97,33 @@ def accounts(inbox):
             raise Conflict('damaged private Feishu account metadata')
         result.append({**value,'platform':'feishu','snapshot_sha256':digest(value),'network_requested':False})
     return result
+
+
+def retry_auth(inbox,policy,request):
+    required={'connector','credential_scope','account_scope','owner_uid','note_sha256'}
+    if (not isinstance(request,dict) or set(request)!=required or not isinstance(request['connector'],str)
+            or policy.connectors.get(request['connector'],{}).get('platform')!='feishu'
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
+            or any(not isinstance(request[k],str) or not HASH.fullmatch(request[k]) for k in ['credential_scope','account_scope','note_sha256'])):
+        raise PermissionError('exact current Feishu account and owner authentication-recheck decision required')
+    db=inbox.db;changed=0;now=time.time();db.execute('BEGIN IMMEDIATE')
+    try:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='feishu_profile_status'").fetchone():
+            changed+=db.execute("UPDATE feishu_profile_status SET status='created',updated_at=?,next_attempt=MAX(next_attempt,0) "
+                "WHERE connector=? AND credential_scope=? AND status IN ('authentication-refused','identity-refused')",
+                (now,request['connector'],request['credential_scope'])).rowcount
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='feishu_delivery_backoff'").fetchone():
+            changed+=db.execute("UPDATE feishu_delivery_backoff SET status='ready',updated_at=? WHERE account_scope=? AND status='authentication-refused'",
+                (now,request['account_scope'])).rowcount
+        if changed:
+            db.execute('''CREATE TABLE IF NOT EXISTS feishu_auth_owner_events(connector TEXT NOT NULL,credential_scope TEXT NOT NULL,
+                account_scope TEXT NOT NULL,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,policy_sha256 TEXT NOT NULL,
+                changed INTEGER NOT NULL,created_at REAL NOT NULL)''')
+            db.execute('INSERT INTO feishu_auth_owner_events VALUES(?,?,?,?,?,?,?,?)',
+                (request['connector'],request['credential_scope'],request['account_scope'],request['owner_uid'],request['note_sha256'],
+                    digest([policy.publication,policy.connectors,policy.bindings]),changed,now))
+        db.execute('COMMIT')
+    except BaseException:
+        if db.in_transaction:db.execute('ROLLBACK')
+        raise
+    return {'connector':request['connector'],'authentication_blocks_cleared':changed,'network_requested':False}

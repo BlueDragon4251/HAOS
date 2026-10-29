@@ -182,7 +182,7 @@ def main():
         finally:await runner.cleanup();receiver.close();originals.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-feishu-webhook-') as directory:asyncio.run(exercise(Path(directory)))
     report={'passed':len(cases),'cases':cases,'actual_native_signature_AES_codec_SQLite_and_verified_HTTPS':True,
-        'all_network_targets_loopback_fixtures':True,'public_feishu_enabled':False,
+        'all_network_targets_loopback_fixtures':True,'public_registry_activation_established_by_this_probe':False,
         'kernel_listener_publication_live_account_external_messages_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))

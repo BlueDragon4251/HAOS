@@ -150,7 +150,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-feishu-ws-frames-') as directory:asyncio.run(exercise(Path(directory)))
     report={'passed':len(cases),'cases':cases,'actual_SDK_protobuf_assembly_ACK_native_codec_and_SQLite':True,
         'actual_thread_to_owner_loop_handoff':True,'socket_send_and_transport_authentication_are_fixtures':True,
-        'connected_WS_TLS_endpoint_kernel_identity_or_live_account_verified':False,'public_feishu_enabled':False}
+        'connected_WS_TLS_endpoint_kernel_identity_or_live_account_verified':False,'public_registry_activation_established_by_this_probe':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 

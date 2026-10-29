@@ -54,6 +54,11 @@ def main():
             envelope=adapter_envelope(event,'feishu');assert event.source.user_id_alt is None
             relay.admit(policy(),'feishu',envelope);observed.append(event);return True
         adapter.set_durable_message_handler(receive)
+        # The generic public runtime prefilter grants only Telegram. Feishu's
+        # independently retained route remains the sole platform authority.
+        from haos.gateway_runtime import native_authorization_prefilter
+        adapter.set_authorization_check(lambda user_id,chat_type=None,chat_id=None,**kwargs:
+            native_authorization_prefilter(policy(),'feishu',user_id,chat_id,**kwargs))
         stamp=str(int(time.time()*1000)-1000)
         def resource(number,text,*,group=False):
             message={'message_id':'om_'+format(number,'032x'),'create_time':stamp,'chat_id':binding['chat'],
@@ -129,7 +134,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='haos-feishu-native-ingress-') as td:asyncio.run(exercise(Path(td)))
     report={'passed':len(cases),'cases':cases,'actual_pinned_native_decode_SQLite_relay_and_controller':True,
         'transport_authentication_owner_publication_and_direct_controller_calls_are_fixtures':True,
-        'model_inference_or_external_messages':False,'public_feishu_enabled':False,
+        'model_inference_or_external_messages':False,'public_registry_activation_established_by_this_probe':False,
         'media_transport_owner_GUI_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))

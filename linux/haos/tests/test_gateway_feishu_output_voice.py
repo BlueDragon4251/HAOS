@@ -101,3 +101,12 @@ def test_full_cache_refuses_encoding_before_worker_and_rechecks_after_yield(voic
     monkeypatch.setattr('haos.speech_client.opus',encode)
     with pytest.raises(Conflict):asyncio.run(prepare(v))
     assert db.execute('SELECT COUNT(*) FROM feishu_output_voice').fetchone()[0]==0
+
+
+def test_LINE_output_cannot_overrun_shared_byte_budget_already_used_by_retained_Feishu_voice(voice):
+    from haos.gateway_line_output import Output as LineOutput
+    v=voice;asyncio.run(prepare(v));db=v.inbox.db
+    db.execute('UPDATE feishu_output_voice SET data=zeroblob(?)',(64*1024*1024,))
+    line=LineOutput(v.output.adapter);line.current=lambda _row:v.binding
+    with pytest.raises(PermissionError):line.put(v.binding,'d'*64,'e'*64,b'new output','document','application/octet-stream')
+    assert db.execute('SELECT COUNT(*) FROM line_output_media').fetchone()[0]==0

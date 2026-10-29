@@ -92,7 +92,7 @@ def main():
                 cases.append('actual_Lark_HTTP_authentication_rejection_does_not_reach_bot_lookup')
         report={'passed':len(cases),'cases':cases,'lark_oapi':version('lark-oapi'),'actual_native_Hermes_and_SDK':True,
             'all_HTTP_targets_are_loopback_fixtures':True,'HAOS_transport_delivery_or_GUI_connected':False,
-            'public_feishu_enabled':False,'live_account_or_external_messages_or_installed_acceptance':False}
+            'public_registry_activation_established_by_this_probe':False,'live_account_or_external_messages_or_installed_acceptance':False}
         if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report,indent=2))
     finally:server.shutdown();server.server_close();thread.join(timeout=5)

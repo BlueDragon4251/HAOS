@@ -230,7 +230,7 @@ asyncio.run(main())
             assert child.returncode==0 and out==(mode+'-stopped\n').encode(),(out,err)
             cases.append('actual_'+mode+'_kills_and_joins_blocked_private_binary_worker_before_return')
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65533,65534],
-            'loopback_fixed_origin_fixture_only':True,'direct_controller_policy_and_calls_are_fixtures':True,'public_feishu_enabled':False}))
+            'loopback_fixed_origin_fixture_only':True,'direct_controller_policy_and_calls_are_fixtures':True,'public_registry_activation_established_by_this_probe':False}))
     finally:
         release.set();http.shutdown();http.server_close()
 

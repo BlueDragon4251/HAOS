@@ -273,7 +273,7 @@ asyncio.run(main())
         assert seen[before:]==['auth','upload']
         cases.append('actual_committed_write_intent_before_withheld_response_and_SIGKILL_restart_quarantine_prevent_second_upload')
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65533,65534],
-            'fixed_origin_loopback_fixture_only':True,'durable_upload_journal':True,'connection_and_original_source_authentication_are_fixtures':True,'native_media_reply_delivery_fixture':True,'public_feishu_enabled':False}))
+            'fixed_origin_loopback_fixture_only':True,'durable_upload_journal':True,'connection_and_original_source_authentication_are_fixtures':True,'native_media_reply_delivery_fixture':True,'public_registry_activation_established_by_this_probe':False}))
     finally:release.set();http.shutdown();http.server_close()
 
 
