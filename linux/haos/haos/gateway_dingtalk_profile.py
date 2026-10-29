@@ -86,6 +86,13 @@ def _lifecycle(adapter, lease, identity):
     native = adapter._haos_native; db = native.inbox.db; value = adapter._haos_dingtalk_value
     current = adapter._haos_dingtalk_check; lifecycle = asyncio.Lock()
     adapter._haos_dingtalk_socket = None; adapter._haos_dingtalk_task = None
+    adapter._haos_dingtalk_live = False
+    from .gateway_dingtalk_delivery import Publisher
+    from .gateway_dingtalk_send import MAX_TEXT
+    adapter.MAX_MESSAGE_LENGTH = MAX_TEXT
+    adapter._haos_dingtalk_publisher = Publisher(adapter) if any(
+        row['connector'] == native.connector and 'read' in row['capabilities']
+        for row in native.policy().bindings.values()) else None
     credential_scope = digest([native.connector, value])
     db.execute('''CREATE TABLE IF NOT EXISTS dingtalk_profile_status(
         identity TEXT PRIMARY KEY, connector TEXT NOT NULL, credential_scope TEXT NOT NULL,
@@ -110,6 +117,7 @@ def _lifecycle(adapter, lease, identity):
         state = kind if kind in STATES else 'transport-unavailable'
         status(state, 60 if state == 'rate-limited' else 0 if state in BLOCKS else delay)
     async def stop():
+        adapter._haos_dingtalk_live = False
         task = adapter._haos_dingtalk_task; adapter._haos_dingtalk_task = None
         if task is not None and task is not asyncio.current_task():
             task.cancel(); await asyncio.gather(task, return_exceptions=True)
@@ -121,7 +129,7 @@ def _lifecycle(adapter, lease, identity):
         from .gateway_dingtalk_ws_process import Session
         adapter._haos_dingtalk_socket = Session(value, native.connector, current, lambda raw: capture(adapter, raw))
         await adapter._haos_dingtalk_socket.start(); current()
-        adapter._mark_connected(); status('connected-ws')
+        adapter._mark_connected(); adapter._haos_dingtalk_live = True; status('connected-ws')
     async def replay():
         backoff = 2
         try:
@@ -193,10 +201,28 @@ def _lifecycle(adapter, lease, identity):
             if self._haos_dingtalk_closed:
                 return
             self._haos_dingtalk_closed = True; await stop()
+            if self._haos_dingtalk_publisher is not None:
+                await self._haos_dingtalk_publisher.close()
             self._haos_dingtalk_raw.close(); os.close(lease)
             row = health(self)
             if row['status'] not in BLOCKS | {'rate-limited'} and row['next_attempt'] <= time.time():
                 status('closed')
+    async def send(self, chat_id, content, reply_to=None, metadata=None):
+        from .gateway_delivery_authority import current_delivery
+        if self._haos_dingtalk_publisher is None:
+            raise PermissionError('creation-only DingTalk profile has no reply authority')
+        async with lifecycle:
+            current = current_delivery(self, 'dingtalk', chat_id, metadata)
+            binding = native.policy().current_binding(metadata['haos_binding'])
+            prepared = metadata.get('haos_output')
+            if prepared is not None:
+                if (not isinstance(prepared, dict) or set(prepared) != {'items', 'text'}
+                        or prepared['items'] != [] or not isinstance(prepared['text'], str)):
+                    raise PermissionError('DingTalk outbound media has no connected private capability')
+                content = prepared['text']
+            return await self._haos_dingtalk_publisher.send(binding, metadata.get('haos_delivery_id'),
+                metadata.get('haos_delivery_attempt'), content, reply_to, current)
     adapter.connect = MethodType(connect, adapter); adapter.disconnect = MethodType(disconnect, adapter)
     adapter.close_profile = MethodType(close, adapter); adapter.native_health = MethodType(health, adapter)
+    adapter.send = MethodType(send, adapter)
     return adapter

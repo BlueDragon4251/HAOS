@@ -94,6 +94,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_sdk.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-sdk-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_compatibility.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-compatibility-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_reply.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-reply-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_custody.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-custody-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-admission-build-probe.json

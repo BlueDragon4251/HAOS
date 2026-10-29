@@ -90,8 +90,30 @@ unsealed resource messages stay pending until the media broker is connected. Nat
 input commits, finite durable receipts and cancellation/backpressure. No mission
 or external delivery is claimed by these custody/socket checks.
 
-Still required before public activation: actual native mission dispatch, replies
-and media/voice paths, persistent account/per-write recovery and retry state,
+A private per-write reply path now invokes the actual pinned native sender and
+markdown formatter in its own bounded gateway-UID subprocess. It may write only
+the exact retained session URL, source, body and current read/reply grant. The
+strict httpx boundary keeps TLS validation enabled, refuses redirects and cookies,
+limits responses and requires a valid native `errcode: 0` vendor acknowledgement.
+HTTP 200 with a nonzero native code is a rejection. The native sender's random
+UUID is never treated as a remote message ID: its private result carries a local
+`haos-dingtalk-…` acceptance proof, `remote_message_id: null` and
+`recipient_read_verified: false`.
+
+The parent writes a FULL-synchronous immutable intent before starting the worker.
+Confirmed replay uses its existing local vendor-acceptance proof without another
+write. A begun write with a dropped, truncated, malformed or otherwise ambiguous
+response is quarantined as uncertain, including after process/profile restart;
+a new attempt does not implicitly resend it. HTTP 401/429 refusals retain account
+blocks/deadlines. Expired session routes are refused before writing. An inbound
+WSS interruption does not withdraw a separately valid HTTPS reply route: that
+requires a live profile, fresh owner authority, an unchanged account and no
+explicit stop or auth/TLS block. A transient socket interruption cannot itself
+create or expand reply authority.
+
+Still required before public activation: shared controller mission acceptance, incoming/outgoing media and local voice
+paths, stable reply capability after session expiry, owner account/per-write
+recovery and management,
 source management and complete owner setup/GUI. These private transport pieces
 must be connected to the independent shared mission and management boundaries.
 

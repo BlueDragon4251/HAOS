@@ -1,0 +1,131 @@
+{
+  "parent_commit": "8a12e2c043d3a477318444b1081cf83514fdbbc1",
+  "recorded_at": "2026-10-29T23:09:58.561911+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "171b528e33e97b23e9c1eb8cd5ad4f4a708f2d83251fc60b5835b317f7a44182"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "14988638e3034daa9dafe7c2648403cf5df2b75b1bf20667f8a6c53cb8894f80"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "d4141be39e685e92da718c9eb53e958899e1e598b09dc992b3044fbe3ddda208"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_delivery.py",
+      "sha256": "6f644be61b2e39a2ea0ed096cf81c32107ad55abddea77b2c51865e66916d009"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_profile.py",
+      "sha256": "b82274bd10fcea014b38672bebe5538b8ce0fe8db68c9888f0b86a452fe0de8b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_reply_http.py",
+      "sha256": "b1a9cfbf694b580bb1224f60bf377c534ee737d0b074f4583b196389c7d4cbeb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_reply_process.py",
+      "sha256": "34581d63c3b928592fc3436f41321e1b0cd83e55f5fd41f12d029dd1896cfe84"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_reply_worker.py",
+      "sha256": "d455439ac40cd46dfb6a7a159cbc7c2ed664a3598aa1a2a407af9f8dee3f75e5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_send.py",
+      "sha256": "f5f77277eb4fe82241a8fcb0cb42a5c3de73b5cb119fa4ae018472dfd6745399"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_reply_process.py",
+      "sha256": "331acb675a35da8ecd75cd8dacbc393bd467430bbfd9bba420e625337be43117"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_reply.py",
+      "sha256": "641687977cfe7f404212c63a309c8dd58b18ec4eab3c4b1b85a4149547a61074"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_reply.py",
+      "sha256": "42afe65a9c192636e2fde6ec3a0fe63732c8ce8cbcc076783d373c979b27a6ff"
+    }
+  ],
+  "validation": {
+    "minimal_runtime": {
+      "passed": 2205,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; covered by actual root suite"
+    },
+    "full_pinned_10_extra_runtime": {
+      "passed": 2205,
+      "existing_skips": 2
+    },
+    "actual_root_UID_backup_boundaries": {
+      "passed": 150
+    },
+    "actual_native_sender_httpx_TLS": {
+      "cases": [
+        "actual_native_sender_verified_TLS_httpx_ok_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_native-error_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_401_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_429_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_302_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_500_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_drop_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_truncated_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_bool-code_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_duplicate_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_nonfinite_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_large_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_wrong-type_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_encoding_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_withdraw_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_original_native_projection_refuses_wrong_source_hash_message_private_reflection_attempt_and_encoding",
+        "creation_only_owner_grant_cannot_authorize_native_reply",
+        "expired_original_session_refused_without_write_or_implicit_alternate_route"
+      ],
+      "scope": "Actual native sender and httpx with real verified loopback TLS; only fixture transport substitutes the official origin.",
+      "parent_journal_UID_live_messages_and_installed_acceptance": false
+    },
+    "actual_UID_TLS_private_reply_journal": {
+      "passed": 11,
+      "cases": [
+        "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+        "actual_native_reply_private_worker_vendor_ACK_and_per_write_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "new_unit_protocol_guards": {
+      "passed": 22
+    },
+    "shell_and_workflow_parse": "passed"
+  },
+  "implementation_correction": "The first extended real process test exposed inappropriate coupling of an independently valid HTTPS reply capability to a transient inbound WSS state. Active profile and fresh independent authority now gate replies, preserving explicit stop/close, root withdrawal and auth/TLS blocks. The unchanged reconnect and write assertions then passed; the probe was extended to actual dropped-response quarantine and restart.",
+  "limits": [
+    "DingTalk remains private; public gateway software remains 12/22.",
+    "The native session sender has no remote message ID. Only a local vendor-acceptance proof is returned, remote_message_id is null and recipient_read_verified is false.",
+    "The actual private gateway profile, SDK sender, TLS transport and SQLite journals are exercised; owner publications and controller delivery metadata are fixtures, not a controller mission acceptance.",
+    "Private reply-worker cancellation/revocation/hard-deadline negative process cases are still separate pending verification; WSS lifetime and existing no-send worker cases do not substitute for them.",
+    "Incoming/outgoing media, local voice, stable reply capability after session expiry, owner recovery/GUI and public activation remain pending.",
+    "No live account, real external messages, installed-system, hardware or release acceptance."
+  ]
+}

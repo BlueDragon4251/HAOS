@@ -118,6 +118,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_compatibility.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-compatibility.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-reply.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
@@ -374,6 +375,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
           cat "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_REPLY_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
       - name: Verify private email worker UID isolation revocation cancellation and hard deadline
         run: |
           set -euo pipefail
