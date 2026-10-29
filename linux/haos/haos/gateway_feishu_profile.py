@@ -1,6 +1,6 @@
-"""Private prepared native Feishu HTTPS profile with durable replay and revocation.
+"""Private prepared native Feishu HTTPS and supervised WS profile with durable replay and revocation.
 
-Public registry, outgoing transport and socket-mode activation remain separate.
+Public registry and media activation remain separate.
 """
 import asyncio
 import os
@@ -15,14 +15,13 @@ from .gateway_feishu_cache import RawEvents
 from .gateway_feishu_ingress import install,dispatch_stored
 from .gateway_feishu_webhook import Receiver
 
-STATES=frozenset({'created','connecting','listening-tls','storage-unavailable','tls-refused',
+STATES=frozenset({'created','connecting','listening-tls','connected-ws','storage-unavailable','tls-refused',
     'identity-refused','authentication-refused','source-unavailable','rate-limited','transport-unavailable','revoked','disconnected','closed'})
 
 
 def build(value,*,parent,connector,policy,inbox):
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity();value=credentials(value,verify_tls=False)
-    if value['connection_mode']!='webhook':raise PermissionError('only reviewed prepared Feishu HTTPS profile is connected')
     def snapshot(latest):
         if not isinstance(latest,PreparedFeishuPolicy) or latest.connectors.get(connector,{}).get('platform')!='feishu':
             raise PermissionError('prepared independent Feishu policy required')
@@ -47,11 +46,11 @@ def build(value,*,parent,connector,policy,inbox):
         except FileExistsError:pass
         _directory(home)
         from .redaction import Redactor
-        inbox.redactor=Redactor([*inbox.redactor.secrets,value['app_secret'],value['verification_token'],
-            value['encrypt_key'],value['tls']['private_key']])
+        inbox.redactor=Redactor([*inbox.redactor.secrets,value['app_secret'],value.get('verification_token',''),
+            value.get('encrypt_key',''),value.get('tls',{}).get('private_key','')])
         env={'HERMES_SAFE_MODE':'1','FEISHU_APP_ID':value['app_id'],'FEISHU_APP_SECRET':value['app_secret'],
-            'FEISHU_DOMAIN':value['domain'],'FEISHU_CONNECTION_MODE':'webhook','FEISHU_BOT_OPEN_ID':value['bot_open_id'],
-            'FEISHU_ENCRYPT_KEY':value['encrypt_key'],'FEISHU_VERIFICATION_TOKEN':value['verification_token'],
+            'FEISHU_DOMAIN':value['domain'],'FEISHU_CONNECTION_MODE':value['connection_mode'],'FEISHU_BOT_OPEN_ID':value['bot_open_id'],
+            'FEISHU_ENCRYPT_KEY':value.get('encrypt_key',''),'FEISHU_VERIFICATION_TOKEN':value.get('verification_token',''),
             'FEISHU_GROUP_POLICY':'allowlist','FEISHU_ALLOWED_USERS':','.join(sorted({row['sender'] for row in pinned().bindings.values() if row['connector']==connector})),
             'FEISHU_ALLOW_ALL_USERS':'false','GATEWAY_ALLOW_ALL_USERS':'false','FEISHU_ALLOW_BOTS':'none',
             'FEISHU_REQUIRE_MENTION':'false','FEISHU_REACTIONS':'false','FEISHU_BOT_USER_ID':'','FEISHU_BOT_NAME':''}
@@ -69,10 +68,11 @@ def build(value,*,parent,connector,policy,inbox):
             pinned()
             for field,key in [('app_id','app_id'),('app_secret','app_secret'),('domain_name','domain'),
                     ('encrypt_key','encrypt_key'),('verification_token','verification_token'),('bot_open_id','bot_open_id')]:
-                if getattr(adapter,'_'+field)!=value[key]:raise PermissionError('native Feishu credential identity changed')
+                if getattr(adapter,'_'+field)!=value.get(key,''):raise PermissionError('native Feishu credential identity changed')
         adapter._haos_feishu_check=current
         originals=RawEvents(profile/'originals.db',inbox.redactor,current);adapter._haos_feishu_raw=originals
-        receiver=Receiver(adapter,profile/'webhooks.db');adapter._haos_feishu_receiver=receiver
+        receiver=Receiver(adapter,profile/'webhooks.db') if value['connection_mode']=='webhook' else None
+        adapter._haos_feishu_receiver=receiver;adapter._haos_feishu_socket=None
         return _install(adapter,fd,profile,initial)
     except BaseException:
         if receiver is not None:receiver.close()
@@ -102,20 +102,51 @@ def _install(adapter,fd,profile,identity):
     async def stop():
         task=adapter._haos_feishu_task;adapter._haos_feishu_task=None
         if task is not None and task is not asyncio.current_task():task.cancel();await asyncio.gather(task,return_exceptions=True)
+        socket=adapter._haos_feishu_socket;adapter._haos_feishu_socket=None
+        if socket is not None:await socket.close()
         runner=adapter._haos_feishu_runner;adapter._haos_feishu_runner=None
         if runner is not None:await runner.cleanup()
         with private_scope(adapter._haos_feishu_home,adapter._haos_feishu_environment):adapter._mark_disconnected()
+    async def open_socket():
+        from .gateway_feishu_ws_process import Session
+        from .gateway_feishu_ingress import capture
+        adapter._haos_feishu_socket=Session(value,native.connector,current,lambda raw:capture(adapter,raw))
+        await adapter._haos_feishu_socket.start();current()
+        with private_scope(adapter._haos_feishu_home,adapter._haos_feishu_environment):adapter._mark_connected()
+        status('connected-ws')
     async def replay():
+        backoff=2
         try:
             while True:
                 current()
+                if value['connection_mode']=='websocket':
+                    socket=adapter._haos_feishu_socket
+                    if socket is not None and not socket.active:
+                        kind=socket.failure;adapter._haos_feishu_socket=None;await socket.close()
+                        with private_scope(adapter._haos_feishu_home,adapter._haos_feishu_environment):adapter._mark_disconnected()
+                        state=kind if kind in {'authentication-refused','identity-refused','rate-limited','tls-refused'} else 'transport-unavailable'
+                        status(state,60 if state=='rate-limited' else backoff)
+                        backoff=min(60,backoff*2)
+                    row=health(adapter)
+                    if adapter._haos_feishu_socket is None and row['status'] not in {'authentication-refused','identity-refused','tls-refused'} and row['next_attempt']<=time.time():
+                        try:await open_socket()
+                        except asyncio.CancelledError:raise
+                        except PermissionError:raise
+                        except Exception:
+                            socket=adapter._haos_feishu_socket;adapter._haos_feishu_socket=None
+                            kind=socket.failure if socket is not None else None
+                            if socket is not None:await socket.close()
+                            state=kind if kind in {'authentication-refused','identity-refused','rate-limited','tls-refused'} else 'transport-unavailable'
+                            status(state,60 if state=='rate-limited' else backoff);backoff=min(60,backoff*2)
                 try:
-                    adapter._haos_feishu_receiver.recover()
+                    if adapter._haos_feishu_receiver is not None:adapter._haos_feishu_receiver.recover()
                     key=native.inbox.due(native.connector)
                     if key is not None:await dispatch_stored(adapter,key)
-                    if health(adapter)['status'] in {'storage-unavailable','source-unavailable'}:status('listening-tls')
+                    if health(adapter)['status'] in {'storage-unavailable','source-unavailable'}:
+                        if value['connection_mode']=='webhook':status('listening-tls')
+                        elif adapter._haos_feishu_socket is not None and adapter._haos_feishu_socket.active:status('connected-ws')
                 except Refused:
-                    current();status('source-unavailable')  # Unsupported owned input keeps its bounded durable retry state.
+                    current();status('source-unavailable')  # Retain the bounded durable input retry.
                 except PermissionError:raise
                 except Exception:
                     current();status('storage-unavailable')
@@ -136,22 +167,29 @@ def _install(adapter,fd,profile,identity):
             row=health(self)
             if row['status'] in {'identity-refused','authentication-refused'} or row['next_attempt']>time.time():return False
             status('connecting')
-            try:tls=context(value['tls'],profile,webhook_path='/feishu/webhook')
-            except Exception:status('tls-refused');return False
+            if value['connection_mode']=='webhook':
+                try:tls=context(value['tls'],profile,webhook_path='/feishu/webhook')
+                except Exception:status('tls-refused');return False
             try:
                 result=await account(value,native.connector,current);current()
                 if 'error' in result:
                     kind=result['error'];state=kind if kind in STATES else 'transport-unavailable'
                     status(state,60 if state=='rate-limited' else 0);return False
-                runner=web.AppRunner(application(self._haos_feishu_receiver),access_log=None,auto_decompress=False,shutdown_timeout=5)
-                self._haos_feishu_runner=runner;await runner.setup()
-                await web.TCPSite(runner,value['tls']['bind_host'],value['port'],ssl_context=tls).start()
+                if value['connection_mode']=='webhook':
+                    runner=web.AppRunner(application(self._haos_feishu_receiver),access_log=None,auto_decompress=False,shutdown_timeout=5)
+                    self._haos_feishu_runner=runner;await runner.setup()
+                    await web.TCPSite(runner,value['tls']['bind_host'],value['port'],ssl_context=tls).start()
+                else:
+                    await open_socket()
                 current()
                 with private_scope(self._haos_feishu_home,self._haos_feishu_environment):self._mark_connected()
-                status('listening-tls');self._haos_feishu_task=asyncio.create_task(replay());return True
+                status('listening-tls' if value['connection_mode']=='webhook' else 'connected-ws');self._haos_feishu_task=asyncio.create_task(replay());return True
             except asyncio.CancelledError:await stop();raise
             except PermissionError:await stop();status('revoked');raise
-            except Exception:await stop();status('transport-unavailable');return False
+            except Exception:
+                socket=self._haos_feishu_socket;kind=socket.failure if socket is not None else None
+                await stop();state=kind if kind in {'authentication-refused','identity-refused','rate-limited','tls-refused'} else 'transport-unavailable'
+                status(state,60 if state=='rate-limited' else 2);return False
     async def disconnect(self):
         async with lifecycle:
             await stop()
@@ -171,7 +209,8 @@ def _install(adapter,fd,profile,identity):
             if self._haos_feishu_closed:return
             self._haos_feishu_closed=True;await stop()
             if self._haos_feishu_publisher is not None:await self._haos_feishu_publisher.close()
-            self._haos_feishu_receiver.close();self._haos_feishu_raw.close();os.close(fd)
+            if self._haos_feishu_receiver is not None:self._haos_feishu_receiver.close()
+            self._haos_feishu_raw.close();os.close(fd)
             if health(self)['status'] not in {'identity-refused','authentication-refused','rate-limited','tls-refused'}:status('closed')
     adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter);adapter.send=MethodType(send,adapter)
     adapter.close_profile=MethodType(close,adapter);adapter.native_health=MethodType(health,adapter)

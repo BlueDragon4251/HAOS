@@ -284,6 +284,38 @@ HTTP/WSS redirects, status errors, malformed/oversized endpoint data, withdrawal
 and diagnostic secrecy. A goal containing digit `1` and restoration of its
 opaque original prove that public routing ID `service_id=1` does not poison
 redaction or input receipts. Brand origins, allowed fixture hosts/ports and CA
-trust are changed only inside this disposable contract probe. This is not yet
-the private kernel-UID WS profile, its process supervision/reconnection or a
-live Feishu account. The public registry/GUI remains disabled.
+trust are changed only inside this disposable contract probe. This probe alone
+does not establish kernel UID separation, process supervision or a live account.
+The public registry/GUI remains disabled.
+
+
+The prepared private profile now also supports native WebSocket mode. A fixed,
+root-owned SDK worker runs under the private gateway UID, with a private home,
+parent-death SIGKILL, bounded startup, address space, file descriptors and frame
+queues. The parent checks fresh root publication every 100 ms and kills the
+worker on withdrawal. No caller command, endpoint, proxy or TLS override crosses
+this boundary. Shutdown makes the generation inactive before waiting for the
+child; a late event cannot acquire input authority.
+
+The native SDK receives success only after the independent parent has admitted
+the exact original bytes into the FULL-synchronous original, reply-context and
+native input journals. The parent checks canonical base64, checksum and strict
+sequence; it returns only an opaque durable receipt. Failure, unknown senders,
+withdrawal or unavailable storage produces no successful acknowledgement.
+Ephemeral endpoint tickets stay inside the worker; normalization there refuses
+reflection into goals or resource names before parent admission. SDK stdout is
+separated from the private receipt protocol and stderr is discarded boundedly.
+
+The pinned Hermes native WS runner and actual SDK remain responsible for
+connection and native frame encoding. Hidden SDK reconnect is disabled: the
+profile creates a new supervised child after a persisted 2–60 second backoff.
+Authentication and TLS refusals stop automatic reconnect; rate refusal retains
+a 60-second deadline. Original-event and NativeInbox identity survive disconnect,
+process restart and duplicate delivery; reconnect never resends an outgoing
+reply. The account check precedes initial activation, and the same independent
+native decoder and durable RelayInbox path serves both HTTPS and WS profiles.
+
+These are private integration paths. Public owner configuration, media/voice,
+source disposal/recovery UI and final gateway activation remain unfinished.
+No live tenant, external delivery, installed-system or hardware acceptance is
+claimed by these loopback SDK/process fixtures.
