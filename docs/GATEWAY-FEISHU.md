@@ -94,3 +94,26 @@ reuse, credential rotation, exact-message permissions, revocation, redirect and
 Only fixture code substitutes API origins with loopback and trusts its temporary
 CA. This is a private read contract, not yet a kernel-authenticated worker,
 connected ingress listener, message writer or enabled public gateway.
+
+The prepared account check also runs in a disposable private gateway subprocess.
+Both parent and worker enforce the actual unprivileged gateway UID/GID without
+supplementary groups. The fixed root-owned interpreter runs with `-E -s`, a
+minimal environment, bounded stdin/stdout/stderr, CPU/address-space/file limits,
+a hard alarm and kernel parent-death SIGKILL. Every boundary rereads the trusted
+root publication; pending publication, wrong account scope, own-bot grants,
+unsafe policy permissions and changed snapshots refuse access. Cancellation and
+withdrawal kill and join the child. This action can obtain a tenant access token
+and query bot information, but cannot send a message or fetch arbitrary URLs.
+Its result confirms only an exact returned bot open ID: this API does not prove
+the separately supplied tenant key, so `tenant_identity_verified` remains false.
+
+`probes/probe_feishu_process.py` exercises the actual native SDK and verified
+TLS with real root/gateway/agent UIDs in a guarded fresh Docker namespace with
+network disabled. Only that fixture adds its CA to disposable trust stores and
+resolves the fixed Feishu API domain to a loopback HTTPS server; production code
+and endpoint constants are unchanged. It checks policy-file gates, false bot
+identity, 401/429, cancellation, live policy withdrawal, denied agent access to
+private credentials and a running worker's input, and actual parent-death
+SIGKILL with process reaping. It is not an installed service or owner GUI test.
+Feishu remains outside the public registry until its transport, deliveries,
+media, recovery and owner setup are connected and verified together.

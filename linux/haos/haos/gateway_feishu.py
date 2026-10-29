@@ -65,3 +65,22 @@ class PreparedFeishuPolicy(GatewayPolicy):
         super().__init__(value)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']=='feishu':validate_binding(binding)
+
+
+def authority(connector,value,expected=None):
+    """Fresh root-owned publication, including exact account scope and own-bot denial."""
+    from pathlib import Path
+    from .gateway_publication import pending
+    from .sandbox import trusted_json
+    value=credentials(value,verify_tls=False);config=Path('/etc/haos')
+    if pending(config):raise PermissionError('Feishu owner publication requires recovery')
+    raw=trusted_json(config/'gateways.json');policy=PreparedFeishuPolicy(raw)
+    if policy.connectors.get(connector,{}).get('platform')!='feishu':
+        raise PermissionError('configured private Feishu connector required')
+    for binding in policy.bindings.values():
+        if binding['connector']==connector and (binding['scope']!=scope(value) or binding['sender']==value['bot_open_id']):
+            raise PermissionError('Feishu grant differs from configured account or approves the bot itself')
+    identity=digest(raw)
+    if pending(config) or expected is not None and identity!=expected:
+        raise PermissionError('Feishu owner publication changed')
+    return identity
