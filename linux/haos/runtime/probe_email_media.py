@@ -123,7 +123,7 @@ def main():
         finally:store.close();relay.close();raw.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-email-media-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_native_attachment_cache_dispatch_relay_and_controller':True,
-        'prepared_only_not_public':True,'headers_accounts_and_controller_transport_are_fixtures':True,
+        'public_registry_enabled':True,'headers_accounts_and_controller_transport_are_fixtures':True,
         'external_delivery_agent_backend_or_local_asr_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

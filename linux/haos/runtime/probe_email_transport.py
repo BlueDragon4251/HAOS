@@ -236,7 +236,7 @@ def main():
         assert not any(verb in {'MAIL','RCPT','DATA','STORE','CLOSE','EXPUNGE'} for protocol,verb in commands)
     with tempfile.TemporaryDirectory(prefix='haos-email-tls-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_pinned_imap_smtp_clients_and_verified_tls':True,
-        'prepared_only_not_public':True,'worker_supervision_is_not_part_of_this_protocol_probe':True,
+        'public_registry_enabled':True,'worker_supervision_is_not_part_of_this_protocol_probe':True,
         'external_accounts_mail_delivery_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

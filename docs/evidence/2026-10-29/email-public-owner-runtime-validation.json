@@ -1,0 +1,229 @@
+{
+  "parent_commit": "17d6ad020acee2dc675993729b8270ed006583ab",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "88e9d426970a7f1be1c973d12f085c7b8bb92d1b38305c96cb58837489b42950"
+    },
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "6d9afb44d504eb85c0df5cc61d16ebff70f57236f4dfca9b2c7ccb6609cfa1a2"
+    },
+    {
+      "path": "docs/GATEWAYS.md",
+      "sha256": "38251f12576f4b5077d5d02c415b0fea098b55b077d9b377c7daaa671468251c"
+    },
+    {
+      "path": "docs/GRAPHICAL-OWNER-SETUP.md",
+      "sha256": "28124135acb6d21b18721ceb0c5a871e6eb62c66856a04239da61f7922c4952f"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "a1af62d9509b7bdb211e4d0a2af8480497659b521721c5dd5c4cf66b1b903e22"
+    },
+    {
+      "path": "linux/haos/haos/email_owner_gui.py",
+      "sha256": "88352e3ec665cc99d3bf9213013c6067ec937f2f4386c7fac4b9436aee186a8a"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "5600bf47df4a633324b1eaa047b4846f64ed63c395f0636a8233bb7d73d48e97"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email.py",
+      "sha256": "68c226ae477c7b8b1df8b69fa8cbb0382cf42557ea06925c18d121bc3499fe6a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "e1cc3aeeb182ea250bc5390815ad560c6c37f21da4d9b2235cea7260fe1e6517"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "2f925d40e5d6e4e4daa1a6074c75608a95ff2ef571e96d11b91e97d431516efc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "b325218e2d5b4ebfcecce15f6d8d0f9d98e836fc1926644c8cc10c9c5cf518cd"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "1eea5faaef4a25d4cc47af7da03e0b2c3d0c017ba70ae6b069908de9046fa4a4"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "4cdbfdb98b0ebf6faf76c734ac38c1d659cabbeb03ef5cbeb037de095d03e436"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "fba9764f9499f3f7984955ef99d69b485e9c998ab3a68512365df2859969687a"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_process.py",
+      "sha256": "be2baf70d67b1b1d5b911a9161052a17173a4816953abf83bf077c9f2e38eda3"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_publication_process.py",
+      "sha256": "af52ebf03b0199b7dba8813bcd70d6f1e9bfc09277a795a8ee08fc6ffbe6d47d"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "291d6f0ac81a7218b0920428edb2a20e9ad8afe69576ca7b4a75f711d1403117"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_admission.py",
+      "sha256": "1b5b55796e889c67bc17e40eeb2a10f9e20b21c0974b8ceea7da3798bf5f44d7"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_codec.py",
+      "sha256": "dead3bc403bfe7d1aed5e79325bc8fe868d9646b26085155e4cd5d87e61dea52"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_ingress.py",
+      "sha256": "ab8347f34fa0fcf69cd552c306e1c5c6734a3381f92b720ec97b46e47456cdca"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_media.py",
+      "sha256": "b476cff3d8a287fa832a48363ee7cdf9235144548a5ca03c93c823b7bb43a5dc"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_output.py",
+      "sha256": "86cb6c77ffa2591eeb114660ea5c8262b9689ebb87f7a090e3b18bf19d338807"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_owner_gui.py",
+      "sha256": "e2890fd7bb7e9c7ecf6583e043253129faf5dbc8ef3188bc8f3fe14339023568"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_recovery_gui.py",
+      "sha256": "b7f91b61e693289399dcf74cbce1104cf1476f89f1d708bfd23bc6a149d01aaf"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_smtp.py",
+      "sha256": "5d81e94bd8d15b5ca28709ec3e574c4a8637576580bcfe79b1e8b68b2a1f3c6a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_transport.py",
+      "sha256": "2e50b51613a25158392eafdde4ba60d18f59f73b77e0807f0ca5b0c50434ab6f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_voice.py",
+      "sha256": "566493987fa0a19dc7f711baed459d5ddab9a191aae076679b89ddd06fe11f8f"
+    },
+    {
+      "path": "linux/haos/tests/test_email_owner_setup.py",
+      "sha256": "6060a541675b5b7f900595077986d0ad82f922cad9c6a347ffcd28959e9b445a"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email.py",
+      "sha256": "fc7e39bedbd923a6d0c227d7d2dacfde8bb06ba62dcd019182d7bb45bd71cec2"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email_publication.py",
+      "sha256": "8a41412dc9df2597762cc4224147c36022dfefd3d4cbc642117ec0597833cd5a"
+    },
+    {
+      "path": "linux/haos/tests/test_hermes_capabilities.py",
+      "sha256": "d5e5f4a0131a5170c5e16124227904b5508690662eaab682d3400b58b8f82cd6"
+    }
+  ],
+  "public_gateway_paths": 11,
+  "checks": {
+    "minimal_python311": "1754 passed, 2 existing skips",
+    "full_pinned_runtime": "1754 passed, 2 existing skips",
+    "real_kernel_gateway_suite_without_haos_source_in_environment": "92 passed",
+    "exact_services_ci_root_suite_with_real_bubblewrap_backup_policy_owner_provider_and_UI_authority": "143 passed",
+    "native_protocol_cases": {
+      "codec": 15,
+      "transport": 38,
+      "admission": 9,
+      "ingress": 6,
+      "media": 7,
+      "smtp": 20,
+      "output": 5,
+      "voice": 6
+    },
+    "actual_private_process_cases": {
+      "email-public-final-native-process.log": 19,
+      "email-publication-process.log": 7,
+      "email-public-recovery-process.log": 6,
+      "email-public-media-peer.log": 7,
+      "email-public-speech-peer.log": 10
+    },
+    "actual_tk_cases": {
+      "email_owner 1280x800": 10,
+      "email_recovery 1280x800": 10,
+      "sms_owner 1280x800": 13,
+      "sms_recovery 1280x800": 11,
+      "line_owner 1280x800": 19,
+      "line_recovery 1280x800": 9,
+      "email_owner 640x480": 10,
+      "email_recovery 640x480": 10,
+      "sms_owner 640x480": 13,
+      "sms_recovery 640x480": 11,
+      "line_owner 640x480": 19,
+      "line_recovery 640x480": 9
+    },
+    "actual_pinned_backend": "authenticated controller upload/session plus byte-matching PNG, maximum 8 MiB document and MP4 attachment; no model turn",
+    "workflow_yaml": "both changed/relevant workflow documents parse"
+  },
+  "test_environment": {
+    "python_image": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+    "extended_ci_root_image": "sha256:a68a2d333af6e5964b2f73160f19d5151bb1fa974b18cf3af3d8ba6104898dad",
+    "extended_ci_root_fixture_permissions": "network none, repository read-only; SYS_ADMIN and unconfined seccomp/apparmor/systempaths permit actual nested bubblewrap/proc tests; no production policy changed",
+    "actual_bwrap_sha256": "573236e5328ac2ebb08f59ae3a9805b4f8d12bdef14be8af4450d5463294985f"
+  },
+  "log_sha256": {
+    "email-public-final-minimal.log": "90c2f9c225c7ab2ecc8f521ec0591fd4a7e789b41e9112b5351b1052c9142ec9",
+    "email-public-final-full.log": "983ca14136c1765dbcc336d6067cfead41cd05449aedeea3b832e34193c49f41",
+    "email-public-kernel-no-source-env.log": "9e2205076cda2c4c843d23701b3c14de03c5c15ff2983acefe3a06703ba727e1",
+    "email-public-ci-root-suite-proc.log": "66de66f6687d6e1ed7e361b1a0b07d32a13372669efca41c1dcfa517d57f834a",
+    "email-public-final-native-process.log": "9469c7c13347e4d7afdcc736759bf0012092049999690ecffe78d11e2b1c1d0e",
+    "email-publication-process.log": "f01d0b78884b68805a4adef3d3489c3d8831a50f34f7a5af67e87088bd783495",
+    "email-public-recovery-process.log": "4b0dbc41b8d0ae815364c66e088304bfeb969b555f7269aacc3c70d56438f904",
+    "email-public-media-peer.log": "c292768c5392f1cd651eaf155459885d17787f3e880d01b10c7ada9cb27483da",
+    "email-public-speech-peer.log": "2c019eea2c7db95ddab50a9a350848c812f3f6fcf6144d6a88be824f807170d8",
+    "email-public-codec.json": "7aeb3f18a4097e3fad2bcd218bdf25186c4eabeef2aa6da41448ecaf0e4994d8",
+    "email-public-codec.log": "7ec29bf30c1052bc6c22b8e59ab47b8b3b5af73cec2198c18204184f88bbcb20",
+    "email-public-transport.json": "2eff2244b9ffed0362897021810beafe2f7bc3f2748f95bc6f51d3cb42a16e6b",
+    "email-public-transport.log": "94ff1b8b32090b774ed67e5bea3c973ff6faa1dd69757440f72147742aef401d",
+    "email-public-admission.json": "07b4dca0e96e6f34f24a4cc9b58195b5447d448f6e545e2249688e04b7ec0033",
+    "email-public-admission.log": "3bdc3c06c111027c6fa9c0c9600e563a0324f050a4870fb7768bb00c31117295",
+    "email-public-ingress.json": "486af35a3a1ee21845943b36a26e128abe06f670234529419ea37b4abebddcb6",
+    "email-public-ingress.log": "973769873545c8a44f5ca8bb9b9478b7d318e3fb47512f2ee851dfd51aa9f310",
+    "email-public-media.json": "b80bde4705e672ea337cc7106bc0d7e82c7711b89502bf1eacc84a7d5db6a162",
+    "email-public-media.log": "f5dd8ab7d4e1fba0f232a8a7a6a070950e2a5bdb77b2dafa8a8c99550ec1a104",
+    "email-public-smtp.json": "da17d14beffd347ae1b39195c6285a4471114cc17e54902d22bc7b58f8138876",
+    "email-public-smtp.log": "449436ffe84859953c04e4b415cef3ea745ef77acd6a86cffde2563f4c7f233b",
+    "email-public-output.json": "c083743bbb4d10bd9779148ec1df0370665eb7cc091288cbef9b509577f4bff4",
+    "email-public-output.log": "14f5b51af75901bd5acacbfa2fda41076af9857e6018324e45766e2a7b50eef5",
+    "email-public-voice.json": "cfcb454acab62f201f181b01ff6bccdbc9d7bf8e60583dcdffbd523a5ac080a3",
+    "email-public-voice.log": "b3165c2a56d85a9ad6e5131656a7712558504c375d8e81cb33671832ce3e901e",
+    "email-public-gui-email_owner-1280x800.log": "43e8889fe8043f2e7cb30dd7298d5e7e0fe08247899d42bce3efafaa30f9e958",
+    "email-public-gui-email_recovery-1280x800.log": "13e02ac49139c03fd6860d2d2cb9a86d5434d5e1f21af6052db32a1e216469ca",
+    "email-public-gui-sms_owner-1280x800.log": "0d7d69106639b83b95d5321dabc49d71c0427214f2c8072356545697053aebc9",
+    "email-public-gui-sms_recovery-1280x800.log": "074fef37c7ede7dfa341888d08abe5d6d8f4d62cf88a60119b33e9df5eb848a0",
+    "email-public-gui-line_owner-1280x800.log": "64e56e9b7a6584cfd7ed7d0098782f21c3eba7f29f69f52c774e5796d31be6e6",
+    "email-public-gui-line_recovery-1280x800.log": "0ef84764ebad3d4d00353f213cc33b799fdb6d80776a40334f273d4b457769e5",
+    "email-public-gui-email_owner-640x480.log": "701db401c7c40b0734846422ca5ea28dac00bc7ad993ade36c9291e3cb009a63",
+    "email-public-gui-email_recovery-640x480.log": "7102ac75457760a851a696e62e9f7a3504d44a4d15b10c1865762a231c723458",
+    "email-public-gui-sms_owner-640x480.log": "0d7d69106639b83b95d5321dabc49d71c0427214f2c8072356545697053aebc9",
+    "email-public-gui-sms_recovery-640x480.log": "074fef37c7ede7dfa341888d08abe5d6d8f4d62cf88a60119b33e9df5eb848a0",
+    "email-public-gui-line_owner-640x480.log": "64e56e9b7a6584cfd7ed7d0098782f21c3eba7f29f69f52c774e5796d31be6e6",
+    "email-public-gui-line_recovery-640x480.log": "0ef84764ebad3d4d00353f213cc33b799fdb6d80776a40334f273d4b457769e5",
+    "email-public-media-backend.json": "1497b342690f3968e0b0b9fe6ad8d22c5e74412e33ba6fb2496fd07cf5033e15",
+    "email-public-media-backend.log": "817fa3264c379bb34eee68d29469d54035e33708ee00e75027a96d917237b9d7"
+  },
+  "corrections_and_unsuccessful_attempts": [
+    "Previous commit 17d6ad0 services CI failed because three new UID child tests inherited no HAOS import path; fixed explicit trusted test-source path in child, with real UID transitions unchanged. New no-source-environment kernel suite and exact 143-case CI root suite pass.",
+    "Initial generic Python container lacked /usr/bin/python3 and bubblewrap for five extended root cases; a prepared Debian fixture supplies them. Docker proc masking then refused three actual namespace mounts; disposable test container systempaths policy was corrected. No tests weakened or skipped."
+  ],
+  "limits": [
+    "Actual native mail clients, TLS and atomic root publication are tested locally with loopback accounts and explicit owner grants as fixtures.",
+    "Actual Tk owner handoffs/source-profile metadata are fixtures, not installed graphical enrollment or live account acceptance.",
+    "SMTP acceptance is not recipient delivery; unknown writes remain blocked absent independently inspected separate owner decisions.",
+    "No existing owner/recovery data deleted, no external messages sent. Logical cache disposal tests use disposable ledgers.",
+    "No model inference, live external account, installed boot, HP hardware, ISO, container release or Android acceptance.",
+    "Ordinary suites retain existing backup-file exclusion and two skips; actual backup/root tests pass separately in the 143-case suite."
+  ]
+}

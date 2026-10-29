@@ -34,5 +34,6 @@ def test_ui_does_not_label_untested_adapters_as_supported():
     assert gateways['homeassistant']=='GUI'
     assert gateways['irc']=='GUI'
     assert gateways['line']=='GUI'
-    for name in ("whatsapp", "feishu", "email"):
+    assert gateways["email"] == "GUI"
+    for name in ("whatsapp", "feishu"):
         assert gateways[name] == "Nicht integriert"

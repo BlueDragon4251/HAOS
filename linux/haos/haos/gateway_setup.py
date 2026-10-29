@@ -85,7 +85,9 @@ def owner_email_account(connector):
     def finite(_value):raise ValueError('finite private account response required')
     checked=response(json.loads(result.stdout,object_pairs_hook=_object,parse_constant=finite))
     authority(connector,value,publication)
+    from .owner import audit
     if 'error' in checked:
+        audit('gateway.email-account-inspected',{'connector':connector,'authenticated':False,'error':checked['error']})
         if checked['error'] not in ERRORS:raise ValueError('finite account diagnostic required')
         return {'authenticated':False,'error':checked['error'],'smtp_message_sent':False,
             'sender_grants_changed':False,'external_delivery_verified':False}
@@ -309,6 +311,20 @@ def owner_gateway(args):
     if args.gateway_action == "setup":
         if args.platform not in GatewayPolicy.platforms:
             raise ValueError("select an implemented transport")
+        if args.platform=='email':
+            from .initial_setup import configure_email_gateway
+            account={'address':input('Exact dedicated email address (canonical lowercase): '),
+                'password':getpass.getpass('Private email app/account password: ')}
+            for protocol,default in [('imap',993),('smtp',465)]:
+                account[protocol+'_host']=input(protocol.upper()+' exact TLS hostname: ')
+                raw=input(protocol.upper()+' port ['+str(default)+']: ') or str(default)
+                if not raw.isascii() or not raw.isdecimal() or len(raw)>5 or not 1<=int(raw)<=65535:
+                    raise ValueError('mail port must contain digits from 1 to 65535')
+                account[protocol+'_port']=int(raw)
+                account[protocol+'_security']=input(protocol.upper()+' TLS mode (tls/starttls) [tls]: ') or 'tls'
+            account['authserv_id']=input('Exact trusted receiving Authentication-Results authserv-id: ')
+            consent=input('Independently verified receiving server strips forged own Authentication-Results and prepends trusted results? Type VERIFIED: ')=='VERIFIED'
+            return configure_email_gateway(args.connector,account,trust_authentication_results=consent)
         if args.platform=='sms':
             from .initial_setup import configure_sms_gateway,read_line_tls_file
             account=input('Exact Twilio Account SID (AC + 32 hex digits): ')
@@ -403,6 +419,12 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
+        if selected and selected['platform']=='email':
+            from .initial_setup import pair_gateway_sender
+            return pair_gateway_sender(args.binding,args.connector,args.sender,args.chat,args.identity,
+                tuple(args.capabilities),scope=args.scope,thread=args.thread,
+                allow_media=getattr(args,'allow_media',False),allow_voice=getattr(args,'allow_voice',False),
+                allow_video=getattr(args,'allow_video',False),allow_outbound_media=getattr(args,'allow_outbound_media',False))
         if selected and selected['platform'] in {'line','sms'}:
             saved=credentials['connectors'][args.connector]
             destination=saved['destination'] if selected['platform']=='line' else saved['account_sid']+':'+saved['from_number']

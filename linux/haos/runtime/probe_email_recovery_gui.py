@@ -110,7 +110,7 @@ def main():
             check.invoke();before=len(calls);button('Geprüftes Original aus Live-Cache entfernen').invoke();settle();assert len(calls)==before
             cases.append('changing_source_clears_consent_and_pending_source_remains_protected_even_with_checkbox_selected')
             print(json.dumps({'passed':len(cases),'cases':cases,'screen':[wizard.root.winfo_screenwidth(),wizard.root.winfo_screenheight()],
-                'actual_Tk_and_SQLite_inventory':True,'owner_handoffs_are_fixtures':True,'public_email_enabled':False,
+                'actual_Tk_and_SQLite_inventory':True,'owner_handoffs_are_fixtures':True,'public_email_enabled':True,
                 'external_delivery_or_installed_owner_acceptance':False},indent=2))
         finally:wizard.root.destroy()
 

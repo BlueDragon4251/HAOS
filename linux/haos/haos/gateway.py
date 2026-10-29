@@ -10,7 +10,7 @@ import time
 from .store import Conflict, MissionStore, PAUSED_PHASE
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -85,6 +85,9 @@ class GatewayPolicy:
                 validate_binding(binding)
             if connector and connector['platform']=='line':
                 from .gateway_line_ingress import validate_binding
+                validate_binding(binding)
+            if connector and connector['platform']=='email':
+                from .gateway_email import validate_binding
                 validate_binding(binding)
             if connector and connector['platform']=='sms':
                 from .gateway_sms import validate_binding

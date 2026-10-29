@@ -89,7 +89,7 @@ async def session(base,token,workspace):
         cases.append('fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads')
     finally:inbox.close();store.close()
     return {'passed':len(cases),'cases':cases,'actual_authenticated_backend_artifact_reader':True,
-        'completed_session_and_connected_mail_transport_are_fixtures':True,'prepared_only_not_public':True,
+        'completed_session_and_connected_mail_transport_are_fixtures':True,'public_registry_enabled':True,
         'smtp_write_worker_isolation_external_mail_or_inference_acceptance':False}
 
 

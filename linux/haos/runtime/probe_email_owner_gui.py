@@ -16,7 +16,8 @@ def main():
     initial_setup.setup_in_progress=lambda:False
     initial_setup.provider_state=lambda:{'routes':[],'default':None,'fallbacks':{}}
     initial_setup.gateway_configuration=lambda:{'connectors':[],'bindings':[]}
-    calls=[];checks=[];retries=[];cases=[]
+    calls=[];checks=[];retries=[];pairs=[];cases=[]
+    initial_setup.pair_gateway_sender=lambda *args,**kwargs:pairs.append((args,kwargs))
     initial_setup.configure_email_gateway=lambda *args,**kwargs:calls.append((args,kwargs))
     initial_setup.inspect_email_gateway_account=lambda connector:checks.append(connector) or {'authenticated':False,'error':'tls-refused','smtp_message_sent':False}
     initial_setup.retry_email_gateway_auth=lambda connector:retries.append(connector)
@@ -68,12 +69,33 @@ def main():
         cases.append('finite_account_failure_is_displayed_without_claiming_authentication_or_delivery')
         button('E-Mail-Anmeldung erneut erlauben').invoke();settle();assert retries==['email-main']
         cases.append('authentication_recheck_has_a_real_owner_handoff_and_does_not_send')
+        from haos.gateway_email import scope
+        fill('Absender-ID','owner@example.invalid')
+        assert field('Chat-ID').get()=='owner@example.invalid' and str(field('Chat-ID').cget('state'))=='disabled'
+        expected_scope=scope({'address':'haos@example.invalid','imap_host':'imap2.example.invalid','imap_port':993})
+        assert field('Bereich').get()==expected_scope and str(field('Bereich').cget('state'))=='disabled'
+        fill('Thread-ID','<root@example.invalid>')
+        cases.append('email_pairing_binds_exact_sender_reply_address_mailbox_and_explicit_optional_root_thread')
+        media=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('E-Mail-Bilder'))
+        outbound=next(w for w in widgets(wizard.content) if isinstance(w,tk.Checkbutton) and w.cget('text').startswith('Markierte Ergebnisdateien als E-Mail'))
+        assert not wizard.root.getvar(media.cget('variable')) and not wizard.root.getvar(outbound.cget('variable'))
+        media.invoke();outbound.invoke();fill('Absender-ID','other@example.invalid')
+        assert field('Chat-ID').get()=='other@example.invalid'
+        assert not wizard.root.getvar(media.cget('variable')) and not wizard.root.getvar(outbound.cget('variable'))
+        cases.append('email_media_and_output_default_deny_and_sender_changes_clear_each_consent')
+        media.invoke();outbound.invoke();button('Absender mit ausgewählten Rechten freigeben').invoke();settle()
+        assert pairs[-1][0][2:4]==('other@example.invalid','other@example.invalid')
+        assert pairs[-1][1]['scope']==expected_scope and pairs[-1][1]['thread']=='<root@example.invalid>'
+        assert pairs[-1][1]['allow_media'] is True and pairs[-1][1]['allow_outbound_media'] is True
+        assert pairs[-1][1]['allow_voice'] is False and pairs[-1][1]['allow_video'] is False
+        assert not wizard.root.getvar(media.cget('variable')) and not wizard.root.getvar(outbound.cget('variable'))
+        cases.append('email_pairing_handoff_keeps_exact_route_and_separate_media_permissions_then_clears_consent')
         fill('E-Mail-App-Passwort','private-form-fixture');check.invoke()
         wizard.root.setvar(menu.cget('textvariable'),'telegram');wizard.root.update()
         assert password.get()=='' and not wizard.root.getvar(check.cget('variable')) and not password.winfo_viewable()
         cases.append('platform_switch_clears_mail_password_and_consent')
         print(json.dumps({'passed':len(cases),'cases':cases,'screen':[wizard.root.winfo_screenwidth(),wizard.root.winfo_screenheight()],
-            'actual_Tk':True,'owner_handoffs_are_fixtures':True,'prepared_page_not_publicly_enabled':True,
+            'actual_Tk':True,'owner_handoffs_are_fixtures':True,'public_registry_enabled':True,
             'external_accounts_or_delivery_or_installed_owner_acceptance':False},indent=2))
     finally:wizard.root.destroy()
 

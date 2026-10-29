@@ -869,6 +869,7 @@ def test_email_owner_account_and_forms_reject_actual_service_uids_before_any_hel
     assert os.geteuid()==0
     code='''
 import os,sys
+sys.path.insert(0,sys.argv[2])
 from haos.gateway_setup import owner_email_account
 from haos import initial_setup
 os.setgroups([]);os.setgid(int(sys.argv[1]));os.setuid(int(sys.argv[1]))
@@ -881,5 +882,5 @@ for call in [lambda:owner_email_account('email'),lambda:initial_setup.inspect_em
     else:raise AssertionError('service UID reached an owner-only email operation')
 assert 'plugins.platforms.email.adapter' not in sys.modules
 '''
-    result=subprocess.run([sys.executable,'-c',code,str(uid)],capture_output=True,text=True,timeout=10)
+    result=subprocess.run([sys.executable,'-c',code,str(uid),str(Path(__file__).resolve().parents[1])],capture_output=True,text=True,timeout=10)
     assert result.returncode==0,result.stderr

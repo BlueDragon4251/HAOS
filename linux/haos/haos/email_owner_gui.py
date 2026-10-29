@@ -188,3 +188,75 @@ class AccountForm:
         wizard=self.wizard;connector=self.connector();self.clear_secret()
         wizard._run_async(lambda:initial_setup.retry_email_gateway_auth(connector),
             success='Neue Anmeldung ausdrücklich erlaubt. Postfachsperren, Wartefrist und Freigaben bleiben erhalten; Dienst manuell starten.')
+
+
+class PairForm:
+    def __init__(self,wizard,parent,platform,account,sender,chat,scope,thread,rights,before):
+        self.wizard=wizard;self.platform=platform;self.account=account;self.sender=sender;self.chat=chat
+        self.scope=scope;self.thread=thread;self.rights=rights;self.before=before;tk=wizard.tk
+        self.frame=tk.Frame(parent,bg=wizard.PANEL);self.active=False
+        self.flags={key:tk.BooleanVar(value=False) for key in ['allow_media','allow_voice','allow_video','allow_outbound_media']}
+        self.boxes={}
+        for key,label in [('allow_media','E-Mail-Bilder und Dokumente dieses Absenders ausdrücklich freigeben'),
+                ('allow_voice','E-Mail-Sprachnachrichten dieses Absenders ausdrücklich freigeben'),
+                ('allow_video','E-Mail-Videodateien dieses Absenders ausdrücklich freigeben'),
+                ('allow_outbound_media','Markierte Ergebnisdateien als E-Mail-Anhänge an diesen Absender senden')]:
+            box=tk.Checkbutton(self.frame,text=label,variable=self.flags[key],bg=wizard.PANEL,fg=wizard.TEXT,
+                selectcolor=wizard.BG,wraplength=wizard.label_wrap,justify='left');box.pack(anchor='w',pady=5);self.boxes[key]=box
+        wizard._label(self.frame,'Absender und Antwortadresse sind dieselbe exakte kanonische E-Mail-Adresse. '
+            'Bereich ist ausschließlich die gespeicherte IMAP-INBOX. Ein leerer Thread erlaubt nur Nachrichten ohne Root-Thread; '
+            'für Antworten in einem bestehenden Gespräch dessen exakte Root-Message-ID angeben, einschließlich <…>. Keine Platzhalter. '
+            'Die Domain-Authentifizierung des Empfangsservers beweist keine individuelle Person. '
+            'Höchstens vier Anhänge, je 8 MiB; PNG/JPEG insgesamt 2 MiB. Voice benötigt lokalen Spracherkennungsdienst und Erstellrecht. '
+            'Video geht als Datei in die Mission. Ergebnisanhänge benötigen Leserecht; keine öffentliche Download-Adresse erforderlich. '
+            'SMTP-Annahme beweist keinen Empfang.',size=10,color=wizard.MUTED).pack(anchor='w',pady=6)
+        for field in (sender,chat,thread):
+            variable=getattr(field,'_haos_public_value',None)
+            if variable is None:
+                variable=tk.StringVar(value=field.get());field.configure(textvariable=variable);field._haos_public_value=variable
+            variable.trace_add('write',self.clear)
+        sender._haos_public_value.trace_add('write',self.sender_changed)
+        for key in ['address','imap_host','imap_port']:
+            account.fields[key]._haos_public_value.trace_add('write',self.changed)
+        for variable in rights.values():variable.trace_add('write',self.permissions)
+        def platform_changed(*_args):
+            if platform.get()=='email':wizard.root.after_idle(self.changed)
+            else:self.changed()
+        platform.trace_add('write',platform_changed)
+
+    def clear(self,*_args):
+        for variable in self.flags.values():variable.set(False)
+
+    def sender_changed(self,*_args):
+        if self.platform.get()!='email':return
+        self.chat.configure(state='normal');self.chat.delete(0,self.wizard.tk.END);self.chat.insert(0,self.sender.get());self.chat.configure(state='disabled')
+
+    def permissions(self,*_args):
+        for key,box in self.boxes.items():
+            allowed=self.rights['read' if key=='allow_outbound_media' else 'create'].get()
+            if not allowed:self.flags[key].set(False)
+            box.configure(state='normal' if allowed else 'disabled')
+
+    def changed(self,*_args):
+        self.clear();active=self.platform.get()=='email';tk=self.wizard.tk
+        if active:
+            self.frame.pack(fill='x',before=self.before)
+            self.scope.configure(state='normal');self.scope.delete(0,tk.END)
+            from .gateway_email import address,hostname,scope
+            try:
+                values={key:self.account.fields[key].get() for key in ['address','imap_host','imap_port']}
+                address(values['address']);hostname(values['imap_host']);raw=values['imap_port']
+                if not raw.isascii() or not raw.isdecimal() or len(raw)>5 or not 1<=int(raw)<=65535:raise ValueError('port')
+                values['imap_port']=int(raw);self.scope.insert(0,scope(values))
+            except ValueError:pass
+            self.scope.configure(state='disabled');self.thread.configure(state='normal')
+            if not self.active:
+                for field in [self.sender,self.chat,self.thread]:field.configure(state='normal');field.delete(0,tk.END)
+            self.sender_changed();self.permissions()
+        else:
+            self.frame.pack_forget()
+            if self.active:
+                for field in [self.sender,self.chat,self.scope,self.thread]:field.configure(state='normal');field.delete(0,tk.END)
+        self.active=active
+
+    def options(self):return {key:variable.get() for key,variable in self.flags.items()}

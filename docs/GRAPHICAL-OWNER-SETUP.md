@@ -245,3 +245,25 @@ inputs, API catch-up failures/refusals and uncertain outgoing attempts use the
 existing owner recovery controls. See [SMS requirements and operation](GATEWAY-SMS.md).
 No external message, public reachability or handset receipt is established by
 saving configuration or by the Tk/loopback fixtures.
+
+
+## E-Mail gateway
+
+Select **email** on the Gateways page. Enter the dedicated account/app password
+in the protected field, exact IMAP/SMTP hosts/ports and verified TLS modes. Confirm
+the independently verified receiving Authentication-Results service and its
+header-custody requirements. Save, then authenticate the saved account without
+sending mail. Pair an exact lowercase sender; HAOS fixes its reply address to the
+same sender and derives the saved INBOX scope. Approve an exact root Message-ID
+for a pre-existing conversation, or leave the thread blank for messages outside
+threads. Files, local voice, video and result attachments have separate default-
+deny permissions. Password/account changes withdraw old grants.
+
+The recovery view displays IMAP fences and private SMTP acceptance/uncertainty.
+Inspected mailbox recovery appends a scan epoch without removing old receipts.
+Uncertain SMTP retry requires independent non-delivery confirmation and separate
+private gateway/controller decisions. The E-Mail source-management page protects
+pending inputs and requires explicit inspected logical disposal of eligible
+originals. See [E-Mail operation and limits](GATEWAY-EMAIL.md). Actual Tk fixtures
+and separate UID/process evidence do not establish installed graphical setup or
+external mail delivery.

@@ -1,3 +1,87 @@
+# E-Mail gateway
+
+## Current implementation (2026-10-29)
+
+The public HAOS gateway factory, owner CLI and graphical setup now connect the
+pinned native Hermes E-Mail adapter to independent HAOS authorization. Local
+software contracts cover account configuration, reception, replies, separately
+approved attachments/voice, persistent delivery and explicit recovery. External
+mail accounts, actual recipient delivery and installed graphical setup still
+require account/device acceptance; fixtures do not establish these outcomes.
+
+### Set up a dedicated account
+
+In graphical Gateway management select **email**, enter a canonical lowercase
+service address and private account/app password, and specify exact IMAP/SMTP
+hostnames, ports and `tls` or `starttls`. Plaintext is refused. The receiving
+server must strip forged Authentication-Results for its own authserv-id and
+prepend trusted results. Independently verify this and explicitly confirm it;
+enter that exact authserv-id. Domain authentication does not prove a person.
+OAuth-only accounts need a supported provider-issued app password; this adapter
+does not invent an OAuth flow or accept an arbitrary plugin.
+
+Save the account, then use **Gespeichertes E-Mail-Konto ohne Versand prüfen**.
+This authenticates the actual private IMAP/SMTP clients with a bounded worker,
+without MAIL/RCPT/DATA. Errors are finite and credentials never enter agent
+configuration, command arguments, GUI metadata or audit logs. Changing endpoints,
+connector or platform clears the password and trust confirmation. CLI equivalents
+are `haos-owner gateway setup ID email` and `haos-owner gateway email-account ID`.
+Use protected owner input; never put a password in command arguments.
+
+### Grant exact sender authority
+
+Pair one exact lowercase sender address; its reply/chat address must be identical.
+HAOS derives the mailbox scope from the saved service address, IMAP endpoint and
+INBOX, assigns a fresh timed grant, and rejects self-authorization of the service
+account. A blank thread means only messages outside a root thread. An existing
+conversation requires its exact root Message-ID, including angle brackets.
+Unknown senders, other mailboxes and threads have no implied authority.
+
+Select mission rights explicitly. Images/documents, local voice transcription,
+video files and outgoing result attachments each have separate default-deny
+consent. Inputs need create rights; outgoing files need read rights. Voice also
+requires the reviewed local speech service/model. At most four attachments,
+8 MiB each; PNG/JPEG aggregate at most 2 MiB. Result files use controller-approved
+immutable exports and native MIME attachments, without public download hosting.
+Changing the sender or connector clears media consent. Account/password rotation
+withdraws old grants; explicit re-pairing gets a new epoch. Removal withdraws the
+stored account without deleting owner/recovery history. Revoke an app password
+at the mail provider as well when server-side credential revocation is needed.
+
+### Recovery and honest delivery state
+
+The read-only IMAP scanner retains headers/source proofs before cursor advance.
+Changed UIDVALIDITY or regressed UIDNEXT fences reception. In the owner recovery
+view inspect the exact scan snapshot before appending a new local scan epoch;
+old cursors and receipts remain intact. Authentication recheck preserves these
+fences, current grants and retry deadlines.
+
+An interrupted SMTP write is uncertain and is never automatically repeated.
+After independently verifying non-delivery, inspect and approve the private
+SMTP attempt, then separately reconcile the controller outbox. Neither owner
+decision sends a message; starting the service can perform the explicitly
+approved later attempt. Confirmed SMTP acceptance suppresses replay and is not
+proof of recipient delivery or reading. Revocation stops further authorized work.
+
+The source-management page lists opaque private profiles and bounded metadata.
+Pending/recoverable inputs cannot be purged. Explicit logical disposal requires
+a terminal input decision or an unadmitted source with withdrawn authority, an
+exact snapshot and separate confirmation. Metadata, audit and tombstones remain;
+old replay cannot restore the selected BLOB. This does not securely erase SQLite
+free pages, backups, controller state or copies held by recipients.
+
+Validation receipts identify exact source files and distinguish actual native
+clients/TLS, real UID/socket processes, GUI handoff fixtures and external tests.
+The final activation receipt is in `docs/evidence/2026-10-29/`. No live mail,
+installed OS, HP hardware or release-artifact acceptance is implied.
+
+## Historical implementation notes
+
+The following notes describe earlier secured increments. Their former
+"prepared/not public" and unfinished-path statements are historical; the current
+status and setup steps above supersede them. Original receipts remain tied to
+their exact sources.
+
 # Email — prepared private transport, not public setup
 
 Email remains absent from public HAOS setup until owner recovery and real owner configuration join the prepared receiving paths. Bundled upstream

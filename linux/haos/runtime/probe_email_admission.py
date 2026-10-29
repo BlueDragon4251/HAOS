@@ -48,7 +48,7 @@ def main():
     assert result['envelope']['thread']=='<root@example.invalid>'
     cases.append('exact_root_thread_remains_stable_across_nested_replies')
     report={'passed':len(cases),'cases':cases,'actual_native_header_auth_and_independent_owner_policy':True,
-        'prepared_only_not_public':True,'full_body_mission_or_external_acceptance':False}
+        'public_registry_enabled':True,'full_body_mission_or_external_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

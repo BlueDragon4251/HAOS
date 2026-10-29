@@ -572,7 +572,23 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform'] in {'line','sms'}:
+    if selected and selected['platform']=='email':
+        from .gateway_email import scope as mailbox_scope
+        saved=credentials['connectors'][connector];destination=mailbox_scope(saved)
+        if scope and scope!=destination:raise ValueError('email scope must match the saved IMAP mailbox')
+        if sender==saved['address']:raise ValueError('email sender must differ from the service account')
+        item['scope']=destination
+        import secrets,time
+        item.update(generation=secrets.token_hex(32),since=time.time_ns()//1_000_000)
+        for key,value in [('allow_media',allow_media),('allow_voice',allow_voice),('allow_video',allow_video),('allow_outbound_media',allow_outbound_media)]:
+            if type(value) is not bool:raise ValueError('explicit boolean email media approval required')
+            item[key]=value
+        if allow_voice:
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
+                raise PermissionError('configure reviewed local speech before approving email voice')
+    elif selected and selected['platform'] in {'line','sms'}:
         saved=credentials['connectors'][connector]
         destination=saved['destination'] if selected['platform']=='line' else saved['account_sid']+':'+saved['from_number']
         if scope and scope!=destination:raise ValueError('Gateway scope must match the saved receiving identity')
@@ -667,6 +683,9 @@ def gateway_configuration():
           'bind_host':_credentials['connectors'][row['id']]['tls']['bind_host']}
         for row in policy['connectors'] if row['platform']=='sms'}
     if sms:result['sms']=sms
+    email={row['id']:{key:value for key,value in _credentials['connectors'][row['id']].items() if key!='password'}
+        for row in policy['connectors'] if row['platform']=='email'}
+    if email:result['email']=email
     return result
 
 

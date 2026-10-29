@@ -70,7 +70,7 @@ def main():
         except PermissionError:pass
         else:raise AssertionError('unbounded IMAP UID accepted')
         cases.append('out_of_range_imap_uid_refused')
-    report={'passed':len(cases),'cases':cases,'actual_pinned_native_email_codecs':True,'prepared_only_not_public':True,
+    report={'passed':len(cases),'cases':cases,'actual_pinned_native_email_codecs':True,'public_registry_enabled':True,
         'network_accounts_delivery_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

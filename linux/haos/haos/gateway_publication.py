@@ -23,6 +23,12 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='email':
+            from .gateway_email import credentials as email_credentials,scope
+            if email_credentials(row)!=row:raise ValueError('canonical private TLS email account required')
+            if any(binding['connector']==name and (binding['scope']!=scope(row) or binding['sender']==row['address']) for binding in policy['bindings']):
+                raise ValueError('email grant differs from configured mailbox or approves the service account itself')
+            continue
         if platforms[name]=='sms':
             from .gateway_sms import credentials as sms_credentials,scope
             if sms_credentials(row,verify_tls=False)!=row:raise ValueError('canonical private SMS HTTPS credentials required')

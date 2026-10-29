@@ -136,7 +136,7 @@ def main():
         finally:speech_client.transcribe=saved;store.close();relay.close();raw.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-email-voice-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_native_email_mime_dispatch_controller_and_local_model':True,
-        'private_speech_transport_and_agent_terminal_are_fixtures':True,'prepared_only_not_public':True,
+        'private_speech_transport_and_agent_terminal_are_fixtures':True,'public_registry_enabled':True,
         'external_mail_account_delivery_llm_inference_or_installed_acceptance':False}
     if len(sys.argv)>3:Path(sys.argv[3]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

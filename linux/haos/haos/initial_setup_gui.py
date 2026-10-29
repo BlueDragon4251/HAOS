@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -1296,6 +1296,9 @@ class Wizard:
             platform.trace_add('write',sms_pair_changed)
             sms_account._haos_public_value.trace_add('write',sms_pair_changed)
             sms_number._haos_public_value.trace_add('write',sms_pair_changed)
+            from .email_owner_gui import PairForm
+            email_pair=PairForm(self,self.content,platform,email_form,sender,chat,scope,thread,rights,pairing_note)
+            connector_value.trace_add('write',email_pair.clear)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1319,11 +1322,12 @@ class Wizard:
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
+                    else email_pair.options() if platform.get()=='email'
                     else {'allow_media':sms_allow_media.get(),'allow_voice':sms_allow_voice.get(),'allow_video':sms_allow_video.get(),'allow_outbound_media':sms_allow_outbound.get()} if platform.get()=='sms'
                     else {'allow_media':line_allow_media.get(),'allow_voice':line_allow_voice.get(),'allow_video':line_allow_video.get(),'allow_outbound_media':line_allow_outbound.get()} if platform.get()=='line'
                     else {'homeassistant_shared_notifications':share_ha.get(),'homeassistant_trust_system':trust_ha_system.get(),
                         'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
-                reset_sms_voice_consent()
+                reset_sms_voice_consent();email_pair.clear()
                 line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
@@ -1344,10 +1348,12 @@ class Wizard:
                             for c in configured_gateways["connectors"]) else "")
                         + (" · Antworten für ALLE Instanzbenutzer sichtbar" if row.get('homeassistant_shared_notifications') else "")
                         + (" · System-/Automationsquellen dieser Entity ausdrücklich freigegeben" if row.get('homeassistant_trust_system') else ""))
-                    if row.get('allow_media'):binding_details.configure(text=binding_details.cget('text')+' · LINE-Bilder/Dokumente ausdrücklich freigegeben')
+                    media_platform=next((c['platform'] for c in configured_gateways['connectors'] if c['id']==row['connector']),'Gateway')
+                    media_label={'line':'LINE','sms':'SMS','email':'E-Mail'}.get(media_platform,'Gateway')
+                    if row.get('allow_media'):binding_details.configure(text=binding_details.cget('text')+' · '+media_label+'-Bilder/Dokumente ausdrücklich freigegeben')
                     if row.get('allow_video'):binding_details.configure(text=binding_details.cget('text')+' · MP4-Eingang freigegeben')
                     if row.get('allow_outbound_media'):binding_details.configure(text=binding_details.cget('text')+' · Ergebnisdateien für diesen Chat freigegeben')
-                    if row.get('allow_voice'):binding_details.configure(text=binding_details.cget('text')+' · LINE-Sprachnachrichten ausdrücklich freigegeben')
+                    if row.get('allow_voice'):binding_details.configure(text=binding_details.cget('text')+' · '+media_label+'-Sprachnachrichten ausdrücklich freigegeben')
                 revoked_binding.trace_add("write", show_binding_details)
                 show_binding_details()
                 def revoke_binding():

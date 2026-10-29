@@ -1,4 +1,4 @@
-"""Prepared exact email identities and TLS account settings; not a public transport."""
+"""Exact email identities and verified TLS account settings for owner-approved mail."""
 import re
 
 from .gateway import GatewayPolicy,SUPPORTED,digest

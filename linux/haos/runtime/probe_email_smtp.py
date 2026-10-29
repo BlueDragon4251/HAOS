@@ -131,7 +131,7 @@ def main():
         assert not errors,errors
     with tempfile.TemporaryDirectory(prefix='haos-email-smtp-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_native_mime_builder_and_smtp_lifecycle':True,'loopback_tls_server_only':True,
-        'prepared_only_not_public':True,'durable_intent_worker_supervision_external_delivery_or_recipient_receipt':False}
+        'public_registry_enabled':True,'durable_intent_worker_supervision_external_delivery_or_recipient_receipt':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

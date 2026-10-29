@@ -308,6 +308,15 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-owner-recovery-process.json"
           cat "$RUNNER_TEMP/provider-contracts/email-owner-recovery-process.json"
+      - name: Verify actual root email publication and private UID custody
+        run: |
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_email_publication_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_EMAIL_PUBLICATION=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-publication-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-publication-process.json"
       - uses: actions/upload-artifact@v4
         with:
           name: provider-contracts-${{ github.sha }}

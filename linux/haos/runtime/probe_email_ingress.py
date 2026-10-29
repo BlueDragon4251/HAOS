@@ -104,7 +104,7 @@ def main():
         finally:store.close();relay.close();raw.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-email-ingress-') as name:asyncio.run(exercise(Path(name)))
     report={'passed':len(cases),'cases':cases,'actual_native_codec_journals_relay_and_controller':True,
-        'account_auth_headers_and_direct_controller_transport_are_fixtures':True,'prepared_only_not_public':True,
+        'account_auth_headers_and_direct_controller_transport_are_fixtures':True,'public_registry_enabled':True,
         'external_accounts_smtp_messages_model_inference_or_installed_acceptance':False}
     if len(sys.argv)>2:Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))

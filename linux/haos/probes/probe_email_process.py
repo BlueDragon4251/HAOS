@@ -55,8 +55,9 @@ if request['action']=='agent':
     print(json.dumps({'agent_private_data_denied':True,'credential_payload_absent':True}));sys.exit(0)
 assert os.geteuid()==65534
 if request['action']=='profile':
-    from haos.gateway_email_profile import build
-    from haos.gateway_email import PreparedEmailPolicy
+    from haos.gateway_runtime import build_adapter
+    def build(value,**context):return build_adapter('email',value,email_context=context)
+    from haos.gateway import GatewayPolicy
     from haos.gateway_raw import NativeInbox
     from haos.gateway_relay import RelayInbox
     from haos.gateway_runtime import adapter_envelope,delivery_metadata
@@ -65,7 +66,7 @@ if request['action']=='profile':
     async def run_profile():
         root=Path('/var/lib/haos-gateway');inbox=NativeInbox(root/'profile-native.db',Redactor());relay=RelayInbox(root/'profile-relay.db',Redactor())
         parent=root/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
-        policy=lambda:PreparedEmailPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+        policy=lambda:GatewayPolicy(trusted_json(Path('/etc/haos/gateways.json')))
         adapter=build(request['credentials'],parent=parent,connector='email',policy=policy,inbox=inbox)
         def receive(event):relay.admit(policy(),'email',adapter_envelope(event,'email'));return True
         adapter.set_durable_message_handler(receive)
@@ -311,7 +312,10 @@ asyncio.run(exercise())
             'id':'owner','connector':'email','sender':'owner@example.invalid','chat':'owner@example.invalid','scope':scope(value),
             'thread':'','identity':'personal','capabilities':['create','read'],'generation':'b'*64,'since':1,'allow_outbound_media':True}]}
         def publish():
-            temporary=config/'next.json';temporary.write_text(json.dumps(policy));temporary.chmod(0o644);temporary.replace(config/'gateways.json')
+            from haos.gateway_publication import publish as atomic_publish
+            previous=json.loads((config/'gateways.json').read_text()) if (config/'gateways.json').exists() else {'version':1,'connectors':[],'bindings':[]}
+            atomic_publish(config,policy,{'connectors':{'email':value}},previous,65534)
+            assert (config/'gateway-credentials').stat().st_mode&0o077==0
         publish()
         async def invoke(uid,action,**extra):
             child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),str(script),
@@ -434,7 +438,7 @@ asyncio.run(exercise())
     asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65533,65534],
         'actual_private_subprocess_and_kernel_termination':True,'actual_native_clients_and_verified_tls':True,
-        'loopback_account_and_root_publication_are_fixtures':True,'public_email_gateway_enabled':False,
+        'loopback_account_and_owner_grants_are_fixtures':True,'actual_atomic_root_publication':True,'public_email_gateway_enabled':True,
         'external_email_accounts_or_delivery_or_installed_acceptance':False},indent=2))
 
 

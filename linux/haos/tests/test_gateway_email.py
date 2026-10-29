@@ -15,8 +15,8 @@ def policy():
         'scope':scope(settings()),'thread':'','identity':'personal','capabilities':['create','read'],'generation':'b'*64,'since':1}]}
 
 
-def test_email_is_not_public_before_native_transport_media_and_owner_paths_are_connected():
-    with pytest.raises(ValueError):GatewayPolicy(policy())
+def test_public_email_policy_requires_exact_timed_owner_mailbox_authority():
+    assert GatewayPolicy(policy()).bindings['owner']['scope']==scope(settings())
     assert PreparedEmailPolicy(policy()).bindings['owner']['scope']==scope(settings())
     assert credentials(settings())==settings()
     changed={**settings(),'imap_host':'other.example.invalid'}

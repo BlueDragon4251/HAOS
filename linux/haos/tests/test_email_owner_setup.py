@@ -58,3 +58,24 @@ def test_source_inventory_does_not_accept_caller_paths(calls):
 def test_receiving_server_custody_must_be_explicit_before_account_configuration(calls):
     with pytest.raises(PermissionError):initial_setup.configure_email_gateway('email',{})
     assert calls==[]
+
+
+def test_email_owner_pairing_derives_saved_mailbox_and_creates_fresh_timed_grant(calls,monkeypatch):
+    from copy import deepcopy
+    from haos import owner
+    from test_gateway_email_publication import fixture
+    policy,credentials=fixture();policy['bindings']=[];saved=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(deepcopy(policy),deepcopy(credentials)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(owner,'audit',lambda *args:None)
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','email-main','owner@example.invalid','other@example.invalid','personal')
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','email-main','owner@example.invalid','owner@example.invalid','personal',scope='mailbox:'+'b'*64)
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','email-main','haos@example.invalid','haos@example.invalid','personal')
+    assert calls==[] and saved==[]
+    initial_setup.pair_gateway_sender('owner','email-main','owner@example.invalid','owner@example.invalid','personal',thread='<root@example.invalid>',allow_media=True,allow_outbound_media=True)
+    first=saved[-1][0]['bindings'][0]
+    assert len(first['generation'])==64 and type(first['since']) is int and first['since']>123
+    assert first['scope'].startswith('mailbox:') and first['allow_media'] is True and first['allow_outbound_media'] is True
+    assert first['allow_voice'] is False and first['allow_video'] is False
+    initial_setup.pair_gateway_sender('owner','email-main','owner@example.invalid','owner@example.invalid','personal')
+    assert saved[-1][0]['bindings'][0]['generation']!=first['generation']

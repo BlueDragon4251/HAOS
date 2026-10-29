@@ -1603,3 +1603,24 @@ connected. Source-bound evidence accompanies the increment; see [SMS operation
 and limits](GATEWAY-SMS.md). Ten public text paths do not establish ten fully
 accepted gateways or all 22 integrations. Account/carrier/handset, public network,
 installed system and release acceptance remain separate.
+
+
+## Public E-Mail owner/runtime integration (2026-10-29)
+
+The eleventh public HAOS gateway path connects the pinned native E-Mail adapter
+to independent timed sender/mailbox/root-thread grants. The public runtime uses
+its private leased profile, supervised gateway-UID workers, durable readonly IMAP
+capture, separate MIME/media consent and audited single-write SMTP intents.
+Root publication validates complete TLS credentials and exact mailbox grants;
+password rotation withdraws previous routes. Password/native authentication
+aliases are registered with credential redaction before SDK activity. No account
+or refresh credential enters the agent.
+
+Graphical/CLI account setup, no-send authentication, sender pairing, finite
+transport status, UID-fence recovery, uncertain SMTP reconciliation and protected
+original-source management are connected. Loopback fixtures exercise actual
+native clients and atomic root publication; actual Tk tests exercise owner
+handoffs as fixtures. Kernel tests preserve real UID/socket/credential boundaries.
+External mail accounts, recipient delivery and installed/hardware acceptance
+remain separate. See [E-Mail details](GATEWAY-EMAIL.md) and exact receipts under
+`docs/evidence/2026-10-29/`.
