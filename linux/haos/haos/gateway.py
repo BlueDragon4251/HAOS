@@ -53,7 +53,7 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform']=='feishu'
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk'}
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms','email'} else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")

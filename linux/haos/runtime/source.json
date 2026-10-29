@@ -12,7 +12,8 @@
     "azure-identity",
     "matrix",
     "voice",
-    "feishu"
+    "feishu",
+    "dingtalk"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",
@@ -23,7 +24,7 @@
     "tornado": "6.5.9",
     "urllib3": "2.8.0"
   },
-  "requirements_sha256": "34f94c870d00aaebb3cd66756c1137c8e03126ba067978e4bf6b91d863eebf0b",
+  "requirements_sha256": "dc6013cd6f37d1dbb718771eb5444d1eff9700a66204402863a2b06f43dd6bbb",
   "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514",
   "provider_versions": {
     "msal": "1.39.0"
@@ -38,5 +39,12 @@
     "python-socks": "2.8.1",
     "base58": "2.1.1",
     "unpaddedbase64": "2.1.0"
+  },
+  "dingtalk_versions": {
+    "dingtalk-stream": "0.24.3",
+    "alibabacloud-dingtalk": "2.2.42"
+  },
+  "gateway_compatibility_versions": {
+    "alibabacloud-tea-openapi": "0.4.6"
   }
 }

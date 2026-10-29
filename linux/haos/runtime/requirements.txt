@@ -2326,3 +2326,8 @@ yarl==1.22.0 \
     # via
     #   -r evidence/runtime-input.txt
     #   aiohttp
+
+# Targeted DingTalk SDK compatibility with the existing Cryptography 50 pin.
+alibabacloud-tea-openapi==0.4.6 \
+    --hash=sha256:c9e1727b9fb2936f487d050fc3590c99f9f2065256dc3a927e5b61f414674ed6 \
+    --hash=sha256:dafc32401712f5b21c12dc3d05ba887a91ad156d9b49a7662279f9fd90526fb2

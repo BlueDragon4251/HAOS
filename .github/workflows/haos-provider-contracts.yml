@@ -48,7 +48,7 @@ jobs:
           python -m pip install uv
           bash scripts/sync-upstream.sh
           python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
-          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk
           uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
       - name: Compare the generated registry and execute real local protocol probes
@@ -117,6 +117,9 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_feishu_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_compatibility.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-compatibility.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_http.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-http.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
@@ -348,6 +351,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-owner-recovery-process.json"
           cat "$RUNNER_TEMP/provider-contracts/feishu-owner-recovery-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-worker-process.json"
       - name: Verify private email worker UID isolation revocation cancellation and hard deadline
         run: |
           set -euo pipefail

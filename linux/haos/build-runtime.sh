@@ -11,7 +11,7 @@ python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
-uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu
+uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk
 uv pip install --python .venv/bin/python --require-hashes --no-deps -r "$HAOS_RUNTIME_OVERLAY/requirements.txt"
 uv pip check --python .venv/bin/python
 # Fail the build on upstream registry drift. The setup process reads only this
@@ -93,6 +93,9 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_sdk.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-sdk-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_compatibility.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-compatibility-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-admission-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-admission-build-probe.json

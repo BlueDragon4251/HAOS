@@ -1,6 +1,6 @@
 # Hermes runtime
 
-`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with reviewed web, messaging, anthropic, bedrock, vertex, azure-identity, matrix, voice and feishu extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
+`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with reviewed web, messaging, anthropic, bedrock, vertex, azure-identity, matrix, voice, feishu and dingtalk extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
 
 The reviewed `linux/haos/runtime` overlay pins all runtime requirements with package hashes, including fixes for anyio, multidict, PyJWT, tornado and urllib3. Its preparation checks the exact upstream commit, original pyproject/uv.lock hashes and requirements digest before changing the conflicting PyJWT metadata. Installation requires hashes and `uv pip check`; installed versions and the source/requirements provenance remain in immutable `/usr/lib/haos/runtime-provenance`. Run `37818579514` verified the resolved dependencies with pip-audit, the actual pinned Hermes CLI and an expired-JWT regression. That CI result validates dependencies; the resulting updated Fedora image still requires its own build and guest evidence.
 
@@ -1665,3 +1665,14 @@ parts, uncertain-write quarantine and the independent controller reconciliation
 obligation. Root/private-store and cross-UID probes are separate from Tk handoff
 fixtures. See `GATEWAY-FEISHU.md` for prerequisites, exact limits, operation paths
 and the distinction between local contract evidence and live acceptance.
+
+
+The next private gateway stage adds the frozen `dingtalk` extra with actual
+DingTalk Stream SDK 0.24.3 and OpenAPI SDK 2.2.42. SDK/model projection, bounded
+private token/discovery transport and no-send account action are initial
+contracts, not public gateway activation. See `GATEWAY-DINGTALK.md`. Public
+gateways remain 12/22; WebSocket, pre-ACK custody, delivery/media/recovery and
+complete owner setup remain required for DingTalk. A targeted hash-pinned
+Tea-OpenAPI 0.4.6 overlay fixes its frozen 0.4.5 Cryptography upper-bound
+conflict. Cryptography 50 and MSAL 1.39.0 stay unchanged; native RSA/HMAC
+and retry-header compatibility checks accompany the dependency check.

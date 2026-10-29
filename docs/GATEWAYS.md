@@ -46,3 +46,8 @@ platform-specific live/feature acceptance limits.
 [Mission and recovery contracts](GATEWAY-MISSIONS.md) remain independent of
 transport. No privileged HTTP policy endpoint or text-based root elevation is
 provided. Human browser/session credentials are never copied into agent state.
+
+Private DingTalk SDK/identity contracts are in progress; see
+[DingTalk implementation boundaries](GATEWAY-DINGTALK.md). It remains outside the
+public registry until transport, durable delivery, media, recovery and owner GUI
+are integrated.
