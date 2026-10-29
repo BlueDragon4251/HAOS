@@ -32,6 +32,7 @@ def unresolved(inbox, after=0):
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
             r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line','email'} else
             r'(?:SM|MM)[0-9a-fA-F]{32}' if row['platform']=='sms' else
+            r'om_[A-Za-z0-9]{16,64}' if row['platform']=='feishu' else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
         valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
@@ -151,8 +152,9 @@ def unresolved(inbox, after=0):
     from .gateway_email_recovery import outgoing as email_outgoing,transport as email_transport,mailboxes
     transport.extend(email_transport(inbox))
     from .gateway_feishu_recovery import outgoing as feishu_outgoing,accounts as feishu_accounts
+    from .gateway_feishu_media_recovery import outgoing as feishu_media_outgoing
     accounts=feishu_accounts(inbox)
-    return {**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
+    return {**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -345,6 +347,16 @@ def main():
         elif data['action']=='purge-email-source':
             from .gateway_email_recovery import purge_source
             result=purge_source(inbox,policy,data['params'])
+        elif data['action']=='feishu-sources':
+            if set(data['params'])!={'profile','kind'}:raise ValueError('exact private Feishu source selectors required')
+            from .gateway_feishu_source_recovery import sources
+            result=sources(policy,**data['params'])
+        elif data['action']=='purge-feishu-source':
+            from .gateway_feishu_source_recovery import purge
+            result=purge(policy,data['params'])
+        elif data['action']=='approve-feishu-part-retry':
+            from .gateway_feishu_media_recovery import approve_retry
+            result=approve_retry(inbox,policy,data['params'])
         elif data['action']=='approve-feishu-retry':
             from .gateway_feishu_recovery import approve_retry
             result=approve_retry(inbox,policy,data['params'])

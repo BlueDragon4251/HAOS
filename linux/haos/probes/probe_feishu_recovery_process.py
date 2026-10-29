@@ -60,6 +60,24 @@ else:
         inbox.db.execute('INSERT INTO feishu_delivery_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
             (identity,1,'feishu',publisher.credential_scope,'a'*64,state,receipt,'',now,now))
     inbox.db.execute("UPDATE feishu_delivery_backoff SET status='rate-limited',next_attempt=?,updated_at=?",(now+600,now))
+    from haos.gateway import digest
+    import hashlib
+    profiles=Path('/var/lib/haos-gateway/profiles');profiles.mkdir(mode=0o700)
+    profile=profiles/('feishu-'+'a'*64);profile.mkdir(mode=0o700)
+    payload=b'declared offline source fixture';checksum=hashlib.sha256(payload).hexdigest()
+    approval={'binding_id':binding['id'],'binding_digest':digest(binding),'credential_scope':publisher.credential_scope,
+        'envelope':{'platform':'feishu'}}
+    original=NativeInbox(profile/'originals.db',Redactor())
+    original.db.execute('CREATE TABLE feishu_raw_events(id TEXT PRIMARY KEY,source_key TEXT NOT NULL UNIQUE,connector TEXT NOT NULL,binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,credential_scope TEXT NOT NULL,sha256 TEXT NOT NULL,semantic_sha256 TEXT NOT NULL,metadata TEXT NOT NULL,data BLOB NOT NULL,created_at REAL NOT NULL)')
+    meta=json.dumps({'approval':approval,'resources':[],'envelope_sha256':'b'*64})
+    original.db.execute('INSERT INTO feishu_raw_events VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+        ('c'*64,'d'*64,'feishu',binding['id'],digest(binding),publisher.credential_scope,checksum,'b'*64,meta,payload,now))
+    original.close()
+    webhook=NativeInbox(profile/'webhooks.db',Redactor())
+    webhook.db.execute('CREATE TABLE feishu_webhook_receipts(id TEXT PRIMARY KEY,credential_scope TEXT NOT NULL,headers TEXT NOT NULL,wire BLOB NOT NULL,wire_sha256 TEXT NOT NULL,proof TEXT NOT NULL,state TEXT NOT NULL,source_key TEXT,created_at REAL NOT NULL)')
+    webhook.db.execute('INSERT INTO feishu_webhook_receipts VALUES(?,?,?,?,?,?,?,?,?)',
+        ('c'*64,publisher.credential_scope,'{}',payload,checksum,json.dumps(approval),'captured','d'*64,now))
+    webhook.close()
     print(json.dumps({'seeded':True}));inbox.close()
 ''');seed.chmod(0o644)
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'};cases=[]
@@ -104,6 +122,26 @@ else:
     ledger(65532,'reconcile-delivery',accepted,False)
     assert ledger(65532,'reconcile-delivery',{**accepted,'receipt':'om_'+'d'*32})['state']=='delivered'
     cases.append('actual_controller_uid_requires_exact_native_Feishu_receipt_for_separate_owner_delivered_decision')
+    for kind in ['original','webhook']:
+        selectors={'profile':'feishu-'+'a'*64,'kind':kind}
+        active=raw(65534,'feishu-sources',selectors);entry=active['sources'][0]
+        assert active['private_bytes_returned'] is False and entry['purge_allowed'] is False
+        permission={**selectors,'id':entry['id'],'snapshot_sha256':entry['snapshot_sha256'],
+            'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True}
+        raw(65534,'purge-feishu-source',permission,False)
+    config['bindings']=[]
+    for kind in ['original','webhook']:
+        selectors={'profile':'feishu-'+'a'*64,'kind':kind}
+        entry=raw(65534,'feishu-sources',selectors)['sources'][0]
+        assert entry['purge_allowed'] and entry['stored_bytes']>0
+        permission={**selectors,'id':entry['id'],'snapshot_sha256':entry['snapshot_sha256'],
+            'owner_uid':1000,'note_sha256':'e'*64,'confirmed':True}
+        for uid in [0,65532,65533]:raw(uid,'purge-feishu-source',permission,False)
+        first=raw(65534,'purge-feishu-source',permission)
+        assert first['removed_payload_bytes']==entry['stored_bytes'] and first['network_requested'] is False
+        assert raw(65534,'purge-feishu-source',permission)['removed_payload_bytes']==0
+        assert raw(65534,'feishu-sources',selectors)['sources'][0]['purged'] is True
+        cases.append('actual_gateway_UID_'+kind+'_source_disposal_requires_withdrawn_grant_retains_tombstone_and_denies_other_UIDs')
     assert canary.read_text()=='preserve-owner-fixture'
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65532,65533,65534],
         'optional_Hermes_source_or_SDK_imported':False,'network_available':False,

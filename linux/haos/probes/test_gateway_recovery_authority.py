@@ -884,3 +884,65 @@ assert 'plugins.platforms.email.adapter' not in sys.modules
 '''
     result=subprocess.run([sys.executable,'-c',code,str(uid),str(Path(__file__).resolve().parents[1])],capture_output=True,text=True,timeout=10)
     assert result.returncode==0,result.stderr
+
+
+@pytest.mark.parametrize('operation',['upload','reply'])
+@pytest.mark.parametrize('uid',[0,65533,65534])
+def test_actual_feishu_multipart_recovery_main_checks_real_uid_and_preserves_other_parts(uid_fixture_path,operation,uid):
+    import time
+    import sqlite3
+    from types import SimpleNamespace
+    from haos.gateway import digest
+    from haos.gateway_feishu import scope
+    from haos.gateway_feishu_delivery import Publisher
+    from haos.gateway_feishu_media_delivery import MediaPublisher
+    from haos.gateway_feishu_media_recovery import outgoing,TABLES
+    root=uid_fixture_path;root.chmod(0o755);(root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    (root/'var/lib/haos-gateway').mkdir(parents=True,mode=0o700)
+    state=root/'var/lib/haos-gateway';database=state/'native-inbox.db'
+    value={'app_id':'cli_0123456789abcdef','app_secret':'private-feishu-recovery-fixture','domain':'feishu',
+        'tenant_key':'tenant_fixture_01','bot_open_id':'ou_'+'a'*32,'connection_mode':'websocket'}
+    binding={'id':'owner','connector':'feishu','sender':'ou_'+'b'*32,'chat':'oc_'+'c'*32,
+        'scope':scope(value),'thread':'','identity':'personal','capabilities':['create','read'],
+        'generation':'d'*64,'since':123,'allow_outbound_media':True}
+    config={'version':1,'connectors':[{'id':'feishu','platform':'feishu'}],'bindings':[binding]}
+    inbox=NativeInbox(database,Redactor())
+    adapter=SimpleNamespace(_haos_native=SimpleNamespace(connector='feishu',inbox=inbox),_haos_feishu_value=value)
+    Publisher(adapter);publisher=MediaPublisher(adapter);now=time.time()
+    for table in TABLES.values():
+        for part in (0,1):inbox.db.execute(f'INSERT INTO {table} VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+            ('a'*64,part,1,'feishu',publisher.scope,'b'*64,'uncertain','','','',now,now))
+    selected=next(x for x in outgoing(inbox) if x['operation']==operation and x['part']==0)
+    inbox.close();os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    request={'action':'approve-feishu-part-retry','policy':config,'params':{
+        'connector':'feishu','delivery_id':'a'*64,'part':0,'operation':operation,'attempt':1,
+        'snapshot_sha256':selected['snapshot_sha256'],'owner_uid':1000,'note_sha256':'c'*64,
+        'confirmed':True,'confirmed_not_accepted':True}}
+    code='''
+import io,json,os,pwd,sys
+from haos import gateway_raw_recovery,gateway_feishu_media_recovery
+from haos.gateway_feishu import PreparedFeishuPolicy
+PreparedFeishuPolicy(json.loads(sys.argv[3]));pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+assert os.geteuid()==int(sys.argv[2]) and os.getgroups()==[]
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    child=subprocess.run([sys.executable,'-c',code,str(root),str(uid),json.dumps(config)],input=json.dumps(request),
+        text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
+            'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    if uid==65534:
+        assert child.returncode==0,child.stderr
+        report=json.loads(child.stdout);assert report['network_requested'] is False and report['controller_reconciliation_still_required'] is True
+    else:assert child.returncode!=0 and 'PermissionError' in child.stderr and not child.stdout
+    db=sqlite3.connect(database)
+    try:
+        released=[]
+        for name,table in TABLES.items():
+            released.extend((name,part) for part,state in db.execute(f'SELECT part,state FROM {table}') if state=='owner-retry-approved')
+        assert released==([(operation,0)] if uid==65534 else [])
+        if uid==65534:assert db.execute('SELECT owner_uid FROM feishu_media_owner_events').fetchone()[0]==1000
+    finally:db.close()

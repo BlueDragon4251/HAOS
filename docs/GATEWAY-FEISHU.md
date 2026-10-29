@@ -433,3 +433,37 @@ separate speech identity for both authorized caller identities, including a
 The actual authenticated backend-export composition also checks conversion and
 stable repeated preparation; its speech RPC transport is explicitly a fixture,
 while the codec is real. No external Feishu voice delivery is established.
+
+
+Private multipart recovery now inventories upload and media-reply intents
+separately, with exact part/operation/attempt snapshots. Upload keys and original
+receipt bodies stay private; the owner sees receipt checksums. A withdrawal of
+output/read rights denies recovery. Confirmed native acceptance cannot be
+released. An uncertain or definite rejected selected part requires independent
+non-acceptance confirmation plus a bounded inspection-note digest. The atomic
+owner audit does not send, clear account backoff or reconcile the controller
+outbox; that remains a separate owner decision. Later parts which have never
+started may begin in a later authorized overall attempt. Previous uncertain
+writes stay quarantined and confirmed parts remain reused.
+
+The actual SDK/TLS/UID process probe includes recovery after an uncertain upload
+and after an uncertain reply: no automatic second write occurs before the
+inspected decision; exactly the selected native operation repeats afterward.
+Source/connection declarations and independent non-acceptance evidence in these
+loopback cases remain fixtures, not real remote observations.
+
+Offline source management separately inventories opaque Feishu profile originals
+and webhook-wire stores without returning message bodies, headers, keys or raw
+proofs. Disposal requires the original grant to be changed/withdrawn, an exact
+current snapshot and an explicit inspected decision. Byte removal and its owner
+audit commit in one private SQLite transaction. Source/nonce identities remain
+as tombstones; authenticated redelivery never silently restores deleted bytes.
+The two stores require separate decisions, and controller/agent copies or backups
+are untouched. Active webhook capacity excludes removed byte payloads while
+retaining a separate finite metadata limit.
+
+Actual native source-capture and signed/AES/HTTPS webhook probes verify these
+disposal/reopen properties. A separate network-disabled real-UID owner helper
+probe checks both source kinds under the gateway identity and refuses root,
+agent and controller use of that helper. Its source metadata is explicitly
+fixture data. Public CLI/GUI integration and final activation remain open.

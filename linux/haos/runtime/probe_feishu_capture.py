@@ -132,6 +132,27 @@ def main():
             else:raise AssertionError('withdrawn publication read original')
             cases.append('withdrawn_current_publication_cannot_decode_or_replay_retained_original')
             cache.close();inbox.close()
+            from haos.gateway_feishu_source_recovery import sources,purge
+            parent=root/'profiles';parent.mkdir(mode=0o700);profile='feishu-'+digest(['feishu',value])
+            folder=parent/profile;folder.mkdir(mode=0o700);path.rename(folder/'originals.db')
+            inventory=sources(PreparedFeishuPolicy(config),profile,'original',parent=parent)
+            selected=next(row for row in inventory['sources'] if row['id']==first['id'])
+            assert selected['purge_allowed'] and selected['stored_bytes']==len(raw(event))
+            assert raw(event).decode() not in json.dumps(inventory)
+            decision={'profile':profile,'kind':'original','id':first['id'],'snapshot_sha256':selected['snapshot_sha256'],
+                'owner_uid':1000,'note_sha256':'a'*64,'confirmed':True}
+            removed=purge(PreparedFeishuPolicy(config),decision,parent=parent)
+            assert removed['removed_payload_bytes']==len(raw(event)) and removed['tombstones_retained']
+            assert purge(PreparedFeishuPolicy(config),decision,parent=parent)['removed_payload_bytes']==0
+            cases.append('actual_native_captured_original_explicitly_purged_only_after_grant_change_with_audited_idempotent_tombstone')
+            config['bindings'][0]['generation']='d'*64
+            cache=RawEvents(folder/'originals.db',redactor,current)
+            try:cache.capture(PreparedFeishuPolicy(config),'feishu',value,raw(event))
+            except PermissionError:pass
+            else:raise AssertionError('purged native original automatically restored')
+            assert cache.db.execute('SELECT COUNT(*) FROM feishu_raw_events WHERE id=?',(first['id'],)).fetchone()[0]==1
+            cache.close()
+            cases.append('actual_native_redelivery_after_owner_purge_preserves_tombstone_and_refuses_automatic_byte_restoration')
     report={'passed':len(cases),'cases':cases,'actual_pinned_codec_and_private_SQLite':True,
         'transport_authentication_owner_publication_and_service_identity_are_fixtures':True,
         'network_resources_agent_missions_or_external_messages':False,'public_feishu_enabled':False,

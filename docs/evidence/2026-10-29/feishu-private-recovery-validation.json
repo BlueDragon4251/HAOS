@@ -1,0 +1,194 @@
+{
+  "parent_commit": "09d5fde2a50dc659b4b0371568d25930b21cec9f",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "9fa8482473ee149496368f25c682e26b13d1b57404a1746c97b7cfde8c6355a1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media_delivery.py",
+      "sha256": "ff1147fd023ac28446b7e07daddacf2bc1b43570a7e35b0c73da0d97eeff95a8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media_recovery.py",
+      "sha256": "ae05ec5ecb6c6a07f465d3669fd6a613ad929972f9dfb6b5c74c87b1eec8e7b4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_source_recovery.py",
+      "sha256": "fe94f9fa9eb403686786a9eb24005ba5d5ffc1b748f558d31c14c17ec7821950"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload_journal.py",
+      "sha256": "e3e3a090896fb4037604c7e683124310044cad1b38965d799e6bca482c54e541"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_webhook.py",
+      "sha256": "1a5d50f1f1480059e193394448537385e50d819ed438299ebf338c77ad589e6f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "4840d7601e2a2693a6379520370d0f47383b5d2dbbc57c63e5daa027528ffbd7"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_recovery_process.py",
+      "sha256": "147378f35c93a121fc1deb9a68cb83331d78f5c5f933abd782f1cb5f6231b45c"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_upload_process.py",
+      "sha256": "4c077a9f4bb373a097b009cc9c6eaf51e6c31e55e10e05e5d067d0adcc165674"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "bead414819fff9523dc2f268d320d888a3e9bab81a739e48c0e6655ef3f86114"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_capture.py",
+      "sha256": "a2ee52201ea6971a06727e7547b6ec597eed1771fc578a5b5a8d25f8298d0603"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_webhook.py",
+      "sha256": "b974455b9febd90030ba553015fd5d74a037a54b5fd5dc48ea8af605032e6277"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_media_recovery.py",
+      "sha256": "7714ea6c48f20ca263b1d29e65dd0bfd1a698b75dd6bff38c2f9f9118c99720a"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_source_recovery.py",
+      "sha256": "0727b7d9273cd3d1839e74f048db098eade9e70468d426b94af7fa20f79b6ee9"
+    }
+  ],
+  "regressions": {
+    "minimal_without_upstream": {
+      "passed": 2077,
+      "existing_skips": 2
+    },
+    "full_pinned_runtime": {
+      "passed": 2077,
+      "existing_skips": 2
+    },
+    "root_kernel_and_backup": {
+      "passed": 149,
+      "mocks_or_added_skips": false
+    }
+  },
+  "probes": {
+    "native_upload_reply_owner_recovery": {
+      "passed": 19,
+      "cases": [
+        "actual_agent_UID_refused_before_private_upload",
+        "actual_root_UID_refused_before_private_upload",
+        "actual_changed_binary_offer_refused_before_worker_or_network",
+        "actual_private_native_upload_ok_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_401_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_429_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_native-rate_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_500_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_drop_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_missing_finite_receipt_without_hidden_write_retry",
+        "actual_revoke_kills_and_joins_blocked_credential_bearing_upload_worker",
+        "actual_cancel_kills_and_joins_blocked_credential_bearing_upload_worker",
+        "actual_journal_confirmed_or_uncertain_upload_survives_reopen_and_new_attempt_without_second_API_write",
+        "actual_drop-journal_confirmed_or_uncertain_upload_survives_reopen_and_new_attempt_without_second_API_write",
+        "actual_media-journal_native_upload_and_reply_reopen_new_attempt_never_reuploads_or_resends",
+        "actual_media-drop-journal_native_upload_and_reply_reopen_new_attempt_never_reuploads_or_resends",
+        "actual_owner-upload_inspected_per_part_release_allows_one_new_native_write_and_reuses_confirmed_parts",
+        "actual_owner-reply_inspected_per_part_release_allows_one_new_native_write_and_reuses_confirmed_parts",
+        "actual_committed_write_intent_before_withheld_response_and_SIGKILL_restart_quarantine_prevent_second_upload"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "fixed_origin_loopback_fixture_only": true,
+      "durable_upload_journal": true,
+      "connection_and_original_source_authentication_are_fixtures": true,
+      "native_media_reply_delivery_fixture": true,
+      "public_feishu_enabled": false
+    },
+    "separate_UID_offline_owner_and_source_recovery": {
+      "passed": 8,
+      "cases": [
+        "actual_root_agent_and_wrong_service_uids_cannot_open_private_offline_helpers_even_with_supplied_owner_fields",
+        "actual_gateway_uid_inspects_only_finite_opaque_delivery_and_account_metadata_without_optional_runtime",
+        "actual_private_helper_refuses_stale_inspection_missing_non_delivery_confirmation_and_confirmed_acceptance",
+        "gateway_owner_decision_is_idempotent_and_preserves_account_deadline_and_separate_controller_obligation",
+        "distinct_actual_service_uids_record_two_offline_owner_decisions_without_network_or_rewriting_prior_gateway_intent",
+        "actual_controller_uid_requires_exact_native_Feishu_receipt_for_separate_owner_delivered_decision",
+        "actual_gateway_UID_original_source_disposal_requires_withdrawn_grant_retains_tombstone_and_denies_other_UIDs",
+        "actual_gateway_UID_webhook_source_disposal_requires_withdrawn_grant_retains_tombstone_and_denies_other_UIDs"
+      ],
+      "actual_uids": [
+        0,
+        65532,
+        65533,
+        65534
+      ],
+      "optional_Hermes_source_or_SDK_imported": false,
+      "network_available": false,
+      "prepared_owner_policy_and_metadata_states_are_fixtures": true,
+      "public_Feishu_CLI_GUI_or_live_acceptance": false
+    },
+    "native_source_capture_and_disposal": {
+      "passed": 15,
+      "cases": [
+        "actual_native_codec_and_private_SQLite_commit_original_before_any_transport_acknowledgement_or_agent_dispatch",
+        "actual_close_reopen_after_original_commit_recovers_the_gap_before_native_input_admission",
+        "actual_native_processing_crash_reopens_pending_then_terminal_input_compaction_never_readmits_it",
+        "transport_redelivery_nonce_changes_preserve_the_first_verified_original_without_duplicate_rows",
+        "same_message_cannot_replace_original_body_even_if_delivery_identifiers_are_reused",
+        "retained_source_cannot_move_between_private_credential_epochs",
+        "maximum_UTF8_goal_survives_an_original_larger_than_the_native_payload_limit_via_an_opaque_durable_reference",
+        "current_authority_callback_failure_inside_transaction_rolls_back_new_original_without_touching_previous_data",
+        "unknown_sender_cannot_fill_the_private_original_cache",
+        "actual_SQlite_physical_quota_refuses_growth_without_open_transaction_or_removing_previous_originals",
+        "damaged_original_bytes_are_refused_instead_of_silently_replaced_by_redelivery",
+        "damaged_or_extended_original_proof_cannot_add_plugin_fields_or_change_native_projection",
+        "withdrawn_current_publication_cannot_decode_or_replay_retained_original",
+        "actual_native_captured_original_explicitly_purged_only_after_grant_change_with_audited_idempotent_tombstone",
+        "actual_native_redelivery_after_owner_purge_preserves_tombstone_and_refuses_automatic_byte_restoration"
+      ],
+      "actual_pinned_codec_and_private_SQLite": true,
+      "transport_authentication_owner_publication_and_service_identity_are_fixtures": true,
+      "network_resources_agent_missions_or_external_messages": false,
+      "public_feishu_enabled": false,
+      "installed_owner_or_hardware_acceptance": false
+    },
+    "native_signed_HTTPS_webhook_and_disposal": {
+      "passed": 16,
+      "cases": [
+        "actual_loopback_HTTPS_ACK_follows_signature_token_owner_checks_wire_original_and_input_commit_before_agent_dispatch",
+        "actual_native_codec_dispatch_and_same_signed_delivery_replay_produce_one_durable_input",
+        "actual_Lark_AES_decrypts_independently_encrypted_fixture_and_retains_original_ciphertext_before_ACK",
+        "encrypted_signed_token_verified_URL_challenge_does_not_create_sender_authority_or_mission",
+        "tampered_signature_does_not_fill_private_journals_or_receive_success",
+        "stale_signature_does_not_fill_private_journals_or_receive_success",
+        "wrong_token_does_not_fill_private_journals_or_receive_success",
+        "unknown_sender_does_not_fill_private_journals_or_receive_success",
+        "case_duplicated_signature_header_refused_by_actual_HTTPS_application",
+        "authenticated_nonce_reuse_with_other_message_cannot_overwrite_retained_original",
+        "actual_SQLite_failure_close_reopen_and_real_freshness_expiry_recover_only_previously_authenticated_retained_original",
+        "actual_physical_SQLite_receipt_quota_refuses_new_input_without_losing_prior_originals",
+        "webhook_verification_and_encryption_secrets_registered_before_native_agent_text_projection",
+        "owner_publication_withdrawal_immediately_denies_signed_replay",
+        "actual_authenticated_signed_webhook_bytes_have_independent_withdrawal_gated_audited_disposal_and_retained_nonce_tombstone",
+        "actual_receiver_reopen_does_not_recover_or_recreate_a_purged_webhook_receipt"
+      ],
+      "actual_native_signature_AES_codec_SQLite_and_verified_HTTPS": true,
+      "all_network_targets_loopback_fixtures": true,
+      "public_feishu_enabled": false,
+      "kernel_listener_publication_live_account_external_messages_or_installed_acceptance": false
+    }
+  },
+  "fixture_corrections": [
+    "New UID fixture initially replaced stdin with text-only StringIO; changed to preserve real stdin and preload policy from a separate argument. Six UID cases and full root suite then passed."
+  ],
+  "limitations": [
+    "Feishu remains publicly disabled; 11/22 public gateways",
+    "Offline owner source metadata and independent non-acceptance observations are declared fixtures; actual codec/signature/SDK/TLS/UID proofs are separate",
+    "No live tenant, external message, inference, installed-system, hardware or release acceptance",
+    "Owner CLI/GUI and final activation still pending"
+  ]
+}

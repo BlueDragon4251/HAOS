@@ -50,8 +50,7 @@ class MediaPublisher:
                 raise Conflict('damaged private media reply decision')
             if row['state']=='rejected' and row['error'] not in ERRORS|{'native-refused'}:raise Conflict('damaged media reply refusal')
             if row['attempt']==attempt:return {'state':'rejected','error':row['error']}
-        if (previous and (previous[-1]['attempt']+1!=attempt or previous[-1]['state'] not in {'rejected','owner-retry-approved'})
-                or not previous and attempt!=1):raise Conflict('sequential approved media reply attempt required')
+        if previous and (previous[-1]['attempt']+1!=attempt or previous[-1]['state'] not in {'rejected','owner-retry-approved'}):raise Conflict('sequential approved media reply attempt required')
         pages=self.db.execute('PRAGMA page_count').fetchone()[0]-self.db.execute('PRAGMA freelist_count').fetchone()[0]
         if (len(previous)>=5 or self.db.execute('SELECT COUNT(*) FROM feishu_media_reply_intents').fetchone()[0]>=65536
                 or pages*self.db.execute('PRAGMA page_size').fetchone()[0]>=64*1024*1024):

@@ -87,6 +87,7 @@ def main():
                 expected=digest([item['delivery_id'],item['binding_digest'],item['source_id'],item['output']['id'],
                     'Actual sealed output caption','file_v3_0000000000000000'])[:32]
                 assert body['uuid']==expected;seen.append('reply')
+                if state['mode']=='owner-reply-drop':state['mode']='ok';self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
                 if state['mode']=='reply-drop':self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
                 return self.send(200,{'code':0,'data':{'message_id':'om_'+'d'*32,'chat_id':binding['chat']}})
             assert self.path=='/open-apis/im/v1/files' and self.headers['Authorization']=='Bearer private-upload-process-token'
@@ -96,6 +97,7 @@ def main():
             seen.append('upload');mode=state['mode']
             if mode=='block':entered.set();release.wait(20)
             if mode in {'401','429','500'}:return self.send(int(mode),{'code':1})
+            if mode=='owner-upload-drop':state['mode']='ok';self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
             if mode=='drop':self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
             if mode=='missing':return self.send(200,{'code':0,'data':{}})
             if mode=='native-rate':return self.send(200,{'code':99991400})
@@ -120,7 +122,7 @@ async def main():
         print('identity-denied');return
     request=json.loads(Path(sys.argv[1]).read_text());value=request['value'];item=request['item']
     data=b'Actual sealed output upload bytes.'
-    if sys.argv[2] in {'journal','drop-journal','crash-journal','recover-journal','media-journal','media-drop-journal'}:
+    if sys.argv[2] in {'journal','drop-journal','crash-journal','recover-journal','media-journal','media-drop-journal','owner-upload','owner-reply'}:
         from types import SimpleNamespace
         from haos.gateway_feishu import PreparedFeishuPolicy
         from haos.gateway_feishu_cache import RawEvents
@@ -158,7 +160,7 @@ async def main():
             key=capture(adapter,base64.b64decode(item['source_base64']))
             if sys.argv[2]!='recover-journal':assert await dispatch_stored(adapter,key)
             adapter._haos_feishu_publisher=Publisher(adapter)
-            if sys.argv[2] in {'media-journal','media-drop-journal'}:
+            if sys.argv[2] in {'media-journal','media-drop-journal','owner-upload','owner-reply'}:
                 from haos.gateway_feishu_media_delivery import MediaPublisher
                 output={**item['output'],'data':data};prepared={'items':[output],'text':'Actual sealed output caption'}
                 binding=policy().bindings['owner'];publisher=MediaPublisher(adapter)
@@ -169,8 +171,22 @@ async def main():
                 assert again.success is result.success
                 if result.success:assert result.message_id==again.message_id=='om_'+'d'*32
                 else:assert result.raw_response==again.raw_response=={'haos_delivery':'uncertain'}
-                assert inbox.db.execute('SELECT COUNT(*) FROM feishu_upload_intents').fetchone()[0]==1
-                assert inbox.db.execute('SELECT COUNT(*) FROM feishu_media_reply_intents').fetchone()[0]==1
+                if sys.argv[2] in {'owner-upload','owner-reply'}:
+                    from haos.gateway_feishu_media_recovery import outgoing,approve_retry
+                    operation='upload' if sys.argv[2]=='owner-upload' else 'reply'
+                    selected=next(row for row in outgoing(inbox) if row['operation']==operation)
+                    decision={key:selected[key] for key in ['connector','delivery_id','part','operation','attempt','snapshot_sha256']}
+                    decision.update(owner_uid=1000,note_sha256='e'*64,confirmed=True,confirmed_not_accepted=True)
+                    assert approve_retry(inbox,policy(),decision)['network_requested'] is False
+                    recovered=MediaPublisher(adapter)
+                    accepted=await recovered.send(binding,item['delivery_id'],2,item['source_id'],prepared,current)
+                    assert accepted.success and accepted.message_id=='om_'+'d'*32
+                    repeated=await recovered.send(binding,item['delivery_id'],3,item['source_id'],prepared,current)
+                    assert repeated.success and repeated.message_id==accepted.message_id
+                    assert inbox.db.execute('SELECT COUNT(*) FROM feishu_media_owner_events').fetchone()[0]==1
+                else:
+                    assert inbox.db.execute('SELECT COUNT(*) FROM feishu_upload_intents').fetchone()[0]==1
+                    assert inbox.db.execute('SELECT COUNT(*) FROM feishu_media_reply_intents').fetchone()[0]==1
                 print('media-journal-checked');return
             uploads=Uploads(adapter)
             output={**item['output'],'data':data};binding=policy().bindings['owner']
@@ -239,6 +255,13 @@ asyncio.run(main())
             assert child.returncode==0 and out==b'media-journal-checked\n',(mode,out,err)
             assert seen[before:]==['auth','upload','auth','reply'],seen[before:]
             cases.append('actual_'+mode+'_native_upload_and_reply_reopen_new_attempt_never_reuploads_or_resends')
+        for mode in ['owner-upload','owner-reply']:
+            state['mode']=mode+'-drop';before=len(seen);child=start(mode);out,err=child.communicate(timeout=90)
+            assert child.returncode==0 and out==b'media-journal-checked\n',(mode,out,err)
+            expected=(['auth','upload','auth','upload','auth','reply'] if mode=='owner-upload'
+                else ['auth','upload','auth','reply','auth','reply'])
+            assert seen[before:]==expected,seen[before:]
+            cases.append('actual_'+mode+'_inspected_per_part_release_allows_one_new_native_write_and_reuses_confirmed_parts')
         state['mode']='block';entered.clear();release.clear();before=len(seen);child=start('crash-journal')
         assert entered.wait(30)
         import sqlite3

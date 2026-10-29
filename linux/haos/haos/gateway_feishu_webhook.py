@@ -119,8 +119,9 @@ class Receiver:
         try:
             old=self.db.execute('SELECT * FROM feishu_webhook_receipts WHERE id=?',(identity,)).fetchone()
             if old is None:
-                count,size=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(wire)+length(proof)),0) FROM feishu_webhook_receipts').fetchone()
-                if count>=128 or size+len(wire)+len(metadata.encode())>64*1024*1024:
+                count,size=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(wire)+length(proof)),0) FROM feishu_webhook_receipts WHERE length(wire)>0').fetchone()
+                if (count>=128 or size+len(wire)+len(metadata.encode())>64*1024*1024
+                        or self.db.execute('SELECT COUNT(*) FROM feishu_webhook_receipts').fetchone()[0]>=65536):
                     raise Conflict('private Feishu webhook receipt capacity reached; owner recovery required')
                 self.db.execute('INSERT INTO feishu_webhook_receipts VALUES(?,?,?,?,?,?,?,?,?)',
                     (identity,self.credential_scope,encoded_headers,wire,checksum,metadata,'retained',None,time.time()))

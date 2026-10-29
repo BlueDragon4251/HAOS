@@ -162,6 +162,23 @@ def main():
                 except PermissionError:pass
                 else:raise AssertionError('withdrawn publication accepted webhook')
                 cases.append('owner_publication_withdrawal_immediately_denies_signed_replay')
+                from haos.gateway_feishu_source_recovery import sources,purge
+                parent=root/'profiles';parent.mkdir(mode=0o700);profile='feishu-'+'a'*64
+                folder=parent/profile;folder.mkdir(mode=0o700)
+                receiver.close();(root/'webhooks.db').rename(folder/'webhooks.db')
+                withdrawn=PreparedFeishuPolicy({**config,'bindings':[]})
+                inventory=sources(withdrawn,profile,'webhook',parent=parent)
+                selected=inventory['sources'][0]
+                decision={'profile':profile,'kind':'webhook','id':selected['id'],'snapshot_sha256':selected['snapshot_sha256'],
+                    'owner_uid':1000,'note_sha256':'a'*64,'confirmed':True}
+                assert purge(withdrawn,decision,parent=parent)['removed_payload_bytes']==selected['stored_bytes']
+                assert purge(withdrawn,decision,parent=parent)['removed_payload_bytes']==0
+                rows=sources(withdrawn,profile,'webhook',parent=parent)['sources']
+                assert next(row for row in rows if row['id']==selected['id'])['purged'] is True
+                cases.append('actual_authenticated_signed_webhook_bytes_have_independent_withdrawal_gated_audited_disposal_and_retained_nonce_tombstone')
+                live[0]=True;receiver=Receiver(adapter,folder/'webhooks.db')
+                assert receiver.recover()==[]
+                cases.append('actual_receiver_reopen_does_not_recover_or_recreate_a_purged_webhook_receipt')
         finally:await runner.cleanup();receiver.close();originals.close();inbox.close()
     with tempfile.TemporaryDirectory(prefix='haos-feishu-webhook-') as directory:asyncio.run(exercise(Path(directory)))
     report={'passed':len(cases),'cases':cases,'actual_native_signature_AES_codec_SQLite_and_verified_HTTPS':True,
