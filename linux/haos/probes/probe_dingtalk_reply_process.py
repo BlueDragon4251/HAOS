@@ -53,13 +53,14 @@ def main():
     for bundle in [Path('/etc/ssl/certs/ca-certificates.crt'),Path('/sdk/certifi/cacert.pem')]:
         with bundle.open('ab') as stream:stream.write(b'\n'+(ws_cert/'ca.pem').read_bytes())
     with Path('/etc/hosts').open('a') as stream:stream.write('\n127.0.0.1 wss-open-connection.dingtalk.com\n')
-    script=work/'gateway_profile_fixture.py';script.write_text("\nimport asyncio,json,sys\nfrom pathlib import Path\nfrom haos.gateway_dingtalk import PreparedDingTalkPolicy\nfrom haos.gateway_dingtalk_profile import build\nfrom haos.gateway_raw import NativeInbox\nfrom haos.gateway_relay import RelayInbox\nfrom haos.gateway_runtime import adapter_envelope\nfrom haos.redaction import Redactor\nasync def main():\n    base=Path('/var/lib/haos-gateway');value=json.loads(Path(sys.argv[1]).read_text());mode=sys.argv[2]\n    policy=lambda:PreparedDingTalkPolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))\n    parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)\n    inbox=NativeInbox(base/'ws-inbox.db',Redactor());relay=RelayInbox(base/'relay.db',Redactor())\n    def create():\n        adapter=build(value,parent=parent,connector='dingtalk',policy=policy,inbox=inbox)\n        def receive(event):\n            assert event.raw_message is None\n            relay.admit(policy(),'dingtalk',adapter_envelope(event,'dingtalk'));return True\n        adapter.set_durable_message_handler(receive);return adapter\n    adapter=create()\n    try:\n        if mode in {'authentication-refused','rate-limited','transport-unavailable'}:\n            assert not await adapter.connect();assert adapter.native_health()['status']==mode,adapter.native_health()\n            first=adapter.native_health();assert not await adapter.connect()\n            await adapter.close_profile();adapter=create()\n            assert not await adapter.connect();assert adapter.native_health()['status']==mode\n            assert adapter.native_health()['next_attempt']==first['next_attempt']\n            print('blocked',flush=True);return\n        assert await adapter.connect(),adapter.native_health();print('ready',flush=True)\n        while relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1 or not adapter.is_connected:\n            await asyncio.sleep(.02)\n        from haos.gateway import digest\n        binding=policy().bindings['owner']\n        metadata={'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},\n            'haos_scope':binding['scope'],'thread_id':'','haos_delivery_id':'c'*64,'haos_delivery_attempt':1}\n        result=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert result.success and result.message_id.startswith('haos-dingtalk-')\n        assert result.raw_response=={'remote_message_id':None,'recipient_read_verified':False,'local_vendor_acceptance_only':True}\n        metadata['haos_delivery_attempt']=2\n        duplicate=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert duplicate.success and duplicate.message_id==result.message_id\n        metadata['haos_delivery_id']='d'*64;metadata['haos_delivery_attempt']=1\n        uncertain=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert not uncertain.success and uncertain.raw_response=={'haos_delivery':'uncertain'}\n        row=inbox.db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',('d'*64,)).fetchone()\n        assert row['state']=='uncertain'\n        metadata['haos_delivery_attempt']=2\n        repeated=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert not repeated.success and repeated.raw_response=={'haos_delivery':'uncertain'}\n        print('sent',flush=True)\n        while adapter.native_health()['status']!='revoked':await asyncio.sleep(.02)\n        assert adapter._haos_dingtalk_socket is None\n        print('stopped',flush=True)\n    finally:\n        await adapter.close_profile();relay.close();inbox.close()\nasyncio.run(main())\n");script.chmod(0o644)
+    script=work/'gateway_profile_fixture.py';script.write_text("\nimport asyncio,json,sys,hashlib\nfrom pathlib import Path\nfrom haos.gateway_dingtalk import PreparedDingTalkPolicy\nfrom haos.gateway_dingtalk_profile import build\nfrom haos.gateway_raw import NativeInbox\nfrom haos.gateway_relay import RelayInbox\nfrom haos.gateway_runtime import adapter_envelope\nfrom haos.redaction import Redactor\nasync def main():\n    base=Path('/var/lib/haos-gateway');value=json.loads(Path(sys.argv[1]).read_text());mode=sys.argv[2]\n    policy=lambda:PreparedDingTalkPolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))\n    parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)\n    inbox=NativeInbox(base/'ws-inbox.db',Redactor());relay=RelayInbox(base/'relay.db',Redactor())\n    def create():\n        adapter=build(value,parent=parent,connector='dingtalk',policy=policy,inbox=inbox)\n        def receive(event):\n            assert event.raw_message is None\n            relay.admit(policy(),'dingtalk',adapter_envelope(event,'dingtalk'));return True\n        adapter.set_durable_message_handler(receive);return adapter\n    adapter=create()\n    try:\n        if mode in {'authentication-refused','rate-limited','transport-unavailable'}:\n            assert not await adapter.connect();assert adapter.native_health()['status']==mode,adapter.native_health()\n            first=adapter.native_health();assert not await adapter.connect()\n            await adapter.close_profile();adapter=create()\n            assert not await adapter.connect();assert adapter.native_health()['status']==mode\n            assert adapter.native_health()['next_attempt']==first['next_attempt']\n            print('blocked',flush=True);return\n        assert await adapter.connect(),adapter.native_health();print('ready',flush=True)\n        while relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1 or not adapter.is_connected:\n            await asyncio.sleep(.02)\n        ack_path=Path(sys.argv[3])\n        while not ack_path.exists() or ack_path.read_text()!=sys.argv[4]:await asyncio.sleep(.02)\n        from haos.gateway import digest\n        binding=policy().bindings['owner']\n        metadata={'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},\n            'haos_scope':binding['scope'],'thread_id':'','haos_delivery_id':'c'*64,'haos_delivery_attempt':1}\n        if mode in {'cancel-write','revoke-write','orphan-write','deadline-write'}:\n            delivery=hashlib.sha256(mode.encode()).hexdigest();metadata['haos_delivery_id']=delivery\n            task=asyncio.create_task(adapter.send(binding['chat'],mode,reply_to='nativeMessage-123',metadata=metadata))\n            if mode=='cancel-write':\n                await asyncio.get_running_loop().run_in_executor(None,sys.stdin.readline);task.cancel()\n            try:result=await task\n            except (asyncio.CancelledError,PermissionError):\n                assert mode in {'cancel-write','revoke-write'}\n            else:\n                assert mode=='deadline-write' and not result.success and result.raw_response=={'haos_delivery':'uncertain'}\n            row=inbox.db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',(delivery,)).fetchone()\n            assert row['state']=='uncertain'\n            if mode!='revoke-write':\n                metadata['haos_delivery_attempt']=2\n                repeated=await adapter.send(binding['chat'],mode,reply_to='nativeMessage-123',metadata=metadata)\n                assert not repeated.success and repeated.raw_response=={'haos_delivery':'uncertain'}\n            print('quarantined',flush=True);return\n        for previous_mode in ['orphan-write']:\n            delivery=hashlib.sha256(previous_mode.encode()).hexdigest()\n            row=inbox.db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',(delivery,)).fetchone()\n            if row is not None:\n                assert row['state']=='uncertain'\n                check={**metadata,'haos_delivery_id':delivery,'haos_delivery_attempt':2}\n                result=await adapter.send(binding['chat'],previous_mode,reply_to='nativeMessage-123',metadata=check)\n                assert not result.success and result.raw_response=={'haos_delivery':'uncertain'}\n        result=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert result.success and result.message_id.startswith('haos-dingtalk-')\n        assert result.raw_response=={'remote_message_id':None,'recipient_read_verified':False,'local_vendor_acceptance_only':True}\n        metadata['haos_delivery_attempt']=2\n        duplicate=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert duplicate.success and duplicate.message_id==result.message_id\n        metadata['haos_delivery_id']='d'*64;metadata['haos_delivery_attempt']=1\n        uncertain=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert not uncertain.success and uncertain.raw_response=={'haos_delivery':'uncertain'}\n        row=inbox.db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',('d'*64,)).fetchone()\n        assert row['state']=='uncertain'\n        metadata['haos_delivery_attempt']=2\n        repeated=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='nativeMessage-123',metadata=metadata)\n        assert not repeated.success and repeated.raw_response=={'haos_delivery':'uncertain'}\n        print('sent',flush=True)\n        while adapter.native_health()['status']!='revoked':await asyncio.sleep(.02)\n        assert adapter._haos_dingtalk_socket is None\n        print('stopped',flush=True)\n    finally:\n        await adapter.close_profile();relay.close();inbox.close()\nasyncio.run(main())\n");script.chmod(0o644)
     async def exercise():
         import asyncio,sqlite3
         from aiohttp import web,WSMsgType
         from dingtalk_stream import ChatbotMessage
         discoveries=[];connections=[];acks=[];replies=[];failures=[];state={'mode':'ok'}
-        first=asyncio.Event();second=asyncio.Event();third=asyncio.Event()
+        state['ack_generation']=0
+        first=asyncio.Event();second=asyncio.Event();third=asyncio.Event();write_entered=asyncio.Event();write_release=asyncio.Event()
         binding=policy['bindings'][0];now=int(time.time()*1000)
         body={'msgId':'nativeMessage-123','createAt':now-1000,'senderId':binding['sender'],
             'senderCorpId':value['corp_id'],'chatbotCorpId':value['corp_id'],'robotCode':value['robot_code'],
@@ -91,6 +92,7 @@ def main():
                 assert original==json.dumps(body).encode()
             with sqlite3.connect(base/'ws-inbox.db') as db:
                 assert db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0]==1
+            ack_path=work/'callback-ack-generation';ack_path.write_text(str(state['ack_generation']));ack_path.chmod(0o644)
             if len(connections)==1:first.set();await ws.close()
             else:
                 (second if len(connections)==2 else third).set()
@@ -101,11 +103,22 @@ def main():
             assert request.headers.get('Cookie') is None and request.headers.get('Accept-Encoding')=='identity'
             payload=await request.json()
             assert payload['msgtype']=='markdown' and payload['markdown']['title']=='Hermes'
-            assert payload['markdown']['text'] in {'Actual private native reply.','Uncertain private native reply.'}
-            delivery='c'*64 if payload['markdown']['text']=='Actual private native reply.' else 'd'*64
+            assert payload['markdown']['text'] in {'Actual private native reply.','Uncertain private native reply.','cancel-write','revoke-write','orphan-write','deadline-write'}
+            text=payload['markdown']['text']
+            import hashlib
+            delivery='c'*64 if text=='Actual private native reply.' else 'd'*64 if text=='Uncertain private native reply.' else hashlib.sha256(text.encode()).hexdigest()
             with sqlite3.connect(base/'ws-inbox.db') as db:
                 assert db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',(delivery,)).fetchone()[0]=='writing'
             replies.append(payload)
+            if text in {'cancel-write','revoke-write','orphan-write'}:
+                write_entered.set();await asyncio.wait_for(write_release.wait(),20)
+            if text=='deadline-write':
+                response=web.StreamResponse(headers={'Content-Type':'application/json','Content-Length':'50000'})
+                await response.prepare(request);write_entered.set()
+                try:
+                    for _ in range(50000):await response.write(b' ');await asyncio.sleep(.1)
+                except (ConnectionResetError,RuntimeError):pass
+                return response
             if delivery=='d'*64:
                 request.transport.abort()
                 return web.Response(status=200)
@@ -127,8 +140,9 @@ def main():
         children=[];cases=[]
         def identity():os.setgroups([]);os.setgid(65534);os.setuid(65534)
         async def start(mode):
-            child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(script),str(account),mode,
-                stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,preexec_fn=identity,
+            state['ack_generation']+=1
+            child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(script),str(account),mode,str(work/'callback-ack-generation'),str(state['ack_generation']),
+                stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,preexec_fn=identity,
                 env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','HOME':str(base),'HERMES_SAFE_MODE':'1'})
             children.append(child);return child
         def workers(parent):
@@ -189,6 +203,41 @@ print('denied')
                 if result:assert os.WIFSIGNALED(status) and os.WTERMSIG(status)==9;break
                 assert time.monotonic()<deadline;await asyncio.sleep(.02)
             cases.append('actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker')
+            for mode in ['cancel-write','revoke-write','orphan-write','deadline-write']:
+                publish(policy);write_entered.clear();write_release.clear();before=len(replies);child=await start(mode)
+                assert await asyncio.wait_for(child.stdout.readline(),45)==b'ready\n'
+                await asyncio.wait_for(write_entered.wait(),15)
+                active=workers(child.pid);assert len(active)==2
+                start_time=time.monotonic()
+                if mode=='orphan-write':
+                    pids=[int(proc.name) for proc in active];child.kill();await child.wait()
+                    deadline=time.monotonic()+5
+                    for pid in pids:
+                        while True:
+                            result,status=os.waitpid(pid,os.WNOHANG)
+                            if result:assert os.WIFSIGNALED(status) and os.WTERMSIG(status)==9;break
+                            assert time.monotonic()<deadline;await asyncio.sleep(.02)
+                    with sqlite3.connect(base/'ws-inbox.db') as db:
+                        import hashlib
+                        assert db.execute('SELECT state FROM dingtalk_delivery_intents WHERE delivery_id=?',
+                            (hashlib.sha256(mode.encode()).hexdigest(),)).fetchone()[0]=='writing'
+                else:
+                    if mode=='cancel-write':child.stdin.write(b'cancel\n');await child.stdin.drain()
+                    elif mode=='revoke-write':publish({**policy,'bindings':[]})
+                    out,err=await asyncio.wait_for(child.communicate(),35 if mode=='deadline-write' else 5)
+                    assert child.returncode==0 and out==b'quarantined\n',(out,err)
+                    assert not workers(child.pid)
+                    if mode=='deadline-write':assert 20<time.monotonic()-start_time<35
+                write_release.set();assert len(replies)==before+1
+                cases.append('actual_native_reply_'+mode+'_terminates_private_worker_and_retains_begun_write_without_implicit_retry')
+                if mode=='orphan-write':
+                    child=await start('once')
+                    assert await asyncio.wait_for(child.stdout.readline(),45)==b'ready\n'
+                    assert await asyncio.wait_for(child.stdout.readline(),15)==b'sent\n'
+                    assert len(replies)==before+1
+                    publish({**policy,'bindings':[]});out,err=await asyncio.wait_for(child.communicate(),5)
+                    assert child.returncode==0 and out==b'stopped\n',(out,err)
+            publish(policy)
             for mode,expected in [('401','authentication-refused'),('429','rate-limited'),('302','transport-unavailable')]:
                 state['mode']=mode;before=len(discoveries);child=await start(expected)
                 out,err=await asyncio.wait_for(child.communicate(),45)
@@ -203,6 +252,7 @@ print('denied')
                 'owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual':True,
                 'live_messages_missions_or_installed_acceptance':False}))
         finally:
+            write_release.set()
             for child in children:
                 if child.returncode is None:child.kill();await child.wait()
             for ws in connections:await ws.close()

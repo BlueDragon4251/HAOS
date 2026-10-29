@@ -1,0 +1,54 @@
+{
+  "parent_commit": "16b45235799cafb80754b91258d5b3eb2e07461b",
+  "recorded_at": "2026-10-29T23:15:08.596623+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "54c43db4870b4d3c764f0007aca5988e9a3f59df5447ab2318df1971e9ca1753"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_reply_process.py",
+      "sha256": "1950aac739524f4a27ce8e43e71a4a77923ea0cd1842da492f6a42d0034e5492"
+    }
+  ],
+  "validation": {
+    "actual_UID_TLS_reply_worker_and_profile_lifetime": {
+      "passed": 15,
+      "cases": [
+        "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+        "actual_native_reply_private_worker_vendor_ACK_and_per_write_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_native_reply_cancel-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_revoke-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_orphan-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_deadline-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "unchanged_production_code_regression_reference": "dingtalk-private-reply-journal-validation.json: 2205/2 both runtimes, root 150; all production source hashes freshly compared and equal"
+  },
+  "fixture_correction": "The first extended lifetime fixture deliberately killed a freshly connected parent before its unrelated receive callback ACK assertion completed. An explicit fixture ACK-generation marker now synchronizes that assertion before the deliberate kill; all strict ACK, journal, worker-exit and no-resend assertions remain. The corrected probe passes actual exit 0.",
+  "limits": [
+    "DingTalk still private; 12/22 public software gateways.",
+    "Owner publications and controller delivery metadata are fixtures. No actual controller mission or external account acceptance.",
+    "Incoming/outgoing media, local voice, stable reply after session expiry, recovery/GUI/public activation remain pending.",
+    "No real external messages, installed-system, hardware or release acceptance."
+  ]
+}

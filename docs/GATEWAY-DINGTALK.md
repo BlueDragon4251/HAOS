@@ -122,3 +122,13 @@ Loopback API substitutions, temporary fixture CA trust, supplied owner policy
 and synthetic identities are not live authentication, external delivery,
 installed-system or hardware acceptance. No real external messages are sent by
 these probes.
+
+The outgoing worker now also has actual UID/TLS negative lifetime evidence. The
+extended fifteen-case process probe cancels and revokes a begun HTTPS write,
+kills its parent while both WSS and reply workers exist, and dribbles an HTTP
+response across the real 30-second worker alarm. All credential-bearing workers
+terminate. A parent crash leaves a durable writing row that becomes uncertain
+on actual profile recreation; neither recreation nor another attempt resends it.
+The probe synchronizes its receive-ACK assertion before deliberately killing a
+parent, so an unrelated intentionally interrupted callback cannot invalidate
+that fixture. No ACK, journal, worker-lifetime or no-resend assertion is removed.
