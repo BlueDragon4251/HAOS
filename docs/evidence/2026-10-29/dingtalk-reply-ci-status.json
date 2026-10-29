@@ -1,0 +1,41 @@
+{
+  "source_commit": "412655b35011ee423afb4d758f642db0bb6cd7ef",
+  "source_tree": "79faf34d4978cf5d0f2f6b67d865b40bc55f4720",
+  "observed_at": "2026-10-29T23:59:37.901580+00:00",
+  "runs": [
+    {
+      "id": 40973596087,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40973596110,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40973596230,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40973596114,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40973596168,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40973589044,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "limits": [
+    "Six freshly checked CI successes apply exactly to the reply/lifetime source 412655b, before the later media implementation.",
+    "No live accounts, external messages, installed-system, hardware or release acceptance."
+  ]
+}
