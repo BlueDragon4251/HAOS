@@ -23,13 +23,16 @@ key and reviewed HTTPS listener material for `/feishu/webhook`.
 
 Actual Lark event decoding retains millisecond timestamps as strings and
 keeps `thread_id` distinct from the quoted `root_id`. Its SDK token cache uses
-app-ID keys; private profile/credential/brand isolation must be enforced when
-transport is connected. Native send retries and reply fallbacks also need
+app-ID keys; the private read boundary now namespaces tokens by complete
+credential identity and brand. Socket-mode SDK paths still need their own
+reviewed transport boundary. Native send retries and reply fallbacks also need
 independent durable HAOS limits. HAOS will not delegate owner identity to the
 upstream allow-all or pairing defaults.
 
-Transport/listener authentication, persistent ingress, bounded single-write
-replies, replay/recovery, media/voice and owner GUI integration are still open.
+Prepared private HTTPS receive authentication, persistent ingress and native
+replay are implemented and tested below. Public activation, socket-mode
+transport, bounded single-write replies, media/voice and complete owner
+GUI/recovery integration remain open.
 Local SDK and identity tests do not establish live-account, external delivery,
 installed OS or hardware acceptance.
 
@@ -92,8 +95,8 @@ The actual native-SDK TLS probe covers trusted/untrusted issuers, account-cache
 reuse, credential rotation, exact-message permissions, revocation, redirect and
 401/429/500 responses, malformed/duplicate/nonfinite/oversize/truncated bodies.
 Only fixture code substitutes API origins with loopback and trusts its temporary
-CA. This is a private read contract, not yet a kernel-authenticated worker,
-connected ingress listener, message writer or enabled public gateway.
+CA. The read contract is now used by the kernel-authenticated account worker
+below. It grants no message-write capability or public gateway activation.
 
 The prepared account check also runs in a disposable private gateway subprocess.
 Both parent and worker enforce the actual unprivileged gateway UID/GID without
@@ -144,6 +147,26 @@ ciphertext, the real Lark decoder, native Hermes message dispatch and verified
 loopback HTTPS. It checks duplicate raw HTTP headers (a raw TLS request avoids
 HTTP-client header normalization), unknown senders, nonce conflicts, physical
 SQLite quota and a real SQLite-triggered storage failure followed by reopen and
-freshness-expiry recovery. This core still needs the private long-running
-profile/listener lifecycle, owner publication/GUI, socket transport, outgoing
-messages, media and owner recovery integration before public activation.
+freshness-expiry recovery. The prepared profile below now owns the private
+long-running listener lifecycle. Owner publication/GUI, socket transport,
+outgoing messages, media and owner recovery integration remain necessary
+before public activation.
+
+The prepared webhook profile now enforces the actual private gateway UID,
+fresh root publication, exact timed account grants, an exclusive kernel profile
+lease and immutable native credentials. Activation requires an installed durable
+handler, verified owner TLS material and a successful no-send private bot check.
+It binds only the fixed HTTPS receive route, with decompression disabled, and
+replays authenticated retained originals/native inputs in a bounded background
+loop. Policy withdrawal closes the listener; close cancels/reaps tasks and
+releases the lease while retaining journals. Persisted finite account/TLS/rate/
+storage/source statuses do not expose private exceptions. Each prepared profile
+currently needs its own listener port; shared Feishu HTTPS multiplexing and
+socket-mode integration are not claimed.
+
+The expanded real-UID process probe checks actual profile creation, duplicate
+lease refusal, native HTTPS input→durable relay dispatch, remote replay and
+listener shutdown after an actual root policy replacement. All SDK/API targets
+stay loopback in a disposable network-disabled namespace. The public factory,
+owner GUI and public root publication still reject Feishu; this private profile
+alone is not an activated complete gateway.

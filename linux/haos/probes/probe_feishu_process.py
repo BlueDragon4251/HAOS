@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
+import http.client
 import ssl
 import subprocess
 import sys
@@ -83,8 +85,10 @@ def main():
                 marker.write_text('ready');marker.chmod(0o644);entered.set();release.wait(20)
             if mode in {'401','429'}:return self.reply(int(mode),{'code':0})
             bot='ou_'+'f'*32 if mode=='wrong-bot' else value['bot_open_id']
-            self.reply(200,{'code':0,'bot':{'open_id':bot}})
-            if mode=='block':closed.set()
+            try:self.reply(200,{'code':0,'bot':{'open_id':bot}})
+            except (BrokenPipeError,ConnectionResetError,ssl.SSLError):pass
+            finally:
+                if mode=='block':closed.set()
     server=ThreadingHTTPServer(('127.0.0.1',443),Handler);server.daemon_threads=True
     tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(work/'certificate.pem',work/'key.pem')
     server.socket=tls.wrap_socket(server.socket,server_side=True)
@@ -110,6 +114,35 @@ if request['mode']=='agent':
     else:raise AssertionError('agent invoked private SDK worker')
     print(json.dumps({'agent_denied':True}));sys.exit(0)
 async def run():
+    if request['mode']=='profile':
+        from haos.gateway_feishu_profile import build
+        from haos.gateway_feishu import PreparedFeishuPolicy
+        from haos.gateway_raw import NativeInbox
+        from haos.gateway_relay import RelayInbox
+        from haos.gateway_runtime import adapter_envelope
+        from haos.redaction import Redactor
+        from haos.sandbox import trusted_json
+        policy=lambda:PreparedFeishuPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+        base=Path('/var/lib/haos-gateway');parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
+        inbox=NativeInbox(base/'profile-native.db',Redactor());relay=RelayInbox(base/'profile-relay.db',Redactor())
+        adapter=build(request['credentials'],parent=parent,connector='feishu',policy=policy,inbox=inbox)
+        def receive(event):relay.admit(policy(),'feishu',adapter_envelope(event,'feishu'));return True
+        adapter.set_durable_message_handler(receive)
+        try:
+            try:build(request['credentials'],parent=parent,connector='feishu',policy=policy,inbox=inbox)
+            except PermissionError:pass
+            else:raise AssertionError('duplicate private profile lease admitted')
+            assert await adapter.connect(),adapter.native_health()
+            print(json.dumps({'profile_listening':True,'lease_denied':True}),flush=True)
+            async with asyncio.timeout(20):
+                while relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1:await asyncio.sleep(.05)
+            print(json.dumps({'profile_admitted':True,'sender':relay.next(policy())['envelope']['sender']}),flush=True)
+            async with asyncio.timeout(20):
+                while adapter.native_health()['status']!='revoked':await asyncio.sleep(.05)
+            await adapter.disconnect()
+            assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==1
+            return {'profile_revoked':True,'listener_stopped':adapter._haos_feishu_runner is None}
+        finally:await adapter.close_profile();inbox.close();relay.close()
     task=asyncio.create_task(account(request['credentials'],'feishu',lambda:None))
     if request['mode']=='cancel':
         async with asyncio.timeout(20):
@@ -185,6 +218,40 @@ print(json.dumps(asyncio.run(run())))
         assert reaped and not Path('/proc',str(worker_pids[0])).exists()
         release.set();assert closed.wait(5)
         cases.append('actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it')
+        state['mode']='ok';publish(policy)
+        with socket.socket() as reserve:
+            reserve.bind(('127.0.0.1',0));profile_port=reserve.getsockname()[1]
+        value.update(connection_mode='webhook',verification_token='private-profile-verification-fixture',
+            encrypt_key='private-profile-encryption-fixture',port=profile_port,
+            tls={'public_url':'https://open.feishu.cn/feishu/webhook','certificate':(work/'certificate.pem').read_text(),
+                'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False})
+        child=start('profile')
+        ready=json.loads(child.stdout.readline());assert ready=={'profile_listening':True,'lease_denied':True},ready
+        cases.append('actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check')
+        stamp=str(int(time.time()*1000)-1000)
+        event={'schema':'2.0','header':{'event_id':'e'*32,'event_type':'im.message.receive_v1',
+            'app_id':value['app_id'],'tenant_key':value['tenant_key'],'create_time':stamp,'token':value['verification_token']},
+            'event':{'sender':{'sender_id':{'open_id':policy['bindings'][0]['sender']},'sender_type':'user','tenant_key':value['tenant_key']},
+                'message':{'message_id':'om_'+'f'*32,'chat_id':policy['bindings'][0]['chat'],'chat_type':'p2p',
+                    'create_time':stamp,'message_type':'text','content':json.dumps({'text':'Actual private profile source.'})}}}
+        raw=json.dumps(event).encode();stamp=str(int(time.time()));nonce='fixture_profile_nonce'
+        import hashlib
+        signature=hashlib.sha256((stamp+nonce+value['encrypt_key']).encode()+raw).hexdigest()
+        head={'Content-Type':'application/json','x-lark-request-timestamp':stamp,'x-lark-request-nonce':nonce,'x-lark-signature':signature}
+        trust=ssl.create_default_context(cafile=str(work/'ca.pem'))
+        for attempt in range(2):
+            connection=http.client.HTTPSConnection('localhost',profile_port,context=trust,timeout=10)
+            try:
+                connection.request('POST','/feishu/webhook',body=raw,headers=head)
+                response=connection.getresponse();body=response.read(4096);assert response.status==200,(response.status,body)
+            finally:connection.close()
+            if attempt==0:
+                admitted=json.loads(child.stdout.readline());assert admitted=={'profile_admitted':True,'sender':policy['bindings'][0]['sender']}
+        cases.append('actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate')
+        publish({**policy,'bindings':[]});result=finish(child)
+        assert result=={'profile_revoked':True,'listener_stopped':True}
+        cases.append('actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input')
+        publish(policy)
         # Root must never invoke this gateway-only worker directly, even with valid input.
         before=len(seen)
         direct=subprocess.run([python,'-E','-s','-m','haos.gateway_feishu_worker'],input=b'{}\n',capture_output=True,
