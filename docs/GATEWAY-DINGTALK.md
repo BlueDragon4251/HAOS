@@ -76,8 +76,17 @@ Nine actual UID/TLS/process socket contracts pass against offline loopback API
 and WSS domains, including replay on a fresh worker, pre-ACK custody, agent UID
 denial of original/WAL/credentials/stdin, withdrawal, parent death and WSS
 401/429/302 without hidden SDK retries. The reconnect supervisor in this probe
-is explicitly a fixture; public production profile and persistent retry state
-remain pending. Native custody also tests a crash window between original and
+is explicitly a fixture at that checkpoint. A subsequent private profile now
+connects the actual native Hermes `_on_message` handler through the durable MRO
+and independent relay admission, with fresh supervised worker reconnect and
+persistent account-scoped authentication/TLS blocks and retry deadlines.
+A separate nine-case actual UID/TLS profile probe tests this production supervisor,
+including one original/input/relay obligation across reconnect, withdrawal and
+401/429/302 decisions surviving connect, close and profile recreation.
+The native handler is exercised only for a retained input claim; staff aliases,
+raw SDK messages, session-webhook caches and direct callback/token/reaction methods
+cannot bypass that context. Text and vendor-recognized voice text are connected;
+unsealed resource messages stay pending until the media broker is connected. Native custody also tests a crash window between original and
 input commits, finite durable receipts and cancellation/backpressure. No mission
 or external delivery is claimed by these custody/socket checks.
 

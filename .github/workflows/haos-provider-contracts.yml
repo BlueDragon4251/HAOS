@@ -38,7 +38,7 @@ concurrency:
 jobs:
   pinned-runtime:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -118,6 +118,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_compatibility.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-compatibility.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_http.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-http.json"
@@ -366,6 +367,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
           cat "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_profile_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PROFILE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
       - name: Verify private email worker UID isolation revocation cancellation and hard deadline
         run: |
           set -euo pipefail
