@@ -78,6 +78,7 @@ def build(value,*,parent,connector,policy,inbox):
 
 
 def _install(adapter,fd,profile,identity):
+    from .gateway_matrix_profile import scope as private_scope
     native=adapter._haos_native;db=native.inbox.db;value=adapter._haos_email_value;connector=native.connector
     adapter._haos_email_closed=False;adapter._haos_email_tasks=[];lifecycle=asyncio.Lock()
     db.execute('''CREATE TABLE IF NOT EXISTS email_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,
@@ -108,7 +109,8 @@ def _install(adapter,fd,profile,identity):
             (state,time.time(),time.time()+delay if delay else 0,identity))
     def health(self):return dict(db.execute('SELECT connector,status,updated_at,next_attempt FROM email_profile_status WHERE identity=?',(identity,)).fetchone())
     async def stop():
-        adapter._mark_disconnected();tasks=adapter._haos_email_tasks;adapter._haos_email_tasks=[]
+        with private_scope(adapter._haos_email_home,adapter._haos_email_environment):adapter._mark_disconnected()
+        tasks=adapter._haos_email_tasks;adapter._haos_email_tasks=[]
         others=[task for task in tasks if task is not asyncio.current_task()]
         for task in others:task.cancel()
         if others:await asyncio.gather(*others,return_exceptions=True)
@@ -189,7 +191,8 @@ def _install(adapter,fd,profile,identity):
             except Deferred as error:status(error.code if error.code in STATES else 'source-unavailable',30);return False
             except PermissionError:status('revoked');raise
             except Exception:status('source-unavailable',30);return False
-            self._mark_connected();status('receiving')
+            with private_scope(self._haos_email_home,self._haos_email_environment):self._mark_connected()
+            status('receiving')
             self._haos_email_tasks=[asyncio.create_task(receive_loop()),asyncio.create_task(replay_loop())];return True
     async def disconnect(self):
         async with lifecycle:

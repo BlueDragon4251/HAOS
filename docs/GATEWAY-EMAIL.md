@@ -316,3 +316,14 @@ the gateway UID, with root-owned code, private stdin, no supplementary groups,
 finite diagnostics and a 35-second deadline. The public platform registry and
 runtime activation are still disabled while pairing and publication integration
 are completed. The GUI probes do not establish a live account or installed setup.
+
+The live process integration fixture now generates a fresh server `INTERNALDATE`
+with an explicit +0200 offset. Its deliberately old sender `Date` remains a
+counterexample; the admitted input must carry the recent server time. The
+previous hard-coded 28-Oct-2026 13:00 +0200 receipt crossed the real 24-hour
+NativeInbox expiry at 29-Oct 11:00 UTC: the two provider-contract jobs on
+0ecad43 correctly left that fixture input `expired`, attempt zero, rather than
+executing it. Expiry policy, the 25-second integration deadline, UID gates and
+all delivery assertions remain unchanged. Timeout diagnostics expose only
+finite profile status and state/attempt counts. Native lifecycle status writes
+also use the private profile HOME rather than the global service HOME.

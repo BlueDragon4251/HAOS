@@ -1,6 +1,7 @@
 """Disposable real-UID native mail worker probe, revocation, cancellation and deadline."""
 import asyncio
 import base64
+from datetime import datetime,timezone,timedelta
 import json
 import os
 from pathlib import Path
@@ -72,10 +73,16 @@ if request['action']=='profile':
         adapter.set_durable_message_handler(receive)
         try:
             assert await adapter.connect(),adapter.native_health()
-            async with asyncio.timeout(25):
-                while inbox.db.execute("SELECT COUNT(*) FROM native_inbox WHERE state='committed'").fetchone()[0]!=1:
-                    await asyncio.sleep(.05)
+            try:
+                async with asyncio.timeout(25):
+                    while inbox.db.execute("SELECT COUNT(*) FROM native_inbox WHERE state='committed'").fetchone()[0]!=1:
+                        await asyncio.sleep(.05)
+            except TimeoutError:
+                rows=[dict(row) for row in inbox.db.execute('SELECT state,attempt,COUNT(*) AS count FROM native_inbox GROUP BY state,attempt')]
+                raise AssertionError(json.dumps({'profile_status':adapter.native_health(),'native_states':rows})) from None
             assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==1
+            received_at=inbox.db.execute('SELECT created_at FROM native_inbox').fetchone()[0]
+            assert 0<=__import__('time').time()-received_at<300  # Server INTERNALDATE, not the spoofed 1999 Date.
             pending=relay.next(policy());assert 'Actual scoped private mail body.' in pending['envelope']['text']
             assert adapter.native_health()['status']=='receiving'
             from haos.gateway import digest
@@ -220,6 +227,8 @@ asyncio.run(exercise())
     mime_data=b'A native approved attachment.'
     mime_message.add_attachment(mime_data,maintype='application',subtype='pdf',filename='../../owner-secret.pdf')
     mime_whole=mime_message.as_bytes(policy=mail_policy.SMTP);mime_header=mime_whole[:mime_whole.index(b'\r\n\r\n')+4]
+    # Fresh server receipt time; the deliberately old sender Date stays unchanged.
+    internal_date=datetime.fromtimestamp(int(time.time())-10,timezone(timedelta(hours=2))).strftime('%d-%b-%Y %H:%M:%S %z').encode('ascii')
     async def imap(reader,writer):
         active.set()
         try:
@@ -242,7 +251,7 @@ asyncio.run(exercise())
                         full=b'BODY.PEEK[])' in line
                         if full:assert mode[0] in {'message','profile','mime'}
                         payload=whole if full else selected_header;section=b'' if full else b'HEADER'
-                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "28-Oct-2026 13:00:00 +0200" RFC822.SIZE '+str(len(whole) if mode[0] in {'message','profile','mime'} else 1000).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag+b' OK fetched\r\n')
+                        writer.write(b'* 1 FETCH (UID 9 INTERNALDATE "'+internal_date+b'" RFC822.SIZE '+str(len(whole) if mode[0] in {'message','profile','mime'} else 1000).encode()+b' BODY['+section+b'] {'+str(len(payload)).encode()+b'}\r\n'+payload+b')\r\n'+tag+b' OK fetched\r\n')
                 else:raise AssertionError('mail worker attempted unsupported remote command')
                 await writer.drain()
         except (ConnectionError,ssl.SSLError):pass
