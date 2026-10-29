@@ -4,6 +4,13 @@ Feishu remains outside the public HAOS gateway registry and GUI. Installing the
 bundled adapter or SDK is not a working authorized HAOS gateway. Eleven other
 public paths are listed in [Gateways](GATEWAYS.md).
 
+Current private paths include authenticated HTTPS, supervised native WebSocket,
+source custody/replay, native text replies, separate owner recovery decisions,
+and incoming resource bytes through the native SDK into sealed controller
+attachments, plus a native/offline local-ASR composition. Public setup/GUI,
+outgoing media, source disposal and final activation are still open. Loopback fixtures are not
+live account or installed-system acceptance.
+
 The frozen runtime now includes the pinned upstream `feishu` extra: actual
 Lark OpenAPI 1.6.8 and requests-toolbelt 1.0.0. The existing eight extras and
 hash-pinned overlay, including MSAL 1.39.0, remain unchanged. Preparation checks
@@ -24,15 +31,14 @@ key and reviewed HTTPS listener material for `/feishu/webhook`.
 Actual Lark event decoding retains millisecond timestamps as strings and
 keeps `thread_id` distinct from the quoted `root_id`. Its SDK token cache uses
 app-ID keys; the private read boundary now namespaces tokens by complete
-credential identity and brand. Socket-mode SDK paths still need their own
-reviewed transport boundary. Native send retries and reply fallbacks also need
-independent durable HAOS limits. HAOS will not delegate owner identity to the
-upstream allow-all or pairing defaults.
+credential identity and brand. The supervised socket-mode boundary and native
+single-reply limits are described below. HAOS does not delegate owner identity
+to upstream allow-all or pairing defaults.
 
-Prepared private HTTPS receive authentication, persistent ingress and native
-replay are implemented and tested below. Public activation, socket-mode
-transport, media/voice and complete owner GUI/recovery integration remain
-open. Private single-reply delivery is implemented and tested below.
+Prepared private HTTPS/WS authentication, persistent ingress, native replay,
+incoming media and single-reply delivery are implemented and tested below.
+Public activation, outgoing media and complete owner GUI/recovery integration
+remain open; offline voice composition evidence is described below.
 Local SDK and identity tests do not establish live-account, external delivery,
 installed OS or hardware acceptance.
 
@@ -54,8 +60,9 @@ permissions remain separate even when the native SDK labels a video resource as
 owner approvals. The real SDK fixture reproduced and caught the initial video
 consent mismatch; fixed fixtures retain their negative assertions.
 
-This is still a private codec/admission stage. Authenticated transport, durable
-capture/dispatch, actual resources/voice, replies and owner GUI remain unfinished.
+This pure codec is one part of the private integration; authenticated transport,
+custody/dispatch, resource reads and reply delivery are separate boundaries below.
+Owner GUI and final activation remain unfinished.
 
 
 Private original-event custody now commits bounded immutable bytes before the
@@ -77,10 +84,11 @@ cancel commands. A real relay-SQLite-full fault retains pending input and retrie
 without a second mission. Raw callbacks/cards/synthetic events and all unreviewed
 connect/send paths remain denied in the standalone ingress guard; only the
 prepared private profile below installs reviewed lifecycle/reply methods.
-Quote API reads and media dispatch are not yet
-connected. Transport authentication, publication/service identity and direct
-controller invocation are explicit fixtures at this stage; no external messages
-or installed acceptance are established.
+Quote API reads remain unconnected. Incoming media uses the separate retained
+resource path below. In the isolated decoder probe, transport authentication,
+publication/service identity and direct controller invocation are fixtures;
+separate process/HTTPS/WS probes establish those transport boundaries. No live
+external message or installed acceptance is established.
 
 Private SDK reads now have a closed transport boundary: only fixed-brand HTTPS
 origins, tenant/app-token acquisition, bot-account lookup and an independently
@@ -151,7 +159,7 @@ HTTP-client header normalization), unknown senders, nonce conflicts, physical
 SQLite quota and a real SQLite-triggered storage failure followed by reopen and
 freshness-expiry recovery. The prepared profile below now owns the private
 long-running listener lifecycle. Owner publication/GUI, socket transport,
-outgoing messages, media and owner recovery integration remain necessary
+outgoing media and full owner recovery integration remain necessary
 before public activation.
 
 The prepared webhook profile now enforces the actual private gateway UID,
@@ -315,7 +323,55 @@ process restart and duplicate delivery; reconnect never resends an outgoing
 reply. The account check precedes initial activation, and the same independent
 native decoder and durable RelayInbox path serves both HTTPS and WS profiles.
 
-These are private integration paths. Public owner configuration, media/voice,
+These are private integration paths. Public owner configuration, outgoing media,
 source disposal/recovery UI and final gateway activation remain unfinished.
 No live tenant, external delivery, installed-system or hardware acceptance is
 claimed by these loopback SDK/process fixtures.
+
+
+Private incoming media now uses an exact source-bound resource capability. The
+worker independently validates the retained original, current binding digest,
+resource index and separate media/voice/video flags, then calls the actual pinned
+SDK request builder, binary decoder and native download/cache helper. It may
+read only that message/key and the native type selector; an audio/media-to-file
+fallback retains the same resource and cannot bypass authentication or rate
+refusal. No arbitrary URL, host path, SDK client option or asynchronous API is
+exposed to the agent.
+
+Binary responses require verified TLS, no redirects/compression/partial ranges,
+a bounded read deadline and at most 8 MiB per file (2 MiB for model images).
+Both advertised sizes and unadvertised streaming sizes are bounded. API-shaped
+JSON errors are distinguished from real JSON documents with attachment headers.
+Private token reflection is refused. Vendor filenames and response headers are
+replaced before native decoding; only bytes, a checked MIME/descriptor and an
+opaque request binding leave the worker. Cancellation, owner withdrawal and
+parent death terminate the entire credential-bearing worker.
+
+The parent stores approved bytes in the existing FULL-synchronous private media
+cache. A source/index mapping binds the original, grant, byte ID and MIME; replay
+checks that mapping and its message/connector identity. Audio or video MIME in a
+file still needs its separate consent. Aggregate model-image limits apply,
+identical attachments share an opaque media ID, and cached retries do not fetch
+or decode a resource again. Account authentication blocks and 60-second rate
+backoff are shared with private reply delivery. Native source construction and
+dispatch remain in use, while document paths cannot be opened or inlined by the
+parent decoder. Only sealed `haos-media:` references enter the durable relay and
+independent controller media/mission ledger.
+
+The disposable process fixture checks actual root/gateway/agent UIDs, verified
+fixed-origin SDK reads, image/audio/video byte descriptors, a larger binary
+response, cancellation/revocation, real relay SQLite failure, cached retry,
+duplicate suppression and a controller mission with exact attachment bytes.
+Controller policy/calls and source transport authentication in that composition
+are explicit fixtures; separate WS/HTTPS probes establish their transport paths.
+The video sample establishes bounded ISO-header/byte handling, not playback.
+The separate voice composition probe uses the real pinned native decoder,
+private SQLite caches, relay, controller and actual offline local speech model.
+Six cases cover separate voice consent, unknown sender, actual transcription
+into a text-only agent prompt, replay, invalid audio and withdrawal after ASR.
+It seeds an explicitly declared retained-resource fixture instead of replacing
+any UID check or SDK transport; resource retrieval has the separate process/TLS
+proofs above. Private speech transport and agent terminal are fixtures, so the
+result is not live Feishu, LLM inference, installed service or hardware
+acceptance. Outgoing media, owner GUI, source disposal and final activation
+remain open; the public Feishu registry remains disabled.

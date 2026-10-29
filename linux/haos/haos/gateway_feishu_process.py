@@ -42,6 +42,10 @@ async def account(value,connector,current):
     return await _run(value,connector,current,'account')
 
 
+async def resource(value,connector,current,item):
+    return await _run(value,connector,current,'resource',item)
+
+
 async def reply(value,connector,current,item):
     return await _run(value,connector,current,'reply',item)
 
@@ -61,15 +65,15 @@ async def _run(value,connector,current,action,item=None):
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity();value=credentials(value,verify_tls=False);current();identity=authority(connector,value)
     payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity,'parent_pid':os.getpid()}
-    if action=='reply':payload['reply']=item
+    if action in {'reply','resource'}:payload[action]=item
     request=(json.dumps(payload,ensure_ascii=False)+'\n').encode()
-    if len(request)>(2097152 if action=='reply' else 32768):raise ValueError('bounded private Feishu request required')
+    if len(request)>(2097152 if action in {'reply','resource'} else 32768):raise ValueError('bounded private Feishu request required')
     process=None;tasks=[]
-    async def collect(stream):
+    async def collect(stream,limit=16384):
         data=bytearray()
         while chunk:=await stream.read(4096):
             data.extend(chunk)
-            if len(data)>16384:raise ValueError('bounded private Feishu result exceeded')
+            if len(data)>limit:raise ValueError('bounded private Feishu result exceeded')
         return bytes(data)
     async def feed():
         try:process.stdin.write(request);await process.stdin.drain()
@@ -81,7 +85,7 @@ async def _run(value,connector,current,action,item=None):
                 env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'}))
             try:process=await asyncio.shield(spawn)
             except BaseException:process=await spawn;raise
-            output=asyncio.create_task(collect(process.stdout));errors=asyncio.create_task(collect(process.stderr))
+            output=asyncio.create_task(collect(process.stdout,12*1024*1024 if action=='resource' else 16384));errors=asyncio.create_task(collect(process.stderr))
             ended=asyncio.create_task(process.wait());feeder=asyncio.create_task(feed());tasks=[output,errors,ended,feeder]
             while not ended.done():
                 current();authority(connector,value,identity)
@@ -92,6 +96,9 @@ async def _run(value,connector,current,action,item=None):
             if ended.result()!=0:raise ConnectionError('private Feishu account worker unavailable')
             current();authority(connector,value,identity)
             result=json.loads(raw,object_pairs_hook=_object)
+            if action=='resource':
+                from .gateway_feishu_resource import response as resource_response
+                return resource_response(result,item,value)
             return reply_response(result) if action=='reply' else response(result,value)
     finally:
         if process is not None:

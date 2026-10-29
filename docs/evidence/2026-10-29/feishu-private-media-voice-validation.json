@@ -1,0 +1,211 @@
+{
+  "parent_commit": "34df55f45ab43cd8a0b1fe094e0561cdea2ef373",
+  "parent_tree": "0f196220daa0987428f4fcba1ed28d0dcbd17ff3",
+  "parent_CI": "all six freshly successful; not inherited by the patch",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "93678e7cbcf35f65646141c77540e54a7f81368230d25991878e845dc35b2565"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "5e61898b73807d16b9f8689ddca7f9b232d63cc4c8d2a8bc0ece534dbdfe0543"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "ac3c024e6b2a66e1ad614af1b2eec1e5e4ee729d9fcdd996bd6d2ddc7fece9c4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_ingress.py",
+      "sha256": "318813fad9e3f61caa5fc7a5d0cf81762bd1c6ee90b83c32dcd784d669930b45"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_process.py",
+      "sha256": "9180e2859aa126f7c1914b8a97b5a16833b55f824e02b6d2ed79da21d2ea3358"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_worker.py",
+      "sha256": "57617a84b41c914356271ac26dd073be2bd5ef34899ab3ae79bbd547d70d10fc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "2ae3a3485223361dc2db197b9ba3424464fd5e8e0e80a6e421048f8c716bf5b9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "69be48212b06aa2173355d8ea31fa6639a0966aa14661969b80e4d6132f4c490"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media.py",
+      "sha256": "2989f056b50d93e3d3aec5b20f02181e26a9ab4e1e3d2cebe7a6d2c033e29287"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_resource.py",
+      "sha256": "24339b391976f8c29201661f4f4378a3324ca82f30b4c196c4c0d01bb7841dc0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_resource_http.py",
+      "sha256": "1320e9c4c2d81812b6e308b1861e0d2e3a87c7292bddb37343422bd9c0d92a78"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_resource_process.py",
+      "sha256": "98ae6d1b28188865f3525257e980a5dd02a405a63769567f53d1968013214fc3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_resource_http.py",
+      "sha256": "9945a351356d57a37fa81631b002a3dd2acdb5d779523e32fdfccc038daf5e76"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_voice.py",
+      "sha256": "60e8b60bb0ab7a4beadf7958876ee700a252ff776863cbd8ff0edf3af391ef30"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_media.py",
+      "sha256": "c12b5c139ea8d9ecb27c6ec1f7134f1924df427f9bca23c513251bb90381fde0"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_resource_http.py",
+      "sha256": "ccac8da0f60dd04a5d1748456ed9ed94d6f95c221cb03af73ba6db7b50447122"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "2000 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "2000 passed, 2 existing skips",
+    "real_root_kernel_UID_socket_policy_owner_UI_and_backup_suite": "143 passed; backup excluded from ordinary user run and actually tested here",
+    "native_private_resource_process": {
+      "passed": 12,
+      "cases": [
+        "actual_agent_UID_cannot_read_credentials_original_proof_or_invoke_resource_worker",
+        "actual_native_UID_TLS_resource_ok_result_without_false_acceptance_or_credentials",
+        "actual_native_UID_TLS_resource_401_result_without_false_acceptance_or_credentials",
+        "actual_native_UID_TLS_resource_429_result_without_false_acceptance_or_credentials",
+        "actual_private_native_image_binary_and_descriptor_without_host_path_or_private_token",
+        "actual_private_native_voice_binary_and_descriptor_without_host_path_or_private_token",
+        "actual_private_native_video_binary_and_descriptor_without_host_path_or_private_token",
+        "actual_private_native_large_binary_and_descriptor_without_host_path_or_private_token",
+        "actual_native_media_decode_original_SQLite_cache_relay_storage_failure_retry_and_independent_controller_mission",
+        "durable_media_retry_and_remote_replay_do_not_refetch_resource_or_create_second_mission",
+        "actual_revoke_kills_and_joins_blocked_private_binary_worker_before_return",
+        "actual_cancel_kills_and_joins_blocked_private_binary_worker_before_return"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "loopback_fixed_origin_fixture_only": true,
+      "direct_controller_policy_and_calls_are_fixtures": true,
+      "public_feishu_enabled": false
+    },
+    "native_SDK_binary_HTTP": {
+      "passed": 20,
+      "cases": [
+        "actual_native_resource_request_refused_outside_private_capability",
+        "actual_native_builder_SDK_binary_decoder_original_bytes_verified_TLS_and_sanitized_filename_headers",
+        "native_resource_401_refused_without_redirect_or_implicit_retry",
+        "native_resource_429_refused_without_redirect_or_implicit_retry",
+        "native_resource_500_refused_without_redirect_or_implicit_retry",
+        "native_resource_redirect_refused_without_redirect_or_implicit_retry",
+        "native_resource_partial_refused_without_redirect_or_implicit_retry",
+        "native_resource_oversize_refused_without_redirect_or_implicit_retry",
+        "native_resource_oversize-stream_refused_without_redirect_or_implicit_retry",
+        "native_resource_truncated_refused_without_redirect_or_implicit_retry",
+        "native_resource_compressed_refused_without_redirect_or_implicit_retry",
+        "native_resource_mime_refused_without_redirect_or_implicit_retry",
+        "native_resource_secret_refused_without_redirect_or_implicit_retry",
+        "native_resource_api-error_refused_without_redirect_or_implicit_retry",
+        "actual_native_binary_at_exact_byte_limit_preserves_complete_original_data",
+        "actual_native_resource_TLS_untrusted_issuer_refused_before_HTTP_or_byte_release",
+        "actual_JSON_document_with_native_attachment_header_is_not_confused_with_API_error",
+        "withdrawal_during_actual_HTTP_response_prevents_private_byte_release",
+        "actual_native_download_cache_helper_and_same_resource_audio_file_fallback_remain_private",
+        "actual_native_helper_cannot_bypass_rate_refusal_using_file_fallback"
+      ],
+      "loopback_fixture_only": true,
+      "private_kernel_media_worker_or_public_activation": false
+    },
+    "actual_offline_voice_composition": {
+      "passed": 6,
+      "cases": [
+        "voice_without_separate_consent_never_reaches_native_cache_asr_or_mission",
+        "unknown_audio_sender_is_refused_before_native_decode_cache_or_local_asr",
+        "actual_native_Feishu_media_decode_and_dispatch_relay_controller_and_offline_pinned_asr_reach_prompt_as_text_without_raw_agent_audio_or_inference",
+        "retained_Feishu_voice_replay_does_not_redecode_retranscribe_or_create_another_mission",
+        "invalid_audio_retains_source_and_mission_without_transcript_cache_raw_agent_file_or_model_prompt",
+        "owner_withdrawal_after_actual_local_asr_prevents_transcript_write_and_agent_prompt"
+      ],
+      "actual_native_Feishu_decode_retained_media_dispatch_controller_and_local_model": true,
+      "source_transport_resource_retrieval_private_speech_transport_and_agent_terminal_are_fixtures": true,
+      "public_registry_enabled": false,
+      "external_Feishu_account_delivery_llm_inference_or_installed_acceptance": false
+    },
+    "existing_private_WS_profile_regression": {
+      "passed": 9,
+      "cases": [
+        "actual_private_uid_native_runner_https_verified_wss",
+        "actual_native_protobuf_ack_after_independent_parent_full_sqlite_commit",
+        "root_publication_withdrawal_terminates_continuous_worker",
+        "no_hidden_sdk_reconnect_or_ticket_disclosure",
+        "private_profile_reconnects_with_fresh_supervised_worker",
+        "remote_duplicate_replay_keeps_one_original_one_native_input_one_relay_mission",
+        "actual_gateway_parent_sigkill_terminates_ws_worker_via_kernel_parent_death_signal",
+        "actual_wss_401_persists_authentication_block_without_automatic_retry",
+        "actual_wss_429_persists_rate_deadline_second_connect_cannot_bypass"
+      ]
+    },
+    "existing_private_HTTPS_reply_crash_regression": {
+      "passed": 24,
+      "cases": [
+        "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+        "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+        "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+        "actual_private_worker_wrong-bot_refused_without_false_success",
+        "actual_private_worker_401_refused_without_false_success",
+        "actual_private_worker_429_refused_without_false_success",
+        "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+        "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+        "actual_root_wrong-scope_refused_before_private_SDK_network",
+        "actual_root_own-bot_refused_before_private_SDK_network",
+        "actual_root_writable-policy_refused_before_private_SDK_network",
+        "actual_root_pending-publication_refused_before_private_SDK_network",
+        "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+        "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+        "actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check",
+        "actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate",
+        "actual_private_worker_native_reply_confirmation_is_durable_duplicate_suppressed_and_changed_body_denied",
+        "actual_native_reply_connection_drop_remains_uncertain_across_publisher_reopen_and_new_attempt_without_second_write",
+        "actual_native_HTTP_200_rate_code_persists_account_backoff_across_publisher_reopen_and_other_delivery_without_new_API_write",
+        "actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input",
+        "actual_readonly_journal_observes_committed_write_intent_before_withheld_native_API_response",
+        "actual_SIGKILL_of_gateway_during_native_reply_triggers_kernel_worker_death_and_reaping",
+        "actual_private_gateway_process_restart_quarantines_inflight_reply_and_preserves_confirmed_receipt_without_new_API_write",
+        "actual_root_identity_is_refused_before_worker_reads_or_network"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+      "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+      "owner_publication_and_account_are_fixtures": true,
+      "public_feishu_enabled": false,
+      "external_messages_live_account_or_installed_acceptance": false
+    },
+    "existing_native_text_decode_relay_controller": "9 passed",
+    "workflow_yaml_build_shell_and_diff": "passed"
+  },
+  "fixture_corrections": [
+    "Native SDK JSON attachment bytes are distinct from HTTP-200 API error JSON; legitimate attachment disposition is retained only as a classification proof, never a host path.",
+    "Combined controller fixture calls its actual gateway_dispatch method; no nonexistent handle method, weakened assertion or production workaround.",
+    "Video fixture verifies bounded ISO header/byte and type consent; it is not a video playback/decode claim.",
+    "Voice composition seeds explicit real-SQLite retained bytes instead of replacing a UID gate or SDK method; actual private retrieval is separately tested with real UIDs and verified TLS."
+  ],
+  "limits": [
+    "Public gateway count remains 11 of 22; Feishu disabled in public registry/GUI.",
+    "Outgoing media, complete owner setup/GUI, source disposal and final activation remain open.",
+    "Source authentication and direct controller calls in composition probes are explicit fixtures.",
+    "No real tenant, external message/delivery, LLM inference, installed system, HP, final ISO/container or APK release acceptance."
+  ]
+}

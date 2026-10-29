@@ -105,6 +105,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_capture.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-original-capture.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_ws_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ws-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_resource_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-resource-http.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_ws_frames.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ws-frames.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_send_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-codec.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_reply_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-http.json"
@@ -191,6 +192,7 @@ jobs:
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_line_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/line-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_sms_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/sms-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_email_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/email-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_feishu_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/feishu-voice.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail
@@ -319,6 +321,14 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-ws-process.json"
           cat "$RUNNER_TEMP/provider-contracts/feishu-ws-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_resource_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_RESOURCE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
             -v "$PWD/linux/haos/probes/probe_feishu_recovery_process.py:/probe.py:ro" \

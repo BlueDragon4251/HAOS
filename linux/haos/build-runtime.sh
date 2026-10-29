@@ -73,12 +73,14 @@ OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/line-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/sms-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/email-voice-build-probe.json
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/feishu-voice-build-probe.json
 rm -rf -- "$HAOS_SPEECH_FIXTURE"
 
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/sms-prepared-native-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_capture.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-original-capture-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_ws_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-ws-http-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_resource_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-resource-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_ws_frames.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-ws-frames-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_send_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-reply-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_reply_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-reply-http-build-probe.json
