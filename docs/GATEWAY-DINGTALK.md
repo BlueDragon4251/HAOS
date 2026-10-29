@@ -55,12 +55,36 @@ checks constrain that action. Success proves app authentication only: corporatio
 and robot identity remain unverified, and no message is sent. This helper does
 not authorize a sender, install plugins or connect a gateway by itself.
 
-Still required before public activation: supervised native WebSocket lifecycle,
-FULL-synchronous original/input custody before the SDK ACK, replay/idempotent
-mission dispatch, native replies and media/voice paths, persistent account and
-per-write recovery, immediate revocation, source management and complete owner
-setup/GUI. The native SDK currently ACKs before its background message handling;
-HAOS must connect the independent durable receipt before allowing that ACK.
+Private Stream transport now uses the actual SDK subscription/discovery,
+callback parsing and ACK codecs. Its separate gateway-UID worker admits frames
+inline through independent approval, waits for a parent receipt and only then
+allows the SDK ACK. The parent retains exact original bytes and the native input
+in separate FULL-synchronous private SQLite journals. Duplicate callbacks cannot
+change their original body, grant, account epoch or retained reply route; a
+refreshed session bearer on replay never replaces the first original.
+
+The worker owns one verified WSS connection, bounded frames, queue/backpressure,
+heartbeat deadlines and parent IPC. It refuses HTTP redirects and wildcard EVENT
+subscriptions. HAOS deliberately supplies the socket lifecycle around the actual
+SDK codecs because native SDK.start swallows cancellation, reconnects internally
+and creates unbounded background tasks. Parent/publication withdrawal and kernel
+parent-death SIGKILL terminate the private worker. All app/token/ticket/reply URL
+material stays private. The new raw journal has 64 MiB/128 live-original bounds;
+it refuses capacity overflow instead of dropping acknowledged input.
+
+Nine actual UID/TLS/process socket contracts pass against offline loopback API
+and WSS domains, including replay on a fresh worker, pre-ACK custody, agent UID
+denial of original/WAL/credentials/stdin, withdrawal, parent death and WSS
+401/429/302 without hidden SDK retries. The reconnect supervisor in this probe
+is explicitly a fixture; public production profile and persistent retry state
+remain pending. Native custody also tests a crash window between original and
+input commits, finite durable receipts and cancellation/backpressure. No mission
+or external delivery is claimed by these custody/socket checks.
+
+Still required before public activation: actual native mission dispatch, replies
+and media/voice paths, persistent account/per-write recovery and retry state,
+source management and complete owner setup/GUI. These private transport pieces
+must be connected to the independent shared mission and management boundaries.
 
 Local codec, SDK/TLS and private process fixtures have distinct boundaries.
 Loopback API substitutions, temporary fixture CA trust, supplied owner policy
