@@ -76,3 +76,21 @@ connect/send paths remain denied. Quote API reads and media dispatch are not yet
 connected. Transport authentication, publication/service identity and direct
 controller invocation are explicit fixtures at this stage; no external messages
 or installed acceptance are established.
+
+Private SDK reads now have a closed transport boundary: only fixed-brand HTTPS
+origins, tenant/app-token acquisition, bot-account lookup and an independently
+approved exact message read are admitted. Native Lark request serialization,
+authentication and response models remain in use. TLS verification stays on;
+redirects, caller transport options, custom Host/framing headers, unregistered
+bearer tokens, unsupported asynchronous transport and unbounded responses are
+refused. Publication and grant callbacks are checked before and during reads.
+HTTP errors retain finite authentication/rate-limit/transport diagnostics.
+Token caches are namespaced by the full private credential identity and brand;
+a cached token must also have been observed by the current boundary. SDK debug
+records are redacted without propagating raw records to parent log handlers.
+The actual native-SDK TLS probe covers trusted/untrusted issuers, account-cache
+reuse, credential rotation, exact-message permissions, revocation, redirect and
+401/429/500 responses, malformed/duplicate/nonfinite/oversize/truncated bodies.
+Only fixture code substitutes API origins with loopback and trusts its temporary
+CA. This is a private read contract, not yet a kernel-authenticated worker,
+connected ingress listener, message writer or enabled public gateway.

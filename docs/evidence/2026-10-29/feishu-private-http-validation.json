@@ -1,0 +1,48 @@
+{
+  "parent_commit": "61e5cff2764dbc174cf21027573aaf58404bef45",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "fd6f66623e7d08ed2cf326d04ee1d79e2d2c1f8b3e871c17cec1603fabe55814"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "c9056611187add3885a2cbea030ebf3f8e51247d659d6fb169988e88cdd6716d"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "5973f26811789bdefab332e4418bb501503fb98f43776fd962e906aa52d5be32"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_http.py",
+      "sha256": "e51e7fa50bb20267327e863bb93614f7f13b6150aea2d31259f085cf70e06225"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_http.py",
+      "sha256": "92a6a9c2e173904d0e34737bb3a0638e4fabe9ba86c48fa884312ebc5c3d90b0"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_http.py",
+      "sha256": "efbb729c5f9645260acc24c03e364ea938542f13a158894d9fbfc82bcb8e2947"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1859 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1859 passed, 2 existing skips",
+    "actual_native_Lark_SDK_verified_TLS": "19 passed",
+    "syntax_and_diff": "passed"
+  },
+  "log_sha256": {
+    "feishu-http.json": "299dcd71d939fcd4fed931c2fddd8212572cfbc7d77322d525bedc6d3bda9d48",
+    "feishu-http.log": "299dcd71d939fcd4fed931c2fddd8212572cfbc7d77322d525bedc6d3bda9d48",
+    "feishu-http-minimal.log": "6dcddbfa8770c02a604ab44358986b36aa127080d2de931d6d314af430b923e4",
+    "feishu-http-full.log": "c8c449d7f7af9403b8c36ebfd6fbbffef14dcab47136709d6d119dacceb32034"
+  },
+  "limitations": [
+    "all SDK requests terminate at a disposable loopback TLS fixture; no real account or external messages",
+    "no kernel worker/publication implementation is claimed by this read boundary",
+    "ingress authentication, outgoing writes, media, GUI and live acceptance remain open",
+    "Feishu public registry remains disabled; 11 other gateway paths locally implemented"
+  ]
+}

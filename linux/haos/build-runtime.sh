@@ -78,6 +78,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/sms-prepared-native-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_capture.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-original-capture-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-private-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_sdk.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-sdk-build-probe.json
