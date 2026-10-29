@@ -11,7 +11,8 @@
     "vertex",
     "azure-identity",
     "matrix",
-    "voice"
+    "voice",
+    "feishu"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",

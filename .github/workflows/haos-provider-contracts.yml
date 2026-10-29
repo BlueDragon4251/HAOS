@@ -48,7 +48,7 @@ jobs:
           python -m pip install uv
           bash scripts/sync-upstream.sh
           python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
-          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu
           uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
       - name: Compare the generated registry and execute real local protocol probes
@@ -103,6 +103,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_line_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/line-output.json"
           "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
           "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"

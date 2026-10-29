@@ -28,7 +28,7 @@ def dispatch(task, provider, client, kwargs, stream=False):
     return "standard"
 ''')
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
-    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix", "voice"],
+    source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix", "voice", "feishu"],
               "security_versions": {"pyjwt": "2.15.1"}}
     for filename, key, root in [("pyproject.toml", "pyproject_sha256", upstream),
                                 ("uv.lock", "uv_lock_sha256", upstream),
@@ -76,10 +76,11 @@ def test_mismatched_reviewed_security_version(inputs):
         runtime.prepare(*inputs)
 
 
-@pytest.mark.parametrize('change',['remove-matrix','add-all'])
+@pytest.mark.parametrize('change',['remove-matrix','remove-feishu','add-all'])
 def test_unreviewed_extra_set_is_refused_before_runtime_overlay_writes(inputs,change):
     path=inputs[1]/'source.json';source=json.loads(path.read_text())
     if change=='remove-matrix':source['extras'].remove('matrix')
+    elif change=='remove-feishu':source['extras'].remove('feishu')
     else:source['extras'].append('all')
     path.write_text(json.dumps(source))
     before=(inputs[0]/'agent/auxiliary_client.py').read_bytes()

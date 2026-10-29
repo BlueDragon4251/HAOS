@@ -1,6 +1,6 @@
 # Hermes runtime
 
-`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with reviewed web, messaging, anthropic, bedrock, vertex, azure-identity and matrix extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
+`haos-hermes.service` runs as `haos-agent` after first boot, networking and policy preparation. Source is pinned by `upstream/UPSTREAM.lock`. Image-only `build-runtime.sh` uses frozen upstream dependencies with reviewed web, messaging, anthropic, bedrock, vertex, azure-identity, matrix, voice and feishu extras and Fedora's immutable `/usr/bin/python3.11`; RPM versions are recorded in `/usr/lib/haos/python-runtime.txt`.
 
 The reviewed `linux/haos/runtime` overlay pins all runtime requirements with package hashes, including fixes for anyio, multidict, PyJWT, tornado and urllib3. Its preparation checks the exact upstream commit, original pyproject/uv.lock hashes and requirements digest before changing the conflicting PyJWT metadata. Installation requires hashes and `uv pip check`; installed versions and the source/requirements provenance remain in immutable `/usr/lib/haos/runtime-provenance`. Run `37818579514` verified the resolved dependencies with pip-audit, the actual pinned Hermes CLI and an expired-JWT regression. That CI result validates dependencies; the resulting updated Fedora image still requires its own build and guest evidence.
 
@@ -1624,3 +1624,23 @@ handoffs as fixtures. Kernel tests preserve real UID/socket/credential boundarie
 External mail accounts, recipient delivery and installed/hardware acceptance
 remain separate. See [E-Mail details](GATEWAY-EMAIL.md) and exact receipts under
 `docs/evidence/2026-10-29/`.
+
+
+## Frozen Feishu/Lark SDK foundation (2026-10-29, not public)
+
+The next private gateway integration adds only the pinned upstream `feishu`
+extra to the existing eight frozen extras. Lark OpenAPI remains exactly 1.6.8,
+requests-toolbelt 1.0.0 and qrcode 7.4.2; the existing hash overlay is reapplied,
+including MSAL 1.39.0 and Cryptography 50. No upstream pin or dependency versions
+were arbitrarily updated. Runtime preparation refuses a missing Feishu extra or
+an unreviewed extra set. Build and contracts CI invoke the actual native SDK
+builders, event models and loopback authentication/read-only HTTP fixtures.
+
+Prepared account validation distinguishes fixed Feishu/Lark API brands, app,
+tenant and bot identities, with explicit native thread/open-sender/chat IDs and
+separate media flags. Webhook configuration requires verification token,
+encryption key and reviewed HTTPS material; arbitrary endpoint/plugin settings
+are refused. This foundation enables no public Feishu connector, mission,
+external message, live account or installed acceptance. The remaining native
+retry/fallback, token-cache, listener/socket, durability/recovery and GUI paths
+must be sealed and tested before activation.
