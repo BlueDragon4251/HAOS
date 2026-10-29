@@ -53,3 +53,26 @@ consent mismatch; fixed fixtures retain their negative assertions.
 
 This is still a private codec/admission stage. Authenticated transport, durable
 capture/dispatch, actual resources/voice, replies and owner GUI remain unfinished.
+
+
+Private original-event custody now commits bounded immutable bytes before the
+native input receipt. An opaque reference keeps large UTF-8 originals out of the
+64 KiB native payload field. Full-synchronous SQLite/WAL, physical/logical quotas,
+current-publication callbacks and source/credential/codec hashes protect replay.
+Changed transport delivery IDs retain the first original; changed message bodies,
+old credential epochs, damaged proofs and revoked grants are refused. Real SQLite
+quota and in-transaction authority-withdrawal faults preserve previous records.
+No original is automatically purged. Close/reopen tests cover commit gaps; they
+are not a real machine power-cut acceptance.
+
+The retained text bridge runs the actual pinned Feishu decoder under an exact
+native claim. It uses canonical app open IDs even when upstream prefers user-ID
+aliases, binds account scope, bypasses volatile burst buffers in favor of durable
+HAOS acceptance, and retains reply context after native payload compaction.
+Actual relay/controller fixtures create a scoped mission and handle status and
+cancel commands. A real relay-SQLite-full fault retains pending input and retries
+without a second mission. Raw callbacks/cards/synthetic events and all unreviewed
+connect/send paths remain denied. Quote API reads and media dispatch are not yet
+connected. Transport authentication, publication/service identity and direct
+controller invocation are explicit fixtures at this stage; no external messages
+or installed acceptance are established.

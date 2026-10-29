@@ -1,0 +1,70 @@
+{
+  "parent_commit": "625e169cf4fdcc371557569b0a9264d4aa120212",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "c559bf2b9f4c19d2188594223a8c3e72928e69bbb483d45be7d401b50b8cbe5c"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "8bdab20ef94a0c0eebac2833f8de367167e8f658f3e77a86c82d3d6cfdd56187"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "9915e9561fc03fb9400d5401181d3544cc2e7bdaaa66334bc984621bf766c360"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_cache.py",
+      "sha256": "9a2de34fa2e6881801dfa4bc1f9bdf3943224aeea6e8684522bb5f7369e59db5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_ingress.py",
+      "sha256": "9c4bf0772e276fffdd407e6695c00c8ec627296e27c549b1e855e661aba1f911"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_capture.py",
+      "sha256": "b9931a2e4f2dbcf6e409f3c31096dd6efb7f114e1b514f6920abda3fd38ff30a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_ingress.py",
+      "sha256": "0f54399f31f20eb4bce739cf081fcf6c017226472ffefaad8a7b7f9284ed25bd"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1841 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1841 passed, 2 existing skips",
+    "actual_native_codec_original_SQLite_capture": "13 passed",
+    "actual_native_Feishu_text_dispatch_relay_controller": "9 passed",
+    "minimal_import_without_optional_SDK_or_source": "passed",
+    "workflow_build_syntax_and_diff": "passed"
+  },
+  "log_sha256": {
+    "feishu-custody-minimal.log": "d9512c6bf9d973189dcf33b7001889ee7e709603c06d1dd8234c5b58f05a99f4",
+    "feishu-custody-full.log": "244b76356da4f5ed9fa1fcdcd27fdf8f11aa2b432524f1ac8d8ceae19998d64d",
+    "feishu-native-capture-reviewed.json": "9b1921df8e784747e2be8dd0af50bf2744d7d74a0ec7a256596fc7a0d9cd218b",
+    "feishu-native-capture-reviewed.log": "9b1921df8e784747e2be8dd0af50bf2744d7d74a0ec7a256596fc7a0d9cd218b",
+    "feishu-native-ingress-corrected.json": "90b998d174fcc617577327746948713778de6f7b36d5983672211c1090c660e0",
+    "feishu-native-ingress-corrected.log": "90b998d174fcc617577327746948713778de6f7b36d5983672211c1090c660e0"
+  },
+  "contracts": [
+    "immutable original before input receipt; opaque payload reference handles maximum 32000 four-byte characters",
+    "close/reopen original/input commit gap, pending processing replay and terminal compaction",
+    "first original survives delivery nonce changes; immutable body/credential/codec/grant changes refused",
+    "actual 64 MiB SQLite capacity and in-transaction callback withdrawal preserve prior rows",
+    "actual native sender-profile alias preference is replaced with independently approved app open ID",
+    "actual native controller mission/status/cancel and no duplicate mission after relay SQLite-full recovery",
+    "unretained callbacks/cards/decoders and unreviewed send/connect paths denied"
+  ],
+  "initial_fixture_correction": "The first ingress probe queried nonexistent MissionStore status/CANCELLED fields. It now checks the actual state/cancelled contract, without changing production cancellation behavior.",
+  "public_gateway_paths": 11,
+  "public_feishu_enabled": false,
+  "limits": [
+    "Transport authentication, publication and service identity are fixtures; direct controller invocation is a composition fixture.",
+    "No socket/webhook transport, remote quote lookup, media dispatch or outgoing delivery connected yet.",
+    "Close/reopen tests are not actual process SIGKILL or machine power-loss acceptance.",
+    "No model inference, external messages/accounts, installed OS, hardware or release acceptance.",
+    "No existing owner or recovery data deleted; all storage faults/corruption/capacity tests use disposable databases.",
+    "Existing ordinary backup exclusion and two skips unchanged; no kernel tests replaced or skipped."
+  ]
+}
