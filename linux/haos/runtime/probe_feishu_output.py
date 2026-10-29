@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Actual authenticated backend artifacts into bounded prepared Feishu output."""
 import asyncio
+import hashlib
+import math
+import struct
+import wave
 from io import BytesIO
 import json
 from pathlib import Path
@@ -32,6 +36,11 @@ async def session(base,token,workspace):
     config={'version':1,'connectors':[{'id':'feishu','platform':'feishu'}],'bindings':[binding]};policy=lambda:PreparedFeishuPolicy(config)
     image=BytesIO();Image.new('RGB',(3,2),(10,20,30)).save(image,format='PNG')
     files={'image.png':image.getvalue(),'document.txt':b'A bounded actual exported Feishu document.'}
+    audio=BytesIO()
+    with wave.open(audio,'wb') as target:
+        target.setnchannels(1);target.setsampwidth(2);target.setframerate(16000)
+        target.writeframes(b''.join(struct.pack('<h',int(10000*math.sin(i*2*math.pi*440/16000))) for i in range(16000)))
+    files['voice.wav']=audio.getvalue()
     for name,data in files.items():(workspace/name).write_bytes(data)
     result_text='Feishu result fixture\n'+'\n'.join('MEDIA:'+str(workspace/name) for name in files)
     async def ignore(*_args):pass
@@ -61,20 +70,31 @@ async def session(base,token,workspace):
     def current():policy().current_binding(route)
     adapter._haos_feishu_check=current;
     with scope(home,env):adapter._mark_connected()
-    output=Output(adapter);calls=[];cases=[]
+    output=Output(adapter);calls=[];cases=[];encodings=[]
+    from haos import speech_client
+    from haos.audio_opus import encode,result
+    actual_opus=speech_client.opus
+    async def conversion_transport(data,current):
+        current();encodings.append(True)
+        encoded=result(encode(data),hashlib.sha256(data).hexdigest());current();return encoded
+    speech_client.opus=conversion_transport
     async def call(method,params):
         calls.append((method,dict(params)));return await controller.gateway_dispatch({'method':method,'params':params})
     try:
         prepared=await output.prepare(delivery,call)
-        assert [item['data'] for item in prepared['items']]==list(files.values())
-        assert [item['name'] for item in prepared['items']]==['result-0.png','result-1.txt']
-        assert [item['kind'] for item in prepared['items']]==['image','file']
-        assert [item['file_type'] for item in prepared['items']]==['','stream']
+        assert [item['data'] for item in prepared['items'][:2]]==list(files.values())[:2]
+        assert prepared['items'][2]['data'].startswith(b'OggS') and prepared['items'][2]['file_type']=='opus'
+        from haos.speech import decode
+        assert decode(prepared['items'][2]['data'])[1]==16000
+        assert [item['name'] for item in prepared['items']]==['result-0.png','result-1.txt','result-2.ogg']
+        assert [item['kind'] for item in prepared['items']]==['image','file','file']
+        assert [item['file_type'] for item in prepared['items']]==['','stream','opus']
         assert 'MEDIA:' not in prepared['text'] and str(workspace) not in prepared['text']
         assert all('path' not in item for item in prepared['items'])
         cases.append('actual_authenticated_backend_exports_only_exact_marked_completed_source_session_files_as_private_bytes')
         (workspace/'document.txt').write_bytes(b'Changed source must not replace a durable snapshot.')
-        repeated=await output.prepare(delivery,call);assert repeated==prepared
+        repeated=await output.prepare(delivery,call);assert repeated==prepared and len(encodings)==1
+        cases.append('actual_exported_WAV_uses_native_Opus_codec_and_durable_exact_byte_replay_without_reencoding')
         cases.append('durable_controller_snapshot_does_not_reread_a_changed_agent_file_on_repeated_preparation')
         before=len(calls)
         try:await controller.gateway_dispatch({'method':'gateway.output.begin','params':{
@@ -92,9 +112,9 @@ async def session(base,token,workspace):
         stripped=await output.prepare({**delivery,**route},call)
         assert not stripped['items'] and 'separate owner approval' in stripped['text'] and len(calls)==before
         cases.append('fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads')
-    finally:inbox.close();store.close()
+    finally:speech_client.opus=actual_opus;inbox.close();store.close()
     return {'passed':len(cases),'cases':cases,'actual_authenticated_backend_artifact_reader':True,
-        'completed_session_and_connected_Feishu_transport_are_fixtures':True,'public_registry_enabled':False,
+        'completed_session_and_connected_Feishu_transport_are_fixtures':True,'speech_RPC_transport_is_fixture_actual_codec':True,'public_registry_enabled':False,
         'upload_or_reply_worker_external_Feishu_or_inference_acceptance':False}
 
 

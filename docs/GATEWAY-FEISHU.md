@@ -7,8 +7,8 @@ public paths are listed in [Gateways](GATEWAYS.md).
 Current private paths include authenticated HTTPS, supervised native WebSocket,
 source custody/replay, native text replies, separate owner recovery decisions,
 and incoming resource bytes through the native SDK into sealed controller
-attachments, plus a native/offline local-ASR composition. Public setup/GUI,
-outgoing media, source disposal and final activation are still open. Loopback fixtures are not
+attachments, plus a native/offline local-ASR composition. Private outgoing media is also connected below. Public setup/GUI,
+source disposal, complete media recovery and final activation are still open. Loopback fixtures are not
 live account or installed-system acceptance.
 
 The frozen runtime now includes the pinned upstream `feishu` extra: actual
@@ -37,7 +37,7 @@ to upstream allow-all or pairing defaults.
 
 Prepared private HTTPS/WS authentication, persistent ingress, native replay,
 incoming media and single-reply delivery are implemented and tested below.
-Public activation, outgoing media and complete owner GUI/recovery integration
+Public activation and complete owner GUI/recovery integration
 remain open; offline voice composition evidence is described below.
 Local SDK and identity tests do not establish live-account, external delivery,
 installed OS or hardware acceptance.
@@ -172,7 +172,7 @@ loop. Policy withdrawal closes the listener; close cancels/reaps tasks and
 releases the lease while retaining journals. Persisted finite account/TLS/rate/
 storage/source statuses do not expose private exceptions. Each prepared profile
 currently needs its own listener port; shared Feishu HTTPS multiplexing and
-socket-mode integration are not claimed.
+socket-mode integration are described separately below.
 
 The expanded real-UID process probe checks actual profile creation, duplicate
 lease refusal, native HTTPS input→durable relay dispatch, remote replay and
@@ -399,9 +399,8 @@ uploads and replies, real gateway/agent/root UID checks, cancellation/revocation
 write intent before a withheld response, SIGKILL/restart quarantine and no second
 write on confirmed or uncertain replay. Their source/connection declarations are
 fixtures, not live tenant or recipient acceptance. Existing Opus and native
-file/image/video formats are routed by the pinned codec. General non-Opus voice
-conversion, multi-part owner adjudication, source disposal and complete owner
-setup/GUI still need completion before activation.
+file/image/video formats are routed by the pinned codec. Non-Opus voice conversion is described below. Multi-part owner adjudication,
+source disposal and complete owner setup/GUI still need completion before activation.
 
 An actual encoding-negotiation fixture reproduced a valid gzip response being
 mistaken for truncation when compressed Content-Length was compared with decoded
@@ -410,3 +409,27 @@ unexpected compression. A separate actual SDK DEBUG fixture reproduced escaped
 app-secret text in serialized authentication diagnostics; the boundary now
 registers JSON/repr spellings in addition to the original secret. Neither fix
 weakens byte limits or negative assertions.
+
+
+Non-Opus outgoing audio now uses a fixed `opus` operation on the existing
+credential-free local speech socket. This requires the explicitly enabled local
+speech service; no provider key, remote encoder, caller path or command is
+accepted. The pinned PyAV decoder/encoder enforces the existing 8 MiB and
+120-second limits, produces mono Ogg/Opus, and verifies the decoded duration.
+`[[as_document]]` retains document routing instead of voice conversion.
+
+The gateway retains exact converted bytes in a FULL-synchronous per-offer ledger
+bound to the original artifact, delivery and current grant. Concurrent preparation
+reuses the first committed bytes, avoiding nondeterministic Ogg serial changes on
+retry. Shared byte quotas are checked again after encoding under a write lock.
+The owner cache inventory exposes metadata only. Explicit inspected disposal
+requires grant withdrawal, atomically records an audit and retains a tombstone;
+replaying the old offer never regenerates deleted bytes.
+
+The native codec probe covers FLAC/WAV/MP3/M4A and invalid, playlist and excessive
+duration inputs. The actual UID/socket-activation probe runs conversion under the
+separate speech identity for both authorized caller identities, including a
+90-second reply larger than the text-transcript limit and authority withdrawal.
+The actual authenticated backend-export composition also checks conversion and
+stable repeated preparation; its speech RPC transport is explicitly a fixture,
+while the codec is real. No external Feishu voice delivery is established.

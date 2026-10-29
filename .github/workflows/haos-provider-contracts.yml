@@ -196,6 +196,7 @@ jobs:
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_sms_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/sms-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_email_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/email-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_feishu_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/feishu-voice.json"
+          "$PYTHON" linux/haos/runtime/probe_audio_opus.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-opus.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail

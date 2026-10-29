@@ -37,12 +37,22 @@ def trusted_endpoint(path=SOCKET):
 
 
 async def transcribe(data,current):
+    return await _exchange(data,current)
+
+
+async def opus(data,current):
+    return await _exchange(data,current,operation='opus')
+
+
+async def _exchange(data,current,operation=None):
     if not isinstance(data,bytes) or not 1<=len(data)<=MAX_AUDIO_BYTES or not callable(current):
         raise SpeechRefused('bounded approved audio bytes required')
+    from .audio_opus import MAX_REPLY as OPUS_REPLY
+    reply_limit=OPUS_REPLY if operation=='opus' else 96*1024
     current();trusted_endpoint()
     checksum=hashlib.sha256(data).hexdigest()
     async def exchange():
-        reader,writer=await asyncio.open_unix_connection(str(SOCKET),limit=96*1024+1)
+        reader,writer=await asyncio.open_unix_connection(str(SOCKET),limit=reply_limit+1)
         try:
             peer=writer.get_extra_info('socket')
             _pid,uid,_gid=struct.unpack('3i',peer.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
@@ -50,12 +60,17 @@ async def transcribe(data,current):
             # The root-owned, nonreplaceable filesystem endpoint is required too.
             if uid not in {0,pwd.getpwnam('haos-speech').pw_uid}:raise PermissionError('untrusted speech endpoint identity')
             current()
-            writer.write(json.dumps({'data':base64.b64encode(data).decode(),'sha256':checksum}).encode()+b'\n')
+            request={'data':base64.b64encode(data).decode(),'sha256':checksum}
+            if operation is not None:request['operation']=operation
+            writer.write(json.dumps(request).encode()+b'\n')
             await writer.drain();raw=await reader.readline()
-            if not raw.endswith(b'\n') or len(raw)>96*1024:raise SpeechRefused('bounded local speech receipt required')
+            if not raw.endswith(b'\n') or len(raw)>reply_limit:raise SpeechRefused('bounded local speech receipt required')
             reply=json.loads(raw)
             if not isinstance(reply,dict) or set(reply)!={'ok','result'} or reply['ok'] is not True:
                 raise SpeechRefused('local transcription unavailable; inspect local model and service status')
+            if operation=='opus':
+                from .audio_opus import result as encoded_result
+                return encoded_result(reply['result'],checksum)
             return result(reply['result'],checksum)
         finally:
             writer.close()

@@ -20,7 +20,7 @@ _HASH=re.compile('[0-9a-f]{64}\\Z')
 
 
 def request_bytes(value):
-    if (not isinstance(value,dict) or set(value)!={'data','sha256'} or not isinstance(value['data'],str)
+    if (not isinstance(value,dict) or set(value) not in ({'data','sha256'},{'data','sha256','operation'}) or 'operation' in value and value['operation']!='opus' or not isinstance(value['data'],str)
             or not 1<=len(value['data'])<=MAX_AUDIO_BYTES*4//3+4
             or not isinstance(value['sha256'],str) or not _HASH.fullmatch(value['sha256'])):
         raise SpeechRefused('exact bounded audio bytes and checksum required')
@@ -39,11 +39,14 @@ def worker():
     resource.setrlimit(resource.RLIMIT_FSIZE,(8*1024*1024,8*1024*1024))
     raw=sys.stdin.buffer.read(MAX_FRAME+1)
     if len(raw)>MAX_FRAME:raise SpeechRefused('voice frame exceeds bound')
-    data=request_bytes(json.loads(raw))
+    request=json.loads(raw);data=request_bytes(request)
     # Native diagnostics stay out of the RPC reply; there are no credentials here.
     import logging
     logging.disable(logging.CRITICAL)
-    result=transcribe(data)
+    if request.get('operation')=='opus':
+        from .audio_opus import encode
+        result=encode(data)
+    else:result=transcribe(data)
     sys.stdout.write(json.dumps({'ok':True,'result':result})+'\n');sys.stdout.flush()
 
 
@@ -55,13 +58,15 @@ async def kill(process):
 
 
 async def invoke(request):
+    from .audio_opus import MAX_REPLY as OPUS_REPLY
+    reply_limit=OPUS_REPLY if request.get('operation')=='opus' else MAX_REPLY
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1',
         'HOME':'/var/lib/haos-speech','HERMES_HOME':'/etc/haos-speech',
         'PYTHONPATH':os.environ.get('PYTHONPATH','/usr/lib/haos:/usr/lib/haos/hermes'),'PYTHONSAFEPATH':'1',
         'HERMES_SAFE_MODE':'1','HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1'}
     spawning=asyncio.create_task(asyncio.create_subprocess_exec(sys.executable,'-s','-m','haos.speech_service','--worker',
         stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
-        env=env,start_new_session=True,limit=MAX_REPLY+1))
+        env=env,start_new_session=True,limit=reply_limit+1))
     try:process=await asyncio.shield(spawning)
     except asyncio.CancelledError:
         process=await spawning
@@ -82,7 +87,7 @@ async def invoke(request):
     tasks=[]
     try:
         async with asyncio.timeout(60):
-            tasks=[asyncio.create_task(write()),asyncio.create_task(bounded(process.stdout,MAX_REPLY)),
+            tasks=[asyncio.create_task(write()),asyncio.create_task(bounded(process.stdout,reply_limit)),
                 asyncio.create_task(bounded(process.stderr,16384))]
             values=await asyncio.gather(*tasks)
             if await process.wait()!=0:raise SpeechRefused('local speech worker refused audio')

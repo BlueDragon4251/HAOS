@@ -116,8 +116,16 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
         result=json.loads(peer.makefile('rb').readline());assert result=={'ok':False,'error':'speech peer denied'}
     else:
         data=Path('/public-audio/reference.flac').read_bytes()
+        if request['mode']=='opus-long':
+            from io import BytesIO
+            import random,wave
+            source=BytesIO()
+            with wave.open(source,'wb') as target:
+                target.setnchannels(1);target.setsampwidth(2);target.setframerate(16000);target.writeframes(random.Random(17).randbytes(90*16000*2))
+            data=source.getvalue()
         params={'data':base64.b64encode(data).decode(),'sha256':hashlib.sha256(data).hexdigest()}
         if request['mode']=='extra':params['path']='/owner/private'
+        if request['mode'] in {'opus','opus-long'}:params['operation']='opus'
         peer.sendall(json.dumps(params).encode()+b'\n')
         if request['mode']=='disconnect':
             import time
@@ -128,11 +136,17 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             sys.exit(0)
         result=json.loads(peer.makefile('rb').readline())
         if request['mode']=='extra':assert result['ok'] is False and 'result' not in result
+        elif request['mode'] in {'opus','opus-long'}:
+            from haos.audio_opus import result as verify
+            assert result['ok'] is True
+            encoded=verify(result['result'],params['sha256']);assert encoded['data'].startswith(b'OggS')
+            assert encoded['samples']==(90*16000 if request['mode']=='opus-long' else 176000)
+            if request['mode']=='opus-long':assert len(json.dumps(result))>96*1024
         else:
             assert result['ok'] is True and result['result']['source_sha256']==params['sha256']
             assert 'ask not what your country can do for you' in result['result']['transcript'].lower()
 """
-            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal'),(65532,'normal')]:
+            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal'),(65532,'normal'),(65534,'opus'),(65532,'opus'),(65534,'opus-long')]:
                 client=subprocess.run([sys.executable,'-s','-c',client_code],input=json.dumps({'socket':str(endpoint),'mode':mode}),
                     text=True,capture_output=True,timeout=50,user=uid,group=uid,extra_groups=[],env=env)
                 assert client.returncode==0,client.stderr[-2000:]
@@ -175,20 +189,23 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             checked_client="""
 import asyncio,hashlib,sys
 from pathlib import Path
-from haos.speech_client import transcribe
+from haos.speech_client import transcribe,opus
 async def main():
     data=Path('/public-audio/reference.flac').read_bytes();checks=[]
     def current():checks.append(True)
     result=await transcribe(data,current)
     assert result['source_sha256']==hashlib.sha256(data).hexdigest() and len(checks)>1
     assert 'ask not what your country can do for you' in result['transcript'].lower()
+    encoded=await opus(data,current);assert encoded['source_sha256']==hashlib.sha256(data).hexdigest() and encoded['samples']==176000
     count=[0]
     def withdrawn():
         count[0]+=1
         if count[0]>3:raise PermissionError('fixture owner grant withdrawn')
-    try:await transcribe(data,withdrawn)
-    except PermissionError:pass
-    else:raise AssertionError('withdrawn local transcription returned a result')
+    for operation in (transcribe,opus):
+        count[0]=0
+        try:await operation(data,withdrawn)
+        except PermissionError:pass
+        else:raise AssertionError('withdrawn local audio operation returned a result')
 asyncio.run(main())
 """
             checked=subprocess.run([sys.executable,'-s','-c',checked_client],text=True,capture_output=True,timeout=50,
@@ -207,13 +224,15 @@ asyncio.run(main())
         from speech_owner_fixture import exercise as owner_exercise
         owner_cases=owner_exercise()
         receipt=json.loads(result.stdout)
-        print(json.dumps({'passed':7+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+        print(json.dumps({'passed':9+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
             'actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity',
             'actual_container_network_disabled_and_reviewed_model_bytes_used_offline',
             'actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket',
             'actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path',
             'actual_client_disconnect_kills_and_joins_native_worker_without_orphan',
-            'actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation']+owner_cases,
+            'actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation',
+            'actual_gateway_and_controller_UID_Opus_conversion_uses_separate_credential_free_worker_and_checked_receipt',
+            'actual_90_second_Opus_reply_exceeds_text_reply_limit_and_preserves_duration_without_truncation']+owner_cases,
             'native_receipt':receipt,'actual_uid':65530,'owner_service_control_is_fixture':True,'external_stt_account_or_line_voice_acceptance':False},indent=2))
 
 

@@ -1,0 +1,146 @@
+{
+  "parent_commit": "1454a9950e4e91db06ca200b137eb6a4f6126cc0",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "2579e9f0c6563a39ba5147314bff13252097623c727d6964718bdd66d6e1add2"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "317405ebb121d0cea2f3f131127afd7400dbf5a2fc08205ba66918ae0d26208b"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "72e30764515d3b34b21035e1e93b62b10a2a4025966885f42d2884aa918b2f9d"
+    },
+    {
+      "path": "linux/haos/haos/audio_opus.py",
+      "sha256": "293c0b5f55038cf1ada05aac6872e1db84b5b4c9f3786334be222490c1fd2cc0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_output.py",
+      "sha256": "3eaae04f4e81cfee42b6312228ab1a9bea4dd4f34f490662ca9c371ed98dc51f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "be2e508ff82f2bbfe31461bcd5baa9c7ca21ec17e5e4649e50f84bd30408ba9c"
+    },
+    {
+      "path": "linux/haos/haos/speech_client.py",
+      "sha256": "bbd56d1d946edbf2fd447c779399bb1cc5503a844e310e832f08e2afc16b4eb3"
+    },
+    {
+      "path": "linux/haos/haos/speech_service.py",
+      "sha256": "6767b00262e48ad11e9a2953ed0b113843bb3918582653a5678ffafaa82fedd7"
+    },
+    {
+      "path": "linux/haos/probes/probe_speech_process.py",
+      "sha256": "55a24b45e8af7f616d19bcccc32434120556b9d59d3fff7767ba084501a37b0f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_audio_opus.py",
+      "sha256": "7b50b9ef64798380c5034d8f1817e897fde44ac2b50a281803f32e3ae1090db1"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_output.py",
+      "sha256": "bb82b67c5e54d1a4e1537177a762602100fb6ab88be0891cc2193f6eba9bdf64"
+    },
+    {
+      "path": "linux/haos/tests/test_audio_opus.py",
+      "sha256": "28a4b0aa1b3844e8c98cc47a78b013e3217556dbf9c1c2d62df82f8aa8043968"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_output_voice.py",
+      "sha256": "df1dec88bc592daf0b0970a01e383210d1323e5e62e416fa4d50f810c79a1eae"
+    }
+  ],
+  "regressions": {
+    "minimal_without_upstream": {
+      "passed": 2040,
+      "existing_skips": 2
+    },
+    "full_pinned_runtime": {
+      "passed": 2040,
+      "existing_skips": 2
+    },
+    "root_kernel_and_backup": {
+      "passed": 143,
+      "mocks_or_added_skips": false
+    }
+  },
+  "probes": {
+    "codec": {
+      "passed": 7,
+      "cases": [
+        "actual_flac_decoded_and_encoded_to_duration_preserving_mono_Opus",
+        "actual_wav_decoded_and_encoded_to_duration_preserving_mono_Opus",
+        "actual_mp3_decoded_and_encoded_to_duration_preserving_mono_Opus",
+        "actual_m4a_decoded_and_encoded_to_duration_preserving_mono_Opus",
+        "actual_invalid_source_refused_without_model_or_remote_fallback",
+        "actual_playlist_source_refused_without_model_or_remote_fallback",
+        "actual_too_long_source_refused_without_model_or_remote_fallback"
+      ],
+      "actual_codec": true,
+      "private_service_identity_and_transport": false
+    },
+    "output": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 6,
+      "cases": [
+        "actual_authenticated_backend_exports_only_exact_marked_completed_source_session_files_as_private_bytes",
+        "actual_exported_WAV_uses_native_Opus_codec_and_durable_exact_byte_replay_without_reencoding",
+        "durable_controller_snapshot_does_not_reread_a_changed_agent_file_on_repeated_preparation",
+        "arbitrary_or_unmarked_host_path_cannot_become_a_Feishu_output_export",
+        "owner_withdrawal_refuses_the_old_delivery_before_any_further_private_read",
+        "fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads"
+      ],
+      "actual_authenticated_backend_artifact_reader": true,
+      "completed_session_and_connected_Feishu_transport_are_fixtures": true,
+      "speech_RPC_transport_is_fixture_actual_codec": true,
+      "public_registry_enabled": false,
+      "upload_or_reply_worker_external_Feishu_or_inference_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    }
+  },
+  "speech_kernel_probe": {
+    "passed": 12,
+    "cases": [
+      "actual_pinned_hermes_whisper_transcription_under_separate_uid",
+      "actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity",
+      "actual_container_network_disabled_and_reviewed_model_bytes_used_offline",
+      "actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket",
+      "actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path",
+      "actual_client_disconnect_kills_and_joins_native_worker_without_orphan",
+      "actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation",
+      "actual_gateway_and_controller_UID_Opus_conversion_uses_separate_credential_free_worker_and_checked_receipt",
+      "actual_90_second_Opus_reply_exceeds_text_reply_limit_and_preserves_duration_without_truncation",
+      "actual_root_owner_activation_checks_real_frozen_sdk_and_model_then_publishes_closed_readable_config_without_redownload",
+      "actual_root_owner_disable_archives_configuration_and_preserves_all_model_data",
+      "actual_sdk_metadata_version_mismatch_refuses_owner_activation_without_mutating_retained_settings"
+    ],
+    "native_receipt": {
+      "source_sha256": "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715",
+      "model_revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "transcript_sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec",
+      "samples": 176000
+    },
+    "actual_uid": 65530,
+    "owner_service_control_is_fixture": true,
+    "external_stt_account_or_line_voice_acceptance": false
+  },
+  "test_invocation_correction": "Initial ordinary regressions inherited umask 0077; two intentional public-directory fixtures became private. Both full suites rerun with expected umask 022 passed unchanged assertions.",
+  "limitations": [
+    "Feishu public registry and GUI remain disabled; 11 of 22 gateways public",
+    "Speech operation requires explicitly enabled local speech service",
+    "No external Feishu or live voice delivery acceptance",
+    "No installed service, hardware, ISO, APK or release acceptance"
+  ]
+}
