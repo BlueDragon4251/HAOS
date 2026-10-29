@@ -104,6 +104,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
           "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_capture.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-original-capture.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_webhook.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-authenticated-webhook.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-private-http.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"

@@ -1,0 +1,78 @@
+{
+  "parent_commit": "a2bf053708faf1b089e482c80550abbbc087372c",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "946f026f710157cec75fd11fe532a70329036f1a27002c005a4a3b88e5d92803"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "22ae892b583b15568c28fc76e66636601b914895897eca5197bbe699e1449d9a"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "f79514fd7cd0be0be4c42fb6d09ae47607fe50a5a0bfde51b3e812573332e1fb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_webhook.py",
+      "sha256": "afb0d85b3fdcb2cd3c6979426311d88c70c1e2970148f2f5b9d150e513c76b99"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_listener.py",
+      "sha256": "79cb939d7b6008084c4d661d7f789f4d3d4db4307d546363aa2b95211cd09e88"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_webhook.py",
+      "sha256": "2cb0bb27e3bb599dfc5a2c23659f9aa08509a031912c490e4c937ea90e457d60"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_webhook.py",
+      "sha256": "42fb546344e0bbed61bfaa8faa47a5bed0a6de8914eec07e1da55c164641b3a5"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1891 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1891 passed, 2 existing skips",
+    "actual_native_signature_AES_codec_SQLite_and_verified_HTTPS": "14 passed",
+    "build_shell_and_diff": "passed"
+  },
+  "native_report": {
+    "passed": 14,
+    "cases": [
+      "actual_loopback_HTTPS_ACK_follows_signature_token_owner_checks_wire_original_and_input_commit_before_agent_dispatch",
+      "actual_native_codec_dispatch_and_same_signed_delivery_replay_produce_one_durable_input",
+      "actual_Lark_AES_decrypts_independently_encrypted_fixture_and_retains_original_ciphertext_before_ACK",
+      "encrypted_signed_token_verified_URL_challenge_does_not_create_sender_authority_or_mission",
+      "tampered_signature_does_not_fill_private_journals_or_receive_success",
+      "stale_signature_does_not_fill_private_journals_or_receive_success",
+      "wrong_token_does_not_fill_private_journals_or_receive_success",
+      "unknown_sender_does_not_fill_private_journals_or_receive_success",
+      "case_duplicated_signature_header_refused_by_actual_HTTPS_application",
+      "authenticated_nonce_reuse_with_other_message_cannot_overwrite_retained_original",
+      "actual_SQLite_failure_close_reopen_and_real_freshness_expiry_recover_only_previously_authenticated_retained_original",
+      "actual_physical_SQLite_receipt_quota_refuses_new_input_without_losing_prior_originals",
+      "webhook_verification_and_encryption_secrets_registered_before_native_agent_text_projection",
+      "owner_publication_withdrawal_immediately_denies_signed_replay"
+    ],
+    "actual_native_signature_AES_codec_SQLite_and_verified_HTTPS": true,
+    "all_network_targets_loopback_fixtures": true,
+    "public_feishu_enabled": false,
+    "kernel_listener_publication_live_account_external_messages_or_installed_acceptance": false
+  },
+  "log_sha256": {
+    "feishu-webhook-final.json": "40f22c505b3d30cb5eb946555b6b4aefa0b28a88003d591e095f833773f65e63",
+    "feishu-webhook-final.log": "40f22c505b3d30cb5eb946555b6b4aefa0b28a88003d591e095f833773f65e63",
+    "feishu-webhook-minimal.log": "74b4309812f517dc9437f1eeb660b2bc657811c41681186ac408402b38d7078e",
+    "feishu-webhook-full.log": "3ff5af73adf8bb8eb55e785062b7ccc66a88a7d8e803463d3910c4a61242cfc0"
+  },
+  "fixture_and_product_corrections": [
+    "Actual HTTP client normalizes differently cased duplicate signature headers; fixture now sends exact duplicate fields over raw verified TLS.",
+    "Retained-source Conflict inherits ValueError; listener now returns recovery-required 503 before generic malformed-input 400. Assertions retained."
+  ],
+  "limitations": [
+    "Only loopback network, fixture credentials, programmatic prepared owner grants; no external messages or live-account acceptance.",
+    "Long-running private profile/listener kernel lifecycle, websocket transport, outgoing delivery, media, GUI and owner recovery remain open.",
+    "Feishu publicly disabled; no installed OS or hardware acceptance."
+  ]
+}

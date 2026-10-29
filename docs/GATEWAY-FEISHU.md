@@ -117,3 +117,33 @@ private credentials and a running worker's input, and actual parent-death
 SIGKILL with process reaping. It is not an installed service or owner GUI test.
 Feishu remains outside the public registry until its transport, deliveries,
 media, recovery and owner setup are connected and verified together.
+
+A private fixed `/feishu/webhook` HTTPS receive application now verifies fresh
+exact timestamp/nonce/signature headers against the actual pinned Hermes
+validator. Case-duplicated signature headers, wrong mandatory verification
+tokens and signatures, stale deliveries and unknown owner routes are refused.
+Encrypted events use the actual Lark SDK AES decoder after signature validation
+and strict canonical base64/body bounds. Signed, token-verified URL challenges
+create no sender authority or mission. The application rejects insecure HTTP,
+query routes and compressed request bodies, bounds concurrent body reads and
+volatile source/rate budgets, and returns finite errors without private data.
+
+Before a successful event ACK, authenticated wire bytes (including original
+ciphertext), nonce identity and immutable independent approval are committed in
+a private bounded FULL-synchronous SQLite journal, followed by original/native
+input custody. Native decoding and mission dispatch remain independently
+replayable. Reuse of a nonce with different bytes cannot replace a receipt.
+Previously retained authenticated originals can recover after a commit gap and
+live freshness expiry, while new stale requests stay refused. Quota exhaustion
+and policy withdrawal leave existing receipts intact; there is no automatic
+owner-data deletion. Verification/encryption secrets and the TLS key are
+registered with redaction before native text projection.
+
+The native webhook probe uses actual signatures, independently generated AES
+ciphertext, the real Lark decoder, native Hermes message dispatch and verified
+loopback HTTPS. It checks duplicate raw HTTP headers (a raw TLS request avoids
+HTTP-client header normalization), unknown senders, nonce conflicts, physical
+SQLite quota and a real SQLite-triggered storage failure followed by reopen and
+freshness-expiry recovery. This core still needs the private long-running
+profile/listener lifecycle, owner publication/GUI, socket transport, outgoing
+messages, media and owner recovery integration before public activation.
