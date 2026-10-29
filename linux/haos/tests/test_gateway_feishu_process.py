@@ -27,3 +27,23 @@ def test_private_account_result_refuses_false_acceptance_and_extra_credentials(c
 @pytest.mark.parametrize('value',[None,{},[],{'error':True},{'error':'unbounded-diagnostic'}])
 def test_private_process_requires_finite_bounded_response(value):
     with pytest.raises(ValueError):response(value,account())
+
+
+@pytest.mark.parametrize('result',[
+    {'state':'confirmed','message_id':'om_'+'a'*32},{'state':'uncertain'},
+    {'state':'rejected','error':'rate-limited'},{'state':'rejected','error':'native-refused'},
+])
+def test_reply_result_has_exact_native_acceptance_or_finite_non_delivery_state(result):
+    from haos.gateway_feishu_process import reply_response
+    assert reply_response(result)==result
+
+
+@pytest.mark.parametrize('result',[
+    {'state':'confirmed','message_id':True},{'state':'confirmed','message_id':'other-provider-id'},
+    {'state':'confirmed','message_id':'om_'+'a'*32,'recipient_read_verified':True},
+    {'state':'uncertain','retryable':True},{'state':'rejected','error':['rate-limited']},
+    {'state':'rejected','error':'raw response with credentials'},None,{},
+])
+def test_reply_result_never_promotes_uncertainty_or_unreviewed_private_response_to_success(result):
+    from haos.gateway_feishu_process import reply_response
+    with pytest.raises(ValueError):reply_response(result)

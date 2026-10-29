@@ -82,6 +82,9 @@ def build(value,*,parent,connector,policy,inbox):
 
 def _install(adapter,fd,profile,identity):
     native=adapter._haos_native;value=adapter._haos_feishu_value;db=native.inbox.db;current=adapter._haos_feishu_check
+    from .gateway_feishu_delivery import Publisher
+    publisher=Publisher(adapter) if any(row['connector']==native.connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
+    adapter._haos_feishu_publisher=publisher
     scope=digest([native.connector,value]);lifecycle=asyncio.Lock();adapter._haos_feishu_runner=None;adapter._haos_feishu_task=None
     db.execute('''CREATE TABLE IF NOT EXISTS feishu_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,
         credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)''')
@@ -150,12 +153,23 @@ def _install(adapter,fd,profile,identity):
         async with lifecycle:
             await stop()
             if health(self)['status'] not in {'revoked','closed','identity-refused','authentication-refused','rate-limited','tls-refused'}:status('disconnected')
+    async def send(self,chat_id,content,reply_to=None,metadata=None):
+        from .gateway_delivery_authority import current_delivery
+        if self._haos_feishu_publisher is None:raise PermissionError('creation-only Feishu profile has no outbound authority')
+        if isinstance(metadata,dict) and metadata.get('haos_output') is not None:
+            raise PermissionError('Feishu output media is not connected to a private reviewed byte path')
+        async with lifecycle:
+            authority=current_delivery(self,'feishu',chat_id,metadata)
+            binding=native.policy().current_binding(metadata['haos_binding'])
+            return await self._haos_feishu_publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),
+                content,reply_to,authority)
     async def close(self):
         async with lifecycle:
             if self._haos_feishu_closed:return
             self._haos_feishu_closed=True;await stop()
+            if self._haos_feishu_publisher is not None:await self._haos_feishu_publisher.close()
             self._haos_feishu_receiver.close();self._haos_feishu_raw.close();os.close(fd)
             if health(self)['status'] not in {'identity-refused','authentication-refused','rate-limited','tls-refused'}:status('closed')
-    adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter)
+    adapter.connect=MethodType(connect,adapter);adapter.disconnect=MethodType(disconnect,adapter);adapter.send=MethodType(send,adapter)
     adapter.close_profile=MethodType(close,adapter);adapter.native_health=MethodType(health,adapter)
     return adapter

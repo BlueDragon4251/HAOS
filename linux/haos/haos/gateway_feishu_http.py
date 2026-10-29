@@ -85,11 +85,21 @@ class Boundary:
                 or purpose=='account' and target!={}
                 or purpose=='message' and (set(target)!={'message_id'} or not isinstance(target['message_id'],str)
                     or not MESSAGE_ID.fullmatch(target['message_id']))):raise Failure('unapproved-operation')
+        with self._operation(config,purpose,target) as state:yield state
+
+    @contextmanager
+    def _operation(self,config,purpose,target):
         state={'boundary':self,'config':config,'purpose':purpose,'target':deepcopy(target),
             'deadline':time.monotonic()+30,'auth_requests':0}
         self.check(state);token=_ACTIVE.set(state)
-        try:yield
+        try:yield state
         finally:_ACTIVE.reset(token)
+
+    def api_request(self,state,method,path,data):
+        expected='/open-apis/bot/v3/info' if state['purpose']=='account' else '/open-apis/im/v1/messages/'+state['target']['message_id']
+        if method!='GET' or path!=expected or data is not None:raise Failure('unapproved-operation')
+
+    def api_response(self,state,body):pass
 
     def request(self,real,method,url,**kwargs):
         state=active()
@@ -111,7 +121,7 @@ class Boundary:
         params=kwargs.get('params') or []
         if not isinstance(params,(list,tuple,dict)) or params:raise Failure('unapproved-query')
         auth=method=='POST' and address.path in {'/open-apis/auth/v3/tenant_access_token/internal','/open-apis/auth/v3/app_access_token/internal'}
-        data=kwargs.get('data')
+        data=kwargs.get('data');write=False
         if auth:
             if state['auth_requests']>=2:raise Failure('authentication-budget')
             if not isinstance(data,bytes) or not 1<=len(data)<=16384:raise Failure('invalid-authentication-body')
@@ -122,13 +132,13 @@ class Boundary:
                 raise Failure('changed-authentication')
             state['auth_requests']+=1;headers.setdefault('Content-Type','application/json; charset=utf-8')
         else:
-            expected='/open-apis/bot/v3/info' if state['purpose']=='account' else '/open-apis/im/v1/messages/'+state['target']['message_id']
-            if method!='GET' or address.path!=expected or data is not None:raise Failure('unapproved-operation')
+            write=self.api_request(state,method,address.path,data)
             authorization=folded.get('authorization')
             if not isinstance(authorization,str) or not authorization.startswith('Bearer '):raise Failure('missing-private-token')
             token=authorization[7:]
             if self.tokens.get(token,0)<=time.time():raise Failure('unknown-private-token')
         self.check(state)
+        if write:state['write_started']=True
         try:
             response=real(method,url,headers=headers,data=data,params=params,timeout=(3,10),
                 stream=True,allow_redirects=False,verify=True)
@@ -137,6 +147,7 @@ class Boundary:
             if isinstance(error,requests.exceptions.SSLError):raise Failure('tls-refused') from None
             raise Failure('transport-unavailable') from None
         try:
+            state['http_status']=response.status_code
             if 300<=response.status_code<400:raise Failure('redirect-refused')
             if response.status_code==429:raise Failure('rate-limited')
             if response.status_code in {401,403}:raise Failure('authentication-refused')
@@ -158,6 +169,9 @@ class Boundary:
             try:bounded(body)
             except Refused:raise Failure('invalid-response') from None
             if auth:
+                if body['code']!=0:
+                    state['authentication_refused']=True
+                    raise Failure('authentication-refused')
                 key='tenant_access_token' if 'tenant_access_token' in address.path else 'app_access_token'
                 token=body.get(key);expire=body.get('expire')
                 if (body['code']!=0 or not isinstance(token,str) or not TOKEN.fullmatch(token)
@@ -165,7 +179,9 @@ class Boundary:
                 self.tokens={old:end for old,end in self.tokens.items() if end>time.time()}
                 if token not in self.tokens and len(self.tokens)>=4:raise Failure('token-capacity')
                 self.tokens[token]=time.time()+expire;self.remember(token)
-            self.check(state);response._content=raw;response._content_consumed=True
+            self.check(state)
+            if not auth:self.api_response(state,body)
+            response._content=raw;response._content_consumed=True
             return response
         except Failure:raise
         except Exception:raise Failure('transport-unavailable') from None

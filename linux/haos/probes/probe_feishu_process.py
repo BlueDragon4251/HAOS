@@ -58,13 +58,24 @@ def main():
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*_args):pass
         def reply(self,status,body):
-            raw=json.dumps(body).encode();self.send_response(status);self.send_header('Content-Length',str(len(raw)))
+            raw=json.dumps(body).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)))
             self.end_headers()
             try:self.wfile.write(raw)
             except (BrokenPipeError,ConnectionResetError,ssl.SSLError):pass
         def do_POST(self):
-            assert self.path=='/open-apis/auth/v3/tenant_access_token/internal'
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            if self.path.endswith('/reply'):
+                assert self.path=='/open-apis/im/v1/messages/om_'+'f'*32+'/reply'
+                assert self.headers['Authorization']=='Bearer fixture-private-process-token'
+                assert body['reply_in_thread'] is False and body['msg_type']=='text'
+                assert len(body['uuid'])==32 and set(body)=={'content','msg_type','reply_in_thread','uuid'}
+                assert json.loads(body['content'])['text'] in {'Actual private native reply.','Uncertain private native reply.'}
+                seen.append('reply')
+                if state['mode']=='ratewrite':return self.reply(200,{'code':99991400,'msg':'fixture native rate limit'})
+                if state['mode']=='dropwrite':
+                    self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();self.close_connection=True;return
+                return self.reply(200,{'code':0,'data':{'message_id':'om_'+'d'*32,'chat_id':policy['bindings'][0]['chat']}})
+            assert self.path=='/open-apis/auth/v3/tenant_access_token/internal'
             assert body=={'app_id':value['app_id'],'app_secret':value['app_secret']};seen.append('auth')
             self.reply(200,{'code':0,'tenant_access_token':'fixture-private-process-token','expire':7200})
         def do_GET(self):
@@ -137,6 +148,45 @@ async def run():
             async with asyncio.timeout(20):
                 while relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1:await asyncio.sleep(.05)
             print(json.dumps({'profile_admitted':True,'sender':relay.next(policy())['envelope']['sender']}),flush=True)
+            from haos.gateway import digest,Conflict
+            from haos.gateway_feishu_delivery import Publisher
+            from haos.gateway_delivery import delivery_result
+            binding=policy().bindings['owner']
+            metadata={'haos_binding':{'binding_id':'owner','binding_digest':digest(binding)},'haos_scope':binding['scope'],
+                'thread_id':binding['thread'],'haos_delivery_id':'a'*64,'haos_delivery_attempt':1}
+            async def phase(name):
+                async with asyncio.timeout(20):
+                    while not Path(request['command']).exists() or Path(request['command']).read_text()!=name:await asyncio.sleep(.05)
+            await phase('confirmed')
+            first=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,metadata=metadata)
+            assert first.success and first.message_id=='om_'+'d'*32
+            again=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,metadata=metadata)
+            assert again.success and again.message_id==first.message_id
+            try:await adapter.send(binding['chat'],'Changed body must fail.',reply_to='om_'+'f'*32,metadata=metadata)
+            except Conflict:pass
+            else:raise AssertionError('confirmed delivery changed its body')
+            print(json.dumps({'reply_confirmed':True,'duplicate_suppressed':True,'changed_body_denied':True}),flush=True)
+            await phase('uncertain')
+            metadata={**metadata,'haos_delivery_id':'b'*64}
+            unknown=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='om_'+'f'*32,metadata=metadata)
+            assert delivery_result(unknown)=={'status':'uncertain'}
+            await adapter._haos_feishu_publisher.close()
+            adapter._haos_feishu_publisher=Publisher(adapter)
+            again=await adapter.send(binding['chat'],'Uncertain private native reply.',reply_to='om_'+'f'*32,
+                metadata={**metadata,'haos_delivery_attempt':2})
+            assert delivery_result(again)=={'status':'uncertain'}
+            print(json.dumps({'reply_uncertain':True,'new_attempt_denied':True}),flush=True)
+            await phase('rate-limited')
+            metadata={**metadata,'haos_delivery_id':'c'*64,'haos_delivery_attempt':1}
+            limited=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,metadata=metadata)
+            assert delivery_result(limited)=={'status':'retry','retry_after':60}
+            await adapter._haos_feishu_publisher.close();adapter._haos_feishu_publisher=Publisher(adapter)
+            limited=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,
+                metadata={**metadata,'haos_delivery_id':'d'*64})
+            decision=delivery_result(limited)
+            assert decision['status']=='retry' and 1<=decision['retry_after']<=60
+            assert adapter._haos_feishu_publisher.health()['status']=='rate-limited'
+            print(json.dumps({'account_rate_limit_persisted':True,'other_delivery_deferred':True}),flush=True)
             async with asyncio.timeout(20):
                 while adapter.native_health()['status']!='revoked':await asyncio.sleep(.05)
             await adapter.disconnect()
@@ -225,7 +275,8 @@ print(json.dumps(asyncio.run(run())))
             encrypt_key='private-profile-encryption-fixture',port=profile_port,
             tls={'public_url':'https://open.feishu.cn/feishu/webhook','certificate':(work/'certificate.pem').read_text(),
                 'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False})
-        child=start('profile')
+        command=work/'send-command'
+        child=start('profile',command=str(command))
         ready=json.loads(child.stdout.readline());assert ready=={'profile_listening':True,'lease_denied':True},ready
         cases.append('actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check')
         stamp=str(int(time.time()*1000)-1000)
@@ -248,6 +299,18 @@ print(json.dumps(asyncio.run(run())))
             if attempt==0:
                 admitted=json.loads(child.stdout.readline());assert admitted=={'profile_admitted':True,'sender':policy['bindings'][0]['sender']}
         cases.append('actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate')
+        before=seen.count('reply');command.write_text('confirmed');command.chmod(0o644)
+        result=json.loads(child.stdout.readline());assert result=={'reply_confirmed':True,'duplicate_suppressed':True,'changed_body_denied':True}
+        assert seen.count('reply')==before+1
+        cases.append('actual_private_worker_native_reply_confirmation_is_durable_duplicate_suppressed_and_changed_body_denied')
+        state['mode']='dropwrite';command.write_text('uncertain');command.chmod(0o644)
+        result=json.loads(child.stdout.readline());assert result=={'reply_uncertain':True,'new_attempt_denied':True}
+        assert seen.count('reply')==before+2
+        cases.append('actual_native_reply_connection_drop_remains_uncertain_across_publisher_reopen_and_new_attempt_without_second_write')
+        state['mode']='ratewrite';command.write_text('rate-limited');command.chmod(0o644)
+        result=json.loads(child.stdout.readline());assert result=={'account_rate_limit_persisted':True,'other_delivery_deferred':True}
+        assert seen.count('reply')==before+3
+        cases.append('actual_native_HTTP_200_rate_code_persists_account_backoff_across_publisher_reopen_and_other_delivery_without_new_API_write')
         publish({**policy,'bindings':[]});result=finish(child)
         assert result=={'profile_revoked':True,'listener_stopped':True}
         cases.append('actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input')

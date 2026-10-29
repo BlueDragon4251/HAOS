@@ -39,11 +39,31 @@ def response(result,value):
 
 
 async def account(value,connector,current):
+    return await _run(value,connector,current,'account')
+
+
+async def reply(value,connector,current,item):
+    return await _run(value,connector,current,'reply',item)
+
+
+def reply_response(result):
+    if not isinstance(result,dict):raise ValueError('finite private Feishu reply result required')
+    if set(result)=={'state','message_id'} and result['state']=='confirmed':
+        from .gateway_feishu import MESSAGE_ID
+        if isinstance(result['message_id'],str) and MESSAGE_ID.fullmatch(result['message_id']):return result
+    if result=={'state':'uncertain'}:return result
+    if set(result)=={'state','error'} and result['state']=='rejected' and isinstance(result['error'],str) and result['error'] in ERRORS|{'native-refused'}:
+        return result
+    raise ValueError('exact confirmed, rejected or uncertain Feishu reply result required')
+
+
+async def _run(value,connector,current,action,item=None):
     from .gateway_runtime import require_runtime_identity
     require_runtime_identity();value=credentials(value,verify_tls=False);current();identity=authority(connector,value)
-    request=(json.dumps({'action':'account','connector':connector,'credentials':value,
-        'policy_sha256':identity,'parent_pid':os.getpid()},ensure_ascii=False)+'\n').encode()
-    if len(request)>32768:raise ValueError('bounded private Feishu request required')
+    payload={'action':action,'connector':connector,'credentials':value,'policy_sha256':identity,'parent_pid':os.getpid()}
+    if action=='reply':payload['reply']=item
+    request=(json.dumps(payload,ensure_ascii=False)+'\n').encode()
+    if len(request)>(2097152 if action=='reply' else 32768):raise ValueError('bounded private Feishu request required')
     process=None;tasks=[]
     async def collect(stream):
         data=bytearray()
@@ -71,7 +91,8 @@ async def account(value,connector,current):
             raw=await output;await errors;await feeder
             if ended.result()!=0:raise ConnectionError('private Feishu account worker unavailable')
             current();authority(connector,value,identity)
-            return response(json.loads(raw,object_pairs_hook=_object),value)
+            result=json.loads(raw,object_pairs_hook=_object)
+            return reply_response(result) if action=='reply' else response(result,value)
     finally:
         if process is not None:
             if process.returncode is None:

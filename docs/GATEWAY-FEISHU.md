@@ -31,8 +31,8 @@ upstream allow-all or pairing defaults.
 
 Prepared private HTTPS receive authentication, persistent ingress and native
 replay are implemented and tested below. Public activation, socket-mode
-transport, bounded single-write replies, media/voice and complete owner
-GUI/recovery integration remain open.
+transport, media/voice and complete owner GUI/recovery integration remain
+open. Private single-reply delivery is implemented and tested below.
 Local SDK and identity tests do not establish live-account, external delivery,
 installed OS or hardware acceptance.
 
@@ -75,7 +75,9 @@ HAOS acceptance, and retains reply context after native payload compaction.
 Actual relay/controller fixtures create a scoped mission and handle status and
 cancel commands. A real relay-SQLite-full fault retains pending input and retries
 without a second mission. Raw callbacks/cards/synthetic events and all unreviewed
-connect/send paths remain denied. Quote API reads and media dispatch are not yet
+connect/send paths remain denied in the standalone ingress guard; only the
+prepared private profile below installs reviewed lifecycle/reply methods.
+Quote API reads and media dispatch are not yet
 connected. Transport authentication, publication/service identity and direct
 controller invocation are explicit fixtures at this stage; no external messages
 or installed acceptance are established.
@@ -170,3 +172,41 @@ listener shutdown after an actual root policy replacement. All SDK/API targets
 stay loopback in a disposable network-disabled namespace. The public factory,
 owner GUI and public root publication still reject Feishu; this private profile
 alone is not an activated complete gateway.
+
+Private outgoing text/Markdown replies now use the actual pinned Hermes send
+formatter, post codec and SDK reply builder. The original independently admitted
+message, current binding digest, exact chat/native topic, body, native payload
+and stable UUID are sealed together. One durable intent permits at most one
+native reply API write. Native retries, post-to-text retry, top-level fallback,
+changed UUIDs and alternate reply paths cannot escape that capability. The
+separate reply boundary reuses verified fixed-domain TLS, bounded responses,
+redaction, private observed token cache and fresh root/grant checks; the original
+read boundary still grants no writes.
+
+The private worker accepts only closed account/reply actions. A reply source
+must match the current owner route and approved original bytes; its output is
+only confirmed native acceptance, a finite definite rejection, or uncertainty.
+A successful receipt needs exact native message/chat identity and the approved
+topic when present. It does not prove recipient reading. The publisher joins
+committed native input to retained source context, checks originals and writes a
+FULL-synchronous intent before launching the worker. Confirmed receipts suppress
+replay; body/source/authority changes conflict. In-flight/uncertain outcomes
+remain quarantined across publisher reopen and later attempts. There is no
+blind resend after a dropped response. Physical journal limits preserve older
+receipts and require owner recovery rather than automatic deletion.
+
+Actual HTTP/native-API rate-limit rejections create a persistent account pause,
+shared across deliveries with the same private account. Reopening the publisher
+or changing the delivery ID does not bypass the pause. Authentication refusals
+remain blocked for that credential identity. Known pre-write transport failure
+can retry within the bounded outbox attempts; unknown write outcome cannot.
+Media output is explicitly refused until the separate private byte path exists.
+
+Evidence includes native formatter/builder fixtures, real native SDK writes to
+verified loopback TLS (drop/429/redirect/missing source/invalid-post fallback),
+and real UID/profile/worker/SQLite cases: confirmed replay suppression, changed
+body denial, uncertain reopen/later-attempt suppression and persistent account
+backoff on a native rate code returned with HTTP 200. These are fixture replies
+only, never external Feishu delivery or live-account acceptance. Actual process
+kill during an outgoing write and complete owner adjudication/recovery still
+need dedicated verification/integration. Public Feishu activation remains off.
