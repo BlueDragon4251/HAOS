@@ -129,7 +129,9 @@ def main():
             policy = PreparedDingTalkPolicy(trusted_json(Path('/etc/haos/gateways.json')))
             proof = approve(policy, request['connector'], value, raw)
             projection = normalize(policy, request['connector'], value, raw, proof, redactor)
-            if redactor.clean(projection) != projection:
+            # Resource codes remain in the private original/projection. Only
+            # the independently approved envelope can become an agent goal.
+            if redactor.clean(projection['envelope']) != projection['envelope']:
                 raise Refused('private-reflection')
             if pending:
                 raise PermissionError('one retained event at a time')

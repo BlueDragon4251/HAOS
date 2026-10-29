@@ -221,7 +221,8 @@ def delivery_metadata(delivery,platform):
 
 
 def require_runtime_identity():
-    account=pwd.getpwnam('haos-gateway')
+    try:account=pwd.getpwnam('haos-gateway')
+    except KeyError:raise PermissionError('private gateway service identity is unavailable') from None
     if (account.pw_uid==0 or account.pw_gid==0 or os.geteuid()!=account.pw_uid
             or os.getegid()!=account.pw_gid or set(os.getresuid())!={account.pw_uid}
             or set(os.getresgid())!={account.pw_gid} or not set(os.getgroups())<={account.pw_gid}):

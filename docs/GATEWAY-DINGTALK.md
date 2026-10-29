@@ -85,8 +85,9 @@ including one original/input/relay obligation across reconnect, withdrawal and
 401/429/302 decisions surviving connect, close and profile recreation.
 The native handler is exercised only for a retained input claim; staff aliases,
 raw SDK messages, session-webhook caches and direct callback/token/reaction methods
-cannot bypass that context. Text and vendor-recognized voice text are connected;
-unsealed resource messages stay pending until the media broker is connected. Native custody also tests a crash window between original and
+cannot bypass that context. Text, vendor-recognized voice text and independently retained binary resources
+are connected to native dispatch. No native download code or CDN URL becomes an
+agent attachment: only sealed local media IDs are admitted. Native custody also tests a crash window between original and
 input commits, finite durable receipts and cancellation/backpressure. No mission
 or external delivery is claimed by these custody/socket checks.
 
@@ -111,9 +112,40 @@ requires a live profile, fresh owner authority, an unchanged account and no
 explicit stop or auth/TLS block. A transient socket interruption cannot itself
 create or expand reply authority.
 
-Still required before public activation: shared controller mission acceptance, incoming/outgoing media and local voice
+Incoming resource reads now invoke the actual Hermes `_get_access_token` and
+`_fetch_download_url` helpers, real generated Robot SDK/SPI and native response
+models in a separate bounded gateway-UID worker. The generated SDK retains
+port=80/default-zero runtime hints even for HTTPS; HAOS admits those exact pinned
+shapes while fixing the actual transport to verified HTTPS API port 443 with
+independent deadlines. Only the approved original download code and robot may be
+looked up with an observed private token. High-privilege app/token material cannot
+become a returned content URL.
+
+The separate credential-free content client pins reviewed numeric DNS answers,
+accepts ordinary global unicast only, validates TLS, preserves signed escaped
+paths/queries and bounds redirects and bytes. Loopback, LAN, link-local, CGNAT,
+multicast and IPv6 translation/tunnel destinations are refused. API credentials
+and cookies never follow a content URL. Content-server 403/429 decisions stay
+separate from account-auth failures; a native input retains a content rate deadline
+rather than prematurely exhausting its retry budget or blocking the whole account.
+
+The actual native message handler receives retained media through the durable
+MRO and context-bound local IDs. PNG/JPEG images, document bytes, voice bytes and
+ISO video containers retain their separately approved kinds; decoded audio/video
+cannot bypass consent through a document label. Resource and input replay retain
+byte hashes and reuse their committed cache/source pointers after handler failure.
+A missing-data/source-pointer crash window and administrative resource decisions
+still belong to the pending recovery work. Fourteen actual UID/network cases cover
+reads and sealed relay, and the fifteenth connects actual verified WSS capture,
+pre-ACK custody, Robot lookup, binary retrieval and relay crash/retry. The production
+public DNS resolver is exercised without mocks: global-looking fixture addresses
+are assigned only to loopback inside a fresh network-none namespace. There is no
+external interface or Internet delivery. Wave/PDF/video fixtures verify private
+byte transport and consent, not speech recognition, playback or document decoding.
+
+Still required before public activation: shared controller mission acceptance, outgoing media and local voice
 paths, stable reply capability after session expiry, owner account/per-write
-recovery and management,
+and resource recovery/management,
 source management and complete owner setup/GUI. These private transport pieces
 must be connected to the independent shared mission and management boundaries.
 

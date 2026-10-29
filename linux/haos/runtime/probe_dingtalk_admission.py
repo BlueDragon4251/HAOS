@@ -92,6 +92,19 @@ def main():
             except Refused as error:assert error.reason=='private-reflection'
             else:raise AssertionError('private app or reply capability became an agent goal')
         cases.append('actual_native_text_projection_refuses_app_secret_full_session_URL_and_decoded_reply_capability_reflection')
+        private_code='private-resource-code-fixture'
+        reflected={**base,'msgtype':'richText','content':{'richText':[
+            {'type':'text','text':private_code},{'type':'picture','downloadCode':private_code}]}}
+        reflected.pop('text')
+        try:project(reflected)
+        except Refused as error:assert error.reason=='private-reflection'
+        else:raise AssertionError('private SDK resource capability became an agent goal')
+        cases.append('actual_native_resource_download_code_cannot_reflect_into_agent_text')
+        unsafe={**base,'msgtype':'picture','content':{'downloadCode':private_code+'\n'}};unsafe.pop('text')
+        try:project(unsafe)
+        except Refused as error:assert error.reason=='unsupported-content'
+        else:raise AssertionError('control characters accepted in private SDK resource capability')
+        cases.append('actual_native_resource_code_refuses_control_characters_before_private_SDK_request')
         changed=deepcopy(base);changed['senderId']=base['senderStaffId']
         try:project(changed)
         except Refused:pass

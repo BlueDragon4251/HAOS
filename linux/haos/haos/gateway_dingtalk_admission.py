@@ -15,7 +15,9 @@ TYPES=frozenset({'text','picture','richText','audio','file','image','card','inte
 
 
 class Refused(PermissionError):
-    def __init__(self,reason):super().__init__('DingTalk source or content is not approved');self.reason=reason
+    def __init__(self,reason,retry_after=0):
+        if type(retry_after) is not int or not 0<=retry_after<=86400:raise ValueError('bounded private source retry delay required')
+        super().__init__('DingTalk source or content is not approved');self.reason=reason;self.retry_after=retry_after
 
 
 def finite(_value):raise ValueError('finite DingTalk JSON required')
@@ -131,7 +133,8 @@ def normalize(policy,connector,value,raw,approval,redactor):
         if any(getattr(native,key,None)!=envelope[field] for key,field in [('sender_id','sender'),('conversation_id','chat'),('message_id','message_id')]):
             raise Refused('changed-native-source')
         if (not isinstance(text,str) or len(text)>32000 or not isinstance(urls,list) or len(urls)>4
-                or len(urls)!=len(mimes) or any(not isinstance(code,str) or not 16<=len(code)<=8192 or '://' in code for code in urls)
+                or len(urls)!=len(mimes) or any(not isinstance(code,str) or not 16<=len(code)<=8192 or '://' in code
+                    or any(not 33<=ord(char)<=126 for char in code) for code in urls)
                 or set(codes)!=set(urls)):
             raise Refused('unsupported-content')
         binding=policy.current_binding(approval);resources=[]
@@ -146,6 +149,13 @@ def normalize(policy,connector,value,raw,approval,redactor):
             if binding.get(permission) is not True:raise Refused('unapproved-media')
             resources.append({'index':index,'code':code,'kind':category,'mime':mime})
         if not text and not resources:raise Refused('unsupported-content')
+        # Platform download codes remain private SDK capabilities. Register
+        # escaped spellings too before permitting the textual goal to leave.
+        private=set(urls)
+        for _ in range(2):
+            private|={json.dumps(part,ensure_ascii=ascii)[1:-1] for part in tuple(private) for ascii in (True,False)}
+            private|={repr(part)[1:-1] for part in tuple(private)}
+        redactor.secrets=sorted(set([*redactor.secrets,*private]),key=len,reverse=True)
         if redactor.text(text)!=text:raise Refused('private-reflection')
     except Refused:raise
     except (ValueError,TypeError,AttributeError,KeyError,UnicodeError):raise Refused('unsupported-content') from None

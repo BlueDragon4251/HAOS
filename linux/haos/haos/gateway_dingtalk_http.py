@@ -24,9 +24,10 @@ ERRORS=frozenset({'authentication-refused','rate-limited','server-refused','tran
 
 
 class Failure(PermissionError):
-    def __init__(self,kind):
-        if kind not in ERRORS:raise ValueError('finite DingTalk transport diagnostic required')
-        super().__init__('private DingTalk SDK operation refused');self.kind=kind
+    def __init__(self,kind,retry_after=0):
+        if (kind not in ERRORS or type(retry_after) is not int or not 0<=retry_after<=86400
+                or kind!='rate-limited' and retry_after):raise ValueError('finite DingTalk transport diagnostic required')
+        super().__init__('private DingTalk SDK operation refused');self.kind=kind;self.retry_after=retry_after
 
 
 def endpoint(value):
@@ -69,7 +70,7 @@ def sdk_scope():
 class Boundary:
     def __init__(self,value,current,redactor):
         if not callable(current) or not isinstance(redactor,Redactor):raise PermissionError('current owner publication and private redaction required')
-        self.value=credentials(value);self.current=current;self.redactor=redactor;self.failure=None
+        self.value=credentials(value);self.current=current;self.redactor=redactor;self.failure=None;self.retry_after=0
         self.tokens={};self.session=None;self.register(self.value['client_secret']);current()
 
     def register(self,value):
@@ -107,15 +108,15 @@ class Boundary:
     @contextmanager
     def operation(self,purpose,client):
         if purpose not in {'token','connection'} or _ACTIVE.get() is not None:raise PermissionError('one closed private SDK operation required')
-        self.failure=None;self.check(client);operation={'boundary':self,'purpose':purpose,'client':client,'requests':0}
+        self.failure=None;self.retry_after=0;self.check(client);operation={'boundary':self,'purpose':purpose,'client':client,'requests':0}
         token=_ACTIVE.set(operation)
         try:
             yield operation
             self.current()
         finally:_ACTIVE.reset(token)
 
-    def refuse(self,kind):
-        self.failure=kind;raise Failure(kind)
+    def refuse(self,kind,retry_after=0):
+        self.failure=kind;self.retry_after=retry_after;raise Failure(kind,retry_after)
 
     def post(self,operation,url,headers,data):
         self.check(operation['client'])
@@ -151,7 +152,9 @@ class Boundary:
             self.current();status=response.status_code
             if 300<=status<400:self.refuse('redirect-refused')
             if status in {401,403}:self.refuse('authentication-refused')
-            if status==429:self.refuse('rate-limited')
+            if status==429:
+                from .gateway_retry import retry_after
+                self.refuse('rate-limited',retry_after(response.headers.get('Retry-After'),default=60,private_values=self.redactor.secrets))
             if status!=200:self.refuse('server-refused')
             if response.headers.get('Content-Encoding','identity').lower() not in {'','identity'}:self.refuse('invalid-response')
             content_type=response.headers.get('Content-Type','').split(';',1)[0].strip().lower()
