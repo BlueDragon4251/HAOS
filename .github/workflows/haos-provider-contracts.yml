@@ -103,6 +103,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_line_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/line-output.json"
           "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
           "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"

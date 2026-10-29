@@ -77,6 +77,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/sms-prepared-native-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_sdk.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-sdk-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-transport-build-probe.json

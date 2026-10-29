@@ -32,3 +32,24 @@ Transport/listener authentication, persistent ingress, bounded single-write
 replies, replay/recovery, media/voice and owner GUI integration are still open.
 Local SDK and identity tests do not establish live-account, external delivery,
 installed OS or hardware acceptance.
+
+
+Independent input projection now checks bounded duplicate-free finite JSON,
+application and both tenant fields, exact open sender/chat/native topic, user
+role, own-bot exclusion and both original millisecond time boundaries before
+calling the native codec. Group mentions require exact bot open-ID metadata;
+quoted roots, display names, user-ID aliases and @all do not grant access.
+This function consumes already authenticated bytes; it does not authenticate
+webhooks or sockets by itself.
+
+The actual Lark model and pinned Hermes normalizer produce text, rich posts,
+mention/command handling and resource descriptors without a client, download or
+local file write. Header/body snapshots and current grant hashes are checked
+again; private credential reflection is refused. Image/document, audio and video
+permissions remain separate even when the native SDK labels a video resource as
+`file`. Rich-post tags and duplicate resource keys require all corresponding
+owner approvals. The real SDK fixture reproduced and caught the initial video
+consent mismatch; fixed fixtures retain their negative assertions.
+
+This is still a private codec/admission stage. Authenticated transport, durable
+capture/dispatch, actual resources/voice, replies and owner GUI remain unfinished.
