@@ -240,3 +240,26 @@ wrong-role helpers, private inventory, stale/confirmed-state refusal, idempotent
 gateway approval, separate controller retry, and exact native receipt validation.
 Owner policy, initial ledger states and service-stop control are fixtures; this
 does not claim a graphical owner session or real external delivery inspection.
+
+The private WS frame guard now keeps the actual Lark protobuf parser, fragment
+assembler, dispatcher and ACK encoder behind bounded frame/header/fragment
+limits. Missing required protobuf fields, duplicate headers, cards, invalid
+sequence/count aliases, changed partial assemblies and excessive aggregate data
+are refused before dispatch. At most 32 partial messages/16 fragments per message
+are retained for five real seconds. Peer configuration cannot create a zero-delay
+ping loop; partial valid configuration preserves existing safe defaults.
+Incoming SDK dispatch runs inline with receive backpressure rather than spawning
+an unbounded task per frame. The SDK thread waits for the actual owning loop's
+SQLite capture and requires an explicit opaque durable receipt; that internal
+receipt is not returned in the ACK. Storage failure returns native SDK 500,
+while successful ACK follows original/native input commit. This guard still
+needs authenticated endpoint discovery and actual WS TLS/profile lifecycle;
+its probe uses a fixture socket sender and does not establish socket identity.
+
+The frame probe uses actual native protobuf/assembly/ACK and pinned Hermes input
+normalization with real private SQLite, an actual SDK-to-owner thread handoff,
+real fragment TTL expiry and a real SQLite-triggered storage failure. Fixture
+corrections retained assertions: native protobuf needs SeqID/LogID; the fixture
+ACK inspector itself must also inspect SQLite on its owning loop, rather than
+reading the connection from the simulated socket thread. SQLite thread checks
+remain enabled. Public Feishu registry/GUI remains disabled.

@@ -78,6 +78,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_tls.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/line-prepared-tls-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/sms-prepared-native-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_capture.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-original-capture-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_ws_frames.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-ws-frames-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_send_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-reply-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_reply_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-native-reply-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_webhook.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/feishu-authenticated-webhook-build-probe.json
