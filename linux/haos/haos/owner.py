@@ -186,6 +186,8 @@ def main():
     setup = gateway_sub.add_parser("setup")
     setup.add_argument("connector")
     setup.add_argument("platform", choices=["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms"])
+    email_account=gateway_sub.add_parser('email-account',help='authenticate configured IMAP/SMTP without sending or granting access')
+    email_account.add_argument('connector')
     matrix_devices=gateway_sub.add_parser('matrix-devices',help='inspect signed public device keys without granting access')
     matrix_devices.add_argument('connector');matrix_devices.add_argument('sender')
     pair = gateway_sub.add_parser("pair")

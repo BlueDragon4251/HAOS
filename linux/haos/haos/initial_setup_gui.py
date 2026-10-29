@@ -854,7 +854,12 @@ class Wizard:
                 if not isinstance(text,str) or not text.isascii() or not text.isdecimal() or len(text)>5 or not 1024<=int(text)<=65535:
                     raise ValueError('SMS HTTPS-Port muss eine ganze Zahl von 1024 bis 65535 sein')
                 return int(text)
+            from .email_owner_gui import AccountForm
+            email_form=AccountForm(self,self.content,connector.get)
+            connector_value.trace_add('write',email_form.clear_secret)
             def configure():
+                if platform.get()=='email':
+                    email_form.configure();return
                 line_values={'channel_secret':line_secret.get(),'channel_access_token':line_access.get(),
                     'destination':line_destination.get(),'port':line_port.get(),'tls':{'public_url':line_url.get(),
                         'bind_host':line_bind.get(),'public_listener':line_public.get(),**line_pem}}
@@ -895,7 +900,8 @@ class Wizard:
             configure_button = self._button(self.content, "Gateway sicher anlegen", configure, primary=True)
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
-                reset_sms();reset_line()
+                reset_sms();reset_line();email_form.reset()
+                email_form.frame.pack_forget()
                 token.delete(0, tk.END);app_token.delete(0, tk.END);mm_server.delete(0,tk.END)
                 for field in (matrix_server,matrix_user,matrix_device,matrix_recovery):field.delete(0,tk.END)
                 for field in (ntfy_server,ntfy_topic):field.delete(0,tk.END)
@@ -909,17 +915,20 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
-                elif platform.get() in {'line','sms'}:
+                elif platform.get() in {'line','sms','email'}:
                     irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
+                if platform.get()=='email':
+                    email_form.reset(configured_gateways.get('email',{}).get(connector.get()))
+                    email_form.frame.pack(fill='x',before=configure_button)
                 if platform.get()=='slack':slack_credentials.pack(fill="x",before=configure_button)
                 else:slack_credentials.pack_forget()
                 if platform.get()=='mattermost':mattermost_credentials.pack(fill='x',before=configure_button)
@@ -1422,7 +1431,8 @@ class Wizard:
                         'tls-refused':'LINE-TLS-Material abgelehnt; gültige Zertifikatskette und passenden privaten Schlüssel laden. Gespeicherte Daten bleiben erhalten',
                         'revoked':'LINE-Freigabe entzogen oder geändert; keine weitere Ausführung',
                         'closed':'Privates LINE-Profil geschlossen; Daten erhalten'}
-                    labels=(matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                    from .email_owner_gui import LABELS as email_labels
+                    labels=(email_labels if item.get('platform')=='email' else matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
                         else {**{key:value.replace('LINE','SMS/Twilio') for key,value in line_labels.items()},
                             'authentication-refused':'SMS/Twilio-Anmeldung abgelehnt; Account SID und privaten Auth-Token prüfen',
                             'identity-refused':'SMS/Twilio-Konto oder eigene Empfangsnummer passt nicht; gespeicherte Daten bleiben erhalten',
@@ -1442,7 +1452,7 @@ class Wizard:
                             'invalid-page':' · Verlauf: ungültige oder wiederholte Seite; Cursor bleibt erhalten',
                             '':''}[item['history_error']])
                         +(' · letzter Fehler: '+matrix_labels[item['last_error']] if item['last_error'] else '')) if item.get('platform')=='matrix' else ''
-                    if item.get('platform') in {'ntfy','line','sms'}:
+                    if item.get('platform') in {'ntfy','line','sms','email'}:
                         deadline=item.get('next_attempt',0)
                         extra=(' · nächste Anfrage: '+(datetime.datetime.fromtimestamp(deadline).strftime('%d.%m.%Y %H:%M:%S') if deadline>0 else 'keine Wartefrist')
                             +(' · letzter Fehler: '+labels[item['last_error']] if item.get('last_error') else ''))
@@ -1494,6 +1504,8 @@ class Wizard:
                             +' · keine Empfangsbestätigung der Kanalmitglieder'
                             +(' · Prüfbeleg '+outgoing['server_echo_receipt'] if outgoing.get('server_echo_receipt') else ''),
                             size=10,color=self.MUTED).pack(anchor='w',pady=3)
+                from .email_owner_gui import recovery as email_recovery
+                email_recovery(self,recovery_frame,value,load_ingress,connector.get)
                 rows = value["ingress"]
                 if not rows:
                     self._label(recovery_frame, "Keine weiteren ungeklärten Eingänge.", size=10, color=self.MUTED).pack(anchor="w")
@@ -1568,9 +1580,13 @@ class Wizard:
                         "Hermes bringt weitere Plattformadapter mit. HAOS erlaubt erst nach "
                         "echter Authentifizierung, Zustellung und Absenderprüfung zusätzliche Gateways.",
                         color=self.MUTED).pack(anchor="w", pady=(15, 0))
+            self._button(self.content,'Gespeicherte E-Mail-Originale verwalten',lambda:self.show('gateway-email-sources')).pack(anchor='w',pady=6)
             self._button(self.content,'Gespeicherte Gateway-Medien verwalten',lambda:self.show('gateway-media')).pack(anchor='w',pady=6)
             self._button(self.content,'Lokale Spracherkennung verwalten',lambda:self.show('gateway-speech')).pack(anchor='w',pady=6)
             self._catalogue("Alle Hermes-Plattformadapter anzeigen", gateway_rows())
+        elif name=='gateway-email-sources':
+            from .email_owner_gui import sources
+            sources(self)
         elif name=='gateway-speech':
             self._head('Lokale Spracherkennung','Tiny · mehrsprachig · Verarbeitung auf diesem Gerät')
             self._label(self.content,'Die Einrichtung lädt einmalig etwa 75 MiB öffentliche Modelldateien über HTTPS. '

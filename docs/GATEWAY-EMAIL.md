@@ -213,3 +213,22 @@ recipient delivery. A real gateway-UID loopback test exercises the explicit
 release followed by one new controller attempt, then suppression of its replay.
 A separate network-disabled process test exercises gateway/controller UID
 separation and rejects root and unrelated peer identities without optional SDKs.
+
+
+Prepared graphical owner controls now display finite mail transport errors,
+active and archived mailbox scan epochs, SMTP server-acceptance receipts and
+independently confirmed private retry permissions. Selecting another attempt
+clears consent; changing the connector after inspection requires a new snapshot.
+The source-management page uses opaque private profiles and metadata only,
+protects pending inputs, and asks explicitly before logical live-cache disposal.
+Actual Tk probes exercise both 1280×800 and 640×480 layouts. Owner handoffs in
+these GUI probes are explicit fixtures; distinct-UID ledger tests remain separate.
+
+The prepared dedicated account form masks the password, separates IMAP and SMTP
+hosts/ports/TLS modes, requires explicit receiving-server header-custody approval,
+and clears secrets and consent after endpoint or platform changes and submission.
+Its no-send account-check backend invokes the existing fixed native worker under
+the gateway UID, with root-owned code, private stdin, no supplementary groups,
+finite diagnostics and a 35-second deadline. The public platform registry and
+runtime activation are still disabled while pairing and publication integration
+are completed. The GUI probes do not establish a live account or installed setup.

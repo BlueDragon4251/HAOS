@@ -540,6 +540,10 @@ jobs:
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_speech_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_line_recovery_gui.py linux/haos
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_line_recovery_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_email_owner_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_email_owner_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_email_recovery_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_email_recovery_gui.py linux/haos
           xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_sms_recovery_gui.py linux/haos
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_sms_recovery_gui.py linux/haos
       - name: Assert firstboot and migration gate wiring

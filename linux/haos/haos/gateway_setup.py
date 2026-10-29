@@ -60,6 +60,40 @@ def owner_matrix_devices(connector,sender):
     return response
 
 
+def owner_email_account(connector):
+    """Authenticate configured IMAP/SMTP in the private UID; never send mail."""
+    if os.geteuid()!=0:raise PermissionError('email account inspection requires authenticated owner authority')
+    stopped_gateway();policy,private=load()
+    if not any(row['id']==connector and row['platform']=='email' for row in policy['connectors']):
+        raise ValueError('select one configured email connector')
+    from .gateway_email import credentials,authority
+    from .gateway_email_process import command,response,ERRORS
+    from .gateway_line_ingress import _object
+    value=credentials(private['connectors'][connector]);publication=authority(connector,value)
+    account=pwd.getpwnam('haos-gateway')
+    if account.pw_uid==0 or account.pw_gid==0:raise PermissionError('email account inspection must drop root')
+    request={'action':'probe','connector':connector,'credentials':value,'policy_sha256':publication,'parent_pid':os.getpid()}
+    try:
+        result=subprocess.run(command(),input=json.dumps(request,ensure_ascii=False)+'\n',text=True,
+            capture_output=True,check=False,timeout=35,user=account.pw_uid,group=account.pw_gid,
+            extra_groups=[],umask=0o077,cwd='/usr/lib/haos',
+            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','HERMES_SAFE_MODE':'1'})
+    except subprocess.TimeoutExpired:
+        raise RuntimeError('E-Mail-Kontoprüfung abgebrochen: Zeitlimit; IMAP-/SMTP-Endpunkte und Netzwerk prüfen.') from None
+    if result.returncode or len(result.stdout.encode())>16384:
+        raise RuntimeError('E-Mail-Kontoprüfung fehlgeschlagen; private Runtime, Konto, TLS und Netzwerk prüfen.')
+    def finite(_value):raise ValueError('finite private account response required')
+    checked=response(json.loads(result.stdout,object_pairs_hook=_object,parse_constant=finite))
+    authority(connector,value,publication)
+    if 'error' in checked:
+        if checked['error'] not in ERRORS:raise ValueError('finite account diagnostic required')
+        return {'authenticated':False,'error':checked['error'],'smtp_message_sent':False,
+            'sender_grants_changed':False,'external_delivery_verified':False}
+    from .owner import audit
+    audit('gateway.email-account-inspected',{'connector':connector,'imap_authenticated':True,'smtp_authenticated':True})
+    return {**checked,'authenticated':True,'sender_grants_changed':False,'external_delivery_verified':False}
+
+
 def owner_ingress(args, policy):
     """Owner authenticates; only the gateway UID opens its private native journal."""
     from .owner import audit
@@ -263,6 +297,7 @@ def owner_gateway(args):
         audit("gateway." + args.gateway_action, {})
         return {"action": args.gateway_action}
     if args.gateway_action=='matrix-devices':return owner_matrix_devices(args.connector,args.sender)
+    if args.gateway_action=='email-account':return owner_email_account(args.connector)
     policy, credentials = load()
     if args.gateway_action == "status":
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}

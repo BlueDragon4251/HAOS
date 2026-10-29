@@ -1,0 +1,83 @@
+{
+  "parent_commit": "40479172b46132850f734aa66e9006fc6449b020",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "6683104357a587b1637688a6b71a1eeada1b65e8a3527b01c754c0c0e64f4f99"
+    },
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "4ac50c6a91e2de89993e8ee561b528217b476000bac430e983c7a4d9074c659b"
+    },
+    {
+      "path": "linux/haos/haos/email_owner_gui.py",
+      "sha256": "a59816367a90d1df7373bf70ce401e12ff5ab96a89828746efde183ac712efed"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "23d2d2949d04c55d76900c5b1f8e73d4fe8d6afa22d712c34320cf44757e55ef"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "c0866179645ed8120d3580075bfba926b7bf28ac27ddd3455161e4ce79bbe78d"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "6b05ea5006b29fbf9495ce732c0eb2d0a744852dffe4b6a2a05f69b381f8fde5"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "e77de3a98a65d20ca8124cf01a8ba03a02917b93a5e4d3f20da68b34cb4d3035"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "75d048330c1e36d22a880477e46c162a9459b955c59a5bc559ea100ad69aeff8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_owner_gui.py",
+      "sha256": "79e1faee63c073e51d31ef2ab76d32b6023b6f65b73512e1caab92e12a869b01"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_recovery_gui.py",
+      "sha256": "5be269d2858a0836cce0c710d30d1051e6a8124a49d7819e7cccc3685e9f70ac"
+    },
+    {
+      "path": "linux/haos/tests/test_email_owner_setup.py",
+      "sha256": "8c07aae6e023959fd194c51bd5dffee857505b51a22690eb377504a31bb56871"
+    }
+  ],
+  "checks": {
+    "minimal_python311": "1729 passed, 2 existing skips",
+    "full_pinned_runtime": "1729 passed, 2 existing skips",
+    "real_kernel_uid_socket_authority": "92 passed",
+    "actual_tk_email_account": "7 cases at each resolution",
+    "actual_tk_email_recovery_and_sources": "10 cases at each resolution",
+    "shared_wizard_regression": "SMS and LINE owner/recovery probes passed at both resolutions"
+  },
+  "log_sha256": {
+    "email-owner-forms-minimal-022.log": "b835b92afe6327f390c283a03cc72be83b0f541b129c0ca21b7b6c94e42bc26c",
+    "email-owner-forms-full.log": "863c8c9b5ceab26b402d1f39537fc6d7530fab96bb5bfa36aced31b8f0a08e7c",
+    "email-owner-forms-kernel.log": "0838696f5dc95f3c6449a890af72343f0e286aeeae4c06b0a047ebc6238df69b",
+    "email-forms-regression-email_owner-1280x800.log": "f6c29aad4281a6d400436757e831fd697a4e29e0d425e9236f2c5f830826c52a",
+    "email-forms-regression-email_recovery-1280x800.log": "7539714c12de4810103022d02ce6b3cea2c5cbc9eb6b74b0319d5e8d37ae7840",
+    "email-forms-regression-sms_owner-1280x800.log": "0d7d69106639b83b95d5321dabc49d71c0427214f2c8072356545697053aebc9",
+    "email-forms-regression-sms_recovery-1280x800.log": "074fef37c7ede7dfa341888d08abe5d6d8f4d62cf88a60119b33e9df5eb848a0",
+    "email-forms-regression-line_owner-1280x800.log": "64e56e9b7a6584cfd7ed7d0098782f21c3eba7f29f69f52c774e5796d31be6e6",
+    "email-forms-regression-line_recovery-1280x800.log": "0ef84764ebad3d4d00353f213cc33b799fdb6d80776a40334f273d4b457769e5",
+    "email-forms-regression-email_owner-640x480.log": "86d8d39f9359f8102bce7d88d680dd949008e01fde6bdd555e596276864749f5",
+    "email-forms-regression-email_recovery-640x480.log": "a0ade46173ff5e0d420a95e7175160ab68405bef8de1d73b1559b879bc9490b0",
+    "email-forms-regression-sms_owner-640x480.log": "0d7d69106639b83b95d5321dabc49d71c0427214f2c8072356545697053aebc9",
+    "email-forms-regression-sms_recovery-640x480.log": "074fef37c7ede7dfa341888d08abe5d6d8f4d62cf88a60119b33e9df5eb848a0",
+    "email-forms-regression-line_owner-640x480.log": "64e56e9b7a6584cfd7ed7d0098782f21c3eba7f29f69f52c774e5796d31be6e6",
+    "email-forms-regression-line_recovery-640x480.log": "0ef84764ebad3d4d00353f213cc33b799fdb6d80776a40334f273d4b457769e5"
+  },
+  "limits": [
+    "Prepared email account form is deliberately not in public platform choices until publication/pairing/runtime activation is completed.",
+    "GUI owner handoffs and source-profile metadata are fixtures; recovery transport inventory uses actual private SQLite.",
+    "Real kernel UID denials are separate and do not mock identity.",
+    "No external accounts, messages, installed setup, hardware or release acceptance.",
+    "Existing backup file exclusion and two skips unchanged.",
+    "A first ordinary regression run used restrictive shell umask, causing two existing public-directory fixture tests to fail; unchanged tests pass with required umask 022."
+  ]
+}

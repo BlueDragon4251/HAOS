@@ -862,3 +862,24 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         assert observer.execute('SELECT state FROM gateway_media_uploads').fetchone()[0]=='purged'
         assert observer.execute('SELECT actor,note FROM gateway_media_purge_audit').fetchone()==('owner:1000','inspection sha256:'+'e'*64)
     assert database.stat().st_uid==65532 and all(p.stat().st_uid==65532 for p in state.iterdir())
+
+
+@pytest.mark.parametrize('uid',[65532,65533,65534])
+def test_email_owner_account_and_forms_reject_actual_service_uids_before_any_helper_or_network(uid):
+    assert os.geteuid()==0
+    code='''
+import os,sys
+from haos.gateway_setup import owner_email_account
+from haos import initial_setup
+os.setgroups([]);os.setgid(int(sys.argv[1]));os.setuid(int(sys.argv[1]))
+for call in [lambda:owner_email_account('email'),lambda:initial_setup.inspect_email_gateway_account('email'),
+    lambda:initial_setup.configure_email_gateway('email',{},trust_authentication_results=True),
+    lambda:initial_setup.email_gateway_sources(),
+    lambda:initial_setup.recover_email_gateway({},'approve-email-retry','fixture',True,confirmed_not_delivered=True)]:
+    try:call()
+    except PermissionError:pass
+    else:raise AssertionError('service UID reached an owner-only email operation')
+assert 'plugins.platforms.email.adapter' not in sys.modules
+'''
+    result=subprocess.run([sys.executable,'-c',code,str(uid)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr

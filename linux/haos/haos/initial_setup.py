@@ -484,6 +484,30 @@ def configure_line_gateway(connector,channel_secret,channel_access_token,destina
         'external_reachability_verified':False}
 
 
+def configure_email_gateway(connector,account,*,trust_authentication_results=False):
+    """Save a dedicated TLS mail account only after receiving-server approval."""
+    require_root()
+    if trust_authentication_results is not True:
+        raise PermissionError('explicit approval of receiving-server Authentication-Results custody required')
+    from .gateway_email import credentials,scope
+    value=credentials(account)
+    from .gateway_setup import load,persist
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    policy,private=load()
+    if any(row['id']!=connector and row['platform']=='email' for row in policy['connectors']):
+        raise ValueError('one isolated adapter per platform is currently supported')
+    if any(row['id']==connector and row['platform']!='email' for row in policy['connectors']):
+        policy['bindings']=[row for row in policy['bindings'] if row['connector']!=connector]
+    policy['connectors']=[row for row in policy['connectors'] if row['id']!=connector]+[{'id':connector,'platform':'email'}]
+    GatewayPolicy(policy)
+    quiesce_for_setup(gateway_only=True)
+    private['connectors'][connector]=value;persist(policy,private)
+    audit('setup.gateway',{'connector':connector,'platform':'email','receiving_authentication_custody_approved':True})
+    return {'configured':True,'platform':'email','scope':scope(value),'restart_required':True,
+        'sender_pairing_required':True,'authenticated':False,'external_delivery_verified':False}
+
+
 def configure_sms_gateway(connector,account_sid,auth_token,from_number,port,tls):
     """Publish verified SMS HTTPS credentials; no listener or external message here."""
     require_root()
@@ -722,6 +746,68 @@ def retry_sms_gateway_auth(connector):
     quiesce_for_setup(gateway_only=True)
     return owner_gateway(SimpleNamespace(gateway_action='retry-sms-auth',connector=connector,
         note='Owner requested a new SMS authentication check'))
+
+
+def inspect_email_gateway_account(connector):
+    require_root()
+    from .gateway_setup import owner_email_account
+    quiesce_for_setup(gateway_only=True)
+    return owner_email_account(connector)
+
+
+def retry_email_gateway_auth(connector):
+    require_root()
+    configured=gateway_configuration()
+    if not isinstance(connector,str) or not any(row['id']==connector and row['platform']=='email' for row in configured['connectors']):
+        raise ValueError('select one configured email connector')
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='retry-email-auth',connector=connector,
+        note='Owner requested a new email authentication check'))
+
+
+def email_gateway_sources(profile=None):
+    require_root()
+    import re
+    if profile is not None and (not isinstance(profile,str) or not re.fullmatch('email-[0-9a-f]{64}',profile)):
+        raise ValueError('select an exact opaque email profile, not a path')
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(gateway_action='email-sources',profile=profile))
+
+
+def recover_email_gateway(row,action,note,confirmed=False,*,profile=None,confirmed_not_delivered=False):
+    """Carry an inspected snapshot to the offline helper; never infer consent."""
+    require_root()
+    import re
+    if (not isinstance(row,dict) or action not in {'recover-email-mailbox','purge-email-source','approve-email-retry'}
+            or confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000
+            or not isinstance(row.get('snapshot_sha256'),str) or not re.fullmatch('[0-9a-f]{64}',row['snapshot_sha256'])):
+        raise ValueError('select an inspected email snapshot and explicitly confirm a bounded non-secret decision')
+    values={'gateway_action':action,'snapshot_sha256':row['snapshot_sha256'],'note':note,'confirm_inspected':True}
+    if action=='recover-email-mailbox':
+        if (not isinstance(row.get('identity'),str) or not re.fullmatch('[0-9a-f]{64}',row['identity'])
+                or row.get('active') is not True or row.get('status') not in {'uid-validity-changed','uid-next-regressed'}):
+            raise ValueError('select the active fenced mailbox scan')
+        values['identity']=row['identity']
+    elif action=='purge-email-source':
+        if (not isinstance(profile,str) or not re.fullmatch('email-[0-9a-f]{64}',profile)
+                or not isinstance(row.get('id'),str) or not re.fullmatch('[0-9a-f]{64}',row['id'])
+                or row.get('purge_allowed') is not True):raise ValueError('select an inspected terminal email source')
+        values.update(profile=profile,id=row['id'])
+    else:
+        if (confirmed_not_delivered is not True or row.get('state') not in {'writing','uncertain','rejected'}
+                or type(row.get('attempt')) is not int or not 1<=row['attempt']<5
+                or not isinstance(row.get('delivery_id'),str) or not re.fullmatch('[0-9a-f]{64}',row['delivery_id'])
+                or not isinstance(row.get('connector'),str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])):
+            raise ValueError('select an unconfirmed SMTP attempt and independently confirm non-delivery')
+        values.update(connector=row['connector'],delivery_id=row['delivery_id'],attempt=row['attempt'],confirm_not_delivered=True)
+    from .gateway_setup import owner_gateway
+    from types import SimpleNamespace
+    quiesce_for_setup(gateway_only=True)
+    return owner_gateway(SimpleNamespace(**values))
 
 
 def retry_homeassistant_gateway_auth(connector):
