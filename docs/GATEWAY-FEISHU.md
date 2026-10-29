@@ -207,6 +207,36 @@ verified loopback TLS (drop/429/redirect/missing source/invalid-post fallback),
 and real UID/profile/worker/SQLite cases: confirmed replay suppression, changed
 body denial, uncertain reopen/later-attempt suppression and persistent account
 backoff on a native rate code returned with HTTP 200. These are fixture replies
-only, never external Feishu delivery or live-account acceptance. Actual process
-kill during an outgoing write and complete owner adjudication/recovery still
-need dedicated verification/integration. Public Feishu activation remains off.
+only, never external Feishu delivery or live-account acceptance. Actual process kill during an outgoing write is now verified below; complete
+public owner adjudication/recovery still needs frontend integration. Public Feishu activation remains off.
+
+The native private process probe now withholds an API reply after receiving a
+write, verifies the committed `writing` intent through a separate read-only
+SQLite connection, and sends actual SIGKILL to the gateway process. Its worker
+also dies through the kernel parent-death guard and is reaped by the disposable
+init. A new gateway process reopens the same profile, quarantines the in-flight
+intent and preserves previously confirmed receipts without another API write.
+The fixture waits for the real account pause to expire and signals readiness
+before measuring SDK startup/write progress; it does not edit clocks or the
+pause journal. This is a process-crash test, not a power-loss or installed OS
+acceptance. Native connect/disconnect status writes now run inside the private
+profile HOME context rather than falling back to the service's global HOME.
+
+Offline private recovery exposes bounded delivery/account metadata without
+message bodies or credentials. An exact inspected snapshot, current connector
+read authority, authenticated-owner handoff, evidence hash and explicit
+independent non-delivery confirmation are required to mark a private attempt
+`owner-retry-approved`. The immutable decision is idempotent; confirmed native
+acceptance, changed snapshots and ambiguous confirmation are refused. It sends
+nothing and does not clear account pauses or change the controller obligation.
+The separate controller UID must reconcile that outbox itself. Feishu delivered
+adjudication accepts only its own native message-ID format. Neither operation
+is exposed through model/transport RPC. Public owner command/GUI wiring remains
+open while Feishu is disabled.
+
+The SDK-free offline probe exercises actual root/agent/gateway/controller UIDs
+and their separate ledgers in a disposable network-disabled namespace: denied
+wrong-role helpers, private inventory, stale/confirmed-state refusal, idempotent
+gateway approval, separate controller retry, and exact native receipt validation.
+Owner policy, initial ledger states and service-stop control are fixtures; this
+does not claim a graphical owner session or real external delivery inspection.

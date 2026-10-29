@@ -55,6 +55,7 @@ def main():
     owner=work/'owner-secret';owner.write_text('root-only-owner-canary');owner.chmod(0o600)
     private=base/'secret';private.write_text(value['app_secret']);private.chmod(0o600);os.chown(private,65534,65534)
     marker=work/'request-started';state={'mode':'ok'};seen=[];entered=threading.Event();release=threading.Event();closed=threading.Event()
+    write_entered=threading.Event();write_release=threading.Event();write_closed=threading.Event()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*_args):pass
         def reply(self,status,body):
@@ -71,6 +72,12 @@ def main():
                 assert len(body['uuid'])==32 and set(body)=={'content','msg_type','reply_in_thread','uuid'}
                 assert json.loads(body['content'])['text'] in {'Actual private native reply.','Uncertain private native reply.'}
                 seen.append('reply')
+                if state['mode']=='blockwrite':
+                    write_entered.set();write_release.wait(20)
+                    try:self.reply(200,{'code':0,'data':{'message_id':'om_'+'d'*32,'chat_id':policy['bindings'][0]['chat']}})
+                    except (BrokenPipeError,ConnectionResetError,ssl.SSLError):pass
+                    finally:write_closed.set()
+                    return
                 if state['mode']=='ratewrite':return self.reply(200,{'code':99991400,'msg':'fixture native rate limit'})
                 if state['mode']=='dropwrite':
                     self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();self.close_connection=True;return
@@ -125,7 +132,7 @@ if request['mode']=='agent':
     else:raise AssertionError('agent invoked private SDK worker')
     print(json.dumps({'agent_denied':True}));sys.exit(0)
 async def run():
-    if request['mode']=='profile':
+    if request['mode'] in {'profile','crashreply','resume-reply'}:
         from haos.gateway_feishu_profile import build
         from haos.gateway_feishu import PreparedFeishuPolicy
         from haos.gateway_raw import NativeInbox
@@ -144,6 +151,27 @@ async def run():
             except PermissionError:pass
             else:raise AssertionError('duplicate private profile lease admitted')
             assert await adapter.connect(),adapter.native_health()
+            if request['mode']!='profile':
+                from haos.gateway import digest
+                from haos.gateway_delivery import delivery_result
+                binding=policy().bindings['owner']
+                metadata={'haos_binding':{'binding_id':'owner','binding_digest':digest(binding)},'haos_scope':binding['scope'],
+                    'thread_id':binding['thread'],'haos_delivery_id':'e'*64,'haos_delivery_attempt':1}
+                if request['mode']=='crashreply':
+                    # Wait for the REAL persisted pause to expire; no clock or journal edits.
+                    while adapter._haos_feishu_publisher.health()['next_attempt']>__import__('time').time():await asyncio.sleep(.2)
+                    print(json.dumps({'crash_write_ready':True}),flush=True)
+                    await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,metadata=metadata)
+                    raise AssertionError('fixture must kill gateway before withheld write response')
+                unknown=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,
+                    metadata={**metadata,'haos_delivery_attempt':2})
+                assert delivery_result(unknown)=={'status':'uncertain'}
+                row=inbox.db.execute('SELECT state FROM feishu_delivery_intents WHERE delivery_id=?',('e'*64,)).fetchone()
+                assert row['state']=='uncertain'
+                confirmed=await adapter.send(binding['chat'],'Actual private native reply.',reply_to='om_'+'f'*32,
+                    metadata={**metadata,'haos_delivery_id':'a'*64})
+                assert confirmed.success and confirmed.message_id=='om_'+'d'*32
+                return {'crash_state_preserved':True,'no_resend':True,'confirmed_receipt_preserved':True}
             print(json.dumps({'profile_listening':True,'lease_denied':True}),flush=True)
             async with asyncio.timeout(20):
                 while relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1:await asyncio.sleep(.05)
@@ -315,6 +343,48 @@ print(json.dumps(asyncio.run(run())))
         assert result=={'profile_revoked':True,'listener_stopped':True}
         cases.append('actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input')
         publish(policy)
+        state['mode']='blockwrite';write_entered.clear();write_release.clear();write_closed.clear()
+        child=start('crashreply');before=seen.count('reply')
+        ready=child.stdout.readline()
+        if not ready:finish(child);raise AssertionError('crash fixture exited before real pause expiry')
+        assert json.loads(ready)=={'crash_write_ready':True}
+        if not write_entered.wait(35):
+            if child.poll() is None:child.kill()
+            output,error=child.communicate(timeout=10)
+            from haos.redaction import Redactor
+            safe=Redactor([value['app_secret'],value['verification_token'],value['encrypt_key'],value['tls']['private_key']])
+            raise AssertionError('private crash fixture never reached write: '+safe.text(error.decode()[-5000:]))
+
+        assert seen.count('reply')==before+1
+        import sqlite3
+        with sqlite3.connect('file:/var/lib/haos-gateway/profile-native.db?mode=ro',uri=True) as journal:
+            state_before_kill=journal.execute('SELECT state FROM feishu_delivery_intents WHERE delivery_id=?',('e'*64,)).fetchone()
+            assert state_before_kill==('writing',)
+        cases.append('actual_readonly_journal_observes_committed_write_intent_before_withheld_native_API_response')
+        workers=[]
+        for proc in Path('/proc').iterdir():
+            if not proc.name.isdecimal():continue
+            try:status=(proc/'status').read_text()
+            except FileNotFoundError:continue
+            fields=dict(line.split(':',1) for line in status.splitlines() if ':' in line)
+            if fields.get('PPid','').strip()==str(child.pid):
+                assert fields['Uid'].split()==['65534']*4;workers.append(int(proc.name))
+        assert len(workers)==1
+        child.kill();child.communicate(timeout=10);assert child.returncode==-9
+        deadline=time.monotonic()+5;reaped=False
+        while time.monotonic()<deadline:
+            pid,status=os.waitpid(workers[0],os.WNOHANG)
+            if pid:
+                assert os.WIFSIGNALED(status) and os.WTERMSIG(status)==9;reaped=True;break
+            time.sleep(.02)
+        assert reaped and not Path('/proc',str(workers[0])).exists()
+        write_release.set();assert write_closed.wait(5)
+        cases.append('actual_SIGKILL_of_gateway_during_native_reply_triggers_kernel_worker_death_and_reaping')
+        state['mode']='ok'
+        result=finish(start('resume-reply'))
+        assert result=={'crash_state_preserved':True,'no_resend':True,'confirmed_receipt_preserved':True}
+        assert seen.count('reply')==before+1
+        cases.append('actual_private_gateway_process_restart_quarantines_inflight_reply_and_preserves_confirmed_receipt_without_new_API_write')
         # Root must never invoke this gateway-only worker directly, even with valid input.
         before=len(seen)
         direct=subprocess.run([python,'-E','-s','-m','haos.gateway_feishu_worker'],input=b'{}\n',capture_output=True,
@@ -322,7 +392,7 @@ print(json.dumps(asyncio.run(run())))
         assert direct.returncode!=0 and len(seen)==before
         cases.append('actual_root_identity_is_refused_before_worker_reads_or_network')
     finally:
-        release.set()
+        release.set();write_release.set()
         for child in children:
             if child.poll() is None:child.kill();child.communicate(timeout=10)
         server.shutdown();server.server_close();thread.join(timeout=5)

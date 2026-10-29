@@ -81,6 +81,7 @@ def build(value,*,parent,connector,policy,inbox):
 
 
 def _install(adapter,fd,profile,identity):
+    from .gateway_matrix_profile import scope as private_scope
     native=adapter._haos_native;value=adapter._haos_feishu_value;db=native.inbox.db;current=adapter._haos_feishu_check
     from .gateway_feishu_delivery import Publisher
     publisher=Publisher(adapter) if any(row['connector']==native.connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
@@ -103,7 +104,7 @@ def _install(adapter,fd,profile,identity):
         if task is not None and task is not asyncio.current_task():task.cancel();await asyncio.gather(task,return_exceptions=True)
         runner=adapter._haos_feishu_runner;adapter._haos_feishu_runner=None
         if runner is not None:await runner.cleanup()
-        adapter._mark_disconnected()
+        with private_scope(adapter._haos_feishu_home,adapter._haos_feishu_environment):adapter._mark_disconnected()
     async def replay():
         try:
             while True:
@@ -145,7 +146,9 @@ def _install(adapter,fd,profile,identity):
                 runner=web.AppRunner(application(self._haos_feishu_receiver),access_log=None,auto_decompress=False,shutdown_timeout=5)
                 self._haos_feishu_runner=runner;await runner.setup()
                 await web.TCPSite(runner,value['tls']['bind_host'],value['port'],ssl_context=tls).start()
-                current();self._mark_connected();status('listening-tls');self._haos_feishu_task=asyncio.create_task(replay());return True
+                current()
+                with private_scope(self._haos_feishu_home,self._haos_feishu_environment):self._mark_connected()
+                status('listening-tls');self._haos_feishu_task=asyncio.create_task(replay());return True
             except asyncio.CancelledError:await stop();raise
             except PermissionError:await stop();status('revoked');raise
             except Exception:await stop();status('transport-unavailable');return False

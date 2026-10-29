@@ -1,0 +1,131 @@
+{
+  "parent_commit": "6301a7ab2b6195946169528c92dece312bcd07ca",
+  "parent_tree": "afc5e329d497aaac02f973817848856bdc56f8d1",
+  "parent_CI": "all six freshly successful, attributed only to parent source",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "42175941a3f962615416073a56b43a5c4b9fc109abbf8cb4723caa9421474424"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "9596b2e088318210cd57f4e5d201b35beea7bc5ef54fcbe50e9fbb2786556279"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_profile.py",
+      "sha256": "2ece8974aae0650597335c62979afb674c57a4f333cae52a8cc4265aa931cfaf"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_recovery.py",
+      "sha256": "c055e7bce0dd7d1898108a6f03d4469eb67c4e6a83e8c98b3e66c0d6de366e4b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "9d9018880c0442516df6dda198b5e8dbe74ce901c0cf9fa9596886b8acd954a5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "113a5133cca6df39c7744c9f44b25093a210829e0cee5c013305c310ac1c6e97"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_process.py",
+      "sha256": "da9f65acbbf0f87b92476c4be01b7bc49c6fdeee52d6e2fd9c6266ac9fe6e431"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_recovery_process.py",
+      "sha256": "0906eb8f2b80e88a76d3127a988ff4c553e92da389d22bf22fb116ed8c595a1d"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_recovery.py",
+      "sha256": "4fb5ebf25681cf46f00c18ca722355a86a0befa5d43be8bebe49c0a366f18c8d"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1928 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1928 passed, 2 existing skips",
+    "actual_UID_native_SDK_TLS_profile_write_SIGKILL_and_restart": "24 passed",
+    "actual_distinct_UID_offline_Feishu_recovery_without_SDK": "6 passed",
+    "actual_distinct_UID_existing_email_recovery_regression": "6 passed",
+    "actual_root_backup_policy_owner_gateway_provider_UI_authority_and_bubblewrap_suite": "143 passed",
+    "workflow_yaml_and_diff": "passed"
+  },
+  "native_crash_report": {
+    "passed": 24,
+    "cases": [
+      "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+      "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+      "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+      "actual_private_worker_wrong-bot_refused_without_false_success",
+      "actual_private_worker_401_refused_without_false_success",
+      "actual_private_worker_429_refused_without_false_success",
+      "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+      "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+      "actual_root_wrong-scope_refused_before_private_SDK_network",
+      "actual_root_own-bot_refused_before_private_SDK_network",
+      "actual_root_writable-policy_refused_before_private_SDK_network",
+      "actual_root_pending-publication_refused_before_private_SDK_network",
+      "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+      "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+      "actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check",
+      "actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate",
+      "actual_private_worker_native_reply_confirmation_is_durable_duplicate_suppressed_and_changed_body_denied",
+      "actual_native_reply_connection_drop_remains_uncertain_across_publisher_reopen_and_new_attempt_without_second_write",
+      "actual_native_HTTP_200_rate_code_persists_account_backoff_across_publisher_reopen_and_other_delivery_without_new_API_write",
+      "actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input",
+      "actual_readonly_journal_observes_committed_write_intent_before_withheld_native_API_response",
+      "actual_SIGKILL_of_gateway_during_native_reply_triggers_kernel_worker_death_and_reaping",
+      "actual_private_gateway_process_restart_quarantines_inflight_reply_and_preserves_confirmed_receipt_without_new_API_write",
+      "actual_root_identity_is_refused_before_worker_reads_or_network"
+    ],
+    "actual_uids": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+    "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+    "owner_publication_and_account_are_fixtures": true,
+    "public_feishu_enabled": false,
+    "external_messages_live_account_or_installed_acceptance": false
+  },
+  "offline_recovery_report": {
+    "passed": 6,
+    "cases": [
+      "actual_root_agent_and_wrong_service_uids_cannot_open_private_offline_helpers_even_with_supplied_owner_fields",
+      "actual_gateway_uid_inspects_only_finite_opaque_delivery_and_account_metadata_without_optional_runtime",
+      "actual_private_helper_refuses_stale_inspection_missing_non_delivery_confirmation_and_confirmed_acceptance",
+      "gateway_owner_decision_is_idempotent_and_preserves_account_deadline_and_separate_controller_obligation",
+      "distinct_actual_service_uids_record_two_offline_owner_decisions_without_network_or_rewriting_prior_gateway_intent",
+      "actual_controller_uid_requires_exact_native_Feishu_receipt_for_separate_owner_delivered_decision"
+    ],
+    "actual_uids": [
+      0,
+      65532,
+      65533,
+      65534
+    ],
+    "optional_Hermes_source_or_SDK_imported": false,
+    "network_available": false,
+    "prepared_owner_policy_and_metadata_states_are_fixtures": true,
+    "public_Feishu_CLI_GUI_or_live_acceptance": false
+  },
+  "log_sha256": {
+    "feishu-reply-process-SIGKILL-synchronized.log": "3ade731a6d3c3d5871f59ca70e80515803490d58d7814c4e89ac46c92758e272",
+    "feishu-offline-recovery-process-final.log": "6abb63c773e409c17e0612c07c61da9e5138835a9523543cafcaba076fbf0b87",
+    "feishu-change-email-recovery-regression.log": "4b0dbc41b8d0ae815364c66e088304bfeb969b555f7269aacc3c70d56438f904",
+    "feishu-recovery-minimal-final.log": "e9a48ac74c17ea71f3541df9a151c61041f35d7064b24e5c796f2b827c69fe21",
+    "feishu-recovery-full.log": "77c5a7dfd3db0dc9ba081c9d58bdfed555b22a161b35ffeb6b90b6efe90da12e",
+    "feishu-recovery-root-suite-writable-run.log": "56e7e06314c42ac3cf97fba8353b73d163dd5e1b0dc25ab1af861f1e726d8c10"
+  },
+  "fixture_and_environment_corrections": [
+    "Initial crash fixture counted the real 60-second account pause plus fresh SDK startup inside one 60-second write wait. It now signals readiness after actual pause expiry before observing bounded worker startup/write; no clock or ledger edits.",
+    "Container root suite initially had read-only /run: 119 passed, 24 fixture setup errors. Added disposable writable /run tmpfs, retained all tests, then 143 passed."
+  ],
+  "product_fix": "Native lifecycle status writes use private profile HOME; no fallback to global service HOME.",
+  "limitations": [
+    "Public Feishu activation, owner frontend wiring, websocket and media/voice remain open.",
+    "Owner policy, account, initial recovery states and service-stop control are fixtures; no real owner graphical session claimed.",
+    "All network targets loopback; no external messages, live inference/account/delivery, installed OS, hardware or physical power-loss test claimed."
+  ]
+}

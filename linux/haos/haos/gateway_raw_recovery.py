@@ -150,7 +150,9 @@ def unresolved(inbox, after=0):
     from .gateway_line_recovery import outgoing as line_outgoing
     from .gateway_email_recovery import outgoing as email_outgoing,transport as email_transport,mailboxes
     transport.extend(email_transport(inbox))
-    return {'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
+    from .gateway_feishu_recovery import outgoing as feishu_outgoing,accounts as feishu_accounts
+    accounts=feishu_accounts(inbox)
+    return {**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -288,7 +290,10 @@ def main():
     data = json.loads(raw)
     if not isinstance(data,dict) or set(data) != {'action','policy','params'} or not isinstance(data['params'],dict):
         raise ValueError('invalid ingress recovery request')
-    if any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
+    if any(row.get('platform')=='feishu' for row in data['policy'].get('connectors',[])):
+        from .gateway_feishu import PreparedFeishuPolicy
+        policy=PreparedFeishuPolicy(data['policy'])
+    elif any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
         from .gateway_email import PreparedEmailPolicy
         policy=PreparedEmailPolicy(data['policy'])
     else:policy=GatewayPolicy(data['policy'])
@@ -340,6 +345,9 @@ def main():
         elif data['action']=='purge-email-source':
             from .gateway_email_recovery import purge_source
             result=purge_source(inbox,policy,data['params'])
+        elif data['action']=='approve-feishu-retry':
+            from .gateway_feishu_recovery import approve_retry
+            result=approve_retry(inbox,policy,data['params'])
         elif data['action']=='approve-email-retry':
             from .gateway_email_recovery import approve_retry
             result=approve_retry(inbox,policy,data['params'])

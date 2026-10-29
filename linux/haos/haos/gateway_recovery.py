@@ -111,6 +111,7 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
                 r'line_push_[0-9a-f]{64}' if platform=='line' else
                 r'sms_push_[0-9a-f]{64}' if platform=='sms' else
                 r'smtp_accept_[0-9a-f]{64}' if platform=='email' else
+                r'om_[A-Za-z0-9]{16,64}' if platform=='feishu' else
                 r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
             from .gateway_matrix_policy import opaque
             valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)
@@ -141,7 +142,10 @@ def main():
     data = json.loads(raw)
     if not isinstance(data, dict) or set(data) != {"action", "policy", "params"} or not isinstance(data["params"], dict):
         raise ValueError("invalid owner recovery request")
-    if any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
+    if any(row.get('platform')=='feishu' for row in data['policy'].get('connectors',[])):
+        from .gateway_feishu import PreparedFeishuPolicy
+        policy=PreparedFeishuPolicy(data['policy'])
+    elif any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
         from .gateway_email import PreparedEmailPolicy
         policy=PreparedEmailPolicy(data['policy'])
     else:policy=GatewayPolicy(data['policy'])
