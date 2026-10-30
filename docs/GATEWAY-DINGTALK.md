@@ -29,8 +29,8 @@ an assertion of HAOS local ASR. Rich media resolver aliases are canonicalized on
 a copy for the actual codec; conflicting codes are refused, original bytes are
 unchanged. Video needs video permission even when the pinned codec labels it as
 a file. App secrets and private session-reply URLs/capabilities cannot become
-agent goals. Incoming resource retrieval and sealed mission dispatch are still
-separate pending work.
+agent goals. Incoming resource retrieval and sealed relay dispatch are described
+below; shared controller mission acceptance remains pending.
 
 Private SDK token and connection-discovery operations now have closed scopes.
 The actual SDK request builders remain in use. Only fixed API paths and exact
@@ -149,7 +149,7 @@ external interface or Internet delivery. Wave/PDF/video fixtures verify private
 byte transport and consent, not speech recognition, playback or document decoding.
 
 Still required before public activation: shared controller mission acceptance, outgoing media and local voice
-paths, stable reply capability after session expiry, owner account/per-write
+paths, owner configuration of the private stable-reply mode, owner account/per-write
 and resource recovery/management,
 source management and complete owner setup/GUI. These private transport pieces
 must be connected to the independent shared mission and management boundaries.
@@ -175,3 +175,23 @@ page budget between the source intent and blob insertion. It verifies identical
 byte recovery after restoring capacity and quarantine of changed bytes. No write
 or UID/socket behavior is mocked. These cases retain the complete WSS-to-media
 relay checks; no assertion is weakened to make storage recovery pass.
+
+The private reply credential now optionally selects `reply_mode: robot`; omitting
+it preserves `session` behavior. There is no automatic fallback or mode switch.
+The Robot mode uses the actual pinned Hermes token/SDK helper, generated
+`OrgGroupSend` or `BatchSendOTO` builder, native SPI and response model. Group
+writes target the exact approved conversation. Bot direct messages use one staff
+routing ID from the exact retained authenticated original, after canonical opaque
+sender/chat/account authorization; that hint never authorizes a sender. A
+missing direct-recipient hint is refused. Owner setup must explain the required
+Robot API permissions before this mode becomes publicly available.
+
+Stable replies use fixed verified HTTPS Robot endpoints, one request per immutable
+intent, bounded strict JSON and no redirects/cookies. A native `processQueryKey`
+is only provider queue acceptance, never a remote message ID or read receipt.
+Recipient-invalid decisions reject the write; explicit flow control retains a
+retry deadline. Unknown recipient decisions, missing keys, malformed responses,
+connection loss and withdrawal after a possible write remain uncertain. The
+existing durable per-write journal prevents implicit resend. Expired or absent
+session URLs do not prevent an explicitly approved Robot-mode write, and do not
+cause any session fallback. No public registry or GUI activation is implied.

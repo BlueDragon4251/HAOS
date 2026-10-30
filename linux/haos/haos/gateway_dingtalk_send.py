@@ -2,6 +2,7 @@
 import base64
 from copy import deepcopy
 import hashlib
+import json
 import re
 import time
 
@@ -50,14 +51,18 @@ def specification(value, policy, connector, item, redactor, *, require_fresh=Tru
     if (approval['binding_id'] != item['binding_id'] or approval['binding_digest'] != item['binding_digest']
             or projection['envelope']['message_id'] != item['source_id']):
         raise PermissionError('DingTalk reply differs from independently approved original')
-    data = parse(raw); url, _token = session_webhook(data.get('sessionWebhook'))
-    expiry = milliseconds(data.get('sessionWebhookExpiredTime'))
+    data = parse(raw);mode=value.get('reply_mode','session')
+    if mode not in {'session','robot'}:raise PermissionError('explicit approved DingTalk reply mode required')
+    url,expiry='',0
+    if mode=='session':
+        url, _token = session_webhook(data.get('sessionWebhook'))
+        expiry = milliseconds(data.get('sessionWebhookExpiredTime'))
     if type(require_fresh) is not bool:
         raise ValueError('explicit private reply freshness decision required')
     # The private journal may compare an already-confirmed intent after expiry.
     # Worker admission defaults to fresh; HTTP Boundary always enforces expiry
     # independently immediately before writing, regardless of this comparison.
-    if require_fresh and expiry <= time.time() * 1000:
+    if mode=='session' and require_fresh and expiry <= time.time() * 1000:
         raise ExpiredSession()
     body = item['body']
     if (not isinstance(body, str) or not 1 <= len(body.strip()) <= MAX_TEXT or len(body) > MAX_TEXT
@@ -68,6 +73,13 @@ def specification(value, policy, connector, item, redactor, *, require_fresh=Tru
     result = deepcopy(item)
     result.update(chat_id=binding['chat'], thread_id=binding['thread'], session_webhook=url,
                   session_expires_at=expiry)
+    if mode=='robot':
+        # Canonical sender/chat/account approval above remains the authority.
+        # A staff ID is only a routing hint from those exact authenticated bytes;
+        # it never substitutes for the approved opaque sender ID.
+        group=str(data['conversationType'])=='2'
+        staff='' if group else identity(data.get('senderStaffId'))
+        result.update(robot_route='group' if group else 'oto',routing_staff_id=staff)
     return result
 
 
@@ -81,10 +93,19 @@ def wire_target(adapter, blueprint):
     text = DingTalkAdapter._normalize_markdown(body)
     if not isinstance(text, str) or not text.strip() or len(text.encode()) > 128000:
         raise ValueError('bounded native DingTalk markdown required')
+    intent=digest([blueprint['delivery_id'],blueprint['binding_digest'],blueprint['source_sha256'],blueprint['source_id'],body])
+    if 'robot_route' in blueprint:
+        payload={'msgKey':'sampleMarkdown','msgParam':json.dumps({'title':'Hermes','text':text},ensure_ascii=False,separators=(',',':')),
+            'robotCode':adapter._robot_code}
+        if blueprint['robot_route']=='group':
+            payload['openConversationId']=blueprint['chat_id'];path='/v1.0/robot/groupMessages/send'
+        elif blueprint['robot_route']=='oto':
+            payload['userIds']=[identity(blueprint['routing_staff_id'])];path='/v1.0/robot/oToMessages/batchSend'
+        else:raise PermissionError('reviewed native Robot reply route required')
+        return {'url':'https://api.dingtalk.com'+path,'payload':payload,'intent_sha256':intent}
     return {'url': session_webhook(blueprint['session_webhook'])[0], 'payload': {
         'msgtype': 'markdown', 'markdown': {'title': 'Hermes', 'text': text}},
-        'intent_sha256': digest([blueprint['delivery_id'], blueprint['binding_digest'],
-                                  blueprint['source_sha256'], blueprint['source_id'], body])}
+        'intent_sha256':intent}
 
 
 async def invoke_native(adapter, blueprint, transport, current):

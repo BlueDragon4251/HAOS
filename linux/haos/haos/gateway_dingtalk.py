@@ -15,8 +15,11 @@ def identity(value):
 
 
 def credentials(value):
-    if not isinstance(value,dict) or set(value)!={'client_id','client_secret','corp_id','robot_code'}:
+    required={'client_id','client_secret','corp_id','robot_code'}
+    if not isinstance(value,dict) or set(value) not in (required,required|{'reply_mode'}):
         raise ValueError('exact DingTalk app/secret/corporation/robot identity required')
+    if 'reply_mode' in value and (not isinstance(value['reply_mode'],str) or value['reply_mode'] not in {'session','robot'}):
+        raise ValueError('explicit session or stable Robot API reply mode required')
     for key in ['client_id','corp_id','robot_code']:
         if not isinstance(value[key],str) or not APP.fullmatch(value[key]):raise ValueError('exact DingTalk '+key+' required')
     secret=value['client_secret']

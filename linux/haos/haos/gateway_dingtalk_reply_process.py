@@ -7,10 +7,10 @@ import re
 from .gateway_dingtalk import credentials, authority
 from .gateway_dingtalk_admission import finite
 from .gateway_dingtalk_process import command
+from .gateway_dingtalk_http import ERRORS as SDK_ERRORS
 from .gateway_line_ingress import _object
 
-ERRORS = frozenset({'authority-or-protocol-refused', 'sdk-unavailable', 'expired-session',
-    'authentication-refused', 'rate-limited', 'native-refused', 'transport-unavailable'})
+ERRORS = SDK_ERRORS|{'authority-or-protocol-refused', 'sdk-unavailable', 'expired-session','native-refused'}
 
 
 def response(result):

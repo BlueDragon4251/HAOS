@@ -74,6 +74,14 @@ def main():
                 adapter = durable_adapter(DingTalkAdapter(PlatformConfig(enabled=True, extra={
                     'client_id': value['client_id'], 'client_secret': value['client_secret'],
                     'robot_code': value['robot_code'], 'card_template_id': ''})))
+                if value.get('reply_mode','session')=='robot':
+                    from .gateway_dingtalk_robot_reply import invoke
+                    adapter._haos_robot_credentials=value
+                    def approved_robot():
+                        if specification(value,policy(),request['connector'],request['reply'],redactor)!=blueprint:
+                            raise PermissionError('DingTalk stable reply intent changed')
+                    result=asyncio.run(invoke(adapter,blueprint,approved_robot,redactor))
+                    sys.stdout.write(json.dumps(result)+'\n');sys.stdout.flush();return
                 exact = wire_target(adapter, blueprint)
                 def approved():
                     latest = specification(value, policy(), request['connector'], request['reply'], redactor)

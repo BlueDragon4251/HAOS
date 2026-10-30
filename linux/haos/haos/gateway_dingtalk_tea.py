@@ -22,6 +22,52 @@ API = 'https://api.dingtalk.com'
 PATH = '/v1.0/robot/messageFiles/download'
 
 
+def generated_request(request,runtime,path,token,expected,*,max_bytes=32768):
+    if (request.protocol != 'https' or request.method != 'POST' or request.pathname != path
+            or request.query not in (None, {}) or request.port != 80):
+        raise PermissionError('unreviewed native Robot SDK route')
+    # Pinned DaraRequest retains its constructor's port=80 hint even for
+    # HTTPS. It is not a destination: the actual private URL below is fixed
+    # to https://api.dingtalk.com (443), independent of that SDK hint.
+    permitted = {'key', 'cert', 'ca', 'readTimeout', 'connectTimeout', 'httpProxy', 'httpsProxy',
+        'noProxy', 'socks5Proxy', 'socks5NetWork', 'maxIdleConns', 'retryOptions', 'ignoreSSL',
+        'tlsMinVersion', 'disableHttp2'}
+    if not isinstance(runtime, dict) or set(runtime) != permitted:
+        raise PermissionError('closed native Robot SDK runtime options required')
+    numeric = {'readTimeout', 'connectTimeout', 'maxIdleConns'}
+    # Pinned DaraCore.to_number(None) is exactly integer zero. These SDK
+    # default hints cannot remove the private transport's fixed deadlines.
+    if (any(type(runtime[key]) is not int or runtime[key] != 0 for key in numeric)
+            or any(value is not None for key, value in runtime.items() if key not in numeric | {'disableHttp2'})
+            or runtime['disableHttp2'] is not False):
+        raise PermissionError('native Robot runtime widened proxy, TLS, retry or client capabilities')
+    headers = request.headers
+    if (not isinstance(headers, dict) or set(headers) != {'host', 'user-agent', 'accept', 'content-type', 'x-acs-dingtalk-access-token'}
+            or headers['host'] != 'api.dingtalk.com' or headers['accept'] != 'application/json'
+            or headers['content-type'] != 'application/json; charset=utf-8'
+            or headers['x-acs-dingtalk-access-token'] != token
+            or not isinstance(headers['user-agent'], str) or not 1 <= len(headers['user-agent']) <= 512
+            or not headers['user-agent'].startswith('AlibabaCloud (')
+            or any(ord(char) < 32 or ord(char) == 127 for char in headers['user-agent'])):
+        raise PermissionError('unreviewed native Robot SDK headers or identity')
+    if not isinstance(request.body, str) or len(request.body.encode()) > max_bytes:
+        raise PermissionError('bounded generated Robot lookup body required')
+    try:
+        body = json.loads(request.body, object_pairs_hook=_object, parse_constant=finite)
+    except (ValueError, RecursionError):
+        raise PermissionError('exact generated Robot lookup JSON required') from None
+    if body != expected:
+        raise PermissionError('Robot lookup changed approved resource or app identity')
+    return headers,request.body.encode()
+
+
+class Operation:
+    """Marker for a closed independently approved private Robot operation."""
+
+
+def active(operation):return _ACTIVE.get() is operation
+
+
 class Core:
     def __init__(self, original): self.original = original
     def __getattr__(self, name):
@@ -30,14 +76,14 @@ class Core:
         return getattr(self.original, name)
     async def async_do_action(self, request, runtime):
         boundary = _ACTIVE.get()
-        if not isinstance(boundary, Lookup):
+        if not isinstance(boundary, Operation):
             raise PermissionError('no independently approved private Robot lookup')
         return await boundary.request(request, runtime)
 
 
 @contextmanager
 def sdk_scope(boundary):
-    if not isinstance(boundary, Lookup) or _ACTIVE.get() is not None:
+    if not isinstance(boundary, Operation) or _ACTIVE.get() is not None:
         raise PermissionError('one closed private Robot lookup scope required')
     with _LOCK:
         module = importlib.import_module('alibabacloud_tea_openapi.client'); original = module.DaraCore
@@ -50,7 +96,7 @@ def sdk_scope(boundary):
             _ACTIVE.reset(token); module.DaraCore = original
 
 
-class Lookup:
+class Lookup(Operation):
     def __init__(self, token_owner, token, code, current):
         if (not isinstance(token_owner, TokenBoundary) or not callable(current)
                 or not isinstance(token, str) or token not in token_owner.tokens
@@ -73,41 +119,7 @@ class Lookup:
         self.check()
         if self.used or _ACTIVE.get() is not self:
             raise PermissionError('one current native resource lookup required')
-        if (request.protocol != 'https' or request.method != 'POST' or request.pathname != PATH
-                or request.query not in (None, {}) or request.port != 80):
-            raise PermissionError('unreviewed native Robot SDK route')
-        # Pinned DaraRequest retains its constructor's port=80 hint even for
-        # HTTPS. It is not a destination: the actual private URL below is fixed
-        # to https://api.dingtalk.com (443), independent of that SDK hint.
-        permitted = {'key', 'cert', 'ca', 'readTimeout', 'connectTimeout', 'httpProxy', 'httpsProxy',
-            'noProxy', 'socks5Proxy', 'socks5NetWork', 'maxIdleConns', 'retryOptions', 'ignoreSSL',
-            'tlsMinVersion', 'disableHttp2'}
-        if not isinstance(runtime, dict) or set(runtime) != permitted:
-            raise PermissionError('closed native Robot SDK runtime options required')
-        numeric = {'readTimeout', 'connectTimeout', 'maxIdleConns'}
-        # Pinned DaraCore.to_number(None) is exactly integer zero. These SDK
-        # default hints cannot remove the private transport's fixed deadlines.
-        if (any(type(runtime[key]) is not int or runtime[key] != 0 for key in numeric)
-                or any(value is not None for key, value in runtime.items() if key not in numeric | {'disableHttp2'})
-                or runtime['disableHttp2'] is not False):
-            raise PermissionError('native Robot runtime widened proxy, TLS, retry or client capabilities')
-        headers = request.headers
-        if (not isinstance(headers, dict) or set(headers) != {'host', 'user-agent', 'accept', 'content-type', 'x-acs-dingtalk-access-token'}
-                or headers['host'] != 'api.dingtalk.com' or headers['accept'] != 'application/json'
-                or headers['content-type'] != 'application/json; charset=utf-8'
-                or headers['x-acs-dingtalk-access-token'] != self.token
-                or not isinstance(headers['user-agent'], str) or not 1 <= len(headers['user-agent']) <= 512
-                or not headers['user-agent'].startswith('AlibabaCloud (')
-                or any(ord(char) < 32 or ord(char) == 127 for char in headers['user-agent'])):
-            raise PermissionError('unreviewed native Robot SDK headers or identity')
-        if not isinstance(request.body, str) or len(request.body.encode()) > 32768:
-            raise PermissionError('bounded generated Robot lookup body required')
-        try:
-            body = json.loads(request.body, object_pairs_hook=_object, parse_constant=finite)
-        except (ValueError, RecursionError):
-            raise PermissionError('exact generated Robot lookup JSON required') from None
-        if body != {'downloadCode': self.code, 'robotCode': self.owner.value['robot_code']}:
-            raise PermissionError('Robot lookup changed approved resource or app identity')
+        headers,_body=generated_request(request,runtime,PATH,self.token,{'downloadCode':self.code,'robotCode':self.owner.value['robot_code']})
         self.used = True
         import httpx
         self.client = httpx.AsyncClient(trust_env=False, follow_redirects=False,

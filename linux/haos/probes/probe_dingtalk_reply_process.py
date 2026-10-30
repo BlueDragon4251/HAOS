@@ -40,6 +40,11 @@ def main():
     with Path('/etc/hosts').open('a') as stream:stream.write('\n127.0.0.1 api.dingtalk.com\n')
     value={'client_id':'ding_private_fixture_app','client_secret':'private-dingtalk-process-fixture',
         'corp_id':'ding_fixture_corporation','robot_code':'ding_fixture_robot'}
+    reply_mode=os.environ.get('HAOS_DINGTALK_REPLY_MODE','session')
+    if reply_mode not in {'session','robot'}:raise PermissionError('explicit fixture reply mode required')
+    conversation=os.environ.get('HAOS_DINGTALK_REPLY_CONVERSATION','oto')
+    if conversation not in {'oto','group'} or reply_mode=='session' and conversation!='oto':raise PermissionError('reviewed fixture route required')
+    if reply_mode=='robot':value['reply_mode']='robot'
     config=Path('/etc/haos');config.mkdir(mode=0o755)
     policy={'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[{
         'id':'owner','connector':'dingtalk','sender':'$:LWCP_v1:$opaque-owner','chat':'cidExactConversation/+=',
@@ -68,6 +73,12 @@ def main():
             'text':{'content':'Actual private supervised DingTalk source.'},
             'sessionWebhook':'https://api.dingtalk.com/robot/sendBySession?session=private-process-session',
             'sessionWebhookExpiredTime':now+7200000}
+        if reply_mode=='robot':
+            body.update(senderStaffId='native-approved-staff',sessionWebhookExpiredTime=now-500,
+                conversationType='2' if conversation=='group' else '1',isInAtList=True)
+        async def token(request):
+            assert request.secure and await request.json()=={'appKey':value['client_id'],'appSecret':value['client_secret']}
+            return web.json_response({'accessToken':'private-native-reply-token','expireIn':7200})
         async def discovery(request):
             assert request.secure;data=await request.json()
             assert data['clientId']==value['client_id'] and data['clientSecret']==value['client_secret']
@@ -99,9 +110,19 @@ def main():
                 async for _ in ws:pass
             return ws
         async def reply(request):
-            assert request.secure and request.query=={'session':'private-process-session'}
+            assert request.secure
+            assert request.query==({'session':'private-process-session'} if reply_mode=='session' else {})
             assert request.headers.get('Cookie') is None and request.headers.get('Accept-Encoding')=='identity'
             payload=await request.json()
+            if reply_mode=='robot':
+                assert request.path==('/v1.0/robot/groupMessages/send' if conversation=='group' else '/v1.0/robot/oToMessages/batchSend')
+                assert request.headers['x-acs-dingtalk-access-token']=='private-native-reply-token'
+                assert set(payload)=={'msgKey','msgParam','robotCode'}|({'openConversationId'} if conversation=='group' else {'userIds'})
+                assert payload['robotCode']==value['robot_code']
+                if conversation=='group':assert payload['openConversationId']==binding['chat']
+                else:assert payload['userIds']==['native-approved-staff']
+                assert payload['msgKey']=='sampleMarkdown'
+                payload={'msgtype':'markdown','markdown':json.loads(payload['msgParam'])}
             assert payload['msgtype']=='markdown' and payload['markdown']['title']=='Hermes'
             assert payload['markdown']['text'] in {'Actual private native reply.','Uncertain private native reply.','cancel-write','revoke-write','orphan-write','deadline-write'}
             text=payload['markdown']['text']
@@ -122,7 +143,7 @@ def main():
             if delivery=='d'*64:
                 request.transport.abort()
                 return web.Response(status=200)
-            return web.json_response({'errcode':0,'errmsg':'ok'})
+            return web.json_response({'errcode':0,'errmsg':'ok'} if reply_mode=='session' else {'processQueryKey':'fixture-native-queued-result','invalidStaffIdList':[],'flowControlledStaffIdList':[]})
         @web.middleware
         async def checked(request,handler):
             try:return await handler(request)
@@ -130,6 +151,9 @@ def main():
         async def forbidden(request):raise AssertionError('redirect was followed')
         app=web.Application(middlewares=[checked]);app.router.add_post('/v1.0/gateway/connections/open',discovery)
         app.router.add_get('/connect',websocket);app.router.add_get('/unreviewed',forbidden);app.router.add_post('/robot/sendBySession',reply)
+        app.router.add_post('/v1.0/oauth2/accessToken',token)
+        app.router.add_post('/v1.0/robot/oToMessages/batchSend',reply)
+        app.router.add_post('/v1.0/robot/groupMessages/send',reply)
         runner=web.AppRunner(app,access_log=None);await runner.setup()
         tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(work/'certificate.pem',work/'key.pem')
         ws_tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ws_tls.load_cert_chain(ws_cert/'certificate.pem',ws_cert/'key.pem')
@@ -248,7 +272,7 @@ print('denied')
                 account.write_text(json.dumps(value));account.chmod(0o600);os.chown(account,65534,65534)
             assert not failures,failures
             print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],
-                'public_dingtalk_enabled':False,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
+                'public_dingtalk_enabled':False,'reply_mode':reply_mode,'conversation':conversation,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
                 'owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual':True,
                 'live_messages_missions_or_installed_acceptance':False}))
         finally:
