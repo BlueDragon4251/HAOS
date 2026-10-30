@@ -19,6 +19,19 @@ import time
 import uuid
 
 
+def live_process_names(pids):
+    """A cgroup PID snapshot may contain a process that has already exited."""
+    result = {}
+    for pid in pids:
+        try:
+            result[pid] = Path(f'/proc/{pid}/comm').read_text().strip()
+        except (FileNotFoundError, ProcessLookupError):
+            # Do not treat an exited transient setsid/launcher as evidence of
+            # the required long-lived child. The caller still waits for sleep.
+            continue
+    return result
+
+
 def main():
     if (os.geteuid()!=0 or os.environ.get('GITHUB_ACTIONS')!='true'
             or os.environ.get('HAOS_DISPOSABLE_CI')!='1'
@@ -191,7 +204,7 @@ def main():
         deadline=time.monotonic()+3
         while True:
             descendants=[int(v) for v in (group/'cgroup.procs').read_text().split()]
-            sleeps=[pid for pid in descendants if Path(f'/proc/{pid}/comm').read_text().strip()=='sleep']
+            sleeps=[pid for pid,name in live_process_names(descendants).items() if name=='sleep']
             if sleeps: break
             assert time.monotonic()<deadline,'real escaped process-group child';time.sleep(0.025)
         assert launcher.stop(requests[0])['state']=='stopped'
