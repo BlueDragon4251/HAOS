@@ -17,12 +17,31 @@ async def revoke(store,policy,connector,account,request,before_io,*,http=None):
     def current():
         private();before_io()
         if policy().connectors.get(connector,{}).get('platform')!='google_chat':raise PermissionError('selected Google Chat Owner connector required')
-    current();vault=TokenVault(store);local=vault.local_revoke(account,request);db=store.db
+    from .gateway_google_chat_identity import descriptor
+    current()
+    return await _revoke_identity(store,descriptor(account),request,current,http=http)
+
+
+async def revoke_retired(store,identity,request,before_io,*,http=None):
+    # Called by the separate authenticated Owner historical-account worker.
+    # Its current callback pins Root request/policy and the private descriptor;
+    # no synthetic active connector, service-account key or sender grant exists.
+    private()
+    if not callable(before_io):raise PermissionError('current authenticated retired-account Owner capability required')
+    from .gateway_google_chat_identity import validate
+    identity=validate(identity)
+    def current():private();before_io()
+    current()
+    return await _revoke_identity(store,identity,request,current,http=http)
+
+
+async def _revoke_identity(store,identity,request,current,*,http=None):
+    current();vault=TokenVault(store);local=vault.local_revoke_identity(identity,request);db=store.db
     if local['remote_revocation_verified']:
         confirmed=db.execute("SELECT receipt FROM google_chat_oauth_revocations WHERE token_id=? AND generation=? AND state='confirmed' ORDER BY created_at DESC LIMIT 1",(request['id'],request['generation'])).fetchone()
         if confirmed is None:raise Conflict('Google remote revocation has no durable confirmation receipt')
         return {**local,'receipt':confirmed['receipt'],'remote_status':'confirmed','retry_after':0}
-    row,payload,_conf=vault.record(db.execute('SELECT * FROM google_chat_user_tokens WHERE id=?',(request['id'],)).fetchone(),account)
+    row,payload,_conf=vault.record_identity(db.execute('SELECT * FROM google_chat_user_tokens WHERE id=?',(request['id'],)).fetchone(),identity)
     db.execute('''CREATE TABLE IF NOT EXISTS google_chat_oauth_revocations(
         id TEXT PRIMARY KEY,token_id TEXT NOT NULL,generation INTEGER NOT NULL,state TEXT NOT NULL,
         created_at REAL NOT NULL,receipt TEXT NOT NULL)''')

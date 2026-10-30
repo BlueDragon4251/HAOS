@@ -543,3 +543,47 @@ association remain in progress; the descriptor itself authorizes no API access,
 refresh, send, inference or automatic provider/gateway permission.
 
 Exact-source checks: [private identity migration, custody and SDK/Owner regressions](evidence/2026-10-30/google-chat-private-account-identity-validation.json).
+
+
+## Historical token status and withdrawal after account removal
+
+A separate fixed Root/private-UID historical worker now supports profile
+inventory, token metadata and explicit token withdrawal without a service-account
+key. The authenticated Root backend first quiesces/verifies the gateway service,
+then pins the trusted public configuration (including actual file absence),
+passes only closed metadata/selectors through stdin and drops all extra groups.
+The worker verifies the actual live Root parent, installs parent-death and
+NoNewPrivs guards, applies resource bounds, acquires the real private profile
+lease and revalidates its immutable public app descriptor before I/O.
+
+Retained OAuth credential/client hashes are checked against that public app
+identity in the private process. Active enrollment, route selection, refresh
+and file API loading still require their original full-account/current-grant
+checks; public metadata does not satisfy those checks. No active connector,
+policy grant or synthetic service-account credential is recreated for cleanup.
+Status displays the actual published file-grant count as information and marks
+`active_authorization_returned=false`. Token/client-secret bytes remain private
+and are added to shared bounded credential redaction before any metadata reply.
+
+Historical withdrawal requires the exact app snapshot, token ID/generation,
+explicit Owner confirmation and a nonsecret note hash. The FULL local token and
+transport denial/audit precedes the single fixed Google revocation POST.
+Unknown/declined/rate-limited outcomes retain local denial; a repeated decision
+cannot repeat an unclear write. A confirmed existing receipt is reused without
+another HTTP request. Original tokens/journals remain private custody; secure
+WAL/backup erasure is not claimed.
+
+The process fixture first performs real pinned-SDK Flow/RSA/PKCE user enrollment,
+then removes the active connector and every service-account credential/config
+file before invoking the actual Root historical backend. It independently sees
+local denial and the durable write intent before accepting the TLS revocation
+request. Metadata also works with optional SDK/Hermes paths removed. Real kernel
+UID/parent, flock, identity-tamper, pending-publication and parent-death checks
+remain enforced. Google endpoints/DNS/CA and declared systemctl service state
+are explicit local fixtures, not live Google or installed systemd acceptance.
+
+Historical quarantine disposal, output association/recovery, missing legacy
+identity recovery and the public management GUI/CLI remain in progress. These
+functions do not activate Google Chat publicly; the software count stays15/22.
+
+Exact-source checks: [historical Owner token status/withdrawal and regression](evidence/2026-10-30/google-chat-private-historical-tokens-validation.json).

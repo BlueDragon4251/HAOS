@@ -22,9 +22,21 @@ OPAQUE=re.compile('[A-Za-z0-9_-]{43,128}\\Z')
 
 def client(value,account):
     account=credentials(account)
+    return _client(value,account['service_account']['project_id'])
+
+
+def client_for_identity(value,identity):
+    # Metadata/withdrawal only. Active enrollment/route/refresh still validate
+    # the full dedicated account through client()/credentials()/route().
+    from .gateway_google_chat_identity import validate
+    identity=validate(identity)
+    return _client(value,identity['project_id'])
+
+
+def _client(value,project_id):
     if not isinstance(value,dict) or set(value)!={'installed'}:raise ValueError('dedicated installed Google OAuth client JSON required')
     data=value['installed'];fields={'client_id','project_id','auth_uri','token_uri','auth_provider_x509_cert_url','client_secret','redirect_uris'}
-    if (not isinstance(data,dict) or set(data)!=fields or data['project_id']!=account['service_account']['project_id']
+    if (not isinstance(data,dict) or set(data)!=fields or data['project_id']!=project_id
             or not isinstance(data['client_id'],str) or not re.fullmatch('[0-9]{1,32}-[A-Za-z0-9_-]{1,128}\\.apps\\.googleusercontent\\.com',data['client_id'])
             or data['auth_uri']!=AUTH_URI or data['token_uri']!=TOKEN_URI
             or data['auth_provider_x509_cert_url']!='https://www.googleapis.com/oauth2/v1/certs'

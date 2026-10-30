@@ -19,9 +19,17 @@ def private():
 
 
 def configuration(payload,account):
-    return client({'installed':{'client_id':payload['client_id'],'client_secret':payload['client_secret'],
-        'project_id':account['service_account']['project_id'],'auth_uri':AUTH_URI,'token_uri':TOKEN_URI,
-        'auth_provider_x509_cert_url':'https://www.googleapis.com/oauth2/v1/certs','redirect_uris':['http://localhost']}},account)
+    from .gateway_google_chat_identity import descriptor
+    return configuration_for_identity(payload,descriptor(account))
+
+
+def configuration_for_identity(payload,identity):
+    from .gateway_google_chat_identity import validate
+    from .gateway_google_chat_oauth import client_for_identity
+    identity=validate(identity)
+    return client_for_identity({'installed':{'client_id':payload['client_id'],'client_secret':payload['client_secret'],
+        'project_id':identity['project_id'],'auth_uri':AUTH_URI,'token_uri':TOKEN_URI,
+        'auth_provider_x509_cert_url':'https://www.googleapis.com/oauth2/v1/certs','redirect_uris':['http://localhost']}},identity)
 
 
 class Deferred(PermissionError):
@@ -48,12 +56,21 @@ class TokenVault:
             owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,created_at REAL NOT NULL)''')
 
     def record(self,record,account):
-        private();row=dict(record);account=credentials(account)
+        private()
+        from .gateway_google_chat_identity import descriptor
+        return self.record_identity(record,descriptor(credentials(account)))
+
+    def record_identity(self,record,identity):
+        # Only private custody validation; no API authorization, refresh, send
+        # or new credential enrollment follows from a public app descriptor.
+        private();row=dict(record)
+        from .gateway_google_chat_identity import validate,account_scope
+        identity=validate(identity)
         from .gateway_line_ingress import _object
         from .gateway_dingtalk_admission import finite
         payload=json.loads(row['credential'],object_pairs_hook=_object,parse_constant=finite)
-        conf=configuration(payload,account);validate_token(payload,conf,legacy_for_disposal=True)
-        if (row['account_scope']!=scope(account) or row['client_sha256']!=digest(conf)
+        conf=configuration_for_identity(payload,identity);validate_token(payload,conf,legacy_for_disposal=True)
+        if (row['account_scope']!=account_scope(identity) or row['client_sha256']!=digest(conf)
                 or row['id']!=digest([row['account_scope'],row['subject'],row['client_sha256']])
                 or row['credential']!=json.dumps(payload,sort_keys=True,separators=(',',':'))
                 or type(row['generation']) is not int or not 1<=row['generation']<2**53
@@ -61,6 +78,11 @@ class TokenVault:
                 or any(not isinstance(row[k],str) or not HEX.fullmatch(row[k]) for k in ['binding_digest','nonce_sha256','pending_id'])):
             raise Conflict('private Google user token custody damaged')
         resource(row['subject'],'user')
+        from .redaction import Redactor
+        redactor=self.store.inbox.redactor
+        aliases=Redactor([*redactor.secrets,*[payload[k] for k in ['token','refresh_token','client_secret','rapt_token'] if k in payload]]).secrets
+        if len(aliases)>4096 or sum(len(item) for item in aliases)>8*1024*1024:raise Conflict('private Google token redaction capacity reached')
+        redactor.secrets=aliases
         public=json.dumps({'installed':{key:value for key,value in conf['installed'].items() if key!='client_secret'}},sort_keys=True,separators=(',',':'))
         if row['public_client']=='{}':
             # Recover only metadata uniquely anchored by the pre-existing
@@ -163,7 +185,14 @@ class TokenVault:
             raise
 
     def local_revoke(self,account,request):
-        private();fields={'id','generation','owner_uid','note_sha256','confirmed'}
+        private()
+        from .gateway_google_chat_identity import descriptor
+        return self.local_revoke_identity(descriptor(credentials(account)),request)
+
+    def local_revoke_identity(self,identity,request):
+        private()
+        from .gateway_google_chat_identity import validate
+        identity=validate(identity);fields={'id','generation','owner_uid','note_sha256','confirmed'}
         if (not isinstance(request,dict) or set(request)!=fields or request['confirmed'] is not True
                 or any(not isinstance(request[k],str) or not HEX.fullmatch(request[k]) for k in ['id','note_sha256'])
                 or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
@@ -173,13 +202,15 @@ class TokenVault:
         try:
             record=db.execute('SELECT * FROM google_chat_user_tokens WHERE id=?',(request['id'],)).fetchone()
             if record is None:raise PermissionError('known private user token required')
-            row,_payload,_conf=self.record(record,account)
+            row,_payload,_conf=self.record_identity(record,identity)
             if row['generation']!=request['generation']:raise Conflict('Google user token changed after Owner inspection')
             receipt=digest([request,'revoked-local'])
             old=db.execute('SELECT * FROM google_chat_oauth_token_owner_events WHERE receipt=?',(receipt,)).fetchone()
             if old is None:
                 if row['status']!='revoked-remote':db.execute("UPDATE google_chat_user_tokens SET status='revoked-local' WHERE id=?",(row['id'],))
-                db.execute("UPDATE google_chat_oauth_transport SET status='revoked-local',updated_at=? WHERE token_id=?",(time.time(),row['id']))
+                db.execute("""INSERT INTO google_chat_oauth_transport(token_id,generation,status,updated_at) VALUES(?,?,'revoked-local',?)
+                    ON CONFLICT(token_id) DO UPDATE SET generation=excluded.generation,status='revoked-local',updated_at=excluded.updated_at""",
+                    (row['id'],row['generation'],time.time()))
                 db.execute('INSERT INTO google_chat_oauth_token_owner_events VALUES(?,?,?,?,?,?,?)',
                     (receipt,row['id'],row['generation'],'revoked-local',request['owner_uid'],request['note_sha256'],time.time()))
             db.execute('COMMIT');return {'id':row['id'],'receipt':receipt,'locally_revoked':True,'remote_revocation_verified':row['status']=='revoked-remote',
@@ -220,12 +251,24 @@ class TokenVault:
     def inventory(self,policy,connector,account):
         private()
         if policy.connectors.get(connector,{}).get('platform')!='google_chat':raise PermissionError('selected private Google Owner connector required')
+        from .gateway_google_chat_identity import descriptor
+        return self._inventory_identity(descriptor(credentials(account)),bindings=policy.bindings.values(),connector=connector)
+
+    def inventory_identity(self,identity):
+        # Retired metadata never reports an active file grant and cannot load
+        # credentials for API use; load()/route() keep their full account gate.
+        return self._inventory_identity(identity,bindings=(),connector=None)
+
+    def _inventory_identity(self,identity,*,bindings,connector):
+        private()
+        from .gateway_google_chat_identity import validate,account_scope
+        identity=validate(identity)
         exists=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='google_chat_user_tokens'").fetchone()
-        rows=self.db.execute('SELECT * FROM google_chat_user_tokens WHERE account_scope=? ORDER BY updated_at DESC LIMIT 129',(scope(account),)).fetchall() if exists else []
+        rows=self.db.execute('SELECT * FROM google_chat_user_tokens WHERE account_scope=? ORDER BY updated_at DESC LIMIT 129',(account_scope(identity),)).fetchall() if exists else []
         from .gateway_google_chat_oauth import SCOPES
         values=[]
         for record in rows[:128]:
-            row,payload,_conf=self.record(record,account)
+            row,payload,_conf=self.record_identity(record,identity)
             state=self.db.execute('SELECT status FROM google_chat_oauth_transport WHERE token_id=?',(row['id'],)).fetchone()
             budget=digest([row['account_scope'],row['subject'],payload['client_id']]);deadline=self.db.execute('SELECT not_before FROM google_chat_oauth_budget WHERE scope=?',(budget,)).fetchone()
             wait=deadline[0] if deadline is not None else 0
@@ -234,7 +277,7 @@ class TokenVault:
             value.update(public_client=json.loads(row['public_client']),transport_status=state['status'] if state is not None else 'ready',next_attempt=wait,
                 scopes=list(payload['scopes']),scope_upgrade_required=set(payload['scopes'])!=set(SCOPES),
                 current_file_grants=sum(binding['connector']==connector and binding['scope']==row['account_scope'] and binding['sender']==row['subject']
-                    and 'read' in binding['capabilities'] and binding.get('allow_outbound_media') is True for binding in policy.bindings.values()),
+                    and 'read' in binding['capabilities'] and binding.get('allow_outbound_media') is True for binding in bindings),
                 private_credentials_returned=False)
             values.append({**value,'snapshot_sha256':digest(value)})
         return {'tokens':values,'history_truncated':len(rows)>128,'network_requested':False,'private_credentials_returned':False}

@@ -96,6 +96,10 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
             values=parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode(),strict_parsing=True)
             if self.path=='/revoke':
                 assert values['token'][0] in {'owner-private-refresh-fixture','owner-rejected-refresh-fixture'}
+                if values['token'][0]=='owner-private-refresh-fixture':
+                    with sqlite3.connect(database) as db:
+                        assert db.execute('SELECT status FROM google_chat_user_tokens').fetchone()[0]=='revoked-local'
+                        assert db.execute("SELECT state FROM google_chat_oauth_revocations ORDER BY created_at DESC LIMIT 1").fetchone()[0]=='writing'
                 requests.append('revoke');self.reply(200,{});return
             assert self.path=='/token' and values['grant_type']==['authorization_code']
             code=values['code'][0];entry=authorizations[code]
@@ -159,12 +163,17 @@ print('denied')
                 cases.append('actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction')
         sessions=call('inspect',{'kind':'sessions'})['sessions'];assert {row['status'] for row in sessions}=={'complete','refused'}
         policy['bindings']=[];publication.write_text(json.dumps(policy));publication.chmod(0o644)
-        row=call('inspect',{'kind':'tokens'})['tokens'][0];assert row['current_file_grants']==0
-        revoked=call('revoke',{'row':row,'note':'explicit owner logout after withdrawal','confirmed':True})
-        assert revoked['locally_revoked'] and revoked['remote_revocation_verified'] and revoked['network_requested']
-        replay=call('revoke',{'row':row,'note':'explicit owner logout after withdrawal','confirmed':True})
-        assert replay['remote_revocation_verified'] and not replay['network_requested'] and replay['receipt']==revoked['receipt']
-        cases.append('actual_authenticated_Root_handoff_can_revoke_after_all_file_grants_are_withdrawn_and_repeated_decision_returns_existing_receipt_without_HTTP')
+        if os.environ.get('HAOS_GOOGLE_CHAT_RETIRED_OAUTH_PROCESS')=='1':
+            sys.path.insert(0,'/repo/linux/haos/runtime')
+            from google_chat_retired_fixture import exercise as historical
+            cases.extend(historical(runtime=runtime,code=code,env=env,publication=publication,secret=secret,database=database,requests=requests,configuration=configuration))
+        else:
+            row=call('inspect',{'kind':'tokens'})['tokens'][0];assert row['current_file_grants']==0
+            revoked=call('revoke',{'row':row,'note':'explicit owner logout after withdrawal','confirmed':True})
+            assert revoked['locally_revoked'] and revoked['remote_revocation_verified'] and revoked['network_requested']
+            replay=call('revoke',{'row':row,'note':'explicit owner logout after withdrawal','confirmed':True})
+            assert replay['remote_revocation_verified'] and not replay['network_requested'] and replay['receipt']==revoked['receipt']
+            cases.append('actual_authenticated_Root_handoff_can_revoke_after_all_file_grants_are_withdrawn_and_repeated_decision_returns_existing_receipt_without_HTTP')
         assert requests.count('revoke')==2 and sum(item.startswith('token-') for item in requests)==2
         with sqlite3.connect(database) as db:
             assert db.execute('SELECT status FROM google_chat_user_tokens').fetchone()[0]=='revoked-remote'
