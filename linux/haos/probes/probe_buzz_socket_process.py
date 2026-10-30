@@ -41,8 +41,10 @@ def main():
     guard='''import asyncio
 from haos.gateway_buzz_profile import build
 from haos.gateway_buzz_send_process import send
+from haos.gateway_buzz_upload import upload
 for action in [lambda:build(None,parent=None,connector=None,policy=None,inbox=None),
-    lambda:asyncio.run(send(None,None,home=None,current=None,retain=None,redactor=None))]:
+    lambda:asyncio.run(send(None,None,home=None,current=None,retain=None,redactor=None)),
+    lambda:asyncio.run(upload(None,None,home=None,current=None,redactor=None))]:
     try:action()
     except PermissionError:print('refused-before-optional-SDK')
     else:raise AssertionError('foreign UID entered private Buzz profile or sender')
@@ -50,7 +52,7 @@ for action in [lambda:build(None,parent=None,connector=None,policy=None,inbox=No
     for uid,gid,groups in [(0,0,[]),(65533,65533,[]),(65534,65534,[0])]:
         result=subprocess.run([sys.executable,'-c',guard],user=uid,group=gid,extra_groups=groups,
             env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(code)},capture_output=True,text=True,timeout=5)
-        assert result.returncode==0 and result.stdout=='refused-before-optional-SDK\n'*2 and not result.stderr
+        assert result.returncode==0 and result.stdout=='refused-before-optional-SDK\n'*3 and not result.stderr
     from webhook_tls_fixture import create
     from plugins.platforms.buzz import nostr_auth
     from haos.gateway_buzz import scope
@@ -144,6 +146,72 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1].startswith('output-'):
+            from haos.gateway_buzz_output import Output
+            import hashlib,base64,sqlite3
+            name=sys.argv[1];data=b'%PDF-1.7\\nPrivate local fixture output\\n%%EOF\\n'
+            case='fault' if name in {'output-fault','output-fault-reopen'} else 'normal'
+            binding=next(iter(current().bindings.values()))
+            adapter._haos_native=SimpleNamespace(inbox=inbox,policy=current,connector='buzz')
+            adapter._haos_buzz_value=value;adapter._haos_buzz_home=base;adapter._haos_buzz_check=current
+            output=Output(adapter);delivery={'id':digest(['output',case]),'attempt':1,'binding_id':binding['id'],'binding_digest':digest(binding),
+                'content':'Generated.\\nMEDIA:./result.pdf'}
+            context={'version':1,'mission_id':'fixture-mission','kind':'mission.completed','source_event':'fixture-event','state':'completed',
+                'phase':'done','request_id':None,'request_method':None,'part':0,'parts':1,'total_bytes':len(delivery['content'].encode()),
+                'content_sha256':hashlib.sha256(delivery['content'].encode()).hexdigest(),'group_sha256':'f'*64}
+            delivery['event_context']=context;chunks=[]
+            # Only the root export RPC is a fixture in this component case.
+            # Real Controller/MissionStore/GatewayEngine projection and storage
+            # are tested separately for Buzz with actual SQL failure injection.
+            async def root_export(method,params):
+                assert params['delivery']==delivery['id'] and params['attempt']==1
+                if method=='gateway.output.manifest':return {'paths':['./result.pdf'],'text':'Generated.',
+                    'source_sha256':context['content_sha256'],'group_sha256':context['group_sha256']}
+                if method=='gateway.output.begin':
+                    assert params['path']=='./result.pdf'
+                    return {'id':'e'*64,'size':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+                assert method=='gateway.output.chunk' and params['id']=='e'*64 and params['offset']==0
+                chunks.append(True);return {'id':'e'*64,'offset':0,'data':base64.b64encode(data).decode()}
+            if name=='output-damage':output.db.execute("UPDATE buzz_output_uploads SET stored=x'00' WHERE delivery_id=?",(delivery['id'],))
+            if name=='output-fault':
+                output.db.execute("CREATE TRIGGER fail_upload_receipt BEFORE UPDATE ON buzz_output_uploads WHEN NEW.state='ready' BEGIN SELECT RAISE(ABORT,'fixture upload custody failure'); END")
+            try:result=await output.prepare(delivery,root_export)
+            except sqlite3.IntegrityError:
+                assert name=='output-fault'
+                output.db.execute('DROP TRIGGER fail_upload_receipt');print(json.dumps({'intent_retained':True}),flush=True);return
+            except Conflict:
+                assert name in {'output-damage','output-fault-reopen'} and not chunks
+                print(json.dumps({'custody_refused':True}),flush=True);return
+            assert result['text']=='Generated.' and len(result['items'])==1
+            parts=output.resolve(delivery,result['items']);assert parts[0]['descriptor']['sha256']==hashlib.sha256(data).hexdigest()
+            assert bool(chunks)==(name=='output-first')
+            print(json.dumps({'root_snapshot_fixture':True,'native_verified_upload':True,'reused':not bool(chunks)}),flush=True);return
+        if sys.argv[1].startswith('upload-'):
+            from haos.gateway_buzz_upload import upload,UploadFailed
+            data=b'%PDF-1.7\\nPrivate local fixture output\\n%%EOF\\n'
+            if sys.argv[1]=='upload-secret':data+=value['private_key'].encode()
+            if sys.argv[1]=='upload-oversized':data=b'x'*(8*1024*1024+1)
+            def authorized():
+                policy=current()
+                assert any(row.get('allow_outbound_media') is True and 'read' in row['capabilities'] for row in policy.bindings.values())
+            try:result=await upload(value,data,home=reader.home,current=authorized,redactor=redactor)
+            except UploadFailed as error:print(json.dumps({'refused':error.category}),flush=True);return
+            except PermissionError:
+                assert sys.argv[1] in {'upload-secret','upload-oversized'}
+                print(json.dumps({'refused':'private-input'}),flush=True);return
+            assert result['stored']==data and result['source_sha256']==__import__('hashlib').sha256(data).hexdigest()
+            if sys.argv[1]=='upload-message':
+                source=json.loads(Path(sys.argv[2]).read_text())['original']
+                target={'channel':value['channels'][0],'anchor':source['id'],'thread':source['id'],
+                    'content':'Private local result file','kind':9,'allowed_mentions':[source['pubkey'],value['public_key']],
+                    'explicit_mentions':[],'attachments':[{'descriptor':result['descriptor'],'name':'result-0.pdf'}]}
+                inbox.db.execute('CREATE TABLE IF NOT EXISTS buzz_outgoing_probe(id TEXT PRIMARY KEY,data BLOB NOT NULL)')
+                async def retained(raw,event):
+                    authorized();inbox.db.execute('INSERT INTO buzz_outgoing_probe VALUES(?,?)',(event['id'],raw));return True
+                receipt=await private_send(value,target,home=base,current=authorized,retain=retained,redactor=redactor)
+                assert receipt['state']=='confirmed',receipt
+                print(json.dumps({'native_file_message':True,'source_verified':True,'uploaded':result['descriptor']['sha256']}),flush=True);return
+            print(json.dumps({'uploaded':result['descriptor']['sha256'],'source_verified':True}),flush=True);return
         if sys.argv[1].startswith('media'):
             fixture=json.loads(Path(sys.argv[2]).read_text())
             profiles=base/'media-profiles';profiles.mkdir(mode=0o700,exist_ok=True)
@@ -512,11 +580,34 @@ except PermissionError as error:
     cases=['actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory']
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[];assets={};media_gets=[];public_gets=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[];assets={};media_gets=[];public_gets=[];uploads=[]
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
         async def handle(request):
+            if request.path=='/upload':
+                assert request.secure and request.method=='PUT'
+                raw=await request.read();sha=hashlib.sha256(raw).hexdigest()
+                header=request.headers['Authorization'];assert header.startswith('Nostr ')
+                encoded=header[6:];auth=json.loads(base64.urlsafe_b64decode(encoded+'='*((-len(encoded))%4)));verified(auth)
+                tags={tag[0]:tag[1] for tag in auth['tags'] if len(tag)==2}
+                assert auth['kind']==24242 and auth['pubkey']==public and auth['content']=='Upload file'
+                assert tags['t']=='upload' and tags['x']==sha and tags['server']=='localhost:'+str(port)
+                assert 0<int(tags['expiration'])-auth['created_at']<=60
+                assert request.headers['X-SHA-256']==sha and request.headers['Content-Type']=='application/pdf'
+                assert scalar.encode() not in raw and scalar not in header
+                uploads.append(sha)
+                if mode['name']=='upload-auth':return web.Response(status=401,body=b'\xff')
+                if mode['name']=='upload-rate':return web.json_response({'error':'rate-limited: retry in 0s'},status=429)
+                if mode['name']=='upload-redirect':return web.Response(status=302,headers={'Location':value['relay_url']+'/escape'})
+                if mode['name']=='upload-malformed':return web.Response(text='invalid descriptor')
+                if mode['name']=='upload-header':
+                    response=web.StreamResponse(headers={'Content-Length':str(8*1024*1024+1)})
+                    await response.prepare(request);return response
+                path='/media/'+sha+'.pdf';assets[path]=b'changed' if mode['name']=='upload-corrupt' else raw
+                descriptor={'url':value['relay_url']+path,'sha256':sha,'size':len(raw),'type':'application/pdf','uploaded':int(time.time())}
+                if mode['name']=='upload-foreign':descriptor['url']='https://never.fixture.invalid'+path
+                return web.json_response(descriptor)
             if request.path.startswith('/media/'):
                 assert request.method=='GET' and request.path in assets
                 header=request.headers['Authorization'];assert header.startswith('Nostr ')
@@ -536,7 +627,13 @@ except PermissionError as error:
                     import sqlite3
                     original=json.loads(body);verified(original);assert original['pubkey']==public
                     expected='outgoing-drop' if mode['name']=='outgoing-replay' else 'outbox-receipt-fail' if mode['name']=='outbox-owner-retry' else mode['name']
-                    assert ['h',channel] in original['tags'] and original['content']=='Private local fixture '+expected
+                    assert ['h',channel] in original['tags']
+                    if mode['name']=='upload-message':
+                        sha=uploads[-1];url=value['relay_url']+'/media/'+sha+'.pdf'
+                        assert original['content']=='Private local result file\n[result-0.pdf]('+url+')'
+                        assert [tag for tag in original['tags'] if tag[0]=='imeta']==[['imeta','url '+url,'m application/pdf','x '+sha,
+                            'size '+str(len(assets['/media/'+sha+'.pdf'])),'filename result-0.pdf']]
+                    else:assert original['content']=='Private local fixture '+expected
                     if mode['name'].startswith('outbox'):
                         with sqlite3.connect('file:'+str(private/'outbox-native.db')+'?mode=ro',uri=True) as check:
                             assert check.execute("SELECT signed_raw FROM buzz_delivery_intents WHERE event_id=? AND state='writing'",(original['id'],)).fetchone()[0]==body
@@ -710,7 +807,7 @@ except PermissionError as error:
             try:
                 public_origin='https://localhost:'+str(public_port)
                 account.write_text(json.dumps({**value,'attachment_origins':[public_origin]}));account.chmod(0o600)
-                media_grant={**grant,'allow_media':True,'allow_voice':True,'allow_video':True,'generation':'c'*64,'since':(int(time.time())-5)*1000}
+                media_grant={**grant,'allow_media':True,'allow_voice':True,'allow_video':True,'allow_outbound_media':True,'generation':'c'*64,'since':(int(time.time())-5)*1000}
                 publish({**config,'bindings':[media_grant],'publication':'c'*64})
                 png_url=value['relay_url']+'/media/'+hashlib.sha256(png).hexdigest()+'.png'
                 def imeta(data,url,mime):return ['imeta','url '+url,'x '+hashlib.sha256(data).hexdigest(),'size '+str(len(data)),'m '+mime,'filename attachment.bin']
@@ -760,6 +857,31 @@ except PermissionError as error:
                 before=len(media_gets)+len(public_gets);process=spawn('media-unapproved')
                 assert await line(process)=={'capture_refused':True};await done(process);assert len(media_gets)+len(public_gets)==before
                 cases.append('signed_foreign_media_origin_without_explicit_owner_approval_is_refused_before_original_admission_or_any_HTTP_credentials')
+                for name,error,attempts,gets in [('upload-ok',None,1,1),('upload-message',None,1,1),('upload-secret','private-input',0,0),
+                        ('upload-oversized','private-input',0,0),('upload-auth','authentication_refused',1,0),
+                        ('upload-rate','rate_limited',3,0),('upload-redirect','upload_unavailable',1,0),
+                        ('upload-malformed','upload_unavailable',1,0),('upload-header','upload_unavailable',1,0),
+                        ('upload-foreign','invalid_descriptor',1,0),('upload-corrupt','stored_blob_mismatch',1,1)]:
+                    mode['name']=name;before=len(uploads);read_before=len(media_gets);process=spawn(name)
+                    result=await line(process);await done(process)
+                    if error is None:assert result.get('source_verified') is True and result.get('uploaded')==uploads[-1],(name,result)
+                    else:assert result=={'refused':error},(name,result)
+                    assert len(uploads)==before+attempts and len(media_gets)==read_before+gets,(name,len(uploads)-before,len(media_gets)-read_before)
+                assert not escapes
+                cases.append('actual_gateway_UID_uploads_only_sealed_inherited_memory_bytes_using_native_Blossom_SDK_signature_exact_identity_hash_server_expiry_and_then_verifies_the_stored_content_addressed_blob_over_TLS')
+                cases.append('private_upload_refuses_credential_bytes_and_oversized_input_before_HTTP_and_authentication_before_invalid_error_body_with_no_retry')
+                cases.append('actual_native_upload_429_retries_only_three_identical_blobs_and_redirect_or_malformed_or_oversized_response_never_publishes_a_message')
+                cases.append('foreign_upload_descriptor_never_gains_network_authority_and_changed_stored_bytes_never_become_a_publishable_attachment')
+                cases.append('actual_native_file_message_uses_sealed_uploaded_descriptor_without_reupload_and_preserves_exact_native_imeta_hash_size_MIME_name_URL_body_reply_and_FULL_signed_original_before_HTTP')
+                for name,expected,attempts in [('output-first',{'root_snapshot_fixture':True,'native_verified_upload':True,'reused':False},1),
+                        ('output-reopen',{'root_snapshot_fixture':True,'native_verified_upload':True,'reused':True},0),
+                        ('output-damage',{'custody_refused':True},0),('output-fault',{'intent_retained':True},1),
+                        ('output-fault-reopen',{'custody_refused':True},0)]:
+                    mode['name']=name;before=len(uploads);read_before=len(media_gets);process=spawn(name)
+                    assert await line(process)==expected;await done(process)
+                    assert len(uploads)==before+attempts and len(media_gets)==read_before+attempts
+                cases.append('actual_UID_root_snapshot_RPC_component_fixture_retains_source_and_native_upload_bytes_then_reuses_exact_SQL_descriptor_after_process_reopen_without_network_or_new_artifact_read')
+                cases.append('actual_SQL_failure_after_successful_upload_retains_unresolved_intent_and_new_process_refuses_automatic_reupload_while_damaged_ready_custody_never_refetches_or_restores_blob')
             finally:await public_runner.cleanup()
         finally:
             for connection in active:await connection.close()

@@ -270,3 +270,41 @@ Minimal/full regressions each pass 2,565 tests with the same two existing skips;
 172 actual root/kernel cases pass. Public factory activation, media outputs,
 real owner UID/GUI recovery, production controller process integration and
 packaging/CI remain separate unfinished work. The public count remains 14/22.
+
+### Private sealed artifact uploads and native file replies (2026-10-30)
+
+The reviewed CLI overlay now derives its additional generic-file MIME subset
+from the exact pinned relay validator. This reconciles the relay's actual
+PDF/document/audio support with the older CLI image/video-only list; it does
+not update dependencies or admit the relay's blocked executable MIME types.
+Native Blossom upload signing, primary/legacy endpoint selection and bounded
+same-byte retry behavior remain upstream code. Files are nonempty and at most
+8 MiB before reading; upload responses use the bounded strict native handler.
+
+The private HAOS uploader accepts immutable bytes through a Linux-sealed
+inherited memory descriptor, uses only the fixed installed CLI and its
+`upload file --file` grammar, and verifies the actual stored blob through the
+native authenticated media GET. A foreign descriptor, checksum/size mismatch,
+credential reflection or unexpected generic-file transformation is refused.
+Image/video normalization retains distinct source and stored hashes. A second
+sealed descriptor carries up to four already verified uploads to the native
+message builder. Its real imeta tags, content, filename, reply/thread and
+notification recipients are checked before the signed original is committed
+and publication is acknowledged. No file is uploaded again by message sending.
+
+Buzz now uses whole-event controller output projections and exact root-owned
+export snapshots. Upload intents are committed before network I/O. Successful
+source/blob/descriptor custody is reused after process restart; unresolved
+intents and damaged retained blobs stop for inspected recovery rather than
+triggering automatic upload or restoration. A private owner recovery interface
+for these upload intents is still required. The public factory stays closed.
+
+Validation at this checkpoint: 2,601 tests pass with both the minimal and full
+pinned runtime, with the same two existing skips; 172 actual root/kernel cases,
+15 native CLI cases, seven native media CLI cases and 42 installed-UID process
+cases pass. The additional output component cases explicitly substitute the
+root export RPC; real controller projection/SQL contracts are exercised
+separately for both A2A and Buzz. No installed controller-to-native-file flow,
+GUI/account setup, external relay delivery, provider inference, release or
+hardware acceptance is inferred from these fixtures. See
+[evidence/2026-10-30/buzz-native-output-validation.json](evidence/2026-10-30/buzz-native-output-validation.json).

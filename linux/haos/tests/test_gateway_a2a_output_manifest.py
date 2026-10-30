@@ -12,14 +12,20 @@ from haos.gateway_outbound import Exports
 from haos.store import MissionStore
 
 
-@pytest.fixture
-def output(tmp_path):
+@pytest.fixture(params=['a2a','buzz'])
+def output(tmp_path,request):
+    platform=request.param
     binding={'id':'owner','connector':'a2a','sender':'alice','chat':'ctx-output','scope':'a2a:'+'a'*64,'thread':'',
         'identity':'personal','capabilities':['create','read'],'generation':'a'*64,'since':1}
-    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[binding]}
-    policy=lambda:PreparedA2APolicy(config)
+    policy_type=PreparedA2APolicy
+    if platform=='buzz':
+        from haos.gateway_buzz import PreparedBuzzPolicy
+        policy_type=PreparedBuzzPolicy
+        binding.update(sender='b'*64,chat='01234567-89ab-4cde-8012-3456789abcde',scope='buzz:'+'a'*64)
+    config={'version':1,'connectors':[{'id':'a2a','platform':platform}],'bindings':[binding]}
+    policy=lambda:policy_type(config)
     store=MissionStore(tmp_path/'missions.db');controller=Controller(store,'unused',set());controller.gateway_policy=policy
-    envelope={'platform':'a2a','sender':'alice','chat':binding['chat'],'scope':binding['scope'],'thread':'',
+    envelope={'platform':platform,'sender':binding['sender'],'chat':binding['chat'],'scope':binding['scope'],'thread':'',
         'message_id':'source-output','text':'Controlled projection contract.','is_bot':False}
     try:
         result=asyncio.run(controller.gateway_dispatch({'method':'gateway.receive','params':{'connector':'a2a','envelope':envelope,

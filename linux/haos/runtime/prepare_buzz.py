@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 import tomllib
 
@@ -10,9 +11,9 @@ import tomllib
 def prepare(source,overlay):
     value=json.loads((overlay/'buzz-source.json').read_text())
     client=source/'crates/buzz-cli/src/client.rs';messages=source/'crates/buzz-cli/src/commands/messages.rs'
-    lock=source/'Cargo.lock';helper=overlay/'buzz-verify/Cargo.lock'
+    lock=source/'Cargo.lock';helper=overlay/'buzz-verify/Cargo.lock';validation=source/'crates/buzz-media/src/validation.rs'
     for path,expected in [(client,value['client_original_sha256']),(messages,value['messages_original_sha256']),(lock,value['official_lock_sha256']),
-            (helper,value['helper_lock_sha256'])]:
+            (helper,value['helper_lock_sha256']),(validation,value['media_validation_original_sha256'])]:
         if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise ValueError('Buzz build input differs from the reviewed exact source')
     allowed={(row['name'],row['version'],row.get('source'),row.get('checksum')) for row in tomllib.loads(lock.read_text())['package']}
     for row in tomllib.loads(helper.read_text())['package']:
@@ -97,6 +98,53 @@ def prepare(source,overlay):
                 Ok(bytes::Bytes::from(data))'''
     media=media.replace(media_anchor,media_patch)
     patched=patched[:media_start]+media+patched[media_end:]
+    upload_start=patched.index('    pub async fn upload_file(&self, file_path: &str) -> Result<BlobDescriptor, CliError> {')
+    upload_end=patched.index('\n    }\n',upload_start)+len('\n    }')
+    upload=patched[upload_start:upload_end]
+    source_validation=validation.read_text()
+    generic=source_validation[source_validation.index('fn file_mime_to_ext('):source_validation.index('\n/// Validate uploaded bytes for the **generic file** upload path.')]
+    mimes=sorted({'application/octet-stream',*re.findall(r'"([a-z0-9.+-]+/[a-z0-9.+-]+)"',generic)})
+    deny=source_validation[source_validation.index('const BLOCKED_FILE_MIME_TYPES:'):source_validation.index('\n/// Map a sniffed MIME type')]
+    if set(mimes)&set(re.findall(r'"([a-z0-9.+-]+/[a-z0-9.+-]+)"',deny)):
+        raise ValueError('generic CLI MIME subset intersects the exact relay deny policy')
+    mime_anchor='        if !ALLOWED_MIMES.contains(&mime.as_str()) {'
+    read_anchor='        let bytes = std::fs::read(file_path)'
+    timeout_anchor='''        let upload_timeout = if mime.starts_with("video/") {
+            Duration::from_secs(600)
+        } else {
+            Duration::from_secs(120)
+        };'''
+    response_primary='''                    let status = resp.status();
+                    if !status.is_success() {
+                        let s = status.as_u16();
+                        let body = resp.text().await.unwrap_or_default();
+                        return Err(CliError::Relay { status: s, body });
+                    }
+                    resp.json::<BlobDescriptor>().await.map_err(CliError::from)'''
+    response_legacy='''                if !resp.status().is_success() {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    return Err(CliError::Relay { status, body });
+                }
+                resp.json::<BlobDescriptor>().await.map_err(CliError::from)'''
+    for expected in [mime_anchor,read_anchor,timeout_anchor,response_primary,response_legacy]:
+        if upload.count(expected)!=1:raise ValueError('pinned Buzz immutable upload or descriptor handling changed')
+    upload=upload.replace(read_anchor,'''        if metadata.len() == 0 || metadata.len() > 8 * 1024 * 1024 {
+            return Err(CliError::Usage("private upload exceeds bounded nonempty file size".into()));
+        }
+''' + read_anchor)
+    generic_list=', '.join(json.dumps(mime) for mime in mimes)
+    upload=upload.replace(mime_anchor,'        let generic: &[&str] = &['+generic_list+'];\n'
+        '        let generic_enabled = matches!(std::env::var("HAOS_BUZZ_GENERIC_FILES").as_deref(), Ok("1"));\n'
+        '        if !ALLOWED_MIMES.contains(&mime.as_str()) && !(generic_enabled && generic.contains(&mime.as_str())) {')
+    upload=upload.replace(timeout_anchor,'        let upload_timeout = env_duration_secs("BUZZ_TIMEOUT_SECS", 30);')
+    upload=upload.replace(response_primary,'''                    let body = self.handle_response(resp).await?;
+                    serde_json::from_str::<BlobDescriptor>(&body)
+                        .map_err(|_| CliError::Other("invalid upload descriptor".into()))''')
+    upload=upload.replace(response_legacy,'''                let body = self.handle_response(resp).await?;
+                serde_json::from_str::<BlobDescriptor>(&body)
+                    .map_err(|_| CliError::Other("invalid upload descriptor".into()))''')
+    patched=patched[:upload_start]+upload+patched[upload_end:]
     query=messages.read_text();query_anchor='    if let Some(s) = since {\n        filter["since"] = serde_json::json!(s);\n    }\n\n    let resp = client.query(&filter).await?;'
     if query.count(query_anchor)!=1:raise ValueError('pinned Buzz message query cursor changed')
     query_patch=query_anchor.replace('    let resp = client.query(&filter).await?;', '    // HAOS private history supplies the relay\'s existing composite cursor.\n    // It is read-only, scoped to this process and still uses the exact channel.\n    if let Ok(before_id) = std::env::var("HAOS_BUZZ_BEFORE_ID") {\n        validate_hex64(&before_id)?;\n        if before.is_none() {\n            return Err(CliError::Usage("composite history cursor requires its exact timestamp".into()));\n        }\n        filter["before_id"] = serde_json::json!(before_id);\n    }\n    let resp = client.query(&filter).await?;')
@@ -166,8 +214,69 @@ def prepare(source,overlay):
     };'''
     send_patch=send_patch.replace('    let event = client.sign_event(builder)?;',replay)
     prepared_query=prepared_query.replace(send_anchor,send_patch)
+    file_start=prepared_query.index('    // Upload files and build imeta tags\n')
+    file_end=prepared_query.index('    let final_content = if media_content.is_empty() {',file_start)
+    files=prepared_query[file_start:file_end]
+    if (files.count('let desc = client')!=1 or files.count('upload_file(file_path)')!=1
+            or files.count('media_tags.push(crate::client::build_imeta_tag(&desc));')!=1):
+        raise ValueError('pinned Buzz native message attachment builder changed')
+    prepared_query=prepared_query[:file_start]+'''    // Preserve the actual imeta codec for root-sealed, already uploaded files.
+    fn append_private_descriptor(
+        desc: &crate::client::BlobDescriptor, name: &str,
+        tags: &mut Vec<Vec<String>>, content: &mut String,
+    ) -> Result<(), CliError> {
+        if name.is_empty() || name.len() > 120
+            || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+            || name.starts_with('.') || desc.size == 0 || desc.size > 8 * 1024 * 1024 {
+            return Err(CliError::Usage("invalid private uploaded file descriptor".into()));
+        }
+        let mut tag = crate::client::build_imeta_tag(desc);
+        tag.push(format!("filename {name}"));
+        tags.push(tag);
+        if desc.mime_type.starts_with("video/") {
+            content.push_str("\\n![video](");
+        } else if desc.mime_type.starts_with("image/") {
+            content.push_str("\\n![image](");
+        } else {
+            content.push_str(&format!("\\n[{name}]("));
+        }
+        content.push_str(&desc.url);
+        content.push(')');
+        Ok(())
+    }
+    let mut media_tags: Vec<Vec<String>> = Vec::new();
+    let mut media_content = String::new();
+    if let Some(fd) = std::env::var_os("HAOS_BUZZ_UPLOADED_FD") {
+        use std::io::Read;
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct PrivateFile { descriptor: crate::client::BlobDescriptor, name: String }
+        let refused = || CliError::Other("private uploaded manifest refused".into());
+        if !p.files.is_empty() { return Err(refused()); }
+        let fd = fd.to_str().ok_or_else(refused)?;
+        if fd.is_empty() || fd.len() > 10 || !fd.bytes().all(|b| b.is_ascii_digit()) { return Err(refused()); }
+        let descriptor: u32 = fd.parse().map_err(|_| refused())?;
+        if descriptor < 3 || descriptor > i32::MAX as u32 { return Err(refused()); }
+        let stream = std::fs::File::open(format!("/proc/self/fd/{descriptor}")).map_err(|_| refused())?;
+        let mut raw = Vec::new();
+        stream.take(65537).read_to_end(&mut raw).map_err(|_| refused())?;
+        if raw.is_empty() || raw.len() > 65536 { return Err(refused()); }
+        let files: Vec<PrivateFile> = serde_json::from_slice(&raw).map_err(|_| refused())?;
+        if files.is_empty() || files.len() > 4 { return Err(refused()); }
+        for file in files {
+            append_private_descriptor(&file.descriptor, &file.name, &mut media_tags, &mut media_content)?;
+        }
+    }
+    for file_path in &p.files {
+        let desc = client.upload_file(file_path).await
+            .map_err(|e| CliError::Other(format!("upload failed: {e}")))?;
+        let name = std::path::Path::new(file_path).file_name().and_then(|name| name.to_str())
+            .ok_or_else(|| CliError::Usage("bounded upload filename required".into()))?;
+        append_private_descriptor(&desc, name, &mut media_tags, &mut media_content)?;
+    }
+''' + prepared_query[file_end:]
     client.write_text(patched);messages.write_text(prepared_query)
-    return {**value,'client_prepared_sha256':hashlib.sha256(patched.encode()).hexdigest(),
+    return {**value,'generic_file_mime_types':mimes,'client_prepared_sha256':hashlib.sha256(patched.encode()).hexdigest(),
         'messages_prepared_sha256':hashlib.sha256(prepared_query.encode()).hexdigest()}
 
 

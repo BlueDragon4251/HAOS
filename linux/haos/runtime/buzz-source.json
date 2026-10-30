@@ -28,5 +28,8 @@
   "prepublish_guard": "HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission",
   "signed_replay": "HAOS_BUZZ_REPLAY_FD-v1: bounded SDK-verified original from inherited descriptor, exact own identity, same prepublication guard, no new signature",
   "native_media_body_limit": "8388608 bytes before allocation, scoped native request/connect deadlines, bounded native error handler, actual Blossom signer unchanged",
+  "media_validation_original_sha256": "8416b3801cca06f1912ca8988a12db53895d1a5bf6f436851b86dc58b88239c4",
+  "generic_file_upload": "HAOS_BUZZ_GENERIC_FILES-v1: exact pinned relay MIME subset, sealed input, 8MiB before read, scoped deadline and bounded native response",
+  "uploaded_manifest": "HAOS_BUZZ_UPLOADED_FD-v1: sealed root-owned upload descriptors, actual native imeta builder, one guarded message for up to four files",
   "maximum_glibc": "2.36"
 }

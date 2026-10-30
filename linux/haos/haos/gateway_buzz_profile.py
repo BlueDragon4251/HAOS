@@ -110,6 +110,8 @@ def _lifecycle(adapter,lease,identity):
     from .gateway_buzz_delivery import Publisher
     publisher=Publisher(adapter) if any(row['connector']==native.connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
     adapter._haos_buzz_publisher=publisher
+    from .gateway_buzz_output import Output
+    adapter._haos_buzz_output=Output(adapter)
     adapter._haos_buzz_monitor=None;adapter._haos_buzz_replay=None
     db.execute('''CREATE TABLE IF NOT EXISTS buzz_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,
         credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)''')
@@ -246,13 +248,8 @@ def _lifecycle(adapter,lease,identity):
         authority=current_delivery(self,'buzz',chat_id,metadata)
         if publisher is None:raise PermissionError('creation-only Buzz profile has no reply authority')
         binding=native.policy().current_binding(metadata['haos_binding'])
-        prepared=metadata.get('haos_output')
-        if prepared is not None:
-            if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list)
-                    or not isinstance(prepared['text'],str) or prepared['items']):
-                raise PermissionError('Buzz media output requires its private sealed implementation')
-            content=prepared['text']
-        return await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority)
+        return await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority,
+            prepared=metadata.get('haos_output'))
     for name,method in {'connect':connect,'disconnect':disconnect,'_haos_close':close,'_haos_health':health,
             'close_profile':close,'native_health':health,'send':send}.items():
         setattr(adapter,name,MethodType(method,adapter))

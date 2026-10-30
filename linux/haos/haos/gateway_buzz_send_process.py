@@ -1,6 +1,5 @@
 """One fixed CLI send with verified original custody before native publication."""
 import asyncio
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -16,9 +15,50 @@ from .gateway_buzz_crypto import command,verify
 GUARD='HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission'
 
 
+def files(value,item):
+    from .gateway_buzz_upload import descriptor
+    parts=item.get('attachments',[])
+    if not isinstance(parts,list) or len(parts)>4:raise PermissionError('at most four sealed uploaded Buzz files required')
+    result=[];names=set()
+    for part in parts:
+        if (not isinstance(part,dict) or set(part)!={'descriptor','name'} or not isinstance(part['name'],str)
+                or not 1<=len(part['name'])<=120 or part['name'].startswith('.')
+                or any(not(c.isascii() and (c.isalnum() or c in '._-')) for c in part['name']) or part['name'] in names):
+            raise PermissionError('distinct bounded inert Buzz result filenames required')
+        names.add(part['name']);result.append({'descriptor':descriptor(value,part['descriptor']),'name':part['name']})
+    return result
+
+
+def body(value,item):
+    result=item['content']
+    for part in files(value,item):
+        desc=part['descriptor'];kind=desc['type'].split('/')[0]
+        label='!['+kind+']' if kind in {'image','video'} else '['+part['name']+']'
+        result+='\n'+label+'('+desc['url']+')'
+    return result
+
+
+def media_tags(value,item,tags):
+    parts=files(value,item);actual=[tag for tag in tags if tag[0]=='imeta']
+    if len(parts)!=len(actual):return False
+    for part,tag in zip(parts,actual):
+        desc=part['descriptor'];expected=['imeta','url '+desc['url'],'m '+desc['type'],'x '+desc['sha256'],'size '+str(desc['size'])]
+        for key in ['dim','blurhash','thumb']:
+            if desc.get(key) is not None:expected.append(key+' '+desc[key])
+        if desc.get('duration') is not None:
+            if len(tag)!=len(expected)+2 or not tag[-2].startswith('duration '):return False
+            try:duration=float(tag[-2][9:])
+            except ValueError:return False
+            if duration!=desc['duration']:return False
+            tag=tag[:-2]+tag[-1:]
+        expected.append('filename '+part['name'])
+        if tag!=expected:return False
+    return True
+
+
 def target(value,item):
     fields={'channel','anchor','thread','content','kind','allowed_mentions','explicit_mentions'}
-    if (not isinstance(item,dict) or set(item)!=fields or item['channel'] not in value['channels']
+    if (not isinstance(item,dict) or not fields<=set(item)<=fields|{'attachments'} or item['channel'] not in value['channels']
             or any(not isinstance(item[key],str) or not HEX.fullmatch(item[key]) for key in ['anchor','thread'])
             or type(item['kind']) is not int or item['kind'] not in {9,45003}
             or not isinstance(item['content'],str) or not 1<=len(item['content'].strip().encode())<=32000
@@ -30,6 +70,7 @@ def target(value,item):
         if (not isinstance(parts,list) or len(parts)>2 or any(not isinstance(part,str) or not HEX.fullmatch(part) for part in parts)
                 or len(set(parts))!=len(parts)):raise PermissionError('bounded explicit Buzz notification identities required')
     if not set(item['explicit_mentions'])<=set(item['allowed_mentions']):raise PermissionError('Buzz mention lacks separate reply recipient authority')
+    if len(body(value,item).encode())>32000:raise PermissionError('bounded complete Buzz message including uploaded references required')
     args=['messages','send','--channel',item['channel'],'--content','-','--reply-to',item['anchor']]
     if item['kind']!=9:args+=['--kind',str(item['kind'])]
     for public in item['explicit_mentions']:args+=['--mention',public]
@@ -72,11 +113,11 @@ async def send(value,item,*,home,current,retain,redactor,replay=None):
                 channels=[tag[1] for tag in event['tags'] if tag[0]=='h' and len(tag)>=2]
                 mentions=[tag[1] for tag in event['tags'] if tag[0]=='p' and len(tag)>=2]
                 links=[tag[1] for tag in event['tags'] if tag[0]=='e' and len(tag)>=2]
-                if (event['pubkey']!=value['public_key'] or event['kind']!=item['kind'] or event['content']!=item['content']
+                if (event['pubkey']!=value['public_key'] or event['kind']!=item['kind'] or event['content']!=body(value,item)
                         or channels!=[item['channel']] or thread(event)!=item['thread'] or _event_reply_parent_id(event)!=item['anchor']
                         or not set(links)<={item['anchor'],item['thread']} or len(links)>2
                         or len(set(mentions))!=len(mentions) or not set(mentions)<=set(item['allowed_mentions'])
-                        or any(tag[0] in {'imeta','broadcast'} for tag in event['tags'])
+                        or any(tag[0]=='broadcast' for tag in event['tags']) or not media_tags(value,item,event['tags'])
                         or replay_event is None and abs(time.time()-event['created_at'])>60
                         or replay_event is not None and (event!=replay_event or raw!=replay)):
                     raise PermissionError('native signed Buzz message changed approved body route thread recipient or resource authority')
@@ -109,16 +150,22 @@ async def send(value,item,*,home,current,retain,redactor,replay=None):
         return bytes(out)
     async def revoked():
         while True:current();await asyncio.sleep(.1)
-    spawn=None;replay_fd=None
+    spawn=None;replay_fd=None;upload_fd=None
     try:
         current()
         inherited=()
+        attachments=files(value,item)
+        if attachments:
+            from .gateway_buzz_upload import MANIFEST,sealed
+            if metadata.get('uploaded_manifest')!=MANIFEST:raise PermissionError('installed Buzz program lacks reviewed sealed upload manifest')
+            raw=json.dumps(attachments,separators=(',',':'),ensure_ascii=False).encode()
+            if len(raw)>65536 or redactor.text(raw.decode())!=raw.decode():raise PermissionError('bounded nonprivate upload manifest required')
+            upload_fd=sealed('haos-buzz-uploaded-manifest',raw)
+            env['HAOS_BUZZ_UPLOADED_FD']=str(upload_fd);inherited+=(upload_fd,)
         if replay is not None:
-            replay_fd=os.memfd_create('haos-buzz-signed-replay',os.MFD_CLOEXEC|os.MFD_ALLOW_SEALING)
-            with os.fdopen(os.dup(replay_fd),'wb') as stream:stream.write(replay);stream.flush()
-            os.lseek(replay_fd,0,os.SEEK_SET)
-            fcntl.fcntl(replay_fd,fcntl.F_ADD_SEALS,fcntl.F_SEAL_SEAL|fcntl.F_SEAL_SHRINK|fcntl.F_SEAL_GROW|fcntl.F_SEAL_WRITE)
-            env['HAOS_BUZZ_REPLAY_FD']=str(replay_fd);inherited=(replay_fd,)
+            from .gateway_buzz_upload import sealed
+            replay_fd=sealed('haos-buzz-signed-replay',replay)
+            env['HAOS_BUZZ_REPLAY_FD']=str(replay_fd);inherited+=(replay_fd,)
         spawn=asyncio.create_task(asyncio.create_subprocess_exec(program,*args,stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,env=env,cwd=str(home),start_new_session=True,limit=16384,pass_fds=inherited))
         async with asyncio.timeout(40):
@@ -156,3 +203,4 @@ async def send(value,item,*,home,current,retain,redactor,replay=None):
             if not task.done():task.cancel()
         if tasks or clients:await asyncio.gather(*tasks,*clients,return_exceptions=True)
         if replay_fd is not None:os.close(replay_fd)
+        if upload_fd is not None:os.close(upload_fd)

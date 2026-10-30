@@ -51,7 +51,7 @@ class Publisher:
             raise PermissionError('Buzz reply original has no matching committed independent input')
         return item
 
-    async def send(self,binding,delivery_id,attempt,content,source_id,authority):
+    async def send(self,binding,delivery_id,attempt,content,source_id,authority,*,prepared=None):
         from gateway.platforms.base import SendResult
         if (not isinstance(delivery_id,str) or not HEX.fullmatch(delivery_id) or type(attempt) is not int or not 1<=attempt<=5
                 or not isinstance(content,str) or not content.strip() or len(content.encode())>32000):
@@ -59,10 +59,20 @@ class Publisher:
         binding=deepcopy(binding)
         def current():self.current(binding,authority)
         current();source=await self.source(binding,source_id);original=wire(source['raw'])
+        attachments=[]
+        if prepared is not None:
+            if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['text'],str)
+                    or len(prepared['text'].encode())>32000):raise PermissionError('closed private Buzz output projection required')
+            if prepared['items']:
+                attachments=self.adapter._haos_buzz_output.resolve({'id':delivery_id,'binding_id':binding['id'],
+                    'binding_digest':digest(binding)},prepared['items'])
+            elif not isinstance(prepared['items'],list):raise PermissionError('retained Buzz output identities required')
+            content=prepared['text'] or ('Result files' if attachments else 'Mission completed.')
         if self.native.inbox.redactor.text(content)!=content:raise PermissionError('private Buzz credential reflection refused')
         target={'channel':binding['chat'],'anchor':binding['thread'] or source_id,'thread':binding['thread'] or source_id,
             'content':content,'kind':45003 if original['kind'] in {45001,45003} else 9,
             'allowed_mentions':sorted({binding['sender'],self.value['public_key']}),'explicit_mentions':[]}
+        if attachments:target['attachments']=attachments
         encoded=json.dumps(target,sort_keys=True,separators=(',',':'),ensure_ascii=False)
         source_sha=hashlib.sha256(source['raw']).hexdigest()
         fingerprint=digest([self.scope,digest(binding),source['id'],source_sha,target])
