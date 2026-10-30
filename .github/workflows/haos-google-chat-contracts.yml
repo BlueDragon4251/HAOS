@@ -183,6 +183,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb python3-tk
           for screen in 1440x1000x24 390x640x24; do
+            xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_retired_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/retired-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_owner_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/owner-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_oauth_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/owner-oauth-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_file_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/file-recovery-gui-$screen.json"

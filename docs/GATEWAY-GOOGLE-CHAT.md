@@ -658,3 +658,33 @@ Purged tombstones no longer consume the live output quota (128 files/48 MiB).
 A separate 65,536-record history bound preserves the audit limit. Inventories
 show retained bytes before purged history so older live files remain reachable.
 Public Google Chat setup and activation remain in progress; count stays 15/22.
+
+## Owner controls for retained accounts
+
+The authenticated graphical administration now offers **Gateways → Google Chat:
+entfernte Konten und lokale Altbestände verwalten** independently of an active
+connector. It lists known public app descriptors separately from opaque profiles
+whose original identity is missing. Selecting a profile clears all old results
+and confirmations; the Owner must load and select a fresh token, rejected capsule
+or local output snapshot, enter a non-secret reason and explicitly confirm.
+Background results from an earlier selection are discarded. Unexpected private
+fields are rejected before rendering. Global unassociated output recovery does
+not infer or require a selected account.
+
+The same Root backend is available through `haos-owner gateway
+google-chat-retired`. Read-only actions are `profiles`, `tokens`, `quarantines`,
+`outputs` and `unassociated-outputs`; account-specific actions require
+`--profile`. Withdrawal actions are `revoke-token`, `dispose-capsule`,
+`purge-output` and `purge-unassociated-output`. Each requires the exact inspected
+`--id`, `--snapshot-sha256`, `--note` and `--confirm-inspected`; account actions
+also require `--profile`. The CLI reloads metadata and refuses stale snapshots.
+Secrets are never CLI arguments, JSON output or GUI details.
+
+Inspection stops the gateway and does not automatically restart it. Revocation
+can contact the fixed Google revocation endpoint after durable local denial;
+it does not send a chat message. An uncertain remote result remains uncertain.
+Local output disposal refuses any active original grant and preserves audit
+tombstones. Missing legacy app identity still prevents account-specific token
+withdrawal; it never triggers guessed identity or credential reconstruction.
+Public account enrollment, pairing and production activation remain separate
+unfinished work. The public software count remains 15/22.

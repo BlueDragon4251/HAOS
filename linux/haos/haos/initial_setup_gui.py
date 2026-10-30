@@ -617,9 +617,17 @@ class Wizard:
                                 success="Bootc-Update vorbereitet. Neustart nach eigener Freigabe.")
             self._button(self.content, "Kanal wählen und bootc-Image prüfen",
                          apply_channel, primary=True).pack(anchor="w", pady=13)
+        elif name == "google-chat-history":
+            self._head('Google Chat · erhaltene Konten',
+                       'Lokale Prüfbelege und ausdrücklicher Widerruf bleiben auch nach einer Kontoentfernung erreichbar.')
+            self._button(self.content,'Zur Gateway-Verwaltung',lambda:self.show('gateways')).pack(anchor='w',pady=5)
+            from .google_chat_retired_gui import HistoricalRecoveryForm
+            historical=HistoricalRecoveryForm(self,self.content);historical.frame.pack(fill='x')
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
+            self._button(self.content,'Google Chat: entfernte Konten und lokale Altbestände verwalten',
+                         lambda:self.show('google-chat-history')).pack(anchor='w',pady=5)
             configured_gateways = self._run(initial_setup.gateway_configuration, success="") or {"connectors": [], "bindings": []}
             process_status = self._label(self.content, "Dienststatus noch nicht geprüft.", size=10, color=self.MUTED)
             process_status.pack(anchor="w", pady=6)

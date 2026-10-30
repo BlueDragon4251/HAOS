@@ -346,6 +346,9 @@ def owner_gateway(args):
     from .owner import audit
     if os.geteuid() != 0:
         raise PermissionError("gateway setup requires authenticated owner authority")
+    if args.gateway_action=='google-chat-retired':
+        from .google_chat_retired_cli import run
+        return run(args)
     if args.gateway_action == "recover-configuration":
         from .gateway_publication import recover
         stopped_gateway()
