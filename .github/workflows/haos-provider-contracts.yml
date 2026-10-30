@@ -36,7 +36,8 @@ permissions:
   contents: read
 concurrency:
   group: provider-contracts-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve running exhaustive UID/SDK checks; GitHub coalesces pending revisions.
+  cancel-in-progress: false
 jobs:
   pinned-runtime:
     runs-on: ubuntu-24.04
