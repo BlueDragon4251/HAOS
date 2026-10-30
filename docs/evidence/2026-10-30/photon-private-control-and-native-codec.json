@@ -1,0 +1,193 @@
+{
+  "recorded_UTC": "2026-10-30T18:48:54.047989+00:00",
+  "base_commit": "181b0a5df4ff2bc279b3d6247b2d22957a7de292",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "643396f02277bb35e3ba043c6eda6b97011c82590fb4ca683e88f0bc84fd7cd7"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "ede89e450478319dbc501f8a748fd64103a5d1d771e01d6fcf7312466613f994"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "ddad5304ad429968eba6e95028567d058bf54f910d71bd166dc1f6f985400008"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "51f5e010dee9469abd4bcff34de1b7bc6fa3790ff3b7893f18fd52232ccf6729"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon.py",
+      "sha256": "6f82114f2b4618c2beba58f631a0992f4b275e0d2a72bbf5f43161b3cbdb92a1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_admission.py",
+      "sha256": "9eddf65e5b14ae411e1a3688c17fd13619a5d4a74e94773bef64e6dfc02f3b47"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_codec.py",
+      "sha256": "3093717b1bc701b3a8113819a1685c5cf24fb900dded7129cd79604bf4bf3256"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_control.py",
+      "sha256": "88f5717cae2432f7909fac7a49e1dcc312da0592579e4ec8809a4e62bf5fcc00"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_custody.py",
+      "sha256": "233493a7f21d4b376ba26032666fd4e629e481402c238b078a727762e212597d"
+    },
+    {
+      "path": "linux/haos/runtime/photon_sidecar.mjs",
+      "sha256": "de0ce172ca56a0750f5bb4c087da85fb0db16b2354b1bcd76283d4e47bfcf4d6"
+    },
+    {
+      "path": "linux/haos/runtime/prepare_photon.py",
+      "sha256": "cb35baa967f25f5aa2f77f30bf17b98c8a44e02bbbedda98d8a892b58a3793e3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_codec.py",
+      "sha256": "09c3579825b99ff05820218bf5dfca8dee519110d2dffb6f9607d53d61878753"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_sdk_codec.mjs",
+      "sha256": "9965ecd079d43660d7aabf7067cd39fb2c7a8ba3eaabd905e2ba9e210456336a"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_admission.py",
+      "sha256": "4e4e6d0132d7f07ebe5255e57c08cac0341c606a3249380a1c8e9ea16771b6e7"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_control.py",
+      "sha256": "c345bf0b9108c4571faf77caf6a238efab0bdb3f4c6b068a92398ba294904e64"
+    }
+  ],
+  "minimal_regression": "3130 passed, 2 skipped in 17.44s",
+  "full_pinned_regression": "3130 passed, 2 skipped in 17.22s",
+  "existing_kernel_regression": {
+    "result": "174 passed in 14.09s",
+    "scope": "existing actual Root/UID/socket/credential tests after shared media platform allowance; does not establish Photon process UID installation or live gRPC transport"
+  },
+  "private_component_cases": 94,
+  "actual_native_codec": {
+    "schema": 1,
+    "passed": 13,
+    "cases": [
+      "text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "reply_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "group-thread_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "voice_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "document_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "audio-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "caf-alias_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-unicode_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-no-marker_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-adjacent-markers_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "multi-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay"
+    ],
+    "scope": "actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy and FULL SQLite/media custody",
+    "substitutions": [
+      "SDK remote RPC frames",
+      "final controller callback"
+    ],
+    "external_messages_sent": false,
+    "controller_inference_verified": false,
+    "local_STT_verified": false,
+    "kernel_UID_verified_by_this_probe": false
+  },
+  "native_transport": {
+    "schema": 1,
+    "passed": 13,
+    "cases": [
+      "native_sdk_refuses_before_mapping_or_automatic_contact_callback",
+      "native_vcard_download_is_refused_before_eager_sdk_conversion",
+      "native_poll_and_group_hydration_refused_before_rpc",
+      "failed_independent_custody_cannot_be_interpreted_as_admission",
+      "approved_text_uses_actual_native_message_and_sender_codec",
+      "actual_native_reply_keeps_target_id_without_quoted_message_hydration",
+      "actual_native_attachment_stream_obeys_bound_and_closes_native_rpc",
+      "lying_native_size_refused_and_rpc_closed",
+      "truncated_native_attachment_is_not_a_successful_marker",
+      "authority_rechecked_between_native_chunks_and_withdrawal_cancels_rpc",
+      "hung_native_stream_is_cancelled_at_total_deadline",
+      "oversize_metadata_refused_before_stream_open",
+      "incomplete_sdk_embedding_fails_closed"
+    ],
+    "actual_spectrum_version": "12.7.0",
+    "prepared_sdk_sha256": "a88336534bd4b6e68d2563333f386f44f70625e41984086b1841e3f2b62e99e0",
+    "native_rpc_frames": "local fixture",
+    "external_network": false,
+    "live_delivery_verified": false
+  },
+  "prepared_source": {
+    "schema": 1,
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "spectrum_version": "12.7.0",
+    "inputs": [
+      {
+        "path": "../adapter.py",
+        "sha256": "7dcedacead3b762166acbb0309e372d9eedf81b28efa7adce692122130775a68"
+      },
+      {
+        "path": "index.mjs",
+        "sha256": "f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e"
+      },
+      {
+        "path": "package.json",
+        "sha256": "46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24"
+      }
+    ],
+    "prepared": [
+      {
+        "path": "index.mjs",
+        "sha256": "6172d9f259e33b7895fcedc5d020f6b904e7d82179bc7f9cf2311eddefba06c7"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "a88336534bd4b6e68d2563333f386f44f70625e41984086b1841e3f2b62e99e0"
+      },
+      {
+        "path": "../adapter.py",
+        "sha256": "9d32b8700b55665f470b9e88c7bc6a712d6b0108d15d942b5244f408a90c0377"
+      }
+    ]
+  },
+  "CI_previous_checkpoint": {
+    "head": "181b0a5df4ff2bc279b3d6247b2d22957a7de292",
+    "actual_PR_merge_source": "3241e8522a3b1721169a48a0c098ecc76103c834",
+    "services_run": 41107804998,
+    "services_job": 124242590975,
+    "services_conclusion": "SUCCESS",
+    "Photon_prepared_run": 41107805159,
+    "Photon_prepared_conclusion": "SUCCESS",
+    "new_codec_and_control_CI": "not yet executed"
+  },
+  "known_remaining_transport_requirements": [
+    "durable SDK resume cursor and explicit refusal of silently accepted event gaps",
+    "automatic native write retry restriction and actual gRPC transport fixtures",
+    "fixed launcher installation, current-authority supervision and live status",
+    "full durable controller receive/replay path and guarded replies",
+    "owner account/device setup, GUI/CLI and inspected recovery"
+  ],
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_verified": false,
+    "public_gateway_activation": false,
+    "local_STT_verified": false,
+    "installed_service_GUI_verified": false,
+    "release_acceptance": false
+  }
+}

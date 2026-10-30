@@ -78,7 +78,7 @@ def attachment(source):
 
 
 @pytest.mark.parametrize('change', ['unapproved', 'voice', 'video', 'oversize', 'unknown-size', 'bool-size', 'negative',
-    'duplicate', 'path', 'control', 'vcard', 'vcard-extension', 'total', 'too-many'])
+    'duplicate', 'path', 'control', 'vcard', 'vcard-application', 'vcard-x-application', 'vcard-extension', 'total', 'too-many'])
 def test_media_refusals_precede_download(source, change):
     part = attachment(source); binding = source[1]['bindings'][0]
     if change == 'unapproved': binding.pop('allow_media')
@@ -92,6 +92,8 @@ def test_media_refusals_precede_download(source, change):
     elif change == 'path': part['fileName'] = '../../private'
     elif change == 'control': part['fileName'] = 'hidden\nprivate'
     elif change == 'vcard': part['mimeType'] = 'text/vcard'
+    elif change == 'vcard-application': part['mimeType'] = 'application/vcard'
+    elif change == 'vcard-x-application': part['mimeType'] = 'application/x-vcard'
     elif change == 'vcard-extension': part['fileName'] = 'private.vcf'
     elif change == 'total':
         part['totalBytes'] = 8 * 1024 * 1024
@@ -104,7 +106,9 @@ def test_separate_voice_and_video_consents(source):
     part = attachment(source); binding = source[1]['bindings'][0]
     assert admit(source)['attachment_bytes'] == 3
     part['mimeType'] = 'audio/mp4'; binding['allow_voice'] = True
-    with pytest.raises(Refused): admit(source)
+    # The pinned SDK supports audio files as well as native voice-note bubbles.
+    # Both need the explicit voice grant; the flag controls the wire type only.
+    assert admit(source)['attachment_bytes'] == 3
     source[2]['event']['message']['isAudioMessage'] = True
     assert admit(source)['attachment_bytes'] == 3
     part['mimeType'] = 'video/mp4'; binding['allow_video'] = True
@@ -220,7 +224,8 @@ def test_native_bytes_are_exact_bounded_canonical_and_retained_once(source, cust
     projected = decoded(source)
     binary = {'type': 'attachment', 'id': part['guid'], 'name': part['fileName'], 'mimeType': part['mimeType'],
         'size': part['totalBytes'], 'data': base64.b64encode(b'abc').decode(), 'encoding': 'base64'}
-    projected['content'] = {'type': 'group', 'items': [{'id': 'text-part', 'content': projected['content']}, {'id': 'binary-part', 'content': binary}]}
+    mid = data['event']['message']['guid']
+    projected['content'] = {'type': 'group', 'items': [{'id': 'p:0/' + mid, 'content': binary}, {'id': 'p:1/' + mid, 'content': projected['content']}]}
     encoded = json.dumps(projected).encode(); store.decode(key, policy, 'phone', account, encoded)
     row, _ = store.load(key, policy, 'phone', account)
     assert json.loads(row['parts'])[part['guid']]['size'] == 3
@@ -243,7 +248,8 @@ def test_native_binary_failure_never_becomes_successful_metadata_marker(source, 
     elif change == 'size': binary['size'] = True
     elif change == 'foreign-id': binary['id'] = str(uuid.uuid4())
     elif change == 'mime': binary['mimeType'] = 'video/mp4'
-    data['content'] = {'type': 'group', 'items': [{'id': 'text', 'content': data['content']}, {'id': 'binary', 'content': binary}]}
+    mid = source[2]['event']['message']['guid']
+    data['content'] = {'type': 'group', 'items': [{'id': 'p:0/' + mid, 'content': binary}, {'id': 'p:1/' + mid, 'content': data['content']}]}
     if change == 'duplicate': data['content']['items'].append({'id': 'duplicate', 'content': dict(binary)})
     with pytest.raises(Conflict): store.decode(key, policy, 'phone', source[0], json.dumps(data).encode())
     assert store.load(key, policy, 'phone', source[0])[0]['normalized'] == b''
@@ -284,3 +290,30 @@ def test_retained_source_cannot_move_to_changed_identity_epoch_grant_or_body(sou
     elif change == 'normalized': store.db.execute('UPDATE photon_originals SET normalized=? WHERE id=?', (b'{}', key))
     with pytest.raises((PermissionError, Conflict)):
         store.load(key, policy, 'phone', account)
+
+
+@pytest.mark.parametrize('change', ['none', 'order', 'child-id', 'text', 'trim-0085', 'nested-group', 'extra-reply'])
+def test_native_mixed_order_and_javascript_whitespace_are_exact(source, custody, change):
+    import base64
+    from haos.gateway import Conflict
+    part = attachment(source); source[2]['event']['message']['content']['text'] = '\ufeff\u0085first \ufffc second\ufeff'
+    policy = PreparedPhotonPolicy(source[1]); store = custody[0]; store.current = lambda: policy
+    key = store.retain(policy, 'phone', source[0], json.dumps(source[2]).encode()); mid = source[2]['event']['message']['guid']
+    data = decoded(source)
+    contents = [{'type': 'text', 'text': '\u0085first'}, {'type': 'attachment', 'id': part['guid'], 'name': part['fileName'],
+        'mimeType': part['mimeType'], 'size': 3, 'data': base64.b64encode(b'abc').decode(), 'encoding': 'base64'}, {'type': 'text', 'text': 'second'}]
+    data['content'] = {'type': 'group', 'items': [{'id': 'p:' + str(i) + '/' + mid, 'content': c} for i, c in enumerate(contents)]}
+    items = data['content']['items']
+    if change == 'order': items[0]['content'], items[1]['content'] = items[1]['content'], items[0]['content']
+    elif change == 'child-id': items[0]['id'] = 'foreign-part'
+    elif change == 'text': items[0]['content']['text'] = '\u0085first modified'
+    elif change == 'trim-0085': items[0]['content']['text'] = 'first'
+    elif change == 'nested-group': items[0]['content'] = {'type': 'group', 'items': []}
+    elif change == 'extra-reply': data['content'] = {'type': 'reply', 'targetMessageId': str(uuid.uuid4()), 'content': data['content']}
+    raw = json.dumps(data).encode()
+    if change == 'none':
+        store.decode(key, policy, 'phone', source[0], raw)
+        assert store.load(key, policy, 'phone', source[0])[0]['normalized'] == raw
+    else:
+        with pytest.raises(Conflict): store.decode(key, policy, 'phone', source[0], raw)
+        assert store.load(key, policy, 'phone', source[0])[0]['normalized'] == b''

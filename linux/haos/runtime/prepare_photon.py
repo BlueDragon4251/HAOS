@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 INPUTS = {
+    '../adapter.py': '7dcedacead3b762166acbb0309e372d9eedf81b28efa7adce692122130775a68',
     'index.mjs': 'f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e',
     'package.json': '46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca',
     'package-lock.json': '2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313',
@@ -86,6 +87,33 @@ if (hermesTransport !== undefined && (!hermesTransport ||
     return sidecar, sdk
 
 
+def adapter_extension(text):
+    text = replace_once(text, 'import asyncio\n', 'import asyncio\nfrom contextlib import contextmanager\nfrom contextvars import ContextVar\n')
+    anchor = 'def _cache_inbound_attachment(content: Dict[str, Any], name: str, mime: str, *,\n'
+    addition = '''_ATTACHMENT_CACHE = ContextVar("hermes_photon_attachment_cache", default=None)
+
+
+@contextmanager
+def attachment_cache(callback):
+    """Scoped private cache transport; native content/event codecs remain here."""
+    if not callable(callback):
+        raise TypeError("attachment cache callback required")
+    token = _ATTACHMENT_CACHE.set(callback)
+    try:
+        yield
+    finally:
+        _ATTACHMENT_CACHE.reset(token)
+
+
+'''
+    text = replace_once(text, anchor, addition + anchor)
+    anchor = '    if not content.get("data"):\n        return None\n'
+    return replace_once(text, anchor, '''    cache = _ATTACHMENT_CACHE.get()
+    if cache is not None:
+        return cache(content, name, mime, force_audio=force_audio)
+''' + anchor)
+
+
 def prepare(root, *, check_only=False):
     root = Path(root)
     data = {}
@@ -97,8 +125,8 @@ def prepare(root, *, check_only=False):
         if hashlib.sha256(raw).hexdigest() != expected:
             raise ValueError('Photon build input changed: ' + name)
         data[name] = raw.decode('utf-8')
-    names = ['index.mjs', 'node_modules/@spectrum-ts/imessage/dist/index.js']
-    prepared = transformed(*(data[name] for name in names))
+    names = ['index.mjs', 'node_modules/@spectrum-ts/imessage/dist/index.js', '../adapter.py']
+    prepared = (*transformed(*(data[name] for name in names[:2])), adapter_extension(data['../adapter.py']))
     result = {'schema': 1, 'hermes_commit': 'f97608f178d1ffeca59860195ab7da295f7c8e5f',
         'spectrum_version': '12.7.0', 'inputs': [{'path': name, 'sha256': value} for name, value in INPUTS.items()],
         'prepared': [{'path': name, 'sha256': hashlib.sha256(value.encode()).hexdigest()} for name, value in zip(names, prepared)]}

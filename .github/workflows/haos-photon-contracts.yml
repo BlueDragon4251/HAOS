@@ -14,7 +14,7 @@ concurrency:
 jobs:
   prepared-native-contracts:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -25,6 +25,11 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/sync-upstream.sh
+          python -m pip install uv
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
           SIDECAR="$PWD/upstream/hermes-agent/plugins/platforms/photon/sidecar"
           npm ci --prefix "$SIDECAR" --ignore-scripts --no-audit --no-fund
           mkdir -p "$RUNNER_TEMP/photon-contracts"
@@ -32,11 +37,12 @@ jobs:
           python linux/haos/runtime/prepare_photon.py "$SIDECAR" --receipt "$RUNNER_TEMP/photon-contracts/prepared-source.json"
           node --check "$SIDECAR/index.mjs"
           node linux/haos/runtime/probe_photon_transport.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-transport.json"
+          upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_photon_codec.py upstream/hermes-agent "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-codec.json"
       - name: Independent grants and actual FULL SQLite custody without Hermes imports
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

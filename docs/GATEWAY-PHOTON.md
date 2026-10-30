@@ -50,6 +50,27 @@ transactions, bounded capacity, immutable source and credential/grant mappings,
 byte lengths/checksums, replay checks and a single parent custody receipt.
 Withdrawal and damaged/purged originals cannot silently gain fresh authority.
 
+The private control component now uses an AF_UNIX listener with a fresh launch
+token and actual SO_PEERCRED checks for the supervised child PID/UID/GID. Wrong
+processes cannot use another process's token. Refusals retain only a bounded
+reason/hash record; failed writes and withdrawn policy produce no custody
+receipt. Existing socket paths are preserved rather than unlinked blindly.
+
+The actual prepared Spectrum mapper, native sidecar normalization functions and
+Hermes Python adapter are connected in a component probe. It covers text,
+replies, group threads, mixed image/text, files, audio files, native voice notes,
+CAF MIME aliases and retained replay. The checker preserves the pinned SDK's
+exact part ordering, child IDs and JavaScript whitespace rules. At most four
+attachments are accepted. A scoped native cache transport supplies only opaque
+retained media IDs; native temporary host paths never become agent inputs.
+Transferred cache rows replay without restoring their acknowledged bytes.
+
+The fixed Node embedding source is present and disables inherited telemetry,
+automatic read receipts, contact sharing, implicit URL fetches, typing/reactions
+and unapproved writes. Its production process installation, full live transport
+and supervision still need to be connected and verified; source presence and
+syntax checks are not an installed-service acceptance.
+
 ## Evidence limits and work remaining
 
 The native transport probe exercises the actual prepared Spectrum mapper and
@@ -59,8 +80,8 @@ The Photon CI workflow runs these contracts without external messages. These
 checks do not establish a live Spectrum connection, receipt by another person,
 HAOS controller inference, installed service/GUI behavior or hardware acceptance.
 
-Still required before counting Photon: fixed private launcher/Unix sockets,
-full durable receive/replay/controller path, actual native guarded replies and
+Still required before counting Photon: fixed private launcher installation and
+supervision, full durable receive/replay/controller path, actual native guarded replies and
 outbox, reconnect/rate/auth status, immediate process revocation, supported media
 and voice conversion, inspected source/output/account recovery, real Owner GUI
 and CLI onboarding/device authentication, build installation/provenance and

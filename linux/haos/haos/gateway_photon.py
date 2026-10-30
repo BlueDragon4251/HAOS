@@ -57,6 +57,17 @@ def scope(value):
     return 'photon:' + digest([value['project_id'], value['phone']])
 
 
+def wire_mime(attachment):
+    """Exact immutable-source CAF alias used by the pinned iMessage mapper."""
+    mime = attachment['mimeType']
+    uti = attachment.get('uti')
+    if mime.lower() == 'application/octet-stream' and (
+            isinstance(uti, str) and uti.lower() == 'com.apple.coreaudio-format'
+            or attachment['fileName'].lower().endswith('.caf')):
+        return 'audio/x-caf'
+    return mime
+
+
 def validate_binding(binding):
     peer(binding.get('sender')); chat(binding.get('chat'))
     if binding.get('thread') != '':

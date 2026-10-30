@@ -6,7 +6,7 @@ import time
 
 from .gateway import digest
 from .gateway_dingtalk_admission import parse, Refused as JSONRefused
-from .gateway_photon import checked_policy, credentials, scope, peer, chat, message_id, validate_binding
+from .gateway_photon import checked_policy, credentials, scope, peer, chat, message_id, validate_binding, wire_mime
 
 MAX_ATTACHMENT = 8 * 1024 * 1024
 MAX_TOTAL = 16 * 1024 * 1024
@@ -79,7 +79,7 @@ def approve(policy, connector, value, raw):
         if not isinstance(content, dict) or not isinstance(content.get('text'), str) or len(content['text'].encode()) > 65536:
             raise Refused('unsupported-content')
         attachments = content.get('attachments')
-        if not isinstance(attachments, list) or len(attachments) > 16:
+        if not isinstance(attachments, list) or len(attachments) > 4:
             raise Refused('unsupported-content')
         total = 0; ids = set()
         for attachment in attachments:
@@ -93,22 +93,23 @@ def approve(policy, connector, value, raw):
             if (type(size) is not int or not 0 < size <= MAX_ATTACHMENT or not isinstance(mime, str)
                     or not re.fullmatch(r'[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+', mime)
                     or not isinstance(name, str) or not 1 <= len(name.encode()) <= 255
-                    or any(ord(c) < 32 for c in name) or '/' in name or '\\' in name):
+                    or any(ord(c) < 32 for c in name) or '/' in name or '\\' in name
+                    or attachment.get('uti') is not None and (not isinstance(attachment['uti'], str) or len(attachment['uti']) > 256)):
                 raise Refused('unsupported-content')
             total += size
             if total > MAX_TOTAL:
                 raise Refused('unsupported-content')
             if binding.get('allow_media') is not True:
                 raise Refused('unapproved-media')
-            if mime.startswith('audio/') and (binding.get('allow_voice') is not True or msg.get('isAudioMessage') is not True):
+            if wire_mime(attachment).startswith('audio/') and binding.get('allow_voice') is not True:
                 raise Refused('unapproved-voice')
             if mime.startswith('video/') and binding.get('allow_video') is not True:
                 raise Refused('unapproved-video')
             # The pinned native mapper eagerly parses vCards. Until its bounded
             # binary-preserving path is connected, never download one implicitly.
-            if mime in {'text/vcard', 'text/x-vcard', 'text/directory'} or name.lower().endswith('.vcf'):
+            if mime in {'text/vcard', 'text/x-vcard', 'text/directory', 'application/vcard', 'application/x-vcard'} or name.lower().endswith('.vcf'):
                 raise Refused('unsupported-contact')
-        if not content['text'].strip() and not attachments:
+        if not content['text'].replace('\ufffc', '').strip() and not attachments:
             raise Refused('unsupported-content')
         if 'create' not in binding['capabilities'] and attachments:
             raise Refused('unapproved-media')
