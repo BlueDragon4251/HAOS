@@ -1,10 +1,10 @@
 name: HAOS Photon prepared contracts
 on:
   pull_request:
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   push:
     branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +12,46 @@ concurrency:
   group: photon-contracts-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  installed-private-process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare actual pinned image-install inputs
+        run: |
+          set -euo pipefail
+          bash scripts/sync-upstream.sh
+          mkdir -p "$RUNNER_TEMP/photon-install" "$RUNNER_TEMP/photon-installed-runtime"
+          chmod 0777 "$RUNNER_TEMP/photon-installed-runtime"
+          curl --fail --silent --show-error --proto '=https' --max-time 180 --max-filesize 64000000 \
+            https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz --output "$RUNNER_TEMP/photon-node.tar.xz"
+      - name: Actual official Node and locked SDK installation with lifecycle scripts disabled
+        run: |
+          set -euo pipefail
+          docker run --rm --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$PWD/upstream/hermes-agent:/input/hermes:ro" \
+            -v "$RUNNER_TEMP/photon-node.tar.xz:/input/node.tar.xz:ro" \
+            -v "$RUNNER_TEMP/photon-installed-runtime:/output" \
+            -e HAOS_DISPOSABLE_PHOTON_INSTALL=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_install.py > "$RUNNER_TEMP/photon-install/install.log" 2>&1
+          cp "$RUNNER_TEMP/photon-installed-runtime/install-receipt.json" "$RUNNER_TEMP/photon-install/install.json"
+          cp "$RUNNER_TEMP/photon-installed-runtime/photon/source.json" "$RUNNER_TEMP/photon-install/installed-source.json"
+      - name: Actual private UID program checks and production Node lifetime without external network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+            -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+            -e HAOS_DISPOSABLE_PHOTON_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_process.py > "$RUNNER_TEMP/photon-install/private-process.json" 2> "$RUNNER_TEMP/photon-install/private-process.err"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: photon-installed-private-process-${{ github.sha }}
+          path: ${{ runner.temp }}/photon-install
+          if-no-files-found: error
   prepared-native-contracts:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

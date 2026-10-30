@@ -14,6 +14,7 @@ test -x /usr/lib/haos/buzz/haos-buzz-verify
 PYTHONPATH=/usr/lib/haos /usr/bin/python3.11 -c 'from haos.gateway_buzz_crypto import command; command("buzz"); command("haos-buzz-verify")'
 python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
+python3 "$HAOS_RUNTIME_OVERLAY/install_photon.py" /usr/lib/haos/photon /usr/lib/haos/hermes/plugins/platforms/photon/sidecar
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
 uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
@@ -26,6 +27,7 @@ cmp /tmp/haos-registry.json /usr/lib/haos/haos/hermes_registry.json
 mkdir -p /usr/lib/haos/runtime-provenance
 cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" "$HAOS_RUNTIME_OVERLAY/homeassistant-protocol-source.json" "$HAOS_RUNTIME_OVERLAY/irc-protocol-source.json" /usr/lib/haos/runtime-provenance/
 cp /usr/lib/haos/buzz/source.json /usr/lib/haos/runtime-provenance/buzz-native-source.json
+cp /usr/lib/haos/photon/source.json /usr/lib/haos/runtime-provenance/photon-native-source.json
 uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/installed.txt
 # Installed /usr is immutable and runtime bytecode writes are disabled. Compile
 # actual trusted sources here instead of parsing the entire cold import graph

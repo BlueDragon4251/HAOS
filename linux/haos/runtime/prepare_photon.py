@@ -16,6 +16,9 @@ INPUTS = {
     'index.mjs': 'f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e',
     'package.json': '46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca',
     'package-lock.json': '2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313',
+    'send-format.mjs': '827c6c0b3a7fd3b731365ecd17bb52d65b05c9a53e67795922ec2ebb79de58fe',
+    'stream-staleness.mjs': 'fc77b20e29c8b759b1f45ec4b34d115b37859966b277e2583b1ae0fe8c73e141',
+    'patch-spectrum-mixed-attachments.mjs': '0d1ed02316cc8ddb3fbcf985c1a5c511361bf03609c7d5ae21d594f5510c68b7',
     'node_modules/@spectrum-ts/imessage/dist/index.js': '2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24',
     'node_modules/@spectrum-ts/core/dist/authoring.js': 'f96d907578eb44bb74b51203f4b3f2bb70d44364f5cef819b05b9899a9be6852',
 }

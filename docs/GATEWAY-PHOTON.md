@@ -89,6 +89,23 @@ and unapproved writes. Its production process installation, full live transport
 and supervision still need to be connected and verified; source presence and
 syntax checks are not an installed-service acceptance.
 
+The image build now installs the exact official Node 24.19.0 archive and the
+committed Spectrum lockfile with dependency lifecycle scripts disabled. It
+records twelve actual program digests. The private launcher verifies those
+digests, immutable root ownership and canonical paths, uses fixed arguments and
+a restricted environment, and never invokes npm in the service. Public program
+directories are made readable by the actual service identity during installation;
+private account/receive stores are separate.
+
+An offline disposable installed-layout fixture passes 17 actual process/kernel
+checks: exact UID/GID, root/agent/supplementary/saved-ID denial, changed source,
+writable/hardlinked/foreign-owned program rejection, required NoNewPrivileges,
+withdrawal during startup and hard parent loss. The actual production bootstrap
+is used, with its first private resume RPC held before SDK initialization. The
+actual SDK resume probe also passes under the private UID using immutable
+installed modules. This does not establish a live or fixture gRPC connection,
+the complete service lifecycle, a booted OS or an installed GUI acceptance.
+
 ## Evidence limits and work remaining
 
 The native transport probe exercises the actual prepared Spectrum mapper and
@@ -98,8 +115,8 @@ The Photon CI workflow runs these contracts without external messages. These
 checks do not establish a live Spectrum connection, receipt by another person,
 HAOS controller inference, installed service/GUI behavior or hardware acceptance.
 
-Still required before counting Photon: fixed private launcher installation and
-supervision, full durable receive/replay/controller path, actual native guarded replies and
+Still required before counting Photon: full native HTTP/gRPC profile and status,
+full durable receive/replay/controller path, actual native guarded replies and
 outbox, reconnect/rate/auth status, immediate process revocation, supported media
 and voice conversion, inspected source/output/account recovery, real Owner GUI
 and CLI onboarding/device authentication, build installation/provenance and
