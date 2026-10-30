@@ -1,0 +1,56 @@
+{
+  "source_commit": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+  "source_tree": "66616638223ba6bf9a1c2700f77d086fd6029f09",
+  "recorded_at": "2026-10-30 00:27:21 UTC",
+  "runs": [
+    {
+      "id": 40976813827,
+      "name": "Arch package",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976813827"
+    },
+    {
+      "id": 40976813822,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976813822"
+    },
+    {
+      "id": 40976813817,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976813817"
+    },
+    {
+      "id": 40976813826,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976813826"
+    },
+    {
+      "id": 40976813804,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976813804"
+    },
+    {
+      "id": 40976806915,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40976806915"
+    }
+  ],
+  "scope": "All six runs successful on this exact earlier source; not CI evidence for subsequent local commits or live gateway acceptance."
+}
