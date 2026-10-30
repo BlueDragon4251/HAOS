@@ -113,7 +113,7 @@ def build(value,*,parent,connector,policy,inbox):
         revoke_notice[0]=revoked
         from .gateway_a2a_resources import Resources,Refused as ResourceRefused
         resources=Resources(value,connector,policy,pinned,originals,inbox);resource_error=[None];ingress_locks={}
-        listener=[None];worker=[None];lock=asyncio.Lock();close_task=[None]
+        listener=[None];worker=[None];lock=asyncio.Lock();close_task=[None];recovering={}
 
         async def receive(event,proof,task_id):
             async with ingress_locks.setdefault(proof['source_key'],asyncio.Lock()):
@@ -164,7 +164,8 @@ def build(value,*,parent,connector,policy,inbox):
             if peers.get(peer) is not native:raise PermissionError('exact current native A2A cancellation peer required')
             from .gateway_a2a_controls import Controls
             result=await Controls(indexes[peer],originals,value,connector,policy).cancel(source)
-            pinned();return result
+            if result.get('source_prevented') is True:await native._haos_a2a_cancel_prevented(source)
+            pinned();return {'cancel_requested':result['cancel_requested']}
         async def recover():
             while True:
                 try:
@@ -176,6 +177,13 @@ def build(value,*,parent,connector,policy,inbox):
                         if selection is None:continue
                         where,args=selection
                         from plugins.platforms.a2a.protocol import STATE_WORKING
+                        from .gateway_a2a_controls import Controls
+                        controls=Controls(index,originals,value,connector,policy)
+                        cancellations=index.db.execute('SELECT t.task_id FROM a2a_tasks t JOIN a2a_control_intents c ON c.task_id=t.task_id WHERE '+where+
+                            " AND c.operation='cancel-source' AND json_extract(t.record,'$.state')=? ORDER BY t.updated_at LIMIT 128",[*args,STATE_WORKING]).fetchall()
+                        for candidate in cancellations:
+                            source=index.entry(candidate['task_id']);result=await controls.cancel(source)
+                            if result.get('source_prevented') is True:await peers[peer]._haos_a2a_cancel_prevented(source)
                         # Native create commits SUBMITTED before its anti-loop/
                         # readiness checks. Only WORKING proves preparation got
                         # past those checks; never synthesize an early dispatch
@@ -187,14 +195,20 @@ def build(value,*,parent,connector,policy,inbox):
                             "WHERE i.admitted_receipt='' AND t.connector=? AND t.peer=? AND t.credential_scope=? AND t.binding_digest IN ("+holders+
                             ") AND json_extract(t.record,'$.state')=? ORDER BY i.created_at LIMIT 32",[*args,STATE_WORKING]).fetchall()]
                         for row in rows:
-                            proof=originals.get(policy(),connector,value,peer,row['raw_id'])
                             native=peers[peer]
+                            if row['raw_id'] in recovering or native._haos_a2a_receiving(row['task_id']):continue
+                            proof=originals.get(policy(),connector,value,peer,row['raw_id'])
                             source=native._haos_a2a_lookup(proof)
                             if source is None:raise Conflict('retained A2A input lost its native task mapping')
                             from gateway.platforms.event import MessageEvent,MessageType
                             event=MessageEvent(text=proof['envelope']['text'],message_type=MessageType.TEXT,message_id=row['task_id'],
                                 source=native.build_source(chat_id=source['context_id'],user_id=peer,user_name=peer,chat_type='dm',chat_name='a2a:'+peer))
-                            with index.source(connector,proof):await native.handle_message(event)
+                            with index.source(connector,proof):task=asyncio.create_task(native.handle_message(event))
+                            recovering[row['raw_id']]=task
+                            def finished(task,key=row['raw_id']):
+                                recovering.pop(key,None)
+                                if not task.cancelled() and task.exception() is not None:status('storage-unavailable')
+                            task.add_done_callback(finished)
                     status('listening')
                 except asyncio.CancelledError:raise
                 except PermissionError:
@@ -210,6 +224,9 @@ def build(value,*,parent,connector,policy,inbox):
             task=worker[0];worker[0]=None
             if task is not None:
                 task.cancel();await asyncio.gather(task,return_exceptions=True)
+            tasks=list(recovering.values())
+            for task in tasks:task.cancel()
+            await asyncio.gather(*tasks,return_exceptions=True)
             server=listener[0];listener[0]=None
             if server is not None:await server.close()
             else:

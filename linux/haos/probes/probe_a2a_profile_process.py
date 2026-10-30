@@ -51,8 +51,8 @@ def main():
     grant={'id':'owner','connector':'a2a','sender':'alice','chat':'ctx-process-device','scope':scope(value,'alice'),'thread':'',
         'identity':'personal','capabilities':['create','read','cancel','answer'],'generation':'a'*64,'since':1}
     media_grants=[{**grant,'id':'media-'+name,'chat':'ctx-media-'+name,'identity':'media-'+name,
-        'capabilities':['create','read'],'allow_media':True,'allow_voice':True,'allow_video':True}
-        for name in ['input','auth','rate','drop','revoke']]
+        'capabilities':['create','read','cancel'] if name=='cancel' else ['create','read'],'allow_media':True,'allow_voice':True,'allow_video':True}
+        for name in ['input','auth','rate','drop','revoke','cancel']]
     loop_grant={**grant,'id':'loop-check','chat':'ctx-loop-check','identity':'loop-check','capabilities':['create','read']}
     output_grant={**grant,'id':'output-check','chat':'ctx-output-check','identity':'output-check','capabilities':['create','read'],'allow_outbound_media':True}
     config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant,*media_grants,loop_grant,output_grant]}
@@ -128,6 +128,13 @@ async def exercise():
                     'binding':{'binding_id':item['binding_id'],'binding_digest':'f'*64}})
                 except PermissionError:result={'denied':True}
                 else:raise AssertionError('controller admitted a changed owner grant epoch')
+            elif command['method']=='late-cancelled-source':
+                index=adapter._haos_a2a_indexes['alice'];row=index.entry(command['task_id'])
+                proof=adapter._haos_a2a_originals.get(policy(),'a2a',value,'alice',row['raw_id'])
+                try:await call('gateway.receive',{'connector':'a2a','envelope':proof['envelope'],
+                    'binding':{'binding_id':row['binding_id'],'binding_digest':row['binding_digest']}})
+                except PermissionError:result={'root_denied':True}
+                else:raise AssertionError('root admitted a source after confirming its cancellation')
             elif command['method']=='cancel-receipt-fault':
                 from haos.gateway_a2a_controls import Controls
                 index=adapter._haos_a2a_indexes['alice']
@@ -431,15 +438,17 @@ asyncio.run(exercise())
             assert __import__('hashlib').sha256(flac).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
             video=movie(width=64,height=32);document=b'Exact private A2A document fixture.'
             fetched=[];released=asyncio.Event();started=asyncio.Event();stalled=asyncio.Event();stall_closed=asyncio.Event();release_stall=asyncio.Event();mode={'status':200}
+            cancel_started=asyncio.Event();cancel_closed=asyncio.Event();cancel_release=asyncio.Event()
             async def attachment(web_request):
                 assert web_request.secure and 'Authorization' not in web_request.headers and 'Cookie' not in web_request.headers
                 assert all(token not in str(web_request.headers) for token in value['peer_tokens'].values())
                 fetched.append(web_request.path)
-                if web_request.path=='/stall':
+                if web_request.path in {'/stall','/cancel'}:
                     response=web.StreamResponse(headers={'Content-Type':'application/octet-stream','Content-Length':'1024'})
-                    await response.prepare(web_request);stalled.set()
-                    while not release_stall.is_set():
-                        if web_request.transport is None or web_request.transport.is_closing():stall_closed.set();break
+                    beginning,closed,released_now=((stalled,stall_closed,release_stall) if web_request.path=='/stall' else (cancel_started,cancel_closed,cancel_release))
+                    await response.prepare(web_request);beginning.set()
+                    while not released_now.is_set():
+                        if web_request.transport is None or web_request.transport.is_closing():closed.set();break
                         await asyncio.sleep(.02)
                     return response
                 if web_request.path=='/image.png':
@@ -495,6 +504,33 @@ asyncio.run(exercise())
                 cases.append('actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission')
                 await controller.dispatch('uid:0',{'method':'missions.cancel','params':{'id':media_mid}})
                 await command(process,{'method':'pump'})
+                early_cancel={'jsonrpc':'2.0','id':40,'method':'SendStreamingMessage','params':{'message':{'messageId':'source-cancel-during-download',
+                    'contextId':'ctx-media-cancel','role':'ROLE_USER','parts':[{'url':'https://localhost:'+str(media_port)+'/cancel',
+                    'filename':'waiting.bin','mediaType':'application/octet-stream'}]}}}
+                async with client.stream('POST',address,headers=headers,json=early_cancel) as stream:
+                    frames=stream.aiter_lines();early=[]
+                    while len(early)<2:
+                        frame=await anext(frames)
+                        if frame.startswith('data:'):early.append(json.loads(frame[5:]))
+                    cancel_task=early[0]['result']['task']['id'];await asyncio.wait_for(cancel_started.wait(),5)
+                    cancelled=await client.post(address,headers=headers,json={'jsonrpc':'2.0','id':41,'method':'CancelTask','params':{'id':cancel_task}})
+                    assert cancelled.status_code==200 and cancelled.json()['result']['status']['state']==protocol.STATE_CANCELED,cancelled.text
+                    await asyncio.wait_for(cancel_closed.wait(),3)
+                    endings=[]
+                    async for frame in frames:
+                        if frame.startswith('data:'):endings.append(json.loads(frame[5:]))
+                    assert endings[-1]['result']['statusUpdate']['status']['state']==protocol.STATE_CANCELED
+                assert len(store.list())==5 and await command(process,{'method':'counts'})=={'relay':8,'native_committed':8}
+                assert store.db.execute("SELECT COUNT(*) FROM gateway_source_cancellations WHERE mission_id=''").fetchone()[0]==1
+                cases.append('actual_native_CancelTask_during_stalled_TLS_download_commits_root_absence_tombstone_then_closes_reader_and_native_Future_without_creating_mission')
+                assert await command(process,{'method':'late-cancelled-source','task_id':cancel_task})=={'root_denied':True}
+                assert len(store.list())==5
+                cases.append('actual_gateway_UID_controller_Unix_request_cannot_admit_original_source_after_root_confirmed_prevention')
+                before_cancel_fetches=list(fetched);await stop(process);process=spawn();assert (await line(process))['ready'] is True
+                replay=await client.post(address,headers=headers,json={**early_cancel,'id':42,'method':'SendMessage'})
+                assert replay.json()['result']['task']['status']['state']==protocol.STATE_CANCELED
+                assert fetched==before_cancel_fetches and len(store.list())==5
+                cases.append('actual_UID_profile_restart_retains_pre_admission_cancelled_native_source_and_never_refetches_or_replays_it_into_root_mission')
                 file_bytes=b'row,value\n'+b'1,reviewed bounded artifact bytes\n'*10000;file_reads=[]
                 artifact_token='private-fixture-hermes-file-capability'
                 store.redactor=__import__('haos.redaction',fromlist=['Redactor']).Redactor([artifact_token,*value['peer_tokens'].values()])
@@ -631,7 +667,7 @@ asyncio.run(exercise())
                     assert json.loads(record)['state']==protocol.STATE_WORKING and receipt==''
                 assert len(store.list())==12 and (await command(process,{'method':'counts'}))['relay']==15
                 cases.append('actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task')
-            finally:released.set();release_stall.set();await media_runner.cleanup()
+            finally:released.set();release_stall.set();cancel_release.set();await media_runner.cleanup()
             changed={**config,'bindings':[{**grant,'generation':'b'*64}]};publish(changed)
             async with asyncio.timeout(5):
                 while (await command(process,{'method':'health'}))['status']!='revoked':await asyncio.sleep(.02)

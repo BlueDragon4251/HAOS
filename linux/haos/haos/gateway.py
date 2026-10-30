@@ -8,6 +8,7 @@ import re
 import time
 
 from .store import Conflict, MissionStore, PAUSED_PHASE
+from .gateway_source_cancel import SourceCancellation
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
 SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk"}
@@ -142,6 +143,7 @@ class GatewayEngine:
         self.store = store
         from .gateway_media import GatewayMedia
         self.media=GatewayMedia(store)
+        self.source_cancellations=SourceCancellation(store)
         # This additive extension has its own version and preserves the v1 mission contract.
         store.db.executescript("""
             BEGIN IMMEDIATE;
@@ -227,6 +229,7 @@ class GatewayEngine:
         actor = "gateway:" + binding["identity"]
         answer_request = None
         with self.store.transaction():
+            if policy.connectors[connector]['platform']=='a2a':self.source_cancellations.before_admission(key)
             old = self.store.db.execute("SELECT * FROM gateway_inbox WHERE key=?", (key,)).fetchone()
             if old:
                 if (old["fingerprint"] != fingerprint or old["identity"] != binding["identity"]

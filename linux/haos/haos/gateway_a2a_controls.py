@@ -26,6 +26,9 @@ class Controls:
         proof=self.originals.get(self.policy(),self.connector,self.value,self.tasks.peer,row['raw_id'])
         with self.tasks.lock:
             target=self.db.execute('SELECT * FROM a2a_controller_routes WHERE task_id=?',(row['task_id'],)).fetchone()
+            source_intent=self.db.execute("SELECT 1 FROM a2a_control_intents WHERE task_id=? AND operation='cancel-source'",(row['task_id'],)).fetchone()
+        if target is None or source_intent is not None:return await self.cancel_source(row,proof)
+        with self.tasks.lock:
             if (target is None or target['source_key']!=row['source_key'] or target['binding_digest']!=row['binding_digest']
                     or target['credential_scope']!=row['credential_scope']
                     or target['route_id']!=digest([target['mission_id'],row['binding_id'],row['binding_digest']])):
@@ -61,3 +64,50 @@ class Controls:
             self.db.execute("UPDATE a2a_control_intents SET state='committed',response=?,response_sha256=?,updated_at=? WHERE task_id=? AND operation='cancel'",
                 (encoded_response,digest([checksum,encoded_response]),time.time(),row['task_id']))
         return {'cancel_requested':True}
+
+    async def cancel_source(self,row,proof):
+        request={'connector':self.connector,'envelope':proof['envelope'],
+            'binding':{'binding_id':row['binding_id'],'binding_digest':row['binding_digest']}}
+        encoded=json.dumps(request,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+        checksum=digest([row['task_id'],row['source_key'],row['binding_digest'],row['credential_scope'],encoded])
+        with self.tasks.lock:
+            self.tasks.current();self.tasks.authorize(row)
+            old=self.db.execute("SELECT * FROM a2a_control_intents WHERE task_id=? AND operation='cancel-source'",(row['task_id'],)).fetchone()
+            if old is not None:
+                if old['source_key']!=row['source_key'] or old['request']!=encoded or old['sha256']!=checksum or old['state'] not in {'writing','committed'}:
+                    raise Conflict('source cancellation changed its original root request')
+                if old['state']=='committed':return source_receipt(self.tasks,row)
+            else:
+                self.db.execute('INSERT INTO a2a_control_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
+                    (row['task_id'],'cancel-source',row['source_key'],encoded,checksum,'writing','','',time.time(),time.time()))
+        from .gateway_runtime import call
+        response=await call('gateway.cancel-source',request)
+        if (not isinstance(response,dict) or set(response)!={'source_key','prevented','mission_id'} or response['source_key']!=row['source_key']
+                or type(response['prevented']) is not bool or response['prevented']!=(response['mission_id'] is None)
+                or response['mission_id'] is not None and (not isinstance(response['mission_id'],str) or not 1<=len(response['mission_id'])<=128)):
+            raise Conflict('root did not confirm exact original A2A source cancellation')
+        encoded_response=json.dumps(response,sort_keys=True,separators=(',',':'))
+        with self.tasks.lock:
+            self.tasks.current();self.tasks.authorize(row)
+            self.db.execute("UPDATE a2a_control_intents SET state='committed',response=?,response_sha256=?,updated_at=? WHERE task_id=? AND operation='cancel-source'",
+                (encoded_response,digest([checksum,encoded_response]),time.time(),row['task_id']))
+            return source_receipt(self.tasks,row)
+
+
+def source_receipt(tasks,row):
+    """Validate a retained root receipt before a native pre-admission outcome."""
+    from .gateway_raw import NativeInbox
+    tasks.current();tasks.authorize(row)
+    saved=tasks.db.execute("SELECT * FROM a2a_control_intents WHERE task_id=? AND operation='cancel-source'",(row['task_id'],)).fetchone()
+    if saved is None or saved['state']!='committed':raise Conflict('root source cancellation has no committed local receipt')
+    try:request=json.loads(saved['request']);response=json.loads(saved['response'])
+    except (ValueError,RecursionError):raise Conflict('damaged root source cancellation receipt') from None
+    checksum=digest([row['task_id'],row['source_key'],row['binding_digest'],row['credential_scope'],saved['request']])
+    if (saved['source_key']!=row['source_key'] or saved['sha256']!=checksum or saved['response_sha256']!=digest([checksum,saved['response']])
+            or not isinstance(request,dict) or set(request)!={'connector','envelope','binding'} or request['connector']!=row['connector']
+            or request['binding']!={'binding_id':row['binding_id'],'binding_digest':row['binding_digest']}
+            or NativeInbox.key(row['connector'],request['envelope'])!=row['source_key']
+            or not isinstance(response,dict) or set(response)!={'source_key','prevented','mission_id'} or response['source_key']!=row['source_key']
+            or type(response['prevented']) is not bool or response['prevented']!=(response['mission_id'] is None)):
+        raise Conflict('root source cancellation receipt changed its source or authority')
+    return {'cancel_requested':True,'source_prevented':response['prevented']}

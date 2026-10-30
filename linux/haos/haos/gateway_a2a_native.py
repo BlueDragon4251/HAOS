@@ -71,11 +71,14 @@ def build(value,peer,home,current,policy,tasks,receive):
 
     adapter.set_durable_message_handler(accepted);adapter.set_message_handler(accepted)
 
-    receive_tasks=set();adapter._haos_receive_tasks=receive_tasks
+    receive_tasks=set();receive_by_task={};adapter._haos_receive_tasks=receive_tasks
     async def handle(self,event):
         task=asyncio.current_task();receive_tasks.add(task)
+        receive_by_task.setdefault(event.message_id,set()).add(task)
         try:await dispatch_received(self,event)
-        finally:receive_tasks.discard(task)
+        finally:
+            receive_tasks.discard(task);receive_by_task[event.message_id].discard(task)
+            if not receive_by_task[event.message_id]:receive_by_task.pop(event.message_id)
 
     async def dispatch_received(self,event):
         proof,row=source(event)
@@ -224,6 +227,32 @@ def build(value,peer,home,current,policy,tasks,receive):
         return SendResult(success=True,message_id=task_id,raw_response={'recipient_read_verified':False,'local_task_committed':True})
 
     async def connect(self,**_kwargs):raise PermissionError('A2A requires the separately bounded authenticated HTTPS server')
+    async def cancel_prevented(self,source):
+        from .gateway_a2a_controls import source_receipt
+        check();row=tasks.entry(source['task_id'])
+        if row is None or any(row[k]!=source[k] for k in ['task_id','source_key','raw_id','binding_digest','credential_scope']):
+            raise Conflict('pre-admission cancellation changed native source')
+        if source_receipt(tasks,row)!={'cancel_requested':True,'source_prevented':True}:
+            raise PermissionError('root must prove prevention before native task cancellation')
+        receivers={task for task in receive_by_task.get(row['task_id'],set()) if task is not asyncio.current_task()}
+        for task in receivers:task.cancel()
+        await asyncio.gather(*receivers,return_exceptions=True)
+        async with send_lock:
+            with finalize_lock:
+                check();source_receipt(tasks,row);record=tasks.get(row['task_id'])
+                body='Cancelled by root before mission admission.'
+                if record['state']==protocol.STATE_CANCELED and record['reply']==body:return
+                if record['state'] in protocol.TERMINAL_STATES:raise Conflict('pre-admission source already has another terminal outcome')
+                if tasks.db.execute("SELECT 1 FROM a2a_result_epochs WHERE task_id=? AND state='writing'",(row['task_id'],)).fetchone():
+                    raise Conflict('pre-admission task has an uncertain result transition')
+                task_id=row['task_id']
+                if task_id not in prepared:
+                    prepared[task_id]={'task_id':task_id,'context_id':record['context_id'],'peer':peer,
+                        'future':self._add_pending(task_id,record['context_id']),'created_iso':record['created_iso'],'started':record['created_at']}
+                pending=prepared[task_id]
+                if not native_resolve(self,task_id,protocol.STATE_CANCELED,body) or pending['future'].result()!=(protocol.STATE_CANCELED,body):
+                    raise Conflict('pre-admission cancellation did not resolve its actual native Future')
+                finalized.pop(task_id,None);self._finalize_task(pending,protocol.STATE_CANCELED,body);check()
     native_emit=adapter._emit_terminal.__func__;native_sse=adapter._sse_write
     def emit(self,handler,task_id,context_id,state,reply,req_id=None):
         with finalize_lock:
@@ -282,6 +311,8 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter._finalize_task=MethodType(finalize,adapter);adapter._resolve_oldest_for_context=MethodType(resolve,adapter)
     adapter.send=MethodType(send,adapter);adapter.send_outcome=MethodType(outcome,adapter)
     adapter.connect=MethodType(connect,adapter);adapter.close_profile=MethodType(close,adapter)
+    adapter._haos_a2a_cancel_prevented=MethodType(cancel_prevented,adapter)
+    adapter._haos_a2a_receiving=lambda task_id:bool(receive_by_task.get(task_id))
     def lookup(proof):
         return inputs.lookup(proof) if 'target_task_id' in proof else tasks.by_source(proof['source_key'])
     def envelope(proof):

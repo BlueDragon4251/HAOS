@@ -108,6 +108,8 @@ class Controller:
         params = request.get("params", {})
         if not isinstance(params, dict):
             raise ValueError("params must be an object")
+        if request.get('method')=='gateway.cancel-source':
+            return self.gateway.source_cancellations.cancel(policy,params)
         if request.get("method") == "gateway.receive":
             if set(params)-{'connector','envelope','media','binding'}:raise ValueError('unsupported gateway admission fields')
             if 'media' in params and params['media'] is None:raise ValueError('explicit media IDs must be a list')

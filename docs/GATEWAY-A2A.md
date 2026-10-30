@@ -295,3 +295,34 @@ the separate installed-process and speech-authority probes establish their own
 boundaries. No live A2A peer or model inference is asserted. This voice probe is
 included in the frozen-runtime build and protocol CI with existing reviewed
 speech assets; dependencies and model pins are unchanged.
+
+### Root-proven source cancellation before admission
+
+CancelTask can now reach the root controller before the native task has received
+its mission queue receipt, including while an input URI is still downloading.
+The exact current peer/context, read/cancel permissions and grant epoch are
+required. In one root SQLite transaction, an existing source mission receives a
+real cancellation request, or an absence tombstone permanently prevents later
+admission of that source. The gateway never infers mission absence from its own
+queue. Root source keys and the separate native inbox keys remain distinct and
+are derived at their own boundaries.
+
+The gateway retains its exact root cancellation intent/receipt before resolving
+the actual native Future and cancelling that task's resource receivers. A
+pre-admission cancelled task keeps its empty parent-admission receipt and its
+original bytes/history; no fake mission is created. If a root mission already
+exists, native terminal cancellation still waits for its actual controller
+terminal event. Recovery uses individually tracked native receiver tasks so
+cancelling a resource download cannot kill the recovery supervisor. Exact lost
+source-cancellation requests can be reconciled against the same root tombstone.
+
+The actual UID/controller/TLS process probe now has 37 cases, including stalled
+reader cancellation, a later gateway-UID admission attempt refused by the real
+controller socket, and actual profile restart/native replay without resource
+refetch or a new mission. Eight root unit contracts cover absence/admission
+ordering, one real existing-mission cancellation, real SQL failure rolling back
+both the cancellation and tombstone, sender/context/grant refusal, root database
+reopen and damaged custody proof. The existing 172 actual root/kernel checks
+also pass without Hermes source or added skips. Their chroot recovery check
+caught the new constructor dependency being imported too late; the pure root
+helper is now loaded with the gateway module and requires no optional SDK.
