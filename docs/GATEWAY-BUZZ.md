@@ -65,7 +65,7 @@ an owner canary. These checks use real kernel identities and files, not mocks.
 ## Outstanding before public activation
 
 The complete native adapter lifecycle, authenticated WebSocket boundary,
-retained paged history and replay, incoming/outgoing media and local voice,
+integration of retained history into live dispatch, incoming/outgoing media and local voice,
 independent root mission/control dispatch, delivery/uncertainty recovery,
 owner account/discovery/pairing/recovery GUI, installed image packaging and
 build/CI wiring still need completion and source-bound evidence. No permission
@@ -121,3 +121,37 @@ production profile recovery remain a separate unfinished integration step.
 
 Source-bound evidence for this stage is in
 [evidence/2026-10-30/buzz-native-custody-validation.json](evidence/2026-10-30/buzz-native-custody-validation.json).
+
+## Fixed read process and persistent history (still private)
+
+The private Reader now runs the exact root-owned, digest-checked official CLI
+under the actual gateway identity. Its closed read grammar refuses writes,
+arbitrary flags, unknown peers/channels, unbounded queries and injected stdin.
+It checks the native private-to-public identity before any query, strips ambient
+credentials/proxies/program overrides, uses the installed system CA, bounds both
+output streams/deadline and kills the process group on cancellation or withdrawn
+owner publication. Authentication refusal remains sticky in this reader.
+Discovery results expose only explicitly selected channels. Relay error bodies
+never become native mention-retry instructions, logs, or fake empty history.
+
+History uses a FULL private SQLite checkpoint bound to the exact account and
+current timed grants. Each step requests at most 50 signed events with the
+official composite timestamp/event-ID cursor; every admitted original must be
+durably retained before the cursor transaction can commit. Reopen resumes the
+saved tuple. The completed scan retains an inclusive five-minute overlap for
+permitted clock skew/late arrival; event custody absorbs replay. Capacity errors
+halt advancement rather than discarding sources. This is complete local paging
+against the fixture relay's contract, not a promise about an unavailable or
+noncompliant external relay retaining messages indefinitely.
+
+Actual source inspection also found `cmd_get_messages` converted malformed JSON
+into an empty history with `unwrap_or_default`. The exact-source overlay now
+changes that parser to a finite error. No other command parser or native signing
+behavior is replaced. The actual rebuilt CLI verifies this over HTTP/TLS.
+
+Sixteen actual installed-UID/CLI/WSS/custody/history cases pass, including 121
+events sharing one timestamp across three pages and fresh process reopens,
+a real SQL cursor failure after fifty durable originals, exact page replay and
+malformed HTTP history without a false completed scan. Nine separate actual
+CLI/TLS cases pass. These do not establish full profile/controller/media/GUI
+integration, outbound delivery or public activation.

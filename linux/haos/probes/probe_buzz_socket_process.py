@@ -39,6 +39,9 @@ def main():
     from haos.gateway_buzz import scope
     scalar=format(1,'064x');peer_scalar=format(2,'064x');public=nostr_auth.public_key_hex(scalar);peer=nostr_auth.public_key_hex(peer_scalar)
     root=Path(tempfile.mkdtemp(prefix='haos-buzz-wss-'));root.chmod(0o755);create(root,'buzz.fixture.invalid')
+    # Only this disposable namespace trusts the local TLS CA. The production
+    # runner always uses the root-owned installed system bundle, never env CA.
+    with Path('/etc/ssl/certs/ca-certificates.crt').open('ab') as stream:stream.write((root/'ca.pem').read_bytes())
     with socket.socket() as chosen:chosen.bind(('127.0.0.1',0));port=chosen.getsockname()[1]
     channel='01234567-89ab-4cde-8012-3456789abcde'
     value={'private_key':scalar,'public_key':public,'relay_url':'https://localhost:'+str(port),'channels':[channel]}
@@ -59,6 +62,8 @@ require_runtime_identity();prepare_runtime_home()
 from haos.gateway import digest
 from haos.gateway_buzz import PreparedBuzzPolicy,scope
 from haos.gateway_buzz_crypto import verify
+from haos.gateway_buzz_cli import Reader,QueryFailed
+from haos.gateway_buzz_history import History
 from haos.gateway_buzz_socket import Transport
 from haos.gateway_buzz_cache import RawEvents
 from haos.gateway_buzz_admission import Refused
@@ -85,7 +90,8 @@ async def capture(channel,event):
     current();captured.append(event['id']);proofs[event['id']]=proof;return True
 adapter=durable_adapter(BuzzAdapter(PlatformConfig(enabled=True,extra={'relay_url':value['relay_url'],'channels':value['channels'],'require_mention':False,'cli_path':'/usr/lib/haos/buzz/buzz'})))
 assert callable(getattr(BuzzAdapter,'_open_websocket',None))
-native_cli=adapter._run_cli
+reader=Reader('buzz',value,current,redactor)
+native_cli=reader.run
 async def observed_cli(args,**kwargs):
     result=await native_cli(args,**kwargs)
     try:error=json.loads(result[2]).get('error')
@@ -117,6 +123,46 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1].startswith('history'):
+            import sqlite3
+            history=History(base/'history.db',reader,redactor,capture)
+            try:
+                if sys.argv[1]=='history-fail':
+                    history.db.execute("CREATE TRIGGER failed_history_cursor BEFORE UPDATE ON buzz_history BEGIN SELECT RAISE(ABORT,'fixture cursor commit failure'); END")
+                try:result=await history.step(value['channels'][0])
+                except sqlite3.IntegrityError:
+                    assert sys.argv[1]=='history-fail'
+                    assert history.db.execute('SELECT revision FROM buzz_history').fetchone()[0]==0
+                    history.db.execute('DROP TRIGGER failed_history_cursor')
+                    result={'cursor_failed':True}
+                except QueryFailed as error:
+                    assert sys.argv[1]=='history-malformed' and error.category=='query_unavailable'
+                    assert history.db.execute('SELECT revision FROM buzz_history').fetchone()[0]==3
+                    result={'malformed_failed':True}
+                result['raw_count']=originals.db.execute('SELECT COUNT(*) FROM buzz_raw_events').fetchone()[0]
+                print(json.dumps(result),flush=True);return
+            finally:history.close()
+        if sys.argv[1].startswith('reader'):
+            if sys.argv[1]=='reader':
+                for args in [['messages','delete','--event','a'*64],['reactions','add','--event','a'*64],
+                    ['users','get','--pubkey','f'*64],['channels','get','--channel','11234567-89ab-4cde-8012-3456789abcde'],
+                    ['messages','get','--channel',value['channels'][0],'--limit','50','--limit','100']]:
+                    try:await reader.run(args)
+                    except PermissionError:pass
+                    else:raise AssertionError('unapproved native query escaped')
+                for action in ['channels','dms']:
+                    result=await reader.run([action,'list']);assert len(json.loads(result[1]))==1
+                result=await reader.run(['users','get']);assert json.loads(result[1])[0]['pubkey']==value['public_key']
+                print(json.dumps({'reader_verified':True}),flush=True);return
+            try:await reader.run(['users','get'])
+            except QueryFailed as error:
+                if sys.argv[1]=='reader-auth':
+                    assert error.category=='authentication_refused'
+                    try:await reader.run(['users','get'])
+                    except QueryFailed as repeated:assert repeated.category=='authentication_refused'
+                    else:raise AssertionError('refused native identity retried')
+                print(json.dumps({'query_failed':error.category}),flush=True);return
+            else:raise AssertionError('invalid query result accepted')
         if sys.argv[1]=='storage':
             import sqlite3
             from haos.gateway import Conflict
@@ -207,10 +253,12 @@ except PermissionError as error:
     fixture=root/'signed-inputs.json';fixture.write_text(json.dumps({'original':event,'alternate':alternate,'negatives':negatives,
         'receipt_failure':signed(peer_scalar,'Local receipt recovery source')}));fixture.chmod(0o644)
     profile=signed(peer_scalar,json.dumps({'display_name':'Peer Fixture'}),0)
+    same_second=int(time.time())
+    history_events=[signed(peer_scalar,'Same-second fixture history '+str(index),created_at=same_second) for index in range(121)]
     cases=[]
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[]
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
@@ -221,8 +269,25 @@ except PermissionError as error:
                 tags={tag[0]:tag[1] for tag in auth['tags'] if len(tag)==2}
                 assert auth['kind']==27235 and auth['pubkey']==public and tags['u']==value['relay_url']+'/query'
                 assert tags['method']=='POST' and tags['payload']==hashlib.sha256(body).hexdigest()
-                assert json.loads(body)==[{'kinds':[0],'authors':[peer],'limit':1}]
-                return web.json_response([profile])
+                selection=json.loads(body);queries.append(selection)
+                assert isinstance(selection,list) and len(selection)==1
+                if mode['name']=='reader-auth':return web.json_response({'error':'not channel members '+scalar},status=401)
+                if mode['name']=='reader-reflect':return web.json_response([signed(scalar,json.dumps({'display_name':scalar}),0)])
+                if mode['name']=='reader-identity':return web.json_response([profile])
+                if selection[0]['kinds']==[0]:
+                    assert selection[0]['authors'] in [[peer],[public]]
+                    own=signed(scalar,json.dumps({'display_name':'Own Fixture'}),0)
+                    return web.json_response([profile] if selection[0]['authors']==[peer] else [own])
+                if selection[0]['kinds']==[9,45001,45003]:
+                    filter=selection[0];assert filter['#h']==[channel] and filter['limit']==50
+                    if mode['name']=='history-malformed':return web.Response(text='not a JSON history',content_type='application/json')
+                    chosen=[event for event in history_events if filter['since']<=event['created_at']<=filter['until']
+                        and (not filter.get('before_id') or event['created_at']<filter['until'] or event['id']<filter['before_id'])]
+                    chosen.sort(key=lambda event:(event['created_at'],event['id']),reverse=True)
+                    return web.json_response(chosen[:filter['limit']])
+                kind=selection[0]['kinds'][0];assert kind in {39000,41001}
+                return web.json_response([signed(peer_scalar,'',kind,tags=[['d',identity],['name','Fixture channel'],['p',public]])
+                    for identity in [channel,'11234567-89ab-4cde-8012-3456789abcde']])
             if request.path=='/escape':escapes.append(True);return web.Response()
             if mode['name']=='redirect':return web.Response(status=302,headers={'Location':value['relay_url']+'/escape'})
             socket=web.WebSocketResponse();await socket.prepare(request);active.append(socket)
@@ -255,6 +320,14 @@ except PermissionError as error:
             assert process.returncode==0,error
             assert scalar not in error and peer_scalar not in error
         try:
+            mode['name']='reader';before=len(queries);process=spawn('reader')
+            assert await line(process)=={'reader_verified':True};await done(process);assert len(queries)==before+3
+            cases.append('actual_private_UID_fixed_official_CLI_rejects_writes_unknown_peers_channels_and_duplicate_flags_before_HTTP_and_filters_native_discovery_to_owner_channels')
+            for name,category in [('reader-auth','authentication_refused'),('reader-reflect','private_reflection'),('reader-identity','identity_mismatch')]:
+                mode['name']=name;before=len(queries);process=spawn(name)
+                assert await line(process)=={'query_failed':category};await done(process);assert len(queries)==before+1
+            cases.append('actual_official_CLI_auth_refusal_is_sticky_without_retry_or_empty_history_and_reflected_private_material_or_wrong_public_identity_never_reaches_native_adapter')
+            mode['name']='receive'
             process=spawn('receive');assert await line(process)=={'ready':True,'uid':65534}
             result=await line(process);assert result=={'received':[event['id']],'captured':[event['id'],event['id']],'raw_count':1,'native_count':1,'relay_count':1},result
             await done(process)
@@ -268,6 +341,17 @@ except PermissionError as error:
             cases.append('Nostr_signature_randomness_replay_keeps_first_valid_original_without_new_semantic_message_or_local_admission')
             cases.append('actual_SQL_receipt_failure_after_native_and_parent_commit_reopens_and_reconciles_without_new_local_delivery_or_fake_mission')
             cases.append('changed_retained_original_bytes_are_refused_without_automatic_restoration_or_discarding_source_tombstone')
+            mode['name']='history'
+            process=spawn('history-fail');assert await line(process)=={'cursor_failed':True,'raw_count':52};await done(process)
+            for page,expected in enumerate([{'complete':False,'events':50,'retained':50,'revision':1,'raw_count':52},
+                    {'complete':False,'events':50,'retained':50,'revision':2,'raw_count':102},
+                    {'complete':True,'events':21,'retained':21,'revision':3,'raw_count':123}]):
+                process=spawn('history');assert await line(process)==expected;await done(process)
+            cases.append('actual_UID_official_CLI_signed_query_and_FULL_history_reopen_page_121_same_second_events_without_native_50_event_truncation_or_new_source_on_replayed_page')
+            cases.append('actual_SQL_history_cursor_commit_failure_after_50_verified_original_commits_keeps_revision_zero_then_reconciles_exact_page_after_process_reopen')
+            mode['name']='history-malformed';process=spawn('history-malformed')
+            assert await line(process)=={'malformed_failed':True,'raw_count':123};await done(process)
+            cases.append('actual_native_CLI_rejects_malformed_HTTP_history_without_false_empty_list_or_completed_sweep_and_saved_cursor_remains_unchanged')
             mode['name']='unapproved';before=len(subscriptions);process=spawn('unapproved');assert (await line(process))['ready'] is True
             assert await line(process)=={'unapproved_subscription_refused':True};await done(process)
             assert len(subscriptions)==before+2

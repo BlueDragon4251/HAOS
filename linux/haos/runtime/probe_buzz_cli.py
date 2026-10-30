@@ -48,6 +48,7 @@ def main():
                 if mode['name']=='auth':return web.json_response({'error':'unauthorized fixture'},status=401)
                 if mode['name']=='redirect':return web.Response(status=302,headers={'Location':origin+'/escape'})
                 if request.path=='/query':
+                    if mode['name']=='malformed-history':return web.Response(text='not a JSON array',content_type='application/json')
                     queries.append(json.loads(raw));return web.json_response([read_event] if mode['name']=='cursor' else [profile])
                 event=json.loads(raw);verified(event);writes.append(raw)
                 assert event['kind']==9 and event['pubkey']==public and ['h','01234567-89ab-4cde-8012-3456789abcde'] in event['tags']
@@ -107,6 +108,10 @@ def main():
                 no_timestamp=['messages','get','--channel','01234567-89ab-4cde-8012-3456789abcde']
                 code,out,err=await run(no_timestamp,before_id=cursor);assert code==1 and len(calls)==count,(code,out,err)
                 cases.append('invalid_or_unpaired_history_cursor_is_refused_before_HTTP_or_NIP98_request')
+                mode['name']='malformed-history'
+                code,out,err=await run(read_args);assert code==4 and not out,(code,out,err)
+                assert json.loads(err)['message']=='invalid history response'
+                cases.append('malformed_successful_HTTP_history_is_an_explicit_native_CLI_error_not_an_empty_complete_history')
                 mode['name']='drop';writes.clear()
                 code,out,err=await run(args,'Ambiguous local message');assert code!=0 and len(writes)==3,(code,out,err)
                 assert writes[0]==writes[1]==writes[2] and len(set(auth_ids[-3:]))==3

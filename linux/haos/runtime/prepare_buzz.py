@@ -31,6 +31,17 @@ def prepare(source,overlay):
     if query.count(query_anchor)!=1:raise ValueError('pinned Buzz message query cursor changed')
     query_patch=query_anchor.replace('    let resp = client.query(&filter).await?;', '    // HAOS private history supplies the relay\'s existing composite cursor.\n    // It is read-only, scoped to this process and still uses the exact channel.\n    if let Ok(before_id) = std::env::var("HAOS_BUZZ_BEFORE_ID") {\n        validate_hex64(&before_id)?;\n        if before.is_none() {\n            return Err(CliError::Usage("composite history cursor requires its exact timestamp".into()));\n        }\n        filter["before_id"] = serde_json::json!(before_id);\n    }\n    let resp = client.query(&filter).await?;')
     prepared_query=query.replace(query_anchor,query_patch)
+    parse_anchor='''    let resp = client.query(&filter).await?;
+    let mut events: Vec<serde_json::Value> = serde_json::from_str(&resp).unwrap_or_default();
+    events.sort_by_key(|e| e.get("created_at").and_then(|v| v.as_u64()).unwrap_or(0));'''
+    # Restrict this change to get-messages, not search/thread/write behavior.
+    start=prepared_query.index('pub async fn cmd_get_messages(')
+    end=prepared_query.index('\npub fn resolve_thread_target(',start)
+    segment=prepared_query[start:end]
+    if segment.count(parse_anchor)!=1:raise ValueError('pinned Buzz history response parser changed')
+    segment=segment.replace(parse_anchor,parse_anchor.replace('serde_json::from_str(&resp).unwrap_or_default()',
+        'serde_json::from_str(&resp).map_err(|_| CliError::Other("invalid history response".into()))?'))
+    prepared_query=prepared_query[:start]+segment+prepared_query[end:]
     client.write_text(patched);messages.write_text(prepared_query)
     return {**value,'client_prepared_sha256':hashlib.sha256(patched.encode()).hexdigest(),
         'messages_prepared_sha256':hashlib.sha256(prepared_query.encode()).hexdigest()}

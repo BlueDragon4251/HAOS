@@ -23,5 +23,6 @@
   "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1",
   "messages_original_sha256": "8c5ff2a85a92f1b726fa00d5ee416b4707fccf616394bff7e4bad5c122ee1243",
   "bounded_query_cursor_extension": "HAOS_BUZZ_BEFORE_ID",
+  "history_parser": "cmd_get_messages rejects invalid response JSON instead of substituting an empty list",
   "maximum_glibc": "2.36"
 }
