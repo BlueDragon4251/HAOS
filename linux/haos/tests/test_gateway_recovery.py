@@ -254,3 +254,22 @@ def test_recovery_exposes_only_reviewed_public_media_failure_codes(outbox,reason
     row=unresolved(store)['deliveries'][0]
     if reason.startswith('media-export-'):assert row['reason']==reason
     else:assert 'reason' not in row and reason not in str(row)
+
+
+@pytest.mark.parametrize('receipt',['haos-dingtalk-'+'a'*64,'1234','haos-dingtalk:'+'a'*64,'haos-dingtalk-'+'z'*64])
+def test_dingtalk_owner_reconciliation_accepts_only_local_API_acceptance_proof_without_resend(tmp_path,receipt):
+    from test_gateway_dingtalk import binding
+    b=binding();policy=GatewayPolicy({'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[b]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'dingtalk',{'platform':'dingtalk','sender':b['sender'],'chat':b['chat'],
+            'scope':b['scope'],'thread':'','message_id':'observed-source','is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy);engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request=decision(delivery,decision='delivered',receipt=receipt,confirmed_not_delivered=False)
+        if receipt=='haos-dingtalk-'+'a'*64:
+            assert reconcile(store,policy,request)['state']=='delivered' and engine.next_delivery(policy) is None
+            assert store.db.execute('SELECT receipt FROM gateway_outbox').fetchone()[0]==receipt
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()

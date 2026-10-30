@@ -207,7 +207,7 @@ print('denied')
                 cases.append('actual_WSS_'+mode+'_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect')
             assert not failures,failures
             print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],
-                'public_dingtalk_enabled':False,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
+                'live_or_installed_dingtalk_acceptance':False,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
                 'current_owner_publication_service_supervisor_and_external_account_are_fixtures':True,
                 'live_messages_missions_or_installed_acceptance':False}))
         finally:

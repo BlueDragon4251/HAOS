@@ -112,6 +112,7 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
                 r'sms_push_[0-9a-f]{64}' if platform=='sms' else
                 r'smtp_accept_[0-9a-f]{64}' if platform=='email' else
                 r'om_[A-Za-z0-9]{16,64}' if platform=='feishu' else
+                r'haos-dingtalk-[0-9a-f]{64}' if platform=='dingtalk' else
                 r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
             from .gateway_matrix_policy import opaque
             valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)

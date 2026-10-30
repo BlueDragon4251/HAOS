@@ -1676,3 +1676,13 @@ complete owner setup remain required for DingTalk. A targeted hash-pinned
 Tea-OpenAPI 0.4.6 overlay fixes its frozen 0.4.5 Cryptography upper-bound
 conflict. Cryptography 50 and MSAL 1.39.0 stay unchanged; native RSA/HMAC
 and retry-header compatibility checks accompany the dependency check.
+
+
+### DingTalk public software path (2026-10-30)
+
+The previous private checkpoints are superseded for public availability by the
+DingTalk owner setup/GUI, explicit untrusted-ID observation, independent grants,
+private account inspection, per-part/source/conversion recovery and shared runtime
+activation. The registry is now 13/22. See `GATEWAY-DINGTALK.md` for exact app rights,
+reply-mode selection, limits and no-live-acceptance boundaries. Historical receipts
+remain tied to their original source, not retroactively upgraded by this change.

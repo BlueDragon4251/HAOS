@@ -102,7 +102,10 @@ def owner_ingress(args, policy):
     if os.geteuid() != 0:
         raise PermissionError('native ingress recovery requires authenticated owner authority')
     stopped_gateway()
-    if any(row.get('platform')=='feishu' for row in policy['connectors']):
+    if any(row.get('platform')=='dingtalk' for row in policy['connectors']):
+        from .gateway_dingtalk import PreparedDingTalkPolicy
+        PreparedDingTalkPolicy(policy)
+    elif any(row.get('platform')=='feishu' for row in policy['connectors']):
         from .gateway_feishu import PreparedFeishuPolicy
         PreparedFeishuPolicy(policy)
     elif any(row.get('platform')=='email' for row in policy['connectors']):
@@ -144,6 +147,28 @@ def owner_ingress(args, policy):
             else:
                 params.update(connector=args.connector,delivery_id=args.delivery_id,attempt=args.attempt)
                 if args.gateway_action=='approve-feishu-part-retry':params.update(part=args.part,operation=args.operation,confirmed_not_accepted=args.confirm_not_accepted)
+                else:params['confirmed_not_delivered']=args.confirm_not_accepted
+    if args.gateway_action=='dingtalk-sources':params={'profile':args.profile,'kind':args.kind}
+    if args.gateway_action=='dingtalk-output-cache':params={}
+    if args.gateway_action in {'retry-dingtalk-auth','approve-dingtalk-retry','approve-dingtalk-part-retry','purge-dingtalk-source','purge-dingtalk-output-cache'}:
+        if not isinstance(args.note,str) or not 1<=len(args.note.strip())<=2000:raise ValueError('bounded non-secret DingTalk owner context required')
+        params={'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(args.note.strip().encode()).hexdigest()}
+        if args.gateway_action=='retry-dingtalk-auth':
+            _,private=load()
+            if not any(row['id']==args.connector and row['platform']=='dingtalk' for row in policy['connectors']):raise ValueError('select one saved DingTalk connector')
+            from .gateway import digest
+            from .gateway_dingtalk import credentials as checked_credentials
+            value=checked_credentials(private['connectors'][args.connector])
+            params.update(connector=args.connector,credential_scope=digest([args.connector,value]),
+                account_scope=digest([value[key] for key in ['client_id','client_secret','corp_id','robot_code']]))
+        else:
+            if args.confirm_inspected is not True:raise PermissionError('explicit inspected DingTalk decision required')
+            params.update(snapshot_sha256=args.snapshot_sha256,confirmed=True)
+            if args.gateway_action=='purge-dingtalk-source':params.update(profile=args.profile,kind=args.kind,id=args.id)
+            elif args.gateway_action=='purge-dingtalk-output-cache':params['id']=args.id
+            else:
+                params.update(connector=args.connector,delivery_id=args.delivery_id,attempt=args.attempt)
+                if args.gateway_action=='approve-dingtalk-part-retry':params.update(part=args.part,operation=args.operation,confirmed_not_accepted=args.confirm_not_accepted)
                 else:params['confirmed_not_delivered']=args.confirm_not_accepted
     if args.gateway_action=='email-sources':params={'profile':args.profile}
     if args.gateway_action in {'recover-email-mailbox','purge-email-source','approve-email-retry'}:
@@ -188,6 +213,8 @@ def owner_ingress(args, policy):
         audit('gateway.'+args.gateway_action,{**value,'note_sha256':params['note_sha256']})
     if args.gateway_action in {'retry-feishu-auth','approve-feishu-retry','approve-feishu-part-retry','purge-feishu-source'}:
         audit('gateway.'+args.gateway_action,{**value,'note_sha256':params['note_sha256']})
+    if args.gateway_action in {'retry-dingtalk-auth','approve-dingtalk-retry','approve-dingtalk-part-retry','purge-dingtalk-source','purge-dingtalk-output-cache'}:
+        audit('gateway.'+args.gateway_action,{**value,'note_sha256':params['note_sha256']})
     return value
 
 
@@ -198,7 +225,10 @@ def owner_delivery(args, policy):
         raise PermissionError("outbox reconciliation requires authenticated owner authority")
     stopped_gateway()
     stopped()
-    if any(row.get('platform')=='feishu' for row in policy['connectors']):
+    if any(row.get('platform')=='dingtalk' for row in policy['connectors']):
+        from .gateway_dingtalk import PreparedDingTalkPolicy
+        PreparedDingTalkPolicy(policy)
+    elif any(row.get('platform')=='feishu' for row in policy['connectors']):
         from .gateway_feishu import PreparedFeishuPolicy
         PreparedFeishuPolicy(policy)
     elif any(row.get('platform')=='email' for row in policy['connectors']):
@@ -327,6 +357,9 @@ def owner_gateway(args):
         return {"action": args.gateway_action}
     if args.gateway_action=='matrix-devices':return owner_matrix_devices(args.connector,args.sender)
     if args.gateway_action=='email-account':return owner_email_account(args.connector)
+    if args.gateway_action=='dingtalk-account':
+        from .dingtalk_owner_setup import inspect
+        return inspect(args.connector)
     if args.gateway_action=='feishu-account':
         from .feishu_owner_setup import inspect
         return inspect(args.connector)
@@ -335,12 +368,18 @@ def owner_gateway(args):
         return {"policy": policy, "credential_configured": sorted(credentials["connectors"])}
     if args.gateway_action in {"deliveries", "reconcile-delivery"}:
         return owner_delivery(args, policy)
-    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth','recover-email-mailbox','email-sources','purge-email-source','approve-email-retry','media-cache','purge-media-cache','retry-feishu-auth','feishu-sources','purge-feishu-source','approve-feishu-retry','approve-feishu-part-retry'}:
+    if args.gateway_action in {'ingress','reconcile-ingress','retry-ntfy-auth','retry-homeassistant-auth','retry-irc-auth','retry-line-auth','retry-sms-auth','retry-email-auth','recover-email-mailbox','email-sources','purge-email-source','approve-email-retry','media-cache','purge-media-cache','retry-feishu-auth','feishu-sources','purge-feishu-source','approve-feishu-retry','approve-feishu-part-retry','dingtalk-sources','dingtalk-output-cache','retry-dingtalk-auth','approve-dingtalk-retry','approve-dingtalk-part-retry','purge-dingtalk-source','purge-dingtalk-output-cache'}:
         return owner_ingress(args, policy)
     stopped_gateway()
     if args.gateway_action == "setup":
         if args.platform not in GatewayPolicy.platforms:
             raise ValueError("select an implemented transport")
+        if args.platform=='dingtalk':
+            from .dingtalk_owner_setup import configure
+            return configure(args.connector,{'client_id':input('Exact DingTalk Client ID / AppKey: '),
+                'client_secret':getpass.getpass('Private DingTalk Client Secret / AppSecret: '),
+                'corp_id':input('Exact corporation ID: '),'robot_code':input('Exact robot code: '),
+                'reply_mode':input('Explicit reply route (session/robot): ')})
         if args.platform=='feishu':
             from .feishu_owner_setup import configure
             from .initial_setup import read_line_tls_file
@@ -465,7 +504,7 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
-        if selected and selected['platform'] in {'email','feishu'}:
+        if selected and selected['platform'] in {'email','feishu','dingtalk'}:
             from .initial_setup import pair_gateway_sender
             return pair_gateway_sender(args.binding,args.connector,args.sender,args.chat,args.identity,
                 tuple(args.capabilities),scope=args.scope,thread=args.thread,require_mention=not getattr(args,'no_require_mention',False),

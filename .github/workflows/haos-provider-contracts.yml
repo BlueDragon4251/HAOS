@@ -7,6 +7,7 @@ on:
       - 'linux/haos/haos/gateway*.py'
       - 'linux/haos/haos/initial_setup*.py'
       - 'linux/haos/haos/owner.py'
+      - 'linux/haos/haos/*_owner_*.py'
       - 'linux/haos/install.sh'
       - 'linux/haos/probes/**'
       - 'linux/haos/tests/test_gateway*'
@@ -22,6 +23,7 @@ on:
       - 'linux/haos/haos/gateway*.py'
       - 'linux/haos/haos/initial_setup*.py'
       - 'linux/haos/haos/owner.py'
+      - 'linux/haos/haos/*_owner_*.py'
       - 'linux/haos/install.sh'
       - 'linux/haos/probes/**'
       - 'linux/haos/tests/test_gateway*'
@@ -128,6 +130,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_http.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-http.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_pairing.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-native.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
@@ -382,6 +385,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
           cat "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_pairing_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PAIRING_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-worker-process.json"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
             -v "$PWD/linux/haos/probes/probe_dingtalk_profile_process.py:/probe.py:ro" \

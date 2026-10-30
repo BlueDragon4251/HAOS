@@ -216,7 +216,7 @@ asyncio.run(main())
         assert not failures,failures
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],
             'API_and_upload_domains_distinct_verified_TLS_origins':True,'network_none_fixture_hosts_only':True,
-            'policy_source_output_and_owner_are_fixtures':True,'public_dingtalk_enabled':False,
+            'policy_source_output_and_owner_are_fixtures':True,'live_or_installed_dingtalk_acceptance':False,
             'parent_journal_controller_artifact_handoff_outbound_message_live_or_installed_acceptance':False}))
     finally:
         release.set()

@@ -1,0 +1,425 @@
+{
+  "parent_commit": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+  "recorded_at": "2026-10-30T01:31:11.985390+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateway_software_paths": 13,
+  "total_pinned_gateways": 22,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "5279185852d8036cc2da088c33b6545350ef51aec36e355724449906eaea39f7"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "ecc20a5d523777e00f27e8b89bc0205898af825953044238db8db822622152e7"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "817007f9ab7542fbe1311533fa7e5e77c1234ee2063c944d22721d7c9fb19322"
+    },
+    {
+      "path": "docs/GATEWAYS.md",
+      "sha256": "9555a869b520ff45c2a87be13f6025ac02abb2b351abd134a5cd9503441e9be9"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "38759003490b31b265c9b9e2fecce2d2a7b1ae1f63b71dfde8a6a846f8b61639"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "871c858c19f00268e5a5afd0668470a2edd5abb1387348ecb91d7e442e85b773"
+    },
+    {
+      "path": "linux/haos/haos/dingtalk_owner_gui.py",
+      "sha256": "cf70f144da5fda5bc769722bf2e6c70cff5b74905f1cb6362e59d9abaa1282a2"
+    },
+    {
+      "path": "linux/haos/haos/dingtalk_owner_setup.py",
+      "sha256": "eb4befbecdd1db8218f494e9b6ed066bdd800bb63277b1f84be4f5245585c79e"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "6323ac0c8a9e7f843410b5656dfc39c4a1824432123d003e8a48be998bbdf99d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_media_recovery.py",
+      "sha256": "27dfeb8e5650e3ca9f8e10b6cc2f1a0e04b74a38ad713022d5c61b860d5b3444"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_pairing.py",
+      "sha256": "512d7360271efdad22bf3cb3672e4551841b2ca39c8f551c81513d98caa46eda"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_pairing_worker.py",
+      "sha256": "4605cb34065b7b67ebbc8d3b89658fbf330e2c244cfdd4b007158a96bd2cd35d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_transform_recovery.py",
+      "sha256": "a930a22a07d2dcede483126558b96a4dadb75cdc0b5f288864035f572429d536"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ws_process.py",
+      "sha256": "1e26b03b0a45bd983d57ac628e824dfaccca38e32bbc1ea87870ecc67ae7af76"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ws_worker.py",
+      "sha256": "55524450ee0d2561b26faffed3ad075974f496dde7cb1b0270dca35f79d7b4dc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "b7b02227a8b817ca623a08e55d4f8f738a0469112f33715c291d305dd945cb90"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "d4c55ade549ed7910db2bc2db44d9b0b402fcd8697611dfff025c7844db6519b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "055b7672df62ca6114f6f5e73cee9712be89dd5c6d88599204d99efc6a4c5f5b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "4d2b8fc14ac5471f8dc1422930edf4237d7f5c8e7cf03555570bf52b447f89a5"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "fab2a19724654c0e7e9d590f22e3cc278c39bc2afc49999774f029052ec9c0ab"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "a6efcd401228bf9d11cff7274e6c93c4e128aff1fa05323ff7d47bf08fc5698f"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "964fe79185c62081d9d9b99958a87f85fe07b40e187b313d823c547db3fd4b47"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_media_delivery_process.py",
+      "sha256": "9c5a06f2ee4312385cba1bf9f125840904fcef6aadfb0196f7e5f4b032afd364"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_media_reply_process.py",
+      "sha256": "de7d36a59132488a2c1aba36c1161b8632d6ccd3dc6883ea08efd136190fb376"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_pairing_process.py",
+      "sha256": "8d485114e8730442358ac955ff034460e24d3929a449f0bbb8d3382093e65905"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_process.py",
+      "sha256": "caff611bb0ee0995db0ea7fe232529ceb7fa85eb439af6c4a915e44e919a5873"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_profile_process.py",
+      "sha256": "241c52a5dffd2f4def6f040efb6f13c48c16a8105541cf6bda844877bb82339c"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_reply_process.py",
+      "sha256": "9122e97c3b82b8959b4ede1c6fcb5d595f85212fc4921ff061201d5281f4eae7"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_upload_process.py",
+      "sha256": "3274e72790388aa1968c5e5bffeaa8849d79fb8e9b491aea702530fb3fb59d54"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_ws_process.py",
+      "sha256": "895fbf696f4286cb1a4c771a3542a94919fca7052119c54354015e38f16143af"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "8f78953f2eafe176a224951c363fc913ee0af0f53e457dfb1cc10019c2f66c3c"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "62844785dca3145f7a1ebe0237a3179511e9a88d831823907fdaf30f54c4d794"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_admission.py",
+      "sha256": "d9ec0891e0fe8b79635dd5b5920338ef9955641880d188fbf5520e0940345d96"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_http.py",
+      "sha256": "8a6544fe80c89643598a15f87d4d74ddd087f3892f1d099d3dc8abc2ebb1a77e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_owner_gui.py",
+      "sha256": "7a22a4d88cf65027f61dffd462c83959fab9e02f67bc2a0655d8136bb512d5b8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_pairing.py",
+      "sha256": "e32893b55e31be371220994a69adccf48a877456c2fa98f12157c2ae5767a23e"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk.py",
+      "sha256": "744261d5eacf471bbbe34614426a98530413a73db41183b0aadf0ce60588000a"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_media_recovery.py",
+      "sha256": "d52f269df53e230db143cfb722ce4318b8564eaa64a25dd55987720119c59434"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_pairing.py",
+      "sha256": "8c25078a44c136748fc3011ab6779fa78d2830d5a3541d199e35a8e5b73075ba"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_transform_recovery.py",
+      "sha256": "f873c1c45e0bb2c3920955e12676c47810276af9679f0dbd319dd2fe017ce9f7"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_recovery.py",
+      "sha256": "582b0f5c2031074635ac2caeee237100350fb838ccfdc616947ecbaa05a4e8c8"
+    }
+  ],
+  "checks": {
+    "minimal": {
+      "summary": "2342 passed, 2 skipped in 13.81s",
+      "log_sha256": "bbc719d76c93d8630c2640f34b3739d501d531b1b3b0bb079290c38a1a70d707"
+    },
+    "full": {
+      "summary": "2342 passed, 2 skipped in 13.95s",
+      "log_sha256": "fdc609bef9239548dd346b4eabc73e928d87b49d690129967ad0d6d23a8d3e34"
+    },
+    "root": {
+      "summary": "172 passed in 12.97s",
+      "log_sha256": "c742c3c2b4ecea906245c9100b1eb1abd4d8225c75e95f41c85b8e77c919b37e"
+    },
+    "native_pairing": {
+      "case_count": 27,
+      "receipt": {
+        "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+        "cases": [
+          "native_identity_str_1",
+          "native_identity_int_1",
+          "native_identity_str_2",
+          "native_identity_int_2",
+          "native_reject_0",
+          "native_reject_1",
+          "native_reject_2",
+          "native_reject_3",
+          "native_reject_4",
+          "native_reject_5",
+          "native_reject_6",
+          "native_reject_7",
+          "native_reject_8",
+          "native_reject_9",
+          "native_reject_10",
+          "native_reject_11",
+          "native_reject_12",
+          "native_reject_13",
+          "native_reject_14",
+          "native_reject_15",
+          "native_reject_16",
+          "nonchallenge_21",
+          "nonchallenge_22",
+          "nonchallenge_23",
+          "nonchallenge_24",
+          "retained_native_candidate_is_not_authorization_or_mission",
+          "fresh_explicit_grant_does_not_replay_prior_observation"
+        ],
+        "scope": "actual frozen native SDK parser and local SQLite/policy; no transport or live DingTalk account",
+        "source_sha256": "e32893b55e31be371220994a69adccf48a877456c2fa98f12157c2ae5767a23e"
+      },
+      "log_sha256": "b6a2a702b2c8907e26287a8ec2a1fc003e2826bdce3492a72846d515b29b0105"
+    },
+    "pairing_root_UID_WSS": {
+      "case_count": 11,
+      "receipt": {
+        "cases": [
+          "actual_gateway_UID_frozen_SDK_discovery_and_verified_TLS_WSS_observation",
+          "native_ACK_after_FULL_candidate_metadata_commit_without_grant_or_native_input",
+          "root_and_agent_secrets_absent_from_candidate_receipt",
+          "actual_root_owner_bridge_drops_UID_and_returns_only_retained_untrusted_candidate_without_modifying_grants",
+          "actual_root_owner_account_bridge_private_native_token_helper_no_message_or_corp_robot_verification_claim",
+          "wrong-nonce_receives_no_ACK_or_implicit_authorization",
+          "wrong-corp_receives_no_ACK_or_implicit_authorization",
+          "already_approved_original_and_pending_native_input_retained_before_ACK_during_observation_without_agent_dispatch",
+          "UID_0_denied_before_network",
+          "UID_65533_denied_before_network",
+          "fresh_root_withdrawal_terminates_and_joins_observation_and_private_socket"
+        ],
+        "scope": "real kernel UID/NSS, isolated fixed-host TLS/WSS and actual SDK ACK; synthetic source frames only",
+        "live_delivery_verified": false,
+        "external_messages_sent": false,
+        "service_control_and_system_audit_are_declared_fixtures": true
+      },
+      "log_sha256": "916a6ea0532c6a62a615e3b73a8027dcc0bae15df03b87cc53de1b6823013b9e"
+    },
+    "public_factory_media": {
+      "case_count": 19,
+      "receipt": {
+        "passed": 19,
+        "cases": [
+          "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+          "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+          "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+          "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+          "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+          "actual_native_media_reply_private_worker_vendor_ACK_and_per_part_manifest_and_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+          "actual_full_media_manifest_refuses_ordinary_or_empty_output_caption_changed_bytes_and_added_parts_without_new_upload_or_message",
+          "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+          "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+          "actual_native_media_reply_cancel-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_native_media_reply_revoke-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_native_media_reply_orphan-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_native_media_reply_deadline-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_native_media_reply_disconnect-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_native_media_reply_close-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+          "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+          "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+          "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+          "public_GatewayPolicy_shared_factory_and_offline_recovered_batch_receipt_match_actual_native_media_acceptance_without_resend"
+        ],
+        "actual_UIDs": [
+          0,
+          65533,
+          65534
+        ],
+        "live_or_installed_dingtalk_acceptance": false,
+        "reply_mode": "robot",
+        "conversation": "oto",
+        "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+        "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+        "controller_artifact_offers_live_messages_missions_or_installed_acceptance": false,
+        "fixture_prepared_output_bytes": true
+      },
+      "log_sha256": "6616f19472d03aff074611cdb8650e08fb68dc9b44d7bc430e52726373684edf"
+    },
+    "normal_WSS_regression": {
+      "case_count": 9,
+      "receipt": {
+        "passed": 9,
+        "cases": [
+          "actual_gateway_UID_native_SDK_discovery_verified_TLS_WSS",
+          "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+          "fresh_parent_supervised_worker_reconnect_replays_one_original_one_input",
+          "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+          "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+          "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+          "actual_WSS_401_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect",
+          "actual_WSS_429_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect",
+          "actual_WSS_302_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect"
+        ],
+        "actual_UIDs": [
+          0,
+          65533,
+          65534
+        ],
+        "public_dingtalk_enabled": false,
+        "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+        "current_owner_publication_service_supervisor_and_external_account_are_fixtures": true,
+        "live_messages_missions_or_installed_acceptance": false
+      },
+      "log_sha256": "914af5fc51666841901fcd7b22d50b911304eb993529b3c56e3e910daf467f68"
+    },
+    "Tk_1280x800": {
+      "case_count": 16,
+      "receipt": {
+        "passed": 16,
+        "cases": [
+          "actual_Tk_masks_private_app_secret_and_hides_unrelated_token",
+          "app_identity_change_clears_private_secret",
+          "exact_app_corporation_robot_and_explicit_reply_mode_reach_owner_handoff_then_secret_clears",
+          "account_inspection_and_auth_recheck_buttons_have_distinct_no_send_handoffs",
+          "actual_Tk_challenge_copy_and_observation_handoff_fill_untrusted_opaque_IDs_without_pairing",
+          "explicit_separate_owner_pairing_carries_exact_IDs_scope_and_default_denied_media_flags",
+          "session_reply_mode_cannot_enable_outbound_artifact_consent",
+          "observation_timeout_is_honest_and_never_creates_a_grant",
+          "platform_switch_clears_private_secret_and_restores_other_platform_thread_field",
+          "every_finite_DingTalk_transport_state_part_and_complete_batch_proof_is_displayed_without_upload_key_or_recipient_read_claim",
+          "no_independent_non_acceptance_checkbox_means_no_owner_retry_handoff",
+          "selected_part_operation_snapshot_and_non_acceptance_confirmation_reach_separate_owner_handoff",
+          "changing_selected_part_clears_confirmation_and_confirmed_parts_are_not_retry_choices",
+          "explicit_source_disposal_carries_exact_profile_kind_and_snapshot_without_returning_raw_bytes",
+          "source_change_resets_confirmation_and_active_grant_cannot_be_purged_even_with_checkbox",
+          "conversion_disposal_requires_explicit_inspection_and_passes_exact_metadata_snapshot"
+        ],
+        "actual_Tk": true,
+        "screen": [
+          1280,
+          800
+        ],
+        "privileged_handoffs_and_account_responses_are_fixtures": true,
+        "public_DingTalk_activation_or_external_delivery": false
+      },
+      "log_sha256": "f6905d203fe483c99ebf39a61e2f060b86849de4f1f16424086969bb63a95d89"
+    },
+    "Tk_640x480": {
+      "case_count": 16,
+      "receipt": {
+        "passed": 16,
+        "cases": [
+          "actual_Tk_masks_private_app_secret_and_hides_unrelated_token",
+          "app_identity_change_clears_private_secret",
+          "exact_app_corporation_robot_and_explicit_reply_mode_reach_owner_handoff_then_secret_clears",
+          "account_inspection_and_auth_recheck_buttons_have_distinct_no_send_handoffs",
+          "actual_Tk_challenge_copy_and_observation_handoff_fill_untrusted_opaque_IDs_without_pairing",
+          "explicit_separate_owner_pairing_carries_exact_IDs_scope_and_default_denied_media_flags",
+          "session_reply_mode_cannot_enable_outbound_artifact_consent",
+          "observation_timeout_is_honest_and_never_creates_a_grant",
+          "platform_switch_clears_private_secret_and_restores_other_platform_thread_field",
+          "every_finite_DingTalk_transport_state_part_and_complete_batch_proof_is_displayed_without_upload_key_or_recipient_read_claim",
+          "no_independent_non_acceptance_checkbox_means_no_owner_retry_handoff",
+          "selected_part_operation_snapshot_and_non_acceptance_confirmation_reach_separate_owner_handoff",
+          "changing_selected_part_clears_confirmation_and_confirmed_parts_are_not_retry_choices",
+          "explicit_source_disposal_carries_exact_profile_kind_and_snapshot_without_returning_raw_bytes",
+          "source_change_resets_confirmation_and_active_grant_cannot_be_purged_even_with_checkbox",
+          "conversion_disposal_requires_explicit_inspection_and_passes_exact_metadata_snapshot"
+        ],
+        "actual_Tk": true,
+        "screen": [
+          640,
+          480
+        ],
+        "privileged_handoffs_and_account_responses_are_fixtures": true,
+        "public_DingTalk_activation_or_external_delivery": false
+      },
+      "log_sha256": "74322c077e6c1974049fb70c236ccf5a2e43ae0e02475bde0ef0542ce1315abe"
+    },
+    "Feishu_Tk_regression": {
+      "case_count": 14,
+      "receipt": {
+        "passed": 14,
+        "cases": [
+          "actual_Tk_Feishu_form_masks_secret_and_hides_unrelated_generic_token",
+          "app_identity_change_clears_private_secret_and_listener_consent",
+          "websocket_owner_handoff_contains_exact_account_without_unused_webhook_secrets",
+          "no_send_account_and_auth_retry_buttons_have_real_separate_owner_handoffs_and_finite_errors",
+          "exact_app_scope_is_derived_and_sender_edit_resets_separate_default_denied_media_consents",
+          "exact_open_ID_chat_topic_and_separate_grants_reach_owner_pairing_then_consents_clear",
+          "webhook_fields_are_real_and_invalid_port_refuses_handoff_while_clearing_all_secrets",
+          "mode_and_platform_switch_clear_secrets_without_secret_in_status_or_labels",
+          "every_finite_Feishu_transport_state_and_distinct_part_acceptance_is_displayed_without_receipt_body",
+          "no_independent_non_acceptance_checkbox_means_no_owner_retry_handoff",
+          "selected_part_operation_snapshot_and_non_acceptance_confirmation_reach_separate_owner_handoff",
+          "changing_selected_part_clears_confirmation_and_confirmed_parts_are_not_retry_choices",
+          "explicit_source_disposal_carries_exact_profile_kind_and_snapshot_without_returning_raw_bytes",
+          "source_change_resets_confirmation_and_active_grant_cannot_be_purged_even_with_checkbox"
+        ],
+        "actual_Tk": true,
+        "screen": [
+          1280,
+          800
+        ],
+        "privileged_handoffs_and_account_responses_are_fixtures": true,
+        "public_Feishu_activation_or_external_delivery": false
+      },
+      "log_sha256": "a9e315442baa6043e3541a5b4591f4f0ae59a80e906444a39d1306cb511c512f"
+    }
+  },
+  "root_test_environment": "Disposable privileged network-none container; real Linux UID/chroot/SQLite/Unix peers and bubblewrap; readonly repository, tmpfs /run, no host owner/recovery data.",
+  "scope": [
+    "Public independent policy, root-owned matched credential publication, explicit sender/chat grants, rotation and private stopped-service recovery.",
+    "Real root-to-gateway-UID native app token and one-shot untrusted identity observation; fixed-host verified TLS/WSS and native ACK after metadata commit.",
+    "Actual shared factory with public GatewayPolicy, synthetic incoming frame/prepared PNG output, native private byte upload and Robot response SDK, journals and source-bound aggregate receipt recovery.",
+    "Actual Tk widgets at both sizes; privileged calls, account responses and observed IDs are explicitly fixture handoffs, not live inference or real account acceptance.",
+    "All previous source-bound DingTalk SDK/resource/codec/UID receipts retain their original narrower boundaries."
+  ],
+  "not_claimed": [
+    "live DingTalk account authentication, app permissions or external delivery",
+    "real agent inference or result creation",
+    "device playback or installed/hardware acceptance",
+    "secure erasure of other copies, WAL or backups",
+    "ISO/container/APK release or complete 22-gateway integration"
+  ],
+  "latest_pushed_source_CI": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687 results tracked separately; new activation source CI not yet run"
+}

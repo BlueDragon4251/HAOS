@@ -272,7 +272,7 @@ print('denied')
                 account.write_text(json.dumps(value));account.chmod(0o600);os.chown(account,65534,65534)
             assert not failures,failures
             print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],
-                'public_dingtalk_enabled':False,'reply_mode':reply_mode,'conversation':conversation,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
+                'live_or_installed_dingtalk_acceptance':False,'reply_mode':reply_mode,'conversation':conversation,'API_WSS_domains_mapped_only_in_offline_fixture_hosts':True,
                 'owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual':True,
                 'live_messages_missions_or_installed_acceptance':False}))
         finally:

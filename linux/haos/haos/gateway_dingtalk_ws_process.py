@@ -26,11 +26,13 @@ def event(value,expected):
 
 
 class Session:
-    def __init__(self,value,connector,current,capture):
+    def __init__(self,value,connector,current,capture,*,observation=None):
         if not callable(current) or not callable(capture):raise PermissionError('independent parent admission required')
         self.value=credentials(value)
         self.connector=connector;self.current=current;self.capture=capture
-        self.process=None;self.tasks=[];self.active=False;self.ready=None;self.failure=None
+        from .gateway_dingtalk_pairing import challenge
+        self.observation=challenge(observation) if observation is not None else None
+        self.process=None;self.tasks=[];self.active=False;self.ready=None;self.failure=None;self.observation_ack=None
 
     def check(self):
         if not self.active:raise PermissionError('private WS generation inactive')
@@ -42,8 +44,10 @@ class Session:
         if self.process is not None:raise PermissionError('private WS session cannot be reused')
         self.current();self.identity=authority(self.connector,self.value);self.active=True
         self.ready=asyncio.get_running_loop().create_future()
+        if self.observation is not None:self.observation_ack=asyncio.get_running_loop().create_future()
         request=(json.dumps({'connector':self.connector,'credentials':self.value,
-            'policy_sha256':self.identity,'parent_pid':os.getpid()},separators=(',',':'))+'\n').encode()
+            'policy_sha256':self.identity,'parent_pid':os.getpid(),
+            **({'observation':self.observation} if self.observation is not None else {})},separators=(',',':'))+'\n').encode()
         if len(request)>32768:raise ValueError('bounded private WS startup required')
         try:
             args=command();args[-1]='haos.gateway_dingtalk_ws_worker'
@@ -72,6 +76,9 @@ class Session:
                 if value=={'kind':'ready'}:
                     if self.ready.done():raise ValueError('duplicate private WS readiness')
                     self.ready.set_result(True);continue
+                if value=={'kind':'observation-acknowledged'}:
+                    if self.observation_ack is None or self.observation_ack.done() or sequence<=1:raise ValueError('unexpected observation ACK')
+                    self.observation_ack.set_result(True);continue
                 if isinstance(value,dict) and set(value)=={'kind','error'} and value['kind']=='stopped':
                     if not isinstance(value['error'],str) or value['error'] not in ERRORS:raise ValueError('finite private WS failure required')
                     self.failure=value['error'];break

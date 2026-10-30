@@ -631,3 +631,55 @@ def test_actual_feishu_owner_setup_pairing_rotation_and_cross_uid_denial(tmp_pat
     assert original_load(config)[0]['bindings']==[]
     assert canary.read_bytes()==b'preserve existing owner evidence'
     assert value['app_secret'] not in str(audit) and any(event[0]=='setup.gateway-pair' for event in audit)
+
+
+def test_actual_dingtalk_owner_setup_pairing_rotation_and_cross_uid_denial(tmp_path,monkeypatch):
+    from haos import initial_setup,gateway_setup,owner,dingtalk_owner_setup
+    from haos.gateway_dingtalk import scope
+    assert os.geteuid()==0,'actual root publication and kernel UID gates required'
+    config=tmp_path/'configuration';config.mkdir(mode=0o700)
+    original_load,original_persist=gateway_setup.load,gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args:original_load(config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:original_persist(p,c,config=config,gid=0))
+    # Only service control and audit sink are declared fixtures; UID and publication are actual.
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:None)
+    monkeypatch.setattr(gateway_setup,'stopped_gateway',lambda:None)
+    audit=[];monkeypatch.setattr(owner,'audit',lambda action,fields:audit.append((action,fields)))
+    value={'client_id':'ding_fixture_app','client_secret':'private-dingtalk-owner-fixture',
+        'corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot','reply_mode':'robot'}
+    canary=config/'owner-recovery-canary';canary.write_bytes(b'preserve existing owner evidence');canary.chmod(0o600)
+    assert dingtalk_owner_setup.configure('dingtalk-main',value)['sender_pairing_required']
+    assert stat.S_IMODE((config/'gateways.json').stat().st_mode)==0o640
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    assert value['client_secret'] not in (config/'gateways.json').read_text()
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','dingtalk-main',value['robot_code'],'cidExactConversation/+=','personal')
+    initial_setup.pair_gateway_sender('owner','dingtalk-main','$:LWCP_v1:$opaque-owner','cidExactConversation/+=','personal',
+        thread='',allow_media=True,allow_outbound_media=True,require_mention=False)
+    policy,private=original_load(config);b=policy['bindings'][0]
+    assert b['scope']==scope(value) and b['thread']=='' and b['require_mention'] is False
+    assert b['allow_media'] is True and b['allow_outbound_media'] is True and b['allow_voice'] is False
+    assert len(b['generation'])==64 and type(b['since']) is int and b['since']>123
+    public=initial_setup.gateway_configuration()
+    assert value['client_secret'] not in str(public) and public['dingtalk']['dingtalk-main']['client_id']==value['client_id']
+    pid=os.fork()
+    if pid==0:
+        try:
+            os.setgroups([]);os.setgid(65534);os.setuid(65534)
+            for action in [lambda:dingtalk_owner_setup.configure('dingtalk-main',value),lambda:dingtalk_owner_setup.inspect('dingtalk-main'),
+                    lambda:dingtalk_owner_setup.sources(),lambda:dingtalk_owner_setup.outputs(),lambda:dingtalk_owner_setup.retry_auth('dingtalk-main'),
+                    lambda:dingtalk_owner_setup.observe('dingtalk-main',{}),
+                    lambda:initial_setup.pair_gateway_sender('owner','dingtalk-main','$:LWCP_v1:$opaque-owner','cidExactConversation/+=','personal')]:
+                try:action()
+                except PermissionError:pass
+                else:raise AssertionError('non-owner UID performed DingTalk owner action')
+            try:(config/'gateway-credentials').read_bytes()
+            except PermissionError:pass
+            else:raise AssertionError('gateway UID read root credential store')
+            os._exit(0)
+        except BaseException as error:
+            os.write(2,('DingTalk owner UID fixture: '+type(error).__name__+'\n').encode());os._exit(1)
+    _,status=os.waitpid(pid,0);assert os.waitstatus_to_exitcode(status)==0
+    assert dingtalk_owner_setup.configure('dingtalk-main',{**value,'client_secret':'rotated-dingtalk-owner-fixture'})['configured']
+    assert original_load(config)[0]['bindings']==[]
+    assert canary.read_bytes()==b'preserve existing owner evidence'
+    assert value['client_secret'] not in str(audit) and any(event[0]=='setup.gateway-pair' for event in audit)

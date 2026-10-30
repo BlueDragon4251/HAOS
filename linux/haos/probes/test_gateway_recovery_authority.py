@@ -1081,3 +1081,132 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         assert db.execute('SELECT data FROM dingtalk_raw_events').fetchone()[0]==(b'' if service_uid==65534 else payload)
         assert db.execute('SELECT COUNT(*) FROM dingtalk_raw_events').fetchone()[0]==1
         if service_uid==65534:assert db.execute('SELECT owner_uid FROM dingtalk_source_owner_events').fetchone()[0]==1000
+
+
+@pytest.mark.parametrize('operation',['upload','reply'])
+@pytest.mark.parametrize('uid',[0,65533,65534])
+def test_actual_dingtalk_multipart_recovery_main_checks_real_uid_and_preserves_other_parts(uid_fixture_path,operation,uid):
+    import time
+    import sqlite3
+    from types import SimpleNamespace
+    from haos.gateway import digest
+    from haos.gateway_dingtalk import scope
+    from haos.gateway_dingtalk_delivery import Publisher
+    from haos.gateway_dingtalk_media_delivery import MediaPublisher
+    from haos.gateway_dingtalk_media_recovery import outgoing,TABLES
+    root=uid_fixture_path;root.chmod(0o755);(root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    (root/'var/lib/haos-gateway').mkdir(parents=True,mode=0o700)
+    state=root/'var/lib/haos-gateway';database=state/'native-inbox.db'
+    value={'client_id':'ding_fixture_app','client_secret':'private-dingtalk-recovery-fixture',
+        'corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot','reply_mode':'robot'}
+    binding={'id':'owner','connector':'dingtalk','sender':'$:LWCP_v1:$opaque-owner','chat':'cidExactConversation/+=',
+        'scope':scope(value),'thread':'','identity':'personal','capabilities':['create','read'],
+        'generation':'d'*64,'since':123,'allow_outbound_media':True}
+    config={'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[binding]}
+    inbox=NativeInbox(database,Redactor())
+    adapter=SimpleNamespace(_haos_native=SimpleNamespace(connector='dingtalk',inbox=inbox),_haos_dingtalk_value=value)
+    adapter._haos_dingtalk_publisher=Publisher(adapter);publisher=MediaPublisher(adapter);now=time.time()
+    for table in TABLES.values():
+        for part in (0,1):inbox.db.execute(f'INSERT INTO {table} VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+            ('a'*64,part,1,'dingtalk',publisher.scope,'b'*64,'uncertain','','','',now,now))
+    selected=next(x for x in outgoing(inbox) if x['operation']==operation and x['part']==0)
+    inbox.close();os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    request={'action':'approve-dingtalk-part-retry','policy':config,'params':{
+        'connector':'dingtalk','delivery_id':'a'*64,'part':0,'operation':operation,'attempt':1,
+        'snapshot_sha256':selected['snapshot_sha256'],'owner_uid':1000,'note_sha256':'c'*64,
+        'confirmed':True,'confirmed_not_accepted':True}}
+    code='''
+import io,json,os,pwd,sys
+from haos import gateway_raw_recovery,gateway_dingtalk_media_recovery
+from haos.gateway_dingtalk import PreparedDingTalkPolicy
+PreparedDingTalkPolicy(json.loads(sys.argv[3]));pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+assert os.geteuid()==int(sys.argv[2]) and os.getgroups()==[]
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    child=subprocess.run([sys.executable,'-c',code,str(root),str(uid),json.dumps(config)],input=json.dumps(request),
+        text=True,capture_output=True,timeout=15,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
+            'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
+    if uid==65534:
+        assert child.returncode==0,child.stderr
+        report=json.loads(child.stdout);assert report['network_requested'] is False and report['controller_reconciliation_still_required'] is True
+    else:assert child.returncode!=0 and 'PermissionError' in child.stderr and not child.stdout
+    db=sqlite3.connect(database)
+    try:
+        released=[]
+        for name,table in TABLES.items():
+            released.extend((name,part) for part,state in db.execute(f'SELECT part,state FROM {table}') if state=='owner-retry-approved')
+        assert released==([(operation,0)] if uid==65534 else [])
+        if uid==65534:assert db.execute('SELECT owner_uid FROM dingtalk_media_owner_events').fetchone()[0]==1000
+    finally:db.close()
+
+
+
+@pytest.mark.parametrize('service_uid',[0,65533,65534])
+@pytest.mark.parametrize('journal_exists',[False,True])
+def test_dingtalk_output_cache_disposal_dispatch_is_private_offline_and_requires_fresh_withdrawal(uid_fixture_path,service_uid,journal_exists):
+    import hashlib,sqlite3
+    from types import SimpleNamespace
+    from haos.gateway import digest
+    from haos.gateway_dingtalk import scope
+    from haos.gateway_dingtalk_output import Output
+    root=uid_fixture_path;root.chmod(0o755);(root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    value={'client_id':'ding_fixture_app','client_secret':'private-dingtalk-recovery-fixture',
+        'corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot','reply_mode':'robot'}
+    binding={'id':'owner','connector':'dingtalk','sender':'$:LWCP_v1:$opaque-owner','chat':'cidExactConversation/+=',
+        'scope':scope(value),'thread':'','identity':'personal','capabilities':['create','read'],
+        'generation':'d'*64,'since':123,'allow_outbound_media':True}
+    config={'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[binding]}
+    state=root/'var/lib/haos-gateway';state.mkdir(parents=True,mode=0o700);database=state/'native-inbox.db'
+    data=b'private synthetic output bytes; no codec or native delivery claim'
+    if journal_exists:
+        inbox=NativeInbox(database,Redactor());Output(SimpleNamespace(_haos_native=SimpleNamespace(inbox=inbox)))
+        sha=hashlib.sha256(data).hexdigest()
+        metadata=json.dumps({'kind':'file','name':'result-0.zip','size':len(data),'sha256':sha},sort_keys=True,separators=(',',':'))
+        inbox.db.execute('INSERT INTO dingtalk_output_transforms VALUES(?,?,?,?,?,?,?,?,?)',
+            ('a'*64,'b'*64,'owner',digest(binding),'c'*64,sha,metadata,data,123))
+        inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    code='''
+import os,pwd,sys
+from haos import gateway_raw_recovery,gateway_dingtalk_transform_recovery
+pwd.getpwnam('nobody');os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])}
+    def action(name,params,policy=config):
+        return subprocess.run([sys.executable,'-c',code,str(root),str(service_uid)],
+            input=json.dumps({'action':name,'policy':policy,'params':params}),text=True,capture_output=True,timeout=15,env=env)
+    listed=action('dingtalk-output-cache',{})
+    if service_uid!=65534:assert listed.returncode!=0 and not listed.stdout
+    else:
+        assert listed.returncode==0,listed.stderr
+        report=json.loads(listed.stdout);assert not report['private_bytes_returned'] and not report['network_requested']
+        assert data.decode() not in listed.stdout
+        if not journal_exists:assert report['outputs']==[] and report['native_journal_created'] is False
+        else:
+            item=report['outputs'][0];assert item['purge_allowed'] is False
+            request={'id':item['id'],'snapshot_sha256':item['snapshot_sha256'],'owner_uid':1000,'note_sha256':'f'*64,'confirmed':True}
+            assert action('purge-dingtalk-output-cache',request).returncode!=0
+            revoked={**config,'bindings':[]}
+            fresh=action('dingtalk-output-cache',{},revoked);assert fresh.returncode==0,fresh.stderr
+            assert action('purge-dingtalk-output-cache',request,revoked).returncode!=0
+            request['snapshot_sha256']=json.loads(fresh.stdout)['outputs'][0]['snapshot_sha256']
+            removed=action('purge-dingtalk-output-cache',request,revoked);assert removed.returncode==0,removed.stderr
+            assert json.loads(removed.stdout)['removed_payload_bytes']==len(data)
+            repeated=action('purge-dingtalk-output-cache',request,revoked);assert repeated.returncode==0,repeated.stderr
+            assert json.loads(repeated.stdout)['removed_payload_bytes']==0
+    if not journal_exists:assert not database.exists()
+    else:
+        with sqlite3.connect(database) as db:
+            assert db.execute('SELECT data FROM dingtalk_output_transforms').fetchone()[0]==(b'' if service_uid==65534 else data)
+            assert db.execute('SELECT COUNT(*) FROM dingtalk_output_transforms').fetchone()[0]==1
+            if service_uid==65534:assert db.execute('SELECT owner_uid FROM dingtalk_transform_owner_events').fetchone()[0]==1000

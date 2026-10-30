@@ -572,7 +572,23 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform']=='feishu':
+    if selected and selected['platform']=='dingtalk':
+        from .gateway_dingtalk import scope as dingtalk_scope,validate_binding
+        import secrets,time
+        saved=credentials['connectors'][connector];expected=dingtalk_scope(saved)
+        if scope and scope!=expected:raise ValueError('DingTalk-Bereich muss zum gespeicherten App-/Corporation-/Robot-Konto gehören')
+        if sender==saved['robot_code']:raise ValueError('DingTalk-Bot darf sich nicht selbst freigeben')
+        item.update(scope=expected,generation=secrets.token_hex(32),since=time.time_ns()//1_000_000,require_mention=require_mention)
+        for key,value in [('allow_media',allow_media),('allow_voice',allow_voice),('allow_video',allow_video),('allow_outbound_media',allow_outbound_media)]:
+            if type(value) is not bool:raise ValueError('explicit boolean DingTalk media approval required')
+            item[key]=value
+        if allow_outbound_media and saved.get('reply_mode','session')!='robot':raise ValueError('DingTalk-Ergebnisdateien benötigen den ausdrücklich gewählten robot-Antwortweg')
+        validate_binding(item)
+        if allow_voice:
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):raise PermissionError('Lokalen Sprachdienst vor DingTalk-Voice-Freigabe einrichten')
+    elif selected and selected['platform']=='feishu':
         from .gateway_feishu import scope as feishu_scope,validate_binding
         import secrets,time
         saved=credentials['connectors'][connector];expected=feishu_scope(saved)
@@ -625,7 +641,7 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     elif allow_media or allow_voice or allow_video or allow_outbound_media:raise ValueError('media approval applies only to reviewed LINE/SMS paths')
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
-    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True and (not selected or selected['platform']!='feishu'):
+    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True and (not selected or selected['platform'] not in {'feishu','dingtalk'}):
         raise ValueError('Matrix device and encryption options apply only to Matrix')
     if selected and selected['platform']=='ntfy':
         configured=credentials['connectors'][connector]
@@ -708,6 +724,10 @@ def gateway_configuration():
         feishu[row['id']]={key:saved[key] for key in ['app_id','tenant_key','bot_open_id','domain','connection_mode']}
         if saved['connection_mode']=='webhook':feishu[row['id']].update(port=saved['port'],public_url=saved['tls']['public_url'],bind_host=saved['tls']['bind_host'])
     if feishu:result['feishu']=feishu
+    dingtalk={row['id']:{key:_credentials['connectors'][row['id']][key] for key in ['client_id','corp_id','robot_code']}
+        | {'reply_mode':_credentials['connectors'][row['id']].get('reply_mode','session')}
+        for row in policy['connectors'] if row['platform']=='dingtalk'}
+    if dingtalk:result['dingtalk']=dingtalk
     return result
 
 

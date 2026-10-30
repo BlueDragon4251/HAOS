@@ -106,6 +106,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_custody.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-custody-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-http-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_pairing.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-pairing-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-admission-build-probe.json

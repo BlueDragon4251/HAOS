@@ -35,7 +35,10 @@ def unresolved(inbox, after=0):
             r'om_[A-Za-z0-9]{16,64}' if row['platform']=='feishu' else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
         from .gateway_matrix_policy import opaque
-        valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
+        if row['platform']=='dingtalk':
+            from .gateway_dingtalk import identity as dingtalk_identity
+            valid=dingtalk_identity(row['message_id'])
+        else:valid=opaque(row['message_id'],'$') if row['platform']=='matrix' else pattern is not None and re.fullmatch(pattern,row['message_id'])
         if not valid:
             raise ValueError('invalid native source metadata')
         result.append({'cursor':row['cursor'],'ingress_id':row['id'],'state':row['state'],'platform':row['platform'],
@@ -174,9 +177,10 @@ def unresolved(inbox, after=0):
     from .gateway_feishu_recovery import outgoing as feishu_outgoing,accounts as feishu_accounts
     from .gateway_feishu_media_recovery import outgoing as feishu_media_outgoing
     from .gateway_dingtalk_recovery import outgoing as dingtalk_outgoing,accounts as dingtalk_accounts
+    from .gateway_dingtalk_media_recovery import outgoing as dingtalk_media_outgoing,batches as dingtalk_batches
     private_accounts=dingtalk_accounts(inbox)
     accounts=feishu_accounts(inbox)
-    return {**({'dingtalk_accounts':private_accounts} if private_accounts else {}),**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox)+dingtalk_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
+    return {**({'dingtalk_accounts':private_accounts} if private_accounts else {}),**({'feishu_accounts':accounts} if accounts else {}),'native_batches':dingtalk_batches(inbox),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox)+dingtalk_outgoing(inbox)+dingtalk_media_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -348,6 +352,10 @@ def main():
             platform='dingtalk' if data['action']=='retry-dingtalk-auth' else 'feishu'
             connector=_recheck_connector(policy,{k:params[k] for k in ['connector','owner_uid','note_sha256']},platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,'network_requested':False,'native_journal_created':False}));return
+        if data['action']=='dingtalk-output-cache':
+            if data['params']!={}:raise ValueError('output cache inventory takes no selectors')
+            print(json.dumps({'outputs':[],'stored_bytes':0,'history_truncated':False,'network_requested':False,
+                'private_bytes_returned':False,'native_journal_created':False}));return
         if data['action']=='media-cache' and data['params']=={}:
             print(json.dumps({'uploads':[],'stored_bytes':0,'reserved_bytes':0,'limit_bytes':64*1024*1024,'limit_records':128,'native_journal_created':False}))
             return
@@ -397,6 +405,16 @@ def main():
         elif data['action']=='retry-dingtalk-auth':
             from .gateway_dingtalk_recovery import retry_auth
             result=retry_auth(inbox,policy,data['params'])
+        elif data['action']=='dingtalk-output-cache':
+            if data['params']!={}:raise ValueError('output cache inventory takes no selectors')
+            from .gateway_dingtalk_transform_recovery import inventory
+            result=inventory(inbox,policy)
+        elif data['action']=='purge-dingtalk-output-cache':
+            from .gateway_dingtalk_transform_recovery import purge
+            result=purge(inbox,policy,data['params'])
+        elif data['action']=='approve-dingtalk-part-retry':
+            from .gateway_dingtalk_media_recovery import approve_retry
+            result=approve_retry(inbox,policy,data['params'])
         elif data['action']=='approve-dingtalk-retry':
             from .gateway_dingtalk_recovery import approve_retry
             result=approve_retry(inbox,policy,data['params'])

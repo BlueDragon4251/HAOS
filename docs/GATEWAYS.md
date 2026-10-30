@@ -2,10 +2,10 @@
 
 The pinned Hermes catalog contains 22 adapters. Loading an upstream adapter is
 not HAOS integration or authorization. Current public HAOS text setup paths are
-Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail and Feishu/Lark.
+Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail, Feishu/Lark and DingTalk.
 Each uses the independent peer-authenticated mission queue, exact owner grants
 and its checked transport/delivery path. Unknown senders and plugins receive no
-automatic HAOS identity or owner rights. These twelve software paths are not twelve
+automatic HAOS identity or owner rights. These thirteen software paths are not thirteen
 fully accepted platforms or a completed 22-gateway implementation.
 
 LINE additionally connects incoming PNG/JPEG/documents, isolated local voice
@@ -35,7 +35,7 @@ voice conversion and inspected per-part/source recovery. See
 [Feishu/Lark setup and evidence](GATEWAY-FEISHU.md) for required app rights, exact
 identities, TLS configuration and explicit live-acceptance limits.
 
-The remaining HAOS integrations are a2a, buzz, dingtalk,
+The remaining HAOS integrations are a2a, buzz,
 google_chat, photon, raft, simplex, teams, wecom and whatsapp. Their bundled
 upstream modules alone do not count as working HAOS gateways. Complete each
 transport's owner provisioning, sender/chat/thread scopes, durable input/output,
@@ -47,7 +47,10 @@ platform-specific live/feature acceptance limits.
 transport. No privileged HTTP policy endpoint or text-based root elevation is
 provided. Human browser/session credentials are never copied into agent state.
 
-Private DingTalk SDK/identity contracts are in progress; see
-[DingTalk implementation boundaries](GATEWAY-DINGTALK.md). It remains outside the
-public registry until transport, durable delivery, media, recovery and owner GUI
-are integrated.
+DingTalk connects the pinned Stream SDK with pre-ACK custody, exact app/corporation/robot
+identity, explicit sender/chat grants, session or explicitly selected Robot replies,
+separate native media/voice/video output and inspected per-part/source/cache recovery.
+Its owner GUI provides a no-send app check and one-shot untrusted ID observation
+before explicit pairing. See [DingTalk setup and evidence](GATEWAY-DINGTALK.md).
+Software/fixture completion does not establish a live account, external delivery,
+subscription permissions or installed/hardware acceptance.

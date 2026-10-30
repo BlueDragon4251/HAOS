@@ -112,7 +112,7 @@ def main():
         cases.append('SDK_staff_alias_does_not_substitute_for_exact_independently_approved_sender_ID')
     report={'passed':len(cases),'cases':cases,'actual_pinned_DingTalk_SDK_and_native_codecs':True,
         'transport_authentication_owner_publication_and_socket_denial_are_fixtures':True,
-        'native_vendor_voice_transcript_is_fixture_no_local_ASR':True,'public_dingtalk_enabled':False,
+        'native_vendor_voice_transcript_is_fixture_no_local_ASR':True,'live_or_installed_dingtalk_acceptance':False,
         'network_resources_missions_external_messages_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))
 

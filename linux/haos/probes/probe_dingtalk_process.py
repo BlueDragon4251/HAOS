@@ -173,7 +173,7 @@ print('denied')
         server.shutdown();server.server_close();thread.join(timeout=5)
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],
         'actual_Hermes_SDK_TLS_parent_lifetime_and_kernel_permissions':True,'API_domain_loopback_only_in_fixture_hosts':True,
-        'owner_publication_and_service_manager_are_fixtures':True,'public_dingtalk_enabled':False,
+        'owner_publication_and_service_manager_are_fixtures':True,'live_or_installed_dingtalk_acceptance':False,
         'real_external_account_messages_or_installed_acceptance':False},indent=2))
 
 

@@ -35,7 +35,8 @@ def main():
     if len(raw) > 32768 or not raw.endswith(b'\n'):
         raise ValueError('bounded private socket startup required')
     request = json.loads(raw, object_pairs_hook=_object, parse_constant=finite)
-    if (not isinstance(request, dict) or set(request) != {'connector', 'credentials', 'policy_sha256', 'parent_pid'}
+    if (not isinstance(request, dict) or set(request) not in ({'connector', 'credentials', 'policy_sha256', 'parent_pid'},
+                {'connector', 'credentials', 'policy_sha256', 'parent_pid', 'observation'})
             or type(request['parent_pid']) is not int or request['parent_pid'] != parent or os.getppid() != parent
             or not isinstance(request['connector'], str) or not isinstance(request['policy_sha256'], str)
             or not re.fullmatch('[0-9a-f]{64}', request['policy_sha256'])):
@@ -51,6 +52,8 @@ def main():
             != {'dingtalk-stream': '0.24.3', 'alibabacloud-dingtalk': '2.2.42',
                 'alibabacloud-tea-openapi': '0.4.6', 'websockets': '15.0.1'}):
         raise PermissionError('reviewed private SDK versions required')
+    from .gateway_dingtalk_pairing import challenge,candidate
+    observation=challenge(request['observation']) if 'observation' in request else None
     value = credentials(request['credentials']); stopped = threading.Event()
     output = sys.stdout.buffer; sys.stdout = sys.stderr
     os.set_blocking(output.fileno(), False)
@@ -70,7 +73,7 @@ def main():
                 self.logger.log(level, 'private DingTalk socket diagnostic')
 
     async def run():
-        loop = asyncio.get_running_loop(); pending = {}; sequence = 0
+        loop = asyncio.get_running_loop(); pending = {}; sequence = 0; observed_capture=False
         stop_event = asyncio.Event(); output_lock = asyncio.Lock()
         def stop():
             stopped.set(); loop.call_soon_threadsafe(stop_event.set)
@@ -124,15 +127,17 @@ def main():
             finally:
                 stop()
         async def capture(raw):
-            nonlocal sequence
+            nonlocal sequence,observed_capture
             current()
-            policy = PreparedDingTalkPolicy(trusted_json(Path('/etc/haos/gateways.json')))
-            proof = approve(policy, request['connector'], value, raw)
-            projection = normalize(policy, request['connector'], value, raw, proof, redactor)
-            # Resource codes remain in the private original/projection. Only
-            # the independently approved envelope can become an agent goal.
-            if redactor.clean(projection['envelope']) != projection['envelope']:
-                raise Refused('private-reflection')
+            observed=candidate(value,observation,raw) if observation is not None else None
+            if observed is None:
+                policy = PreparedDingTalkPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+                proof = approve(policy, request['connector'], value, raw)
+                projection = normalize(policy, request['connector'], value, raw, proof, redactor)
+                # Resource codes remain in the private original/projection. Only
+                # the independently approved envelope can become an agent goal.
+                if redactor.clean(projection['envelope']) != projection['envelope']:
+                    raise Refused('private-reflection')
             if pending:
                 raise PermissionError('one retained event at a time')
             sequence += 1; seq = sequence; future = loop.create_future(); pending[seq] = future
@@ -142,6 +147,7 @@ def main():
                 result = await asyncio.wait_for(future, 5); current()
                 if 'receipt' not in result:
                     raise PermissionError('parent refused durable input')
+                if observed is not None:observed_capture=True
                 return result['receipt']
             finally:
                 pending.pop(seq, None)
@@ -178,6 +184,8 @@ def main():
                         if not isinstance(raw, str):
                             raise Refused('unsupported-frame')
                         result = await client._haos_route_frame(raw.encode('utf-8'))
+                        if observed_capture:
+                            await emit({'kind':'observation-acknowledged'});return
                         if result == client.TAG_DISCONNECT:
                             return
                 except ConnectionClosedOK:

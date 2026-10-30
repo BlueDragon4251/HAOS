@@ -1,8 +1,9 @@
-# DingTalk — private integration in progress
+# DingTalk — owner setup and integration
 
-DingTalk is not in the public HAOS gateway registry or owner GUI. Twelve public
-software paths are listed in [Gateways](GATEWAYS.md). SDK presence and the private
-contracts below are not a complete gateway or live-account acceptance.
+DingTalk now has a public HAOS software setup path, bringing the gateway registry
+to thirteen of the pinned 22 platforms. This is not live-account or installed
+acceptance. Credentials remain in the separate gateway identity; the agent gets
+only scoped local mission/artifact capabilities.
 
 The exact pinned upstream `dingtalk` extra contains `dingtalk-stream` 0.24.3 and
 `alibabacloud-dingtalk` 2.2.42. Its frozen extras now join the existing nine extras
@@ -148,10 +149,9 @@ are assigned only to loopback inside a fresh network-none namespace. There is no
 external interface or Internet delivery. Wave/PDF/video fixtures verify private
 byte transport and consent, not speech recognition, playback or document decoding.
 
-Public activation still requires the complete authenticated owner setup/GUI,
-resource/per-part recovery management and final shared-runtime acceptance. The
-private controller artifact, media-message and local codec connections are now
-covered by the additional contracts below.
+The earlier private stages below are now connected to authenticated owner setup,
+per-part/source/cache management and the shared public runtime. Each fixture
+boundary still applies; none proves external DingTalk delivery.
 
 Local codec, SDK/TLS and private process fixtures have distinct boundaries.
 Loopback API substitutions, temporary fixture CA trust, supplied owner policy
@@ -183,7 +183,7 @@ writes target the exact approved conversation. Bot direct messages use one staff
 routing ID from the exact retained authenticated original, after canonical opaque
 sender/chat/account authorization; that hint never authorizes a sender. A
 missing direct-recipient hint is refused. Owner setup must explain the required
-Robot API permissions before this mode becomes publicly available.
+Robot API permissions; they remain account-dependent live checks.
 
 Stable replies use fixed verified HTTPS Robot endpoints, one request per immutable
 intent, bounded strict JSON and no redirects/cookies. A native `processQueryKey`
@@ -193,7 +193,7 @@ retry deadline. Unknown recipient decisions, missing keys, malformed responses,
 connection loss and withdrawal after a possible write remain uncertain. The
 existing durable per-write journal prevents implicit resend. Expired or absent
 session URLs do not prevent an explicitly approved Robot-mode write, and do not
-cause any session fallback. No public registry or GUI activation is implied.
+cause any session fallback. This SDK contract alone does not establish GUI or live-account acceptance.
 
 Private offline management now exposes finite transport/account/write inventory,
 account-authentication recheck and inspected non-delivery retry decisions through
@@ -209,8 +209,8 @@ snapshot and audited owner confirmation. It retains source proofs/tombstones;
 failed audit insertion rolls back byte removal. Repeated identical decisions are
 idempotent. Existing private path/UID/regular-file/single-link checks refuse
 symlinked or hardlinked stores. Disposal does not claim erasure of WAL remnants,
-other ledgers, controller/agent copies or backups. These low-level functions are
-not yet a completed public GUI or authenticated stopped-service owner flow.
+other ledgers, controller/agent copies or backups. The owner controls described below now invoke these functions through the
+authenticated stopped-service handoff; private functions alone are not that proof.
 
 Nine additional actual UID/chroot/SQLite recovery cases exercise real gateway
 account dispatch with and without a ledger, root/agent denial, retained waits,
@@ -249,7 +249,7 @@ probe. These codec/RPC checks do not claim DingTalk delivery or device playback.
 
 Those standalone upload/AMR contracts preceded their parent batch journal,
 artifact handoff and Robot media-message connection. The following stage now
-connects those pieces; public owner/GUI activation remains gated separately.
+connects those pieces; owner/GUI activation is covered separately below.
 
 The private shared runtime factory now constructs the actual DingTalk profile
 with exact parent/connector/policy/inbox context. Delivery metadata, credential
@@ -295,3 +295,83 @@ probe uses the actual shared factory, WSS pre-ACK custody, native handler, priva
 byte upload and Robot media-message workers, FULL batch/part journals, replay,
 revocation and process lifetime guards. Its already-prepared output bytes remain
 fixtures, so it does not claim a real agent result or provider inference.
+
+## Owner setup and identity pairing
+
+1. In the DingTalk developer console create an internal enterprise app, enable its
+   bot and Stream mode, and make it available to the intended enterprise users.
+   Copy exact **Client ID/AppKey**, **Client Secret/AppSecret**, **Corporation ID**
+   and **Robot Code**. No inbound port or callback listener is needed for Stream.
+2. In HAOS management → Gateways select `dingtalk`, enter those four values and
+   choose `session` or `robot` explicitly. Saving/rotating the account withdraws
+   its existing grants and leaves the gateway service stopped. The masked secret
+   is cleared on account/mode changes and after handoff.
+3. Use **DingTalk-Konto ohne Nachricht prüfen**. It checks app authentication
+   privately and sends no chat message. It cannot verify the corporation/robot
+   assignment or message permissions. Correct credentials/permissions before
+   **DingTalk-Anmeldung erneut erlauben**; retained rate waits and uncertain
+   writes remain protected.
+4. To discover the real opaque `senderId`/`conversationId`, choose
+   **DingTalk-IDs ohne Freigabe erfassen**. HAOS shows a random 128-bit one-time
+   challenge, valid for 60 seconds. Send that text yourself to the intended bot;
+   mention the bot in a group. HAOS sends no outgoing challenge. A separate
+   gateway-UID process checks fixed TLS/WSS discovery, the actual native frame and
+   message codecs, corporation/robot, timestamp, sender and challenge. It commits
+   metadata before native ACK. No original text, session URL, staff alias or
+   credential is returned to the GUI. Already-approved ordinary traffic is
+   retained for later dispatch while the service is stopped.
+5. The captured IDs remain **untrusted and unauthorized**. Inspect sender/chat,
+   choose a HAOS identity and explicit mission permissions, then approve pairing.
+   No display name, staff ID, `isAdmin`, unknown sender or plugin grants rights.
+   New grant timestamps prevent the old challenge from becoming a mission.
+   The pinned adapter has no topic-thread route: thread must remain empty.
+6. Approve images/documents, voice, video and output files separately. Voice needs
+   the configured local speech service. Output files require read permission and
+   explicitly chosen `robot` mode, with matching native Robot API permissions
+   for sending bot group messages and bot single-recipient messages. Enable the
+   app permissions required by the DingTalk console for those exact operations.
+   Missing direct-recipient staff routing information is refused after canonical
+   sender approval; it is never substituted for that approval. Session mode keeps
+   its original bounded webhook expiry and never silently switches reply mode.
+7. Start the gateway service and inspect status. Revoking a grant, stopping the
+   service or removing the connector kills active workers and prevents further
+   use. Local removal does not revoke the enterprise app at DingTalk: disable or
+   rotate it in the DingTalk console when provider-side revocation is intended.
+
+## Owner recovery and disposal
+
+The gateway ingress panel displays text and individual upload/media-message
+states. Unknown write outcomes remain blocked across restart and later attempt
+numbers. Only an inspected exact part/snapshot plus independent confirmation of
+non-acceptance can release its private retry lock. Controller reconciliation is
+separate and never sends a message by itself. Accepted writes cannot be released.
+
+A complete media batch exposes its local aggregate acceptance proof only when
+its caption (if any), every upload/cover and every reply has a committed receipt.
+This proof can help the owner reconcile a lost controller ACK. It is not a native
+remote message ID, recipient delivery or read confirmation. Partial/uncertain
+batches expose no aggregate acceptance proof and never auto-repeat.
+
+**Gespeicherte DingTalk-Quellen verwalten** and **Gespeicherte
+DingTalk-Konvertierungen verwalten** return metadata/hashes and sizes, not bytes.
+Disposal requires withdrawing/changing the original grant, loading a fresh
+snapshot and confirming one exact item with a non-secret note. Audited FULL
+transactions retain proof/tombstone rows; failed audit insertion rolls back byte
+removal, and repeated identical decisions are idempotent. Old bytes cannot be
+silently regenerated. Other copies, backups and SQLite WAL erasure are not claimed.
+
+CLI equivalents include `haos-owner gateway setup … dingtalk`,
+`dingtalk-account`, `retry-dingtalk-auth`, `dingtalk-sources`,
+`dingtalk-output-cache`, `purge-dingtalk-source`,
+`purge-dingtalk-output-cache`, `approve-dingtalk-retry` and
+`approve-dingtalk-part-retry`. Decisions require explicit IDs, attempt/snapshot,
+inspection and non-acceptance confirmations as applicable. Credentials use secure
+owner entry and never command-line arguments.
+
+The activation receipt records exact source hashes, minimal/full runtime tests,
+real root/gateway/agent UID checks, actual native SDK fixtures and Tk exercises at
+both screen sizes. Service control/audit or account responses replaced by fixtures
+are explicitly named in each receipt. No real external message, account permission,
+provider inference, installed boot, device playback or final release is claimed.
+
+Source-bound activation evidence: [2026-10-30 owner/public validation](evidence/2026-10-30/dingtalk-public-owner-validation.json).

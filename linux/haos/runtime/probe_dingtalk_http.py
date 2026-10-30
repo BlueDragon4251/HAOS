@@ -146,7 +146,7 @@ def main():
             server.shutdown();server.server_close();thread.join(timeout=5)
     result={'passed':len(cases),'cases':cases,'actual_native_SDK_requests_and_verified_loopback_TLS':True,
         'API_origin_and_fixture_CA_substitution_only_in_this_probe':True,'owner_publication_and_UID_are_fixtures':True,
-        'public_dingtalk_enabled':False,'external_accounts_messages_or_installed_acceptance':False}
+        'live_or_installed_dingtalk_acceptance':False,'external_accounts_messages_or_installed_acceptance':False}
     Path(sys.argv[2]).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))
 
 
