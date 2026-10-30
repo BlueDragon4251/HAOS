@@ -14,7 +14,7 @@ _EVENT=ContextVar('haos_admitted_media_event',default=None)
 
 @contextmanager
 def event_scope(event,ids,types,*,platform='line'):
-    if platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz'}:raise PermissionError('reviewed retained media platform required')
+    if platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz','google_chat'}:raise PermissionError('reviewed retained media platform required')
     ids=references(ids)
     if not ids or event.media_urls!=['haos-media:'+identity for identity in ids] or event.media_types!=types:
         raise PermissionError('native media must match the private retained copy')
@@ -26,7 +26,7 @@ def event_scope(event,ids,types,*,platform='line'):
 def event_media(event,platform):
     proof=_EVENT.get()
     if not event.media_urls:return []
-    if (platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz'} or proof is None or proof[0] is not event or proof[3]!=platform
+    if (platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz','google_chat'} or proof is None or proof[0] is not event or proof[3]!=platform
             or event.media_urls!=['haos-media:'+identity for identity in proof[1]]):
         raise PermissionError('no independent retained media admission')
     return list(proof[1])

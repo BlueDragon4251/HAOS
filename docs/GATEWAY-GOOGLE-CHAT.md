@@ -198,3 +198,44 @@ systemctl service state is an explicit fixture; this does not prove installed
 systemd quiescence or Owner login. Tk desktop/compact fixtures exercise actual
 widgets and the wizard's asynchronous queue with explicit privileged backend
 fixtures. Neither is a live Google account, installed GUI or release acceptance.
+
+## Prepared incoming media path
+
+Incoming image/document/voice/video declarations now have source-specific private
+resource capabilities. The complete service-account message, stable sender,
+space/thread, timed create grant and separate media-kind consent are checked
+before any download. A download resource must belong to that exact original
+message's attachment namespace. `downloadUri` is never fetched, and a Drive
+picker reference without downloadable Chat resource fails explicitly rather
+than silently losing its attachment. Optional native upload-reference tokens
+are kept private, registered for redaction and never used as download authority.
+Raw native message payloads do not cross the durable HAOS event boundary.
+
+The private reader uses the actual Google discovery media request and
+MediaIoBaseDownload with zero SDK retries, source-bound GET-only HTTP, bounded
+responses/buffer/chunks/time and continuous independent grant checks. Response
+MIME, contiguous Content-Range and declared total are checked. PNG/JPEG and
+MP4/3GP/3G2 declarations must match byte descriptors. No arbitrary URL, fallback
+HTTP client or native filesystem cache is used. The actual Hermes message
+builder resolves only independently retained copies under its exact asyncio
+context; event media references are hashes, not host paths.
+
+First byte identity is journaled before private blob insertion. Replay reuses
+existing bytes without another download; a missing first insertion may only
+recover the original recorded byte identity. Purged/damaged cache rows are
+never restored automatically. Independent aggregate image and private storage
+budgets still apply. The prepared real-UID TLS profile fixture passes the PNG
+copy through the native attachment codec, FULL cache, actual controller media
+begin/chunk/receive/attach methods and verified per-mission bytes. It also checks
+resource401 stopping the profile, resource429 persisting account delay, malformed
+range refusal and oversized response refusal. Explicit local TLS/OAuth/Google
+fixtures do not establish a live account or installed daemon acceptance.
+
+Voice/video kinds have admission/retention contracts; actual Google-specific
+local ASR/video decoder process acceptance, native outgoing attachments and
+per-user OAuth remain open. The public count remains 15/22.
+
+Source-bound incoming-media evidence:
+[incoming media and existing receive/text regression](evidence/2026-10-30/google-chat-private-input-media-validation.json).
+Prepared Owner recovery evidence remains separately pinned to its own source:
+[Owner handoff and Tk component validation](evidence/2026-10-30/google-chat-private-owner-validation.json).

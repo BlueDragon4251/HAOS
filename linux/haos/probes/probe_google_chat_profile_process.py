@@ -81,7 +81,11 @@ def main():
     publication=directory/'policy.json';publication.write_text(json.dumps(policy));publication.chmod(0o644)
     original_path=profile/('google-chat-'+digest(scope(value)))/'originals.sqlite'
     scenario=os.environ.get('HAOS_GOOGLE_CHAT_PROFILE_ACCOUNT','active')
-    if scenario not in {'active','auth','rate','tokenrate','sendauth'}:raise ValueError('finite private profile fixture scenario required')
+    if scenario not in {'active','auth','rate','tokenrate','sendauth','media','mediaauth','mediarate','mediarange','medialarge'}:raise ValueError('finite private profile fixture scenario required')
+    if scenario in {'media','mediaauth','mediarate','mediarange','medialarge'}:
+        binding['allow_media']=True;publication.write_text(json.dumps(policy));publication.chmod(0o644)
+    import base64
+    image=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF10AAAAASUVORK5CYII=')
     api_calls=[];api_requests=[]
     class API(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -118,6 +122,26 @@ def main():
                 self.send_response(code);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)))
                 if scenario=='rate':self.send_header('Retry-After','180')
                 self.end_headers();self.wfile.write(data);return
+            if urlsplit(self.path).path.startswith('/v1/media/'):
+                assert scenario in {'media','mediaauth','mediarate','mediarange','medialarge'} and self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
+                assert urlsplit(self.path).path in ['/v1/media/spaces/room1/messages/'+mid+'/attachments/resource1' for mid in ['shared','diskretry']]
+                assert parse_qs(urlsplit(self.path).query)=={'alt':['media']} and self.headers.get('Range')=='bytes=0-524287'
+                if scenario in {'mediaauth','mediarate'}:
+                    code=401 if scenario=='mediaauth' else 429;api_calls.append('native-media-'+str(code))
+                    body=json.dumps({'error':{'code':code,'message':'local-profile-google-fixture-token'}}).encode()
+                    self.send_response(code);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)))
+                    if code==429:self.send_header('Retry-After','180')
+                    self.end_headers();self.wfile.write(body);return
+                if scenario in {'mediarange','medialarge'}:
+                    api_calls.append('native-media-bound-refused');self.send_response(206);self.send_header('Content-Type','image/png')
+                    self.send_header('Content-Length',str(9*1024*1024) if scenario=='medialarge' else str(len(image)))
+                    self.send_header('Content-Range','bytes 1-'+str(len(image))+'/'+str(len(image)+1))
+                    self.end_headers()
+                    if scenario=='mediarange':self.wfile.write(image)
+                    return
+                api_calls.append('native-media-download');self.send_response(206);self.send_header('Content-Type','image/png')
+                self.send_header('Content-Length',str(len(image)));self.send_header('Content-Range','bytes 0-'+str(len(image)-1)+'/'+str(len(image)))
+                self.end_headers();self.wfile.write(image);return
             assert urlsplit(self.path).path=='/v1/spaces/room1/members/999'
             assert self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
             api_calls.append('own-bot-membership');self.response({'name':'spaces/room1/members/999','state':'MEMBER','member':{'name':'users/999','type':'BOT'}})
@@ -135,7 +159,11 @@ except PermissionError:
     try:denied_build(None,parent='/tmp',connector='unapproved',policy=lambda:None,inbox=None)
     except PermissionError:pass
     else:raise AssertionError('private profile factory accepted wrong UID')
-    assert 'google.oauth2.id_token' not in sys.modules
+    from haos.gateway_google_chat_resources import download
+    try:asyncio.run(download(None,None,None))
+    except PermissionError:pass
+    else:raise AssertionError('foreign UID entered Google media SDK')
+    assert 'google.oauth2.id_token' not in sys.modules and 'googleapiclient.http' not in sys.modules
     print(json.dumps({'denied_before_optional_SDK':True}));raise SystemExit(3)
 from haos.gateway_google_chat import PreparedGoogleChatPolicy
 from haos.gateway_google_chat_profile import build
@@ -165,11 +193,15 @@ async def run():
         try:build(v['value'],parent=parent,connector='google',policy=policy,inbox=inbox)
         except PermissionError:pass
         else:raise AssertionError('parallel identity lease accepted')
-        def receive(event):relay.admit(policy(),'google',adapter_envelope(event,'google_chat'));return True
+        def receive(event):
+            assert event.raw_message is None and 'opaque-private-upload-reference-fixture' not in event.text
+            from haos.gateway_media_relay import event_media
+            relay.admit(policy(),'google',adapter_envelope(event,'google_chat'),media=event_media(event,'google_chat'));return True
         adapter.set_durable_message_handler(receive)
         current=adapter._haos_google_check;origin='https://localhost:'+str(v['api_port'])
-        def http(self):
-            current();base=single_request_http(current,fixture_origin=origin,redactor=inbox.redactor);base.ca_certs=v['ca']
+        def http(self,authority=None):
+            selected=authority or current
+            selected();base=single_request_http(selected,fixture_origin=origin,limit=8*1024*1024 if authority else 1048576,redactor=inbox.redactor);base.ca_certs=v['ca']
             class Routed:
                 def __getattr__(self,key):return getattr(base,key)
                 def request(self,uri,method='GET',body=None,headers=None,**kwargs):
@@ -181,6 +213,7 @@ async def run():
                     return token_response(uri,response,data)
             return AuthorizedHttp(self._credentials,http=Routed(),max_refresh_attempts=0)
         adapter._new_authed_http=MethodType(http,adapter)
+        adapter._haos_google_media_http=MethodType(lambda self,authority:http(self,authority),adapter)
         if v['scenario'] in {'auth','rate','tokenrate'}:
             assert not await adapter.connect() and not adapter.is_connected
             expected='authentication-refused' if v['scenario']=='auth' else 'rate-limited'
@@ -215,7 +248,17 @@ async def run():
             if adapter.is_connected:
                 incoming=relay.next(policy())
                 if incoming:
-                    received=await controller.gateway.receive(policy(),'google',incoming['envelope'],controller)
+                    from haos.gateway_media_relay import forward,MediaCache
+                    async def local_call(method,params):
+                        if method=='gateway.media.begin':return controller.gateway.media.begin(policy(),params)
+                        if method=='gateway.media.chunk':return controller.gateway.media.chunk(policy(),params)
+                        assert method=='gateway.receive'
+                        return await controller.gateway.receive(policy(),params['connector'],params['envelope'],controller,media=params.get('media'))
+                    received=await forward(policy,'google',incoming['envelope'],incoming['media'],MediaCache(inbox),local_call)
+                    if incoming['media']:
+                        prepared=controller.gateway.media.for_mission(policy(),received['mission_id'])
+                        assert len(prepared)==1 and prepared[0]['descriptor']['kind']=='image'
+                        assert prepared[0]['data']==__import__('base64').b64decode(v['image'])
                     relay.admitted(incoming['id'],received['mission_id'])
                 delivery=controller.gateway.next_delivery(policy())
                 if delivery:
@@ -237,13 +280,18 @@ async def run():
 asyncio.run(run())
 ''');driver.chmod(0o755)
     def event(mid='shared',sender='users/123'):
-        return {'type':'MESSAGE','space':{'name':'spaces/room1','spaceType':'DIRECT_MESSAGE'},'message':{
+        result={'type':'MESSAGE','space':{'name':'spaces/room1','spaceType':'DIRECT_MESSAGE'},'message':{
             'name':'spaces/room1/messages/'+mid,'thread':{'name':binding['thread']},'sender':{'type':'HUMAN','name':sender},
             'createTime':now.isoformat().replace('+00:00','Z'),'text':'Create a local plan'}}
+        if scenario in {'media','mediaauth','mediarate','mediarange','medialarge'}:
+            resource=result['message']['name']+'/attachments/resource1'
+            result['message']['attachment']=[{'name':resource,'attachmentDataRef':{'resourceName':resource,'attachmentUploadToken':'opaque-private-upload-reference-fixture'},'contentType':'image/png',
+                'downloadUri':'https://foreign-fixture.invalid/never-fetch'}]
+        return result
     claims={'iss':'https://accounts.google.com','aud':audience,'sub':'123456789','email':caller,'email_verified':True,
         'iat':int(now.timestamp()),'exp':int(now.timestamp())+3600}
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
-    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'ca':str(ca_file),'scenario':scenario}
+    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode()}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -273,6 +321,40 @@ asyncio.run(run())
                         body=await response.read();assert b'BEGIN PRIVATE KEY' not in body and b'local-google-caller' not in body
                         return response.status,body
                 assert await send()==(200,b'{}')
+                if scenario in {'mediarange','medialarge'}:
+                    deadline=asyncio.get_running_loop().time()+5
+                    while True:
+                        state=json.loads((profile/'profile-status.json').read_text())
+                        if state['status']=='transport-unavailable':break
+                        assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.05)
+                    assert state['parent_records']==0 and state['confirmed_outputs']==0
+                    assert api_calls==['actual-SDK-RSA-token-grant','own-bot-membership']*2+['native-media-bound-refused']
+                    with sqlite3.connect(profile/'native.sqlite') as db:assert db.execute('SELECT COUNT(*) FROM native_media_cache').fetchone()[0]==0
+                    cases.append('actual_private_UID_Google_media_SDK_'+scenario+'_is_refused_before_blob_parent_mission_or_reply_and_never_falls_back_to_foreign_download_URI')
+                    return
+                if scenario in {'mediaauth','mediarate'}:
+                    deadline=asyncio.get_running_loop().time()+5
+                    expected='authentication-refused' if scenario=='mediaauth' else 'rate-limited'
+                    while True:
+                        state=json.loads((profile/'profile-status.json').read_text())
+                        if state['status']==expected and (scenario!='mediaauth' or not state['connected']):break
+                        assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.05)
+                    expected_calls=['actual-SDK-RSA-token-grant','own-bot-membership']*2+['native-media-'+('401' if scenario=='mediaauth' else '429')]
+                    assert api_calls==expected_calls
+                    with sqlite3.connect(original_path) as db:assert db.execute('SELECT COUNT(*) FROM google_chat_originals').fetchone()[0]==1
+                    if scenario=='mediaauth':
+                        try:await send(event('after-auth-refusal'))
+                        except OSError:pass
+                        else:raise AssertionError('resource authentication failure left listener active')
+                        cases.append('actual_private_UID_native_media_SDK_HTTP401_preserves_original_custody_and_sticky_auth_block_then_stops_profile_and_TLS_listener_without_creating_a_mission_or_reply')
+                    else:
+                        with sqlite3.connect(profile/'native.sqlite') as db:
+                            wait=db.execute('SELECT next_attempt FROM google_chat_profile_status').fetchone()[0]
+                            assert wait>=__import__('time').time()+175
+                            assert db.execute('SELECT not_before FROM google_chat_profile_budget').fetchone()[0]>=wait
+                        await asyncio.sleep(.6);assert api_calls==expected_calls
+                        cases.append('actual_private_UID_native_media_SDK_HTTP429_has_one_GET_attempt_and_persistent_account_RetryAfter_without_mission_reply_or_automatic_download_retry')
+                    return
                 if scenario=='sendauth':
                     deadline=asyncio.get_running_loop().time()+5
                     while True:
@@ -321,7 +403,15 @@ asyncio.run(run())
                     state=json.loads((profile/'profile-status.json').read_text())
                     if state['parent_records']==2 and state['confirmed_outputs']==2:break
                     assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.05)
-                assert api_calls==['actual-SDK-RSA-token-grant','own-bot-membership']*2+['native-message-create']*2
+                base_calls=[call for call in api_calls if call!='native-media-download']
+                assert base_calls==['actual-SDK-RSA-token-grant','own-bot-membership']*2+['native-message-create']*2
+                if scenario=='media':
+                    assert api_calls.count('native-media-download')==2
+                    with sqlite3.connect(profile/'native.sqlite') as db:
+                        assert db.execute('SELECT COUNT(*) FROM google_chat_input_media').fetchone()[0]==2
+                    with sqlite3.connect(profile/'controller-component.sqlite') as db:
+                        assert db.execute("SELECT COUNT(*) FROM gateway_media_uploads WHERE state='attached'").fetchone()[0]==2
+                    cases.append('actual_private_UID_source_bound_Google_discovery_MediaIoBaseDownload_TLS_GET_native_attachment_codec_FULL_retention_and_real_controller_media_begin_chunk_receive_attach_preserve_exact_PNG_bytes_with_no_foreign_downloadURI_fetch_or_duplicate_download_on_replay')
                 cases.append('actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records')
                 cases.append('actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs')
                 cases.append('actual_native_profile_disconnect_and_reconnect_close_and_rebind_TLS_with_the_same_private_lease_and_journals_and_fresh_real_SDK_account_auth_checks')
@@ -343,8 +433,9 @@ asyncio.run(run())
     finally:api_server.shutdown();api_server.server_close();api_thread.join(timeout=2)
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite':True,
         'Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures':True,
-        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth'},
-        'root_controller_IPC_media_GUI_live_Google_account_or_public_activation':False},indent=2))
+        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media'},
+        'actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer':scenario=='media',
+        'root_controller_IPC_local_ASR_video_decode_GUI_live_Google_account_or_public_activation':False},indent=2))
 
 
 if __name__=='__main__':main()

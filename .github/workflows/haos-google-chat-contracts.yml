@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
-          for SCENE in active auth rate tokenrate sendauth; do
+          for SCENE in active auth rate tokenrate sendauth media mediaauth mediarate mediarange medialarge; do
             docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
               -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
               -v "$PWD/linux/haos/probes/probe_google_chat_profile_process.py:/probe.py:ro" \

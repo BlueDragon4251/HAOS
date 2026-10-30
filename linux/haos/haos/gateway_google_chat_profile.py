@@ -82,6 +82,12 @@ def build(value,*,parent,connector,policy,inbox):
             from google_auth_httplib2 import AuthorizedHttp
             return AuthorizedHttp(self._credentials,http=single_request_http(current,redactor=inbox.redactor),max_refresh_attempts=0)
         adapter._new_authed_http=MethodType(http,adapter)
+        def media_http(self,authority):
+            current()
+            from google_auth_httplib2 import AuthorizedHttp
+            from .gateway_media import MAX_BYTES
+            return AuthorizedHttp(self._credentials,http=single_request_http(authority,limit=MAX_BYTES,redactor=inbox.redactor),max_refresh_attempts=0)
+        adapter._haos_google_media_http=MethodType(media_http,adapter)
         return _lifecycle(adapter,profile,lease,identity)
     except BaseException:
         if originals is not None:originals.close()
@@ -183,6 +189,8 @@ def _lifecycle(adapter,profile,lease,identity):
                 check();state=classify(error)
                 from .gateway_google_chat_retry import retry_after
                 status(state,max(retry_after(error),getattr(error,'retry_after',0)) if state=='rate-limited' else 2)
+                if state in BLOCKS:
+                    adapter._haos_google_stopping=True;await stop();return
             await asyncio.sleep(.5)
     def delivery_error(error):
         state=classify(error)

@@ -1,13 +1,23 @@
 """Prepared immutable original -> actual native codec -> durable HAOS relay."""
 import asyncio
 from contextvars import ContextVar
+from contextlib import contextmanager
 from datetime import datetime,timezone
 from types import MethodType
 
 from .gateway import Conflict,digest
-from .gateway_google_chat_codec import decode_text
+from .gateway_google_chat_codec import decode_event
 
 _CURRENT=ContextVar('haos_google_chat_original',default=None)
+
+
+@contextmanager
+def media_scope(event):
+    if event.media_urls:
+        from .gateway_media_relay import event_scope
+        ids=[url.removeprefix('haos-media:') for url in event.media_urls]
+        with event_scope(event,ids,event.media_types,platform='google_chat'):yield
+    else:yield
 
 
 def install(adapter):
@@ -34,11 +44,11 @@ async def capture_stored(adapter,identity):
     raw,proof=adapter._haos_google_originals.load(identity,policy,native.connector,adapter._haos_google_value,adapter._haos_google_check)
     from .gateway_matrix_profile import scope
     with scope(adapter._haos_google_home,adapter._haos_google_environment):
-        event=await decode_text(adapter,policy,native.connector,adapter._haos_google_value,raw,proof)
+        event=await decode_event(adapter,policy,native.connector,adapter._haos_google_value,raw,proof,identity)
     # Native text is the command projection, but credentials remain private.
     event.text=native.inbox.redactor.text(event.text);event.channel_prompt=None
     from .gateway_runtime import adapter_envelope
-    envelope=adapter_envelope(event,'google_chat')
+    with media_scope(event):envelope=adapter_envelope(event,'google_chat')
     if {**envelope,'text':''}!=proof['envelope']:raise Conflict('Google Chat codec changed approved immutable route')
     if not 1<=len(event.text.strip())<=32000:raise PermissionError('Google Chat source has no bounded actionable text')
     source_key=native.inbox.key(native.connector,envelope);db=native.inbox.db
@@ -66,18 +76,19 @@ async def dispatch_stored(adapter,key):
             raw,proof=adapter._haos_google_originals.load(identity,policy,native.connector,adapter._haos_google_value,adapter._haos_google_check)
             from .gateway_matrix_profile import scope
             with scope(adapter._haos_google_home,adapter._haos_google_environment):
-                event=await decode_text(adapter,policy,native.connector,adapter._haos_google_value,raw,proof)
+                event=await decode_event(adapter,policy,native.connector,adapter._haos_google_value,raw,proof,identity)
             event.text=native.inbox.redactor.text(event.text);event.channel_prompt=None
             event.timestamp=datetime.fromtimestamp(proof['received_at'],timezone.utc)
             from .gateway_runtime import adapter_envelope
-            envelope=adapter_envelope(event,'google_chat')
+            with media_scope(event):envelope=adapter_envelope(event,'google_chat')
             projection=native.inbox.db.execute('SELECT * FROM google_chat_native_projection WHERE source_key=?',(key,)).fetchone()
             if (projection is None or projection['raw_id']!=identity or projection['raw_sha256']!=proof['raw_sha256']
                     or projection['binding_digest']!=row['binding_digest'] or projection['credential_scope']!=proof['credential_scope']
                     or projection['envelope_sha256']!=digest(envelope) or envelope!=row['envelope']):
                 raise Conflict('retained Google Chat source differs from first native projection')
             token=_CURRENT.set({'adapter':adapter,'event':event,'row':row})
-            try:adapter._haos_admit(event)
+            try:
+                with media_scope(event):adapter._haos_admit(event)
             finally:_CURRENT.reset(token)
             adapter._haos_google_check();native.policy().current_binding(row)
             if event._gateway_accepted is not True:raise Conflict('Google Chat parent admission has no committed receipt')
