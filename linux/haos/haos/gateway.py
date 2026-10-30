@@ -164,6 +164,9 @@ class GatewayEngine:
                 attempt INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0,
                 lease_until REAL, receipt TEXT, error TEXT
             );
+            CREATE TABLE IF NOT EXISTS gateway_delivery_context(
+                delivery_id TEXT PRIMARY KEY REFERENCES gateway_outbox(id),metadata TEXT NOT NULL,sha256 TEXT NOT NULL
+            );
             COMMIT;
         """)
         versions = store.db.execute("SELECT version FROM gateway_schema").fetchall()
@@ -177,7 +180,7 @@ class GatewayEngine:
                 store.db.execute("ALTER TABLE gateway_inbox ADD COLUMN binding_digest TEXT")
                 store.db.execute("UPDATE gateway_schema SET version=2")
 
-    def _queue(self, route_id: str, key: str, content: str, *, limit=1800):
+    def _queue(self, route_id: str, key: str, content: str, *, limit=1800,context=None):
         content = self.store.redactor.text(content)
         # Bound native platform chunks; each part has a stable durable identity.
         groups=[content]
@@ -199,9 +202,17 @@ class GatewayEngine:
                     line=remaining.rfind('\n',0,end)+1
                     if line and remaining[line:end].lstrip().startswith('MEDIA:'):end=line
                 chunks.append(remaining[:end]);remaining=remaining[end:]
+        if context is not None:
+            total_bytes=sum(len(item.encode()) for item in chunks);group_sha256=digest([route_id,key,chunks])
         for part, chunk in enumerate(chunks):
+            delivery_id=digest([route_id,key,part])
             self.store.db.execute("INSERT OR IGNORE INTO gateway_outbox(id,route_id,content) VALUES(?,?,?)",
-                                  (digest([route_id, key, part]), route_id, chunk))
+                                  (delivery_id, route_id, chunk))
+            if context is not None:
+                from .gateway_event_context import retain
+                retain(self.store,delivery_id,{**context,'part':part,'parts':len(chunks),
+                    'total_bytes':total_bytes,'content_sha256':hashlib.sha256(chunk.encode()).hexdigest(),
+                    'group_sha256':group_sha256},chunk)
 
     async def receive(self, policy: GatewayPolicy, connector: str, envelope: dict, controller, *, media=None) -> dict:
         from .gateway_media import references,authorize as authorize_media
@@ -278,7 +289,10 @@ class GatewayEngine:
                 VALUES(?,?,?,?,?,?,?,?)""",
                 (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply), digest(binding)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
-            if policy.connectors[connector]['platform']=='sms':self._queue(route_id,key,content,limit=1600)
+            if policy.connectors[connector]['platform']=='a2a':
+                from .gateway_event_context import snapshot
+                self._queue(route_id,key,content,context=snapshot(self.store,mid,'gateway.receipt',key))
+            elif policy.connectors[connector]['platform']=='sms':self._queue(route_id,key,content,limit=1600)
             else:self._queue(route_id,key,content)
         # Commit admission BEFORE a network response to Hermes. A replay never repeats that side effect.
         if answer_request is not None:
@@ -287,7 +301,11 @@ class GatewayEngine:
             except Exception as error:
                 with self.store.transaction():
                     self.store._event(mid, "gateway.answer-unconfirmed", {"error": type(error).__name__})
-                    self._queue(route_id, key + ":answer", "Answer delivery unconfirmed; inspect the live question in Herald before retrying.")
+                    context=None
+                    if policy.connectors[connector]['platform']=='a2a':
+                        from .gateway_event_context import snapshot
+                        context=snapshot(self.store,mid,'gateway.answer-unconfirmed',key+':answer')
+                    self._queue(route_id, key + ":answer", "Answer delivery unconfirmed; inspect the live question in Herald before retrying.",context=context)
         return reply
 
     def refresh(self, policy: GatewayPolicy):
@@ -314,7 +332,13 @@ class GatewayEngine:
                         content = f"Mission {route['mission_id']}: {kind.removeprefix('mission.')}\n{payload.get('result') or payload.get('error') or ''}"
                     else:
                         continue
-                    if policy.connectors[route['connector']]['platform']=='sms':self._queue(route['id'],str(event['seq']),content,limit=1600)
+                    if policy.connectors[route['connector']]['platform']=='a2a':
+                        from .gateway_event_context import snapshot
+                        context=snapshot(self.store,route['mission_id'],kind,str(event['seq']),
+                            request_id=payload.get('id') if kind=='mission.request' else None,
+                            request_method=payload.get('method') if kind=='mission.request' else None)
+                        self._queue(route['id'],str(event['seq']),content,context=context)
+                    elif policy.connectors[route['connector']]['platform']=='sms':self._queue(route['id'],str(event['seq']),content,limit=1600)
                     else:self._queue(route['id'],str(event['seq']),content)
                 if events:
                     self.store.db.execute("UPDATE gateway_routes SET cursor=? WHERE id=?", (events[-1]["seq"], route["id"]))
@@ -340,7 +364,16 @@ class GatewayEngine:
             if row is None:
                 return None
             self.store.db.execute("UPDATE gateway_outbox SET state='sending',attempt=attempt+1,lease_until=? WHERE id=?", (now + 120, row["id"]))
-            return {**dict(row), "attempt": row["attempt"] + 1}
+            result={**dict(row), "attempt": row["attempt"] + 1}
+            if policy.connectors[row['connector']]['platform']=='a2a':
+                from .gateway_event_context import load
+                try:result['event_context']=load(self.store,result)
+                except Conflict:
+                    self.store.db.execute("UPDATE gateway_outbox SET state='failed',error='controller-event-context-damaged',lease_until=NULL WHERE id=?",(row['id'],))
+                    mission=self.store.db.execute('SELECT mission_id FROM gateway_routes WHERE id=?',(row['route_id'],)).fetchone()[0]
+                    self.store._event(mission,'gateway.delivery-context-refused',{'delivery':row['id'],'reason':'controller-event-context-damaged'})
+                    return None
+            return result
 
     def acknowledge(self, policy: GatewayPolicy, delivery_id: str, result: dict):
         with self.store.transaction():

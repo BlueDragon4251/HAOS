@@ -1585,6 +1585,7 @@ class Wizard:
                 def delivery_details(*_args):
                     row=choices[selected.get()]
                     reason={'media-export-unavailable':'Ergebnisdatei vor dem Senden nicht verfügbar: lokalen Hermes-Dienst und Quellsitzung prüfen.',
+                        'controller-event-context-damaged':'Controller-Ereigniskontext beschädigt: Dienste stoppen und Quelle sowie Zustellungsbelege unabhängig prüfen.',
                         'media-export-or-format-refused':'Keine Medien gesendet: separate Dateifreigabe, Quellpfad, Größen-/Formatgrenzen und öffentliche HTTPS-Einrichtung prüfen.'}.get(row.get('reason'),'')
                     details.configure(text='Mission: '+row['mission_id']+(' · '+reason if reason else ''))
                 selected.trace_add('write',delivery_details);delivery_details()

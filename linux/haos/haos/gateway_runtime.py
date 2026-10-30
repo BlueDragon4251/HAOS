@@ -228,6 +228,12 @@ def delivery_metadata(delivery,platform):
     if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
     if platform in {'homeassistant','irc','line','sms','email','feishu','dingtalk'}:metadata['haos_delivery_id']=delivery['id']
     if platform in {'irc','line','sms','email','feishu','dingtalk'}:metadata['haos_delivery_attempt']=delivery['attempt']
+    if platform=='a2a':
+        from .gateway_event_context import validate
+        context=validate(delivery.get('event_context'))
+        import hashlib
+        if context['content_sha256']!=hashlib.sha256(delivery['content'].encode()).hexdigest():raise Conflict('controller event no longer matches delivery bytes')
+        metadata.update(haos_delivery_id=delivery['id'],haos_delivery_attempt=delivery['attempt'],haos_event_context=dict(context))
     return metadata
 
 

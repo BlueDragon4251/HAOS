@@ -148,6 +148,36 @@ def build(value,peer,home,current,policy,tasks,receive):
             tasks.confirm_result(task_id,content,state,projected)
             return SendResult(success=True,message_id=task_id,raw_response={'recipient_read_verified':False,'local_task_committed':True})
 
+    from .gateway_a2a_result import Results
+    results=Results(tasks)
+    async def outcome(self,task_id,source_key,epoch,content,state):
+        from gateway.platforms.base import SendResult
+        check()
+        async with send_lock:
+            cached,desired,projected=results.begin(task_id,source_key,epoch,content,state)
+            if not cached:
+                record=tasks.get(task_id)
+                if task_id not in prepared:
+                    future=self._add_pending(task_id,record['context_id'])
+                    prepared[task_id]={'task_id':task_id,'context_id':record['context_id'],'peer':peer,'future':future,
+                        'created_iso':record['created_iso'],'started':record['created_at']}
+                pending=prepared[task_id]
+                if state==protocol.STATE_COMPLETED:
+                    delivery=[self,task_id,0];token=_DELIVERY.set(delivery)
+                    try:
+                        with private_scope(home,environment):sent=await native_send(self,record['context_id'],content,reply_to=task_id,metadata={'notify':True})
+                    finally:_DELIVERY.reset(token)
+                    resolved=sent.success is True and delivery[2]==1
+                else:resolved=native_resolve(self,task_id,state,content)
+                if not resolved or not pending['future'].done() or pending['future'].result()!=(state,content):
+                    raise Conflict('native A2A outcome did not resolve its exact retained task Future')
+                # A later controller event may legitimately finish a task after
+                # an input-required outcome. The immutable epochs remain separate.
+                finalized.pop(task_id,None)
+                self._finalize_task(pending,state,content);check()
+                results.confirm(task_id,source_key,epoch,content,state)
+            return SendResult(success=True,message_id=task_id,raw_response={'recipient_read_verified':False,'local_task_committed':True})
+
     async def connect(self,**_kwargs):raise PermissionError('A2A requires the separately bounded authenticated HTTPS server')
     native_emit=adapter._emit_terminal.__func__;native_sse=adapter._sse_write
     def emit(self,handler,task_id,context_id,state,reply,req_id=None):
@@ -173,9 +203,14 @@ def build(value,peer,home,current,policy,tasks,receive):
         # mission or terminal result is persisted merely because this closes.
         for _,future in tuple(self._pending.values()):future.cancel()
         self._pending.clear();self._pending_order.clear();prepared.clear();finalized.clear()
+        with tasks.native._lock:
+            for watchers in tasks.native._watchers.values():
+                for future in watchers:future.cancel()
+            tasks.native._watchers.clear()
     adapter.handle_message=MethodType(handle,adapter);adapter._prepare_task=MethodType(prepare,adapter)
     adapter._finalize_task=MethodType(finalize,adapter);adapter._resolve_oldest_for_context=MethodType(resolve,adapter)
-    adapter.send=MethodType(send,adapter);adapter.connect=MethodType(connect,adapter);adapter.close_profile=MethodType(close,adapter)
+    adapter.send=MethodType(send,adapter);adapter.send_outcome=MethodType(outcome,adapter)
+    adapter.connect=MethodType(connect,adapter);adapter.close_profile=MethodType(close,adapter)
     adapter._advertised_skills=MethodType(skills,adapter);adapter._haos_a2a_check=check
     adapter._emit_terminal=MethodType(emit,adapter);adapter._sse_write=MethodType(sse,adapter)
     adapter._build_card=MethodType(card,adapter)

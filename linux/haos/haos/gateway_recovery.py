@@ -59,7 +59,7 @@ def unresolved(store: MissionStore, after: int = 0) -> dict:
         deliveries.append({"cursor": row["cursor"], "delivery_id": row["id"], "mission_id": row["mission_id"],
                            "state": row["state"], "attempt": row["attempt"],
                            "content_sha256": hashlib.sha256(row["content"].encode()).hexdigest()})
-        if row['error'] in {'media-export-unavailable','media-export-or-format-refused'}:
+        if row['error'] in {'media-export-unavailable','media-export-or-format-refused','controller-event-context-damaged'}:
             deliveries[-1]['reason']=row['error']
     return {"deliveries": deliveries, "next_cursor": rows[-1]["cursor"] if rows else after}
 

@@ -13,7 +13,7 @@ import tempfile
 
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
-    from haos.gateway import Conflict
+    from haos.gateway import Conflict,digest
     from haos.gateway_a2a import credentials,scope,PreparedA2APolicy
     from haos.gateway_a2a_cache import RawEvents
     from haos.gateway_a2a_tasks import Tasks
@@ -119,6 +119,52 @@ def main():
                 before=deepcopy(committed);await adapter.send(grant['chat'],body,metadata=metadata)
                 assert tasks.get(pending['task_id'])==before
                 cases.append('actual_native_finalization_and_cached_projection_'+('email_redaction' if index==2 else 'input_required_marker'))
+            # These are structured controller outcomes, rather than language
+            # model text interpreted as mission state. Exercise actual native
+            # Futures and both SQLite commit boundaries.
+            for index,state in [(4,protocol.STATE_INPUT_REQUIRED),(5,protocol.STATE_FAILED),(6,protocol.STATE_CANCELED),(7,protocol.STATE_COMPLETED)]:
+                await adapter.close_profile()
+                adapter=build(value,'alice',home,current,policy,tasks,receive)
+                message=request(index);proof=raw.capture(policy(),'a2a',value,'alice',json.dumps(message).encode())
+                def prepare_outcome():
+                    with tasks.source('a2a',proof):return adapter._prepare_task(message['params'],'alice')
+                terminal,pending=await asyncio.to_thread(prepare_outcome);assert terminal is None
+                async with asyncio.timeout(5):
+                    while len(accepted)<index:await asyncio.sleep(.01)
+                target=pending['task_id'];key=proof['source_key'];epoch=digest(['controller-event',index])
+                body='Which approved option?' if index==4 else 'Controller outcome '+str(index)+'.'
+                if index==7:
+                    tasks.db.execute("CREATE TRIGGER failed_epoch_commit BEFORE UPDATE ON a2a_result_epochs BEGIN SELECT RAISE(ABORT,'fixture epoch receipt failure'); END")
+                    try:await adapter.send_outcome(target,key,epoch,body,state)
+                    except __import__('sqlite3').IntegrityError:pass
+                    else:raise AssertionError('epoch receipt commit failure was hidden')
+                    assert tasks.get(target)['state']==state and tasks.get(target)['reply']==body
+                    assert tasks.db.execute('SELECT state FROM a2a_result_epochs WHERE task_id=?',(target,)).fetchone()[0]=='writing'
+                    tasks.db.execute('DROP TRIGGER failed_epoch_commit')
+                    before=tasks.db.execute('SELECT COUNT(*) FROM a2a_task_transitions').fetchone()[0]
+                    recovered=await adapter.send_outcome(target,key,epoch,body,state)
+                    assert recovered.success and tasks.db.execute('SELECT COUNT(*) FROM a2a_task_transitions').fetchone()[0]==before
+                    cases.append('committed_native_outcome_recovers_failed_epoch_receipt_without_repeating_native_resolution')
+                else:
+                    result=await adapter.send_outcome(target,key,epoch,body,state)
+                    assert result.success and result.message_id==target
+                assert tasks.get(target)['state']==state and tasks.get(target)['reply']==body
+                before=deepcopy(tasks.get(target))
+                await adapter.send_outcome(target,key,epoch,body,state)
+                assert tasks.get(target)==before
+                if index==4:
+                    finished=await adapter.send_outcome(target,key,digest(['controller-completed',index]),'Owner answered; mission completed.',protocol.STATE_COMPLETED)
+                    assert finished.success and tasks.get(target)['state']==protocol.STATE_COMPLETED
+                    completed=deepcopy(tasks.get(target))
+                    await adapter.send_outcome(target,key,epoch,body,state)
+                    assert tasks.get(target)==completed
+                    cases.append('input_required_then_completed_uses_distinct_immutable_epochs_and_old_question_replay_cannot_replace_final_result')
+                else:cases.append('structured_controller_state_uses_actual_native_Future_and_immutable_epoch_'+state)
+                for wrong_epoch,wrong_body,wrong_state in [(epoch,body+' changed',state),(epoch,body,protocol.STATE_WORKING)]:
+                    try:await adapter.send_outcome(target,key,wrong_epoch,wrong_body,wrong_state)
+                    except (ValueError,PermissionError,Conflict):pass
+                    else:raise AssertionError('controller event changed outcome or used a non-outcome state')
+            cases.append('changed_epoch_bodies_and_non_outcome_states_are_refused_before_native_resolution')
             active[0]=False
             try:await adapter.send(grant['chat'],body,metadata=metadata)
             except PermissionError:pass

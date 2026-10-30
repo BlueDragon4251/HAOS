@@ -68,3 +68,30 @@ secure account/peer management and the full graphical path. A queue receipt must
 not be mistaken for a completed task result. Every source-bound validation
 receipt distinguishes real native/local work from substituted controller/IPC or
 service supervision. No external messages are sent during development fixtures.
+
+## Controller outcome integration (private)
+
+Controller deliveries now carry a bounded, separately committed event context in
+an additive outbox table. Existing gateway schema and chat transports retain
+their behavior. Context corruption quarantines the delivery, records an audit
+event and exposes a finite reason in owner recovery; it does not guess task
+state from the message text. Only question ID/method are exported, not private
+tool parameters. Queue and claim events never complete a native task, even when
+they are collected after the mission has completed.
+
+A private publisher retains individual chunks in FULL SQLite custody, checks the
+complete ordered group against its original route/event digest and byte count,
+and then resolves the actual native Future. Partial acknowledgments mean local
+queue custody only. Replayed or out-of-order chunks cannot prematurely complete
+a task. Exact controller completion, failure, cancellation and input-required
+states have immutable per-event acceptance epochs. A question can be followed by
+a final outcome; replay of the old question cannot replace that final outcome.
+Failed epoch/group receipt commits can recover an already committed native
+outcome without repeating native execution. This currently accepts complete text
+outcomes up to 32,000 UTF-8 bytes; larger results require the still-pending bounded
+artifact transport, never truncation presented as success.
+
+The component probe uses actual MissionStore/GatewayEngine transactions and the
+actual native MessageEvent/Future/finalizer. Its parent dispatch is a direct local
+fixture, not the installed controller socket or gateway UID. Public activation,
+full mission controls, media, management and GUI remain unfinished.
