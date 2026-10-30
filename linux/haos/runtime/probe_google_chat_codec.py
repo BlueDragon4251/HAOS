@@ -61,6 +61,20 @@ def main():
                         assert event.text=='/status' and event.source.user_id=='users/123' and event.source.thread_id==binding['thread']
                         assert event.source.scope_id==binding['scope'] and event.message_id==msg['name']
                     cases.append('actual_native_'+fmt+'_'+space_type+'_codec_preserves_exact_stable_sender_and_thread_on_replay_despite_mutable_email_and_native_DM_counter')
+                    for projection in ['nested-name-only','nested-description','legacy-type']:
+                        partial=deepcopy(data)
+                        part_msg=partial['message'] if fmt=='native' else partial['chat']['messagePayload']['message']
+                        part_space=partial['space'] if fmt=='native' else partial['chat']['messagePayload']['space']
+                        part_msg['space']={'name':binding['chat']}
+                        if projection=='nested-description':part_msg['space']['displayName']='Partial descriptive projection'
+                        if projection=='legacy-type':
+                            alias='DM' if space_type=='DIRECT_MESSAGE' else 'ROOM'
+                            part_space.pop('spaceType');part_space['type']=alias;part_msg['space']['type']=alias
+                        partial_raw=json.dumps(partial).encode();partial_approval=approve(policy,'google',value,partial_raw)
+                        for _ in range(2):
+                            decoded=await decode_text(adapter,policy,'google',value,partial_raw,partial_approval)
+                            assert decoded.text=='/status' and decoded.source.user_id=='users/123' and decoded.source.thread_id==binding['thread']
+                        cases.append('actual_native_'+fmt+'_'+space_type+'_'+projection+'_preserves_approved_resource_kind_without_rewriting_retained_source')
                     changed=deepcopy(data)
                     changed_msg=changed['message'] if fmt=='native' else changed['chat']['messagePayload']['message']
                     changed_msg['argumentText']='/cancel mission'

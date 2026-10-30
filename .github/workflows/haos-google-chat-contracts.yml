@@ -90,6 +90,18 @@ jobs:
             -e HAOS_DISPOSABLE_GOOGLE_CHAT_OWNER_OAUTH_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/owner-oauth-process.json"
+      - name: Actual native file adapter private user SDK upload fences echo suppression and controller components
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          for SCENE in active upload-auth upload-rate upload-disconnect create-auth create-rate create-disconnect response-mismatch callback-no-client local-logout publisher; do
+            docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+              -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+              -v "$PWD/linux/haos/probes/probe_google_chat_file_process.py:/probe.py:ro" \
+              -e HAOS_DISPOSABLE_GOOGLE_CHAT_FILE_PROCESS=1 -e "HAOS_GOOGLE_CHAT_FILE_SCENE=$SCENE" \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/native-file-$SCENE.json"
+          done
       - name: Actual Tk recovery controls on desktop and compact screens with explicit backend fixtures
         run: |
           set -euo pipefail

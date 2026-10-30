@@ -357,3 +357,53 @@ responses, so they do not establish an installed Owner login or a live account.
 Exact-source checks: [Owner OAuth handoff and Tk validation](evidence/2026-10-30/google-chat-private-owner-oauth-validation.json).
 The previous lifecycle checkpoint's CI status is separately pinned:
 [145e35e CI](evidence/2026-10-30/google-chat-private-oauth-lifecycle-ci-status.json).
+
+Prepared native user-authored file output now connects the retained original /
+native admission / parent relay evidence to immutable controller output
+projections. The controller exports only explicitly marked artifacts from the
+completed source session under the current delivery lease and separate
+`allow_outbound_media` grant. Native Google output keeps a bounded first-byte
+identity and private copies; missing, purged or changed custody is not silently
+restored. The actual Hermes `_send_file` and `MediaFileUpload` receive a sealed
+memfd, a generic filename and the exact source thread, never an arbitrary agent
+or Owner host path.
+
+User selection comes from the verified numeric source user and private token
+vault. Mutable sender email and legacy credential slots cannot select a file
+principal. The real Google discovery upload/create client uses bounded one-shot
+HTTP and explicit journalled refresh only. Upload intent commits before wire
+I/O; accepted upload references stay private and are reused without reupload.
+Create intent commits before publication with stable client/request IDs and
+`REPLY_MESSAGE_OR_FAIL`, overriding the native builder's thread fallback. A begun
+or unclear create can only query its own retained client ID; a404 alone never
+allows another POST. Known confirmed receipts need no new token/API access,
+including after local logout. A revoked user cannot start a new file operation.
+Explicit API401/403 and429 persist private-user auth/rate barriers, with stable
+budget deadlines and no hidden SDK refresh or retransmission.
+
+Google user-authored file messages are HUMAN messages. The pre-ACK receiver
+therefore recognizes retained own client IDs/receipts, and narrowly refuses an
+ambiguous matching pending file/caption/user/thread projection when Google omits
+that client ID. It does not suppress unrelated human commands or authorize an
+unknown sender. Own-write recognition uses the stable app account scope across
+service-key rotation; replay/publication still requires its original credential
+and source proofs. The refusal audit contains hashes/reasons, not copied file
+capabilities or message bodies.
+
+Space admission now accepts a legitimate partial nested Space description only
+when its resource and all supplied type aliases agree with the outer Space.
+Contradictory names/kinds still refuse before native processing. Canonical type
+normalization is confined to the native builder input; existing raw originals,
+semantic hashes and custody proofs are not rewritten.
+
+These file paths are still prepared/private. Offline Owner decisions for file
+upload/publication recovery and native output disposal, the complete public
+account/file GUI, remaining Google ASR/video and Pub/Sub profile acceptance,
+production controller Unix IPC and installed packaging remain open. No Google
+file delivery, real consent entitlement or recipient read is established by the
+local fixtures. No automatic retry or remote orphan deletion is claimed for an
+unclear upload. The public software count remains15/22.
+
+Exact-source checks: [native files and source-bound publisher components](evidence/2026-10-30/google-chat-private-native-files-validation.json).
+Previous-source Owner OAuth CI is separately pinned:
+[b3c975b CI](evidence/2026-10-30/google-chat-private-owner-oauth-ci-status.json).

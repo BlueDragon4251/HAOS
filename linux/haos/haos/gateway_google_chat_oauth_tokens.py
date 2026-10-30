@@ -104,6 +104,27 @@ class TokenVault:
         if not_before>time.time():raise Deferred('rate-limited',min(86400,max(1,math.ceil(not_before-time.time()))))
         return {'row':row,'payload':payload,'configuration':conf,'budget':budget,'route':dict(selected)}
 
+    def api_failure(self,snapshot,status,*,retry_after=0):
+        """Retain explicit user-API auth/rate refusal without replaying a write."""
+        private()
+        if status not in {'authentication-refused','rate-limited'} or type(retry_after) is not int or not 0<=retry_after<=86400:
+            raise ValueError('finite private Google user API refusal required')
+        row=snapshot['row'];db=self.db;db.execute('BEGIN IMMEDIATE')
+        try:
+            actual=db.execute('SELECT status,generation FROM google_chat_user_tokens WHERE id=?',(row['id'],)).fetchone()
+            if actual is None or actual['status']!='active' or actual['generation']!=row['generation']:
+                raise PermissionError('Google user changed before API refusal was retained')
+            updated=db.execute('UPDATE google_chat_oauth_transport SET status=?,updated_at=? WHERE token_id=? AND generation=?',
+                (status,time.time(),row['id'],row['generation'])).rowcount
+            if updated!=1:raise Conflict('Google user API refusal lacks its current token transport')
+            if status=='rate-limited':
+                db.execute('UPDATE google_chat_oauth_budget SET not_before=MAX(not_before,?) WHERE scope=?',
+                    (time.time()+max(1,retry_after),snapshot['budget']))
+            db.execute('COMMIT')
+        except BaseException:
+            if db.in_transaction:db.execute('ROLLBACK')
+            raise
+
     def begin_refresh(self,snapshot):
         private();db=self.db;row=snapshot['row'];db.execute('BEGIN IMMEDIATE')
         try:

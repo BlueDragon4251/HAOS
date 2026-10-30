@@ -25,7 +25,26 @@ class Publisher:
             parts INTEGER NOT NULL,state TEXT NOT NULL,receipt TEXT NOT NULL,connector TEXT NOT NULL)''')
         if 'connector' not in {row[1] for row in self.db.execute('PRAGMA table_info(google_chat_delivery_groups)')}:
             self.db.execute("ALTER TABLE google_chat_delivery_groups ADD COLUMN connector TEXT NOT NULL DEFAULT ''")
+        from .gateway_google_chat_output import Output
+        from .gateway_google_chat_files import FileLedger
+        self.output=Output(adapter);self.file_ledger=FileLedger(self.native.inbox);self.files=None;self.user_inbox=None
+        adapter._haos_google_output=self.output
+        receiver=getattr(adapter,'_haos_google_receiver',None)
+        if receiver is not None:receiver.own_message=lambda raw:self.file_ledger.own_message(self.native.connector,self.value,raw)
         self.install()
+
+    def file_sender(self):
+        if self.files is None:
+            from .gateway_raw import NativeInbox
+            from .gateway_google_chat_oauth import OAuthStore
+            from .gateway_google_chat_files import Files
+            self.user_inbox=NativeInbox(self.adapter._haos_google_home.parent/'user-oauth.sqlite',self.native.inbox.redactor)
+            self.files=Files(self.adapter,OAuthStore(self.user_inbox))
+        return self.files
+
+    async def close(self):
+        async with self.lock:
+            if self.user_inbox is not None:self.user_inbox.close();self.user_inbox=None;self.files=None
 
     def source(self,binding,message_id,thread):
         resource(message_id,'message',space=binding['chat']);self.adapter._haos_google_check()
@@ -87,18 +106,44 @@ class Publisher:
             raise PermissionError('exact bounded root outbox identity and attempt required')
         context=validate(metadata.get('haos_event_context'))
         if context['content_sha256']!=hashlib.sha256(content.encode()).hexdigest():raise Conflict('controller Google Chat content changed')
-        if metadata.get('haos_output') is not None:raise PermissionError('Google Chat file outputs need separate private media integration')
+        binding=self.native.policy().current_binding(metadata['haos_binding']);thread=metadata.get('thread_id','')
+        delivery={'id':delivery_id,'attempt':attempt,**metadata['haos_binding'],'chat':chat,'scope':binding['scope'],
+            'thread':thread,'event_context':context,'content':content}
+        projected=metadata.get('haos_output');artifacts=[];rendered=content
+        if projected is not None:
+            artifacts=self.output.resolve(delivery,projected);rendered=projected['text']
+            if self.native.inbox.redactor.text(rendered)!=rendered:raise PermissionError('Google output text reflects private credentials')
         # Do not render an agent filesystem path as a fallback chat message.
         from gateway.platforms.base import BasePlatformAdapter
         files,_=BasePlatformAdapter.extract_media(content)
-        if files:raise PermissionError('Google Chat file directives require separately approved sealed output')
-        binding=self.native.policy().current_binding(metadata['haos_binding']);thread=metadata.get('thread_id','')
+        if files and projected is None:raise PermissionError('Google Chat file directives require separately approved sealed output')
         def current():
             self.adapter._haos_google_check();authority()
             self.source(self.native.policy().current_binding(metadata['haos_binding']),reply_to,thread)
         async with self.lock:
             current();source,raw=self.source(binding,reply_to,thread)
-            chunks=GoogleChatAdapter._chunk_text(self.adapter,GoogleChatAdapter.format_message(content))
+            last_file=None
+            if artifacts:
+                evidence={'delivery_id':delivery_id,'source_key':source['source_key'],'source_id':reply_to,
+                    'source_sha256':hashlib.sha256(raw).hexdigest(),'context_sha256':digest(context),'content_sha256':context['content_sha256']}
+                def file_current():
+                    current();self.output.resolve(delivery,projected)
+                try:
+                    for index,artifact in enumerate(artifacts):
+                        file_current();manager=self.file_sender()
+                        from .gateway_matrix_profile import scope as private_scope
+                        with private_scope(self.adapter._haos_google_home,self.adapter._haos_google_environment):
+                            last_file=await manager.send(digest([delivery_id,source['source_key'],'file',index]),dict(metadata['haos_binding']),
+                                evidence,artifact,'',thread,file_current)
+                        file_current()
+                        if last_file.success is not True:raise Conflict('Google file part has no durable acceptance receipt')
+                except asyncio.CancelledError:raise
+                except Exception:
+                    return SendResult(success=False,error='Google file user authorization or write needs inspected recovery',raw_response={'haos_delivery':'uncertain'})
+            if not rendered.strip():
+                if last_file is not None:return last_file
+                raise PermissionError('Google output has no approved file or text')
+            chunks=GoogleChatAdapter._chunk_text(self.adapter,GoogleChatAdapter.format_message(rendered))
             if not chunks or len(chunks)>64:raise ValueError('bounded native Google Chat text projection required')
             bodies=[_thread_body(chunk,thread or None) for chunk in chunks]
             values=(delivery_id,binding['id'],digest(binding),digest(self.value),reply_to,hashlib.sha256(raw).hexdigest(),
@@ -117,7 +162,7 @@ class Publisher:
             try:
                 from .gateway_matrix_profile import scope as private_scope
                 with private_scope(self.adapter._haos_google_home,self.adapter._haos_google_environment):
-                    result=await GoogleChatAdapter.send(self.adapter,chat,content,reply_to=reply_to,metadata=metadata)
+                    result=await GoogleChatAdapter.send(self.adapter,chat,rendered,reply_to=reply_to,metadata=metadata)
                 current()
                 if result.success is not True or state['part']!=len(bodies):
                     return SendResult(success=False,error='Google Chat text acceptance requires inspected recovery',raw_response={'haos_delivery':'uncertain'})

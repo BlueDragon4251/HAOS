@@ -4,7 +4,7 @@ This is a prepared primitive; no public receive/profile lifecycle is enabled.
 """
 from copy import deepcopy
 
-from .gateway_google_chat_admission import approve,message,Refused
+from .gateway_google_chat_admission import approve,message,space_type,Refused
 from .gateway_dingtalk_admission import parse
 
 
@@ -17,7 +17,7 @@ async def decode_text(adapter,policy,connector,value,raw,approval):
     if expected.get('attachment'):raise Refused('text-codec-requires-separate-private-media')
     extracted=GoogleChatAdapter._extract_message_payload(deepcopy(data))
     if extracted is None or extracted[0]!=expected or extracted[1]!=space:raise Refused('native-projection-differs')
-    event=await adapter._build_message_event(extracted[0],{**deepcopy(data),'space':extracted[1]})
+    event=await adapter._build_message_event(extracted[0],{**deepcopy(data),'space':{**space,'spaceType':space_type(expected,space)}})
     if event is None or event.source is None or event.media_urls or event.media_types:raise Refused('native-projection-differs')
     envelope=approval['envelope']
     if event.message_id!=envelope['message_id'] or event.source.chat_id!=envelope['chat']:raise Refused('native-projection-differs')
@@ -44,6 +44,9 @@ async def decode_event(adapter,policy,connector,value,raw,approval,raw_id):
         raise PermissionError('actual native Google Chat adapter and matching original approval required')
     extracted=GoogleChatAdapter._extract_message_payload(deepcopy(data))
     if extracted is None or extracted[0]!=msg or extracted[1]!=space:raise Refused('native-projection-differs')
+    # Do not rewrite the retained raw/proof representation. Only the native
+    # builder receives the independently checked canonical Space kind.
+    space={**space,'spaceType':space_type(msg,space)}
     def normalize(event):
         if event is None or event.source is None or event.message_id!=approval['envelope']['message_id'] or event.source.chat_id!=approval['envelope']['chat']:
             raise Refused('native-projection-differs')

@@ -270,7 +270,7 @@ def _lifecycle(adapter,profile,lease,identity):
         self._haos_google_stopping=True
         async with lifecycle:
             if self._haos_google_closed:return
-            await stop();self._haos_google_closed=True;self._haos_google_originals.close();os.close(lease)
+            await stop();self._haos_google_closed=True;await publisher.close();self._haos_google_originals.close();os.close(lease)
             if health(self)['status'] not in BLOCKS|{'revoked'}:status('closed')
     async def send(self,chat,content,reply_to=None,metadata=None):
         check()

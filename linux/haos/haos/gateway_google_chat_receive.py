@@ -9,15 +9,17 @@ from .gateway_google_chat_admission import Refused
 
 
 class Receiver:
-    def __init__(self,connector,value,originals,policy,current,*,http_verifier=None):
+    def __init__(self,connector,value,originals,policy,current,*,http_verifier=None,own_message=None):
         self.connector=connector;self.value=credentials(value);self.originals=originals;self.policy=policy;self.current=current
-        self.http_verifier=http_verifier;current()
+        self.http_verifier=http_verifier;self.own_message=own_message;current()
+        if own_message is not None and not callable(own_message):raise TypeError('private own-write filter must be callable')
         self.originals.db.execute('''CREATE TABLE IF NOT EXISTS google_chat_source_refusals(
             id TEXT PRIMARY KEY,raw_sha256 TEXT NOT NULL,reason TEXT NOT NULL,
             first_seen REAL NOT NULL,last_seen REAL NOT NULL,repeats INTEGER NOT NULL)''')
 
     def _retain(self,raw):
         self.current();policy=self.policy()
+        if self.own_message is not None and self.own_message(raw):raise Refused('self-or-automated')
         return self.originals.retain(policy,self.connector,self.value,raw,self.current)
 
     def http(self,headers,raw):

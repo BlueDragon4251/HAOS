@@ -46,7 +46,11 @@ def marked(content,*,max_chars=65536):
 
 def approved(policy,row):
     binding=policy.current_binding(dict(row))
-    if (policy.connectors.get(binding['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk','a2a','buzz'}
+    platform=policy.connectors.get(binding['connector'],{}).get('platform')
+    if platform=='google_chat':
+        from .gateway_google_chat import PreparedGoogleChatPolicy
+        if not isinstance(policy,PreparedGoogleChatPolicy):raise PermissionError('prepared independent Google output policy required')
+    if (platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz','google_chat'}
             or binding.get('allow_outbound_media') is not True or 'read' not in binding['capabilities']
             or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('separate current output-file/read approval required')
@@ -90,7 +94,11 @@ class Exports:
         if row is None or row['state']!='sending' or row['attempt']!=attempt or row['lease_until']<=time.time():
             raise Conflict('controller output manifest is not in flight')
         binding=policy.current_binding(dict(row))
-        if policy.connectors[binding['connector']]['platform'] not in {'a2a','buzz'} or 'read' not in binding['capabilities']:
+        platform=policy.connectors[binding['connector']]['platform']
+        if platform=='google_chat':
+            from .gateway_google_chat import PreparedGoogleChatPolicy
+            if not isinstance(policy,PreparedGoogleChatPolicy):raise PermissionError('prepared independent Google output policy required')
+        if platform not in {'a2a','buzz','google_chat'} or 'read' not in binding['capabilities']:
             raise PermissionError('exact current native output read grant required')
         from .gateway_event_context import load
         context=load(self.store,dict(row))
@@ -144,8 +152,8 @@ class Exports:
             row,mission=self.current(params['delivery'],params['attempt'])
             binding=self.controller.gateway_policy().current_binding(dict(row))
             paths=(self.manifest({'delivery':params['delivery'],'attempt':params['attempt']})['paths']
-                if self.controller.gateway_policy().connectors[binding['connector']]['platform'] in {'a2a','buzz'} else marked(row['content'])[0])
-            maximum=MAX_BYTES if self.controller.gateway_policy().connectors[binding['connector']]['platform'] in {'a2a','buzz'} else 65536
+                if self.controller.gateway_policy().connectors[binding['connector']]['platform'] in {'a2a','buzz','google_chat'} else marked(row['content'])[0])
+            maximum=MAX_BYTES if self.controller.gateway_policy().connectors[binding['connector']]['platform'] in {'a2a','buzz','google_chat'} else 65536
             if path not in paths or path not in marked(mission['result'],max_chars=maximum)[0]:
                 raise PermissionError('artifact is not explicitly marked in this immutable mission output')
             identity=digest([row['id'],row['binding_digest'],mission['stored_session_id'],path])

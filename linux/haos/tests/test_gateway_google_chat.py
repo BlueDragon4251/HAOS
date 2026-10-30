@@ -177,3 +177,40 @@ def test_private_token_response_captures_credentials_before_sdk_parsing_and_maps
     with pytest.raises(TokenError) as caught:
         token_response(url,SimpleNamespace(status=400),json.dumps({'error':'invalid_grant','error_description':token}).encode())
     assert caught.value.reason=='invalid_grant' and token not in str(caught.value)
+
+
+@pytest.mark.parametrize('nested',[
+    {'name':'spaces/space1'}, {'name':'spaces/space1','displayName':'Different descriptive projection'},
+    {'name':'spaces/space1','type':'ROOM'}, {'name':'spaces/space1','spaceType':'SPACE'}])
+def test_partial_nested_space_projection_preserves_same_resource_type_authority(nested):
+    data=event();data['message']['space']=nested
+    assert admitted(data)['envelope']==admitted()['envelope']
+
+
+@pytest.mark.parametrize('change',[
+    {'type':'DM'}, {'spaceType':'DIRECT_MESSAGE'}, {'type':'ROOM','spaceType':'DIRECT_MESSAGE'},
+    {'name':'spaces/foreign'}, {'type':[]}, {'type':'UNKNOWN'}])
+def test_conflicting_nested_space_resource_or_kind_is_not_resolved_by_precedence(change):
+    data=event();data['message']['space']={'name':'spaces/space1',**change}
+    with pytest.raises(Refused):admitted(data)
+
+
+def test_deprecated_room_type_can_describe_a_consistent_modern_group_chat_but_DM_cannot():
+    data=event();data['space'].update(spaceType='GROUP_CHAT',type='ROOM');data['message']['space']={'name':'spaces/space1','type':'ROOM'}
+    assert admitted(data)['envelope']['chat']=='spaces/space1'
+    data['space']['type']='DM'
+    with pytest.raises(Refused):admitted(data)
+
+
+def test_legacy_space_alias_keeps_original_custody_semantic_hash_and_bytes_unchanged(tmp_path):
+    from haos.gateway import digest
+    from haos.gateway_google_chat_custody import Originals
+    from haos.redaction import Redactor
+    tmp_path.chmod(0o700);store=Originals(tmp_path/'originals.sqlite',Redactor([]))
+    data=event();data['space']={'name':'spaces/space1','type':'ROOM'};raw=json.dumps(data).encode();selected=policy()
+    identity=store.retain(selected,'google',account(),raw,lambda:None)
+    before=tuple(store.db.execute('SELECT * FROM google_chat_originals').fetchone())
+    assert store.db.execute('SELECT semantic_sha256 FROM google_chat_originals').fetchone()[0]==digest([data['message'],data['space']])
+    assert store.load(identity,selected,'google',account(),lambda:None)[0]==raw
+    assert tuple(store.db.execute('SELECT * FROM google_chat_originals').fetchone())==before
+    store.close()

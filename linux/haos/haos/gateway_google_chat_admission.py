@@ -28,13 +28,34 @@ def message(data):
     # Use the actual pinned extractor later, after authority. Relay aliases lack
     # a verified Google resource sender and cannot establish independent grants.
     if data.get('type')=='MESSAGE' and isinstance(data.get('message'),dict):
-        msg=data['message'];space=data.get('space') or msg.get('space')
+        msg=data['message'];space=data['space'] if 'space' in data else msg.get('space')
     elif isinstance(data.get('chat'),dict) and isinstance(data['chat'].get('messagePayload'),dict):
         payload=data['chat']['messagePayload'];msg=payload.get('message');space=payload.get('space')
     else:raise Refused('unsupported-event')
     if not isinstance(msg,dict) or not isinstance(space,dict):raise Refused('unsupported-event')
-    if msg.get('space') is not None and msg['space']!=space:raise Refused('ambiguous-space')
-    return msg,space
+    space_type(msg,space);return msg,space
+
+
+def space_type(msg,space):
+    # Google can project a full outer Space alongside a nested name-only or
+    # differently descriptive Space. Bind authority to the resource and a
+    # consistent type, rather than requiring incidental metadata equality.
+    descriptors=[space]
+    if msg.get('space') is not None:descriptors.append(msg['space'])
+    kinds={'DIRECT_MESSAGE','SPACE','GROUP_CHAT'};typed=False
+    for descriptor in descriptors:
+        if not isinstance(descriptor,dict) or descriptor.get('name')!=space.get('name'):raise Refused('ambiguous-space')
+        for field in ['spaceType','type']:
+            if field not in descriptor:continue
+            value=descriptor[field];typed=True
+            if not isinstance(value,str):raise Refused('unsupported-space')
+            allowed=({'DIRECT_MESSAGE'} if value=='DM' else {'SPACE','GROUP_CHAT'} if value=='ROOM' else
+                {value} if value in {'DIRECT_MESSAGE','SPACE','GROUP_CHAT'} else set())
+            if not allowed:raise Refused('unsupported-space')
+            kinds&=allowed
+            if not kinds:raise Refused('ambiguous-space')
+    if not typed:raise Refused('unsupported-space')
+    return 'SPACE' if kinds=={'SPACE','GROUP_CHAT'} else next(iter(kinds))
 
 
 def approve(policy,connector,value,raw):
@@ -54,13 +75,12 @@ def approve(policy,connector,value,raw):
         except PermissionError:raise Refused('unapproved-route') from None
         validate_binding(binding);created=timestamp(msg.get('createTime'))
         if not binding['since']<created<=time.time()*1000+300000:raise Refused('pre-grant')
-        if space.get('spaceType',space.get('type')) not in {'DIRECT_MESSAGE','DM','SPACE','GROUP_CHAT','ROOM'}:
-            raise Refused('unsupported-space')
+        kind=space_type(msg,space)
         annotations=msg.get('annotations',[])
         if not isinstance(annotations,list) or len(annotations)>128:raise Refused('unsupported-content')
         mentioned=any(isinstance(a,dict) and a.get('type')=='USER_MENTION' and isinstance(a.get('userMention'),dict)
             and isinstance(a['userMention'].get('user'),dict) and a['userMention']['user'].get('name')==value['bot_user'] for a in annotations)
-        if space.get('spaceType',space.get('type')) not in {'DIRECT_MESSAGE','DM'} and binding.get('require_mention',True) and not mentioned:
+        if kind!='DIRECT_MESSAGE' and binding.get('require_mention',True) and not mentioned:
             raise Refused('mention-required')
         for key in ['text','argumentText']:
             if key in msg and (not isinstance(msg[key],str) or len(msg[key].encode())>32768):raise Refused('unsupported-content')
