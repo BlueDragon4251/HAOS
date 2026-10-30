@@ -11,7 +11,8 @@ from .gateway import Conflict,digest
 from .gateway_google_chat import credentials,scope,resource
 
 CHAT_SCOPE='https://www.googleapis.com/auth/chat.messages.create'
-SCOPES=(CHAT_SCOPE,'openid')
+READ_SCOPE='https://www.googleapis.com/auth/chat.messages.readonly'
+SCOPES=(CHAT_SCOPE,READ_SCOPE,'openid')
 AUTH_URI='https://accounts.google.com/o/oauth2/auth'
 TOKEN_URI='https://oauth2.googleapis.com/token'
 REDIRECT_URI='http://localhost:1'
@@ -119,6 +120,18 @@ class OAuthStore:
             if row['owner_uid']!=owner_uid or row['status']!='awaiting' or time.time()>=row['expires_at']:
                 raise PermissionError('OAuth session is expired, already begun or belongs to another Owner')
             self._current(row,policy,connector,account)
+            budget_table=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='google_chat_oauth_budget'").fetchone()
+            if budget_table is not None:
+                configured=json.loads(row['client'])['installed']
+                key=digest([row['account_scope'],row['subject'],configured['client_id']])
+                wait=db.execute('SELECT not_before FROM google_chat_oauth_budget WHERE scope=?',(key,)).fetchone()
+                if wait is not None:
+                    deadline=wait[0]
+                    if type(deadline) not in {int,float} or not math.isfinite(deadline) or not 0<=deadline<=253402300799:
+                        raise Conflict('damaged private Google OAuth account/client budget')
+                    if deadline>time.time():
+                        from .gateway_google_chat_oauth_tokens import Deferred
+                        raise Deferred('rate-limited',min(86400,max(1,math.ceil(deadline-time.time()))))
             code=callback(returned_url,row['state'])
             changed=db.execute("UPDATE google_chat_oauth_pending SET status='exchanging' WHERE id=? AND status='awaiting'",(identity,)).rowcount
             if changed!=1:raise Conflict('Google OAuth exchange changed before its durable intent')
@@ -169,7 +182,10 @@ class OAuthStore:
             db.execute("""CREATE TABLE IF NOT EXISTS google_chat_user_tokens(
                 id TEXT PRIMARY KEY,account_scope TEXT NOT NULL,subject TEXT NOT NULL,client_sha256 TEXT NOT NULL,
                 credential TEXT NOT NULL,status TEXT NOT NULL,binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,
-                nonce_sha256 TEXT NOT NULL,updated_at REAL NOT NULL,generation INTEGER NOT NULL,pending_id TEXT NOT NULL)""")
+                nonce_sha256 TEXT NOT NULL,updated_at REAL NOT NULL,generation INTEGER NOT NULL,pending_id TEXT NOT NULL,public_client TEXT NOT NULL DEFAULT '{}')""")
+            if 'public_client' not in {field[1] for field in db.execute('PRAGMA table_info(google_chat_user_tokens)')}:
+                db.execute("ALTER TABLE google_chat_user_tokens ADD COLUMN public_client TEXT NOT NULL DEFAULT '{}'")
+            public_client=json.dumps({'installed':{key:value for key,value in configuration['installed'].items() if key!='client_secret'}},sort_keys=True,separators=(',',':'))
             token_id=digest([row['account_scope'],row['subject'],row['client_sha256']])
             previous=db.execute('SELECT generation,length(credential) AS size FROM google_chat_user_tokens WHERE id=?',(token_id,)).fetchone()
             count,size=db.execute('SELECT COUNT(*),COALESCE(SUM(length(credential)),0) FROM google_chat_user_tokens').fetchone()
@@ -184,8 +200,8 @@ class OAuthStore:
             db.execute("UPDATE google_chat_user_tokens SET status='superseded' WHERE account_scope=? AND subject=? AND id!=? AND status='active'",
                 (row['account_scope'],row['subject'],token_id))
             now=time.time()
-            db.execute('INSERT OR REPLACE INTO google_chat_user_tokens VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-                (token_id,row['account_scope'],row['subject'],row['client_sha256'],verified.credential_json,'active',row['binding_id'],row['binding_digest'],verified.nonce_sha256,now,generation,identity))
+            db.execute('INSERT OR REPLACE INTO google_chat_user_tokens VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                (token_id,row['account_scope'],row['subject'],row['client_sha256'],verified.credential_json,'active',row['binding_id'],row['binding_digest'],verified.nonce_sha256,now,generation,identity,public_client))
             receipt=digest([identity,token_id,'complete',owner_uid,row['note_sha256'],generation,now])
             db.execute('INSERT INTO google_chat_oauth_events VALUES(?,?,?,?,?,?)',(receipt,identity,'complete',owner_uid,row['note_sha256'],now))
             db.execute("UPDATE google_chat_oauth_pending SET status='complete',client='',state='',nonce='',verifier='' WHERE id=?",(identity,))
@@ -197,13 +213,14 @@ class OAuthStore:
             raise
 
 
-def validate_token(value,configuration):
+def validate_token(value,configuration,*,legacy_for_disposal=False):
     from datetime import datetime
     fields={'token','refresh_token','token_uri','client_id','client_secret','scopes','expiry','universe_domain','account'}
     if (not isinstance(value,dict) or not fields<=set(value)<=fields|{'rapt_token'} or value['token_uri']!=TOKEN_URI
             or value['client_id']!=configuration['installed']['client_id'] or value['client_secret']!=configuration['installed']['client_secret']
             or not isinstance(value['scopes'],(list,tuple)) or any(not isinstance(v,str) for v in value['scopes'])
-            or len(value['scopes'])!=len(SCOPES) or set(value['scopes'])!=set(SCOPES)
+            or len(set(value['scopes']))!=len(value['scopes'])
+            or (set(value['scopes']) not in (set(SCOPES),{CHAT_SCOPE,'openid'}) if legacy_for_disposal else set(value['scopes'])!=set(SCOPES))
             or value['universe_domain']!='googleapis.com' or not isinstance(value['account'],str) or len(value['account'])>320):
         raise PermissionError('exact dedicated Google Chat/OpenID user credentials required')
     for key in ['token','refresh_token','client_secret',*(['rapt_token'] if 'rapt_token' in value else [])]:
@@ -215,3 +232,72 @@ def validate_token(value,configuration):
     if not 0<expires<=time.time()+86460:raise ValueError('bounded private Google access-token expiry required')
     if len(json.dumps(value).encode())>65536:raise ValueError('bounded private Google credential record required')
     return value
+
+
+
+def _quarantine_write(store,row,tokens,reason,*,origin,public_client):
+    if reason not in {'sdk-refused','identity-refused','exchange-uncertain','storage-unavailable','rate-limited'}:
+        raise ValueError('finite rejected Google credential category required')
+    if not isinstance(tokens,dict) or not set(tokens)<={'access_token','refresh_token'}:raise ValueError('closed private rejected-token capsule required')
+    for value in tokens.values():
+        if not isinstance(value,str) or not 1<=len(value)<=16384 or any(not 33<=ord(c)<=126 for c in value):raise ValueError('bounded private rejected-token capability required')
+    db=store.db
+    db.execute("""CREATE TABLE IF NOT EXISTS google_chat_oauth_quarantine(
+        id TEXT PRIMARY KEY,pending_id TEXT NOT NULL,account_scope TEXT NOT NULL,subject_expected TEXT NOT NULL,
+        client_sha256 TEXT NOT NULL,public_client TEXT NOT NULL,tokens TEXT NOT NULL,tokens_sha256 TEXT NOT NULL,
+        state TEXT NOT NULL,reason TEXT NOT NULL,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,created_at REAL NOT NULL,
+        origin TEXT NOT NULL DEFAULT 'enrollment')""")
+    if 'origin' not in {field[1] for field in db.execute('PRAGMA table_info(google_chat_oauth_quarantine)')}:
+        db.execute("ALTER TABLE google_chat_oauth_quarantine ADD COLUMN origin TEXT NOT NULL DEFAULT 'enrollment'")
+    encoded=json.dumps(tokens,sort_keys=True,separators=(',',':'));pin=digest(encoded)
+    identity=digest([row['id'],pin] if origin=='enrollment' else ['refresh',row['id'],pin]);now=time.time()
+    if tokens:
+        count,size=db.execute('SELECT COUNT(*),COALESCE(SUM(length(tokens)),0) FROM google_chat_oauth_quarantine').fetchone()
+        old=db.execute('SELECT * FROM google_chat_oauth_quarantine WHERE id=?',(identity,)).fetchone()
+        if old is None:
+            if count>=128 or size+len(encoded.encode())>8*1024*1024:raise Conflict('private rejected Google credential custody full')
+            db.execute('INSERT INTO google_chat_oauth_quarantine VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                (identity,row['id'],row['account_scope'],row['subject'],row['client_sha256'],public_client,encoded,pin,'rejected',reason,row['owner_uid'],row['note_sha256'],now,origin))
+        elif any(old[k]!=v for k,v in {'pending_id':row['id'],'tokens':encoded,'tokens_sha256':pin,'owner_uid':row['owner_uid'],'origin':origin}.items()):
+            raise Conflict('rejected Google credential capsule changed')
+    status='uncertain' if reason in {'exchange-uncertain','storage-unavailable'} else 'refused'
+    if origin=='enrollment':db.execute('UPDATE google_chat_oauth_pending SET status=? WHERE id=?',(status,row['id']))
+    receipt=digest([row['id'],identity,reason,now]);db.execute('INSERT INTO google_chat_oauth_events VALUES(?,?,?,?,?,?)',
+        (receipt,row['id'],'quarantined-'+origin if tokens else status,row['owner_uid'],row['note_sha256'],now))
+    return {'id':identity if tokens else None,'receipt':receipt,'state':status,'private_tokens_retained':bool(tokens),
+        'api_use_authorized':False,'remote_revocation_verified':False,'network_requested':False,'private_credentials_returned':False}
+
+
+def quarantine(store,row,tokens,reason):
+    """Retain rejected exchange capabilities only for disposal, never API use."""
+    db=store.db;db.execute('BEGIN IMMEDIATE')
+    try:
+        current=db.execute('SELECT * FROM google_chat_oauth_pending WHERE id=?',(row['id'],)).fetchone()
+        if current is None or current['status']=='complete' or any(current[k]!=row[k] for k in ['connector','account_scope','credential_scope','client_sha256','subject','owner_uid','note_sha256']):
+            raise PermissionError('rejected enrollment no longer belongs to this exact pending Owner operation')
+        public=json.dumps({'installed':{k:v for k,v in json.loads(row['client'])['installed'].items() if k!='client_secret'}},sort_keys=True,separators=(',',':'))
+        result=_quarantine_write(store,row,tokens,reason,origin='enrollment',public_client=public)
+        db.execute('COMMIT');return result
+    except BaseException:
+        if db.in_transaction:db.execute('ROLLBACK')
+        raise
+
+
+def quarantine_refresh(store,snapshot,intent_id,tokens,reason):
+    """A rejected refresh can never rewrite its accepted enrollment or token."""
+    db=store.db;db.execute('BEGIN IMMEDIATE')
+    try:
+        intent=db.execute('SELECT * FROM google_chat_oauth_refreshes WHERE id=?',(intent_id,)).fetchone()
+        token=snapshot['row']
+        if (intent is None or intent['token_id']!=token['id'] or intent['generation']!=token['generation']
+                or intent['state'] not in {'writing','rate-limited','authentication-refused','refresh-uncertain'}):
+            raise PermissionError('known unconfirmed private refresh required for rejected credential disposal')
+        enrollment=db.execute('SELECT * FROM google_chat_oauth_pending WHERE id=?',(token['pending_id'],)).fetchone()
+        if enrollment is None or enrollment['status']!='complete':raise Conflict('Google refresh lacks its retained original enrollment')
+        meta={'id':intent_id,'account_scope':token['account_scope'],'subject':token['subject'],'client_sha256':token['client_sha256'],
+            'owner_uid':enrollment['owner_uid'],'note_sha256':enrollment['note_sha256']}
+        result=_quarantine_write(store,meta,tokens,reason,origin='refresh',public_client=token['public_client'])
+        db.execute('COMMIT');return result
+    except BaseException:
+        if db.in_transaction:db.execute('ROLLBACK')
+        raise

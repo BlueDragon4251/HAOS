@@ -276,3 +276,54 @@ neither live Google account permissions nor external delivery. Public count:
 Source-bound enrollment evidence:
 [private PKCE/SDK enrollment validation](evidence/2026-10-30/google-chat-private-oauth-enrollment-validation.json).
 Pending-secret compaction does not assert erasure of WAL, backups or other copies.
+
+## Prepared user token lifecycle and rejected-grant disposal
+
+The private token vault selects only the exact current stable user under the
+explicit read/file-output grant. Valid cached credentials need no token request.
+Actual Google Credentials SDK refresh has a FULL pre-wire intent, strict
+post-refresh scopes/identity checks and atomic acceptance. HTTP429 delays stay
+in an independent stable account/user/client budget through reopen and new
+token generations. A new Owner code exchange also respects that deadline.
+Authentication refusal and unclear refresh results block further automatic
+refresh; a repeated call cannot blindly retry a possibly rotated refresh token.
+Failed audit acceptance retains the old credentials and recovery state.
+
+Local withdrawal commits before any Google revocation POST. Explicit remote
+revocation uses the refresh token in a bounded fixed-endpoint POST body, never a
+URL query, and needs no preceding refresh. Only a verified HTTP200 protocol
+response with a durable receipt marks remote success. Refusal, redirect,
+unexpected response, disconnect and failed receipt commits do not fabricate a
+remote success. Repeating the same inspected decision does not issue another
+POST. Old-scope credentials remain usable for disposal, not new file API use.
+
+New enrollment requests `chat.messages.readonly` in addition to the native
+`chat.messages.create` and OpenID scopes. The actual pinned discovery contract
+requires a user read scope for `messages.get`; create alone cannot generally
+reconcile an unclear user-authored file message. App authentication with
+`chat.bot` only reads messages visible to the app and is not a general substitute.
+Existing grants are never silently upgraded. The still-open Owner/file UI must
+explain the extra read consent and restrict native lookups to retained own
+outbox operations. No general message-reading Agent capability is added.
+
+Rejected exchanges and rejected refreshes retain newly returned capabilities
+in a separate bounded private quarantine, never the active-token selector.
+Metadata exposes the expected source user, not an invented verified returned
+identity. Explicit snapshot-bound disposal invokes only the Google revocation
+endpoint and compacts capsule payload after its durable confirmation while
+keeping tombstones/audit. Failed refresh quarantine cannot rewrite its accepted
+original enrollment. Missing/ambiguous token responses and process loss still
+leave uncertainty; remote revocation is not asserted without a receipt.
+
+Real-UID SDK/TLS fixtures cover refresh with/without new ID token, partial scopes,
+wrong identity/nonce,400/429, post-body disconnect, audit failure, reopen/new token
+generation rate preservation, local-before-wire denial, bounded one-shot remote
+revocation and rejected exchange/refresh disposal. They use local Google-service
+substitutes and do not prove a live Google account, external file delivery or
+installed service acceptance. Authenticated Owner OAuth handoff/GUI and native
+outgoing files remain separate integration work; public count remains15/22.
+
+Source-bound lifecycle evidence:
+[private refresh/revocation/quarantine validation](evidence/2026-10-30/google-chat-private-oauth-lifecycle-validation.json).
+Earlier enrollment-only CI is separately pinned to its exact source:
+[enrollment checkpoint CI](evidence/2026-10-30/google-chat-private-oauth-enrollment-ci-status.json).

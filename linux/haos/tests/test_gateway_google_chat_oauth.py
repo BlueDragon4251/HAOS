@@ -132,3 +132,69 @@ def test_saved_sdk_credentials_cannot_redirect_refresh_or_borrow_another_client_
         'scopes':list(SCOPES),'expiry':(datetime.now(timezone.utc)+timedelta(hours=1)).replace(tzinfo=None).isoformat()+'Z','universe_domain':'googleapis.com','account':''}
     assert validate_token(payload,configuration_value)==payload
     with pytest.raises((PermissionError,ValueError)):validate_token({**payload,field:value},configuration_value)
+
+
+def test_pending_owner_code_exchange_waits_for_persisted_same_client_budget_without_advancing_its_intent(tmp_path):
+    from haos.gateway_google_chat_oauth_tokens import Deferred
+    from haos.gateway_google_chat import scope
+    inbox,store,selected=opened(tmp_path);row=begin(store,selected);deadline=time.time()+300
+    inbox.db.execute('CREATE TABLE google_chat_oauth_budget(scope TEXT PRIMARY KEY,not_before REAL NOT NULL)')
+    key=digest([scope(account()),row['subject'],configuration()['installed']['client_id']])
+    inbox.db.execute('INSERT INTO google_chat_oauth_budget VALUES(?,?)',(key,deadline))
+    with pytest.raises(Deferred) as error:store.exchange(selected,'google',account(),row['id'],returned(row),owner_uid=1000)
+    assert error.value.status=='rate-limited' and error.value.retry_after>=299
+    assert inbox.db.execute('SELECT status FROM google_chat_oauth_pending').fetchone()[0]=='awaiting'
+    assert inbox.db.execute('SELECT not_before FROM google_chat_oauth_budget').fetchone()[0]==deadline
+    assert inbox.db.execute('SELECT COUNT(*) FROM google_chat_oauth_events').fetchone()[0]==1;inbox.close()
+
+
+def test_rejected_issued_credentials_are_custodied_only_for_disposal_and_never_become_active_user_tokens(tmp_path):
+    from haos.gateway_google_chat_oauth import quarantine
+    inbox,store,selected=opened(tmp_path);row=begin(store,selected)
+    store.exchange(selected,'google',account(),row['id'],returned(row),owner_uid=1000)
+    result=quarantine(store,row,{'access_token':'rejected-private-access-fixture','refresh_token':'rejected-private-refresh-fixture'},'identity-refused')
+    assert result['private_tokens_retained'] and not result['api_use_authorized'] and not result['remote_revocation_verified']
+    assert not result['network_requested'] and not result['private_credentials_returned']
+    assert inbox.db.execute('SELECT status FROM google_chat_oauth_pending').fetchone()[0]=='refused'
+    assert inbox.db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_user_tokens'").fetchone() is None
+    row=inbox.db.execute('SELECT * FROM google_chat_oauth_quarantine').fetchone()
+    assert row['state']=='rejected' and row['tokens_sha256']==digest(row['tokens'])
+    assert 'client_secret' not in row['public_client'] and json.loads(row['tokens'])['refresh_token']=='rejected-private-refresh-fixture'
+    inbox.close()
+
+
+def test_quarantine_audit_failure_preserves_exchange_fence_without_a_partial_rejected_token_record(tmp_path):
+    from haos.gateway_google_chat_oauth import quarantine
+    inbox,store,selected=opened(tmp_path);row=begin(store,selected)
+    store.exchange(selected,'google',account(),row['id'],returned(row),owner_uid=1000)
+    inbox.db.execute("CREATE TRIGGER deny_quarantine_audit BEFORE INSERT ON google_chat_oauth_events BEGIN SELECT RAISE(ABORT,'fixture audit full'); END")
+    with pytest.raises(sqlite3.IntegrityError):quarantine(store,row,{'refresh_token':'rejected-private-refresh-fixture'},'identity-refused')
+    assert not inbox.db.in_transaction
+    assert inbox.db.execute('SELECT status FROM google_chat_oauth_pending').fetchone()[0]=='exchanging'
+    exists=inbox.db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_oauth_quarantine'").fetchone()
+    assert exists is None or inbox.db.execute('SELECT COUNT(*) FROM google_chat_oauth_quarantine').fetchone()[0]==0;inbox.close()
+
+
+def test_pre_read_reconciliation_scope_credentials_remain_disposable_but_cannot_authorize_new_file_client():
+    from haos.gateway_google_chat_oauth import validate_token,CHAT_SCOPE,TOKEN_URI
+    from datetime import datetime,timezone,timedelta
+    conf=configuration();payload={'token':'local-access-fixture','refresh_token':'local-refresh-fixture','token_uri':TOKEN_URI,
+        'client_id':conf['installed']['client_id'],'client_secret':conf['installed']['client_secret'],'scopes':[CHAT_SCOPE,'openid'],
+        'expiry':(datetime.now(timezone.utc)+timedelta(hours=1)).replace(tzinfo=None).isoformat()+'Z','universe_domain':'googleapis.com','account':''}
+    assert validate_token(payload,conf,legacy_for_disposal=True)==payload
+    with pytest.raises(PermissionError):validate_token(payload,conf)
+
+
+def test_rejected_token_snapshot_contains_only_metadata_and_detects_changed_capsule_bytes(tmp_path):
+    from haos.gateway_google_chat_oauth import quarantine
+    from haos.gateway_google_chat_oauth_quarantine import view
+    inbox,store,selected=opened(tmp_path);row=begin(store,selected)
+    store.exchange(selected,'google',account(),row['id'],returned(row),owner_uid=1000)
+    quarantine(store,row,{'refresh_token':'rejected-private-refresh-fixture'},'identity-refused')
+    record=inbox.db.execute('SELECT * FROM google_chat_oauth_quarantine').fetchone();snapshot=view(record,account())
+    assert snapshot['has_refresh_token'] and not snapshot['actual_user_verified'] and not snapshot['api_use_authorized']
+    assert snapshot['snapshot_sha256']==digest({k:v for k,v in snapshot.items() if k!='snapshot_sha256'})
+    assert 'rejected-private-refresh-fixture' not in json.dumps(snapshot) and 'client_secret' not in json.dumps(snapshot)
+    inbox.db.execute("UPDATE google_chat_oauth_quarantine SET tokens='{}'")
+    with pytest.raises(Conflict):view(inbox.db.execute('SELECT * FROM google_chat_oauth_quarantine').fetchone(),account())
+    inbox.close()

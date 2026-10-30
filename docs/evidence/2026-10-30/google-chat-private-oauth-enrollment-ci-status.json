@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-30",
+  "source_commit": "f683c30610eef00d619cef9867eb88f532c22e69",
+  "source_tree": "e3b6caecf804a321eb73af676aab333216846b4f",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 41062544387,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062544404,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062544418,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062544398,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062544539,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "CI",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062544537,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "Arch package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41062544388,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "in_progress"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062534552,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41062534688,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41062534550,
+      "headSha": "f683c30610eef00d619cef9867eb88f532c22e69",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "in_progress"
+    }
+  ],
+  "pending_preserved": true,
+  "scope": "GitHub status API; exact previous source only; no downloaded job logs/artifacts"
+}

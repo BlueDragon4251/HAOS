@@ -62,7 +62,7 @@ jobs:
               python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
               python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/profile-$SCENE.json"
           done
-      - name: Actual private UID OAuth Flow PKCE RSA exchange and private FULL token custody
+      - name: Actual private UID OAuth enrollment refresh revocation and rejected-credential disposal
         run: |
           set -euo pipefail
           SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"

@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import json
+import time
 from urllib.parse import urlsplit,parse_qs
 
 from .gateway_google_chat_oauth import AUTH_URI,TOKEN_URI,REDIRECT_URI,CHAT_SCOPE,SCOPES
@@ -25,6 +26,12 @@ def _checked_grant(value):
     if not isinstance(value,_VerifiedGrant) or value.seal is not _GRANT_SEAL:
         raise PermissionError('actual private Google SDK verified grant required; no serialized claim authority')
     private();return value
+
+
+class EnrollmentFailure(RuntimeError):
+    def __init__(self,status,retry_after=0):
+        self.status=status;self.retry_after=retry_after
+        super().__init__('Google enrollment was refused; private recovery metadata retained')
 
 
 def private():
@@ -62,7 +69,7 @@ def authorization(row):
         'network_requested':False,'message_sent':False,'private_verifier_or_credentials_returned':False}
 
 
-def transport(sdk,current,redactor,*,http=None):
+def transport(sdk,current,redactor,*,http=None,received=None):
     private();current()
     import requests
     from .gateway_google_chat_http import single_request_http,token_response
@@ -76,7 +83,11 @@ def transport(sdk,current,redactor,*,http=None):
             body=request.body
             if not isinstance(body,(str,bytes)):raise ValueError('bounded Google OAuth form required')
             response,data=wire.request(TOKEN_URI,method='POST',body=body,headers=dict(request.headers),redirections=0)
-            response,data=token_response(TOKEN_URI,response,data,redactor=redactor);current()
+            response,data=token_response(TOKEN_URI,response,data,redactor=redactor)
+            if response.status==200 and received is not None:
+                value=json.loads(data)
+                received({key:value[key] for key in ['access_token','refresh_token'] if isinstance(value.get(key),str)})
+            current()
             result=requests.Response();result.status_code=response.status;result.headers=requests.structures.CaseInsensitiveDict(dict(response))
             result._content=data;result.encoding='utf-8';result.url=TOKEN_URI;result.request=request
             return result
@@ -94,7 +105,8 @@ async def exchange(store,policy,connector,account,identity,returned_url,*,owner_
     from .redaction import Redactor
     config=json.loads(row['client'])['installed']
     redactor.secrets=Redactor([*redactor.secrets,config['client_secret'],row['verifier'],code]).secrets
-    sdk=flow(row);transport(sdk,current,redactor,http=http)
+    observed={}
+    sdk=flow(row);transport(sdk,current,redactor,http=http,received=lambda value:observed.update(value))
     def request():
         current();sdk.fetch_token(code=code,include_client_id=True,timeout=10,allow_redirects=False)
         tokens=sdk.oauth2session.token
@@ -111,9 +123,40 @@ async def exchange(store,policy,connector,account,identity,returned_url,*,owner_
         if credentials.client_id!=config['client_id'] or credentials.client_secret!=config['client_secret'] or not credentials.refresh_token:
             raise PermissionError('exact refreshable Google user credentials required')
         return {'subject':subject,'credentials':json.loads(credentials.to_json()),'claims_nonce_sha256':hashlib.sha256(row['nonce'].encode()).hexdigest()}
-    try:result=await asyncio.to_thread(request)
+    try:
+        result=await asyncio.to_thread(request);current()
+    except Exception as error:
+        from .gateway_google_chat_http import TokenError
+        from .gateway_google_chat_oauth import quarantine
+        reason=('rate-limited' if isinstance(error,TokenError) and error.category=='rate-limited' else
+            'sdk-refused' if isinstance(error,TokenError) and error.category=='authentication-refused' else
+            'identity-refused' if observed else 'exchange-uncertain')
+        if reason=='rate-limited':
+            from .gateway import digest
+            store.db.execute('CREATE TABLE IF NOT EXISTS google_chat_oauth_budget(scope TEXT PRIMARY KEY,not_before REAL NOT NULL)')
+            key=digest([row['account_scope'],row['subject'],config['client_id']])
+            store.db.execute('INSERT OR IGNORE INTO google_chat_oauth_budget VALUES(?,0)',(key,))
+            store.db.execute('UPDATE google_chat_oauth_budget SET not_before=MAX(not_before,?) WHERE scope=?',
+                (time.time()+min(86400,max(1,error.retry_after)),key))
+        quarantine(store,row,observed,reason)
+        raise EnrollmentFailure(reason,getattr(error,'retry_after',0)) from None
     finally:sdk.oauth2session.close()
-    current()
     # This opaque private result is accepted only by the token journal. Never
     # serialize it in an Owner/Agent response.
     return row,_VerifiedGrant(row['id'],result['subject'],json.dumps(result['credentials'],sort_keys=True,separators=(',',':')),result['claims_nonce_sha256'],_GRANT_SEAL)
+
+
+async def finish(store,policy,connector,account,identity,returned_url,*,owner_uid,http=None,certificate_request=None):
+    """Only sanitized acceptance metadata can leave this private SDK boundary."""
+    private()
+    row,verified=await exchange(store,policy,connector,account,identity,returned_url,owner_uid=owner_uid,http=http,certificate_request=certificate_request)
+    try:
+        result=store.complete(policy(),connector,account,identity,verified,owner_uid=owner_uid)
+    except Exception:
+        status=store.db.execute('SELECT status FROM google_chat_oauth_pending WHERE id=?',(identity,)).fetchone()
+        if status is not None and status['status']!='complete':
+            from .gateway_google_chat_oauth import quarantine
+            payload=json.loads(verified.credential_json)
+            quarantine(store,row,{'access_token':payload['token'],'refresh_token':payload['refresh_token']},'storage-unavailable')
+        raise EnrollmentFailure('storage-unavailable') from None
+    return {**result,'network_requested':True}

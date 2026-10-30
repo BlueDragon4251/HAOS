@@ -46,7 +46,8 @@ def token_response(uri,response,data,*,redactor=None):
     raise TokenError(category,status,delay,reason)
 
 
-def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=None):
+def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=None,oauth_revoke=False):
+    if type(oauth_revoke) is not bool:raise ValueError('explicit private OAuth revocation transport required')
     if not callable(current) or type(limit) is not int or not 1<=limit<=8388608:raise ValueError('bounded private HTTP authority required')
     import httplib2
     from .redaction import Redactor
@@ -64,7 +65,8 @@ def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=Non
         def request(self,uri,method='GET',body=None,headers=None,redirections=0,connection_type=None):
             current();parsed=urlsplit(uri)
             official=(parsed.scheme=='https' and parsed.port in {None,443}
-                and (parsed.hostname=='chat.googleapis.com' or parsed.hostname=='oauth2.googleapis.com' and parsed.path=='/token'))
+                and (parsed.hostname=='chat.googleapis.com' or parsed.hostname=='oauth2.googleapis.com' and (parsed.path=='/token'
+                    or oauth_revoke and parsed.path=='/revoke' and method=='POST' and not parsed.query)))
             fixture=fixture_origin is not None and uri.startswith(fixture_origin.rstrip('/')+'/')
             if (not (official or fixture) or parsed.username or parsed.password or parsed.fragment
                     or method not in {'GET','POST'} or connection_type is not None):
