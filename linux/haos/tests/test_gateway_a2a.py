@@ -13,10 +13,10 @@ def binding():return {'id':'owner','connector':'a2a','sender':'alice','chat':'ct
     'thread':'','identity':'personal','capabilities':['create','read'],'generation':'a'*64,'since':123}
 
 
-def test_prepared_a2a_policy_is_not_a_public_gateway_or_automatic_peer_grant():
+def test_public_a2a_policy_keeps_independent_exact_owner_grants():
     config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[binding()]}
     assert PreparedA2APolicy(config).bindings['owner']==binding()
-    with pytest.raises(ValueError):GatewayPolicy(config)
+    assert GatewayPolicy(config).bindings['owner']==binding()
     changed=PreparedA2APolicy({**config,'bindings':[]})
     with pytest.raises(PermissionError):changed.authorize('a2a',{'platform':'a2a','sender':'alice','chat':'ctx-owner-device',
         'scope':scope(account(),'alice'),'thread':'','message_id':'source-fixture','text':'untrusted peer message','is_bot':False})
@@ -58,3 +58,9 @@ def test_continuation_requires_closed_exact_question_pointer_before_optional_SDK
         'taskId':'task-'+'a'*16,'metadata':metadata}}}
     with pytest.raises(Refused) as error:approve(policy,'a2a',account(),'alice',json.dumps(request).encode(),Redactor())
     assert error.value.reason=='exact-question-epoch-required'
+
+
+@pytest.mark.parametrize('caps',[['pause'],['resume'],['cancel'],['answer']])
+def test_public_a2a_policy_rejects_unsupported_pause_or_control_without_read(caps):
+    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[{**binding(),'capabilities':caps}]}
+    with pytest.raises(ValueError):GatewayPolicy(config)

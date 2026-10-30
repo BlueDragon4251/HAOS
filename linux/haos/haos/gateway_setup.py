@@ -358,6 +358,28 @@ def owner_gateway(args):
         return {"action": args.gateway_action}
     if args.gateway_action=='matrix-devices':return owner_matrix_devices(args.connector,args.sender)
     if args.gateway_action=='email-account':return owner_email_account(args.connector)
+    if args.gateway_action in {'a2a-peer','a2a-remove-peer'}:
+        from .a2a_owner_setup import set_peer,remove_peer
+        if args.gateway_action=='a2a-remove-peer':return remove_peer(args.connector,args.peer)
+        keep=input('Keep this exact saved peer token? Type KEEP, otherwise enter a replacement next: ')=='KEEP'
+        token='' if keep else getpass.getpass('Private random peer bearer token: ')
+        origins=input('Approved HTTPS download origins separated by spaces; empty removes; KEEP preserves: ')
+        callback=input('Exact HTTPS callback URL; empty removes; KEEP preserves: ')
+        keep_signing=False;signing=''
+        if callback and callback!='KEEP':
+            keep_signing=input('Keep signing key of this exact saved peer and URL? Type KEEP: ')=='KEEP'
+            if not keep_signing:signing=getpass.getpass('Separate private callback signing key: ')
+        return set_peer(args.connector,args.peer,token,keep_token=keep,download_origins=None if origins=='KEEP' else origins.split(),
+            callback_url=None if callback=='KEEP' else callback,callback_secret=signing,keep_callback_secret=keep_signing)
+    if args.gateway_action in {'a2a-account','a2a-sources','a2a-recover'}:
+        from .a2a_owner_setup import inspect,recover
+        if args.gateway_action=='a2a-account':return inspect(args.connector)
+        inventory=inspect(args.connector,'sources',args.cursor)
+        if args.gateway_action=='a2a-sources' or 'error' in inventory:return inventory
+        selected=[row for row in inventory['tasks'] if (row['profile'],row['peer_journal'],row['task_id'],row['snapshot_sha256'])==
+            (args.profile,args.peer_journal,args.task_id,args.snapshot_sha256)]
+        if len(selected)!=1:raise ValueError('exact current inspected snapshot on the selected A2A inventory page required')
+        return recover(args.connector,selected[0],args.action,args.note,confirmed=args.confirm_inspected)
     if args.gateway_action=='dingtalk-account':
         from .dingtalk_owner_setup import inspect
         return inspect(args.connector)
@@ -375,6 +397,15 @@ def owner_gateway(args):
     if args.gateway_action == "setup":
         if args.platform not in GatewayPolicy.platforms:
             raise ValueError("select an implemented transport")
+        if args.platform=='a2a':
+            from .a2a_owner_setup import save_account
+            agent=input('Public A2A display name: ');url=input('Public trusted https://hostname/a2a URL: ')
+            host=input('Bind host (127.0.0.1/0.0.0.0/::): ');port=input('Local HTTPS port (1024-65535): ')
+            if not port.isascii() or not port.isdecimal() or len(port)>5:raise ValueError('bounded integer A2A port required')
+            public=host!='127.0.0.1' and input('Approve network listener? Type PUBLIC: ')=='PUBLIC'
+            peer=input('Exact named peer: ');token=getpass.getpass('Private random peer bearer token: ')
+            certificate=input('Trusted certificate chain PEM path: ');key=input('Private TLS key PEM path: ')
+            return save_account(args.connector,{'agent_name':agent,'public_url':url,'bind_host':host,'port':int(port),'public_listener':public},peer,token,certificate,key)
         if args.platform=='dingtalk':
             from .dingtalk_owner_setup import configure
             return configure(args.connector,{'client_id':input('Exact DingTalk Client ID / AppKey: '),
@@ -505,6 +536,14 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
+        if selected and selected['platform']=='a2a':
+            from .a2a_owner_setup import pair
+            from .gateway_a2a import scope
+            if args.thread or args.scope and args.scope!=scope(credentials['connectors'][args.connector],args.sender):
+                raise ValueError('exact saved A2A peer/server scope and no thread required')
+            return pair(args.binding,args.connector,args.sender,args.chat,args.identity,args.capabilities,
+                allow_media=args.allow_media,allow_voice=args.allow_voice,allow_video=args.allow_video,
+                allow_outbound_media=args.allow_outbound_media,allow_callback=getattr(args,'allow_callback',False))
         if selected and selected['platform'] in {'email','feishu','dingtalk'}:
             from .initial_setup import pair_gateway_sender
             return pair_gateway_sender(args.binding,args.connector,args.sender,args.chat,args.identity,

@@ -88,14 +88,25 @@ if sys.argv[1]=='agent':
     try:build_adapter('a2a',{},a2a_context={'parent':base,'connector':'a2a','policy':lambda:None,'inbox':None})
     except PermissionError:pass
     else:raise AssertionError('agent constructed privileged A2A profile')
-    try:asyncio.run(call('gateway.next',{'ready':['a2a']}))
-    except PermissionError:pass
-    else:raise AssertionError('controller socket authorized foreign UID with gateway group access')
+    async def refused_before_request():
+        from haos.gateway_runtime import SOCKET
+        reader,writer=await asyncio.wait_for(asyncio.open_unix_connection(SOCKET),5)
+        try:
+            # SO_PEERCRED is checked before reading a request. Read its exact
+            # refusal first; writing an unread frame races the server close and
+            # can replace the actual denial reply with a transport reset.
+            line=await asyncio.wait_for(reader.readline(),5)
+            assert json.loads(line)=={'ok':False,'error':'control peer is not authorized'}
+        finally:writer.close();await writer.wait_closed()
+    asyncio.run(refused_before_request())
     print(json.dumps({'agent_private_data_and_factory_denied':True}));sys.exit(0)
 require_runtime_identity()
 try:Path(sys.argv[2]).read_bytes()
 except PermissionError:pass
 else:raise AssertionError('gateway read owner credential')
+if sys.argv[1]=='production':
+    from haos.gateway_runtime import serve
+    asyncio.run(serve());sys.exit(0)
 async def exercise():
     policy=lambda:PreparedA2APolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))
     inbox=NativeInbox(base/'native.db',Redactor());relay=RelayInbox(base/'relay.db',Redactor());cache=MediaCache(inbox)
@@ -171,7 +182,7 @@ asyncio.run(exercise())
     environment={'PATH':os.environ['PATH'],'PYTHONPATH':'/usr/lib/haos:/usr/lib/haos/hermes-source:/sdk','HOME':'/nonexistent','HERMES_SAFE_MODE':'1'}
     def spawn(mode='gateway',uid=65534):
         return subprocess.Popen([sys.executable,str(script),mode,str(canary)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-            text=True,user=uid,group=65534,extra_groups=[],env=environment)
+            text=True,user=uid,group=65534,extra_groups=[],env={**environment,'CREDENTIALS_DIRECTORY':str(base/'installed-credentials')})
     async def line(process):
         text=await asyncio.wait_for(asyncio.to_thread(process.stdout.readline),30)
         if not text:
@@ -839,6 +850,66 @@ print('all-owner-actions-denied-before-sdk')
                 audit=Path('/var/lib/haos-owner/audit.jsonl').read_text()
                 assert all(secret not in audit for secret in [replacement,*value['peer_tokens'].values(),value['callbacks']['alice']['secret']])
                 cases.append('actual_root_peer_token_rotation_revokes_all_old_connector_grants_preserves_resource_callback_settings_and_all_historical_task_data_without_credentials_in_owner_audit')
+                # Exercise the actual production serve loop, not this fixture's
+                # manual forwarding/pumping helpers or a prepared policy factory.
+                a2a_owner_setup.pair('production-ui','a2a','alice','ctx-production-runtime','personal',['create','read','cancel'])
+                production_policy,_=gateway_setup.load()
+                production_private=json.loads((etc/'gateway-credentials').read_text())
+                from haos.gateway import GatewayPolicy
+                assert GatewayPolicy(production_policy).connectors['a2a']['platform']=='a2a'
+                credential_directory=base/'installed-credentials';credential_directory.mkdir(mode=0o700);os.chown(credential_directory,65534,65534)
+                credential_file=credential_directory/'gateway-credentials';credential_file.write_text(json.dumps(production_private));credential_file.chmod(0o400);os.chown(credential_file,65534,65534)
+                process=spawn('production')
+                production_headers={**headers,'Authorization':'Bearer '+replacement}
+                async with asyncio.timeout(15):
+                    while True:
+                        if process.poll() is not None:raise AssertionError('production runtime exited: '+process.stderr.read())
+                        try:
+                            health=await client.get(address+'/health',headers=production_headers)
+                            if health.status_code==200:break
+                        except httpx.TransportError:pass
+                        await asyncio.sleep(.05)
+                production_request={'jsonrpc':'2.0','id':80,'method':'SendMessage','params':{'message':{
+                    'messageId':'actual-production-source','contextId':'ctx-production-runtime','role':'ROLE_USER',
+                    'parts':[{'text':'Actual production runtime loop input without model inference.'}]}}}
+                pending=asyncio.create_task(client.post(address,headers=production_headers,json=production_request))
+                async with asyncio.timeout(15):
+                    while len(store.list())!=13:
+                        if process.poll() is not None:raise AssertionError('production runtime exited: '+process.stderr.read())
+                        await asyncio.sleep(.05)
+                production_mission=next(row for row in store.list() if 'Actual production runtime loop input' in row['goal'])
+                assert production_mission['state']=='queued' and not pending.done()
+                listing=(await client.post(address,headers=production_headers,json={'jsonrpc':'2.0','id':81,'method':'ListTasks','params':{'pageSize':10}})).json()
+                production_task=next(task['id'] for task in listing['result']['tasks'] if task['contextId']=='ctx-production-runtime')
+                process.kill();await asyncio.to_thread(process.wait)
+                try:await pending
+                except httpx.TransportError:pass
+                else:raise AssertionError('killed production listener claimed a complete task outcome')
+                pending=None;process=spawn('production')
+                async with asyncio.timeout(15):
+                    while True:
+                        if process.poll() is not None:raise AssertionError('production restart exited: '+process.stderr.read())
+                        try:
+                            health=await client.get(address+'/health',headers=production_headers)
+                            if health.status_code==200:break
+                        except httpx.TransportError:pass
+                        await asyncio.sleep(.05)
+                recovered=(await client.post(address,headers=production_headers,json=production_request)).json()
+                assert recovered['result']['task']['id']==production_task and recovered['result']['task']['status']['state']==protocol.STATE_WORKING,recovered
+                assert len(store.list())==13 and store.get(production_mission['id'])['state']=='queued'
+                cases.append('actual_production_serve_SIGKILL_and_reopen_restore_native_task_and_parent_inbox_without_repeating_root_mission_on_same_wire_source_replay')
+                await controller.dispatch('uid:0',{'method':'missions.cancel','params':{'id':production_mission['id']}})
+                async with asyncio.timeout(15):
+                    while True:
+                        production_reply=(await client.post(address,headers=production_headers,json={'jsonrpc':'2.0','id':82,'method':'GetTask','params':{'id':production_task}})).json()
+                        if production_reply['result']['status']['state']==protocol.STATE_CANCELED:break
+                        await asyncio.sleep(.05)
+                assert store.get(production_mission['id'])['state']=='cancelled'
+                cases.append('actual_public_GatewayPolicy_and_production_serve_use_private_credentials_native_profile_TLScodec_automatic_root_admission_and_durable_outcome_publishing_without_fixture_forward_or_pump')
+                process.terminate();await asyncio.wait_for(asyncio.to_thread(process.wait),20)
+                production_stderr=process.stderr.read();assert process.returncode==0,production_stderr
+                assert all(secret not in production_stderr for secret in [replacement,*value['peer_tokens'].values(),value['tls']['private_key'],value['callbacks']['alice']['secret']])
+                cases.append('actual_production_serve_SIGTERM_closes_native_TLS_tasks_workers_and_journals_cleanly_without_exposing_private_credentials')
             finally:initial_setup.quiesce_for_setup=original_quiesce;gateway_setup.stopped_gateway=original_stopped
         finally:
             if process.poll() is None:process.kill();await asyncio.to_thread(process.wait)
@@ -851,7 +922,8 @@ print('all-owner-actions-denied-before-sdk')
     print(json.dumps({'cases':cases,'passed':len(cases),'actual_UID_TLS_kernel_flock_SIGKILL_SQLite_reopen':True,
         'pinned_hermes':'f97608f178d1ffeca59860195ab7da295f7c8e5f',
         'actual_controller_Unix_socket_SO_PEERCRED':True,
-        'live_peer_inference_public_activation_or_release':False},indent=2))
+        'actual_public_registry_and_production_runtime':True,
+        'live_peer_inference_installed_OS_or_release':False},indent=2))
 
 
 if __name__=='__main__':main()

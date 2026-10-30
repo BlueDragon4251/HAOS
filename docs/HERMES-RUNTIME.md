@@ -1686,3 +1686,17 @@ private account inspection, per-part/source/conversion recovery and shared runti
 activation. The registry is now 13/22. See `GATEWAY-DINGTALK.md` for exact app rights,
 reply-mode selection, limits and no-live-acceptance boundaries. Historical receipts
 remain tied to their original source, not retroactively upgraded by this change.
+
+### A2A public owner/runtime activation (2026-10-30)
+
+A2A is now wired through the ordinary public GatewayPolicy and GUI catalog,
+private native inbox/profile lifecycle, complete credential redaction and actual
+production gateway serve loop. It adds no dependency extra or unpinned program.
+The independent policy rejects unsupported native pause/resume, control without
+read, anonymous/wildcard peers and missing timed grants. Its real owner forms
+and CLI expose account/TLS, named peers, separate download/callback settings,
+exact-context pairing, no-send runtime checks and reviewed historical recovery.
+See [A2A setup and source-bound validation](GATEWAY-A2A.md). Software registration
+raises the count to 14/22; no live account, external delivery, installed OS or
+release acceptance follows from the offline fixtures. Earlier private-stage
+counts in this document remain evidence for their exact historical sources.

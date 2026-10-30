@@ -28,10 +28,10 @@ def account():
             'private_key':'private fixture TLS key bytes','bind_host':'127.0.0.1','public_listener':False}}
 
 
-def test_prepared_owner_publication_does_not_activate_a2a_in_public_runtime_registry(account):
+def test_owner_publication_and_public_runtime_share_exact_a2a_policy(account):
     policy={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[]}
     assert owner_policy(policy).connectors['a2a']['platform']=='a2a'
-    with pytest.raises(ValueError):GatewayPolicy(policy)
+    assert GatewayPolicy(policy).connectors['a2a']['platform']=='a2a'
 
 
 def test_prepared_owner_callback_flag_requires_explicit_read_permission(account):
@@ -74,3 +74,12 @@ def test_recovery_selection_cannot_escape_fixed_private_journal_or_omit_owner_re
         'snapshot_sha256':'d'*64,'note_sha256':'e'*64}
     assert parameters(params)==params
     with pytest.raises(ValueError):parameters({**params,key:value})
+
+
+def test_runtime_redactor_registers_all_named_peer_and_independent_callback_TLS_wire_keys_before_SDK_logging(account):
+    from haos.gateway_runtime import credential_redactor
+    account['callbacks']={'alice':{'url':'https://peer.fixture.invalid/callback','secret':'private_owner_signing_fixture_'+'b'*32}}
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[]})
+    redactor=credential_redactor({'connectors':{'a2a':account}},policy)
+    for secret in [*account['peer_tokens'].values(),account['callbacks']['alice']['secret'],account['tls']['private_key']]:
+        assert redactor.text('SDK log '+secret)=='SDK log [REDACTED]'

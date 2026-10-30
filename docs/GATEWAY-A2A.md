@@ -1,9 +1,66 @@
-# A2A — private integration in progress
+# A2A — owner setup and implementation evidence
 
-A2A remains outside the public HAOS gateway registry and owner GUI. Public
-software paths remain 13/22. These native/local contracts are not a completed
-A2A gateway, live peer or installed-system acceptance. Exact controller/UID
-component evidence is distinguished below from direct local parent fixtures.
+A2A now has a public HAOS runtime and graphical owner setup path. It is the
+fourteenth of the 22 software integrations, subject to the acceptance limits
+below. Registration alone is not evidence: the installed-code process fixture
+runs the actual production `gateway_runtime.serve()` with the real private UID,
+credential publication, TLS listener, automatic root admission and native
+outcome publication. No external peer, real model inference, installed OS,
+hardware or release acceptance is claimed.
+
+## Owner setup
+
+1. In management → Gateways select `a2a`. Enter the public server name, exact
+   `https://hostname/a2a` URL, local nonprivileged port, bind address and locally
+   selected trusted certificate-chain/private-key PEM files. Explicitly approve
+   a network listener when needed. Configure your own DNS/TLS forwarding; HAOS
+   does not silently change router or reverse-proxy rules.
+2. Save a named peer with its own random bearer key. Generate or enter it in the
+   masked local field; disclose it only to that intended authenticated peer.
+   Keeping saved TLS/key material is an explicit choice. No saved private key
+   is displayed or given to the agent.
+3. In the peer editor optionally approve exact HTTPS download origins and/or an
+   exact HTTPS callback destination with a separate signing key. These settings
+   alone grant neither mission access nor permission to send callbacks.
+4. Pair the exact saved peer and context with a HAOS identity and the required
+   create/read/cancel/answer rights. Cancel and answers require read. Native
+   pause/resume and arbitrary topic threads are unsupported and cannot be
+   granted. Media, local voice transcription, video, outgoing files and
+   callbacks each require their separate explicit checkbox. Voice also needs
+   the existing configured isolated speech service and model.
+5. Run the local no-send readiness check. It stops the gateway service, checks
+   the pinned native runtime, current trusted TLS material and exclusive port
+   binding under the private gateway UID. It does not verify Internet reachability.
+   Start the saved gateway service explicitly in management when ready.
+6. Inspect the paginated local task/recovery page for native task state,
+   current account/grant, local inbox receipt, retained original, resource
+   authentication/backoff, uncertain operations and callback receipts. A local
+   inbox receipt is not a mission or a recipient acknowledgment.
+7. For recovery, select the exact task snapshot, enter a review note and
+   explicitly confirm the decision. Authentication retry is restricted to a
+   current, unadmitted working source and its unchanged refused HTTPS resource.
+   Byte removal is restricted to terminal sources whose exact grant was
+   withdrawn; uncertain transitions, controls or result epochs block maintenance.
+   Metadata and replay proofs remain. Logical byte removal is not secure
+   erasure and does not delete separate cache/controller/agent/backup copies.
+   The service remains stopped until an explicit later restart.
+8. Removing a peer or rotating account material immediately withdraws all old
+   connector grants. Historical data remain inspectable; new grants receive
+   fresh epochs and cannot resurrect old sources. Remove the connector to
+   revoke its last peer.
+
+CLI equivalents are `haos-owner gateway setup ID a2a`, `a2a-peer`,
+`a2a-remove-peer`, `pair --allow-callback`, `a2a-account`, `a2a-sources` and
+`a2a-recover`. Private keys use masked local input or private PEM files, never
+command-line arguments. Source recovery takes the explicit inventory page
+cursor, profile/peer-journal/task IDs, snapshot digest, review note and
+`--confirm-inspected`. A stale or unapproved selection is refused.
+
+Current source-bound validation is recorded in
+[evidence/2026-10-30/a2a-public-owner-validation.json](evidence/2026-10-30/a2a-public-owner-validation.json).
+The sections below retain the earlier private implementation stages and their
+own source-specific counts; their historical “private/unregistered” status does
+not override this current software registration or imply any live acceptance.
 
 The pinned Hermes adapter provides a stdlib JSON-RPC HTTP server, bearer-derived
 peer identities, in-memory TaskStore, native MessageEvent dispatch, task Futures,

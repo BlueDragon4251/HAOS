@@ -1,4 +1,4 @@
-"""Prepared A2A server identity and exact peer/context grants; not public activation."""
+"""A2A server identity and exact independently approved peer/context grants."""
 import json
 import re
 
@@ -67,8 +67,8 @@ def validate_binding(binding):
     if not isinstance(binding.get('scope'),str) or not re.fullmatch('a2a:[0-9a-f]{64}',binding['scope']) or binding.get('thread')!='':
         raise ValueError('exact A2A server scope and context required; separate topic threads do not apply')
     caps=binding.get('capabilities')
-    if (not isinstance(caps,list) or not caps or any(not isinstance(c,str) or c not in CAPABILITIES for c in caps)
-            or len(set(caps))!=len(caps)):
+    if (not isinstance(caps,list) or not caps or any(not isinstance(c,str) or c not in {'create','read','cancel','answer'} for c in caps)
+            or len(set(caps))!=len(caps) or any(c in caps for c in ['cancel','answer']) and 'read' not in caps):
         raise ValueError('explicit A2A mission permissions required')
     if (not isinstance(binding.get('generation'),str) or not re.fullmatch('[0-9a-f]{64}',binding['generation'])
             or type(binding.get('since')) is not int or not 0<binding['since']<2**53):

@@ -2,10 +2,10 @@
 
 The pinned Hermes catalog contains 22 adapters. Loading an upstream adapter is
 not HAOS integration or authorization. Current public HAOS text setup paths are
-Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail, Feishu/Lark and DingTalk.
+Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail, Feishu/Lark, DingTalk and A2A.
 Each uses the independent peer-authenticated mission queue, exact owner grants
 and its checked transport/delivery path. Unknown senders and plugins receive no
-automatic HAOS identity or owner rights. These thirteen software paths are not thirteen
+automatic HAOS identity or owner rights. These fourteen software paths are not fourteen
 fully accepted platforms or a completed 22-gateway implementation.
 
 LINE additionally connects incoming PNG/JPEG/documents, isolated local voice
@@ -35,7 +35,7 @@ voice conversion and inspected per-part/source recovery. See
 [Feishu/Lark setup and evidence](GATEWAY-FEISHU.md) for required app rights, exact
 identities, TLS configuration and explicit live-acceptance limits.
 
-The remaining HAOS integrations are a2a, buzz,
+The remaining HAOS integrations are buzz,
 google_chat, photon, raft, simplex, teams, wecom and whatsapp. Their bundled
 upstream modules alone do not count as working HAOS gateways. Complete each
 transport's owner provisioning, sender/chat/thread scopes, durable input/output,
@@ -55,4 +55,11 @@ before explicit pairing. See [DingTalk setup and evidence](GATEWAY-DINGTALK.md).
 Software/fixture completion does not establish a live account, external delivery,
 subscription permissions or installed/hardware acceptance.
 
-The next A2A work remains private/unregistered; see [A2A implementation boundaries](GATEWAY-A2A.md). Its actual native/SQLite/TLS fixtures do not advance the public count.
+A2A connects the actual native TaskStore/JSON-RPC/SSE server to independently
+approved named peers and exact contexts, trusted TLS, durable originals/tasks,
+root mission/question/cancellation outcomes, separately approved media/local voice,
+controller-exported output files and signed callbacks. The actual production
+runtime has offline installed-code UID/TLS/restart coverage. Real owner forms
+provide account/peer/pairing and inspected local recovery. See
+[A2A owner setup and evidence](GATEWAY-A2A.md). No external peer or installed OS
+acceptance is inferred from these software fixtures.

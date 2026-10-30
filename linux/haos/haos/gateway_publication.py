@@ -14,10 +14,7 @@ PENDING = 'gateway-publication.json'
 
 
 def owner_policy(value):
-    """Validate prepared owner data without registering an unfinished transport."""
-    if isinstance(value,dict) and isinstance(value.get('connectors'),list) and any(row.get('platform')=='a2a' for row in value['connectors'] if isinstance(row,dict)):
-        from .gateway_a2a import PreparedA2APolicy
-        return PreparedA2APolicy(value)
+    """Owner configuration and runtime share exact independent transport policy."""
     return GatewayPolicy(value)
 
 

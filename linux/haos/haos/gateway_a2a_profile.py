@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 
-from .gateway import digest,Conflict
+from .gateway import GatewayPolicy,digest,Conflict
 from .gateway_a2a import credentials,scope,PreparedA2APolicy,authority
 from .gateway_a2a_cache import RawEvents
 from .gateway_a2a_tasks import Tasks
@@ -23,8 +23,8 @@ def build(value,*,parent,connector,policy,inbox):
     require_runtime_identity();prepare_runtime_home();value=credentials(value)
     def snapshot():
         latest=policy()
-        if not isinstance(latest,PreparedA2APolicy) or latest.connectors.get(connector,{}).get('platform')!='a2a':
-            raise PermissionError('prepared independent A2A owner policy required')
+        if not isinstance(latest,GatewayPolicy) or latest.connectors.get(connector,{}).get('platform')!='a2a':
+            raise PermissionError('independent A2A owner policy required')
         bindings=[row for row in latest.bindings.values() if row['connector']==connector]
         if not bindings or any(row['sender'] not in value['peer_tokens'] or row['scope']!=scope(value,row['sender']) for row in bindings):
             raise PermissionError('exact timed A2A peer/context grants matching saved server identity required')
