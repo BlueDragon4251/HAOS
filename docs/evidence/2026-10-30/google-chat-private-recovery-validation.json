@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-30",
+  "parent": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+  "source_files_sha256": [
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "ca4b5de2a3ea4785e29e8175ef9ee5cbd0f7c60672b5133652ccf2e44a5b6e81"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_delivery.py",
+      "sha256": "a47ebb773b4f8cf1f31c728cbc0656eec84535ee68ab56666b0da57ce18ffa7c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_recovery.py",
+      "sha256": "26079569a949062d6037f8d8a7c59136a4ff2d0db19e4cf4d733a5db8cdbe1bc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_text.py",
+      "sha256": "08a914fb4f6eede475fe292a4422de486fb0a46d9e8df02082763ccf44e7af3d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_text.py",
+      "sha256": "e808703f76f53077a7395030a2418658a4b69dc2785102a7ec07f1325b1c50a4"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat_recovery.py",
+      "sha256": "e2f7dc9347120ae97c349ac398f0171c58c63644690043684a68bf35e75c39cf"
+    }
+  ],
+  "full_and_minimal": {
+    "passed_each": 2695,
+    "existing_skips_each": 2,
+    "excluded_file": "test_backup.py, covered by real root/kernel run"
+  },
+  "root_kernel_passed": 173,
+  "recovery_SQLite_passed": 12,
+  "actual_SDK_HTTP": {
+    "passed": 13,
+    "cases": [
+      "actual_Google_AuthorizedHttp_injects_private_bearer_and_shared_redactor_captures_it_before_any_API_error_or_log_response",
+      "actual_native_send_and_Google_discovery_HTTP_create_use_stable_client_request_IDs_and_OR_FAIL_after_independent_connection_observes_FULL_write_intent_then_confirmed_replay_has_no_HTTP",
+      "post_body_disconnect_reopen_uses_only_exact_client_ID_GET_reconciliation_without_another_create_or_new_recipient",
+      "actual_HTTP_429_and_recovery_GET_404_never_automatically_repeat_begun_write_or_reinterpret_not_found_as_non_delivery",
+      "actual_native_HTTP_401_has_one_wire_attempt_no_redirect_auth_challenge_retry_or_fabricated_acceptance",
+      "actual_native_HTTP_302_has_one_wire_attempt_no_redirect_auth_challenge_retry_or_fabricated_acceptance",
+      "actual_SDK_retry_queries_late_acceptance_first_and_reuses_exact_client_request_IDs_after_independent_SQL_connection_observes_durable_approval_consumption_before_POST",
+      "lost_approved_retry_and_repeated_Owner_decision_do_not_rearm_POST_even_after_read_only_404",
+      "late_acceptance_after_new_Owner_inspection_confirms_exact_retained_reply_with_GET_only_closes_approval_audit_and_confirmed_replay_has_no_network",
+      "changed_content_cross_thread_and_revoked_grant_refused_before_HTTP_including_previously_confirmed_replies",
+      "explicit_whole_space_owner_grant_preserves_each_actual_source_thread_in_native_SDK_create_with_OR_FAIL_and_distinct_client_IDs",
+      "explicit_whole_space_consent_also_supports_no_thread_conversation_reply_without_inventing_a_target_thread",
+      "whole_space_native_send_still_refuses_foreign_space_thread_before_any_HTTP"
+    ],
+    "actual_native_send_Google_API_discovery_SDK_HTTP_and_FULL_SQLite": true,
+    "HTTP_server_and_account_auth_are_explicit_loopback_fixtures": true,
+    "UID_controller_outbox_media_GUI_live_account_recipient_delivery_or_public_activation": false
+  },
+  "actual_UID_private_profile": {
+    "passed": 10,
+    "cases": [
+      "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+      "actual_private_UID_listener_verifies_system_trusted_TLS_material_and_Google_SDK_RSA_token_then_returns_HTTP200_only_after_FULL_original_custody_and_replay_keeps_one_original",
+      "authenticated_unknown_sender_receives_only_durable_hash_refusal_without_native_decode_or_mission_rights",
+      "actual_TLS_callback_refuses_missing_duplicate_wrong_audience_and_wrong_caller_tokens_without_body_admission_or_secret_errors",
+      "actual_SQL_failure_returns_retryable_HTTP503_without_success_ACK_and_next_inspected_source_can_be_retained",
+      "only_fixed_query_free_callback_path_is_exposed_no_arbitrary_plugin_listener",
+      "actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records",
+      "actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs",
+      "actual_native_profile_disconnect_and_reconnect_close_and_rebind_TLS_with_the_same_private_lease_and_journals_and_fresh_real_SDK_account_auth_checks",
+      "actual_root_publication_withdrawal_stops_native_profile_and_TLS_listener_without_another_callback_message_or_success_ACK"
+    ],
+    "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+    "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+    "actual_native_controller_component_outbox_and_TLS_replies": true,
+    "root_controller_IPC_media_GUI_live_Google_account_or_public_activation": false
+  },
+  "logs_sha256": [
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-recovery-minimal.log",
+      "sha256": "ad7f9853d8e7b00f439b22f4fdefab8678c5ba5db591817b7a331ec0bfb8f704"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-recovery-full.log",
+      "sha256": "b6901b86dd9c0d30c54ce4c31f938f9ab4cc00f64da45760c9fcaebaf7c624db"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-recovery-kernel.log",
+      "sha256": "65ecf298561e261232f6205167fe579d0bf2c27aca2ca31ac57f359defead1b5"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-recovery-contracts.log",
+      "sha256": "ac2f36e71645a1de73da7440fcbb6859ffac97f0e92a46c130cee96e3a6add79"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-text.log",
+      "sha256": "5a2929b679a11dd70bb8e1f94d47c857c7458190e8597069781967f9de9e3162"
+    }
+  ],
+  "public_software_gateways": 15,
+  "not_claimed": [
+    "Google public activation",
+    "Owner backend or GUI completion",
+    "real Google account privileges",
+    "external message delivery or read",
+    "full root-controller Unix socket/production serve",
+    "installed OS or release"
+  ]
+}

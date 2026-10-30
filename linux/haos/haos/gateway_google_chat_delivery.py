@@ -22,7 +22,9 @@ class Publisher:
         self.db.execute('''CREATE TABLE IF NOT EXISTS google_chat_delivery_groups(
             id TEXT PRIMARY KEY,binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,credential_scope TEXT NOT NULL,
             source_id TEXT NOT NULL,source_sha256 TEXT NOT NULL,context_sha256 TEXT NOT NULL,content_sha256 TEXT NOT NULL,
-            parts INTEGER NOT NULL,state TEXT NOT NULL,receipt TEXT NOT NULL)''')
+            parts INTEGER NOT NULL,state TEXT NOT NULL,receipt TEXT NOT NULL,connector TEXT NOT NULL)''')
+        if 'connector' not in {row[1] for row in self.db.execute('PRAGMA table_info(google_chat_delivery_groups)')}:
+            self.db.execute("ALTER TABLE google_chat_delivery_groups ADD COLUMN connector TEXT NOT NULL DEFAULT ''")
         self.install()
 
     def source(self,binding,message_id,thread):
@@ -103,12 +105,12 @@ class Publisher:
                 digest(context),hashlib.sha256(content.encode()).hexdigest(),len(bodies))
             previous=self.db.execute('SELECT * FROM google_chat_delivery_groups WHERE id=?',(delivery_id,)).fetchone()
             if previous is not None:
-                if tuple(previous)[:9]!=values:raise Conflict('Google Chat root delivery changed source, account, text or event context')
+                if tuple(previous)[:9]!=values or previous['connector']!=self.native.connector:raise Conflict('Google Chat root delivery changed source, account, text or event context')
                 if previous['state']=='confirmed':return SendResult(success=True,message_id=resource(previous['receipt'],'message',space=chat))
                 if previous['state']!='writing':raise Conflict('damaged Google Chat root delivery state')
             else:
                 if self.db.execute('SELECT COUNT(*) FROM google_chat_delivery_groups').fetchone()[0]>=65536:raise Conflict('Google Chat outbox history full')
-                self.db.execute('INSERT INTO google_chat_delivery_groups VALUES(?,?,?,?,?,?,?,?,?,?,?)',(*values,'writing',''))
+                self.db.execute('INSERT INTO google_chat_delivery_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(*values,'writing','',self.native.connector))
             state={'publisher':self,'task':asyncio.current_task(),'current':current,'chat':chat,'thread':thread,
                 'route':dict(metadata['haos_binding']),'source_key':source['source_key'],'delivery_id':delivery_id,'part':0,'bodies':bodies}
             token=_SENDING.set(state)

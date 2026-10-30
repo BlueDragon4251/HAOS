@@ -147,3 +147,27 @@ listener. All use explicit local TLS/OAuth/Google-service fixture boundaries.
 Prior source CI is separately recorded in
 [6ee96ff results](evidence/2026-10-30/google-chat-private-receive-ci-status.json);
 those results do not establish later source revisions.
+
+## Prepared inspected recovery contracts
+
+The private recovery module returns bounded metadata and byte hashes for retained
+originals and controller reply groups. It never returns message bodies, proof
+payloads, keys or tokens. Disposing an original requires withdrawal/change of its
+exact grant, a matching inspected snapshot, explicit Owner confirmation and a
+FULL-journal audit. Payload-bearing proof is compacted with the original; replay
+tombstones remain. This does not assert erasure of backups, other copies or WAL.
+Authentication recheck clears only the selected current account's sticky block;
+it preserves both status and account rate deadlines and performs no network I/O.
+
+An uncertain reply part requires its own exact group snapshot and independent
+Owner confirmation of non-delivery. Its audited approval releases one attempt,
+with a maximum of four approvals. Confirmed sibling parts cannot be released.
+Replaying an earlier Owner decision never rearms a consumed approval. The real
+SDK first GETs the stable client ID even after approval: late acceptance closes
+the audit without another POST. Only approval plus GET404 permits a new POST,
+using the original client/request IDs and exact retained bytes. Consumption and
+its audit commit before that POST; disconnect and audit failure do not silently
+rearm it. GET404 alone continues to mean unknown delivery.
+
+These are prepared private contracts, not a completed Owner GUI/backend or
+production-daemon integration. They do not change the 15/22 public count.
