@@ -38,7 +38,10 @@ def main():
             or not isinstance(request['policy_sha256'],str) or not HEX.fullmatch(request['policy_sha256']) or not isinstance(request['params'],dict)):
         raise PermissionError('closed authenticated historical Google request required')
     action=request['action'];params=request['params']
-    if action in {'profiles','unassociated-outputs'}:
+    if action=='status':
+        from .gateway_google_chat_health import selector
+        selector(params)
+    elif action in {'profiles','unassociated-outputs'}:
         if params:raise ValueError('historical profile inventory takes no selector')
     elif action=='purge-unassociated-output':
         if (set(params)!={'id','snapshot_sha256','owner_uid','note_sha256','confirmed'} or params['confirmed'] is not True
@@ -80,7 +83,14 @@ def main():
         from .gateway_google_chat_identity import load,account_scope
         profiles=Path('/var/lib/haos-gateway/profiles')
         if profiles.exists():_directory(profiles)
-        if action in {'unassociated-outputs','purge-unassociated-output'}:
+        if action=='status':
+            from .gateway_google_chat_health import read
+            selected=current_policy()
+            if selected is None or selected.connectors.get(params['connector'],{}).get('platform')!='google_chat':
+                raise PermissionError('saved current Google connector required for recorded status')
+            value=read(Path('/var/lib/haos-gateway/native-inbox.db'),params,current)
+            result={'result':value,'active_authorization_returned':False}
+        elif action in {'unassociated-outputs','purge-unassociated-output'}:
             # Unknown provenance cannot pick one app lease; require all bounded
             # Google profile holders to be inactive before global Owner cleanup.
             if profiles.exists():

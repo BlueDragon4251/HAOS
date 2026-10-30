@@ -779,6 +779,35 @@ separate explicit withdrawal decisions remain mandatory. If the original public
 values are unknown, preserve the opaque profile and obtain them from the Owner's
 original project records; HAOS does not guess or infer an account.
 
+## Recorded native status without stopping the service
+
+The account page's **Gespeicherten nativen Zustand prüfen** button and
+`haos-owner gateway google-chat-status CONNECTOR` read the last private native
+status without stopping or starting the gateway, acquiring its profile lease,
+requesting network access or loading Google SDKs in the private status worker.
+The authenticated Root caller supplies only selected account/credential
+fingerprints; it does not pass service-account keys to that worker. HTTPS saved
+credential validation in the Root caller uses the installed cryptography runtime.
+
+The private UID opens a read-only SQLite transaction, selects the exact current
+credential epoch and preserves the original stable account rate budget. Missing
+status returns `not-started` without creating a journal. Finite status/timestamp
+schemas reject private or malformed rows. Canonical paths, owner/mode, single
+links and WAL/SHM custody remain mandatory; nothing is automatically repaired.
+Root publication and parent lifetime are rechecked around the read.
+
+The GUI displays the recorded UTC update and remaining wait and explicitly
+states that this is **not a live connection check**. After a crash, a last
+`listening-tls` or `connected-pull` record may be stale; inspect the separate
+systemd service status too. An auth refusal or rate limit is shown without
+reflecting SDK errors or credentials. This operation does not clear an auth block
+or shorten a retry deadline; those retain their explicit Owner recovery paths.
+
+Actual namespace checks read status through the Root/private worker while both
+production transport variants and their kernel profile leases remain active.
+Additional SDK-free UID/SQLite/WAL/lease/filesystem probes cover missing data,
+credential isolation, preserved budgets and refusal of unsafe links/custody.
+
 The actual Root/private-UID process fixture removes only its disposable legacy
 marker after real SDK enrollment and removes all active connector/key/config
 data. Metadata restoration and subsequent historical inspection work with SDK

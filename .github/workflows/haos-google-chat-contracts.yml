@@ -142,6 +142,14 @@ jobs:
             -e HAOS_DISPOSABLE_GOOGLE_CHAT_OWNER_OAUTH_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/owner-oauth-process.json"
+      - name: Actual recorded status SQLite WAL UID lease and filesystem boundaries without optional SDK
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$PWD/linux/haos/probes/probe_google_chat_health_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_GOOGLE_CHAT_HEALTH_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/recorded-status-process.json"
       - name: Actual shared production service Root publication readonly service credentials controller IPC reconnect and withdrawal
         run: |
           set -euo pipefail

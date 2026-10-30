@@ -11,7 +11,7 @@ import time
 def main():
     sys.path.insert(0,str(Path(sys.argv[1]).resolve()))
     import tkinter as tk
-    from haos import initial_setup,google_chat_account_setup as owner
+    from haos import initial_setup,google_chat_account_setup as owner,google_chat_retired_setup as recovery
     from haos.initial_setup_gui import Wizard
     from haos.google_chat_account_gui import AccountForm,PairForm
     initial_setup.account_status=lambda:{'owner':True,'recovery':True,'complete':True,'pending':False}
@@ -19,13 +19,20 @@ def main():
     account={'project_id':'haos-fixture','service_account_email':'gateway@haos-fixture.iam.gserviceaccount.com','bot_user':'users/999',
         'inbound':{'mode':'pubsub','subscription':'projects/haos-fixture/subscriptions/private','trust_topic_publishers':True},
         'saved_service_account':True,'scope':'google-chat:'+'a'*64}
-    calls=[];reads=[];mode={'blocked':False};entered=threading.Event();release=threading.Event();selected={'id':'google-main'}
+    calls=[];reads=[];mode={'blocked':False,'private_status':False};entered=threading.Event();release=threading.Event();selected={'id':'google-main'}
     secret=json.dumps({'private_fixture':'ephemeral-private-Owner-input'})
     def save(connector,bot,inbound,value,**options):
         if mode['blocked']:entered.set();assert release.wait(5)
         calls.append(('account',connector,bot,deepcopy(inbound),value,options));return {'configured':True}
     def pair(*args,**options):calls.append(('pair',args,options));return {'paired':True}
     owner.save_account=save;initial_setup.pair_gateway_sender=pair
+    def status(connector):
+        calls.append(('status',connector));value={'connector':connector,'credential_scope':'b'*64,'account_scope':account['scope'],
+            'status':'authentication-refused','updated_at':time.time(),'next_attempt':time.time()+180,'observed_only':True,
+            'live_transport_verified':False,'network_requested':False,'private_credentials_returned':False}
+        if mode['private_status']:value['token']='must-not-render-status'
+        return {'result':value,'active_authorization_returned':False}
+    recovery.status=status
     initial_setup.gateway_configuration=lambda:{'google_chat':{selected['id']:deepcopy(account)}}
     initial_setup.read_line_tls_file=lambda path,kind:reads.append((path,kind)) or 'private-TLS-fixture-'+kind
     w=Wizard(tk)
@@ -76,6 +83,13 @@ def main():
         pair_form.flags['allow_voice'].set(True);pair_form.flags['all_threads'].set(True);pair_form.confirm.set(True);pair_form.vars['sender'].set('users/124')
         assert not pair_form.confirm.get() and not pair_form.flags['allow_voice'].get() and not pair_form.flags['all_threads'].get()
         cases.append('actual_Tk_route_edit_clears_previous_whole_space_and_media_permissions_and_confirmation')
+        form.variables['account'].set(secret);form.status_button.invoke();settle()
+        assert calls[-1]==('status','google-main') and not form.variables['account'].get()
+        assert 'Anmeldung abgelehnt' in form.status_label.cget('text') and 'Keine Live-Verbindungsprüfung' in form.status_label.cget('text')
+        cases.append('actual_Tk_recorded_native_status_shows_auth_refusal_and_retry_budget_without_claiming_live_connection_or_reusing_private_input')
+        mode['private_status']=True;form.status_button.invoke();settle()
+        assert 'verworfen' in form.status_label.cget('text') and 'must-not-render-status' not in form.status_label.cget('text')
+        cases.append('actual_Tk_status_rejects_unexpected_private_fields_before_rendering')
         w.show('google-chat-setup');w.root.update();w.viewport.yview_moveto(1);w.root.update()
         assert w.page=='google-chat-setup' and w.content.winfo_height()>w.viewport.winfo_height()
         cases.append('actual_Wizard_constructs_complete_scrollable_account_pairing_OAuth_file_and_recovery_page_at_current_screen_size')

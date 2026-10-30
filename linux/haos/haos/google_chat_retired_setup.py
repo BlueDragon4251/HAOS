@@ -15,7 +15,8 @@ def _invoke(action,params):
     from .gateway_line_ingress import _object
     from .gateway_dingtalk_admission import finite
     from .owner import audit
-    quiesce_for_setup(gateway_only=True);stopped_gateway();publication=policy_snapshot()
+    if action!='status':quiesce_for_setup(gateway_only=True);stopped_gateway()
+    publication=policy_snapshot()
     account=pwd.getpwnam('haos-gateway')
     if account.pw_uid==0 or account.pw_gid==0:raise PermissionError('separate historical Google gateway identity required')
     _runtime_state(account)
@@ -40,6 +41,16 @@ def _invoke(action,params):
 def profiles():
     from .initial_setup import require_root
     require_root();return _invoke('profiles',{})
+
+
+def status(connector):
+    from .initial_setup import require_root
+    require_root()
+    from .google_chat_owner_setup import saved
+    from .gateway_google_chat import scope
+    from .gateway import digest
+    _,account=saved(connector)
+    return _invoke('status',{'connector':connector,'credential_scope':digest([connector,account]),'account_scope':scope(account)})
 
 
 def restore_identity(profile,identity,note,*,confirmed=False):

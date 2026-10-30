@@ -183,6 +183,7 @@ def main():
     gateway_sub = gateway.add_subparsers(dest="gateway_action", required=True)
     from .google_chat_retired_cli import arguments as historical_google_arguments
     historical_google_arguments(gateway_sub)
+    gateway_sub.add_parser('google-chat-status',help='read recorded native Google status without stopping the gateway; not a live Google probe').add_argument('connector')
     for action in ("status", "start", "stop", "recover-configuration"):
         gateway_sub.add_parser(action)
     setup = gateway_sub.add_parser("setup")

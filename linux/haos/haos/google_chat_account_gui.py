@@ -38,6 +38,10 @@ class AccountForm:
             'Es wird keine Routerregel automatisch geöffnet.',size=10,color=wizard.MUTED).pack(anchor='w',pady=5)
         self.flag(self.frame,'Genau dieses Konto und diese Verbindung speichern; bei Änderung bestehende Absender neu koppeln',self.confirm)
         self.save_button=wizard._button(self.frame,'Google-Chat-Konto sicher speichern',self.configure,primary=True);self.save_button.pack(anchor='w',pady=8)
+        self.status_button=wizard._button(self.frame,'Gespeicherten nativen Zustand prüfen (Dienst bleibt unverändert)',self.status)
+        self.status_button.pack(anchor='w',pady=4)
+        self.status_label=wizard._label(self.frame,'Zustand noch nicht gelesen; Dienststatus in der Gateway-Verwaltung prüfen.',size=10,color=wizard.MUTED)
+        self.status_label.pack(anchor='w',pady=5)
         for var in [self.keep,self.trust,self.public,self.bind]:var.trace_add('write',self.changed)
         self.mode.trace_add('write',self.mode_changed);self.mode_changed()
 
@@ -51,6 +55,7 @@ class AccountForm:
 
     def changed(self,*_args):
         self.epoch+=1;self.confirm.set(False)
+        if hasattr(self,'status_label'):self.status_label.configure(text='Kontofelder geändert; gespeicherten Zustand ausdrücklich neu lesen.')
 
     def mode_changed(self,*_args):
         self.clear_secret();self.pull.pack_forget();self.http.pack_forget()
@@ -96,6 +101,35 @@ class AccountForm:
             result,account=value;self.reset(account);self.on_saved(account)
             w.status.configure(text='Konto gespeichert. Noch keine Live-Abnahme; Absender exakt koppeln und Gateway danach bewusst starten.')
         w._run_async(execute,result_handler=done)
+
+    def status(self):
+        w=self.wizard
+        if w.running:return
+        from .google_chat_retired_setup import status
+        from .google_chat_retired_process import response
+        from .google_chat_owner_gui import ERRORS
+        connector=self.connector();self.clear_secret();epoch=self.epoch
+        def done(value):
+            if connector!=self.connector() or epoch!=self.epoch or not self.frame.winfo_exists():return
+            try:
+                value=response(value,'status')
+                if 'error' in value:self.status_label.configure(text=ERRORS[value['error']]);return
+                result=value['result']
+                if result['connector']!=connector or self.saved and result['account_scope']!=self.saved['scope']:
+                    raise ValueError('saved Google account changed')
+            except (ValueError,KeyError,TypeError):
+                self.status_label.configure(text='Ungültigen oder veralteten Zustandsbeleg verworfen; Konto neu laden.');return
+            import datetime,math,time
+            labels={'not-started':'Noch kein Zustand für dieses gespeicherte Konto','created':'Profil vorbereitet','connecting':'Verbindung wird hergestellt',
+                'connected-pull':'Pub/Sub-Pull verbunden','listening-tls':'HTTPS-Listener gestartet','disconnected':'Getrennt','closed':'Geschlossen',
+                'revoked':'Freigabe entzogen','authentication-refused':'Anmeldung abgelehnt; Konto und API-Rechte prüfen',
+                'identity-refused':'Identität oder API-Berechtigung abgelehnt','rate-limited':'Anbieter-Wartefrist aktiv',
+                'transport-unavailable':'Verbindung nicht verfügbar','source-unavailable':'Quellbelege nicht verfügbar','storage-unavailable':'Privates Journal nicht verfügbar'}
+            updated=('keine Meldung' if result['updated_at'] is None else datetime.datetime.fromtimestamp(result['updated_at'],datetime.timezone.utc).isoformat())
+            delay=min(86400,max(0,math.ceil(result['next_attempt']-time.time())))
+            self.status_label.configure(text='Zuletzt privat gemeldet: '+labels[result['status']]+'. Stand: '+updated+'. Wartefrist: '+str(delay)+
+                ' s. Keine Live-Verbindungsprüfung; bei Prozessabbruch kann die letzte Meldung veraltet sein. Dienststatus separat prüfen.')
+        w._run_async(lambda:status(connector),result_handler=done)
 
 
 class PairForm:

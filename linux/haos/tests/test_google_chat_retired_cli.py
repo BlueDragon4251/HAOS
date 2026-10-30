@@ -78,3 +78,14 @@ def test_legacy_identity_cli_passes_only_explicit_original_public_metadata_and_o
     assert cli.run(selected)=={'metadata':True}
     assert calls==[(selected.profile,{'version':1,'project_id':selected.project_id,'service_account_email':selected.service_account_email,
         'bot_user':selected.bot_user},'independent Owner review',{'confirmed':True})]
+
+
+def test_recorded_status_owner_dispatch_has_no_unprivileged_entry(monkeypatch):
+    from haos import gateway_setup
+    calls=[];selected=SimpleNamespace(gateway_action='google-chat-status',connector='google')
+    monkeypatch.setattr(cli.owner,'status',lambda connector:calls.append(connector) or {'recorded':True})
+    monkeypatch.setattr(gateway_setup.os,'geteuid',lambda:1000)
+    with pytest.raises(PermissionError):gateway_setup.owner_gateway(selected)
+    assert calls==[]
+    monkeypatch.setattr(gateway_setup.os,'geteuid',lambda:0)
+    assert gateway_setup.owner_gateway(selected)=={'recorded':True} and calls==['google']

@@ -17,8 +17,7 @@ from .gateway_google_chat_custody import Originals
 from .gateway_google_chat_receive import Receiver
 from .gateway_google_chat_ingress import install,capture_stored,dispatch_stored
 
-STATES=frozenset({'created','connecting','connected-pull','listening-tls','disconnected','closed','revoked',
-    'authentication-refused','identity-refused','rate-limited','transport-unavailable','source-unavailable','storage-unavailable'})
+from .gateway_google_chat_health import STATES
 BLOCKS=frozenset({'authentication-refused','identity-refused'})
 
 

@@ -349,6 +349,9 @@ def owner_gateway(args):
     if args.gateway_action=='google-chat-retired':
         from .google_chat_retired_cli import run
         return run(args)
+    if args.gateway_action=='google-chat-status':
+        from .google_chat_retired_setup import status
+        return status(args.connector)
     if args.gateway_action == "recover-configuration":
         from .gateway_publication import recover
         stopped_gateway()
