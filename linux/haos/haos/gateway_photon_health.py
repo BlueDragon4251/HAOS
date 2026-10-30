@@ -1,5 +1,6 @@
 """Finite recorded Photon state and stable account retry budgets; no SDK import."""
 import math
+from itertools import permutations
 import time
 
 from .gateway import Conflict, digest
@@ -15,7 +16,10 @@ class Ledger:
     def __init__(self, inbox, connector, value, publication, current):
         if not callable(current): raise PermissionError('current independent Photon authority required')
         current(); value = credentials(value); self.current = current; self.db = inbox.db
-        self.account = scope(value); self.credential = digest(value)
+        self.account = scope(value)
+        # Service toggles change receive authority, not the rejected project
+        # credential. They must not re-enable the same refused key.
+        self.credential = digest([value['project_id'], value['project_secret'], value['phone']])
         self.identity = digest([self.account, self.credential, connector, publication])
         self.db.execute('''CREATE TABLE IF NOT EXISTS photon_profile_status(
             id TEXT PRIMARY KEY,account_scope TEXT NOT NULL,credential_scope TEXT NOT NULL,
@@ -24,8 +28,13 @@ class Ledger:
             account_scope TEXT PRIMARY KEY,next_attempt REAL NOT NULL)''')
         # Auth refusal follows the same credential across publication/connector
         # changes. The rate budget follows the account across key rotation too.
-        prior = self.db.execute('SELECT status FROM photon_profile_status WHERE account_scope=? AND credential_scope=? ORDER BY updated_at DESC',
-            (self.account, self.credential)).fetchall()
+        # Earlier prepared profiles hashed the service list into the credential
+        # key. Preserve their refusals without resetting or deleting recovery
+        # data. The three finite service names give only 15 legacy permutations.
+        credential_keys = [self.credential, *[digest({**value, 'services': list(items)})
+            for count in range(1, 4) for items in permutations(('iMessage', 'SMS', 'RCS'), count)]]
+        prior = self.db.execute('SELECT status FROM photon_profile_status WHERE account_scope=? AND credential_scope IN (' +
+            ','.join('?' for _ in credential_keys) + ') ORDER BY updated_at DESC', (self.account, *credential_keys)).fetchall()
         blocked = next((row['status'] for row in prior if row['status'] in TERMINAL - {'revoked'}), None)
         self.db.execute('INSERT OR IGNORE INTO photon_account_budget VALUES(?,0)', (self.account,))
         self.db.execute('INSERT OR IGNORE INTO photon_profile_status VALUES(?,?,?,?,?,?)',
@@ -53,7 +62,9 @@ class Ledger:
             previous = self.recorded()
             # Delayed network errors cannot overwrite the original terminal
             # reason. Budget and state either both commit or both roll back.
-            selected = previous['status'] if previous['status'] in TERMINAL else state
+            active_limit = (previous['status'] == 'rate-limited' and previous['next_attempt'] > time.time()
+                and state in {'transport-unavailable', 'connecting', 'local-ready', 'upstream-observed'})
+            selected = previous['status'] if previous['status'] in TERMINAL or active_limit else state
             deadline = max(previous['next_attempt'], time.time() + delay) if delay else previous['next_attempt']
             self.db.execute('UPDATE photon_account_budget SET next_attempt=? WHERE account_scope=?', (deadline, self.account))
             self.db.execute('UPDATE photon_profile_status SET status=?,updated_at=? WHERE id=?', (selected, time.time(), self.identity))

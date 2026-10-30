@@ -97,9 +97,10 @@ def install(target, sidecar, *, archive=None):
                 continue
             if entry.lstat().st_uid != 0: raise PermissionError('root-owned Photon dependency required')
             entry.chmod(0o755 if entry.is_dir() else 0o644)
-        for filename in ['photon_sidecar.mjs', 'photon_bounded_stream.mjs']:
+        for filename in ['photon_sidecar.mjs', 'photon_bounded_stream.mjs', 'photon_cloud.mjs']:
             shutil.copyfile(overlay / filename, target / filename); (target / filename).chmod(0o644)
         programs = {'node': node, 'launcher': target / 'photon_sidecar.mjs', 'bounded-stream': target / 'photon_bounded_stream.mjs',
+            'cloud': target / 'photon_cloud.mjs',
             'sidecar': sidecar / 'index.mjs', 'format': sidecar / 'send-format.mjs', 'staleness': sidecar / 'stream-staleness.mjs',
             'compatibility': sidecar / 'patch-spectrum-mixed-attachments.mjs',
             'imessage': sidecar / 'node_modules/@spectrum-ts/imessage/dist/index.js',

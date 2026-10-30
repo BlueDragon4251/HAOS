@@ -11,6 +11,7 @@ import stat
 ROOT = Path('/usr/lib/haos/photon')
 SIDECAR = Path('/usr/lib/haos/hermes/plugins/platforms/photon/sidecar')
 PROGRAMS = {'node': ROOT / 'node', 'launcher': ROOT / 'photon_sidecar.mjs', 'bounded-stream': ROOT / 'photon_bounded_stream.mjs',
+    'cloud': ROOT / 'photon_cloud.mjs',
     'sidecar': SIDECAR / 'index.mjs', 'format': SIDECAR / 'send-format.mjs', 'staleness': SIDECAR / 'stream-staleness.mjs',
     'compatibility': SIDECAR / 'patch-spectrum-mixed-attachments.mjs',
     'imessage': SIDECAR / 'node_modules/@spectrum-ts/imessage/dist/index.js',
@@ -85,6 +86,7 @@ class Child:
         if self.process is not None: raise PermissionError('Photon child already started')
         if os.path.lexists(self.control_socket): raise PermissionError('Photon control entry already exists')
         environment = {'PATH': '/usr/bin:/bin', 'HOME': str(self.home), 'HERMES_HOME': str(self.home), 'LANG': 'C.UTF-8',
+            'HAOS_PHOTON_PHONE': self.value['phone'],
             'PHOTON_PROJECT_ID': self.value['project_id'], 'PHOTON_PROJECT_SECRET': self.value['project_secret'],
             'PHOTON_SIDECAR_TOKEN': self.token, 'HAOS_PHOTON_POLICY_SOCKET': str(self.policy_socket),
             'HAOS_PHOTON_CONTROL_SOCKET': str(self.control_socket), 'NODE_OPTIONS': '', 'NODE_PATH': '',

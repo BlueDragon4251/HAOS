@@ -91,7 +91,8 @@ public registry until outgoing replies and Owner management are complete.
 
 The image build now installs the exact official Node 24.19.0 archive and the
 committed Spectrum lockfile with dependency lifecycle scripts disabled. It
-records twelve actual program digests. The private launcher verifies those
+records thirteen actual program digests, including the bounded cloud transport.
+The private launcher verifies those
 digests, immutable root ownership and canonical paths, uses fixed arguments and
 a restricted environment, and never invokes npm in the service. Public program
 directories are made readable by the actual service identity during installation;
@@ -127,11 +128,29 @@ account retry budgets are persisted atomically; later network errors cannot
 replace an earlier terminal authentication/revocation reason. This is recorded
 local state, never proof of live account entitlement or recipient receipt.
 
-The cloud-boundary helper has eight independent contract checks for fixed
-routes, response limits, redirects, authority, typed errors and dedicated line
-selection. It is not wired into the prepared SDK yet; its component tests do
-not establish native HTTP failure handling. The next integration step must
-exercise those actual SDK failures and token refresh paths.
+The bounded cloud transport is now wired into the actual SDK before module
+initialization. It permits only the three required project/token/platform
+operations against the fixed HTTPS origin, refuses redirects, bounds response
+bytes and total fetch time, and reports finite status without native error
+bodies. Actual gRPC error codes follow the same private status path. The
+supervisor stops the process and enforces persistent retry budgets instead of
+letting internal SDK retries race the independent authority.
+
+Both the initial token catalogue and actual SDK token renewal pass through
+exact approved-line selection. Shared/dedicated mode mismatches, missing or
+ambiguous dedicated numbers and unsafe instance host labels are refused before
+client creation. Other project lines are filtered before opening channels.
+Private account credentials cannot select arbitrary hosts or program paths.
+
+Ten complete private-UID TLS/gRPC scenes pass 54 checks: shared and dedicated
+receive/revoke paths; HTTP 401, 403 and 429; actual gRPC authentication and rate
+errors; wrong dedicated line; and actual token-refresh 401/429. Reopening a
+profile cannot bypass a terminal refusal or a current account budget. Eight
+additional cloud-boundary component checks cover fixed routes, redirects,
+response bounds and typed errors. A late generic startup error retains an
+active rate-limit diagnostic. Changing service toggles cannot turn the same
+refused project key into a fresh credential; old prepared status rows remain
+intact and their refusals are carried forward.
 
 ## Evidence limits and work remaining
 
@@ -143,8 +162,8 @@ checks do not establish a live Spectrum connection, receipt by another person,
 HAOS controller inference, installed service/GUI behavior or hardware acceptance.
 
 Still required before counting Photon: full durable receive/replay/controller
-path, actual native guarded replies and outbox, SDK reconnect/rate/auth and
-refresh handling, supported media
+path, actual native guarded replies and outbox, broader reconnect/refresh and
+recovery acceptance, supported media
 and voice conversion, inspected source/output/account recovery, real Owner GUI
 and CLI onboarding/device authentication, build installation/provenance and
 end-to-end native/private-UID fixtures. Continue this gateway before Raft,

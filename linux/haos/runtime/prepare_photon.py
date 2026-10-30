@@ -91,6 +91,14 @@ if (hermesTransport !== undefined && (!hermesTransport ||
     sdk = replace_once(sdk, anchor, anchor + '\n\tif (globalThis[Symbol.for("hermes.photon.sdk.transport")]?.avoidReplyHydration === true) return stubReplyTarget(base, targetGuid);')
     sdk, count = re.subn(r'(?m)^(\t+)retry: true,$', r'\1retry: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticRetries !== true,', sdk)
     if count != 3: raise ValueError('pinned Photon automatic RPC retry constructors changed')
+    anchor = '\tlet tokenData = await cloud.issueImessageTokens(projectId, projectSecret);'
+    sdk = replace_once(sdk, anchor, '''\tconst selectTokenData = async (data) => {
+\t\tconst embedding = globalThis[Symbol.for("hermes.photon.sdk.transport")];
+\t\treturn embedding?.selectTokenData ? await embedding.selectTokenData(data) : data;
+\t};
+\tlet tokenData = await selectTokenData(await cloud.issueImessageTokens(projectId, projectSecret));''')
+    sdk = replace_once(sdk, '\t\t\ttokenData = await cloud.issueImessageTokens(projectId, projectSecret);',
+        '\t\t\ttokenData = await selectTokenData(await cloud.issueImessageTokens(projectId, projectSecret));')
     anchor = 'const messageStream = (client, phone, onInbound, recover) => resumableOrderedStream({\n'
     sdk = replace_once(sdk, anchor, anchor + '''	initialCursor: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.initialCursor,
 	onCursor: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.commitCursor,

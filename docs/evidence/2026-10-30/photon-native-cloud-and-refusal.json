@@ -1,0 +1,881 @@
+{
+  "recorded_UTC": "2026-10-30T19:53:48.299900+00:00",
+  "base_commit": "b5e3f814b4168f33add34bc27652e1dde91050c3",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "78bdcee5ead6f8cd7a8adc246a04f28bfd40c9a4450b71fad60762bb57615a73"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "f196a6ace3d5a29df555dd36a54799db5dcdff9d5ab84eaee543d7f5dddd580d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_health.py",
+      "sha256": "7d92bda5df544614f653528810af33eb0a47d1df5f707a3001a0fa950cc81d45"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_process.py",
+      "sha256": "c677e6ea733628199d791b040c9bf04b2eac07bb8b2ff89a20baf19d4347bd58"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_profile.py",
+      "sha256": "1e8be756bad0b2ca0655af786900b9e47afbd073f13eb1a5f84bd4ae6981d01b"
+    },
+    {
+      "path": "linux/haos/runtime/install_photon.py",
+      "sha256": "1c2e7408956b3a25afba445d7b983beb62028ae2ee5ab36b369e3264c3a052e6"
+    },
+    {
+      "path": "linux/haos/runtime/photon_cloud.mjs",
+      "sha256": "ae4da28429f7d5740c24fd77138379ec5173fab23fbf31d7e98e5117f3b81a6e"
+    },
+    {
+      "path": "linux/haos/runtime/photon_protocol_fixture.mjs",
+      "sha256": "6b727a018795367a46de392a13de4943e91117d76f253f577208899fb0a99efa"
+    },
+    {
+      "path": "linux/haos/runtime/photon_sidecar.mjs",
+      "sha256": "0714f35248034cf6141a6824b1f7f3892819a43e2170c7eb5ef658bb54291e40"
+    },
+    {
+      "path": "linux/haos/runtime/prepare_photon.py",
+      "sha256": "2ae22874a3e0658f9c280dfd149d557750901575f55ddfe2ea07c0867a53bd65"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_health.py",
+      "sha256": "86fac4d7ef1b1504052bdfd0af579398ccfed1ae4aff657105382e82d79723a2"
+    }
+  ],
+  "actual_native_private_scenes": [
+    {
+      "passed": 7,
+      "scenario": "normal",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 70
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 7,
+      "scenario": "dedicated",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SubscribeGroupEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1,
+          "SubscribeGroupEvents": 1
+        },
+        "timer_ticks": 91
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http403",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "grpc401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 20
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "grpc429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 35
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "wrong-line",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "refresh401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 2,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "refresh429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 2,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    }
+  ],
+  "actual_native_private_check_count": 54,
+  "actual_image_component_install": {
+    "schema": 1,
+    "actual_installer": true,
+    "node": "24.19.0",
+    "spectrum": "12.7.0",
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "runtime_programs": 13,
+    "source_sha256": "cb75af260b64d52608db32066363fd3a53fc344584a1b732b138ad036fa84429",
+    "dependency_lifecycle_scripts": false,
+    "network_scope": "public locked npm dependencies only; no messaging SDK connection",
+    "live_Photon_verified": false,
+    "private_UID_process_verified": false,
+    "OS_release_artifact": false
+  },
+  "actual_private_process": {
+    "schema": 1,
+    "passed": 17,
+    "cases": [
+      "actual_private_UID_GID_accepts_only_verified_fixed_Node_command",
+      "actual_kernel_root_cannot_use_gateway_command",
+      "actual_kernel_agent_cannot_use_gateway_command",
+      "actual_kernel_supplementary-root_cannot_use_gateway_command",
+      "actual_kernel_saved-root-uid_cannot_use_gateway_command",
+      "actual_kernel_saved-root-gid_cannot_use_gateway_command",
+      "actual_installed_spectrum_version_drift_refused",
+      "actual_installed_hermes_commit_drift_refused",
+      "actual_installed_schema_drift_refused",
+      "actual_source_bytes_cannot_change_behind_trusted_metadata",
+      "actual_writable_program_refused",
+      "actual_hardlinked_program_refused",
+      "actual_foreign_owned_program_refused",
+      "actual_missing_NoNewPrivileges_refused_before_any_child_or_credentials_handoff",
+      "actual_production_Node_bootstrap_is_stopped_on_owner_withdrawal_before_SDK_init",
+      "actual_parent_hard_exit_kills_production_Node_bootstrap_before_SDK_init",
+      "actual_official_Node_private_UID_flags_and_readonly_SDK_resume_probe_pass"
+    ],
+    "actual_node": "24.19.0",
+    "scope": "actual verified installed programs, kernel identities, NoNewPrivileges, production bootstrap and Unix peer, early withdrawal and parent death",
+    "substitution": "initial resume RPC held before SDK/cloud initialization",
+    "live_Photon_verified": false,
+    "native_gRPC_verified": false,
+    "OS_release_artifact": false
+  },
+  "actual_native_SDK_components": [
+    {
+      "schema": 1,
+      "passed": 13,
+      "cases": [
+        "native_sdk_refuses_before_mapping_or_automatic_contact_callback",
+        "native_vcard_download_is_refused_before_eager_sdk_conversion",
+        "native_poll_and_group_hydration_refused_before_rpc",
+        "failed_independent_custody_cannot_be_interpreted_as_admission",
+        "approved_text_uses_actual_native_message_and_sender_codec",
+        "actual_native_reply_keeps_target_id_without_quoted_message_hydration",
+        "actual_native_attachment_stream_obeys_bound_and_closes_native_rpc",
+        "lying_native_size_refused_and_rpc_closed",
+        "truncated_native_attachment_is_not_a_successful_marker",
+        "authority_rechecked_between_native_chunks_and_withdrawal_cancels_rpc",
+        "hung_native_stream_is_cancelled_at_total_deadline",
+        "oversize_metadata_refused_before_stream_open",
+        "incomplete_sdk_embedding_fails_closed"
+      ],
+      "actual_spectrum_version": "12.7.0",
+      "prepared_sdk_sha256": "40681a93d44d7c05873751ec8cbc79b3f6892cff60360b35d95ad944748c8676",
+      "native_rpc_frames": "local fixture",
+      "external_network": false,
+      "live_delivery_verified": false
+    },
+    {
+      "schema": 1,
+      "passed": 6,
+      "cases": [
+        "actual_native_restart_uses_saved_cursor_and_catches_up_before_buffered_live_events",
+        "actual_native_cursor_waits_for_durable_callback_before_processing_later_events",
+        "actual_native_failed_cursor_write_retries_from_previous_resume_point",
+        "actual_native_cursor_rejection_requires_embedding_recovery_and_never_falls_back_to_live",
+        "actual_native_failure_callback_observes_typed_cause_without_changing_cursor",
+        "native_nonembedded_default_does_not_acquire_an_invented_cursor"
+      ],
+      "scope": "actual prepared Spectrum resumableOrderedStream and Repeater",
+      "substitutions": [
+        "live and catch-up transport iterators",
+        "durable cursor callback"
+      ],
+      "external_network": false,
+      "live_Photon_verified": false,
+      "SQLite_verified_by_this_probe": false
+    },
+    {
+      "schema": 1,
+      "passed": 18,
+      "cases": [
+        "text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "reply_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "mixed-image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "group-thread_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "voice_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "document_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "audio-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "caf-alias_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "mixed-unicode_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "mixed-no-marker_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "mixed-adjacent-markers_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "multi-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "restart-text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "parent-receipt-lost_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "virtual-message_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "virtual-attachment_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+        "dedicated-chat_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay"
+      ],
+      "scope": "actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy, FULL original/native/media/RelayInbox custody and restart",
+      "substitutions": [
+        "SDK remote RPC frames",
+        "final handler invokes actual RelayInbox without a controller connection"
+      ],
+      "external_messages_sent": false,
+      "controller_inference_verified": false,
+      "local_STT_verified": false,
+      "kernel_UID_verified_by_this_probe": false
+    }
+  ],
+  "cloud_boundary_component": {
+    "passed": 8,
+    "cases": [
+      "native_JSON_preserved_with_redirects_refused_and_abort_bound",
+      "unknown_host_project_query_method_body_and_missing_auth_refused_before_fetch",
+      "HTTP_401_and_403_finite_terminal_status_without_response_body",
+      "HTTP_429_persists_bounded_account_budget",
+      "advertised_and_actual_cloud_response_size_capped",
+      "current_authority_required_before_cloud_fetch",
+      "actual_native_typed_gRPC_codes_use_finite_auth_rate_transport_status",
+      "dedicated_token_catalogue_selects_only_one_exact_approved_line_and_safe_host_label"
+    ],
+    "scope": "embedding cloud boundary contract; fixture fetch responses",
+    "live_Photon_verified": false
+  },
+  "minimal_regression": "3185 passed, 2 skipped in 34.48s",
+  "full_frozen_regression": "3185 passed, 2 skipped in 36.60s",
+  "actual_kernel_regression": "174 passed in 14.25s",
+  "preceding_commit_CI": [
+    {
+      "conclusion": "success",
+      "databaseId": 41117976595,
+      "headSha": "b5e3f814b4168f33add34bc27652e1dde91050c3",
+      "jobs": [
+        {
+          "completedAt": "2026-10-30T19:48:13Z",
+          "conclusion": "success",
+          "databaseId": 124277046679,
+          "name": "installed-private-process",
+          "startedAt": "2026-10-30T19:46:30Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Prepare actual pinned image-install inputs",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual official Node and locked SDK installation with lifecycle scripts disabled",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual private UID program checks and production Node lifetime without external network",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v7",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Prepare exact frozen Python runtime for the actual private Photon profile",
+              "number": 7,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID",
+              "number": 8,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 9,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v7",
+              "number": 17,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 18,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 19,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41117976595/job/124277046679"
+        },
+        {
+          "completedAt": "2026-10-30T19:47:09Z",
+          "conclusion": "success",
+          "databaseId": 124277047051,
+          "name": "prepared-native-contracts",
+          "startedAt": "2026-10-30T19:46:30Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v7",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Prepare exact pinned Hermes and immutable Photon dependency inputs",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Independent grants and actual FULL SQLite custody without Hermes imports",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 7,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 12,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v7",
+              "number": 13,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 14,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41117976595/job/124277047051"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41117976606,
+      "headSha": "b5e3f814b4168f33add34bc27652e1dde91050c3",
+      "jobs": [
+        {
+          "completedAt": "2026-10-30T19:50:41Z",
+          "conclusion": "success",
+          "databaseId": 124277046856,
+          "name": "services",
+          "startedAt": "2026-10-30T19:46:30Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v7",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3 Pillow==12.3.0",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run HAOS_TEST_PYTHON=\"$(command -v python)\" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Install sandbox dependency for real root authority fixtures",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Root-authority backup and policy-access tests in disposable fixtures",
+              "number": 7,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "QEMU runtime selection and privileged guest fixture regression tests",
+              "number": 8,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Verify exact owner-approved application files and persistent revocation",
+              "number": 9,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real private host application Wayland input and denied peers",
+              "number": 10,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 11,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real local socket and kernel filesystem probes",
+              "number": 12,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Delegate and revoke real ACLs on isolated ext4 xfs btrfs disks",
+              "number": 13,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Launch the isolated filesystem view under actual production systemd hardening",
+              "number": 14,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Record actual diskless QEMU acceleration",
+              "number": 15,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real bounded systemd application units and escaped-child cleanup",
+              "number": 16,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 17,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real persistent GUI queue and independently authorized application pipeline",
+              "number": 18,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 19,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual production root application hardening and independent broker loss",
+              "number": 20,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 21,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Separate hardened TLS viewer, kernel identities and real application frame delivery",
+              "number": 22,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 23,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual encrypted retention, corrupt-data denial and damaged fixture restore",
+              "number": 24,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Deny inherited observer administrator rights on a disposable account",
+              "number": 25,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Validate service unit syntax",
+              "number": 26,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Enforce the actual agent socket UID boundary with nftables",
+              "number": 27,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Verify real owner password authentication and fixed CLI authority",
+              "number": 28,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v7",
+              "number": 55,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 56,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 57,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41117976606/job/124277046856"
+        }
+      ]
+    }
+  ],
+  "corrections": [
+    "Loopback fixture readiness and counters published by atomic rename to avoid partial-read races",
+    "Late generic startup errors no longer replace active rate-limit status; original account deadline retained",
+    "Same rejected project key remains blocked across service toggles, retaining legacy prepared status rows without deletion"
+  ],
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_connection": false,
+    "controller_IPC_verified": false,
+    "full_service_GUI_acceptance": false,
+    "OS_ISO_APK_release_acceptance": false
+  },
+  "next": "Guard actual native replies with exact retained source and one-shot persistent outbox authority; cover uncertain writes without automatic resend. Then controller/media/STT, secure Owner account GUI/CLI and inspected recovery before17. Continue remaining five gateways."
+}

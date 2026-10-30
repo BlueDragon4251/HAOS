@@ -59,13 +59,16 @@ jobs:
       - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
         run: |
           set -euo pipefail
-          docker run --rm --network none --pids-limit 192 --memory 2g \
-            -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
-            -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
-            -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
-            -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
-            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
-            python3 /repo/linux/haos/probes/probe_photon_profile.py > "$RUNNER_TEMP/photon-install/private-native-profile.json" 2> "$RUNNER_TEMP/photon-install/private-native-profile.err"
+          for fixture_case in normal dedicated http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429; do
+            docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case "$fixture_case" \
+              > "$RUNNER_TEMP/photon-install/private-native-$fixture_case.json" 2> "$RUNNER_TEMP/photon-install/private-native-$fixture_case.err"
+          done
       - uses: actions/upload-artifact@v7
         if: always()
         with:

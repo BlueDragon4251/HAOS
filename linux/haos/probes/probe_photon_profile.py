@@ -53,7 +53,35 @@ async def worker(directory):
         observed.append(envelope); return True
     adapter.set_durable_message_handler(accept)
     try:
-        assert await adapter.connect(), adapter._haos_photon_health.recorded()
+        connected = await adapter.connect()
+        scenario = config['scenario']
+        if scenario not in {'normal', 'dedicated'}:
+            if connected: (root / 'emit').write_text('emit fixture native refusal')
+            expected = 'identity-refused' if scenario == 'wrong-line' else 'rate-limited' if scenario.endswith('429') else 'authentication-refused'
+            deadline = time.monotonic() + 10
+            while adapter.is_connected or adapter._haos_photon_health.recorded()['status'] != expected:
+                assert time.monotonic() < deadline, (scenario, adapter._haos_photon_health.recorded())
+                await asyncio.sleep(.01)
+            health = adapter._haos_photon_health.recorded()
+            assert health['status'] == expected
+            if expected == 'rate-limited': assert health['next_attempt'] > time.time() + 50
+            counts = json.loads((root / 'counts.json').read_text())
+            token_calls = counts['http'].get('POST /projects/fixture-project/imessage/tokens', 0)
+            assert token_calls >= (2 if scenario.startswith('refresh') else 1)
+            assert not observed and relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 0
+            assert not any(Path('/tmp').glob('hp-*/control.sock'))
+            assert await adapter.connect() is False
+            await adapter.close()
+            reopened = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
+            try: assert await reopened.connect() is False
+            finally: await reopened.close()
+            await asyncio.sleep(.1)
+            assert json.loads((root / 'counts.json').read_text())['http'] == counts['http']
+            return {'passed': 5, 'scenario': scenario, 'cases': ['actual_native_SDK_refusal_recorded_finitely',
+                'actual_Node_stopped_after_refusal', 'no_source_or_parent_delivery',
+                'same_instance_cannot_retry_around_budget_or_terminal_state', 'reopened_profile_cannot_retry_around_persisted_refusal'],
+                'counts': counts, 'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
+        assert connected, adapter._haos_photon_health.recorded()
         assert adapter.is_connected
         (root / 'emit').write_text('emit fixture frames')
         deadline = time.monotonic() + 12
@@ -73,6 +101,11 @@ async def worker(directory):
         assert originals.execute('SELECT COUNT(*) FROM photon_refusals').fetchone()[0] == 1
         assert len(originals.execute('SELECT admitted_receipt FROM photon_originals').fetchone()[0]) == 64
         assert adapter._haos_photon_cursor.resume() == '2'
+        if scenario == 'dedicated':
+            counts = json.loads((root / 'counts.json').read_text())
+            assert counts['grpc']['SubscribeMessageEvents'] == 1
+            assert counts['grpc']['SubscribeGroupEvents'] == 1
+            assert counts['grpc']['SubscribePollEvents'] == 1
         active[0] = False
         deadline = time.monotonic() + 2
         while adapter.is_connected:
@@ -80,7 +113,7 @@ async def worker(directory):
             await asyncio.sleep(.01)
         assert adapter._haos_photon_health.recorded()['status'] == 'revoked'
         assert not any(Path('/tmp').glob('hp-*/control.sock'))
-        return {'passed': 7, 'cases': ['actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC',
+        return {'passed': 7, 'scenario': scenario, 'cases': ['actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC',
             'unknown_sender_hash_only_refusal_before_native_mapping', 'approved_native_SDK_sidecar_Python_codec_durable_relay',
             'duplicate_native_message_exactly_one_parent_row', 'original_and_native_custody_have_parent_receipt',
             'actual_native_stream_advances_durable_cursor', 'owner_withdrawal_stops_actual_Node_and_Unix_control'],
@@ -93,6 +126,9 @@ async def worker(directory):
 def main():
     if os.geteuid() != 0 or os.getpid() != 1 or os.environ.get('HAOS_DISPOSABLE_PHOTON_PROFILE') != '1':
         raise PermissionError('fresh disposable PID-1 network-disabled profile fixture required')
+    scenario = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == '--case' else 'normal'
+    if scenario not in {'normal', 'dedicated', 'http401', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429'}:
+        raise ValueError('finite fixture case required')
     root = Path('/usr/lib/haos'); root.mkdir(mode=0o755)
     # Public package sources only. Never broaden permissions on the checkout,
     # provider identity, owner home or mounted frozen dependency environment.
@@ -102,7 +138,7 @@ def main():
     shutil.copytree('/repo/linux/haos/haos', root / 'haos', ignore=shutil.ignore_patterns('__pycache__'), copy_function=shutil.copyfile)
     shutil.copytree('/input/photon', root / 'photon', copy_function=shutil.copyfile)
     # Exercise the CURRENT fixed launcher, not yesterday's installed fixture.
-    for name in ['photon_sidecar.mjs', 'photon_bounded_stream.mjs']:
+    for name in ['photon_sidecar.mjs', 'photon_bounded_stream.mjs', 'photon_cloud.mjs']:
         shutil.copyfile('/repo/linux/haos/runtime/' + name, root / 'photon' / name)
     fixtures = root / 'fixtures'; fixtures.mkdir()
     shutil.copyfile(__file__, fixtures / 'profile.py')
@@ -135,6 +171,7 @@ def main():
     anchor.write_bytes(ca.public_bytes(serialization.Encoding.PEM))
     subprocess.run(['/usr/sbin/update-ca-certificates'], check=True, capture_output=True)
     account = {'project_id': 'fixture-project', 'project_secret': secrets.token_urlsafe(32), 'phone': 'shared', 'services': ['iMessage']}
+    if scenario in {'dedicated', 'wrong-line'}: account['phone'] = '+15550100002'
     native_token = secrets.token_urlsafe(32); mid = 'spc-' + str(uuid.uuid4()); stamp = {'seconds': int(time.time()), 'nanos': 0}
     def message(sequence, sender, guid):
         chat = 'any;-;' + sender
@@ -145,7 +182,8 @@ def main():
     config = {'sidecar': str(root / 'hermes/plugins/platforms/photon/sidecar'), 'key': str(directory / 'server.key'),
         'cert': str(directory / 'server.crt'), 'project_id': account['project_id'], 'project_secret': account['project_secret'],
         'native_token': native_token, 'counts': str(directory / 'counts.json'), 'emit': str(directory / 'emit'),
-        'ready': str(directory / 'ready.json'), 'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved]}
+        'ready': str(directory / 'ready.json'), 'scenario': scenario,
+        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated'} else []}
     (directory / 'server.json').write_text(json.dumps(config))
     peer = subprocess.Popen([str(root / 'photon/node'), str(fixtures / 'protocol.mjs'), str(directory / 'server.json')],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -162,12 +200,19 @@ def main():
         for path, original, replacement in substitutions:
             code = path.read_text(); assert code.count('"' + original + '"') == 1
             path.write_text(code.replace('"' + original + '"', '"' + replacement + '"'))
+        if scenario in {'dedicated', 'wrong-line'}:
+            sdkfile = sidecar / 'node_modules/@spectrum-ts/imessage/dist/index.js'
+            code = sdkfile.read_text(); assert code.count('`${instanceId}.imsg.photon.codes:443`') == 1
+            sdkfile.write_text(code.replace('`${instanceId}.imsg.photon.codes:443`', '"' + ready['grpc'] + '"'))
+        launcher = root / 'photon/photon_sidecar.mjs'
+        code = launcher.read_text(); assert code.count('"https://spectrum.photon.codes"') == 1
+        launcher.write_text(code.replace('"https://spectrum.photon.codes"', '"' + ready['cloud'] + '"'))
         sys.path.insert(0, str(root))
         from haos.gateway_photon_process import PROGRAMS
         provenance = root / 'photon/source.json'; value = json.loads(provenance.read_text())
         value['programs'] = [{'name': name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for name, path in PROGRAMS.items()]
         provenance.write_text(json.dumps(value))
-        (directory / 'worker.json').write_text(json.dumps({'account': account, 'since': int(time.time() * 1000) - 10000, 'message_id': mid}))
+        (directory / 'worker.json').write_text(json.dumps({'account': account, 'since': int(time.time() * 1000) - 10000, 'message_id': mid, 'scenario': scenario}))
         for entry in directory.rglob('*'): os.chown(entry, 65534, 65534)
         os.chown(directory, 65534, 65534)
         with Path('/etc/passwd').open('a') as output: output.write('haos-gateway:x:65534:65534:fixture:/nonexistent:/usr/sbin/nologin\n')

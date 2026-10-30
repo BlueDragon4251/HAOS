@@ -86,6 +86,7 @@ export function boundedCloud({ origin, project, request, report, current, deadli
     } catch (error) {
       abort.abort();
       if (response?.body && !response.body.locked) response.body.cancel().catch(() => {});
+      if (![401, 403, 429].includes(response?.status)) await report({ state: "transport-unavailable", retry_after: 2 });
       // Native bodies, issued tokens and arbitrary SDK diagnostics never cross
       // the private finite-status RPC. A terminal reason survives later errors.
       throw new Error(error?.message?.startsWith("Photon ") ? error.message : "Photon cloud transport unavailable");

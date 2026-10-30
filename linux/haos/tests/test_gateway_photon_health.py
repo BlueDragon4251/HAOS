@@ -35,10 +35,33 @@ def test_account_rate_budget_survives_key_rotation_connector_and_publication(sou
     assert other.read()['status'] == 'created'
 
 
+def test_generic_startup_error_does_not_hide_an_active_native_rate_limit(source, custody):
+    health = ledger(source, custody); first = health.update('rate-limited', 90)
+    after = health.update('transport-unavailable', 2)
+    assert after['status'] == 'rate-limited' and after['next_attempt'] == first['next_attempt']
+    assert not health.permitted()
+
+
 def test_auth_refusal_survives_republication_with_the_same_key(source, custody):
     health = ledger(source, custody); health.update('authentication-refused')
     other = ledger(source, custody, publication='new-publication')
     assert other.read()['status'] == 'authentication-refused' and not other.permitted()
+
+
+def test_service_toggles_do_not_turn_a_rejected_project_key_into_a_fresh_credential(source, custody):
+    health = ledger(source, custody); health.update('authentication-refused')
+    other = ledger(source, custody, publication='new-services', value={**source[0], 'services': ['iMessage', 'SMS']})
+    assert other.read()['status'] == 'authentication-refused' and not other.permitted()
+
+
+def test_legacy_prepared_auth_refusal_is_preserved_without_deleting_original_rows(source, custody):
+    from haos.gateway import digest
+    health = ledger(source, custody); value = source[0]; db = custody[0].db
+    db.execute('UPDATE photon_profile_status SET credential_scope=?,status=? WHERE id=?',
+        (digest(value), 'authentication-refused', health.identity))
+    other = ledger(source, custody, publication='changed-publication', value={**value, 'services': ['SMS', 'iMessage']})
+    assert other.read()['status'] == 'authentication-refused' and not other.permitted()
+    assert db.execute('SELECT credential_scope,status FROM photon_profile_status WHERE id=?', (health.identity,)).fetchone()[:] == (digest(value), 'authentication-refused')
 
 
 def test_actual_sql_failure_rolls_back_both_status_and_account_deadline(source, custody):

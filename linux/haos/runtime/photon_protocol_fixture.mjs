@@ -10,13 +10,17 @@ const require = createRequire(path.join(config.sidecar, "package.json"));
 const grpc = require("@grpc/grpc-js");
 const loader = require("@grpc/proto-loader");
 const proto = path.join(config.sidecar, "node_modules/@photon-ai/advanced-imessage/proto");
-const definitions = loader.loadSync(["message_service.proto", "event_service.proto", "poll_service.proto"].map(
+const definitions = loader.loadSync(["message_service.proto", "event_service.proto", "poll_service.proto", "group_service.proto"].map(
   (name) => path.join(proto, "photon/imessage/v1", name)), {
   includeDirs: [proto], keepCase: false, longs: Number, enums: String, defaults: true, oneofs: true,
 });
 const services = grpc.loadPackageDefinition(definitions).photon.imessage.v1;
 const counts = { http: {}, grpc: {}, refused_auth: 0, emitted: 0, cancelled: {}, timer_ticks: 0 };
-const save = () => fs.writeFileSync(config.counts, JSON.stringify(counts));
+function publish(file, value) {
+  fs.writeFileSync(file + ".tmp", JSON.stringify(value));
+  fs.renameSync(file + ".tmp", file);
+}
+const save = () => publish(config.counts, counts);
 const count = (kind, name) => { counts[kind][name] = (counts[kind][name] || 0) + 1; save(); };
 const tls = { key: fs.readFileSync(config.key), cert: fs.readFileSync(config.cert) };
 const basic = "Basic " + Buffer.from(config.project_id + ":" + config.project_secret).toString("base64");
@@ -27,8 +31,20 @@ const http = https.createServer(tls, (request, response) => {
     counts.refused_auth++; save(); response.writeHead(401); return response.end();
   }
   let data;
+  const scenario = config.scenario || "normal";
+  const tokenRoute = request.method === "POST" && request.url === base + "/imessage/tokens";
+  const tokenRequests = counts.http["POST " + base + "/imessage/tokens"] || 0;
+  const status = scenario === "http401" ? 401 : scenario === "http403" ? 403 : scenario === "http429" ? 429 :
+    scenario === "refresh401" && tokenRequests > 1 ? 401 : scenario === "refresh429" && tokenRequests > 1 ? 429 : null;
+  if (tokenRoute && status) {
+    response.writeHead(status, { "Content-Type": "application/json", "Retry-After": "90" });
+    return response.end(JSON.stringify({ message: "fixture diagnostic " + config.native_token }));
+  }
   if (request.method === "GET" && request.url === base + "/") data = { id: config.project_id, profile: { imessageSynced: false } };
-  else if (request.method === "POST" && request.url === base + "/imessage/tokens") data = { type: "shared", token: config.native_token, expiresIn: 3600 };
+  else if (tokenRoute) data = scenario === "wrong-line" ? { type: "dedicated", auth: { fixture: config.native_token }, numbers: { fixture: "+15550100009" }, expiresIn: 3600 } :
+    scenario === "dedicated" ? { type: "dedicated", auth: { fixture: config.native_token, unapproved: config.native_token },
+      numbers: { fixture: "+15550100002", unapproved: "+15550100009" }, expiresIn: 3600 } :
+    { type: "shared", token: config.native_token, expiresIn: scenario.startsWith("refresh") ? 1 : 3600 };
   else if (request.method === "GET" && request.url === base + "/platforms/") data = {};
   else { response.writeHead(404); return response.end(); }
   response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ succeed: true, data }));
@@ -50,6 +66,11 @@ function live(call, method, messages) {
     counts.timer_ticks++; save();
     if (!sent && fs.existsSync(config.emit)) {
       sent = true;
+      if (messages && ["grpc401", "grpc429"].includes(config.scenario)) {
+        call.emit("error", { code: config.scenario === "grpc401" ? grpc.status.UNAUTHENTICATED : grpc.status.RESOURCE_EXHAUSTED,
+          details: "fixture native refusal " + config.native_token });
+        return;
+      }
       if (messages) for (const frame of config.frames) { call.write(frame); counts.emitted++; }
       save();
     }
@@ -72,6 +93,9 @@ server.addService(services.MessageService.service, methods(services.MessageServi
 server.addService(services.PollService.service, methods(services.PollService, {
   subscribePollEvents: (call) => live(call, "SubscribePollEvents", false),
 }));
+server.addService(services.GroupService.service, methods(services.GroupService, {
+  subscribeGroupEvents: (call) => live(call, "SubscribeGroupEvents", false),
+}));
 server.addService(services.EventService.service, methods(services.EventService, {
   catchUpEvents(call) {
     if (!authenticated(call, "CatchUpEvents")) return;
@@ -82,7 +106,7 @@ const port = await new Promise((resolve, reject) => server.bindAsync("127.0.0.1:
   grpc.ServerCredentials.createSsl(null, [{ private_key: tls.key, cert_chain: tls.cert }], false),
   (error, port) => error ? reject(error) : resolve(port)));
 save();
-fs.writeFileSync(config.ready, JSON.stringify({ cloud: "https://127.0.0.1:" + http.address().port, grpc: "127.0.0.1:" + port }));
+publish(config.ready, { cloud: "https://127.0.0.1:" + http.address().port, grpc: "127.0.0.1:" + port });
 async function stop() {
   for (const timer of timers) clearInterval(timer);
   for (const call of calls) call.end();

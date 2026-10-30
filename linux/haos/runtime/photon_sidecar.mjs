@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { readBinary } from "./photon_bounded_stream.mjs";
+import { boundedCloud, nativeFailure, selectTokenData } from "./photon_cloud.mjs";
 
 // Bind lifetime before any network/SDK initialization. The write end belongs
 // only to the supervising Python process; it is never passed to another child.
@@ -84,11 +85,31 @@ let active = null;
 const resume = await rpc("/resume", {});
 if (resume.approved !== true || !/^(0|[1-9][0-9]{0,15})$/.test(resume.cursor || "") ||
     !Number.isSafeInteger(Number(resume.cursor))) throw new Error("durable Photon resume cursor required");
+const report = async (value) => {
+  if ((await rpc("/native-status", value)).approved !== true) throw new Error("Photon native status unavailable");
+};
+globalThis.fetch = boundedCloud({ origin: "https://spectrum.photon.codes", project: process.env.PHOTON_PROJECT_ID,
+  request: globalThis.fetch.bind(globalThis), report, current: async () => {
+    if ((await rpc("/lease", {})).approved !== true) throw new Error("Photon authority or retry budget refused");
+  } });
 globalThis[Symbol.for("hermes.photon.sdk.transport")] = Object.freeze({
   disableAutomaticContactSharing: true,
   disableAutomaticRetries: true,
   avoidReplyHydration: true,
   initialCursor: resume.cursor,
+  async selectTokenData(data) {
+    try { return selectTokenData(data, process.env.HAOS_PHOTON_PHONE); }
+    catch {
+      await report({ state: "identity-refused", retry_after: 0 });
+      throw new Error("approved Photon account line unavailable");
+    }
+  },
+  async streamFailure(error) {
+    await report(nativeFailure(error));
+    // The supervisor applies the persistent account budget before another
+    // process may reconnect. Do not let the SDK race an immediate retry.
+    throw new Error("Photon native stream needs supervised recovery");
+  },
   async commitCursor(cursor) {
     if ((await rpc("/cursor", { cursor })).approved !== true) {
       const error = new Error("Photon resume custody unavailable"); error.retryable = true; throw error;
@@ -108,6 +129,7 @@ globalThis[Symbol.for("hermes.photon.sdk.transport")] = Object.freeze({
     if (result.approved !== true) return false;
     if (!/^[a-f0-9]{64}$/.test(result.source || "") || !event?.message?.guid) throw new Error("invalid Photon retained source");
     sources.set(event.message.guid, result.source);
+    await report({ state: "upstream-observed", retry_after: 0 });
     return true;
   },
 });
