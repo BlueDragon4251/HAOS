@@ -80,6 +80,9 @@ def main():
             if not profiles.exists():profiles.mkdir(mode=0o700)
             _directory(profiles);profile=profiles/('google-chat-'+digest(scope(value)))
             profile.mkdir(mode=0o700);lease=acquire_lease(profile)
+        if profile is not None and profile.exists() and profile.name=='google-chat-'+digest(scope(value)):
+            from .gateway_google_chat_identity import remember
+            current();remember(profile,value)
         if action.startswith('oauth-'):
             from .gateway_google_chat_oauth import OAuthStore,HEX,route,client
             from .gateway_raw import NativeInbox

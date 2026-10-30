@@ -514,3 +514,32 @@ An earlier fixture loop exited on that intentional refusal after the worker had
 already stopped and left a stale status marker; no production gate was relaxed.
 
 Exact-source receipt: [native voice/video, withdrawal and media regressions](evidence/2026-10-30/google-chat-private-local-media-validation.json).
+
+
+## Durable public identity for historical private profiles
+
+Profile creation and matched Root Owner recovery now retain an immutable public
+`account-identity.json` under the private app profile lease. It stores only the
+project, service-account email and expected numeric bot resource. These fields
+recompute the original private profile name and survive service-key/subscription
+changes. No private key, access/refresh token, OAuth client secret, transport TLS
+material, source content or new route grant is stored in this descriptor. It is
+a declared app identity, not evidence of Google authentication or entitlement.
+
+Legacy profiles acquire missing metadata only from the current matched Root
+account for that exact profile; their existing SQLite journals are not rewritten.
+Same-identity reopen/rotation preserves the descriptor bytes/inode/timestamp.
+Creation uses a synced private temporary file and atomic non-replacing link;
+a failed exclusive temporary-name creation preserves an existing colliding file;
+existing mismatched/damaged/symlinked/hardlinked or permissive records refuse and
+are preserved for inspection. No automatic metadata repair or custody deletion
+is performed. Root/agent/supplementary-Root identities cannot read/write this
+private helper. Owner selection of a different historical profile never writes
+the current account's descriptor into it.
+
+This provides a nonsecret identity anchor for management after credential
+removal. The separate retired-account Owner actions/UI and historical output
+association remain in progress; the descriptor itself authorizes no API access,
+refresh, send, inference or automatic provider/gateway permission.
+
+Exact-source checks: [private identity migration, custody and SDK/Owner regressions](evidence/2026-10-30/google-chat-private-account-identity-validation.json).

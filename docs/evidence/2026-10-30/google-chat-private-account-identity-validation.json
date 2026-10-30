@@ -1,0 +1,280 @@
+{
+  "recorded_UTC": "2026-10-30T16:17:39.299861+00:00",
+  "base_commit": "963f3336f961a615bfcb572c449627ceec50e10c",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_google_chat_identity.py",
+      "sha256": "aef5226eb71deb610c77d5e177c230d7b5250bce7afb4ea55d59acf74cf5e0db"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_profile.py",
+      "sha256": "e773da4854d8be23ed8898ed1119fd78c784338caba8a0ee07c10ea18345e63c"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_owner_worker.py",
+      "sha256": "ce926cd6e875fc5e340d24998910001ef3f4fa761cd0f4cfe66a522bfbf7e709"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_identity_process.py",
+      "sha256": "48d2363325fbe690f14d6336898f07ec0db1bf21a3e8ff5d3dc47f089b1e6d3d"
+    },
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "d7ee0fa5c11ea1188a5d19fd2472b35c8395e562a128c532c8f1201be9dda535"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "be6fbe0d04c7d80d3b2fc8ff80f42373b870ad67886572a77d41d7accf48828f"
+    }
+  ],
+  "unit_minimal_no_Hermes_source": {
+    "passed": 2893,
+    "existing_skips": 2
+  },
+  "unit_frozen_Hermes_source": {
+    "passed": 2893,
+    "existing_skips": 2
+  },
+  "actual_root_kernel_tests": {
+    "passed": 173,
+    "new_skips_or_kernel_mocks": false
+  },
+  "actual_process_scenes": {
+    "identity": {
+      "cases": [
+        "actual_Root_agent_UID_and_supplementary_Root_group_denied_before_optional_SDK",
+        "actual_private_UID_creates_atomic_public_identity_for_existing_SQLite_profile_without_changing_journal_and_without_private_key_or_transport_material",
+        "actual_private_UID_key_rotation_and_transport_change_preserve_public_app_identity_bytes_inode_and_timestamp",
+        "actual_private_UID_refuses_other_app_for_existing_profile_without_replacing_metadata",
+        "actual_private_UID_widened_identity_refused_and_preserved_without_automatic_repair",
+        "actual_private_UID_hardlink_identity_refused_and_preserved_without_automatic_repair",
+        "actual_private_UID_symlink_identity_refused_and_preserved_without_automatic_repair",
+        "actual_private_UID_truncated_identity_refused_and_preserved_without_automatic_repair",
+        "actual_private_UID_changed_identity_refused_and_preserved_without_automatic_repair",
+        "actual_private_UID_symlinked_profile_directory_refused_before_metadata_read",
+        "actual_O_EXCL_collision_preserves_preexisting_private_file_and_does_not_publish_descriptor"
+      ],
+      "passed": 11,
+      "optional_SDK_imported": false,
+      "actual_UIDs_filesystem_SQLite_and_immutable_public_identity": true,
+      "live_Google_authentication_or_retired_Owner_UI_acceptance": false
+    },
+    "owner_without_SDK": {
+      "passed": 10,
+      "cases": [
+        "actual_fixed_installed_Root_backend_passes_closed_stdin_to_live_Root_parent_private_UID_worker_and_empty_inspection_does_not_create_native_journal_or_import_optional_SDK",
+        "actual_root_foreign_UID_supplementary_root_group_PID1_parent_and_unprivileged_parent_are_denied_and_private_UID_cannot_call_Root_backend",
+        "Root_backend_requires_quiescent_service_before_private_handoff_using_explicit_systemctl_state_fixture",
+        "actual_Root_backend_refuses_nonprivate_credential_file_mismatched_publication_and_pending_publication_before_private_handoff",
+        "actual_UID_owned_originals_are_inspected_as_payload_free_hashed_snapshots_and_active_grant_disposal_is_denied_by_Root_backend",
+        "actual_Root_to_private_UID_reply_inspection_and_exact_part_decision_preserve_confirmed_sibling_and_durably_audit_one_idempotent_approval_without_network",
+        "actual_Root_private_UID_auth_recheck_commits_private_Owner_audit_and_clears_only_auth_block_without_shortening_either_rate_deadline",
+        "real_Root_backend_private_UID_disposal_after_exact_withdrawn_snapshot_compacts_payload_bearing_original_and_proof_keeps_audit_and_is_idempotent",
+        "real_kernel_flock_refuses_Owner_recovery_while_private_profile_is_in_use_even_if_fixture_service_state_claims_inactive",
+        "actual_PR_SET_PDEATHSIG_kills_private_worker_after_authenticated_Root_parent_dies_instead_of_accepting_reparenting_to_PID1"
+      ],
+      "actual_Root_backend_private_UID_parent_credentials_flock_SQLite_and_parent_lifetime": true,
+      "systemctl_service_state_is_explicit_fixture": true,
+      "Google_account_external_delivery_GUI_installed_service_or_public_activation": false
+    },
+    "owner_OAuth": {
+      "passed": 8,
+      "cases": [
+        "actual_Root_backend_private_UID_closed_empty_OAuth_inventories_do_not_create_token_database_or_send_network_requests",
+        "actual_Root_first_setup_creates_missing_private_service_state_but_refuses_existing_insecure_or_symlinked_custody_without_chown_chmod_or_deletion",
+        "actual_gateway_UID_cannot_call_five_Root_OAuth_backend_entry_points",
+        "actual_fixed_Owner_worker_ROOT_parent_private_UID_native_Flow_default_Google_TLS_endpoint_RSA_subject_verification_and_FULL_token_acceptance_return_only_closed_receipt",
+        "actual_Root_private_UID_token_status_exposes_only_exact_public_client_scopes_generation_budget_and_snapshot_without_token_readback",
+        "actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction",
+        "actual_authenticated_Root_handoff_can_revoke_after_all_file_grants_are_withdrawn_and_repeated_decision_returns_existing_receipt_without_HTTP",
+        "real_Root_and_private_credential_audits_persist_actor_and_receipts_without_secret_material_or_external_chat_message_requests"
+      ],
+      "actual_Root_backend_fixed_worker_private_UID_RSA_PKCE_default_HTTPS_and_FULL_SQLite": true,
+      "systemctl_state_is_explicit_fixture": true,
+      "Google_DNS_and_CA_are_substituted_only_in_disposable_network_none_namespace": true,
+      "service_account_schema_only_for_user_OAuth_component": true,
+      "live_Google_account_installed_Owner_login_GUI_or_public_activation": false
+    },
+    "PubSub_controller": {
+      "passed": 7,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_private_profile_real_TLS_gRPC_GetSubscription_and_RSA_OAuth_metadata_before_connected_pull",
+        "actual_PubSub_profile_ACK_checks_FULL_original_or_unknown_sender_hash_refusal_before_real_SDK_acknowledge",
+        "actual_PubSub_native_codec_relay_controller_component_and_native_TLS_reply_loop_has_two_unique_outputs",
+        "actual_PubSub_disconnect_reconnect_revalidates_account_and_subscription_then_replay_preserves_one_source_and_one_reply",
+        "actual_Root_grant_withdrawal_stops_PubSub_profile_cancels_blocked_real_TLS_RPC_and_never_accepts_or_ACKs_queued_source"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": true,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": false,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "actual_local_Google_voice_ASR_controller_execute": false,
+      "actual_local_Google_voice_ASR_revocation": false,
+      "actual_local_Google_video_thumbnail_and_controller_attach": false,
+      "Hermes_WebSocket_service_is_explicit_protocol_fixture_not_inference": false,
+      "GUI_live_Google_account_production_daemon_or_public_activation": false
+    },
+    "file_publisher": {
+      "scene": "publisher",
+      "passed": 1,
+      "process": {
+        "scene": "publisher",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "publisher",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "file_recovery": {
+      "scene": "recover-create",
+      "passed": 1,
+      "process": {
+        "scene": "recover-create",
+        "initial_state": [
+          "uploaded",
+          "writing"
+        ],
+        "final_state": "writing",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": false,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "68e218bbbdbf518a8717678a9443d07e8bddbfceb7ec29ceb95cd76ae2d98604",
+          "action": "retry-file",
+          "generation": 1,
+          "receipt": "d021d22661dc6454abc98f27b269516db479489def4d4f1e87038d8626a18e32",
+          "approval_recorded": true,
+          "network_requested": false,
+          "message_sent": false,
+          "same_source_user_file_and_stable_ids_required": true,
+          "late_acceptance_check_before_create_required": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "bot-token",
+        "bot-membership",
+        "read-own-write",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    }
+  },
+  "execution": {
+    "network": "none",
+    "process_container": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+    "kernel_image": "sha256:a68a2d333af6e5964b2f73160f19d5151bb1fa974b18cf3af3d8ba6104898dad",
+    "gateway_UID": 65534,
+    "identity_probe_optional_SDK": false,
+    "descriptor": "declared public project/service-account-email/bot ID, not a Google authentication or entitlement receipt",
+    "atomic_write": "fsynced private temporary file, non-replacing link, no deletion after failed exclusive creation",
+    "collision_probe": "only random filename generation fixed in disposable fixture; actual O_EXCL/filesystem and UID checks are not mocked",
+    "identity_probe_keys": "ephemeral RSA keys generated inside disposable UID namespace with container-pinned OpenSSL; no literal PEM block, no optional Python SDK or Google authentication claim"
+  },
+  "scope": [
+    "Retains nonsecret app identity for current exact private profile under existing Root publication and lease",
+    "Existing SQLite bytes remain unchanged during missing-metadata migration",
+    "Key/subscription rotation preserves existing public identity bytes/inode/timestamp",
+    "Mismatched/corrupt/permissive/symlink/hardlink records and preexisting temporary collisions preserved without automatic repair",
+    "Owner-selected different historical profile never receives current app metadata"
+  ],
+  "limits": [
+    "Full retired-account Owner API/UI and historical output association still open",
+    "No public Google activation, installed GUI/daemon/systemd or live Google delivery/inference acceptance",
+    "Public software count remains15/22"
+  ],
+  "secret_scan_fixture_correction": "synthetic literal PEM placeholders triggered private-key detection; fixture now generates ephemeral keys at runtime; no scanner rule/allowlist changed"
+}

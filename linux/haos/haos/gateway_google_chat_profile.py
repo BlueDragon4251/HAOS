@@ -46,6 +46,8 @@ def build(value,*,parent,connector,policy,inbox):
     except FileExistsError:pass
     lease=acquire_lease(profile);originals=None
     try:
+        from .gateway_google_chat_identity import remember
+        pinned();remember(profile,value)
         home=profile/'home'
         try:home.mkdir(mode=0o700)
         except FileExistsError:pass
