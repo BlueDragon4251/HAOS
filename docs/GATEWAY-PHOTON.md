@@ -10,8 +10,26 @@ checks private database/WAL/SHM custody, and needs neither SDK imports, network
 access nor the active profile lease. Key rotation cannot hide the stable account
 retry budget. Malformed states, partial status schemas and missing budgets are
 refused without repair. Returned metadata explicitly says it is recorded, not
-live verification. This reader is not yet an Owner GUI/CLI setup path; that
-authenticated integration and source/cursor recovery remain pending.
+live verification. The authenticated Owner backend and the management recovery
+page now expose that reader without handing credentials to the private worker.
+`haos-owner gateway photon-recovery status --connector <ID>` reads the recorded
+state. This does not activate Photon or establish current account entitlement.
+
+The same recovery page and `photon-recovery profiles` / `sources --profile <ID>`
+inspect retained originals, including after removing the connector. Inspections
+stop and verify the gateway service; a private kernel profile lease independently
+refuses access while the native profile is active. Only a retired original with
+an unchanged inspected snapshot, explicit confirmation and a nonsecret reason
+can be disposed through `purge-source --profile <ID> --id <ID>
+--snapshot-sha256 <SHA> --note <reason> --confirm-inspected`. Root records the
+intent before the private worker writes. The FULL SQLite transaction retains
+source hashes, parent receipts and an idempotent Owner decision. Missing or
+altered bodies alone never advance a native cursor. A checked disposal can
+release that original's pending cursor barrier, but never clears a rejected
+server cursor, account retry budget or authorization. It cannot restore purged
+bytes, remove other local copies/backups/WAL, or delete the remote message.
+Account login/setup, public activation and broader cursor/auth recovery remain
+unfinished; this is a working recovery path for the prepared private profile.
 
 Photon provides managed iMessage transport. It does not require the Owner to
 operate a Mac relay. Actual account entitlement, a provisioned project, assigned
@@ -33,8 +51,9 @@ remote content. A second sidecar hook checks the resolved source before
 normalization and requires durable custody before NDJSON dispatch. Embeddings
 can supply a private listener and must authorize both request routes and bodies.
 An incomplete embedding fails closed. Standalone upstream behavior remains
-available only when no trusted embedding is supplied; HAOS still needs to wire
-its fixed launcher and process boundary before public activation.
+available only when no trusted embedding is supplied. HAOS uses the fixed
+launcher and process boundary described below; public activation still waits
+for the remaining account, output and controller integration.
 
 The embedding can suppress automatic contact sharing and quoted-message
 hydration. Reply bodies and immutable target IDs are preserved without fetching
@@ -89,14 +108,16 @@ invokes the embedding's explicit recovery gate, preserving the original failure
 instead of falling back silently to live events. The initial cursor zero asks
 for available history; a server that no longer retains it requires inspected
 Owner recovery. Ordinary nonembedded SDK behavior remains available unchanged.
-The HAOS embedding also disables automatic SDK RPC retries; actual write/RPC
-failure behavior still requires the forthcoming native transport fixture.
+The HAOS embedding also disables automatic SDK and underlying gRPC retries.
+The native transport fixtures below exercise confirmed replies, restart replay
+and a post-write connection reset without a repeated RPC.
 
 The fixed Node embedding disables inherited telemetry,
 automatic read receipts, contact sharing, implicit URL fetches, typing/reactions
 and unapproved writes. The prepared private profile connects that embedding to
 the actual SDK, Unix receive stream and durable inbox. It remains outside the
-public registry until outgoing replies and Owner management are complete.
+public registry until sealed outgoing files, complete Owner account management
+and the production controller path are complete.
 
 The image build now installs the exact official Node 24.19.0 archive and the
 committed Spectrum lockfile with dependency lifecycle scripts disabled. It

@@ -44,14 +44,18 @@ class Cursor:
         return row
 
     def pending(self):
-        rows = self.db.execute('SELECT * FROM photon_originals WHERE account_scope=? AND length(normalized)=0', (self.scope,)).fetchall()
-        if len(rows) > 128: raise Conflict('Photon pending source cursor capacity exceeded')
+        rows = self.db.execute('SELECT * FROM photon_originals WHERE account_scope=? AND length(normalized)=0 LIMIT 65537', (self.scope,)).fetchall()
+        if len(rows) > 65536: raise Conflict('Photon source cursor history capacity exceeded')
         result = []
         for row in rows:
+            if not row['raw']:
+                from .gateway_photon_recovery import disposed
+                if disposed(self.db, row): continue
             self.originals._verify(row)
             proof = json.loads(row['proof']); cursor = sequence(proof['native_cursor'])
             if cursor < 1: raise Conflict('Photon message cursor cannot precede the start watermark')
             result.append(cursor)
+            if len(result) > 128: raise Conflict('Photon pending source cursor capacity exceeded')
         return result
 
     def _advance(self, cursor=None):

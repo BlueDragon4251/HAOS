@@ -1,10 +1,10 @@
 name: HAOS Photon prepared contracts
 on:
   pull_request:
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/photon_owner*.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/owner.py', 'linux/haos/haos/initial_setup_gui.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   push:
     branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/photon_owner*.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/owner.py', 'linux/haos/haos/initial_setup_gui.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   workflow_dispatch:
 permissions:
   contents: read
@@ -131,7 +131,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py linux/haos/tests/test_gateway_photon_status.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py linux/haos/tests/test_gateway_photon_status.py linux/haos/tests/test_gateway_photon_recovery.py linux/haos/tests/test_gateway_photon_owner_protocol.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
       - name: Actual private UID recorded status without SDK or network
         run: |
           set -euo pipefail
@@ -139,6 +139,21 @@ jobs:
             -v "$PWD:/repo:ro" -e HAOS_DISPOSABLE_PHOTON_STATUS_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /repo/linux/haos/probes/probe_photon_status_process.py > "$RUNNER_TEMP/photon-contracts/recorded-status.json"
+      - name: Actual Root Owner handoff, CLI and private recovery without network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 768m \
+            -v "$PWD:/repo:ro" -e HAOS_DISPOSABLE_PHOTON_OWNER_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_owner_process.py > "$RUNNER_TEMP/photon-contracts/owner-recovery.json"
+      - name: Actual Tk recovery controls at desktop and compact resolutions
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb python3-tk
+          for screen in 1280x800x24 640x480x24; do
+            xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_photon_owner_gui.py linux/haos "$RUNNER_TEMP/photon-contracts/owner-gui-$screen.json"
+          done
       - uses: actions/upload-artifact@v7
         if: always()
         with:

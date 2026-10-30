@@ -655,6 +655,11 @@ class Wizard:
             self._button(self.content,'Zur Gateway-Verwaltung',lambda:self.show('gateways')).pack(anchor='w',pady=5)
             from .google_chat_retired_gui import HistoricalRecoveryForm
             historical=HistoricalRecoveryForm(self,self.content);historical.frame.pack(fill='x')
+        elif name == "photon-recovery":
+            self._head('Photon · Status und Recovery', 'Lokale Prüfbelege erhalten und alte Originale ausdrücklich verwalten.')
+            self._button(self.content,'Zur Gateway-Verwaltung',lambda:self.show('gateways')).pack(anchor='w',pady=5)
+            from .photon_owner_gui import RecoveryForm
+            recovery=RecoveryForm(self,self.content);recovery.frame.pack(fill='x')
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
@@ -662,6 +667,8 @@ class Wizard:
                          lambda:self.show('google-chat-setup')).pack(anchor='w',pady=5)
             self._button(self.content,'Google Chat: entfernte Konten und lokale Altbestände verwalten',
                          lambda:self.show('google-chat-history')).pack(anchor='w',pady=5)
+            self._button(self.content,'Photon: aufgezeichneter Status und erhaltene Originale',
+                         lambda:self.show('photon-recovery')).pack(anchor='w',pady=5)
             configured_gateways = self._run(initial_setup.gateway_configuration, success="") or {"connectors": [], "bindings": []}
             process_status = self._label(self.content, "Dienststatus noch nicht geprüft.", size=10, color=self.MUTED)
             process_status.pack(anchor="w", pady=6)
