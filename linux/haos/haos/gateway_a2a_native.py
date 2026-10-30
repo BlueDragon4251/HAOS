@@ -69,7 +69,13 @@ def build(value,peer,home,current,policy,tasks,receive):
 
     adapter.set_durable_message_handler(accepted);adapter.set_message_handler(accepted)
 
+    receive_tasks=set();adapter._haos_receive_tasks=receive_tasks
     async def handle(self,event):
+        task=asyncio.current_task();receive_tasks.add(task)
+        try:await dispatch_received(self,event)
+        finally:receive_tasks.discard(task)
+
+    async def dispatch_received(self,event):
         proof,row=source(event)
         receipt=await receive(event,proof,row['task_id']);check()
         if 'target_task_id' in proof:inputs.admitted(proof,receipt)
@@ -102,7 +108,12 @@ def build(value,peer,home,current,policy,tasks,receive):
                 prepared[task_id]=pending;finalized.pop(task_id,None)
                 asyncio.run_coroutine_threadsafe(self.handle_message(event),self._loop)
             return None,pending
-        with private_scope(home,environment):terminal,pending=native_prepare(self,params,peer,agent=self._agents[''])
+        projected=params
+        if proof.get('resources'):
+            from .gateway_a2a_media import projection
+            projected,resources=projection(value,peer,params,tasks.redactor,binding=policy().current_binding(proof))
+            if resources!=proof['resources']:raise Conflict('A2A file projection changed after retained original admission')
+        with private_scope(home,environment):terminal,pending=native_prepare(self,projected,peer,agent=self._agents[''])
         if pending is not None:
             row=tasks.by_source(proof['source_key'])
             if row is None or row['task_id']!=pending['task_id'] or pending['context_id']!=proof['envelope']['chat']:
@@ -243,6 +254,9 @@ def build(value,peer,home,current,policy,tasks,receive):
     def skills(self,agent=None):return protocol.skills_from_toolsets(['haos_missions'])
     async def close(self):
         closing[0]=True
+        receivers={task for task in receive_tasks if task is not asyncio.current_task()}
+        for task in receivers:task.cancel()
+        await asyncio.gather(*receivers,return_exceptions=True)
         # Pending Futures may outlive a TCP connection. No synthetic failed
         # mission or terminal result is persisted merely because this closes.
         for _,future in tuple(self._pending.values()):future.cancel()

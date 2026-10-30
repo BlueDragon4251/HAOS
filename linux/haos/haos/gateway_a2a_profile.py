@@ -19,8 +19,8 @@ STATES=frozenset({'created','connecting','listening','disconnected','revoked','s
 
 def build(value,*,parent,connector,policy,inbox):
     # No upstream import or credential use before the actual dedicated UID gate.
-    from .gateway_runtime import require_runtime_identity
-    require_runtime_identity();value=credentials(value)
+    from .gateway_runtime import require_runtime_identity,prepare_runtime_home
+    require_runtime_identity();prepare_runtime_home();value=credentials(value)
     def snapshot():
         latest=policy()
         if not isinstance(latest,PreparedA2APolicy) or latest.connectors.get(connector,{}).get('platform')!='a2a':
@@ -30,11 +30,15 @@ def build(value,*,parent,connector,policy,inbox):
             raise PermissionError('exact timed A2A peer/context grants matching saved server identity required')
         return digest([latest.publication,connector,bindings,value])
     initial=snapshot();publication=authority(connector,value)
-    closed=[False];stopping=[False]
+    closed=[False];stopping=[False];revoke_notice=[None]
     def pinned():
         if closed[0] or stopping[0]:raise PermissionError('private A2A profile stopped')
-        if snapshot()!=initial:raise PermissionError('A2A profile grant or credential epoch changed')
-        authority(connector,value,publication);return policy()
+        try:
+            if snapshot()!=initial:raise PermissionError('A2A profile grant or credential epoch changed')
+            authority(connector,value,publication);return policy()
+        except PermissionError:
+            if revoke_notice[0] is not None:revoke_notice[0]()
+            raise
     from .gateway_line_profile import _directory
     from .gateway_matrix_profile import acquire_lease,scope as private_scope
     parent=Path(parent);_directory(parent);profile=parent/('a2a-'+digest([connector,value]))
@@ -98,10 +102,22 @@ def build(value,*,parent,connector,policy,inbox):
             failure=listener[0].failure if listener[0] is not None else None
             known={'PermissionError','Conflict','TimeoutError','OSError','RuntimeError','ValueError','AttributeError','KeyError','TypeError','OperationalError','IntegrityError'}
             result['transport_error']=failure if failure is None or failure in known else 'transport-unavailable'
+            result['attachment_error']=resource_error[0]
             return result
+        announced=[False]
+        def revoked():
+            if not announced[0]:
+                announced[0]=True;status('revoked');mark(False)
+        revoke_notice[0]=revoked
+        from .gateway_a2a_resources import Resources,Refused as ResourceRefused
+        resources=Resources(value,connector,policy,pinned,originals,inbox);resource_error=[None];ingress_locks={}
         listener=[None];worker=[None];lock=asyncio.Lock();close_task=[None]
 
         async def receive(event,proof,task_id):
+            async with ingress_locks.setdefault(proof['source_key'],asyncio.Lock()):
+                return await receive_retained(event,proof,task_id)
+
+        async def receive_retained(event,proof,task_id):
             pinned();peer=proof['envelope']['sender'];index=indexes[peer];native=peers[peer]
             actual=originals.get(policy(),connector,value,peer,proof['id'])
             if actual!=proof:raise Conflict('native A2A input no longer matches original custody')
@@ -113,9 +129,24 @@ def build(value,*,parent,connector,policy,inbox):
             claimed=inbox.claim(key,policy())
             if claimed is None:raise Conflict('native A2A parent input requires retained-source recovery')
             try:
-                with dispatch(native,event,proof):facade._haos_admit(event)
-                if event._gateway_accepted is not True:raise PermissionError('private A2A parent relay did not commit input')
+                parent_event=event
+                media=await resources.retained(proof) if proof.get('resources') else []
+                if media:
+                    from gateway.platforms.event import MessageEvent,MessageType
+                    kinds={item['kind'] for item in media}
+                    kind=MessageType.PHOTO if kinds=={'image'} else MessageType.VOICE if kinds=={'voice'} else MessageType.VIDEO if kinds=={'video'} else MessageType.DOCUMENT
+                    parent_event=MessageEvent(text=event.text,message_type=kind,message_id=event.message_id,source=event.source,
+                        media_urls=['haos-media:'+item['id'] for item in media],media_types=[item['mime'] for item in media])
+                    from .gateway_media_relay import event_scope
+                    with dispatch(native,event,proof,parent_event=parent_event),event_scope(parent_event,[item['id'] for item in media],parent_event.media_types,platform='a2a'):
+                        facade._haos_admit(parent_event)
+                else:
+                    with dispatch(native,event,proof):facade._haos_admit(event)
+                if parent_event._gateway_accepted is not True:raise PermissionError('private A2A parent relay did not commit input')
+                resource_error[0]=None
                 pinned();inbox.complete(key,True);return key
+            except ResourceRefused as error:
+                resource_error[0]=error.reason;inbox.retry(key);raise
             except BaseException:
                 inbox.retry(key);raise
 
@@ -142,10 +173,17 @@ def build(value,*,parent,connector,policy,inbox):
                         selection=index.selection()
                         if selection is None:continue
                         where,args=selection
-                        rows=index.db.execute('SELECT * FROM a2a_tasks WHERE '+where+" AND admitted_receipt='' ORDER BY updated_at LIMIT 128",args).fetchall()
+                        from plugins.platforms.a2a.protocol import STATE_WORKING
+                        # Native create commits SUBMITTED before its anti-loop/
+                        # readiness checks. Only WORKING proves preparation got
+                        # past those checks; never synthesize an early dispatch
+                        # from an intermediate or terminal native record.
+                        rows=index.db.execute('SELECT * FROM a2a_tasks WHERE '+where+" AND admitted_receipt='' AND json_extract(record,'$.state')=? "
+                            "ORDER BY updated_at LIMIT 128",[*args,STATE_WORKING]).fetchall()
                         holders=','.join('?' for _ in args[3:])
                         rows=[*rows,*index.db.execute("SELECT i.task_id,i.raw_id FROM a2a_task_inputs i JOIN a2a_tasks t ON t.task_id=i.task_id "
-                            "WHERE i.admitted_receipt='' AND t.connector=? AND t.peer=? AND t.credential_scope=? AND t.binding_digest IN ("+holders+") ORDER BY i.created_at LIMIT 32",args).fetchall()]
+                            "WHERE i.admitted_receipt='' AND t.connector=? AND t.peer=? AND t.credential_scope=? AND t.binding_digest IN ("+holders+
+                            ") AND json_extract(t.record,'$.state')=? ORDER BY i.created_at LIMIT 32",[*args,STATE_WORKING]).fetchall()]
                         for row in rows:
                             proof=originals.get(policy(),connector,value,peer,row['raw_id'])
                             native=peers[peer]

@@ -16,7 +16,7 @@ def opaque(value):
 
 
 def credentials(value,*,verify_tls=True):
-    if not isinstance(value,dict) or set(value)!={'peer_tokens','port','tls','agent_name'}:
+    if not isinstance(value,dict) or not {'peer_tokens','port','tls','agent_name'}<=set(value)<={'peer_tokens','port','tls','agent_name','download_origins'}:
         raise ValueError('exact private A2A peer tokens, HTTPS listener and public name required')
     peers=value['peer_tokens']
     if (not isinstance(peers,dict) or not 1<=len(peers)<=16
@@ -35,6 +35,11 @@ def credentials(value,*,verify_tls=True):
     try:tls=material(value['tls'],verify=verify_tls,webhook_path='/a2a')
     except ValueError:raise ValueError('A2A HTTPS needs the exact trusted current hostname/certificate/key and explicit listener approval') from None
     result={**value,'peer_tokens':dict(sorted(peers.items())),'tls':tls}
+    if 'download_origins' in value:
+        from .gateway_a2a_media import origins
+        selected=origins(value['download_origins'],peers)
+        if selected:result['download_origins']=selected
+        else:result.pop('download_origins',None)
     if len(json.dumps(result).encode())>32768:raise ValueError('private A2A account exceeds service bound')
     return result
 
@@ -61,6 +66,12 @@ def validate_binding(binding):
     if (not isinstance(binding.get('generation'),str) or not re.fullmatch('[0-9a-f]{64}',binding['generation'])
             or type(binding.get('since')) is not int or not 0<binding['since']<2**53):
         raise ValueError('fresh timed A2A owner grant required')
+    flags=['allow_media','allow_voice','allow_video','allow_outbound_media']
+    if any(key in binding and type(binding[key]) is not bool for key in flags):
+        raise ValueError('explicit boolean A2A media permissions required')
+    if (any(binding.get(key) is True for key in flags[:3]) and 'create' not in caps
+            or binding.get('allow_outbound_media') is True and 'read' not in caps):
+        raise ValueError('separate A2A media/create or outbound-file/read permissions required')
 
 
 class PreparedA2APolicy(GatewayPolicy):

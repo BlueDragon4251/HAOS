@@ -65,7 +65,7 @@ def approved(binding,kind=None):
 def authorize(policy,connector,envelope,kind=None):
     if not isinstance(connector,str):raise ValueError('exact configured media connector required')
     binding=policy.authorize(connector,envelope)
-    if (policy.connectors[connector]['platform'] not in {'line','sms','email','feishu','dingtalk'} or not approved(binding,kind)
+    if (policy.connectors[connector]['platform'] not in {'line','sms','email','feishu','dingtalk','a2a'} or not approved(binding,kind)
             or 'create' not in binding['capabilities'] or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('explicit current timed media/create grant required')
     if not isinstance(envelope['text'],str) or not 1<=len(envelope['text'].strip())<=32000 or envelope['text'].lstrip().startswith('/'):
@@ -97,7 +97,7 @@ class GatewayMedia:
 
     def _current(self,policy,row):
         binding=policy.current_binding(dict(row));meta=descriptor(json.loads(row['descriptor']))
-        if (policy.connectors.get(row['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk'}
+        if (policy.connectors.get(row['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk','a2a'}
                 or binding['connector']!=row['connector']
                 or not approved(binding,meta['kind']) or 'create' not in binding['capabilities']):
             raise PermissionError('media grant withdrawn')

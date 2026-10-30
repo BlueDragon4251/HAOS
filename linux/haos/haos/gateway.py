@@ -54,7 +54,7 @@ class GatewayPolicy:
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk'}
-                else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms','email'} else set())
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms','email','a2a'} else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
                 raise ValueError("invalid gateway identity binding")
             if 'since' in binding and (type(binding['since']) is not int or not 0 < binding['since'] < 2**53):

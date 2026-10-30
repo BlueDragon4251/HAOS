@@ -258,8 +258,25 @@ def require_runtime_identity():
         raise PermissionError('gateway runtime requires its unprivileged service UID/GID without supplementary authority')
 
 
+def prepare_runtime_home():
+    """Pin the SDK's process identity/status home before any native imports.
+
+    Hermes deliberately ignores session-local HOME overrides for status/PID
+    files. These belong to the gateway launcher, never the owner or agent HOME.
+    """
+    require_runtime_identity()
+    from .gateway_line_profile import _directory
+    root=Path('/var/lib/haos-gateway');_directory(root)
+    home=root/'launcher'
+    try:home.mkdir(mode=0o700)
+    except FileExistsError:pass
+    _directory(home);os.environ['HERMES_HOME']=str(home)
+    return home
+
+
 async def serve():
     require_runtime_identity()
+    prepare_runtime_home()
     from .gateway_publication import pending, validate_snapshot
     config = Path("/etc/haos")
     if pending(config):

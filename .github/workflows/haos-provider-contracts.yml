@@ -136,6 +136,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_a2a_native.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-native.json"
           "$PYTHON" linux/haos/runtime/probe_a2a_controller.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-controller.json"
           "$PYTHON" linux/haos/runtime/probe_a2a_https.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-https.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_media.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-media.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
@@ -224,6 +225,7 @@ jobs:
           SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/reference.flac:/public-input/reference.flac:ro" \
             -v "$PWD/linux/haos/probes/probe_a2a_profile_process.py:/probe.py:ro" \
             -e HAOS_DISPOSABLE_A2A_PROFILE_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \

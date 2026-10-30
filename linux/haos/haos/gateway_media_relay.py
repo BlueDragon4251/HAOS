@@ -14,7 +14,7 @@ _EVENT=ContextVar('haos_admitted_media_event',default=None)
 
 @contextmanager
 def event_scope(event,ids,types,*,platform='line'):
-    if platform not in {'line','sms','email','feishu','dingtalk'}:raise PermissionError('reviewed retained media platform required')
+    if platform not in {'line','sms','email','feishu','dingtalk','a2a'}:raise PermissionError('reviewed retained media platform required')
     ids=references(ids)
     if not ids or event.media_urls!=['haos-media:'+identity for identity in ids] or event.media_types!=types:
         raise PermissionError('native media must match the private retained copy')
@@ -26,7 +26,7 @@ def event_scope(event,ids,types,*,platform='line'):
 def event_media(event,platform):
     proof=_EVENT.get()
     if not event.media_urls:return []
-    if (platform not in {'line','sms','email','feishu','dingtalk'} or proof is None or proof[0] is not event or proof[3]!=platform
+    if (platform not in {'line','sms','email','feishu','dingtalk','a2a'} or proof is None or proof[0] is not event or proof[3]!=platform
             or event.media_urls!=['haos-media:'+identity for identity in proof[1]]):
         raise PermissionError('no independent retained media admission')
     return list(proof[1])
@@ -185,7 +185,12 @@ async def forward(policy,connector,envelope,ids,cache,call):
     for identity in ids:
         item=cache.get(policy(),identity)
         if item['envelope_digest']!=digest(envelope) or item['connector']!=connector:raise PermissionError('media relay message changed')
-        result=await call('gateway.media.begin',{'connector':connector,'envelope':envelope,'descriptor':item['descriptor']})
+        declaration={'connector':connector,'envelope':envelope,'descriptor':item['descriptor']}
+        latest=policy()
+        if latest.connectors.get(connector,{}).get('platform')=='a2a':
+            binding=latest.authorize(connector,envelope)
+            declaration['binding']={'binding_id':binding['id'],'binding_digest':digest(binding)}
+        result=await call('gateway.media.begin',declaration)
         size=item['descriptor']['size']
         if (not isinstance(result,dict) or set(result)!={'id','offset','ready'} or result['id']!=identity
                 or type(result['offset']) is not int or not 0<=result['offset']<=size or type(result['ready']) is not bool

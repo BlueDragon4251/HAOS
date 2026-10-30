@@ -5,6 +5,7 @@ A2A policy. Its real Unix client checks SO_PEERCRED; no model inference,
 external peer or full public owner activation is claimed.
 """
 import asyncio
+import base64
 from contextlib import redirect_stdout
 import json
 import os
@@ -42,12 +43,18 @@ def main():
     create(work,'a2a.fixture.invalid')
     with Path('/etc/ssl/certs/ca-certificates.crt').open('ab') as stream:stream.write(b'\n'+(work/'ca.pem').read_bytes())
     with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));port=reserved.getsockname()[1]
+    with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));media_port=reserved.getsockname()[1]
     value={'peer_tokens':{'alice':'private_fixture_alice_'+'a'*32},'port':port,'agent_name':'HAOS',
+        'download_origins':{'alice':['https://localhost:'+str(media_port)]},
         'tls':{'public_url':'https://a2a.fixture.invalid/a2a','certificate':(work/'certificate.pem').read_text(),
             'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False}}
     grant={'id':'owner','connector':'a2a','sender':'alice','chat':'ctx-process-device','scope':scope(value,'alice'),'thread':'',
         'identity':'personal','capabilities':['create','read','cancel','answer'],'generation':'a'*64,'since':1}
-    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant]}
+    media_grants=[{**grant,'id':'media-'+name,'chat':'ctx-media-'+name,'identity':'media-'+name,
+        'capabilities':['create','read'],'allow_media':True,'allow_voice':True,'allow_video':True}
+        for name in ['input','auth','rate','drop','revoke']]
+    loop_grant={**grant,'id':'loop-check','chat':'ctx-loop-check','identity':'loop-check','capabilities':['create','read']}
+    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant,*media_grants,loop_grant]}
     etc=Path('/etc/haos');etc.mkdir(mode=0o755)
     def publish(data):
         PreparedA2APolicy(data);temp=etc/'next-policy';temp.write_text(json.dumps(data));temp.chmod(0o640);os.chown(temp,0,65534);temp.replace(etc/'gateways.json')
@@ -62,6 +69,7 @@ from haos.gateway_runtime import build_adapter,adapter_envelope,require_runtime_
 from haos.gateway import digest
 from haos.gateway_relay import RelayInbox
 from haos.gateway_raw import NativeInbox
+from haos.gateway_media_relay import MediaCache,event_media,forward
 from haos.redaction import Redactor
 assert os.getgroups()==[]
 base=Path('/var/lib/haos-gateway')
@@ -86,15 +94,17 @@ except PermissionError:pass
 else:raise AssertionError('gateway read owner credential')
 async def exercise():
     policy=lambda:PreparedA2APolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))
-    inbox=NativeInbox(base/'native.db',Redactor());relay=RelayInbox(base/'relay.db',Redactor())
+    inbox=NativeInbox(base/'native.db',Redactor());relay=RelayInbox(base/'relay.db',Redactor());cache=MediaCache(inbox)
     parent=base/'profiles';parent.mkdir(mode=0o700,exist_ok=True)
     value=json.loads((base/'account.json').read_text())
     adapter=None
     try:
         adapter=build_adapter('a2a',value,a2a_context={'parent':parent,'connector':'a2a','policy':policy,'inbox':inbox})
         def receive(event):
-            assert event.raw_message is None and event.media_urls==[]
-            relay.admit(policy(),'a2a',adapter_envelope(event,'a2a'));return True
+            assert event.raw_message is None
+            media=event_media(event,'a2a')
+            assert (event.message_type.value in {'photo','document','voice','video'}) if media else event.message_type.value=='text'
+            relay.admit(policy(),'a2a',adapter_envelope(event,'a2a'),media=media);return True
         adapter.set_durable_message_handler(receive)
         assert await adapter.connect() and adapter.health()['status']=='listening'
         print(json.dumps({'ready':True,'uid':os.geteuid()}),flush=True)
@@ -108,9 +118,9 @@ async def exercise():
                     'native_committed':inbox.db.execute("SELECT COUNT(*) FROM native_inbox WHERE state='committed'").fetchone()[0]}
             elif command['method']=='forward':
                 item=relay.next(policy());assert item is not None
-                result=await call('gateway.receive',{'connector':'a2a','envelope':item['envelope'],
-                    'binding':{'binding_id':item['binding_id'],'binding_digest':item['binding_digest']}})
+                result=await forward(policy,'a2a',item['envelope'],item['media'],cache,call)
                 relay.admitted(item['id'],result['mission_id'])
+                cache.transferred(item['media'])
             elif command['method']=='wrong-binding':
                 item=relay.next(policy());assert item is not None
                 try:await call('gateway.receive',{'connector':'a2a','envelope':item['envelope'],
@@ -189,7 +199,12 @@ asyncio.run(exercise())
             'role':'ROLE_USER','parts':[{'text':'Actual dedicated-UID native A2A source.'}]}}}
         try:
             ready=await line(process);assert ready=={'ready':True,'uid':65534}
+            async with asyncio.timeout(5):
+                while not (base/'launcher/gateway_state.json').exists():await asyncio.sleep(.02)
+            assert (base/'launcher/gateway_state.json').stat().st_uid==65534
+            assert __import__('stat').S_IMODE((base/'launcher').stat().st_mode)==0o700
             cases.append('actual_installed_readonly_code_dedicated_gateway_UID_and_verified_TLS_listener')
+            cases.append('actual_native_background_status_writer_uses_private_process_launcher_HOME_not_session_override_or_owner_HOME')
             alien=spawn('agent',65533);assert (await line(alien))['agent_private_data_and_factory_denied'] is True
             assert await asyncio.to_thread(alien.wait)==0
             cases.append('actual_other_UID_cannot_read_account_journals_owner_canary_or_modify_code_or_construct_A2A_profile')
@@ -401,6 +416,136 @@ asyncio.run(exercise())
             finally:
                 await controller.connection.close();controller.connection=None;controller.current=None
                 backend_server.close();await backend_server.wait_closed()
+            from aiohttp import web
+            from video_fixture import movie
+            png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5tUAAAAASUVORK5CYII=')
+            flac=Path('/public-input/reference.flac').read_bytes()
+            assert __import__('hashlib').sha256(flac).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
+            video=movie(width=64,height=32);document=b'Exact private A2A document fixture.'
+            fetched=[];released=asyncio.Event();started=asyncio.Event();stalled=asyncio.Event();stall_closed=asyncio.Event();release_stall=asyncio.Event();mode={'status':200}
+            async def attachment(web_request):
+                assert web_request.secure and 'Authorization' not in web_request.headers and 'Cookie' not in web_request.headers
+                assert all(token not in str(web_request.headers) for token in value['peer_tokens'].values())
+                fetched.append(web_request.path)
+                if web_request.path=='/stall':
+                    response=web.StreamResponse(headers={'Content-Type':'application/octet-stream','Content-Length':'1024'})
+                    await response.prepare(web_request);stalled.set()
+                    while not release_stall.is_set():
+                        if web_request.transport is None or web_request.transport.is_closing():stall_closed.set();break
+                        await asyncio.sleep(.02)
+                    return response
+                if web_request.path=='/image.png':
+                    assert dict(web_request.query)=={'signed':'private-fixture-attachment-capability'}
+                    response=web.StreamResponse(status=200,headers={'Content-Type':'image/png','Content-Length':str(len(png))})
+                    await response.prepare(web_request);started.set();await released.wait();await response.write(png);await response.write_eof();return response
+                if web_request.path=='/voice.flac':return web.Response(body=flac,content_type='audio/flac')
+                return web.Response(status=mode['status'],body=b'fixture resource refusal')
+            media_app=web.Application();media_app.router.add_get('/{name}',attachment)
+            media_runner=web.AppRunner(media_app,access_log=None);await media_runner.setup()
+            media_tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);media_tls.load_cert_chain(work/'certificate.pem',work/'key.pem')
+            await web.TCPSite(media_runner,'127.0.0.1',media_port,ssl_context=media_tls).start()
+            try:
+                image_url='https://localhost:'+str(media_port)+'/image.png?signed=private-fixture-attachment-capability'
+                media_request={'jsonrpc':'2.0','id':20,'method':'SendStreamingMessage','params':{'message':{
+                    'messageId':'actual-four-media-source','contextId':'ctx-media-input','role':'ROLE_USER','parts':[
+                        {'text':'Inspect the four explicitly granted original attachments.'},
+                        {'url':image_url,'filename':'image.png','mediaType':'image/png'},
+                        {'raw':base64.b64encode(document).decode(),'filename':'document.txt','mediaType':'text/plain'},
+                        {'url':'https://localhost:'+str(media_port)+'/voice.flac','filename':'reference.flac','mediaType':'audio/flac'},
+                        {'raw':base64.b64encode(video).decode(),'filename':'clip.mp4','mediaType':'video/mp4'}]}}}
+                assert len(json.dumps(media_request).encode())<1024*1024
+                denied=json.loads(json.dumps(media_request));denied['params']['message']['contextId']=grant['chat']
+                denied['params']['message']['messageId']='no-separate-media-consent'
+                refused=await client.post(address,headers=headers,json=denied)
+                assert refused.status_code==200 and refused.json()['error']['message']=='independent-media-consent-required',refused.text
+                assert fetched==[] and len(store.list())==4
+                cases.append('actual_A2A_media_create_token_without_separate_kind_flags_cannot_fetch_or_admit_files')
+                async with client.stream('POST',address,headers=headers,json=media_request) as streaming:
+                    assert streaming.status_code==200
+                    lines=streaming.aiter_lines();early=[]
+                    while len(early)<2:
+                        text=await anext(lines)
+                        if text.startswith('data:'):early.append(json.loads(text[5:]))
+                    media_task=early[0]['result']['task']['id']
+                    assert early[1]['result']['statusUpdate']['status']['state']==protocol.STATE_WORKING
+                    await asyncio.wait_for(started.wait(),5)
+                    assert (await command(process,{'method':'counts'}))['relay']==7 and len(store.list())==4
+                    released.set()
+                    async with asyncio.timeout(10):
+                        while (await command(process,{'method':'counts'}))['relay']!=8:await asyncio.sleep(.02)
+                    media_mid=(await command(process,{'method':'forward'}))['mission_id']
+                    items=controller.gateway.media.for_mission(PreparedA2APolicy(config),media_mid)
+                    assert [item['descriptor']['kind'] for item in items]==['image','document','voice','video']
+                    assert [item['data'] for item in items]==[png,document,flac,video]
+                    assert 'private-fixture-attachment-capability' not in store.get(media_mid)['goal'] and image_url not in store.get(media_mid)['goal']
+                    assert await command(process,{'method':'counts'})=={'relay':8,'native_committed':8}
+                    cases.append('actual_native_A2A_early_SSE_precedes_complete_verified_TLS_file_read_then_four_exact_bytes_cross_real_media_and_controller_Unix_gates')
+                    cases.append('actual_A2A_URI_capability_stays_private_and_agent_goal_has_only_native_opaque_file_carriers')
+                again=await client.post(address,headers=headers,json={**media_request,'id':21,'method':'SendMessage'})
+                assert again.json()['result']['task']['id']==media_task and fetched==['/image.png','/voice.flac']
+                assert len(store.list())==5 and await command(process,{'method':'counts'})=={'relay':8,'native_committed':8}
+                cases.append('actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission')
+                # Five actual accepted native turns followed by its real sixth-
+                # turn anti-loop rejection. The private recovery loop must not
+                # turn that rejected native source into a fresh root mission.
+                for index in range(5):
+                    loop_request={'jsonrpc':'2.0','id':30+index,'method':'SendMessage','params':{'message':{
+                        'messageId':'loop-source-'+str(index),'contextId':loop_grant['chat'],'role':'ROLE_USER','parts':[{'text':'Controlled local loop contract '+str(index)}]}}}
+                    pending=asyncio.create_task(client.post(address,headers=headers,json=loop_request))
+                    async with asyncio.timeout(10):
+                        while (await command(process,{'method':'counts'}))['relay']!=9+index:await asyncio.sleep(.02)
+                    loop_mid=(await command(process,{'method':'forward'}))['mission_id']
+                    # The fixture root is the configured owner (allowed UID 0).
+                    # Cancel queued test goals through the real owner dispatch;
+                    # do not bypass the active question's agent-home lock.
+                    await controller.dispatch('uid:0',{'method':'missions.cancel','params':{'id':loop_mid}})
+                    assert store.get(loop_mid)['state']=='cancelled'
+                    await command(process,{'method':'pump'})
+                    assert (await pending).json()['result']['task']['status']['state']==protocol.STATE_CANCELED
+                refused_loop=json.loads(json.dumps(loop_request));refused_loop['id']=35
+                refused_loop['params']['message']['messageId']='sixth-loop-source'
+                rejected=(await client.post(address,headers=headers,json=refused_loop)).json()['result']['task']
+                assert rejected['status']['state']==protocol.STATE_REJECTED
+                await asyncio.sleep(.3)
+                assert len(store.list())==10 and await command(process,{'method':'counts'})=={'relay':13,'native_committed':13}
+                cases.append('actual_native_sixth_turn_anti_loop_rejection_is_never_replayed_by_private_pending_input_recovery_into_a_root_mission')
+                for name,status in [('auth',401),('rate',429)]:
+                    mode['status']=status
+                    failed={'jsonrpc':'2.0','id':22,'method':'SendStreamingMessage','params':{'message':{'messageId':'media-'+name,
+                        'contextId':'ctx-media-'+name,'role':'ROLE_USER','parts':[{'url':'https://localhost:'+str(media_port)+'/file.bin',
+                        'filename':'file.bin','mediaType':'application/octet-stream'}]}}}
+                    before=len(fetched)
+                    async with client.stream('POST',address,headers=headers,json=failed) as response:
+                        assert response.status_code==200
+                        lines=response.aiter_lines();frames=0
+                        while frames<2:
+                            text=await anext(lines)
+                            if text.startswith('data:'):frames+=1
+                        async with asyncio.timeout(5):
+                            while len(fetched)!=before+1:await asyncio.sleep(.02)
+                    await asyncio.sleep(.3)
+                    assert len(fetched)==before+1 and len(store.list())==10
+                    assert (await command(process,{'method':'counts'}))['relay']==13
+                    cases.append('actual_A2A_HTTPS_'+str(status)+'_retains_native_input_and_blocks_automatic_resource_refetch_without_mission')
+                waiting={'jsonrpc':'2.0','id':23,'method':'SendStreamingMessage','params':{'message':{'messageId':'media-revoke-stalled',
+                    'contextId':'ctx-media-revoke','role':'ROLE_USER','parts':[{'url':'https://localhost:'+str(media_port)+'/stall',
+                    'filename':'waiting.bin','mediaType':'application/octet-stream'}]}}}
+                async with client.stream('POST',address,headers=headers,json=waiting) as response:
+                    lines=response.aiter_lines();frames=[]
+                    while len(frames)<2:
+                        text=await anext(lines)
+                        if text.startswith('data:'):frames.append(json.loads(text[5:]))
+                    stalled_task=frames[0]['result']['task']['id'];await asyncio.wait_for(stalled.wait(),5)
+                    changed={**config,'bindings':[{**grant,'generation':'b'*64}]};publish(changed)
+                    await asyncio.wait_for(stall_closed.wait(),3)
+                    async with asyncio.timeout(5):
+                        while (await command(process,{'method':'health'}))['status']!='revoked':await asyncio.sleep(.02)
+                with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as db:
+                    record,receipt=db.execute('SELECT record,admitted_receipt FROM a2a_tasks WHERE task_id=?',(stalled_task,)).fetchone()
+                    assert json.loads(record)['state']==protocol.STATE_WORKING and receipt==''
+                assert len(store.list())==10 and (await command(process,{'method':'counts'}))['relay']==13
+                cases.append('actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task')
+            finally:released.set();release_stall.set();await media_runner.cleanup()
             changed={**config,'bindings':[{**grant,'generation':'b'*64}]};publish(changed)
             async with asyncio.timeout(5):
                 while (await command(process,{'method':'health'}))['status']!='revoked':await asyncio.sleep(.02)

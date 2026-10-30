@@ -57,14 +57,14 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     parts=message['parts']
     if not isinstance(parts,list) or not 1<=len(parts)<=16:raise Refused('unsupported-content')
     for part in parts:
-        if (not isinstance(part,dict) or not {'text'}<=set(part)<={'text','kind','type','mediaType'}
+        if not isinstance(part,dict):raise Refused('unsupported-content')
+        if 'text' not in part:continue
+        if (not {'text'}<=set(part)<={'text','kind','type','mediaType'}
                 or not isinstance(part['text'],str) or len(part['text'].encode())>32000
                 or 'kind' in part and part['kind']!='text' or 'type' in part and part['type']!='text'
                 or 'mediaType' in part and part['mediaType']!='text/plain'):
             raise Refused('unsupported-content')
     from plugins.platforms.a2a import protocol,security
-    text=protocol.extract_text(params)
-    if (not text or len(text.encode())>32000 or protocol.extract_context_id(params)!=context):raise Refused('unsupported-content')
     aliases=set([*value['peer_tokens'].values(),value['tls']['private_key']])
     # Credentials embedded in JSON escapes must not become agent input either.
     for _ in range(2):
@@ -74,6 +74,12 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     # expansion. Escaping already escaped PEM aliases on every request grows
     # exponentially and can exhaust a real long-lived worker during replay.
     redactor.secrets=sorted(set(redactor.secrets)|aliases,key=len,reverse=True)
+    from .gateway_a2a_media import projection
+    try:projected,resources=projection(value,peer,params,redactor)
+    except (ValueError,PermissionError):raise Refused('unapproved-media') from None
+    if resources and 'taskId' in message:raise Refused('text-only-clarification-required')
+    text=protocol.extract_text(projected)
+    if (not text or len(text.encode())>32000 or protocol.extract_context_id(projected)!=context):raise Refused('unsupported-content')
     if redactor.text(text)!=text:raise Refused('private-reflection')
     framed=security.wrap_inbound(peer,text)
     if not isinstance(framed,str) or len(framed.encode())>32000 or redactor.text(framed)!=framed:
@@ -83,6 +89,8 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     try:binding=policy.authorize(connector,envelope)
     except PermissionError:raise Refused('unapproved-route') from None
     validate_binding(binding)
+    from .gateway_media import approved
+    if any(not approved(binding,resource['kind']) for resource in resources):raise Refused('independent-media-consent-required')
     required='answer' if 'taskId' in message else 'create'
     if required not in binding['capabilities']:raise Refused('mission-'+required+'-required')
     # The server's authenticated receive instant is used: A2A's Message has no
@@ -94,5 +102,5 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     if binding['since']>=received*1000:raise Refused('pre-grant')
     policy.current_binding({'binding_id':binding['id'],'binding_digest':digest(binding)})
     return {**({'target_task_id':message['taskId'],'question_epoch':message['metadata']['haosQuestionEpoch']} if 'taskId' in message else {}),
-        'envelope':envelope,'binding_id':binding['id'],'binding_digest':digest(binding),
+        **({'resources':resources} if resources else {}),'envelope':envelope,'binding_id':binding['id'],'binding_digest':digest(binding),
         'credential_scope':digest([connector,value]),'raw_sha256':hashlib.sha256(raw).hexdigest(),'received_at':received}

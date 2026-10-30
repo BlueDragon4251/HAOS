@@ -175,6 +175,59 @@ there is no agent inference, live external peer or full installed service test.
 Repeated admission derives private wire aliases only from fixed account material,
 not recursively from the previous aliases. Five hundred actual codec replays
 prove stable bounded retention while raw/private-PEM and both supported escaped
-forms remain refused. Runtime-status updates stay inside the dedicated private
-profile HOME. Media/artifacts, complete owner recovery/configuration and GUI,
-required callbacks and public activation remain outstanding.
+forms remain refused. Per-peer logs use the dedicated private profile HOME;
+process status files require the separate launcher-home fix described below.
+Outgoing artifacts, automatic voice transcription, complete owner
+recovery/configuration and GUI, required callbacks and public activation remain
+outstanding.
+
+## Incoming media and private first-byte custody (private)
+
+Native inline `raw` file Parts and native/legacy URI file Parts now reach the
+actual adapter builder. The native one-MiB request bound remains in place;
+larger attachments use the separate bounded HTTPS file read (up to eight MiB
+per file, four files per message). URI downloads require exact owner-approved
+HTTPS origins for the named peer. There is no credential forwarding, cookie
+reuse, redirect following, downgraded scheme or generic local-path loader.
+Signed URI capabilities remain only in the private original; actual native
+text extraction/logging receives an opaque file carrier. Agent-facing media are
+limited local capabilities, never the signed download URL.
+
+Generic media, automatic voice input and video each require separate timed
+create grants. Known audio/image/video bytes cannot be renamed as a generic
+document to bypass their consent kind. Exact PNG/JPEG and ISO MP4/3GP types are
+checked; voice remains voice and is never silently turned into a text-only goal.
+The first complete response is committed in private FULL SQLite custody before
+any cache or relay receipt. Failed cache copies and process reopen reuse those
+first bytes, even if the remote URI has changed. Transferred cache receipts do
+not silently restore consumed data. Refusals/backoff survive reopen; partial
+responses do not become files. Native receiver coroutines and stalled HTTPS
+reads are cancelled on withdrawal without manufacturing a failed/cancelled
+mission or deleting original recovery data.
+
+The expanded process fixture uses actual installed code, gateway UID, TLS
+resource reads, private media relay, root media/mission Unix methods and kernel
+peer credentials. Four original byte streams (PNG, document, reviewed FLAC and
+actual frozen-codec MP4) arrive unchanged at the controller. Early native SSE
+precedes the withheld file body. URI replay does not re-fetch or create another
+mission. Missing consent, 401/429 and withdrawal during a stalled read are checked.
+These are byte-routing/retention tests, not ASR, model inference, native-device
+playback or live-peer acceptance.
+
+Recovery now selects only native WORKING inputs. Native TaskStore creation
+commits SUBMITTED before native anti-loop/readiness checks, so treating that
+intermediate record as a dispatch permission could race a later rejection.
+The actual sixth-turn rejection remains rejected after private recovery polling
+and creates no root mission. Five preceding queued test missions are cancelled
+by the fixture's configured root owner through actual owner dispatch; the test
+does not bypass the active mission's shared agent-home lock.
+
+Hermes deliberately uses the process home for its background status writer;
+context-local peer HOME overrides do not select that file. The actual runtime
+and standalone A2A factory now prepare `/var/lib/haos-gateway/launcher` under the
+verified service UID before native imports. The process fixture waits for the
+real status JSON and verifies its UID and private parent permissions. The older
+clarification receipt did not assert background status-file placement; the
+28-case media/process receipt provides that additional evidence. A separate
+23-case component fixture covers native file codecs, first-byte SQLite failure/
+reopen, strict origins, MIME/credential refusal and real HTTP faults.

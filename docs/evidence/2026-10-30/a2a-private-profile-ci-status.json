@@ -1,0 +1,83 @@
+{
+  "date_utc": "2026-10-30",
+  "source_commit": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+  "source_tree": "86c17670d30ac2488acf6aef83a363852d997f78",
+  "all_six_success": true,
+  "runs": [
+    {
+      "id": 40993327614,
+      "name": "Arch package",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993327614",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:21Z",
+      "updated_at": "2026-10-30T02:52:12Z",
+      "event": "pull_request"
+    },
+    {
+      "id": 40993327675,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993327675",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:21Z",
+      "updated_at": "2026-10-30T02:45:09Z",
+      "event": "pull_request"
+    },
+    {
+      "id": 40993327652,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993327652",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:21Z",
+      "updated_at": "2026-10-30T02:47:37Z",
+      "event": "pull_request"
+    },
+    {
+      "id": 40993327627,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993327627",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:21Z",
+      "updated_at": "2026-10-30T02:44:25Z",
+      "event": "pull_request"
+    },
+    {
+      "id": 40993327612,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993327612",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:21Z",
+      "updated_at": "2026-10-30T03:24:45Z",
+      "event": "pull_request"
+    },
+    {
+      "id": 40993321510,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40993321510",
+      "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+      "run_started_at": "2026-10-30T02:43:17Z",
+      "updated_at": "2026-10-30T03:24:10Z",
+      "event": "push"
+    }
+  ],
+  "scope": "Exact public CI source 72171cc only; does not upgrade later local clarification/media receipts to CI, live peer, installed boot or release acceptance.",
+  "pr_checkout": {
+    "head_sha": "72171cc43ec95809f4452f0422e9c616f1055bd7",
+    "base_sha": "9e432326e2c7ef56a7d9c0899ced3f53debff0ce",
+    "merge_commit_sha": "2c9b66b1c0e9b8eaaf990ec2fe3375561673e7f1",
+    "merge_tree": "86c17670d30ac2488acf6aef83a363852d997f78",
+    "tree_equals_head": true,
+    "verification": "fresh GitHub PR and immutable Git commit API reads; base is an ancestor of head"
+  }
+}

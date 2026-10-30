@@ -118,6 +118,12 @@ class Controller:
                     raise PermissionError('exact current controller gateway grant epoch required')
             return await self.gateway.receive(policy, params["connector"], params["envelope"], self,media=params.get('media'))
         if request.get('method')=='gateway.media.begin':
+            if policy.connectors.get(params.get('connector'),{}).get('platform')=='a2a':
+                from .gateway import digest
+                binding=policy.authorize(params['connector'],params['envelope'])
+                if params.get('binding')!={'binding_id':binding['id'],'binding_digest':digest(binding)}:
+                    raise PermissionError('exact current controller A2A media grant epoch required')
+                params={key:value for key,value in params.items() if key!='binding'}
             return self.gateway.media.begin(policy,params)
         if request.get('method')=='gateway.media.chunk':
             return self.gateway.media.chunk(policy,params)

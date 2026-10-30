@@ -144,3 +144,42 @@ def test_root_controller_refuses_old_a2a_epoch_after_owner_regrant_without_creat
             **params,'envelope':{**envelope,'message_id':'changed-message-after-regrant'}}}))
         assert len(store.list())==1
     finally:store.close()
+
+
+@pytest.mark.parametrize('epoch',[None,{}, {'binding_id':'owner','binding_digest':'f'*64}])
+def test_a2a_media_declaration_requires_same_exact_root_owner_epoch_as_final_mission(tmp_path,epoch):
+    from haos.controller import Controller
+    from haos.gateway_media import describe
+    b={**binding(),'allow_media':True}
+    policy=PreparedA2APolicy({'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[b]})
+    store=MissionStore(tmp_path/'missions.db');controller=Controller(store,'ws://127.0.0.1:1/not-inferred',{0});controller.gateway_policy=lambda:policy
+    envelope={'platform':'a2a','sender':b['sender'],'chat':b['chat'],'scope':b['scope'],'thread':'',
+        'message_id':'original-media-source','text':'Explicit media goal.','is_bot':False}
+    params={'connector':'a2a','envelope':envelope,'descriptor':describe(b'private document','document')}
+    if epoch is not None:params['binding']=epoch
+    try:
+        with pytest.raises(PermissionError):asyncio.run(controller.gateway_dispatch({'method':'gateway.media.begin','params':params}))
+        assert store.db.execute('SELECT COUNT(*) FROM gateway_media_uploads').fetchone()[0]==0 and store.list()==[]
+    finally:store.close()
+
+
+def test_a2a_media_epoch_allows_real_upload_declaration_and_owner_regrant_blocks_old_byte_chunks(tmp_path):
+    import base64
+    from haos.controller import Controller
+    from haos.gateway import digest
+    from haos.gateway_media import describe
+    b={**binding(),'allow_media':True};config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[b]}
+    policy=[PreparedA2APolicy(config)];store=MissionStore(tmp_path/'missions.db')
+    controller=Controller(store,'ws://127.0.0.1:1/not-inferred',{0});controller.gateway_policy=lambda:policy[0]
+    data=b'private document';envelope={'platform':'a2a','sender':b['sender'],'chat':b['chat'],'scope':b['scope'],'thread':'',
+        'message_id':'original-media-source','text':'Explicit media goal.','is_bot':False}
+    params={'connector':'a2a','envelope':envelope,'descriptor':describe(data,'document'),
+        'binding':{'binding_id':b['id'],'binding_digest':digest(b)}}
+    try:
+        offer=asyncio.run(controller.gateway_dispatch({'method':'gateway.media.begin','params':params}))
+        assert offer['offset']==0 and offer['ready'] is False
+        policy[0]=PreparedA2APolicy({**config,'bindings':[{**b,'generation':'b'*64}]})
+        with pytest.raises(PermissionError):asyncio.run(controller.gateway_dispatch({'method':'gateway.media.chunk',
+            'params':{'id':offer['id'],'offset':0,'data':base64.b64encode(data).decode()}}))
+        assert store.db.execute('SELECT received FROM gateway_media_uploads').fetchone()[0]==0
+    finally:store.close()
