@@ -12,6 +12,7 @@ from .gateway_event_context import validate,HASH
 from .gateway_a2a_result import Results
 from .gateway_a2a import scope
 from .gateway_raw import NativeInbox
+from .gateway_media import MAX_BYTES
 
 
 class Publisher:
@@ -40,7 +41,7 @@ class Publisher:
             raise PermissionError('exact credential-free controller delivery required for native A2A task')
         context=dict(validate(metadata['haos_event_context']))
         checksum=hashlib.sha256(content.encode()).hexdigest()
-        if context['content_sha256']!=checksum or context['total_bytes']>32000 or context['parts']>64:
+        if context['content_sha256']!=checksum or context['total_bytes']>MAX_BYTES or context['parts']>8192:
             raise Conflict('native A2A outcome requires a complete bounded controller event group')
         envelope={'platform':'a2a','scope':scope(self.tasks.value,self.tasks.peer),'chat':chat,'thread':'','message_id':reply_to}
         source=NativeInbox.key(self.tasks.connector,envelope)
@@ -108,7 +109,16 @@ class Publisher:
                         rendered.append(value['text']);artifacts.extend(value['artifact_ids'])
                     if len(artifacts)>4 or len(set(artifacts))!=len(artifacts):raise Conflict('complete A2A result has an invalid attachment set')
                     body=''.join(rendered)
-                    if len(body.encode())>32000:raise Conflict('projected A2A task reply exceeds its bounded native limit')
+                    encoded_body=body.encode()
+                    if len(encoded_body)>32000:
+                        if context['kind']!='mission.completed' or len(encoded_body)>MAX_BYTES:
+                            raise Conflict('native A2A non-completion or text artifact exceeds its bounded limit')
+                        from plugins.platforms.a2a.security import redact_outbound
+                        encoded_body=redact_outbound(body).encode()
+                        checksum=hashlib.sha256(encoded_body).hexdigest()
+                        offer={'id':digest(['controller-text',group,checksum]),'sha256':checksum,'size':len(encoded_body)}
+                        self.adapter._haos_a2a_artifacts.put(task,group,parts[0]['delivery_id'],offer,encoded_body,'result-0.txt','text/plain',kind='text')
+                        body='Complete controller result attached as UTF-8 text ('+str(len(encoded_body))+' bytes).'
                     if not body:body='Result files attached.' if artifacts else 'Result contains no public text.'
                 self.tasks.current();self.db.execute('COMMIT')
             except BaseException:

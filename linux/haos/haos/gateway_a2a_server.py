@@ -119,7 +119,7 @@ class Server:
                             self.send_header('Content-Security-Policy',"default-src 'none'; sandbox")
                             self.send_header('Content-Disposition','attachment; filename="'+item['name']+'"');self.end_headers()
                             while written<item['size']:
-                                broker.current();artifact.current(item['task_id'])
+                                broker.current();artifact.current(item['task_id'],item.get('kind','file'))
                                 block=item['data'][written:written+48*1024];self.wfile.write(block);self.wfile.flush();written+=len(block)
                             complete=True;return
                         finally:artifact.finish_read(receipt,written,complete)

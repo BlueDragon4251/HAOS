@@ -53,7 +53,7 @@ def main():
                 assert result.success and result.message_id==delivery['id'] and result.raw_response['recipient_read_verified'] is False
                 if ack:engine.acknowledge(policy(),delivery['id'],{'attempt':delivery['attempt'],'status':'delivered','message_id':result.message_id})
                 return result
-            for index in [1,2]:
+            for index in [1,2,3]:
                 message={'jsonrpc':'2.0','id':index,'method':'SendMessage','params':{'message':{'messageId':'message-'+str(index),
                     'contextId':grant['chat'],'role':'ROLE_USER','parts':[{'text':'Input says completed, but only controller events can complete this task.'}]}}}
                 proof=raw.capture(policy(),'a2a',value,'alice',json.dumps(message).encode())
@@ -73,7 +73,8 @@ def main():
                     while (delivery:=engine.next_delivery(policy())) is not None:await send(delivery)
                     assert tasks.get(task)['state']==protocol.STATE_INPUT_REQUIRED and 'not exported' not in tasks.get(task)['reply']
                     cases.append('actual_controller_question_becomes_native_input_required_without_exporting_private_parameters')
-                result_text='Complete Unicode ä output; no lost chunks. '*170
+                result_text='Complete Unicode ä output; no lost chunks. '*(2000 if index==3 else 170)
+                if index==3:result_text+='Contact person@fixture.invalid'
                 store.settle(mid,'completed',result=result_text)
                 deliveries=[]
                 while (delivery:=engine.next_delivery(policy())) is not None:
@@ -116,7 +117,14 @@ def main():
                 before=tasks.db.execute('SELECT COUNT(*) FROM a2a_task_transitions').fetchone()[0]
                 await send(final[0]);completed=deepcopy(tasks.get(task))
                 assert completed['state']==protocol.STATE_COMPLETED
-                assert completed['reply']=='Mission '+mid+': completed\n'+result_text
+                expected='Mission '+mid+': completed\n'+result_text
+                if index==3:
+                    files=adapter._haos_a2a_artifacts.for_task(task)
+                    assert len(files)==1 and files[0]['kind']=='text' and 'UTF-8 text' in completed['reply']
+                    assert adapter._haos_a2a_artifacts.get(files[0]['id'])['data']==expected.replace('person@fixture.invalid','[redacted-email]').encode()
+                    assert grant.get('allow_outbound_media') is None
+                    cases.append('long_Unicode_controller_result_is_complete_read_granted_text_artifact_without_filesystem_export_permission_or_truncation')
+                else:assert completed['reply']==expected
                 await send(final[0],ack=False)
                 assert tasks.get(task)==completed
                 assert tasks.db.execute('SELECT COUNT(*) FROM a2a_task_transitions').fetchone()[0]==before+(0 if index==1 else 1)

@@ -1,11 +1,14 @@
 """Project complete controller markup into original durable chunks without fence loss."""
 from .gateway_outbound import marked
+from .gateway_media import MAX_BYTES
 
 
 def project(chunks):
     if not isinstance(chunks,list) or not chunks or any(not isinstance(c,str) for c in chunks):
         raise ValueError('complete ordered controller text chunks required')
-    body=''.join(chunks);allowed,_=marked(body);drops=[];offset=0;fence=None
+    body=''.join(chunks)
+    if len(body.encode())>MAX_BYTES:raise ValueError('bounded complete controller output required')
+    allowed,_=marked(body,max_chars=MAX_BYTES);drops=[];offset=0;fence=None
     for line in body.splitlines(keepends=True):
         text=line.strip();start=offset;offset+=len(line)
         if text.startswith(('```','~~~')):

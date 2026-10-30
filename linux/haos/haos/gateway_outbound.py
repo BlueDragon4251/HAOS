@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import hashlib
+import json
 from pathlib import PurePosixPath
 import re
 import time
@@ -15,13 +16,13 @@ _HASH=re.compile(r'[0-9a-f]{64}\Z')
 EXTENSIONS=frozenset(['.3gp', '.7z', '.apk', '.avi', '.bin', '.bmp', '.bz2', '.csv', '.doc', '.docx', '.epub', '.flac', '.geojson', '.gif', '.gpx', '.gz', '.htm', '.html', '.ipa', '.jpeg', '.jpg', '.json', '.key', '.kml', '.kmz', '.m2a', '.m4a', '.md', '.mkv', '.mov', '.mp3', '.mp4', '.odp', '.ods', '.odt', '.ogg', '.opus', '.pdf', '.png', '.ppt', '.pptx', '.rar', '.rtf', '.svg', '.tar', '.tgz', '.tiff', '.tsv', '.txt', '.wav', '.webm', '.webp', '.xls', '.xlsx', '.xml', '.xz', '.yaml', '.yml', '.zip'])
 
 
-def marked(content):
+def marked(content,*,max_chars=65536):
     """Reviewed output grammar: standalone MEDIA lines outside fences/quotes.
 
     Never export bare paths, URLs, JSON tool logs or code examples. The native
     adapter's extractor must independently recognize the same selected paths.
     """
-    if not isinstance(content,str) or len(content)>65536:raise ValueError('bounded output text required')
+    if not isinstance(content,str) or len(content)>max_chars:raise ValueError('bounded output text required')
     paths=[];lines=[];fence=None
     for line in content.splitlines():
         text=line.strip()
@@ -61,6 +62,22 @@ class Exports:
             source_session TEXT NOT NULL,sha256 TEXT NOT NULL,size INTEGER NOT NULL,
             data BLOB NOT NULL,created_at REAL NOT NULL)''')
         self.lock=asyncio.Lock()
+        self.db.execute('''CREATE TABLE IF NOT EXISTS gateway_output_manifests(
+            id TEXT PRIMARY KEY,header TEXT NOT NULL,sha256 TEXT NOT NULL)''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS gateway_output_projections(
+            manifest_id TEXT NOT NULL,part INTEGER NOT NULL,projection TEXT NOT NULL,sha256 TEXT NOT NULL,
+            PRIMARY KEY(manifest_id,part))''')
+
+    def projected(self,identity,context):
+        row=self.db.execute('SELECT projection,sha256 FROM gateway_output_projections WHERE manifest_id=? AND part=?',
+            (identity,context['part'])).fetchone()
+        if row is None:raise Conflict('retained controller output lacks its exact chunk projection')
+        try:value=json.loads(row['projection'])
+        except (ValueError,RecursionError):raise Conflict('damaged controller output projection') from None
+        if (not isinstance(value,dict) or set(value)!={'text','paths','source_sha256','group_sha256'}
+                or digest(value)!=row['sha256'] or value['source_sha256']!=context['content_sha256']
+                or value['group_sha256']!=context['group_sha256']):raise Conflict('controller output projection changed its original manifest')
+        return value
 
     def manifest(self,params):
         if not isinstance(params,dict) or set(params)!={'delivery','attempt'}:raise ValueError('exact controller output manifest request required')
@@ -78,6 +95,12 @@ class Exports:
         from .gateway_event_context import load
         context=load(self.store,dict(row))
         if context['kind']!='mission.completed':raise PermissionError('controller completed-output event required')
+        header=[row['route_id'],row['binding_digest'],context['group_sha256'],context['parts'],context['total_bytes']]
+        identity=digest(header);encoded=json.dumps(header,separators=(',',':'))
+        prior=self.db.execute('SELECT header,sha256 FROM gateway_output_manifests WHERE id=?',(identity,)).fetchone()
+        if prior is not None:
+            if tuple(prior)!=(encoded,digest(header)):raise Conflict('controller output manifest custody proof changed')
+            return self.projected(identity,context)
         rows=self.db.execute('''SELECT o.* FROM gateway_outbox o JOIN gateway_delivery_context c ON c.delivery_id=o.id
             WHERE o.route_id=? AND json_extract(c.metadata,'$.group_sha256')=? ORDER BY json_extract(c.metadata,'$.part')''',
             (row['route_id'],context['group_sha256'])).fetchall()
@@ -90,8 +113,16 @@ class Exports:
         if digest([row['route_id'],context['source_event'],chunks])!=context['group_sha256']:
             raise Conflict('controller output manifest changed source event or original bytes')
         from .gateway_output_projection import project
-        selected=project(chunks)[context['part']]
-        return {**selected,'source_sha256':context['content_sha256'],'group_sha256':context['group_sha256']}
+        projections=[{**selected,'source_sha256':hashlib.sha256(chunks[index].encode()).hexdigest(),'group_sha256':context['group_sha256']}
+            for index,selected in enumerate(project(chunks))]
+        records=[(identity,index,json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False),digest(value)) for index,value in enumerate(projections)]
+        with self.store.transaction():
+            count,used=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(CAST(projection AS BLOB))),0) FROM gateway_output_projections').fetchone()
+            if count+len(records)>65536 or used+sum(len(item[2].encode()) for item in records)>64*1024*1024:
+                raise Conflict('controller output projection capacity reached; owner recovery required')
+            self.db.executemany('INSERT INTO gateway_output_projections VALUES(?,?,?,?)',records)
+            self.db.execute('INSERT INTO gateway_output_manifests VALUES(?,?,?)',(identity,encoded,digest(header)))
+        return self.projected(identity,context)
 
     def current(self,delivery_id,attempt):
         if (not isinstance(delivery_id,str) or not _HASH.fullmatch(delivery_id)
@@ -114,7 +145,8 @@ class Exports:
             binding=self.controller.gateway_policy().current_binding(dict(row))
             paths=(self.manifest({'delivery':params['delivery'],'attempt':params['attempt']})['paths']
                 if self.controller.gateway_policy().connectors[binding['connector']]['platform']=='a2a' else marked(row['content'])[0])
-            if path not in paths or path not in marked(mission['result'])[0]:
+            maximum=MAX_BYTES if self.controller.gateway_policy().connectors[binding['connector']]['platform']=='a2a' else 65536
+            if path not in paths or path not in marked(mission['result'],max_chars=maximum)[0]:
                 raise PermissionError('artifact is not explicitly marked in this immutable mission output')
             identity=digest([row['id'],row['binding_digest'],mission['stored_session_id'],path])
             prior=self.db.execute('SELECT * FROM gateway_output_files WHERE id=?',(identity,)).fetchone()

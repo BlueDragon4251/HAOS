@@ -263,3 +263,35 @@ TaskStore reopen. Both are executable checks; the component probe runs in build
 and protocol CI. A2A remains private and the public gateway count stays 13/22;
 long-output handling, ASR composition, callback/owner setup and full activation
 remain outstanding.
+
+### Complete long text and actual local voice composition
+
+A completed controller response exceeding the native 32,000-byte reply limit
+becomes a separate bounded UTF-8 text artifact (up to 8 MiB), plus a short native
+reply. It preserves the complete projected response after the actual pinned
+native egress redaction; it does not truncate the response or raise native RPC
+frame limits. A text artifact requires the existing read grant, while agent
+filesystem attachments still require separate outbound-file approval. Up to four
+filesystem attachments and one complete text result can coexist. Whole-event
+marker projections are retained atomically once and selected by indexed chunk;
+large replies no longer reparse the entire event for every output chunk.
+
+The expanded 34-case actual UID/controller/TLS fixture downloads a complete long
+Unicode text result under a read grant without outbound-file approval, verifies
+its exact bytes and verifies that no additional agent-file read occurs. Four
+additional root-controller SQL tests cover cross-chunk fences/long Unicode,
+rollback after a real projection-insert failure, changed retained proofs and
+current grant withdrawal. The native controller probe now has 13 cases,
+including complete long Unicode text and native email redaction.
+
+A separate six-case A2A voice probe now composes actual native MessageEvent
+preparation, verified HTTPS audio retrieval, retained-media relay, controller
+execution and the actual hash-pinned offline ASR model. It verifies the reviewed
+recording's transcript reaches the prompt as text, without the raw audio or
+remote URI. Missing voice consent, an unapproved named peer, retained replay,
+invalid audio and withdrawal after transcription are checked. Parent IPC,
+private speech IPC and the agent terminal remain explicit fixture seams here;
+the separate installed-process and speech-authority probes establish their own
+boundaries. No live A2A peer or model inference is asserted. This voice probe is
+included in the frozen-runtime build and protocol CI with existing reviewed
+speech assets; dependencies and model pins are unchanged.

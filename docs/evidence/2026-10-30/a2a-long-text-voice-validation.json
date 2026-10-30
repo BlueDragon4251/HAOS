@@ -1,0 +1,136 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "216e7f9a209115a8d02170ef20de4f52ebb1fdc5",
+  "tested_source_tree": "c45076bc72a0106a1003560a5239640d2f07bbdd",
+  "source_files_sha256": {
+    ".github/workflows/haos-provider-contracts.yml": "c87e1ee29b78c89a40def9f30284b9c8583c6f39c1538652381bfbb691bf4185",
+    "docs/GATEWAY-A2A.md": "ba5e3cf9419c1e43c6b649b5c13ba745d397eea4ab02f8052ce64321b27b0321",
+    "linux/haos/build-runtime.sh": "0dec861976405967e47d15a43c915f32222fa770b49ebfeef12f74f3661dfda6",
+    "linux/haos/haos/gateway_a2a_artifacts.py": "22deab2c82857c6763277fda081360e51262c4d700ab57c94c19ea57d8ae0336",
+    "linux/haos/haos/gateway_a2a_publisher.py": "2dc96d9614ff64edcca248280c2ca0698be192331fd52adf817f2b396822f67b",
+    "linux/haos/haos/gateway_a2a_server.py": "938a4be799dd0853823466d66bb60259a914da276902ee0a9f10de53ef939f10",
+    "linux/haos/haos/gateway_outbound.py": "8990d10c01b3d5703b1666ccc632b6147723418a0dd552546d187ddd99bdf623",
+    "linux/haos/haos/gateway_output_projection.py": "dd58629bdfeaa731aba8a03c54cdf0fceeea84fb2589072d83dfe71e0409d490",
+    "linux/haos/probes/probe_a2a_profile_process.py": "7eb091fb93d6c5f8c718ba82d1d1dbdbf6fbfb1c3ef1e8ae111adc1d3b4a3434",
+    "linux/haos/runtime/probe_a2a_controller.py": "139ee94b06170567385b83f144f8ba841f72cbd119629b0298c3441fb7bcdf3a",
+    "linux/haos/runtime/probe_a2a_voice.py": "32df803a502ede7cf8259c7af8eefd8d3985db3b82bcb808c0c417f46e151590",
+    "linux/haos/tests/test_gateway_a2a_output_manifest.py": "aa212dc780ad1aa537fccf672bde90d112326417abad9998d028c0d141a77786"
+  },
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 13,
+  "a2a_public_activation": false,
+  "unit_regression": {
+    "minimal": {
+      "passed": 2436,
+      "existing_skips": 2,
+      "log_sha256": "5349ab12bd2af08490b2d293aece4403a9552d096742f402d4f5d7bed56bc956"
+    },
+    "full": {
+      "passed": 2436,
+      "existing_skips": 2,
+      "log_sha256": "5349ab12bd2af08490b2d293aece4403a9552d096742f402d4f5d7bed56bc956"
+    }
+  },
+  "actual_root_kernel_suite": {
+    "passed": 172,
+    "log_sha256": "db53a85cf27d9fee9007d94ff6deb96d1e412c55f6eb6fd49cbb913a65ff5c09"
+  },
+  "native_controller": {
+    "cases": [
+      "actual_queued_mission_receipt_does_not_complete_native_task_1",
+      "out_of_order_partial_chunks_and_same_chunk_replay_prove_custody_without_premature_completion_1",
+      "real_SQLite_group_ACK_failure_preserves_committed_native_result_for_idempotent_recovery",
+      "complete_controller_group_commits_exact_native_result_and_replay_cannot_resolve_it_twice_1",
+      "actual_queued_mission_receipt_does_not_complete_native_task_2",
+      "actual_controller_question_becomes_native_input_required_without_exporting_private_parameters",
+      "out_of_order_partial_chunks_and_same_chunk_replay_prove_custody_without_premature_completion_2",
+      "complete_controller_group_commits_exact_native_result_and_replay_cannot_resolve_it_twice_2",
+      "actual_queued_mission_receipt_does_not_complete_native_task_3",
+      "out_of_order_partial_chunks_and_same_chunk_replay_prove_custody_without_premature_completion_3",
+      "long_Unicode_controller_result_is_complete_read_granted_text_artifact_without_filesystem_export_permission_or_truncation",
+      "complete_controller_group_commits_exact_native_result_and_replay_cannot_resolve_it_twice_3",
+      "owner_withdrawal_precedes_all_cached_and_new_controller_group_receipts"
+    ],
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "scope": "actual MissionStore/GatewayEngine outbox/event transactions, FULL SQLite chunk/epoch custody, actual native A2A MessageEvent/Future/finalization; parent dispatch is direct fixture substitution",
+    "HTTP_TLS_UID_live_peer_inference_or_public_activation": false
+  },
+  "native_artifacts": {
+    "cases": [
+      "real_SQLite_insert_failure_never_creates_an_artifact_receipt_and_retry_retains_exact_bytes",
+      "retained_file_is_unavailable_before_actual_native_result_epoch_commit",
+      "identical_file_replay_is_idempotent_and_changed_metadata_or_group_is_rejected",
+      "actual_complete_controller_group_and_native_result_epoch_unlock_exact_file_snapshot",
+      "changed_retained_file_bytes_are_rejected_even_with_unchanged_transport_identity",
+      "file_read_requires_exact_committed_native_result_acceptance_proof",
+      "interrupted_local_transfer_keeps_exact_written_count_without_claiming_peer_receipt",
+      "current_owner_publication_and_separate_file_permission_gate_cached_reads_and_native_parts",
+      "actual_SQLite_and_native_TaskStore_reopen_preserves_committed_file_without_new_export"
+    ],
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "scope": "actual pinned native A2A task/Future/finalization, MissionStore outbox, FULL SQLite file/result proof and real SQL failures; parent dispatch and sealed export handoff are fixture substitutions",
+    "HTTP_TLS_UID_live_peer_inference_or_public_activation": false
+  },
+  "actual_installed_UID_controller_TLS_process": {
+    "cases": [
+      "actual_installed_readonly_code_dedicated_gateway_UID_and_verified_TLS_listener",
+      "actual_native_background_status_writer_uses_private_process_launcher_HOME_not_session_override_or_owner_HOME",
+      "actual_other_UID_cannot_read_account_journals_owner_canary_or_modify_code_or_construct_A2A_profile",
+      "actual_controller_Unix_socket_SO_PEERCRED_denies_foreign_UID_even_with_socket_group_access",
+      "actual_loopback_TCP_without_named_peer_token_has_no_A2A_rights",
+      "actual_native_MessageEvent_preserves_wire_client_deduplication_identity_through_retained_parent_relay",
+      "actual_root_controller_checks_expected_owner_grant_epoch_before_mission_admission",
+      "actual_gateway_UID_controller_Unix_admission_and_queue_receipt_do_not_complete_waiting_native_JSON_RPC",
+      "actual_concurrent_gateway_process_cannot_reuse_private_profile_lease",
+      "actual_SIGKILL_reopen_restores_working_native_task_and_replay_does_not_repeat_relay_or_root_mission",
+      "actual_UID_restart_then_complete_multichunk_root_output_commits_exact_native_task_available_over_verified_TLS",
+      "actual_native_CancelTask_uses_root_controller_and_lost_receipt_replay_does_not_repeat_cancellation_or_invent_terminal_task",
+      "actual_controller_terminal_cancellation_event_alone_completes_native_Future_and_JSON_RPC_as_cancelled",
+      "actual_Hermes_WebSocket_request_Controller_question_and_native_input_required_export_only_question_identity",
+      "actual_native_taskId_continuation_answers_exact_numeric_Hermes_question_through_root_without_new_task_mission_or_replayed_answer",
+      "new_wire_message_ID_cannot_reuse_old_question_epoch_or_request_permanent_approval_before_parent_dispatch",
+      "actual_native_continuation_SSE_keeps_original_task_ID_and_once_approval_reaches_exact_numeric_Hermes_request",
+      "actual_clarification_and_approval_same_native_task_Future_and_SSE_receive_final_controller_result_without_new_mission",
+      "actual_closed_Hermes_WebSocket_preserves_unconfirmed_answer_with_owner_action_and_no_automatic_or_new_ID_resend",
+      "actual_A2A_media_create_token_without_separate_kind_flags_cannot_fetch_or_admit_files",
+      "actual_native_A2A_early_SSE_precedes_complete_verified_TLS_file_read_then_four_exact_bytes_cross_real_media_and_controller_Unix_gates",
+      "actual_A2A_URI_capability_stays_private_and_agent_goal_has_only_native_opaque_file_carriers",
+      "actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission",
+      "actual_completed_task_SSE_replay_preserves_native_file_Parts_without_second_agent_file_read",
+      "actual_root_export_manifest_preserves_cross_chunk_code_examples_and_only_explicit_real_file_uses_bounded_authenticated_agent_HTTP_reader",
+      "actual_native_Task_file_Parts_and_TLS_artifact_endpoint_deliver_exact_snapshot_only_to_current_named_peer_without_paths_or_credentials",
+      "actual_artifact_download_has_durable_local_write_audit_without_claiming_remote_recipient_read",
+      "actual_TLS_long_UTF8_text_artifact_preserves_every_byte_with_read_only_grant_without_agent_file_export_or_native_response_overflow",
+      "separate_outbound_file_grant_is_required_before_any_root_snapshot_read_or_native_artifact_URL",
+      "actual_native_sixth_turn_anti_loop_rejection_is_never_replayed_by_private_pending_input_recovery_into_a_root_mission",
+      "actual_A2A_HTTPS_401_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_A2A_HTTPS_429_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task",
+      "actual_root_owned_policy_replacement_immediately_closes_gateway_listener_and_retained_peer_authority"
+    ],
+    "passed": 34,
+    "actual_UID_TLS_kernel_flock_SIGKILL_SQLite_reopen": true,
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "actual_controller_Unix_socket_SO_PEERCRED": true,
+    "live_peer_inference_public_activation_or_release": false
+  },
+  "actual_native_voice_and_offline_ASR_composition": {
+    "passed": 6,
+    "cases": [
+      "separate_voice_permission_precedes_native_task_download_cache_and_asr",
+      "named_but_unapproved_peer_cannot_create_task_download_voice_or_use_asr",
+      "actual_native_A2A_MessageEvent_verified_HTTPS_retained_media_controller_and_pinned_offline_ASR_reach_text_prompt_without_raw_audio_or_inference",
+      "retained_voice_source_task_and_relay_receipts_prevent_new_download_asr_or_mission_on_replay",
+      "invalid_audio_retains_source_without_transcript_cache_raw_agent_file_or_prompt",
+      "owner_voice_withdrawal_after_actual_local_ASR_prevents_transcript_commit_and_agent_prompt"
+    ],
+    "actual_native_A2A_decode_verified_HTTPS_retained_media_controller_and_local_model": true,
+    "parent_IPC_private_speech_IPC_and_agent_terminal_are_fixtures": true,
+    "public_activation_live_peer_or_inference": false
+  },
+  "scope_limits": [
+    "A2A remains private. Early source cancellation, callback/owner setup and public activation are outstanding.",
+    "Voice uses actual native/HTTPS/offline ASR with explicit parent/speech IPC and terminal fixture seams.",
+    "No live A2A account, external delivery, model inference, installed OS acceptance or release."
+  ]
+}

@@ -76,6 +76,7 @@ OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/sms-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/email-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_feishu_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/feishu-voice-build-probe.json
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/a2a-voice-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_audio_opus.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/audio-opus-build-probe.json
 rm -rf -- "$HAOS_SPEECH_FIXTURE"
 

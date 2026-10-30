@@ -557,11 +557,18 @@ asyncio.run(exercise())
                         while (await command(process,{'method':'counts'}))['relay']!=10:await asyncio.sleep(.02)
                     without_mid=(await command(process,{'method':'forward'}))['mission_id']
                     assert store.claim()['id']==without_mid;store.session(without_mid,'runtime-without-files','stored-without-files')
-                    store.settle(without_mid,'completed',result='Text result remains public.\nMEDIA:./result.csv')
+                    long_text='Text result remains public. ä '*3000
+                    store.settle(without_mid,'completed',result=long_text+'\nMEDIA:./result.csv')
                     await command(process,{'method':'pump'});without=(await pending).json()['result']['task']
-                    assert without['status']['state']==protocol.STATE_COMPLETED and 'separate owner approval' in json.dumps(without)
-                    assert './result.csv' not in json.dumps(without) and not any('url' in part for item in without.get('artifacts',[]) for part in item['parts'])
+                    assert without['status']['state']==protocol.STATE_COMPLETED and 'UTF-8 text' in json.dumps(without)
+                    text_files=[part for item in without.get('artifacts',[]) for part in item['parts'] if 'url' in part]
+                    assert './result.csv' not in json.dumps(without) and len(text_files)==1 and text_files[0]['mediaType']=='text/plain'
+                    text_path=__import__('urllib.parse',fromlist=['urlsplit']).urlsplit(text_files[0]['url']).path
+                    text_download=await client.get(address.removesuffix('/a2a')+text_path,headers=headers)
+                    assert text_download.status_code==200
+                    assert text_download.content==('Mission '+without_mid+': completed\n'+long_text+'\n\n[Result files require separate owner approval.]\n').encode()
                     assert len(file_reads)==1
+                    cases.append('actual_TLS_long_UTF8_text_artifact_preserves_every_byte_with_read_only_grant_without_agent_file_export_or_native_response_overflow')
                     cases.append('separate_outbound_file_grant_is_required_before_any_root_snapshot_read_or_native_artifact_URL')
                 finally:await artifact_runner.cleanup()
                 # Five actual accepted native turns followed by its real sixth-

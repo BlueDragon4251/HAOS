@@ -9,7 +9,7 @@ from .gateway import Conflict,digest
 from .gateway_media import MAX_BYTES
 
 HASH=re.compile('[0-9a-f]{64}\\Z')
-NAME=re.compile('result-[0-9]{1,3}(?:\\.[a-z0-9]{1,12})?\\Z')
+NAME=re.compile('result-[0-9]{1,5}(?:\\.[a-z0-9]{1,12})?\\Z')
 
 
 class Artifacts:
@@ -24,19 +24,21 @@ class Artifacts:
             binding_digest TEXT NOT NULL,state TEXT NOT NULL,written INTEGER NOT NULL,
             size INTEGER NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL)''')
 
-    def current(self,task_id):
+    def current(self,task_id,kind='file'):
         row=self.tasks.entry(task_id)
         if row is None or row['admitted_receipt']!=row['source_key']:raise PermissionError('exact retained native A2A task input required')
         binding=self.tasks.authorize(row)
-        if 'read' not in binding['capabilities'] or binding.get('allow_outbound_media') is not True:
+        if kind not in {'file','text'} or 'read' not in binding['capabilities'] or kind=='file' and binding.get('allow_outbound_media') is not True:
             raise PermissionError('separate current A2A file-output/read grant required')
         return row
 
     def checked(self,row):
-        task=self.current(row['task_id'])
         try:meta=json.loads(row['metadata'])
         except (ValueError,RecursionError):raise Conflict('damaged private A2A artifact metadata') from None
+        if not isinstance(meta,dict):raise Conflict('damaged private A2A artifact metadata')
+        kind=meta.get('kind','file');task=self.current(row['task_id'],kind)
         fields={'task_id','source_key','binding_id','binding_digest','credential_scope','group_id','delivery_id','export_id','sha256','size','name','mime'}
+        if kind=='text':fields.add('kind')
         if (not isinstance(meta,dict) or set(meta)!=fields or row['metadata_sha256']!=digest(meta)
                 or json.dumps(meta,sort_keys=True,separators=(',',':'))!=row['metadata']
                 or any(meta[key]!=task[key] for key in ['task_id','source_key','binding_id','binding_digest','credential_scope'])
@@ -44,7 +46,8 @@ class Artifacts:
                 or any(not isinstance(meta[key],str) or not HASH.fullmatch(meta[key]) for key in ['group_id','delivery_id','export_id','sha256'])
                 or row['id']!=digest(meta) or type(meta['size']) is not int or not 1<=meta['size']<=MAX_BYTES
                 or not isinstance(meta['name'],str) or not NAME.fullmatch(meta['name'])
-                or not isinstance(meta['mime'],str) or not re.fullmatch('[a-z0-9][a-z0-9.+-]{0,126}/[a-z0-9][a-z0-9.+-]{0,126}',meta['mime'])):
+                or not isinstance(meta['mime'],str) or not re.fullmatch('[a-z0-9][a-z0-9.+-]{0,126}/[a-z0-9][a-z0-9.+-]{0,126}',meta['mime'])
+                or kind=='text' and (meta['name']!='result-0.txt' or meta['mime']!='text/plain')):
             raise Conflict('private A2A artifact changed source, grant, bytes or transport identity')
         data=bytes(row['data'])
         if len(data)!=meta['size'] or hashlib.sha256(data).hexdigest()!=meta['sha256']:
@@ -52,9 +55,9 @@ class Artifacts:
         if any(secret.encode() in data for secret in self.tasks.redactor.secrets):raise PermissionError('private credential in A2A artifact')
         return meta,data
 
-    def put(self,task_id,group_id,delivery_id,offer,data,name,mime):
+    def put(self,task_id,group_id,delivery_id,offer,data,name,mime,*,kind='file'):
         with self.tasks.lock:
-            task=self.current(task_id)
+            task=self.current(task_id,kind)
             if (not isinstance(offer,dict) or set(offer)!={'id','size','sha256'} or not isinstance(data,bytes)
                     or type(offer['size']) is not int or not 1<=offer['size']<=MAX_BYTES or len(data)!=offer['size']
                     or not isinstance(offer['sha256'],str) or hashlib.sha256(data).hexdigest()!=offer['sha256']
@@ -66,6 +69,12 @@ class Artifacts:
             if any(secret.encode() in data for secret in self.tasks.redactor.secrets):raise PermissionError('private credential cannot become A2A output')
             meta={key:task[key] for key in ['task_id','source_key','binding_id','binding_digest','credential_scope']}
             meta.update(group_id=group_id,delivery_id=delivery_id,export_id=offer['id'],sha256=offer['sha256'],size=offer['size'],name=name,mime=mime)
+            if kind=='text':
+                if name!='result-0.txt' or mime!='text/plain':raise ValueError('fixed UTF-8 controller text artifact required')
+                text=data.decode('utf-8')
+                from plugins.platforms.a2a.security import redact_outbound
+                if redact_outbound(text)!=text:raise PermissionError('native A2A egress redaction required before controller text custody')
+                meta['kind']='text'
             identity=digest(meta);encoded=json.dumps(meta,sort_keys=True,separators=(',',':'))
             prior=self.db.execute('SELECT * FROM a2a_output_artifacts WHERE task_id=? AND delivery_id=? AND export_id=?',(task_id,delivery_id,offer['id'])).fetchone()
             if prior is not None:
@@ -73,8 +82,8 @@ class Artifacts:
                 actual,retained=self.checked(prior)
                 if actual!=meta or retained!=data:raise Conflict('A2A artifact replay changed bytes')
                 return identity
-            if self.db.execute('SELECT COUNT(*) FROM a2a_output_artifacts WHERE task_id=? AND group_id=?',(task_id,group_id)).fetchone()[0]>=4:
-                raise Conflict('A2A task result exceeds four attachments')
+            if self.db.execute("SELECT COUNT(*) FROM a2a_output_artifacts WHERE task_id=? AND group_id=? AND COALESCE(json_extract(metadata,'$.kind'),'file')=?",(task_id,group_id,kind)).fetchone()[0]>=(1 if kind=='text' else 4):
+                raise Conflict('A2A task result exceeds its file or text attachment bound')
             if self.db.execute('SELECT COUNT(*) FROM a2a_output_artifacts').fetchone()[0]>=65536:
                 raise Conflict('A2A artifact history capacity reached')
             count,total=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM a2a_output_artifacts WHERE length(data)>0').fetchone()
@@ -97,7 +106,7 @@ class Artifacts:
                     or epoch['receipt_sha256']!=digest([task_id,epoch['epoch'],wanted,task['record_sha256']])):
                 raise Conflict('A2A artifact outcome epoch lacks exact committed task proof')
             rows=self.db.execute('SELECT * FROM a2a_output_artifacts WHERE task_id=? AND group_id=? ORDER BY created_at,id',(task_id,epoch['epoch'])).fetchall()
-            if len(rows)>4:raise Conflict('A2A committed artifact set exceeds task bound')
+            if len(rows)>5:raise Conflict('A2A committed artifact set exceeds task bound')
             return [{'id':row['id'],**self.checked(row)[0]} for row in rows]
 
     def get(self,identity):
@@ -139,7 +148,7 @@ class Artifacts:
 
     def begin_read(self,item):
         with self.tasks.lock:
-            self.current(item['task_id'])
+            self.current(item['task_id'],item.get('kind','file'))
             if self.db.execute('SELECT COUNT(*) FROM a2a_artifact_reads').fetchone()[0]>=65536:
                 raise Conflict('A2A artifact audit history full; owner recovery required')
             cursor=self.db.execute('INSERT INTO a2a_artifact_reads(artifact_id,task_id,binding_digest,state,written,size,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
