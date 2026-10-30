@@ -54,7 +54,7 @@ def decode(data):
     result=BytesIO();samples=0
     try:
         with av.open(BytesIO(data),options={'protocol_whitelist':'pipe',
-                'format_whitelist':'wav,flac,mp3,mov,ogg,aac,amr'}) as source:
+                'format_whitelist':'wav,flac,mp3,mov,ogg,aac,amr,caf'}) as source:
             if len(source.streams.audio)!=1 or source.streams.video:
                 raise SpeechRefused('one audio stream without video required')
             resampler=av.AudioResampler(format='s16',layout='mono',rate=16000)

@@ -37,6 +37,15 @@ def main():
             for packet in stream.encode(None):encoded.mux(packet)
     decoded,count=decode(output.getvalue());assert 176000<=count<180000 and len(decoded)<=360044
     cases.append('actual_aac_m4a_container_roundtrip_is_accepted_without_external_protocols')
+    from caf_fixture import encode
+    caf_bytes=encode(pcm)
+    decoded,caf_samples=decode(caf_bytes)
+    assert caf_samples==176000 and decoded==pcm
+    cases.append('actual_CAF_decoder_preserves_exact_approved_PCM_without_external_protocols')
+    try:decode(encode(wav(121*16000)))
+    except SpeechRefused as error:assert 'two-minute' in str(error)
+    else:raise AssertionError('CAF bypassed the existing voice duration limit')
+    cases.append('actual_CAF_cannot_bypass_existing_two_minute_voice_limit')
     with tempfile.TemporaryDirectory(prefix='haos-stt-native-home-') as temporary:
         home=Path(temporary);config=home/'.hermes';config.mkdir()
         (config/'config.yaml').write_text('stt:\n  provider: local\n  local:\n    device: cpu\n    compute_type: int8\nsecurity:\n  allow_lazy_installs: false\n')
@@ -45,7 +54,12 @@ def main():
         assert 'ask not what your country can do for you' in result['transcript'].lower()
         assert 'ask what you can do for your country' in result['transcript'].lower()
         assert result['provider']=='local' and result['samples']==176000
+        caf_result=transcribe(caf_bytes,model_root=assets/'model',model_owner_uid=os.geteuid())
+        assert 'ask not what your country can do for you' in caf_result['transcript'].lower()
+        assert 'ask what you can do for your country' in caf_result['transcript'].lower()
+        assert caf_result['provider']=='local' and caf_result['samples']==176000
     cases.append('actual_pinned_hermes_local_engine_recognizes_reference_without_account_or_lazy_install')
+    cases.append('actual_pinned_hermes_local_engine_recognizes_Photon_CAF_voice_without_cloud_or_path_input')
     report={'passed':len(cases),'cases':cases,'native':{key:value for key,value in result.items() if key!='transcript'},
         'external_account_line_voice_or_installed_acceptance':False}
     if len(sys.argv)>3:Path(sys.argv[3]).write_text(json.dumps(report,indent=2)+'\n')

@@ -49,8 +49,15 @@ a sender access. The controller already has the gateway socket group; peer UID
 authorization remains mandatory even when filesystem connection is permitted. The physical service profile still requires installed-system acceptance;
 a successful disposable descriptor/UID probe is not an installed boot test.
 
-`probe_speech_backend.py` performs real FLAC decoding, AAC/M4A encoding/decoding,
-negative duration/channel/playlist tests and actual local model recognition.
+`probe_speech_backend.py` performs real FLAC decoding, AAC/M4A and CAF
+encoding/decoding, negative duration/channel/playlist tests and actual local
+model recognition. CAF uses the same byte, channel, sample and two-minute
+limits and the existing pipe-only protocol allowlist. Its decoded PCM must
+match the approved reference exactly, and an overlong valid CAF must fail the
+duration check. The separate Speech UID and checked controller Unix RPC also
+recognize the actual CAF reference through the pinned engine. This fixes the
+previous local rejection of Photon CAF input; native Photon transport through
+the complete controller remains a separate acceptance.
 The public reference recording is OpenAI Whisper's `tests/jfk.flac` at source
 `86098128c0b4f24f0e2aa2994de830614b474227`, SHA-256
 `63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715`.

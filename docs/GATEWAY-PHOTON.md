@@ -200,6 +200,13 @@ state, including a publication revoked during an awaited health response.
 
 ## Evidence limits and work remaining
 
+The local speech decoder now accepts CAF under the existing bounds and
+pipe-only protocol allowlist. Actual encoded CAF preserves reference PCM and
+is recognized by the pinned Whisper engine both directly and under the separate
+Speech UID through checked controller Unix RPC. The old decoder rejected the
+same valid CAF fixture. This closes a local format gap; the complete Photon
+attachment RPC/controller/speech flow still needs its own native acceptance.
+
 The native transport probe exercises the actual prepared Spectrum mapper and
 its attachment-stream cleanup with local RPC frames. Python tests exercise the
 independent policy and actual SQLite writes, failures and reopen behavior.

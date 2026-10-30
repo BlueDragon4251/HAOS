@@ -27,6 +27,11 @@ def main():
     assert hashlib.sha256(audio.read_bytes()).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
     public_audio=Path('/public-audio');public_audio.mkdir(mode=0o755)
     reference=public_audio/'reference.flac';reference.write_bytes(audio.read_bytes());reference.chmod(0o644)
+    sys.path[:0]=['/usr/lib/haos','/sdk','/repo/linux/haos/runtime']
+    from haos.speech import decode
+    from caf_fixture import encode
+    caf_audio=encode(decode(audio.read_bytes())[0]);caf_reference=public_audio/'reference.caf'
+    caf_reference.write_bytes(caf_audio);caf_reference.chmod(0o644)
     fixture_code=public_audio/'video_fixture.py'
     fixture_code.write_bytes(Path('/repo/linux/haos/runtime/video_fixture.py').read_bytes());fixture_code.chmod(0o644)
     with tempfile.TemporaryDirectory(prefix='haos-speech-process-') as directory:
@@ -60,8 +65,14 @@ result=transcribe(Path('/public-audio/reference.flac').read_bytes(),model_root=P
 assert 'ask not what your country can do for you' in result['transcript'].lower()
 assert 'ask what you can do for your country' in result['transcript'].lower()
 assert result['provider']=='local' and result['sample_rate']==16000 and result['samples']==176000
+caf=Path('/public-audio/reference.caf').read_bytes()
+caf_result=transcribe(caf,model_root=Path(request['model']))
+assert caf_result['source_sha256']==hashlib.sha256(caf).hexdigest() and caf_result['samples']==176000
+assert 'ask not what your country can do for you' in caf_result['transcript'].lower()
+assert 'ask what you can do for your country' in caf_result['transcript'].lower()
 print(json.dumps({'source_sha256':result['source_sha256'],'model_revision':result['model_revision'],
-    'transcript_sha256':hashlib.sha256(result['transcript'].encode()).hexdigest(),'samples':result['samples']}))
+    'transcript_sha256':hashlib.sha256(result['transcript'].encode()).hexdigest(),'samples':result['samples'],
+    'caf_source_sha256':caf_result['source_sha256'],'caf_transcript_sha256':hashlib.sha256(caf_result['transcript'].encode()).hexdigest()}))
 '''
         env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1',
             'PYTHONPATH':'/usr/lib/haos:/usr/lib/haos/hermes-source:/sdk',
@@ -217,6 +228,9 @@ async def main():
     result=await transcribe(data,current)
     assert result['source_sha256']==hashlib.sha256(data).hexdigest() and len(checks)>1
     assert 'ask not what your country can do for you' in result['transcript'].lower()
+    caf=Path('/public-audio/reference.caf').read_bytes();caf_result=await transcribe(caf,current)
+    assert caf_result['source_sha256']==hashlib.sha256(caf).hexdigest() and caf_result['samples']==176000
+    assert 'ask not what your country can do for you' in caf_result['transcript'].lower()
     encoded=await opus(data,current);assert encoded['source_sha256']==hashlib.sha256(data).hexdigest() and encoded['samples']==176000
     encoded_amr=await amr(data,current)
     assert encoded_amr['source_sha256']==hashlib.sha256(data).hexdigest() and encoded_amr['encoded_samples']==176320
@@ -251,7 +265,9 @@ asyncio.run(main())
         from speech_owner_fixture import exercise as owner_exercise
         owner_cases=owner_exercise()
         receipt=json.loads(result.stdout)
-        print(json.dumps({'passed':13+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+        print(json.dumps({'passed':15+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+            'actual_Photon_CAF_decode_and_native_Whisper_under_separate_credential_free_speech_UID',
+            'actual_Photon_CAF_checked_controller_UID_Unix_RPC_to_pinned_speech_worker',
             'actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity',
             'actual_container_network_disabled_and_reviewed_model_bytes_used_offline',
             'actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket',
