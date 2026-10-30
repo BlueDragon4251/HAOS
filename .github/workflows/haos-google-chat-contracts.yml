@@ -1,10 +1,10 @@
 name: HAOS prepared Google Chat contracts
 on:
   pull_request:
-    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
   push:
     branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
-    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,6 +37,19 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_google_chat_auth.py "$RUNNER_TEMP/google-chat-contracts/auth.json"
           "$PYTHON" linux/haos/runtime/probe_google_chat_pubsub_custody.py "$RUNNER_TEMP/google-chat-contracts/pubsub-custody.json"
           "$PYTHON" linux/haos/runtime/probe_google_chat_text.py upstream/hermes-agent "$RUNNER_TEMP/google-chat-contracts/text.json"
+      - name: Actual private gateway UID TLS PubSub RPC and HTTPS callback custody
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          for mode in pubsub http; do
+            if [ "$mode" = pubsub ]; then FLAG=HAOS_DISPOSABLE_GOOGLE_CHAT_PROCESS; else FLAG=HAOS_DISPOSABLE_GOOGLE_CHAT_HTTP_PROCESS; fi
+            docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+              -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+              -v "$PWD/linux/haos/probes/probe_google_chat_${mode}_process.py:/probe.py:ro" \
+              -e "$FLAG=1" \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/$mode-process.json"
+          done
       - uses: actions/upload-artifact@v7
         if: always()
         with:

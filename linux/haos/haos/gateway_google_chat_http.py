@@ -1,11 +1,13 @@
 """Per-client bounded HTTP with one transmission and no redirect/global hooks."""
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 
 
-def single_request_http(current,*,fixture_origin=None,limit=1048576):
+def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=None):
     if not callable(current) or type(limit) is not int or not 1<=limit<=8388608:raise ValueError('bounded private HTTP authority required')
     import httplib2
+    from .redaction import Redactor
+    if redactor is not None and not isinstance(redactor,Redactor):raise TypeError('shared private credential redactor required')
     if fixture_origin is not None:
         parsed=urlsplit(fixture_origin)
         if parsed.scheme!='http' or parsed.hostname!='127.0.0.1' or not parsed.port or parsed.path not in {'','/'}:
@@ -25,6 +27,21 @@ def single_request_http(current,*,fixture_origin=None,limit=1048576):
                 raise PermissionError('exact private Google Chat or OAuth HTTP operation required')
             if body is not None and (not isinstance(body,(str,bytes)) or len(body.encode() if isinstance(body,str) else body)>9*1024*1024):
                 raise ValueError('bounded Google HTTP request bytes required')
+            if redactor is not None:
+                aliases=[]
+                for name,value in (headers or {}).items():
+                    if name.lower()=='authorization':
+                        if not isinstance(value,str) or not 1<=len(value)<=16384:raise ValueError('bounded private Google authorization required')
+                        aliases.extend([value,value.split(' ',1)[-1]])
+                if parsed.hostname=='oauth2.googleapis.com' and body:
+                    parts=parse_qs(body.decode('utf-8') if isinstance(body,bytes) else body,strict_parsing=True)
+                    for name in ['assertion','client_secret','refresh_token']:
+                        aliases.extend(parts.get(name,[]))
+                secrets=Redactor([*redactor.secrets,*aliases]).secrets
+                if len(secrets)>4096 or sum(len(s) for s in secrets)>8*1024*1024:raise ValueError('private Google credential redaction capacity reached')
+                # Capture SDK-generated access/assertion values before wire I/O
+                # or native error/log handling can observe a reflected token.
+                redactor.secrets=secrets
             headers=dict(headers or {});headers={k:v for k,v in headers.items() if k.lower()!='accept-encoding'}
             headers['accept-encoding']='identity'
             return super().request(uri,method=method,body=body,headers=headers,redirections=0)

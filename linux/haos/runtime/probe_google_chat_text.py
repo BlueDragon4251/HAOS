@@ -29,6 +29,8 @@ def main():
     from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
     import httplib2
+    from google.oauth2.credentials import Credentials
+    from google_auth_httplib2 import AuthorizedHttp
     # Schema-only private account; HTTP account auth is deliberately outside
     # this native-send/SDK-wire fixture (no real provider credential exists).
     email='gateway@haos-fixture.iam.gserviceaccount.com'
@@ -49,6 +51,7 @@ def main():
             def reply(self,status,data):
                 body=json.dumps(data).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
             def do_POST(self):
+                assert self.headers.get('Authorization')=='Bearer local-wire-token-fixture'
                 query=parse_qs(urlsplit(self.path).query);body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 requests.append(('POST',query,body));client=query['messageId'][0]
                 with sqlite3.connect(path) as db:
@@ -73,7 +76,8 @@ def main():
         api=build('chat','v1',http=single_request_http(lambda:None,fixture_origin=origin),cache_discovery=False,static_discovery=True,
             client_options={'api_endpoint':'http://127.0.0.1:'+str(server.server_port)+'/'})
         adapter=GoogleChatAdapter(PlatformConfig(enabled=True));adapter._chat_api=api
-        adapter._new_authed_http=lambda:single_request_http(lambda:None,fixture_origin=origin)
+        adapter._new_authed_http=lambda:AuthorizedHttp(Credentials('local-wire-token-fixture'),
+            http=single_request_http(lambda:None,fixture_origin=origin,redactor=inbox.redactor),max_refresh_attempts=0)
         ledger=TextLedger(inbox,'google',value,lambda:policy,lambda:None)
         operation={'id':'1'*64}
         async def create(self,parent,body):return await ledger.create(self,operation['id'],route,parent,body)
@@ -82,8 +86,10 @@ def main():
         async def run():
             nonlocal inbox,ledger
             result=await adapter.send(binding['chat'],'native reply',metadata={'thread_id':binding['thread']})
+            assert inbox.redactor.text('local-wire-token-fixture')=='[REDACTED]'
             assert result.success and result.message_id.startswith('spaces/room1/messages/server.part') and len(requests)==1
             result=await adapter.send(binding['chat'],'native reply',metadata={'thread_id':binding['thread']});assert result.success and len(requests)==1
+            cases.append('actual_Google_AuthorizedHttp_injects_private_bearer_and_shared_redactor_captures_it_before_any_API_error_or_log_response')
             cases.append('actual_native_send_and_Google_discovery_HTTP_create_use_stable_client_request_IDs_and_OR_FAIL_after_independent_connection_observes_FULL_write_intent_then_confirmed_replay_has_no_HTTP')
             operation['id']='2'*64;mode['next']='disconnect'
             try:await adapter.send(binding['chat'],'uncertain native reply',metadata={'thread_id':binding['thread']})

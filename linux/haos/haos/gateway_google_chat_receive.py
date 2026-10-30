@@ -1,4 +1,5 @@
 """Prepared authenticated pre-ACK HTTP/PubSub custody; no public listener yet."""
+import asyncio
 import hashlib
 import time
 
@@ -23,10 +24,22 @@ class Receiver:
         self.current()
         if self.value['inbound']['mode']!='http' or self.http_verifier is None:raise PermissionError('saved private HTTP transport required')
         self.http_verifier.verify(headers)
-        key=self._retain(raw);self.current()
+        key=self._http_retain(raw);self.current()
         # Listener may return success only after this method completes. The
         # original is already durable even if dispatch or the response fails.
         return key
+
+    def _http_retain(self,raw):
+        try:return self._retain(raw)
+        except Refused as error:
+            self._refuse(raw,error.reason);self.current();return None
+
+    async def http_async(self,headers,raw):
+        self.current()
+        if self.value['inbound']['mode']!='http' or self.http_verifier is None:raise PermissionError('saved private HTTP transport required')
+        await asyncio.to_thread(self.http_verifier.verify,headers)
+        # Keep every SQLite access on its owning asyncio thread.
+        self.current();return self._http_retain(raw)
 
     def _refuse(self,raw,reason):
         if reason not in {'unapproved-route','self-or-automated','unsupported-event','ambiguous-space','unsupported-thread',

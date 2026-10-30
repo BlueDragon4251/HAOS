@@ -53,11 +53,12 @@ def credentials(value):
                 or not re.fullmatch('projects/'+re.escape(sa['project_id'])+'/subscriptions/[A-Za-z][A-Za-z0-9._~+%-]{2,254}',inbound['subscription'])):
             raise ValueError('exact same-project Pub/Sub pull subscription required')
     elif inbound['mode']=='http':
-        if set(inbound)!={'mode','tls','audience','service_account_email'}:raise ValueError('HTTPS callback, audience and exact Google caller identity required')
+        if set(inbound)!={'mode','port','tls','audience','service_account_email'}:raise ValueError('HTTPS callback, audience and exact Google caller identity required')
+        if type(inbound['port']) is not int or not 1024<=inbound['port']<=65535:raise ValueError('explicit unprivileged Google Chat HTTPS listener port required')
         from .gateway_line_tls import material
         tls=material(inbound['tls'],verify=False,webhook_path='/google-chat')
         audience=inbound['audience']
-        if (not isinstance(audience,str) or audience!=tls['public_url'] or urlsplit(audience).fragment
+        if (not isinstance(audience,str) or not (audience==tls['public_url'] or re.fullmatch('[1-9][0-9]{0,31}',audience)) or urlsplit(audience).fragment
                 or not isinstance(inbound['service_account_email'],str) or not EMAIL.fullmatch(inbound['service_account_email'])
                 or not inbound['service_account_email'].endswith('.gserviceaccount.com')):
             raise ValueError('exact callback audience and dedicated Google service account required')

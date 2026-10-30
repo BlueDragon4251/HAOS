@@ -11,7 +11,8 @@ expected bot `users/<numeric-id>` and official Google auth/token/certificate
 endpoints. Ambient ADC, arbitrary credential paths and token endpoints cannot
 be selected by this prepared schema. Pub/Sub mode selects an explicit same-project
 pull subscription; HTTPS callback mode requires explicit listener/TLS material,
-an exact audience and independently expected caller service account.
+an exact callback-URL or numeric project-number audience, an unprivileged
+listener port and independently expected caller service account.
 
 Independent grants use immutable user, space and optional same-space thread
 resources, an account scope and fresh grant epoch. An email/display alias is
@@ -37,14 +38,20 @@ Pub/Sub SDK's ACK queue operation. Replay retains the first original across
 semantically identical native/Add-ons envelopes. Changed content/account/grant,
 damaged originals and conflicting parent receipts fail closed. Unknown or
 malformed Pub/Sub sources need a durable hash-only refusal audit before ACK;
-failed original or refusal commits produce NACK. Actual remote SubscriberClient
-authentication and server ACK acceptance remain unimplemented/unverified here.
+failed original or refusal commits produce NACK. A dedicated real-UID SDK pull transport now uses fixed TLS gRPC authority,
+bounded message/RPC sizes and deadlines without SDK retries or emulator/ADC
+selection. Its SQL work stays on the owning asyncio thread. Actual SDK client
+and local TLS gRPC server checks exercise ACK/NACK, reopen, authentication/
+transport failures and publication withdrawal. Real Google service-account
+OAuth and the remote subscription remain separate live requirements.
 
 Prepared text writes use the real native `send` formatter and actual Google API
 discovery client. FULL write intent precedes the first HTTP byte; stable client
 and request IDs bind each operation. Exact threads use `REPLY_MESSAGE_OR_FAIL`,
 preventing native fallback into a newly created thread. Per-client HTTP sends
-once, bounds responses and does not redirect; this also prevents httplib2's
+once, bounds responses and does not redirect; actual SDK-generated bearer
+values enter the shared private redactor before wire I/O and native error/log
+handling; this also prevents httplib2's
 otherwise implicit POST resend after a dropped response. A begun/unclear write
 can only reconcile with a read of its exact client ID. A 404 is not proof of
 non-delivery. Confirmed operations return their retained receipt without HTTP;
@@ -52,10 +59,27 @@ changed bodies, routes or revoked grants cannot reuse them. These are private
 primitives; controller outbox authority still needs to be connected by the
 production profile.
 
+The fixed HTTPS callback application also runs under the actual private UID,
+validates trusted TLS material and native Google RSA tokens, retains source or
+hash-only refusal before HTTP success, refuses duplicate Authorization headers,
+and returns 503 on failed source commits. Its real TLS fixture uses raw TLS
+framing for the duplicate-header case because the ordinary test client
+normalizes those duplicates before transmission. Publication replacement
+prevents subsequent admission. These are receiver-process checks, not a
+complete production daemon or remote Google callback acceptance.
+
+The retained original now also feeds the actual native codec and a guarded
+cooperative-MRO admission into FULL native and parent-relay queues. A source
+ContextVar prevents unretained native events from using that admission. Native
+projection hashes, current grant/account and original checksums are checked
+again at dispatch. Actual-UID reopen tests keep one parent record, including a
+real SQL failure between parent commit and the source receipt. This proves the
+local relay handoff, not a root-controller mission or live inference.
+
 ## Remaining before public activation
 
-- Actual private service identity, profile lifecycle, authenticated HTTPS
-  listener and isolated Pub/Sub subscriber, reconnect and scheduling.
+- Complete private profile lifecycle, account identity checks, reconnect and
+  scheduling around the implemented authenticated HTTPS and Pub/Sub receivers.
 - Durable native dispatch into the independent root mission/controller queue,
   cancellation, outbox authority and inspected owner recovery/status/logout.
 - Safe input attachments, local voice and video, sealed controller-exported
@@ -71,7 +95,8 @@ runtime extras have not been expanded yet. No runtime package versions or
 hash-pinned HAOS overlay dependencies were updated.
 
 Source-bound evidence:
-[prepared contracts](evidence/2026-10-30/google-chat-private-primitives-validation.json).
+[prepared contracts](evidence/2026-10-30/google-chat-private-primitives-validation.json)
+and [actual UID receive/relay checks](evidence/2026-10-30/google-chat-private-receive-validation.json).
 Loopback HTTP, certificate and SDK ACK-queue fixtures do not establish live
 account privileges, subscription authorization, public callbacks, inference,
 external recipient delivery/read status, installed OS or release acceptance.

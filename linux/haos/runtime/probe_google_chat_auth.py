@@ -39,6 +39,10 @@ def main():
         except Refused as error:assert error.reason=='invalid-authentication'
         else:raise AssertionError('invalid Google caller accepted')
         cases.append('actual_Google_SDK_or_additional_exact_caller_gate_refuses_'+next(iter(change)))
+    project_audience='123456789012'
+    project_verifier=TokenVerifier(project_audience,email,lambda:None,certificate_request=request)
+    assert project_verifier.verify([('Authorization','Bearer '+token({'aud':project_audience}))])
+    cases.append('actual_Google_SDK_supports_exact_owner_selected_project_number_audience_as_well_as_callback_URL')
     signed=token();parts=signed.split('.');parts[2]=('A' if parts[2][0]!='A' else 'B')+parts[2][1:]
     for headers in [[('Authorization','Bearer '+'.'.join(parts))],[('Authorization','Bearer '+signed),('authorization','Bearer '+signed)],
         [('Authorization','Basic '+signed)],[],[('Authorization','Bearer '+signed+'\r\nextra')]]:
