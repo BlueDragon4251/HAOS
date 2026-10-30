@@ -40,7 +40,7 @@ concurrency:
 jobs:
   pinned-runtime:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -328,7 +328,7 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
           cat "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
-      - name: Verify private Feishu UID isolation delivery crash recovery and owner decisions
+      - name: Verify private Feishu and DingTalk UID isolation delivery crash recovery and owner decisions
         run: |
           set -euo pipefail
           SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
