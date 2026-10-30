@@ -22,7 +22,7 @@ STATES = {'not-started': 'Noch keine Meldung', 'created': 'Profil vorbereitet', 
 
 class RecoveryForm:
     def __init__(self, wizard, parent):
-        self.wizard = wizard; self.epoch = 0; self.rows = []; self.kind = None; self.loaded = None; self.buttons = {}
+        self.wizard = wizard; self.epoch = 0; self.rows = []; self.kind = None; self.loaded = None; self.buttons = {}; self.saved_status = None
         tk = wizard.tk; self.frame = tk.Frame(parent, bg=wizard.PANEL)
         wizard._label(self.frame, 'Photon · aufgezeichneter Status und erhaltene Originale', size=12).pack(anchor='w', pady=5)
         wizard._label(self.frame, 'Der Statusabruf lässt den Dienst laufen. Profil- und Quellenprüfung stoppen den Gateway-Dienst. '
@@ -32,6 +32,11 @@ class RecoveryForm:
             entry = wizard._field(self.frame, label); entry.configure(textvariable=variable); variable.trace_add('write', self.clear)
         for key, label in [('status', 'Aufgezeichneten Status lesen'), ('profiles', 'Erhaltene Profile auflisten'), ('sources', 'Originale des ausgewählten Profils prüfen')]:
             self.button(key, label, lambda key=key: self.load(key))
+        self.auth_confirm = tk.BooleanVar(value=False)
+        tk.Checkbutton(self.frame, text='Den geprüften Anmeldefehler für einen erneuten lokalen Versuch freigeben; Wartefrist erhalten',
+            variable=self.auth_confirm, bg=wizard.PANEL, fg=wizard.TEXT, selectcolor=wizard.BG,
+            wraplength=wizard.label_wrap, justify='left').pack(anchor='w', pady=4)
+        self.button('retry-auth', 'Geprüften Anmeldeversuch erneut erlauben', self.retry_auth)
         self.list = tk.Listbox(self.frame, height=5, exportselection=False, bg=wizard.BG, fg=wizard.TEXT)
         self.list.pack(fill='x', pady=4); self.list.bind('<<ListboxSelect>>', self.selected)
         self.expand = tk.BooleanVar(value=False)
@@ -63,9 +68,10 @@ class RecoveryForm:
 
     def consent(self):
         self.confirm.set(False); self.note.delete(0, self.wizard.tk.END)
+        self.auth_confirm.set(False)
 
     def clear(self, *_args):
-        self.epoch += 1; self.rows = []; self.kind = None; self.loaded = None
+        self.epoch += 1; self.rows = []; self.kind = None; self.loaded = None; self.saved_status = None
         if hasattr(self, 'list'): self.list.delete(0, self.wizard.tk.END); self.render(None); self.consent()
 
     def fresh(self, epoch, connector, profile):
@@ -99,7 +105,7 @@ class RecoveryForm:
             if 'error' in value: w.status.configure(text=ERRORS[value['error']]); return
             self.kind = kind; self.loaded = profile
             if kind == 'status':
-                result = value['result']; self.render(result)
+                result = value['result']; self.saved_status = deepcopy(result); self.render(result)
                 updated = 'keine Meldung' if result['updated_at'] is None else datetime.datetime.fromtimestamp(result['updated_at'], datetime.timezone.utc).isoformat()
                 delay = max(0, math.ceil(result['next_attempt'] - time.time()))
                 w.status.configure(text=STATES[result['status']] + '. Stand: ' + updated + '. Wartefrist: ' + str(delay)
@@ -109,6 +115,31 @@ class RecoveryForm:
                 label = row if kind == 'profiles' else row['message_id'] + ' · ' + {'retained': 'erhalten', 'purged': 'bereinigt', 'damaged': 'beschädigt'}[row['state']]
                 self.list.insert(w.tk.END, label)
             w.status.configure(text='Lokale Prüfbelege geladen; keine Nachricht versendet.' + (' Weitere Belege vorhanden.' if value['history_truncated'] else ''))
+        w._run_async(execute, result_handler=done)
+
+    def retry_auth(self):
+        w = self.wizard
+        if w.running: return
+        connector = self.connector.get().strip(); profile = self.profile.get().strip()
+        try:
+            if (self.kind != 'status' or self.saved_status is None or self.saved_status['connector'] != connector
+                    or self.saved_status['status'] not in {'authentication-refused', 'identity-refused'}):
+                raise ValueError('Zuerst den aktuellen Anmeldefehler dieses Connectors frisch laden.')
+            note = self.note.get().strip()
+            if self.auth_confirm.get() is not True or not 1 <= len(note) <= 2000:
+                raise ValueError('Anmeldeversuch gesondert bestätigen und nicht geheime Prüfbegründung eingeben.')
+            observed = deepcopy(self.saved_status)
+        except ValueError as error: w.status.configure(text=str(error)); return
+        self.clear(); epoch = self.epoch
+        def execute():
+            return response(owner.retry_auth(connector, observed, note, confirmed=True), 'auth-retry', {'connector': connector})
+        def done(value):
+            if not self.fresh(epoch, connector, profile): return
+            if 'error' in value: w.status.configure(text=ERRORS[value['error']]); return
+            if value['recorded_decision_replayed']:
+                w.status.configure(text='Frühere Entscheidung bereits gespeichert. Kein neuer Versuch freigegeben; aktuellen Status erneut prüfen.')
+            else:
+                w.status.configure(text='Erneuter Anmeldeversuch lokal freigegeben. Wartefrist erhalten; keine Anmeldung geprüft. Gateway danach bewusst starten.')
         w._run_async(execute, result_handler=done)
 
     def purge(self):

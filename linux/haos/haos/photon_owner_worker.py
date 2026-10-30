@@ -53,6 +53,14 @@ def main():
                 raise PermissionError('saved current Photon connector required for recorded status')
             from .gateway_photon_status import read
             result = {'result': read(Path('/var/lib/haos-gateway/native-inbox.db'), chosen, current), 'active_authorization_returned': False}
+        elif action == 'auth-retry':
+            if selected is None: raise PermissionError('current Photon publication required for an auth retry')
+            from .gateway_matrix_profile import acquire_lease
+            from .gateway_photon_auth_retry import retry
+            _directory(profiles)
+            profile = profiles / ('photon-' + chosen['account_scope'].removeprefix('photon:'))
+            _directory(profile); lease = acquire_lease(profile)
+            result = retry(Path('/var/lib/haos-gateway/native-inbox.db'), chosen, selected, current)
         elif action == 'profiles':
             rows = []; count = 0
             if profiles.exists():

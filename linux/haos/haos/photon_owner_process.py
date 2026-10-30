@@ -6,7 +6,7 @@ import stat
 from .gateway import digest
 from .gateway_photon_recovery import HEX, NAME, profile_name
 
-ACTIONS = frozenset({'status', 'profiles', 'sources', 'purge-source'})
+ACTIONS = frozenset({'status', 'profiles', 'sources', 'purge-source', 'auth-retry'})
 ERRORS = frozenset({'authority-refused', 'storage-unavailable', 'runtime-unavailable'})
 
 
@@ -42,6 +42,9 @@ def params(action, value, owner_uid):
     if action == 'status':
         from .gateway_photon_status import selector
         return selector(value)
+    if action == 'auth-retry':
+        from .gateway_photon_auth_retry import request
+        return request(value, owner_uid)
     if action == 'profiles':
         if value: raise ValueError('profile inventory takes no selector')
     elif action == 'sources':
@@ -66,6 +69,15 @@ def response(value, action, request):
             raise ValueError('Photon status cannot return active authorization')
         from .gateway_photon_status import checked
         checked(value['result'], request); return value
+    if action == 'auth-retry':
+        if (set(value) != {'connector', 'authentication_blocks_cleared', 'receipt', 'network_requested', 'message_sent',
+                'authentication_verified', 'account_budget_preserved', 'recorded_decision_replayed'}
+                or value['connector'] != request['connector'] or type(value['authentication_blocks_cleared']) is not int
+                or not 0 <= value['authentication_blocks_cleared'] <= 65536 or not isinstance(value['receipt'], str) or not HEX.fullmatch(value['receipt'])
+                or any(value[key] is not False for key in ['network_requested', 'message_sent', 'authentication_verified'])
+                or value['account_budget_preserved'] is not True or type(value['recorded_decision_replayed']) is not bool):
+            raise ValueError('closed local Photon retry receipt without network or authentication claim required')
+        return value
     if action == 'profiles':
         if (set(value) != {'profiles', 'history_truncated', 'network_requested', 'private_bytes_returned'}
                 or not isinstance(value['profiles'], list) or len(value['profiles']) > 128

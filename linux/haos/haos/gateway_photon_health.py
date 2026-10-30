@@ -20,6 +20,13 @@ def known_account(db, account):
     return False
 
 
+def credential_keys(value):
+    value = credentials(value)
+    return [digest([value['project_id'], value['project_secret'], value['phone']]),
+        *[digest({**value, 'services': list(items)}) for count in range(1, 4)
+            for items in permutations(('iMessage', 'SMS', 'RCS'), count)]]
+
+
 class Ledger:
     def __init__(self, inbox, connector, value, publication, current, *, profile=None):
         if not callable(current): raise PermissionError('current independent Photon authority required')
@@ -77,10 +84,9 @@ class Ledger:
         # Earlier prepared profiles hashed the service list into the credential
         # key. Preserve their refusals without resetting or deleting recovery
         # data. The three finite service names give only 15 legacy permutations.
-        credential_keys = [self.credential, *[digest({**value, 'services': list(items)})
-            for count in range(1, 4) for items in permutations(('iMessage', 'SMS', 'RCS'), count)]]
+        keys = credential_keys(value)
         prior = self.db.execute('SELECT status FROM photon_profile_status WHERE account_scope=? AND credential_scope IN (' +
-            ','.join('?' for _ in credential_keys) + ') ORDER BY updated_at DESC', (self.account, *credential_keys)).fetchall()
+            ','.join('?' for _ in keys) + ') ORDER BY updated_at DESC', (self.account, *keys)).fetchall()
         blocked = next((row['status'] for row in prior if row['status'] in TERMINAL - {'revoked'}), None)
         self.db.execute('INSERT OR IGNORE INTO photon_account_budget VALUES(?,0)', (self.account,))
         self.db.execute('INSERT OR IGNORE INTO photon_profile_status VALUES(?,?,?,?,?,?)',
@@ -119,7 +125,9 @@ class Ledger:
             selected = previous['status'] if previous['status'] in TERMINAL or active_limit else state
             deadline = max(previous['next_attempt'], time.time() + delay) if delay else previous['next_attempt']
             self.db.execute('UPDATE photon_account_budget SET next_attempt=? WHERE account_scope=?', (deadline, self.account))
-            self.db.execute('UPDATE photon_profile_status SET status=?,updated_at=? WHERE id=?', (selected, time.time(), self.identity))
+            keep_time = previous['status'] in TERMINAL and selected == previous['status']
+            self.db.execute('UPDATE photon_profile_status SET status=?,updated_at=CASE WHEN ? THEN updated_at ELSE ? END WHERE id=?',
+                (selected, keep_time, time.time(), self.identity))
             if state != 'revoked': self.current()
             self.db.execute('COMMIT')
         except BaseException:

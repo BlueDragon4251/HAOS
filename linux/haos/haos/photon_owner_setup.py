@@ -46,7 +46,10 @@ def _invoke(action, chosen, *, expected=None):
     if account.pw_uid == 0 or account.pw_gid == 0: raise PermissionError('separate private Photon gateway identity required')
     _runtime_state(account)
     request = {'action': action, 'policy_sha256': publication, 'parent_pid': os.getpid(), 'owner_uid': owner_uid, 'params': chosen}
-    if action == 'purge-source':
+    if action == 'auth-retry':
+        audit('gateway.photon-auth-retry-intent', {'connector': chosen['connector'], 'account_scope': chosen['account_scope'],
+            'credential_scope': chosen['credential_scope'], 'inspection_sha256': chosen['inspection_sha256'], 'note_sha256': chosen['note_sha256']})
+    elif action == 'purge-source':
         audit('gateway.photon-source-disposal-intent', {'profile': chosen['profile'], 'id': chosen['id'],
             'snapshot_sha256': chosen['snapshot_sha256'], 'note_sha256': chosen['note_sha256']})
     try:
@@ -74,6 +77,23 @@ def status(connector):
 
 
 def profiles(): return _invoke('profiles', {})
+
+
+def retry_auth(connector, observed, note, *, confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_photon_auth_retry import inspection
+    from .gateway_photon_health import credential_keys
+    from .gateway_photon import scope
+    from .gateway_photon_status import checked
+    value, publication = saved(connector); keys = credential_keys(value)
+    chosen = {'connector': connector, 'credential_scope': keys[0], 'account_scope': scope(value)}
+    checked(observed, chosen)
+    if confirmed is not True or not isinstance(note, str) or not 1 <= len(note.strip()) <= 2000:
+        raise PermissionError('aktuellen Photon-Anmeldefehler prüfen, begründen und einen erneuten Versuch ausdrücklich bestätigen')
+    return _invoke('auth-retry', {**chosen, 'credential_aliases': keys, 'inspection_sha256': inspection(observed),
+        'owner_uid': int(os.environ.get('SUDO_UID', '0')), 'note_sha256': hashlib.sha256(note.strip().encode()).hexdigest(),
+        'confirmed': True}, expected=publication)
 
 
 def sources(profile):
