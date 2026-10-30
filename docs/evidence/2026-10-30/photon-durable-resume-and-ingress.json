@@ -1,0 +1,197 @@
+{
+  "recorded_UTC": "2026-10-30T19:05:03.568098+00:00",
+  "base_commit": "d9d9470fed4c077c44b34652e98ff1190ee05844",
+  "accepted_gateways": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "bd42cd07d2cdc712c09dbd16d74fe997fe31a5c2e79012a6a9cd5b3ca49865fe"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "0fa15b0c3313c359d069358c62713d35a8a9e6d3c9118e53b6b28c14b76e8778"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_admission.py",
+      "sha256": "0132d845273daadbf068da0b655fd2bb5402c8f7f20e204a5151960d9b7abc3d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_control.py",
+      "sha256": "4894d8579c66d4e4b6e4204945b830045bb209c10ecd69fe042ec769aa7dc608"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_custody.py",
+      "sha256": "cdceefd641f880d9a07ea7dd3146fa12c6500528e3af2429b860c58f2775dfa9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_cursor.py",
+      "sha256": "8643d1594d0f9caf0ba3e26a68aff1f0b9f39304cbab76adae7d9ad25a017c7e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_ingress.py",
+      "sha256": "292946d9e0108a4cc595ad3c079f272cc84700ab6b476496f9c31e458ad0dc93"
+    },
+    {
+      "path": "linux/haos/runtime/photon_sidecar.mjs",
+      "sha256": "54431485331bcbca2caed3d724882dc47c2d82cf68d0c6bd7c16531ddb6c9ed5"
+    },
+    {
+      "path": "linux/haos/runtime/prepare_photon.py",
+      "sha256": "b05adb61b9ca69aab1710b68bf962e4fbc9726f6bbb191411839b5f57294416d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_codec.py",
+      "sha256": "582e4f1b27ffe03e7a87640e1ad947fa8490ea1016c7882cb822f9c8bd2acf2f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_resume.mjs",
+      "sha256": "b2a64610eae27fde2ae334276a6d7afce937a23b8185934bbcc1d6afde9ce2d8"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_control.py",
+      "sha256": "f04abddc2df0286339ee8d7f7c5fa26b28c0f9c023c9e8f649890d88aaf8753f"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_cursor.py",
+      "sha256": "41d0f885217fe501941f7f490e4c44bb51ae3e8fda8b9b79535d74d17127d0c9"
+    }
+  ],
+  "minimal_regression": "3151 passed, 2 skipped in 24.71s",
+  "full_frozen_runtime_regression": "3151 passed, 2 skipped in 24.22s",
+  "existing_actual_kernel_UID_socket_credential_regression": "174 passed in 18.06s",
+  "Photon_component_tests": 115,
+  "native_resume": {
+    "schema": 1,
+    "passed": 6,
+    "cases": [
+      "actual_native_restart_uses_saved_cursor_and_catches_up_before_buffered_live_events",
+      "actual_native_cursor_waits_for_durable_callback_before_processing_later_events",
+      "actual_native_failed_cursor_write_retries_from_previous_resume_point",
+      "actual_native_cursor_rejection_requires_embedding_recovery_and_never_falls_back_to_live",
+      "actual_native_failure_callback_observes_typed_cause_without_changing_cursor",
+      "native_nonembedded_default_does_not_acquire_an_invented_cursor"
+    ],
+    "scope": "actual prepared Spectrum resumableOrderedStream and Repeater",
+    "substitutions": [
+      "live and catch-up transport iterators",
+      "durable cursor callback"
+    ],
+    "external_network": false,
+    "live_Photon_verified": false,
+    "SQLite_verified_by_this_probe": false
+  },
+  "native_mapper_transport": {
+    "schema": 1,
+    "passed": 13,
+    "cases": [
+      "native_sdk_refuses_before_mapping_or_automatic_contact_callback",
+      "native_vcard_download_is_refused_before_eager_sdk_conversion",
+      "native_poll_and_group_hydration_refused_before_rpc",
+      "failed_independent_custody_cannot_be_interpreted_as_admission",
+      "approved_text_uses_actual_native_message_and_sender_codec",
+      "actual_native_reply_keeps_target_id_without_quoted_message_hydration",
+      "actual_native_attachment_stream_obeys_bound_and_closes_native_rpc",
+      "lying_native_size_refused_and_rpc_closed",
+      "truncated_native_attachment_is_not_a_successful_marker",
+      "authority_rechecked_between_native_chunks_and_withdrawal_cancels_rpc",
+      "hung_native_stream_is_cancelled_at_total_deadline",
+      "oversize_metadata_refused_before_stream_open",
+      "incomplete_sdk_embedding_fails_closed"
+    ],
+    "actual_spectrum_version": "12.7.0",
+    "prepared_sdk_sha256": "48ad4889440b60db098c4f6fa7646175edd63747dc691926924abe350c280048",
+    "native_rpc_frames": "local fixture",
+    "external_network": false,
+    "live_delivery_verified": false
+  },
+  "actual_codec_and_durable_ingress": {
+    "schema": 1,
+    "passed": 15,
+    "cases": [
+      "text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "reply_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "group-thread_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "voice_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "document_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "audio-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "caf-alias_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-unicode_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-no-marker_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-adjacent-markers_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "multi-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "restart-text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "parent-receipt-lost_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay"
+    ],
+    "scope": "actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy, FULL original/native/media/RelayInbox custody and restart",
+    "substitutions": [
+      "SDK remote RPC frames",
+      "final handler invokes actual RelayInbox without a controller connection"
+    ],
+    "external_messages_sent": false,
+    "controller_inference_verified": false,
+    "local_STT_verified": false,
+    "kernel_UID_verified_by_this_probe": false
+  },
+  "prepared_source": {
+    "schema": 1,
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "spectrum_version": "12.7.0",
+    "inputs": [
+      {
+        "path": "../adapter.py",
+        "sha256": "7dcedacead3b762166acbb0309e372d9eedf81b28efa7adce692122130775a68"
+      },
+      {
+        "path": "index.mjs",
+        "sha256": "f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e"
+      },
+      {
+        "path": "package.json",
+        "sha256": "46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/core/dist/authoring.js",
+        "sha256": "f96d907578eb44bb74b51203f4b3f2bb70d44364f5cef819b05b9899a9be6852"
+      }
+    ],
+    "prepared": [
+      {
+        "path": "index.mjs",
+        "sha256": "6172d9f259e33b7895fcedc5d020f6b904e7d82179bc7f9cf2311eddefba06c7"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "48ad4889440b60db098c4f6fa7646175edd63747dc691926924abe350c280048"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/core/dist/authoring.js",
+        "sha256": "3318813bf5a9746018add0b0e0645be50fbc0591998d63b6e61e1dd2a2897867"
+      },
+      {
+        "path": "../adapter.py",
+        "sha256": "9d32b8700b55665f470b9e88c7bc6a712d6b0108d15d942b5244f408a90c0377"
+      }
+    ]
+  },
+  "claims": {
+    "external_messages": false,
+    "live_Photon_connection": false,
+    "actual_controller_connection": false,
+    "local_STT_acceptance": false,
+    "Photon_private_UID_process_installation": false,
+    "installed_GUI_service_acceptance": false,
+    "release_acceptance": false
+  },
+  "remaining": "Node installer/private process lifecycle, native HTTP/gRPC full profile, guarded replies, account device setup, GUI/CLI and inspected recovery; newly drafted installer/process files are outside this checkpoint and remain to be tested"
+}

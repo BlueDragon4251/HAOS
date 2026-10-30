@@ -65,6 +65,24 @@ attachments are accepted. A scoped native cache transport supplies only opaque
 retained media IDs; native temporary host paths never become agent inputs.
 Transferred cache rows replay without restoring their acknowledged bytes.
 
+Native receive cursors now have their own FULL SQLite record. An SDK-prefetched
+candidate cannot advance the restart point past an unfinished original. Once
+the normalized source is durable, a separate native inbox and the actual HAOS
+RelayInbox take responsibility for controller delivery. Restart recovers these
+decoded sources without requiring another SDK event. A lost parent receipt
+after a real relay commit retries the same durable identity, preserving one
+relay row. The codec/ingress probe now covers 15 cases, including database reopen
+and that ambiguous receipt.
+
+The prepared actual Spectrum resumable stream accepts a durable initial cursor
+and awaits cursor persistence before advancing its own cursor. Cursor rejection
+invokes the embedding's explicit recovery gate, preserving the original failure
+instead of falling back silently to live events. The initial cursor zero asks
+for available history; a server that no longer retains it requires inspected
+Owner recovery. Ordinary nonembedded SDK behavior remains available unchanged.
+The HAOS embedding also disables automatic SDK RPC retries; actual write/RPC
+failure behavior still requires the forthcoming native transport fixture.
+
 The fixed Node embedding source is present and disables inherited telemetry,
 automatic read receipts, contact sharing, implicit URL fetches, typing/reactions
 and unapproved writes. Its production process installation, full live transport

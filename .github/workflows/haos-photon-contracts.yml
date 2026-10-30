@@ -37,12 +37,13 @@ jobs:
           python linux/haos/runtime/prepare_photon.py "$SIDECAR" --receipt "$RUNNER_TEMP/photon-contracts/prepared-source.json"
           node --check "$SIDECAR/index.mjs"
           node linux/haos/runtime/probe_photon_transport.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-transport.json"
+          node linux/haos/runtime/probe_photon_resume.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-resume.json"
           upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_photon_codec.py upstream/hermes-agent "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-codec.json"
       - name: Independent grants and actual FULL SQLite custody without Hermes imports
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

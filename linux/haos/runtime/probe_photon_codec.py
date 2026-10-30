@@ -31,6 +31,9 @@ async def run(upstream, sidecar, output):
     from haos.gateway_photon_custody import Originals
     from haos.gateway_photon_codec import install, decode, dispatch, media_scope
     from haos.gateway_ingress import durable_adapter
+    from haos.gateway_photon_ingress import capture_stored, dispatch_stored, recover, on_line
+    from haos.gateway_relay import RelayInbox
+    from haos.gateway_media_relay import event_media
     from haos.gateway_raw import NativeInbox
     from haos.gateway import Conflict, digest
     from haos.gateway_runtime import adapter_envelope
@@ -50,7 +53,8 @@ async def run(upstream, sidecar, output):
         specs = []
         stamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         for index, kind in enumerate(['text', 'reply', 'image', 'mixed-image', 'group-thread', 'voice', 'document',
-                'audio-file', 'caf-alias', 'mixed-unicode', 'mixed-no-marker', 'mixed-adjacent-markers', 'multi-file']):
+                'audio-file', 'caf-alias', 'mixed-unicode', 'mixed-no-marker', 'mixed-adjacent-markers', 'multi-file',
+                'restart-text', 'parent-receipt-lost']):
             chat = 'any;+;chatFixture' if kind == 'group-thread' else 'any;-;+15550100001'
             target = str(uuid.uuid4()) if kind in {'reply', 'group-thread'} else ''
             binding = {'id': 'binding-' + str(index), 'connector': 'phone', 'identity': 'owner', 'sender': '+15550100001',
@@ -58,11 +62,11 @@ async def run(upstream, sidecar, output):
                 'generation': secrets.token_hex(32), 'since': int(time.time() * 1000) - 10000,
                 'allow_media': True, 'allow_voice': True, 'allow_video': True}
             attachments = []; frames = {}
-            text = 'fixture native text' if kind in {'text', 'reply', 'group-thread'} else 'caption \ufffc suffix' if kind == 'mixed-image' else ''
+            text = 'fixture native text' if kind in {'text', 'reply', 'group-thread', 'restart-text', 'parent-receipt-lost'} else 'caption \ufffc suffix' if kind == 'mixed-image' else ''
             if kind == 'mixed-unicode': text = '\ufeff\u0085caption \ufffc suffix\u0085\ufeff'
             elif kind == 'mixed-no-marker': text = 'caption after attachment'
             elif kind == 'mixed-adjacent-markers': text = 'left\ufffc\ufffcright'
-            if kind not in {'text', 'reply', 'group-thread'}:
+            if kind not in {'text', 'reply', 'group-thread', 'restart-text', 'parent-receipt-lost'}:
                 data = caf if kind == 'caf-alias' else wav if kind in {'voice', 'audio-file'} else b'fixture document bytes' if kind == 'document' else png
                 aid = str(uuid.uuid4()); mime = 'audio/wav' if kind in {'voice', 'audio-file'} else 'application/octet-stream' if kind in {'document', 'caf-alias'} else 'image/png'
                 name = 'fixture.caf' if kind == 'caf-alias' else 'fixture.wav' if kind in {'voice', 'audio-file'} else 'fixture.bin' if kind == 'document' else 'fixture.png'
@@ -91,6 +95,7 @@ async def run(upstream, sidecar, output):
             current = lambda: checked_policy(policy)
             redactor = Redactor([account['project_secret']]); inbox = NativeInbox(profile / 'inbox.db', redactor)
             originals = Originals(profile / 'originals.db', redactor, current)
+            relay = RelayInbox(profile / 'relay.db', redactor)
             try:
                 raw = json.dumps(spec['source']).encode(); identity = originals.retain(policy, 'phone', account, raw)
                 originals.decode(identity, policy, 'phone', account, json.dumps(projection['event']).encode())
@@ -104,8 +109,15 @@ async def run(upstream, sidecar, output):
                 adapter._haos_native = SimpleNamespace(connector='phone', policy=current, inbox=inbox)
                 adapter._haos_photon_check = current; adapter._haos_photon_value = account; adapter._haos_photon_originals = originals
                 install(adapter); calls = []
+                lose_receipt = [spec['kind'] == 'parent-receipt-lost']
                 def handler(event):
-                    calls.append(adapter_envelope(event, 'photon')); return True
+                    envelope = adapter_envelope(event, 'photon')
+                    relay.admit(current(), 'phone', envelope, media=event_media(event, 'photon'))
+                    calls.append(envelope)
+                    if lose_receipt[0]:
+                        lose_receipt[0] = False
+                        raise ConnectionError('fixture parent receipt lost after actual relay commit')
+                    return True
                 adapter.set_durable_message_handler(handler)
                 event, row, proof = await decode(adapter, identity)
                 assert not calls
@@ -114,11 +126,42 @@ async def run(upstream, sidecar, output):
                 if spec['frames']:
                     assert event.media_urls and all(url.startswith('haos-media:') for url in event.media_urls)
                     assert projection['closed_native_streams'] == len(spec['frames'])
-                with dispatch(adapter, event, {'envelope': envelope}, proof): adapter._haos_admit(event)
-                assert calls == [envelope] and event._gateway_accepted is True
+                if spec['kind'] not in {'restart-text', 'parent-receipt-lost'}:
+                    with dispatch(adapter, event, {'envelope': envelope}, proof): adapter._haos_admit(event)
+                    assert calls == [envelope] and event._gateway_accepted is True
                 try: adapter._haos_admit(event)
                 except PermissionError: pass
                 else: raise AssertionError('native event escaped exact source context')
+                if spec['kind'] == 'restart-text':
+                    # No native inbox row or parent receipt exists at the crash
+                    # point. Reopen the actual three databases and reconstruct
+                    # a fresh native adapter without another SDK/NDJSON event.
+                    assert inbox.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0] == 0
+                    assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 0
+                    inbox.close(); originals.close(); relay.close()
+                    inbox = NativeInbox(profile / 'inbox.db', redactor); originals = Originals(profile / 'originals.db', redactor, current)
+                    relay = RelayInbox(profile / 'relay.db', redactor)
+                    with native_scope(home, environment):
+                        adapter = durable_adapter(PhotonAdapter(PlatformConfig(enabled=True, extra={'require_mention': False})))
+                    adapter._haos_native = SimpleNamespace(connector='phone', policy=current, inbox=inbox)
+                    adapter._haos_photon_check = current; adapter._haos_photon_value = account; adapter._haos_photon_originals = originals
+                    install(adapter); adapter.set_durable_message_handler(handler)
+                    assert await recover(adapter) is True
+                else:
+                    native_key = await capture_stored(adapter, identity)
+                    if spec['kind'] == 'parent-receipt-lost':
+                        try: await dispatch_stored(adapter, native_key)
+                        except ConnectionError: pass
+                        else: raise AssertionError('lost actual durable relay receipt was hidden')
+                        assert originals.load(identity, policy, 'phone', account)[0]['admitted_receipt'] == ''
+                        assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 1
+                        await asyncio.sleep(2.1)  # Actual native retry deadline; no mocked clock or extra skip.
+                    assert await dispatch_stored(adapter, native_key) is True
+                assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 1
+                parent_key = relay.db.execute('SELECT id FROM inbox').fetchone()[0]
+                assert originals.load(identity, policy, 'phone', account)[0]['admitted_receipt'] == parent_key
+                assert await on_line(adapter, json.dumps(projection['event'])) is False
+                assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 1
                 replay, _, _ = await decode(adapter, identity)
                 with media_scope(replay): assert adapter_envelope(replay, 'photon') == envelope
                 if spec['frames']:
@@ -130,10 +173,10 @@ async def run(upstream, sidecar, output):
                     assert all(inbox.db.execute('SELECT data FROM native_media_cache WHERE id=?', (item,)).fetchone()[0] is None for item in ids)
                 cases.append(spec['kind'] + '_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay')
             finally:
-                originals.close(); inbox.close()
+                originals.close(); inbox.close(); relay.close()
     result = {'schema': 1, 'passed': len(cases), 'cases': cases,
-        'scope': 'actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy and FULL SQLite/media custody',
-        'substitutions': ['SDK remote RPC frames', 'final controller callback'], 'external_messages_sent': False,
+        'scope': 'actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy, FULL original/native/media/RelayInbox custody and restart',
+        'substitutions': ['SDK remote RPC frames', 'final handler invokes actual RelayInbox without a controller connection'], 'external_messages_sent': False,
         'controller_inference_verified': False, 'local_STT_verified': False, 'kernel_UID_verified_by_this_probe': False}
     output.write_text(json.dumps(result, indent=2) + '\n'); print(json.dumps(result))
 

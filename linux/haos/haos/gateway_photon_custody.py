@@ -150,6 +150,7 @@ class Originals:
         data = parse(bytes(row['raw'])); proof = json.loads(row['proof'])
         if (row['id'] != digest([row['connector'], row['account_scope'], row['message_id']])
                 or json.dumps(proof, sort_keys=True, separators=(',', ':')) != row['proof']
+                or proof['native_cursor'] != data['cursor'] or proof['native_cursor'] != str(data['event']['sequence'])
                 or proof['raw_sha256'] != row['raw_sha256'] or proof['envelope']['message_id'] != row['message_id']
                 or proof['envelope']['scope'] != row['account_scope']
                 or digest([data['phone'], data['event']['message'], proof['envelope']['chat']]) != row['semantic_sha256']

@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 
 
 INPUTS = {
@@ -16,6 +17,7 @@ INPUTS = {
     'package.json': '46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca',
     'package-lock.json': '2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313',
     'node_modules/@spectrum-ts/imessage/dist/index.js': '2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24',
+    'node_modules/@spectrum-ts/core/dist/authoring.js': 'f96d907578eb44bb74b51203f4b3f2bb70d44364f5cef819b05b9899a9be6852',
 }
 
 
@@ -25,7 +27,7 @@ def replace_once(text, anchor, replacement):
     return text.replace(anchor, replacement, 1)
 
 
-def transformed(sidecar, sdk):
+def transformed(sidecar, sdk, core):
     declaration = '''// Optional trusted embedding transport. Never resolved from an incoming message.
 const hermesTransport = globalThis[Symbol.for("hermes.photon.transport")];
 if (hermesTransport !== undefined && (!hermesTransport ||
@@ -84,7 +86,27 @@ if (hermesTransport !== undefined && (!hermesTransport ||
         '\t\tconst tracker = !globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticContactSharing && (staticShareEnabled || profileSyncGate) ? getContactShareTracker(entry.client) : void 0;')
     anchor = 'const resolveReplyTarget = async (client, base, targetGuid, currentGuid, options) => {'
     sdk = replace_once(sdk, anchor, anchor + '\n\tif (globalThis[Symbol.for("hermes.photon.sdk.transport")]?.avoidReplyHydration === true) return stubReplyTarget(base, targetGuid);')
-    return sidecar, sdk
+    sdk, count = re.subn(r'(?m)^(\t+)retry: true,$', r'\1retry: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticRetries !== true,', sdk)
+    if count != 3: raise ValueError('pinned Photon automatic RPC retry constructors changed')
+    anchor = 'const messageStream = (client, phone, onInbound, recover) => resumableOrderedStream({\n'
+    sdk = replace_once(sdk, anchor, anchor + '''	initialCursor: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.initialCursor,
+	onCursor: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.commitCursor,
+	onCursorRejected: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.cursorRejected,
+	onFailure: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.streamFailure,
+''')
+    core = replace_once(core, '\tlet lastCursor;\n', '\tlet lastCursor = options.initialCursor;\n')
+    core = replace_once(core, '\tconst advanceCursor = (cursor, clearDelivered) => {', '\tconst advanceCursor = async (cursor, clearDelivered) => {')
+    core = replace_once(core, '\t\tlastCursor = cursor;\n', '\t\tif (options.onCursor) await options.onCursor(cursor);\n\t\tlastCursor = cursor;\n')
+    core = replace_once(core, '\t\tadvanceCursor(item.cursor, clearOnCursorAdvance);', '\t\tawait advanceCursor(item.cursor, clearOnCursorAdvance);')
+    core = replace_once(core, '\tconst handleFailure = (error, phase) => {', '\tconst handleFailure = async (error, phase) => {\n\t\tif (options.onFailure) await options.onFailure(error instanceof CursorRejectedError ? error.cause : error, phase);')
+    core = replace_once(core, '\t\t\tlastCursor = void 0;\n', '''			if (options.onCursorRejected) {
+				await options.onCursorRejected(lastCursor, error.cause);
+				throw error; // Trusted embedding requires inspected recovery, never a silent live gap.
+			}
+			lastCursor = void 0;
+''')
+    core = replace_once(core, '\t\t\t\tconst delayMs = handleFailure(error, phase);', '\t\t\t\tconst delayMs = await handleFailure(error, phase);')
+    return sidecar, sdk, core
 
 
 def adapter_extension(text):
@@ -125,8 +147,8 @@ def prepare(root, *, check_only=False):
         if hashlib.sha256(raw).hexdigest() != expected:
             raise ValueError('Photon build input changed: ' + name)
         data[name] = raw.decode('utf-8')
-    names = ['index.mjs', 'node_modules/@spectrum-ts/imessage/dist/index.js', '../adapter.py']
-    prepared = (*transformed(*(data[name] for name in names[:2])), adapter_extension(data['../adapter.py']))
+    names = ['index.mjs', 'node_modules/@spectrum-ts/imessage/dist/index.js', 'node_modules/@spectrum-ts/core/dist/authoring.js', '../adapter.py']
+    prepared = (*transformed(*(data[name] for name in names[:3])), adapter_extension(data['../adapter.py']))
     result = {'schema': 1, 'hermes_commit': 'f97608f178d1ffeca59860195ab7da295f7c8e5f',
         'spectrum_version': '12.7.0', 'inputs': [{'path': name, 'sha256': value} for name, value in INPUTS.items()],
         'prepared': [{'path': name, 'sha256': hashlib.sha256(value.encode()).hexdigest()} for name, value in zip(names, prepared)]}

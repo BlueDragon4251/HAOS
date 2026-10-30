@@ -6,6 +6,12 @@ import path from "node:path";
 import http from "node:http";
 import { readBinary } from "./photon_bounded_stream.mjs";
 
+// Bind lifetime before any network/SDK initialization. The write end belongs
+// only to the supervising Python process; it is never passed to another child.
+process.stdin.resume();
+process.stdin.on("end", () => process.kill(process.pid, "SIGKILL"));
+process.stdin.on("error", () => process.kill(process.pid, "SIGKILL"));
+
 const uid = process.getuid(), gid = process.getgid();
 const account = fs.readFileSync("/etc/passwd", "utf8").split("\n")
   .map((line) => line.split(":" )).find((row) => row[0] === "haos-gateway");
@@ -71,9 +77,23 @@ function rpc(route, data) {
 
 const sources = new Map();
 let active = null;
+const resume = await rpc("/resume", {});
+if (resume.approved !== true || !/^(0|[1-9][0-9]{0,15})$/.test(resume.cursor || "") ||
+    !Number.isSafeInteger(Number(resume.cursor))) throw new Error("durable Photon resume cursor required");
 globalThis[Symbol.for("hermes.photon.sdk.transport")] = Object.freeze({
   disableAutomaticContactSharing: true,
+  disableAutomaticRetries: true,
   avoidReplyHydration: true,
+  initialCursor: resume.cursor,
+  async commitCursor(cursor) {
+    if ((await rpc("/cursor", { cursor })).approved !== true) {
+      const error = new Error("Photon resume custody unavailable"); error.retryable = true; throw error;
+    }
+  },
+  async cursorRejected(cursor) {
+    await rpc("/gap", { cursor });
+    throw new Error("Photon resume cursor needs inspected owner recovery");
+  },
   async admitEvent(event, phone, cursor) {
     // Bound prefetch bookkeeping as well as persistent custody. An RPC/storage
     // error is retryable, not an SDK mapping failure that may discard an event.

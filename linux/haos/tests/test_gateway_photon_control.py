@@ -178,3 +178,28 @@ def test_cleanup_does_not_unlink_replacement_recovery_data(source, custody):
         # production close above has demonstrably preserved it.
         server.path.unlink()
     asyncio.run(fixture(source, custody, run))
+
+
+def test_real_child_control_resume_barrier_and_gap_are_durable(source, custody):
+    from haos.gateway_photon_cursor import Cursor
+    async def run(server, allowed, token):
+        server.cursor = Cursor(custody[0], source[0], custody[2])
+        assert await request(server, allowed, frame(token, '/resume', {})) == (200, {'approved': True, 'cursor': '0'})
+        code, admitted = await request(server, allowed, frame(token, '/admit', source[2]))
+        assert code == 200 and admitted['approved'] is True
+        assert await request(server, allowed, frame(token, '/cursor', {'cursor': '5'})) == (200, {'approved': True, 'cursor': '0'})
+        assert await request(server, allowed, frame(token, '/resume', {})) == (200, {'approved': True, 'cursor': '0'})
+        code, decoded_source = await request(server, allowed, frame(token, '/custody', {'source': admitted['source'], 'event': decoded(source)}))
+        assert code == 200 and decoded_source['approved'] is True
+        assert await request(server, allowed, frame(token, '/resume', {})) == (200, {'approved': True, 'cursor': '5'})
+        assert await request(server, allowed, frame(token, '/gap', {'cursor': '5'})) == (200, {'approved': True})
+        assert server.cursor.status()['state'] == 'cursor-refused'
+        for route, body in [('/resume', {}), ('/lease', {}), ('/cursor', {'cursor': '6'}), ('/admit', source[2])]:
+            assert await request(server, allowed, frame(token, route, body)) == (403, {'approved': False})
+    asyncio.run(fixture(source, custody, run))
+
+
+def test_missing_resume_store_is_not_reported_as_live_only_success(source, custody):
+    async def run(server, allowed, token):
+        assert await request(server, allowed, frame(token, '/resume', {})) == (403, {'approved': False})
+    asyncio.run(fixture(source, custody, run))

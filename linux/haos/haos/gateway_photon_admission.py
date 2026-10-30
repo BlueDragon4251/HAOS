@@ -36,7 +36,7 @@ def approve(policy, connector, value, raw):
         if not isinstance(event, dict) or event.get('type') != 'message.received':
             raise Refused('unsupported-event')
         seq = event.get('sequence')
-        if type(seq) is not int or not 0 <= seq < 2**53 or data['cursor'] != str(seq):
+        if type(seq) is not int or not 1 <= seq < 2**53 or data['cursor'] != str(seq):
             raise Refused('invalid-cursor')
         msg = event['message']
         if not isinstance(msg, dict) or msg.get('isFromMe') is not False or msg.get('isAutoReply', False) is not False:
