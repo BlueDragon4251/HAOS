@@ -469,3 +469,24 @@ These scenes are part of the prepared Google Chat CI workflow. They do not
 establish production controller Unix IPC, installed service acceptance, speech
 or video execution, a usable public account/pairing page or live Google delivery.
 The public count remains **15/22**.
+
+
+The private profile probe additionally runs the actual Controller in a separate
+process under its controller UID65532, with a Root-bound inherited Unix socket;
+the actual native Google gateway runs under UID65534 and uses the production
+`gateway_runtime.call` for media begin/chunk, source receipt, outbox next and ACK.
+A deliberately permissive fixture socket ensures the negative agent test reaches
+kernel `SO_PEERCRED`; the agent is denied before any frame, and the gateway is
+denied Owner mission-list methods. The gateway cannot read the controller's
+private0700 directory/0600 database. Controller startup uses the installed
+service's restrictive077 umask rather than the parent fixture's ambient umask.
+
+Pub/Sub and HTTPS profile loops retain two unique Root-controller missions and
+native replies across replay. The image scene carries exact SDK-downloaded PNG
+bytes through the native codec and real Unix IPC into the separate controller's
+FULL media chunks. Prepared Google policy is supplied through the Controller's
+existing policy callback in this fixture; public registry/daemon activation and
+installed systemd acceptance remain open. This is no live Google or model test.
+
+Exact-source receipts: [full Pub/Sub profile](evidence/2026-10-30/google-chat-private-full-pubsub-profile-validation.json)
+and [separate controller Unix IPC](evidence/2026-10-30/google-chat-private-controller-ipc-validation.json).

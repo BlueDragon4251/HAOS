@@ -30,7 +30,7 @@ def main():
     subprocess.run([sys.executable,'/repo/linux/haos/runtime/install_package.py',str(staged),str(code/'hermes-source')],check=True)
     runtime=code/'hermes/.venv';subprocess.run([sys.executable,'-m','venv','--without-pip',str(runtime)],check=True)
     (runtime/'lib/python3.11/site-packages/fixture.pth').write_text('/sdk\n/usr/lib/haos\n/usr/lib/haos/hermes-source\n')
-    with Path('/etc/passwd').open('a') as stream:stream.write('haos-gateway:x:65534:65534:Disposable gateway fixture:/nonexistent:/usr/sbin/nologin\n')
+    with Path('/etc/passwd').open('a') as stream:stream.write('haos-gateway:x:65534:65534:Disposable gateway fixture:/nonexistent:/usr/sbin/nologin\nhaos-control:x:65532:65532:Disposable controller fixture:/nonexistent:/usr/sbin/nologin\n')
     sys.path[:0]=['/deps',str(code)]
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes,serialization
@@ -87,6 +87,9 @@ def main():
     import base64
     image=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF10AAAAASUVORK5CYII=')
     api_calls=[];api_requests=[]
+    controller_ipc=os.environ.get('HAOS_GOOGLE_CHAT_CONTROLLER_IPC','0')
+    if controller_ipc not in {'0','1'}:raise ValueError('explicit private controller fixture mode required')
+    controller_ipc=controller_ipc=='1'
     pubsub_server=None;pubsub_port=0;pubsub_calls=[]
     import queue
     pubsub_messages=queue.Queue();pubsub_active=[0];pubsub_lock=threading.Lock();pubsub_fault={'mode':None,'calls':0,'held':False,'cancelled':False}
@@ -259,7 +262,14 @@ else:raise AssertionError('gateway read owner data')
 async def run():
     inbox=NativeInbox(parent/'native.sqlite',Redactor([]));relay=RelayInbox(parent/'relay.sqlite',inbox.redactor)
     adapter=build(v['value'],parent=parent,connector='google',policy=policy,inbox=inbox)
-    component=MissionStore(parent/'controller-component.sqlite');controller=Controller(component,'ws://127.0.0.1:9119/api/ws',{65534})
+    component=None;controller=None
+    if v['controller_ipc']:
+        from haos.gateway_runtime import call
+        try:Path(v['controller_database']).read_bytes()
+        except PermissionError:pass
+        else:raise AssertionError('gateway read actual Root controller ledger')
+    else:
+        component=MissionStore(parent/'controller-component.sqlite');controller=Controller(component,'ws://127.0.0.1:9119/api/ws',{65534})
     try:
         try:build(v['value'],parent=parent,connector='google',policy=policy,inbox=inbox)
         except PermissionError:pass
@@ -348,13 +358,13 @@ async def run():
                         if method=='gateway.media.chunk':return controller.gateway.media.chunk(policy(),params)
                         assert method=='gateway.receive'
                         return await controller.gateway.receive(policy(),params['connector'],params['envelope'],controller,media=params.get('media'))
-                    received=await forward(policy,'google',incoming['envelope'],incoming['media'],MediaCache(inbox),local_call)
-                    if incoming['media']:
+                    received=await forward(policy,'google',incoming['envelope'],incoming['media'],MediaCache(inbox),call if v['controller_ipc'] else local_call)
+                    if incoming['media'] and not v['controller_ipc']:
                         prepared=controller.gateway.media.for_mission(policy(),received['mission_id'])
                         assert len(prepared)==1 and prepared[0]['descriptor']['kind']=='image'
                         assert prepared[0]['data']==__import__('base64').b64decode(v['image'])
                     relay.admitted(incoming['id'],received['mission_id'])
-                delivery=controller.gateway.next_delivery(policy())
+                delivery=await call('gateway.next',{'ready':['google']}) if v['controller_ipc'] else controller.gateway.next_delivery(policy())
                 if delivery:
                     metadata=delivery_metadata(delivery,'google_chat')
                     try:result=await adapter.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],metadata=metadata)
@@ -364,13 +374,17 @@ async def run():
                     if v['scenario']=='sendauth':assert result is None or not result.success
                     else:
                         assert result.success
-                        controller.gateway.acknowledge(policy(),delivery['id'],{'status':'delivered','message_id':result.message_id,'attempt':delivery['attempt']})
+                        receipt={'status':'delivered','message_id':result.message_id,'attempt':delivery['attempt']}
+                        if v['controller_ipc']:await call('gateway.ack',{'id':delivery['id'],'result':receipt})
+                        else:controller.gateway.acknowledge(policy(),delivery['id'],receipt)
             state={'status':adapter.native_health()['status'],'connected':adapter.is_connected,
                 'parent_records':relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0],
                 'restarted':restarted,'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0]}
             marker=parent/'profile-status.tmp';marker.write_text(json.dumps(state));marker.replace(parent/'profile-status.json')
             await asyncio.sleep(.05)
-    finally:await adapter.close_profile();inbox.close();relay.close();component.close()
+    finally:
+        await adapter.close_profile();inbox.close();relay.close()
+        if component is not None:component.close()
 asyncio.run(run())
 ''');driver.chmod(0o755)
     def event(mid='shared',sender='users/123'):
@@ -385,7 +399,8 @@ asyncio.run(run())
     claims={'iss':'https://accounts.google.com','aud':audience,'sub':'123456789','email':caller,'email_verified':True,
         'iat':int(now.timestamp()),'exp':int(now.timestamp())+3600}
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
-    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode()}
+    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode(),
+        'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite')}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -394,6 +409,65 @@ asyncio.run(run())
     cases.append('actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener')
     async def exercise():
         from aiohttp import ClientSession,TCPConnector
+        control_process=None
+        if controller_ipc:
+            from haos.gateway_runtime import SOCKET
+            private=directory/'controller-private';private.mkdir(mode=0o700);os.chown(private,65532,65532)
+            endpoint=Path(SOCKET);endpoint.parent.mkdir(mode=0o755)
+            listening=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);listening.bind(SOCKET);listening.listen(8)
+            # Deliberately permissive fixture socket: kernel peer authorization
+            # must refuse the agent even when filesystem connection is possible.
+            endpoint.chmod(0o666)
+            control_driver=directory/'controller-driver.py';control_driver.write_text("""import asyncio,json,os,signal,socket,sys
+from contextlib import redirect_stdout
+from pathlib import Path
+from haos.controller import Controller,MAX_FRAME
+from haos.gateway_google_chat import PreparedGoogleChatPolicy
+from haos.store import MissionStore
+v=json.load(sys.stdin)
+assert os.geteuid()==65532 and os.getegid()==65532 and os.getgroups()==[]
+async def main():
+ store=MissionStore(Path(v['controller_database']))
+ controller=Controller(store,'ws://127.0.0.1:1/explicit-not-inferred',{0})
+ controller.gateway_uids={65534};controller.agent_uid=65533
+ controller.gateway_policy=lambda:PreparedGoogleChatPolicy(json.loads(Path(v['policy']).read_text()))
+ async def client(reader,writer):
+  with redirect_stdout(sys.stderr):await controller.client(reader,writer,gateway=True)
+ stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
+ server=await asyncio.start_unix_server(client,sock=socket.socket(fileno=v['socket_fd']),limit=MAX_FRAME)
+ print(json.dumps({'ready':True,'uid':os.geteuid()}),flush=True)
+ try:await stop.wait()
+ finally:server.close();await server.wait_closed();store.close()
+asyncio.run(main())
+""");control_driver.chmod(0o644)
+            control_process=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(control_driver),
+                stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
+                pass_fds=(listening.fileno(),),user=65532,group=65532,extra_groups=[],cwd=str(code),env=env,umask=0o077)
+            control_process.stdin.write(json.dumps({**request,'socket_fd':listening.fileno()}).encode())
+            await control_process.stdin.drain();control_process.stdin.close();listening.close()
+            ready=await asyncio.wait_for(control_process.stdout.readline(),15)
+            if not ready:raise AssertionError((await control_process.stderr.read()).decode()[-1500:])
+            assert json.loads(ready)=={'ready':True,'uid':65532}
+            negative_code="""import asyncio,json,os
+from haos.gateway_runtime import SOCKET,call
+async def main():
+ if os.geteuid()==65533:
+  reader,writer=await asyncio.open_unix_connection(SOCKET)
+  try:assert json.loads(await asyncio.wait_for(reader.readline(),3))=={'ok':False,'error':'control peer is not authorized'}
+  finally:writer.close();await writer.wait_closed()
+ else:
+  try:await call('missions.list',{})
+  except PermissionError:pass
+  else:raise AssertionError('gateway acquired Owner methods')
+ print(json.dumps({'denied':True}))
+asyncio.run(main())
+"""
+            for uid in [65533,65534]:
+                negative=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s','-c',negative_code,
+                    stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,user=uid,group=uid,extra_groups=[],cwd=str(code),env=env,umask=0o077)
+                stdout,stderr=await asyncio.wait_for(negative.communicate(),10)
+                assert negative.returncode==0 and json.loads(stdout)=={'denied':True},stderr.decode()[-1000:]
+            cases.append('actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket')
         child=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(driver),stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,user=65534,group=65534,extra_groups=[],cwd=str(code),env=env,umask=0o077)
         child.stdin.write(json.dumps(request).encode());await child.stdin.drain();child.stdin.close()
@@ -571,8 +645,13 @@ asyncio.run(run())
                     assert api_calls.count('native-media-download')==2
                     with sqlite3.connect(profile/'native.sqlite') as db:
                         assert db.execute('SELECT COUNT(*) FROM google_chat_input_media').fetchone()[0]==2
-                    with sqlite3.connect(profile/'controller-component.sqlite') as db:
+                    with sqlite3.connect(Path(request['controller_database']) if controller_ipc else profile/'controller-component.sqlite') as db:
                         assert db.execute("SELECT COUNT(*) FROM gateway_media_uploads WHERE state='attached'").fetchone()[0]==2
+                        if controller_ipc:
+                            rows=db.execute('SELECT upload_id,data FROM gateway_media_chunks ORDER BY upload_id,offset').fetchall()
+                            values={}
+                            for identity,data in rows:values[identity]=values.get(identity,b'')+data
+                            assert len(values)==2 and all(data==image for data in values.values())
                     cases.append('actual_private_UID_source_bound_Google_discovery_MediaIoBaseDownload_TLS_GET_native_attachment_codec_FULL_retention_and_real_controller_media_begin_chunk_receive_attach_preserve_exact_PNG_bytes_with_no_foreign_downloadURI_fetch_or_duplicate_download_on_replay')
                 cases.append('actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records')
                 cases.append('actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs')
@@ -591,6 +670,12 @@ asyncio.run(run())
             if child.returncode is None:child.terminate()
             _,stderr=await asyncio.wait_for(child.communicate(),10)
             assert b'BEGIN PRIVATE KEY' not in stderr and token().encode() not in stderr
+            if control_process is not None:
+                if control_process.returncode is None:control_process.terminate()
+                _,errors=await asyncio.wait_for(control_process.communicate(),10)
+                assert control_process.returncode==0,errors.decode()[-1500:]
+                assert Path(request['controller_database']).stat().st_uid==65532 and Path(request['controller_database']).stat().st_mode&0o077==0
+
     try:asyncio.run(exercise())
     finally:
         api_server.shutdown();api_server.server_close();api_thread.join(timeout=2)
@@ -600,7 +685,8 @@ asyncio.run(run())
         'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media'} or scenario.startswith('pubsub'),
         'actual_full_PubSub_profile_TLS_gRPC':scenario.startswith('pubsub'),
         'actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer':scenario=='media',
-        'root_controller_IPC_local_ASR_video_decode_GUI_live_Google_account_or_public_activation':False},indent=2))
+        'actual_separate_controller_UID_kernel_Unix_IPC':controller_ipc,
+        'local_ASR_video_decode_GUI_live_Google_account_production_daemon_or_public_activation':False},indent=2))
 
 
 if __name__=='__main__':main()
