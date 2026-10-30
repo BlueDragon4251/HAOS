@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -55,7 +56,7 @@ async def worker(directory):
     try:
         connected = await adapter.connect()
         scenario = config['scenario']
-        if scenario not in {'normal', 'dedicated'}:
+        if scenario not in {'normal', 'dedicated', 'health-withdraw'} and not scenario.startswith('reply-'):
             if connected: (root / 'emit').write_text('emit fixture native refusal')
             expected = 'identity-refused' if scenario == 'wrong-line' else 'rate-limited' if scenario.endswith('429') else 'authentication-refused'
             deadline = time.monotonic() + 10
@@ -106,17 +107,121 @@ async def worker(directory):
             assert counts['grpc']['SubscribeMessageEvents'] == 1
             assert counts['grpc']['SubscribeGroupEvents'] == 1
             assert counts['grpc']['SubscribePollEvents'] == 1
+        reply_checks = []
+        if scenario == 'health-withdraw':
+            # Stop the actual Node process and observe the real Python health
+            # coroutine waiting for its response. No mock, artificial health
+            # method or weakened revocation deadline is used.
+            nodes = []
+            for entry in Path('/proc').iterdir():
+                if not entry.name.isdecimal(): continue
+                try:
+                    status = (entry / 'status').read_text()
+                    if '\nUid:\t65534\t65534\t65534\t65534\n' not in status: continue
+                    args = (entry / 'cmdline').read_bytes().split(b'\0')
+                except (FileNotFoundError, PermissionError, ProcessLookupError): continue
+                if args[0] == b'/usr/lib/haos/photon/node' and b'/usr/lib/haos/photon/photon_sidecar.mjs' in args:
+                    nodes.append(int(entry.name))
+            assert len(nodes) == 1
+            os.kill(nodes[0], signal.SIGSTOP)
+            deadline = time.monotonic() + 5
+            while True:
+                waiting = False
+                for task in asyncio.all_tasks():
+                    names = []; awaited = task.get_coro()
+                    while awaited is not None:
+                        code = getattr(awaited, 'cr_code', None)
+                        if code is not None: names.append(code.co_name)
+                        awaited = getattr(awaited, 'cr_await', None)
+                    if 'monitor' in names and 'local_call' in names: waiting = True
+                if waiting: break
+                assert time.monotonic() < deadline, 'real network health coroutine did not enter its blocked call'
+                await asyncio.sleep(.01)
+            reply_checks.append('actual_SIGSTOP_Node_health_wait_cannot_delay_independent_owner_withdrawal')
+        if scenario.startswith('reply-'):
+            from haos.gateway import digest
+            text = 'approved native reply'
+            event_context = {'version': 1, 'mission_id': 'fixture-mission', 'kind': 'mission.completed',
+                'source_event': config['message_id'], 'state': 'completed', 'phase': 'finished',
+                'request_id': None, 'request_method': None, 'part': 0, 'parts': 1, 'total_bytes': len(text.encode()),
+                'content_sha256': hashlib.sha256(text.encode()).hexdigest(), 'group_sha256': hashlib.sha256(text.encode()).hexdigest()}
+            metadata = {'notify': True, 'haos_scope': binding['scope'],
+                'haos_binding': {'binding_id': binding['id'], 'binding_digest': digest(binding)},
+                'haos_delivery_id': secrets.token_hex(32), 'haos_delivery_attempt': 1, 'haos_event_context': event_context}
+            for method, args in [('send_image', (binding['chat'], 'https://unapproved.invalid/image.png')),
+                    ('send_document', (binding['chat'], '/unapproved-host-path/fixture.txt')),
+                    ('_sidecar_call', ('/send', {'spaceId': binding['chat'], 'text': text}))]:
+                try: await getattr(adapter, method)(*args)
+                except PermissionError: pass
+                else: raise AssertionError('unreviewed native output escaped its early capability boundary')
+            reply_checks.append('implicit_URL_file_and_direct_transport_writes_refused_before_IO')
+            for changed_chat, changed_source in [(binding['chat'], 'spc-foreign-source'), ('any;-;+15550100009', config['message_id'])]:
+                try: await adapter.send(changed_chat, text, reply_to=changed_source, metadata=metadata)
+                except PermissionError: pass
+                else: raise AssertionError('changed native output recipient/source admitted')
+            reply_checks.append('changed_recipient_and_unretained_source_refused_before_native_write')
+            if scenario == 'reply-sql-refusal':
+                inbox.db.execute("CREATE TRIGGER refuse_output_consumption BEFORE UPDATE ON photon_output_intents WHEN NEW.state='writing' BEGIN SELECT RAISE(ABORT,'fixture write gate failure'); END")
+            pending = asyncio.create_task(adapter.send(binding['chat'], text, reply_to=config['message_id'], metadata=metadata))
+            if scenario == 'reply-withdraw':
+                deadline = time.monotonic() + 5
+                while not (root / 'write-observed').exists():
+                    assert time.monotonic() < deadline, 'actual native write did not reach peer'
+                    await asyncio.sleep(.01)
+                active[0] = False
+            result = await asyncio.wait_for(pending, 6)
+            counts = json.loads((root / 'counts.json').read_text())
+            state = inbox.db.execute('SELECT state FROM photon_output_intents').fetchone()[0]
+            if scenario in {'reply-confirmed', 'reply-restart'}:
+                assert result.success is True and result.message_id == config['reply_receipt'] and state == 'confirmed'
+                again = await adapter.send(binding['chat'], text, reply_to=config['message_id'], metadata=metadata)
+                assert again.success is True and again.message_id == result.message_id
+                assert len(json.loads((root / 'counts.json').read_text())['writes']) == 1
+                assert counts['grpc']['SendTextMessage'] == 1 and len(counts['writes']) == 1
+                reply_checks += ['actual_native_Python_sidecar_SDK_reply_builder_and_protobuf_wire', 'confirmed_receipt_replay_does_not_issue_second_RPC']
+                if scenario == 'reply-restart':
+                    await adapter.close()
+                    adapter = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
+                    adapter.set_durable_message_handler(accept)
+                    assert await adapter.connect(), adapter._haos_photon_health.recorded()
+                    after_restart = await adapter.send(binding['chat'], text, reply_to=config['message_id'], metadata=metadata)
+                    assert after_restart.success is True and after_restart.message_id == config['reply_receipt']
+                    counts = json.loads((root / 'counts.json').read_text())
+                    assert counts['grpc']['SendTextMessage'] == 1 and len(counts['writes']) == 1
+                    assert counts['http']['POST /projects/fixture-project/imessage/tokens'] == 2
+                    reply_checks += ['actual_Node_profile_database_reopen_preserves_confirmed_receipt', 'confirmed_reply_after_process_restart_has_no_new_native_write']
+            elif scenario == 'reply-sql-refusal':
+                assert result.success is False and result.raw_response['haos_delivery'] == 'not-dispatched' and state == 'not-dispatched'
+                assert not counts['writes'] and counts['grpc'].get('SendTextMessage', 0) == 0
+                reply_checks += ['actual_SQL_gate_failure_prevents_any_native_RPC', 'unconsumed_write_permission_atomically_cancelled']
+            else:
+                assert result.success is False and result.raw_response['haos_delivery'] == 'uncertain' and state == 'uncertain'
+                assert counts['grpc']['SendTextMessage'] == 1 and len(counts['writes']) == 1
+                if scenario in {'reply-disconnect', 'reply-reset'}:
+                    deadline = time.monotonic() + 3
+                    while adapter.is_connected:
+                        assert time.monotonic() < deadline, 'native write error ignored by supervisor'
+                        await asyncio.sleep(.01)
+                    for attempt in [1, 2]:
+                        assert adapter._haos_photon_publisher.journal.prepare(binding, metadata['haos_delivery_id'], attempt,
+                            config['message_id'], '', text, text, digest(event_context)) == {'state': 'uncertain'}
+                if scenario == 'reply-reset':
+                    assert counts['transport_resets'] == 1
+                    reply_checks.append('actual_TLS_connection_loss_after_write_does_not_replay_RPC_to_live_peer')
+                reply_checks += ['actual_peer_write_without_receipt_remains_uncertain', 'no_automatic_native_RPC_retry_or_resend']
         active[0] = False
+        if not adapter.is_connected: await adapter.disconnect()
         deadline = time.monotonic() + 2
         while adapter.is_connected:
             assert time.monotonic() < deadline, 'actual profile ignored owner withdrawal'
             await asyncio.sleep(.01)
         assert adapter._haos_photon_health.recorded()['status'] == 'revoked'
         assert not any(Path('/tmp').glob('hp-*/control.sock'))
-        return {'passed': 7, 'scenario': scenario, 'cases': ['actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC',
+        return {'passed': 7 + len(reply_checks), 'scenario': scenario, 'cases': ['actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC',
             'unknown_sender_hash_only_refusal_before_native_mapping', 'approved_native_SDK_sidecar_Python_codec_durable_relay',
             'duplicate_native_message_exactly_one_parent_row', 'original_and_native_custody_have_parent_receipt',
-            'actual_native_stream_advances_durable_cursor', 'owner_withdrawal_stops_actual_Node_and_Unix_control'],
+            'actual_native_stream_advances_durable_cursor',
+            'owner_withdrawal_keeps_failed_transport_revoked' if scenario in {'reply-disconnect', 'reply-reset'} else 'owner_withdrawal_stops_actual_Node_and_Unix_control', *reply_checks],
             'counts': json.loads((root / 'counts.json').read_text()), 'live_Photon_verified': False,
             'controller_IPC_verified': False, 'OS_release_artifact': False}
     finally:
@@ -127,7 +232,8 @@ def main():
     if os.geteuid() != 0 or os.getpid() != 1 or os.environ.get('HAOS_DISPOSABLE_PHOTON_PROFILE') != '1':
         raise PermissionError('fresh disposable PID-1 network-disabled profile fixture required')
     scenario = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == '--case' else 'normal'
-    if scenario not in {'normal', 'dedicated', 'http401', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429'}:
+    if scenario not in {'normal', 'dedicated', 'health-withdraw', 'http401', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429',
+            'reply-confirmed', 'reply-restart', 'reply-disconnect', 'reply-reset', 'reply-sql-refusal', 'reply-withdraw'}:
         raise ValueError('finite fixture case required')
     root = Path('/usr/lib/haos'); root.mkdir(mode=0o755)
     # Public package sources only. Never broaden permissions on the checkout,
@@ -136,6 +242,11 @@ def main():
     shutil.copytree('/repo/upstream/hermes-agent', root / 'hermes', ignore=shutil.ignore_patterns('.git', '.venv', 'node_modules', '__pycache__'), copy_function=shutil.copyfile)
     shutil.copytree('/input/hermes', root / 'hermes', dirs_exist_ok=True, copy_function=shutil.copyfile)
     shutil.copytree('/repo/linux/haos/haos', root / 'haos', ignore=shutil.ignore_patterns('__pycache__'), copy_function=shutil.copyfile)
+    baseline = Path('/baseline/profile.py')
+    if baseline.exists():
+        # Regression comparison only: a read-only public prior source module
+        # inside this disposable namespace, never a production loading hook.
+        shutil.copyfile(baseline, root / 'haos/gateway_photon_profile.py')
     shutil.copytree('/input/photon', root / 'photon', copy_function=shutil.copyfile)
     # Exercise the CURRENT fixed launcher, not yesterday's installed fixture.
     for name in ['photon_sidecar.mjs', 'photon_bounded_stream.mjs', 'photon_cloud.mjs']:
@@ -183,7 +294,8 @@ def main():
         'cert': str(directory / 'server.crt'), 'project_id': account['project_id'], 'project_secret': account['project_secret'],
         'native_token': native_token, 'counts': str(directory / 'counts.json'), 'emit': str(directory / 'emit'),
         'ready': str(directory / 'ready.json'), 'scenario': scenario,
-        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated'} else []}
+        'reply_source': mid, 'reply_chat': 'any;-;+15550100001', 'reply_receipt': str(uuid.uuid4()), 'write_observed': str(directory / 'write-observed'),
+        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith('reply-') else []}
     (directory / 'server.json').write_text(json.dumps(config))
     peer = subprocess.Popen([str(root / 'photon/node'), str(fixtures / 'protocol.mjs'), str(directory / 'server.json')],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -212,7 +324,8 @@ def main():
         provenance = root / 'photon/source.json'; value = json.loads(provenance.read_text())
         value['programs'] = [{'name': name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for name, path in PROGRAMS.items()]
         provenance.write_text(json.dumps(value))
-        (directory / 'worker.json').write_text(json.dumps({'account': account, 'since': int(time.time() * 1000) - 10000, 'message_id': mid, 'scenario': scenario}))
+        (directory / 'worker.json').write_text(json.dumps({'account': account, 'since': int(time.time() * 1000) - 10000, 'message_id': mid,
+            'scenario': scenario, 'reply_receipt': config['reply_receipt']}))
         for entry in directory.rglob('*'): os.chown(entry, 65534, 65534)
         os.chown(directory, 65534, 65534)
         with Path('/etc/passwd').open('a') as output: output.write('haos-gateway:x:65534:65534:fixture:/nonexistent:/usr/sbin/nologin\n')

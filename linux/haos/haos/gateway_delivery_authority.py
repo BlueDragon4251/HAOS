@@ -26,6 +26,11 @@ def current_delivery(adapter,platform,chat,metadata):
             if platform=='google_chat':
                 from .gateway_google_chat import thread_allowed
                 thread_matches=thread_allowed(binding,thread)
+            if platform=='photon':
+                from .gateway_photon import checked_policy, message_id
+                checked_policy(latest)
+                if thread: message_id(thread)
+                thread_matches=binding['thread']==thread or binding.get('all_threads') is True
             if (binding['connector']!=connector or binding['chat']!=chat or binding['scope']!=scope
                     or not thread_matches or 'read' not in binding['capabilities']):
                 raise PermissionError

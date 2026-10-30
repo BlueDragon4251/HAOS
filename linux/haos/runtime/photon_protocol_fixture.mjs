@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import https from "node:https";
+import net from "node:net";
 import { createRequire } from "node:module";
 
 const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -15,7 +16,7 @@ const definitions = loader.loadSync(["message_service.proto", "event_service.pro
   includeDirs: [proto], keepCase: false, longs: Number, enums: String, defaults: true, oneofs: true,
 });
 const services = grpc.loadPackageDefinition(definitions).photon.imessage.v1;
-const counts = { http: {}, grpc: {}, refused_auth: 0, emitted: 0, cancelled: {}, timer_ticks: 0 };
+const counts = { http: {}, grpc: {}, refused_auth: 0, emitted: 0, cancelled: {}, timer_ticks: 0, writes: [], transport_resets: 0 };
 function publish(file, value) {
   fs.writeFileSync(file + ".tmp", JSON.stringify(value));
   fs.renameSync(file + ".tmp", file);
@@ -52,6 +53,7 @@ const http = https.createServer(tls, (request, response) => {
 await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
 const server = new grpc.Server({ "grpc.max_receive_message_length": 8 * 1024 * 1024 });
 const calls = new Set(); const timers = new Set();
+const proxySockets = new Set(); let proxy = null;
 function authenticated(call, method) {
   count("grpc", method);
   if (call.metadata.get("authorization")[0] !== "Bearer " + config.native_token) {
@@ -89,6 +91,32 @@ function methods(definition, reviewed) {
 }
 server.addService(services.MessageService.service, methods(services.MessageService, {
   subscribeMessageEvents: (call) => live(call, "SubscribeMessageEvents", true),
+  sendTextMessage(call, callback) {
+    if (!authenticated(call, "SendTextMessage")) return;
+    const body = call.request;
+    if (body.chatGuid !== config.reply_chat || body.text !== "approved native reply" ||
+        body.replyTo?.messageGuid !== config.reply_source || body.enableLinkPreview === true ||
+        body.enableDataDetection === true || body.formatting?.length) {
+      return callback({ code: grpc.status.INVALID_ARGUMENT, details: "fixture wire contract changed" });
+    }
+    counts.writes.push({ chat: body.chatGuid, reply_to: body.replyTo.messageGuid }); save();
+    if (config.scenario === "reply-reset" && counts.writes.length === 1) {
+      counts.transport_resets++; save();
+      // Drop real TLS connections after the actual request reached this peer.
+      // Keep the real gRPC service and TCP proxy listening: an automatic resend
+      // could reconnect successfully and would be counted as a second write.
+      for (const socket of proxySockets) socket.destroy();
+      return;
+    }
+    if (config.scenario === "reply-withdraw") {
+      fs.writeFileSync(config.write_observed, "write reached actual gRPC peer"); return;
+    }
+    if (config.scenario === "reply-disconnect") {
+      return callback({ code: grpc.status.UNAVAILABLE, details: "fixture receipt lost after native write" });
+    }
+    callback(null, { message: { guid: config.reply_receipt, content: { text: body.text },
+      chatGuids: [body.chatGuid], isFromMe: true, dateCreated: { seconds: Math.floor(Date.now() / 1000), nanos: 0 } } });
+  },
 }));
 server.addService(services.PollService.service, methods(services.PollService, {
   subscribePollEvents: (call) => live(call, "SubscribePollEvents", false),
@@ -105,11 +133,26 @@ server.addService(services.EventService.service, methods(services.EventService, 
 const port = await new Promise((resolve, reject) => server.bindAsync("127.0.0.1:0",
   grpc.ServerCredentials.createSsl(null, [{ private_key: tls.key, cert_chain: tls.cert }], false),
   (error, port) => error ? reject(error) : resolve(port)));
+let exposedPort = port;
+if (config.scenario === "reply-reset") {
+  proxy = net.createServer((front) => {
+    const back = net.connect(port, "127.0.0.1");
+    for (const socket of [front, back]) {
+      proxySockets.add(socket); socket.on("error", () => { front.destroy(); back.destroy(); });
+      socket.on("close", () => proxySockets.delete(socket));
+    }
+    front.pipe(back); back.pipe(front);
+  });
+  await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+  exposedPort = proxy.address().port;
+}
 save();
-publish(config.ready, { cloud: "https://127.0.0.1:" + http.address().port, grpc: "127.0.0.1:" + port });
+publish(config.ready, { cloud: "https://127.0.0.1:" + http.address().port, grpc: "127.0.0.1:" + exposedPort });
 async function stop() {
   for (const timer of timers) clearInterval(timer);
   for (const call of calls) call.end();
+  for (const socket of proxySockets) socket.destroy();
+  proxy?.close();
   server.forceShutdown(); http.close();
 }
 process.on("SIGTERM", stop); process.on("SIGINT", stop);

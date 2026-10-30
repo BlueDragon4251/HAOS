@@ -71,6 +71,33 @@ if (hermesTransport !== undefined && (!hermesTransport ||
 });'''
     sidecar = replace_once(sidecar, anchor,
         'if (hermesTransport) hermesTransport.listen(server);\nelse ' + anchor)
+    sidecar = replace_once(sidecar, '  spectrumText,', '  spectrumText,\n  spectrumReply,')
+    sidecar = replace_once(sidecar, '    text: spectrumText,', '    text: spectrumText,\n    reply: spectrumReply,')
+    # A trusted reply capability already names the retained parent. The actual
+    # SDK builder can target that ID without reading quoted message contents.
+    anchor = '''      const result = await space.send(builder);
+      return ok(res, { messageId: result?.id || null });
+    }
+    if (req.url === "/send-richlink")'''
+    sidecar = replace_once(sidecar, anchor, '''      const outbound = hermesTransport
+        ? spectrumReply(builder, { id: body.replyTo, content: { type: "text", text: "" }, space })
+        : builder;
+      let result;
+      try { result = await space.send(outbound); }
+      catch (error) {
+        if (hermesTransport?.writeFailed) await hermesTransport.writeFailed(error);
+        if (hermesTransport) throw new Error("Photon native write failed");
+        throw error;
+      }
+      return ok(res, { messageId: result?.id || null });
+    }
+    if (req.url === "/send-richlink")''')
+    # SDK space.get is a pure exact-reference constructor. The upstream DM
+    # creation fallback can issue an unnecessary chat-creation mutation on a
+    # dedicated line after restart, before the reviewed message write.
+    sidecar = replace_once(sidecar, '  const im = imessage(app);\n  const phoneTarget = phoneTargetFromSpaceId(spaceId);', '''  const im = imessage(app);
+  if (hermesTransport) return await im.space.get(spaceId);
+  const phoneTarget = phoneTargetFromSpaceId(spaceId);''')
     # Earliest mapping gates: vCards, reply targets, reactions, poll and group
     # hydration can perform RPCs before a Message reaches the sidecar.
     for signature in [
@@ -89,7 +116,9 @@ if (hermesTransport !== undefined && (!hermesTransport ||
         '\t\tconst tracker = !globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticContactSharing && (staticShareEnabled || profileSyncGate) ? getContactShareTracker(entry.client) : void 0;')
     anchor = 'const resolveReplyTarget = async (client, base, targetGuid, currentGuid, options) => {'
     sdk = replace_once(sdk, anchor, anchor + '\n\tif (globalThis[Symbol.for("hermes.photon.sdk.transport")]?.avoidReplyHydration === true) return stubReplyTarget(base, targetGuid);')
-    sdk, count = re.subn(r'(?m)^(\t+)retry: true,$', r'\1retry: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticRetries !== true,', sdk)
+    sdk, count = re.subn(r'(?m)^(\t+)retry: true,$',
+        r'\1channelOptions: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticRetries === true ? { "grpc.enable_retries": 0 } : void 0,\n'
+        r'\1retry: globalThis[Symbol.for("hermes.photon.sdk.transport")]?.disableAutomaticRetries !== true,', sdk)
     if count != 3: raise ValueError('pinned Photon automatic RPC retry constructors changed')
     anchor = '\tlet tokenData = await cloud.issueImessageTokens(projectId, projectSecret);'
     sdk = replace_once(sdk, anchor, '''\tconst selectTokenData = async (data) => {

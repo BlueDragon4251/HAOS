@@ -22,7 +22,7 @@ from .gateway_photon_custody import MAX_NORMALIZED, re_full_hash
 
 
 class PolicyServer:
-    def __init__(self, path, token, *, child_pid, connector, value, policy, originals, current, cursor=None, health=None):
+    def __init__(self, path, token, *, child_pid, connector, value, policy, originals, current, cursor=None, health=None, outbox=None):
         self.path = Path(path)
         parent = self.path.parent.lstat()
         if (not self.path.is_absolute() or str(self.path.parent.resolve()) != str(self.path.parent)
@@ -35,6 +35,7 @@ class PolicyServer:
         self.value = value; self.policy = policy; self.originals = originals; self.current = current
         self.cursor = cursor
         self.health = health
+        self.outbox = outbox
         self.server = None; self.identity = None; self.connections = set(); self.lock = asyncio.Lock()
         self.originals.db.execute('''CREATE TABLE IF NOT EXISTS photon_refusals(
             id TEXT PRIMARY KEY,connector TEXT NOT NULL,reason TEXT NOT NULL,raw_sha256 TEXT NOT NULL)''')
@@ -91,7 +92,7 @@ class PolicyServer:
                 pieces = lines[0].split(' ')
                 if len(pieces) != 3 or pieces[0] != 'POST' or pieces[2] != 'HTTP/1.1': raise ValueError('fixed Photon control method required')
                 route = pieces[1]
-                if route not in {'/admit', '/current', '/custody', '/lease', '/resume', '/cursor', '/gap', '/native-status'}: raise PermissionError('unknown Photon control operation')
+                if route not in {'/admit', '/current', '/custody', '/lease', '/resume', '/cursor', '/gap', '/native-status', '/output'}: raise PermissionError('unknown Photon control operation')
                 headers = {}
                 for line in lines[1:]:
                     name, sep, content = line.partition(':')
@@ -103,7 +104,7 @@ class PolicyServer:
                     raise PermissionError('authenticated bounded Photon control JSON required')
                 size = headers.get('content-length', '')
                 if not re.fullmatch('[1-9][0-9]{0,8}', size): raise ValueError('exact Photon control content length required')
-                maximum = MAX_NORMALIZED + 4096 if route == '/custody' else 1048576 if route == '/admit' else 4096
+                maximum = MAX_NORMALIZED + 4096 if route == '/custody' else 1048576 if route == '/admit' else 65536 if route == '/output' else 4096
                 if int(size) > maximum: raise ValueError('Photon control body exceeds bound')
                 raw = await reader.readexactly(int(size))
                 self.peer(writer); self.current()
@@ -165,6 +166,10 @@ class PolicyServer:
                 return {'approved': True}
             return {'approved': True, 'cursor': self.cursor.advance(data['cursor'])}
         if self.cursor is not None: self.cursor.check()
+        if route == '/output':
+            if self.outbox is None or self.health is None or not self.health.permitted():
+                raise PermissionError('Photon native output authority unavailable')
+            return self.outbox.consume(parse(raw))
         if route == '/admit':
             # Preserve the authenticated SDK event bytes before any native
             # contact/reply/poll conversion can fetch additional content.

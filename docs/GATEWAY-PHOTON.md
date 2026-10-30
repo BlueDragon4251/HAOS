@@ -152,6 +152,52 @@ active rate-limit diagnostic. Changing service toggles cannot turn the same
 refused project key into a fresh credential; old prepared status rows remain
 intact and their refusals are carried forward.
 
+## Prepared source-bound replies
+
+Text replies now use the actual Hermes Python send formatting, native sidecar
+and Spectrum reply builder. The retained source GUID supplies the reply target;
+quoted message contents are not fetched. After restart the embedding resolves
+an exact existing space reference through the SDK's pure `space.get` constructor,
+avoiding the upstream fallback that can create a dedicated-line chat.
+
+The private outbox requires completed original/native/parent custody, the exact
+current Owner route and controller content/event identity. It stores a one-use
+capability hash bound to recipient, source, thread and native body. The real
+child must consume that capability through its PID-authenticated control
+socket, and SQLite must commit `writing` before any vendor RPC is allowed.
+Changed recipients, body, source, expired/replayed permissions and failed
+consumption writes cannot reach the native send operation.
+
+A confirmed vendor acceptance ID is returned from durable history on a repeat
+call or process restart. A consumed write without an acceptance receipt stays
+uncertain across attempts and reopening; it is never automatically resent.
+An unconsumed permission can be atomically cancelled, preventing its late use
+and permitting a subsequent controller attempt. Vendor acceptance is not proof
+of recipient delivery or reading. Both SDK middleware retries and the underlying
+gRPC channel's transparent retries are disabled for the trusted embedding.
+Standalone nonembedded upstream behavior is preserved.
+
+Implicit URL/file fetches, media writes, polls, edits, deletion, typing and
+reactions are refused at their method boundary pending their own reviewed
+capabilities. A plain text reply cannot turn into a rich-link fallback or an
+arbitrary filesystem upload. Outgoing files still require a sealed media path
+before public activation.
+
+Native fixtures exercise successful replies, confirmed receipt replay and
+actual Node/profile restart, refused SQL consumption, lost acceptance, Owner
+withdrawal during an actual write, and real TLS connection loss after the peer
+received the request while the peer remains available for a possible retry.
+These use real SDK/protobuf calls to loopback; the controller event metadata
+and final RelayInbox callback remain fixture inputs, not a controller inference
+or external delivery claim.
+
+The running Owner watchdog is separate from network health requests. A test
+that stops the actual Node process with SIGSTOP and observes a blocked real
+health coroutine still requires withdrawal within the original two-second
+bound. The prior observer source fails that same test; the corrected observer
+passes. Unexpected observer failures stop the child and clear local connection
+state, including a publication revoked during an awaited health response.
+
 ## Evidence limits and work remaining
 
 The native transport probe exercises the actual prepared Spectrum mapper and
@@ -162,8 +208,7 @@ checks do not establish a live Spectrum connection, receipt by another person,
 HAOS controller inference, installed service/GUI behavior or hardware acceptance.
 
 Still required before counting Photon: full durable receive/replay/controller
-path, actual native guarded replies and outbox, broader reconnect/refresh and
-recovery acceptance, supported media
+path, broader reconnect/refresh and recovery acceptance, supported media
 and voice conversion, inspected source/output/account recovery, real Owner GUI
 and CLI onboarding/device authentication, build installation/provenance and
 end-to-end native/private-UID fixtures. Continue this gateway before Raft,

@@ -161,14 +161,15 @@ globalThis[Symbol.for("hermes.photon.transport")] = Object.freeze({
   },
   async authorizeRequest(request) {
     if (!((request.method === "GET" && request.url === "/inbound") ||
-          (request.method === "POST" && ["/healthz", "/shutdown"].includes(request.url)))) return false;
+          (request.method === "POST" && ["/healthz", "/shutdown", "/send"].includes(request.url)))) return false;
     return (await rpc("/lease", {})).approved === true;
   },
-  async authorizeBody() {
-    // No implicit native typing, reactions, URL fetches, arbitrary paths or
-    // outbound writes. Dedicated one-shot write capabilities are wired next.
-    return false;
+  async authorizeBody(request, body) {
+    // Root durably consumes the exact source/recipient/body capability before
+    // the actual SDK may issue its one reviewed text-reply RPC.
+    return request.url === "/send" && (await rpc("/output", body)).approved === true;
   },
+  async writeFailed(error) { await report(nativeFailure(error)); },
   listen(server) {
     directory(control);
     server.listen(control, () => { fs.chmodSync(control, 0o600); });

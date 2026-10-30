@@ -5,8 +5,8 @@ import json
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import tempfile
-import time
 from types import MethodType, SimpleNamespace
 
 from .gateway import Conflict, digest
@@ -73,6 +73,8 @@ def build(value, *, parent, connector, policy, inbox):
         adapter._haos_photon_health = Ledger(inbox, connector, value, identity, authority)
         from .gateway_photon_codec import install
         install(adapter)
+        from .gateway_photon_delivery import Publisher
+        adapter._haos_photon_publisher = Publisher(adapter)
         return lifecycle(adapter, lease, home)
     except BaseException:
         if originals is not None: originals.close()
@@ -106,19 +108,29 @@ def lifecycle(adapter, lease, home):
 
     async def local_call(self, path, body):
         check()
-        if path != '/healthz' or body != {} or self._http_client is None:
+        if self._http_client is None:
             raise PermissionError('native Photon write requires a dedicated one-shot output capability')
+        if path == '/healthz' and body == {}:
+            timeout = 3
+        elif path == '/send':
+            body = self._haos_photon_publisher.packet(path, body); timeout = 25
+        else:
+            raise PermissionError('native Photon operation lacks a dedicated capability')
         from .gateway_dingtalk_admission import parse
-        async with self._http_client.stream('POST', 'http://photon.invalid/healthz', json={}, headers=self._sidecar_headers(), timeout=3) as response:
+        async with self._http_client.stream('POST', 'http://photon.invalid' + path, json=body, headers=self._sidecar_headers(), timeout=timeout) as response:
             if response.status_code != 200: raise ConnectionError('private Photon control unavailable')
             content = bytearray()
             async for chunk in response.aiter_bytes():
                 if len(content) + len(chunk) > 8192: raise Conflict('private Photon health response exceeds limit')
                 content.extend(chunk)
-        check(); return parse(bytes(content))
+        check(); data = parse(bytes(content))
+        if path == '/send':
+            from .gateway_photon import message_id
+            if set(data) != {'ok', 'messageId'} or data['ok'] is not True: raise Conflict('Photon native write lacks an exact acceptance receipt')
+            message_id(data['messageId'])
+        return data
 
-    async def monitor():
-        next_health = 0
+    async def authority_watch():
         while True:
             try: check()
             except PermissionError:
@@ -130,16 +142,34 @@ def lifecycle(adapter, lease, home):
             child = resource['child']
             if child is None or child.pid is None:
                 health.update('transport-unavailable', 2); await stop(immediate=True); return
-            if time.monotonic() >= next_health:
-                try:
-                    observed = await adapter._sidecar_call('/healthz', {})
-                    stream = observed.get('stream')
-                    if not isinstance(stream, dict) or stream.get('ok') is False: raise ConnectionError('native Photon stream degraded')
-                except asyncio.CancelledError: raise
-                except Exception:
-                    health.update('transport-unavailable', 2); await stop(immediate=True); return
-                next_health = time.monotonic() + 3
             await asyncio.sleep(.1)
+
+    async def monitor():
+        while True:
+            check()
+            observed = await adapter._sidecar_call('/healthz', {})
+            stream = observed.get('stream')
+            if not isinstance(stream, dict) or stream.get('ok') is False:
+                raise ConnectionError('native Photon stream degraded')
+            await asyncio.sleep(3)
+
+    async def guarded(operation):
+        try: await operation()
+        except asyncio.CancelledError: raise
+        except Exception as error:
+            # A revoked publication or failed status write must never kill only
+            # the observer and leave a connected flag/process behind. Owner
+            # checks have their own task and cannot wait behind network health.
+            try: check()
+            except PermissionError:
+                adapter._haos_photon_stopping = True
+                try: health.update('revoked')
+                except Exception: pass  # Still stop when the status store failed.
+            else:
+                state = 'storage-unavailable' if isinstance(error, sqlite3.Error) else 'source-unavailable' if isinstance(error, Conflict) else 'transport-unavailable'
+                try: health.update(state, 2)
+                except Exception: pass
+            await stop(immediate=True)
 
     async def replay():
         while True:
@@ -163,7 +193,8 @@ def lifecycle(adapter, lease, home):
                 token = secrets.token_hex(32); self._sidecar_token = token
                 child = Child(value, home, directory / 'policy.sock', directory / 'control.sock', token, check); resource['child'] = child
                 server = PolicyServer(directory / 'policy.sock', token, child_pid=lambda: child.pid, connector=native.connector,
-                    value=value, policy=native.policy, originals=self._haos_photon_originals, current=check, cursor=cursor, health=health)
+                    value=value, policy=native.policy, originals=self._haos_photon_originals, current=check, cursor=cursor, health=health,
+                    outbox=self._haos_photon_publisher.journal)
                 resource['server'] = server
                 await server.start(); await child.start(); check()
                 import httpx
@@ -171,7 +202,8 @@ def lifecycle(adapter, lease, home):
                     trust_env=False, follow_redirects=False, timeout=5)
                 self._inbound_running = True; health.update('local-ready'); self._mark_connected()
                 tasks.update(receive=asyncio.create_task(PhotonAdapter._inbound_loop(self)),
-                    monitor=asyncio.create_task(monitor()), replay=asyncio.create_task(replay()))
+                    authority=asyncio.create_task(guarded(authority_watch)),
+                    monitor=asyncio.create_task(guarded(monitor)), replay=asyncio.create_task(guarded(replay)))
                 return True
             except asyncio.CancelledError: await stop(immediate=True); raise
             except Exception:
@@ -196,9 +228,7 @@ def lifecycle(adapter, lease, home):
             self._haos_photon_closed = True; self._haos_photon_originals.close(); os.close(lease)
 
     async def inbound(self, line): return await on_line(self, line)
-    async def no_output(self, *args, **kwargs):
-        raise PermissionError('Photon output requires the guarded native publisher; public activation is not enabled')
     for name, method in [('connect', connect), ('disconnect', disconnect), ('close', close), ('_on_inbound_line', inbound),
-            ('_sidecar_call', local_call), ('send', no_output)]: setattr(adapter, name, MethodType(method, adapter))
+            ('_sidecar_call', local_call)]: setattr(adapter, name, MethodType(method, adapter))
     adapter._sidecar_url = lambda path: 'http://photon.invalid' + path
     return adapter

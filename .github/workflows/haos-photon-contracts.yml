@@ -1,10 +1,10 @@
 name: HAOS Photon prepared contracts
 on:
   pull_request:
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   push:
     branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
-    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
   workflow_dispatch:
 permissions:
   contents: read
@@ -59,7 +59,7 @@ jobs:
       - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
         run: |
           set -euo pipefail
-          for fixture_case in normal dedicated http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429; do
+          for fixture_case in normal dedicated health-withdraw http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw; do
             docker run --rm --network none --pids-limit 192 --memory 2g \
               -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
               -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
@@ -69,6 +69,25 @@ jobs:
               python3 /repo/linux/haos/probes/probe_photon_profile.py --case "$fixture_case" \
               > "$RUNNER_TEMP/photon-install/private-native-$fixture_case.json" 2> "$RUNNER_TEMP/photon-install/private-native-$fixture_case.err"
           done
+      - name: Prior observer must fail the same actual blocked-health withdrawal test
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin ca53134d0b1519a11fa55a2ed8c77127c23121cf
+          git show ca53134d0b1519a11fa55a2ed8c77127c23121cf:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-profile.py"
+          sha256sum "$RUNNER_TEMP/photon-install/prior-profile.py" > "$RUNNER_TEMP/photon-install/prior-profile.sha256"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case health-withdraw \
+              > "$RUNNER_TEMP/photon-install/prior-blocked-health.log" 2>&1; then
+            echo 'Prior observer unexpectedly passed the unchanged withdrawal deadline'
+            exit 1
+          fi
+          rg --fixed-strings --quiet 'actual profile ignored owner withdrawal' "$RUNNER_TEMP/photon-install/prior-blocked-health.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -107,7 +126,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
