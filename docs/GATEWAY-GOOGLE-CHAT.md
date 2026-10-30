@@ -1,8 +1,12 @@
-# Google Chat — private integration in progress
+# Google Chat — public path under software acceptance
 
-Google Chat remains outside the public HAOS registry and GUI. The public software
-count remains 15/22 after Buzz. The prepared modules below do not constitute a
-working installed gateway or live Google Workspace acceptance.
+Google Chat now has a dedicated graphical account/pairing page, Owner CLI,
+matched Root publication and a connection to the common gateway service. The
+accepted software count remains 15/22 while the remaining management/recovery
+checks and source-consistent acceptance are completed. Registry/GUI availability
+alone does not count as a completed integration. No installed-systemd or live
+Google Workspace acceptance is claimed. Sections below retain historical
+checkpoint evidence; their results apply to their recorded source revisions.
 
 ## Implemented private building blocks
 
@@ -76,19 +80,83 @@ again at dispatch. Actual-UID reopen tests keep one parent record, including a
 real SQL failure between parent commit and the source receipt. This proves the
 local relay handoff, not a root-controller mission or live inference.
 
-## Remaining before public activation
+## Remaining acceptance
 
-- Complete production `gateway_runtime.serve`/public factory integration and
-  installed systemd acceptance; private profile loops and actual separate
-  controller Unix IPC are tested below.
-- Historical account/token/output association and Owner cleanup after key
-  rotation or connector removal, without discarding existing custody.
-- Complete usable Owner account/pairing/media/OAuth/recovery GUI and CLI, and
-  frozen installed SDK packaging. Existing prepared OAuth/file/recovery forms
-  are components rather than a complete public Google Chat setup path.
+- Complete historical missing-identity recovery without guessing original app
+  names or replacing existing custody. Known-identity token/quarantine/output
+  cleanup and global unassociated output cleanup are implemented below.
+- Finish source-consistent public-path validation and account/status management
+  review. Actual production-loop tests now cover both transports, Root policy,
+  separate controller Unix IPC, reconnect, replay and withdrawal.
+- Installed systemd/OS acceptance remains part of the system artifact phase.
 - Full source-consistent regression, kernel/process/GUI/build gates for that
   public activation. Live Google account/consent/delivery acceptance stays
   separate from the local SDK fixtures.
+
+## Public account, policy and service path
+
+Open **Gateways → Google Chat: Konto einrichten und exakte Absender freigeben**.
+Save a dedicated private service-account JSON and the expected numeric bot
+resource. Existing credentials can be reused only by an explicit choice; private
+values are not returned to the GUI. Account/key changes withdraw old grants.
+The same stable app identity cannot belong to two connectors. Configuration and
+credentials use the existing atomic Root publication/recovery mechanism.
+
+Pub/Sub requires an explicit same-project pull subscription and separate Owner
+trust in **all** authorized topic publishers, including inherited IAM grants.
+The pinned Hermes setup documents Google's publisher principal
+`chat-api-push@system.gserviceaccount.com`. Give the dedicated HAOS service
+account Subscriber access to the subscription. Independently inspect effective
+topic IAM: an authenticated pull connection does not authenticate each original
+publisher or prevent another trusted publisher from asserting sender IDs. HAOS
+does not claim an automatic effective IAM audit. Without explicit consent the
+public publication is refused. Unknown senders still never receive HAOS rights.
+
+HTTPS mode uses the exact public `/google-chat` URL, trusted matching certificate
+chain and private key from Owner-private PEM files, explicit listener address
+and consent, an unprivileged local port, exact audience and expected Google
+caller account. Configure the Google Chat app and network/proxy separately;
+HAOS does not silently open router ports. TLS/key validation and signed Google
+caller verification are independent of HAOS sender grants.
+
+Pair an exact `users/<numeric-id>` with a `spaces/<id>` and same-space thread.
+An empty thread alone does not approve other threads. Whole-space thread access
+is a separate choice and cannot overlap a specific-thread grant for the same
+sender/app/space. Mission rights, mentions, files/images, voice, video and result
+file export are separate decisions. Voice requires the configured local speech
+service; file export additionally needs the stable user's OAuth delegation.
+Known saved accounts, scopes and flags are displayed without credentials.
+Use the same page's OAuth/source/reply/file recovery controls, or the historical
+page after account removal. Service start/stop, status, connector removal and
+grant withdrawal remain reachable through the common gateway administration.
+
+CLI setup is `haos-owner gateway setup CONNECTOR google_chat`; private JSON uses
+masked local input. Pairing uses the common `gateway pair` command, including
+`--thread` or explicit `--all-threads` and separate media flags. No setup action
+sends a test chat message. The common policy now permits at most 32 connectors
+and 512 bindings, preserving a finite bound while allowing all 22 platforms.
+
+The common service creates the private Google profile, registers the guarded
+native ingress, forwards through the actual controller socket and prepares
+Root-bound output before sending. Google output accepts a validated public
+policy witness; mutating or relabelling an already constructed policy fails.
+The prepared subclass remains available for historical probes. File/checksum,
+source, exact thread, credential epoch and current-grant checks remain intact.
+The frozen build includes `google-chat` plus native codec, RSA token, custody
+and bounded SDK/HTTP text probes; no dependency versions were upgraded.
+
+The production-loop namespace fixture uses actual Root publication, actual
+gateway/controller UIDs and the installed controller's required supplementary
+gateway group. A Root-owned named-UID kernel ACL grants only the gateway read
+access to fixture credentials: the controller cannot read them, and the gateway
+cannot write or chmod them. This models service-scoped access without claiming
+an installed systemd credential mount. Google HTTP/certificate/gRPC endpoints
+are explicit local fixtures. Reconnect is handled by the real `maintain` loop;
+replay has two unique sources/replies. A local completion-event fixture exercises
+actual manifest RPC/output projection and refuses unapproved file export without
+leaking the agent path. Atomic Root withdrawal stops the actual `serve` task.
+None of these checks constitutes Google entitlement, external delivery or real
+agent inference.
 
 ## Private lifecycle and reply checkpoint
 

@@ -11,7 +11,7 @@ from .store import Conflict, MissionStore, PAUSED_PHASE
 from .gateway_source_cancel import SourceCancellation
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}\Z")
-SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a", "buzz"}
+SUPPORTED = {"telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a", "buzz", "google_chat"}
 CAPABILITIES = {"create", "read", "cancel", "answer", "pause", "resume"}
 
 
@@ -38,7 +38,7 @@ class GatewayPolicy:
             raise ValueError("invalid gateway publication")
         self.connectors, self.bindings = {}, {}
         if (not isinstance(config["connectors"], list) or not isinstance(config["bindings"], list)
-                or len(config["connectors"]) > 16 or len(config["bindings"]) > 512):
+                or len(config["connectors"]) > 32 or len(config["bindings"]) > 512):
             raise ValueError("gateway policy exceeds supported limits")
         for connector in config["connectors"]:
             name = connector.get("id")
@@ -123,6 +123,12 @@ class GatewayPolicy:
                 raise ValueError("duplicate or unconfigured gateway route")
             routes.add(route)
             self.bindings[binding["id"]] = binding
+        if any(row['platform']=='google_chat' for row in self.connectors.values()):
+            from .gateway_google_chat import validate_binding,validate_overlaps
+            for binding in self.bindings.values():
+                if self.connectors[binding['connector']]['platform']=='google_chat':validate_binding(binding)
+            validate_overlaps(self)
+            self._google_policy_fingerprint=digest([self.publication,self.connectors,self.bindings])
 
     def authorize(self, connector: str, envelope: dict) -> dict:
         if connector not in self.connectors or not isinstance(envelope, dict):

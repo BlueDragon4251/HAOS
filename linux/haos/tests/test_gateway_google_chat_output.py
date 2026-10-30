@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from haos.gateway import GatewayEngine,digest,Conflict
+from haos.gateway import GatewayEngine,GatewayPolicy,digest,Conflict
 from haos.gateway_google_chat import PreparedGoogleChatPolicy
 from haos.gateway_google_chat_output import Output,sealed
 from haos.gateway_outbound import Exports,approved
@@ -20,11 +20,12 @@ from haos.store import MissionStore
 from test_gateway_google_chat import account,policy,admitted
 
 
-@pytest.fixture
-def root_export(tmp_path):
+@pytest.fixture(params=['prepared','public'])
+def root_export(tmp_path,request):
     store=MissionStore(tmp_path/'missions.sqlite');engine=GatewayEngine(store);selected=policy(allow_outbound_media=True)
     config=deepcopy({'version':1,'connectors':list(selected.connectors.values()),'bindings':list(selected.bindings.values())})
-    controller=SimpleNamespace(store=store,url='ws://127.0.0.1/fixture',gateway_policy=lambda:PreparedGoogleChatPolicy(config))
+    policy_type=GatewayPolicy if request.param=='public' else PreparedGoogleChatPolicy
+    controller=SimpleNamespace(store=store,url='ws://127.0.0.1/fixture',gateway_policy=lambda:policy_type(config))
     envelope=admitted(selected=selected)['envelope'];envelope['text']='Create a report.'
     mid=asyncio.run(engine.receive(controller.gateway_policy(),'google',envelope,None))['mission_id']
     store.claim();store.session(mid,'native-session','stored-session');store.settle(mid,'completed',result='Report\nMEDIA:/agent/report.pdf')
@@ -71,9 +72,10 @@ def test_root_export_refuses_widened_stale_or_unapproved_google_file_authority_b
     with pytest.raises((PermissionError,Conflict)):asyncio.run(exports.begin(args))
 
 
-@pytest.fixture
-def retained(tmp_path):
+@pytest.fixture(params=['prepared','public'])
+def retained(tmp_path,request):
     tmp_path.chmod(0o700);inbox=NativeInbox(tmp_path/'native.sqlite',Redactor([]));selected=policy(allow_outbound_media=True)
+    if request.param=='public':selected=GatewayPolicy({'version':1,'connectors':list(selected.connectors.values()),'bindings':list(selected.bindings.values())})
     adapter=SimpleNamespace(_haos_native=SimpleNamespace(inbox=inbox,policy=lambda:selected,connector='google'),_haos_google_value=account(),_haos_google_check=lambda:None)
     output=Output(adapter);binding=selected.bindings['owner'];content='Report\nMEDIA:/agent/report.pdf'
     context={'version':1,'mission_id':'local-mission','kind':'mission.completed','source_event':'local-source','state':'completed','phase':'done',

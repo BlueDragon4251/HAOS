@@ -12,7 +12,7 @@ import re
 import time
 
 from .gateway import Conflict,digest
-from .gateway_google_chat import PreparedGoogleChatPolicy,scope
+from .gateway_google_chat import checked_policy,scope
 from .gateway_event_context import validate
 from .gateway_media import MAX_BYTES,CHUNK_BYTES
 
@@ -56,7 +56,7 @@ class Output:
     def current(self,delivery,*,media=True):
         adapter=self.adapter;adapter._haos_google_check();policy=adapter._haos_native.policy()
         if not isinstance(delivery.get('id'),str) or not HEX.fullmatch(delivery['id']):raise PermissionError('exact Root Google delivery identity required')
-        if not isinstance(policy,PreparedGoogleChatPolicy):raise PermissionError('independent prepared Google output policy required')
+        checked_policy(policy)
         binding=policy.current_binding(delivery)
         if (binding['connector']!=adapter._haos_native.connector or policy.connectors[binding['connector']]['platform']!='google_chat'
                 or binding['scope']!=scope(adapter._haos_google_value) or 'read' not in binding['capabilities']

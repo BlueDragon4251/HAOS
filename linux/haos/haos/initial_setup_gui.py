@@ -617,6 +617,38 @@ class Wizard:
                                 success="Bootc-Update vorbereitet. Neustart nach eigener Freigabe.")
             self._button(self.content, "Kanal wählen und bootc-Image prüfen",
                          apply_channel, primary=True).pack(anchor="w", pady=13)
+        elif name == 'google-chat-setup':
+            self._head('Google Chat · Konto und Freigaben',
+                       'Dedizierte Service-Identität, authentifizierter Eingang und genaue Absenderrechte bleiben getrennt.')
+            self._button(self.content,'Zur Gateway-Verwaltung: Dienst, Status und Entzug',lambda:self.show('gateways')).pack(anchor='w',pady=5)
+            connector=self._field(self.content,'Google-Chat-Konnektor-ID','google_chat-main')
+            connector_var=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_var)
+            current={}
+            from .google_chat_account_gui import AccountForm,PairForm
+            def refreshed(value):
+                current.clear();current.update(value);pair_form.clear()
+            account_form=AccountForm(self,self.content,connector.get,refreshed)
+            def changed(*_args):
+                current.clear();account_form.saved=None;account_form.clear_secret();pair_form.clear()
+            def load():
+                selected=connector.get();changed()
+                def done(value):
+                    if selected!=connector.get() or not account_form.frame.winfo_exists():return
+                    found=value.get('google_chat',{}).get(selected)
+                    if found is None:self.status.configure(text='Kein gespeichertes Google-Konto mit dieser ID. Neues privates JSON eingeben.');return
+                    account_form.reset(found);refreshed(found)
+                    self.status.configure(text='Öffentliche Kontodaten geladen; Zugangsdaten bleiben privat. Wiederverwendung ausdrücklich auswählen.')
+                self._run_async(initial_setup.gateway_configuration,result_handler=done)
+            self._button(self.content,'Gespeichertes Konto ohne private Werte laden',load).pack(anchor='w',pady=5)
+            account_form.frame.pack(fill='x')
+            pair_form=PairForm(self,self.content,connector.get,lambda:dict(current));pair_form.frame.pack(fill='x')
+            connector_var.trace_add('write',changed)
+            from .google_chat_owner_gui import RecoveryForm,OAuthForm,FileRecoveryForm
+            forms=[RecoveryForm(self,self.content,connector.get),OAuthForm(self,self.content,connector.get),FileRecoveryForm(self,self.content,connector.get)]
+            for form in forms:
+                form.frame.pack(fill='x')
+                connector_var.trace_add('write',form.invalidate if hasattr(form,'invalidate') else form.clear)
+            self._button(self.content,'Entfernte Google-Konten und unzugeordnete lokale Ausgaben',lambda:self.show('google-chat-history')).pack(anchor='w',pady=8)
         elif name == "google-chat-history":
             self._head('Google Chat · erhaltene Konten',
                        'Lokale Prüfbelege und ausdrücklicher Widerruf bleiben auch nach einer Kontoentfernung erreichbar.')
@@ -626,6 +658,8 @@ class Wizard:
         elif name == "gateways":
             self._head("Hermes · Gateways",
                        "Verbinde einen Bot und autorisiere nur konkrete Absender. Andere Hermes-Adapter müssen zuerst sicher integriert werden.")
+            self._button(self.content,'Google Chat: Konto einrichten und exakte Absender freigeben',
+                         lambda:self.show('google-chat-setup')).pack(anchor='w',pady=5)
             self._button(self.content,'Google Chat: entfernte Konten und lokale Altbestände verwalten',
                          lambda:self.show('google-chat-history')).pack(anchor='w',pady=5)
             configured_gateways = self._run(initial_setup.gateway_configuration, success="") or {"connectors": [], "bindings": []}

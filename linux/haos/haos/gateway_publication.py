@@ -27,7 +27,19 @@ def validate_snapshot(policy, credentials):
     if policy.get('publication') != credentials.get('publication'):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
+    google_accounts=set()
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='google_chat':
+            from .gateway_google_chat import credentials as google_credentials,scope
+            if google_credentials(row)!=row:raise ValueError('canonical dedicated Google Chat account required')
+            identity=scope(row)
+            if identity in google_accounts:raise ValueError('Google Chat app identity belongs to more than one connector')
+            google_accounts.add(identity)
+            if row['inbound']['mode']=='pubsub' and row['inbound'].get('trust_topic_publishers') is not True:
+                raise PermissionError('explicit trust in all authorized Google topic publishers required')
+            if any(b['connector']==name and (b['scope']!=identity or b['sender']==row['bot_user']) for b in policy['bindings']):
+                raise ValueError('Google Chat grant differs from saved app or approves its own bot')
+            continue
         if platforms[name]=='a2a':
             from .gateway_a2a import credentials as a2a_credentials,scope
             if a2a_credentials(row,verify_tls=False)!=row:raise ValueError('canonical private A2A server identity required')

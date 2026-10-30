@@ -418,6 +418,29 @@ def owner_gateway(args):
     if args.gateway_action == "setup":
         if args.platform not in GatewayPolicy.platforms:
             raise ValueError("select an implemented transport")
+        if args.platform=='google_chat':
+            from .google_chat_account_setup import save_account
+            from .initial_setup import read_line_tls_file
+            bot=input('Expected immutable bot users/<numeric-id>: ')
+            keep=input('Keep exact saved service account? Type KEEP; otherwise enter new private JSON: ')=='KEEP'
+            account='' if keep else getpass.getpass('Dedicated private service-account JSON (hidden): ')
+            mode=input('Inbound transport (pubsub/http): ')
+            if mode=='pubsub':
+                subscription=input('Exact projects/<project>/subscriptions/<subscription>: ')
+                trust=input('All authorized topic publishers can assert event sender IDs. Independently review topic/inherited IAM. Type TRUST to approve: ')=='TRUST'
+                inbound={'mode':mode,'subscription':subscription,'trust_topic_publishers':trust}
+            elif mode=='http':
+                url=input('Trusted public https://hostname/google-chat callback URL: ')
+                host=input('Bind host (127.0.0.1/0.0.0.0/::): ');port=input('Local HTTPS port (1024-65535): ')
+                if not port.isascii() or not port.isdecimal() or len(port)>5:raise ValueError('bounded integer Google listener port required')
+                approved=host!='127.0.0.1' and input('Approve network listener? Type PUBLIC: ')=='PUBLIC'
+                audience=input('Exact callback URL or numeric project-number audience: ');caller=input('Expected Google callback service account email: ')
+                cert=input('Owner-private trusted certificate chain PEM path: ');key=input('Owner-private TLS key PEM path: ')
+                inbound={'mode':mode,'port':int(port),'audience':audience,'service_account_email':caller,'tls':{
+                    'public_url':url,'bind_host':host,'public_listener':approved,
+                    'certificate':read_line_tls_file(cert,'certificate'),'private_key':read_line_tls_file(key,'private_key')}}
+            else:raise ValueError('explicit Google pubsub/http mode required')
+            return save_account(args.connector,bot,inbound,account,keep_service_account=keep)
         if args.platform=='a2a':
             from .a2a_owner_setup import save_account
             agent=input('Public A2A display name: ');url=input('Public trusted https://hostname/a2a URL: ')
@@ -566,6 +589,8 @@ def owner_gateway(args):
                    "scope": args.scope, "thread": args.thread, "identity": args.identity,
                    "capabilities": args.capabilities}
         selected=next((row for row in policy['connectors'] if row['id']==args.connector),None)
+        if getattr(args,'all_threads',False) and (selected is None or selected['platform']!='google_chat'):
+            raise ValueError('whole-space thread approval applies only to Google Chat')
         if selected and selected['platform']=='a2a':
             from .a2a_owner_setup import pair
             from .gateway_a2a import scope
@@ -574,12 +599,13 @@ def owner_gateway(args):
             return pair(args.binding,args.connector,args.sender,args.chat,args.identity,args.capabilities,
                 allow_media=args.allow_media,allow_voice=args.allow_voice,allow_video=args.allow_video,
                 allow_outbound_media=args.allow_outbound_media,allow_callback=getattr(args,'allow_callback',False))
-        if selected and selected['platform'] in {'email','feishu','dingtalk','buzz'}:
+        if selected and selected['platform'] in {'email','feishu','dingtalk','buzz','google_chat'}:
             from .initial_setup import pair_gateway_sender
             return pair_gateway_sender(args.binding,args.connector,args.sender,args.chat,args.identity,
                 tuple(args.capabilities),scope=args.scope,thread=args.thread,require_mention=not getattr(args,'no_require_mention',False),
                 allow_media=getattr(args,'allow_media',False),allow_voice=getattr(args,'allow_voice',False),
-                allow_video=getattr(args,'allow_video',False),allow_outbound_media=getattr(args,'allow_outbound_media',False))
+                allow_video=getattr(args,'allow_video',False),allow_outbound_media=getattr(args,'allow_outbound_media',False),
+                all_threads=getattr(args,'all_threads',False))
         if selected and selected['platform'] in {'line','sms'}:
             saved=credentials['connectors'][args.connector]
             destination=saved['destination'] if selected['platform']=='line' else saved['account_sid']+':'+saved['from_number']

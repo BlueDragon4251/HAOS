@@ -49,7 +49,9 @@ def credentials(value):
     resource(value['bot_user'],'user');inbound=value['inbound']
     if not isinstance(inbound,dict) or not isinstance(inbound.get('mode'),str):raise ValueError('explicit inbound mode required')
     if inbound['mode']=='pubsub':
-        if (set(inbound)!={'mode','subscription'} or not isinstance(inbound['subscription'],str)
+        if (not {'mode','subscription'}<=set(inbound)<={'mode','subscription','trust_topic_publishers'}
+                or 'trust_topic_publishers' in inbound and type(inbound['trust_topic_publishers']) is not bool
+                or not isinstance(inbound['subscription'],str)
                 or not re.fullmatch('projects/'+re.escape(sa['project_id'])+'/subscriptions/[A-Za-z][A-Za-z0-9._~+%-]{2,254}',inbound['subscription'])):
             raise ValueError('exact same-project Pub/Sub pull subscription required')
     elif inbound['mode']=='http':
@@ -109,10 +111,20 @@ def thread_allowed(binding,thread):
     return True
 
 
+def checked_policy(policy):
+    """A real validated public policy, not a relabelled/mutated policy object."""
+    if (not isinstance(policy,GatewayPolicy) or getattr(policy,'_google_policy_fingerprint',None)
+            !=digest([policy.publication,policy.connectors,policy.bindings])):
+        raise PermissionError('independently validated unchanged Google Chat policy required')
+    return policy
+
+
 def validate_overlaps(policy):
-    groups={}
+    groups={};spaces={}
     for binding in policy.bindings.values():
         if policy.connectors[binding['connector']]['platform']!='google_chat':continue
+        selected=spaces.setdefault(binding['connector'],set());selected.add(binding['chat'])
+        if len(selected)>32:raise ValueError('at most 32 explicitly paired Google Chat spaces per connector')
         key=tuple(binding[k] for k in ['connector','sender','chat','scope'])
         previous=groups.setdefault(key,[])
         if previous and (binding.get('all_threads') is True or any(row.get('all_threads') is True for row in previous)):

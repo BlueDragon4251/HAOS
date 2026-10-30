@@ -214,7 +214,8 @@ except PermissionError:
  assert 'googleapiclient.discovery' not in sys.modules
  print('denied-before-SDK');raise SystemExit(3)
 prepare_runtime_home()
-from haos.gateway_google_chat import PreparedGoogleChatPolicy,authority
+from haos.gateway import GatewayPolicy
+from haos.gateway_google_chat import authority
 from haos.gateway_google_chat_oauth import OAuthStore
 from haos.gateway_google_chat_files import Files
 from haos.gateway_google_chat_output import Output
@@ -245,7 +246,7 @@ for notice in notices:
  assert str(notice.message).startswith('You are using a Python version (3.11.17) which Google will stop supporting in new releases of google.') and '2027-10-24' in str(notice.message)
 adapter=native.GoogleChatAdapter(PlatformConfig(enabled=True,extra={}))
 inbox=NativeInbox(Path(v['native_database']),redactor);oauth_inbox=NativeInbox(profile/'user-oauth.sqlite',redactor);store=OAuthStore(oauth_inbox)
-def policy():return PreparedGoogleChatPolicy(trusted_json(Path('/etc/haos/gateways.json')))
+def policy():return GatewayPolicy(trusted_json(Path('/etc/haos/gateways.json')))
 def current():require_runtime_identity();authority('google',account)
 adapter._haos_native=SimpleNamespace(inbox=inbox,connector='google',policy=policy);adapter._haos_google_value=account;adapter._haos_google_check=current
 if v['publisher']:

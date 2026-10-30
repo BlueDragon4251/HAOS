@@ -12,6 +12,61 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from haos.gateway_setup import load, persist
 
 
+def test_actual_google_owner_publication_pairing_key_rotation_and_foreign_uid_denial(tmp_path,monkeypatch):
+    from haos import initial_setup,gateway_setup,owner,google_chat_account_setup as setup
+    from haos.gateway_google_chat import scope
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tests'))
+    from test_gateway_google_chat import account
+    assert os.geteuid()==0,'actual Root publication and kernel UID gates required'
+    config=tmp_path/'configuration';config.mkdir(mode=0o700)
+    original_load,original_persist=gateway_setup.load,gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args:original_load(config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:original_persist(p,c,config=config,gid=0))
+    # Only service control and audit sink are explicit fixtures. Root-owned
+    # publication, private modes, atomic replacement and the child UID are real.
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:None)
+    monkeypatch.setattr(gateway_setup,'stopped_gateway',lambda:None)
+    audit=[];monkeypatch.setattr(owner,'audit',lambda action,fields:audit.append((action,fields)))
+    value=account();canary=config/'owner-recovery-canary';canary.write_bytes(b'preserve Owner recovery');canary.chmod(0o600)
+    with pytest.raises(PermissionError):setup.configure('google-main',value)
+    assert not (config/'gateways.json').exists()
+    value['inbound']['trust_topic_publishers']=True
+    assert setup.configure('google-main',value)['sender_pairing_required']
+    assert stat.S_IMODE((config/'gateways.json').stat().st_mode)==0o640
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    assert value['service_account']['private_key'] not in (config/'gateways.json').read_text()
+    with pytest.raises(ValueError):setup.configure('second-google',value)
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','google-main','users/999','spaces/space1','personal')
+    initial_setup.pair_gateway_sender('owner','google-main','users/123','spaces/space1','personal',thread='',all_threads=True,
+        allow_media=True,allow_outbound_media=True,require_mention=False)
+    policy,private=original_load(config);binding=policy['bindings'][0]
+    assert binding['scope']==scope(value) and binding['all_threads'] is True and binding['require_mention'] is False
+    assert binding['allow_media'] is True and binding['allow_outbound_media'] is True and binding['allow_voice'] is False
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('overlap','google-main','users/123','spaces/space1','personal',thread='spaces/space1/threads/thread1')
+    public=initial_setup.gateway_configuration()
+    assert value['service_account']['private_key'] not in str(public) and public['google_chat']['google-main']['bot_user']=='users/999'
+    pid=os.fork()
+    if pid==0:
+        try:
+            os.setgroups([]);os.setgid(65534);os.setuid(65534)
+            for action in [lambda:setup.configure('google-main',value),lambda:setup.save_account('google-main','users/999',{},keep_service_account=True),
+                    lambda:initial_setup.pair_gateway_sender('owner','google-main','users/123','spaces/space1','personal')]:
+                try:action()
+                except PermissionError:pass
+                else:raise AssertionError('non-owner UID performed Google Owner action')
+            try:(config/'gateway-credentials').read_bytes()
+            except PermissionError:pass
+            else:raise AssertionError('gateway UID read Root credentials')
+            os._exit(0)
+        except BaseException as error:
+            os.write(2,('Google Owner UID fixture: '+type(error).__name__+'\n').encode());os._exit(1)
+    _,status=os.waitpid(pid,0);assert os.waitstatus_to_exitcode(status)==0
+    rotated=copy.deepcopy(value);rotated['service_account']['private_key_id']='b'*40
+    assert setup.configure('google-main',rotated)['configured'] and original_load(config)[0]['bindings']==[]
+    assert canary.read_bytes()==b'preserve Owner recovery'
+    assert value['service_account']['private_key'] not in str(audit)
+
+
 def test_owner_credentials_and_pairing_are_persisted_with_separate_modes(tmp_path):
     assert os.geteuid() == 0, "run this explicit root-authority fixture as root"
     policy = {"version": 1, "connectors": [{"id": "first", "platform": "telegram"}], "bindings": []}

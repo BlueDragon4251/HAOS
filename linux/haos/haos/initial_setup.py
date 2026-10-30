@@ -559,7 +559,7 @@ def configure_irc_gateway(connector,server,port,nickname,channel,*,server_passwo
 def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
                         identity: str, capabilities: tuple[str, ...] = ("create", "read"), *, scope: str = "", thread: str = "",
                         matrix_devices=None, allow_plaintext=False, require_mention=True, trust_topic_publishers=False, ntfy_server_url="",
-                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False,irc_server="",irc_port=None,irc_channel="",allow_media=False,allow_voice=False,allow_video=False,allow_outbound_media=False):
+                        homeassistant_shared_notifications=False,homeassistant_server_url="",homeassistant_trust_system=False,irc_server="",irc_port=None,irc_channel="",allow_media=False,allow_voice=False,allow_video=False,allow_outbound_media=False,all_threads=False):
     """Grant one exact sender/chat/scope/thread with explicitly selected rights."""
     require_root()
     if not capabilities or not set(capabilities) <= {"create", "read", "cancel", "answer", "pause", "resume"}:
@@ -572,7 +572,25 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform']=='buzz':
+    if type(all_threads) is not bool or all_threads and (not selected or selected['platform']!='google_chat'):
+        raise ValueError('Alle Threads erfordern eine ausdrückliche Google-Chat-Freigabe.')
+    if selected and selected['platform']=='google_chat':
+        from .gateway_google_chat import scope as google_scope,validate_binding
+        import secrets,time
+        saved=credentials['connectors'][connector];expected=google_scope(saved)
+        if scope and scope!=expected:raise ValueError('Google-Chat-Bereich muss zur gespeicherten App gehören.')
+        if sender==saved['bot_user']:raise ValueError('Google-Chat-Bot darf sich nicht selbst freigeben.')
+        item.update(scope=expected,generation=secrets.token_hex(32),since=time.time_ns()//1_000_000,require_mention=require_mention,all_threads=all_threads)
+        for key,value in [('allow_media',allow_media),('allow_voice',allow_voice),('allow_video',allow_video),('allow_outbound_media',allow_outbound_media)]:
+            if type(value) is not bool:raise ValueError('Ausdrückliche Google-Chat-Medienfreigabe erforderlich.')
+            item[key]=value
+        validate_binding(item)
+        if allow_voice:
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
+                raise PermissionError('Lokalen Sprachdienst vor Google-Chat-Voice-Freigabe einrichten.')
+    elif selected and selected['platform']=='buzz':
         from .gateway_buzz import scope as buzz_scope,validate_binding
         import secrets,time
         saved=credentials['connectors'][connector];expected=buzz_scope(saved)
@@ -658,7 +676,7 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
     elif allow_media or allow_voice or allow_video or allow_outbound_media:raise ValueError('media approval applies only to reviewed LINE/SMS paths')
     if selected and selected['platform']=='matrix':
         item.update(matrix_devices=matrix_devices if matrix_devices is not None else [],allow_plaintext=allow_plaintext,require_mention=require_mention)
-    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True and (not selected or selected['platform'] not in {'feishu','dingtalk'}):
+    elif matrix_devices not in (None,[]) or allow_plaintext or require_mention is not True and (not selected or selected['platform'] not in {'feishu','dingtalk','buzz','google_chat'}):
         raise ValueError('Matrix device and encryption options apply only to Matrix')
     if selected and selected['platform']=='ntfy':
         configured=credentials['connectors'][connector]
@@ -745,6 +763,9 @@ def gateway_configuration():
         | {'reply_mode':_credentials['connectors'][row['id']].get('reply_mode','session')}
         for row in policy['connectors'] if row['platform']=='dingtalk'}
     if dingtalk:result['dingtalk']=dingtalk
+    if any(row['platform']=='google_chat' for row in policy['connectors']):
+        from .google_chat_account_setup import public as google_public
+        result['google_chat']={row['id']:google_public(_credentials['connectors'][row['id']]) for row in policy['connectors'] if row['platform']=='google_chat'}
     if any(row['platform']=='buzz' for row in policy['connectors']):
         from .buzz_owner_setup import public as buzz_public
         result['buzz']={row['id']:buzz_public(_credentials['connectors'][row['id']]) for row in policy['connectors'] if row['platform']=='buzz'}

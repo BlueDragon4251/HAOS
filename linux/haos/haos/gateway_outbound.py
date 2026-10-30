@@ -48,8 +48,8 @@ def approved(policy,row):
     binding=policy.current_binding(dict(row))
     platform=policy.connectors.get(binding['connector'],{}).get('platform')
     if platform=='google_chat':
-        from .gateway_google_chat import PreparedGoogleChatPolicy
-        if not isinstance(policy,PreparedGoogleChatPolicy):raise PermissionError('prepared independent Google output policy required')
+        from .gateway_google_chat import checked_policy
+        checked_policy(policy)
     if (platform not in {'line','sms','email','feishu','dingtalk','a2a','buzz','google_chat'}
             or binding.get('allow_outbound_media') is not True or 'read' not in binding['capabilities']
             or not binding.get('generation') or type(binding.get('since')) is not int):
@@ -96,8 +96,8 @@ class Exports:
         binding=policy.current_binding(dict(row))
         platform=policy.connectors[binding['connector']]['platform']
         if platform=='google_chat':
-            from .gateway_google_chat import PreparedGoogleChatPolicy
-            if not isinstance(policy,PreparedGoogleChatPolicy):raise PermissionError('prepared independent Google output policy required')
+            from .gateway_google_chat import checked_policy
+            checked_policy(policy)
         if platform not in {'a2a','buzz','google_chat'} or 'read' not in binding['capabilities']:
             raise PermissionError('exact current native output read grant required')
         from .gateway_event_context import load

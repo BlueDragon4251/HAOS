@@ -1,10 +1,10 @@
 name: HAOS prepared Google Chat contracts
 on:
   pull_request:
-    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/haos/google_chat_owner*.py', 'linux/haos/haos/google_chat_retired*.py', 'linux/haos/tests/test_google_chat_owner*.py', 'linux/haos/tests/test_google_chat_retired*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/haos/google_chat_*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_runtime.py', 'linux/haos/haos/gateway_publication.py', 'linux/haos/haos/gateway_outbound.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/initial_setup*.py', 'linux/haos/haos/owner.py', 'linux/haos/build-runtime.sh', 'linux/haos/probes/test_gateway_authority.py', 'linux/haos/tests/test_google_chat_owner*.py', 'linux/haos/tests/test_google_chat_retired*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
   push:
     branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
-    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/haos/google_chat_owner*.py', 'linux/haos/haos/google_chat_retired*.py', 'linux/haos/tests/test_google_chat_owner*.py', 'linux/haos/tests/test_google_chat_retired*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/haos/google_chat_*.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_runtime.py', 'linux/haos/haos/gateway_publication.py', 'linux/haos/haos/gateway_outbound.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/initial_setup*.py', 'linux/haos/haos/owner.py', 'linux/haos/build-runtime.sh', 'linux/haos/probes/test_gateway_authority.py', 'linux/haos/tests/test_google_chat_owner*.py', 'linux/haos/tests/test_google_chat_retired*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', 'linux/haos/probes/probe_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
   workflow_dispatch:
 permissions:
   contents: read
@@ -142,6 +142,19 @@ jobs:
             -e HAOS_DISPOSABLE_GOOGLE_CHAT_OWNER_OAUTH_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/owner-oauth-process.json"
+      - name: Actual shared production service Root publication readonly service credentials controller IPC reconnect and withdrawal
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          for SCENE in active pubsub; do
+            docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+              -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+              -v "$PWD/linux/haos/probes/probe_google_chat_profile_process.py:/probe.py:ro" \
+              -e HAOS_DISPOSABLE_GOOGLE_CHAT_PROFILE_PROCESS=1 -e HAOS_GOOGLE_CHAT_CONTROLLER_IPC=1 \
+              -e "HAOS_GOOGLE_CHAT_PROFILE_ACCOUNT=$SCENE" -e HAOS_GOOGLE_CHAT_PRODUCTION_SERVE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/production-service-$SCENE.json"
+          done
       - name: Actual Root historical account recovery after connector and all service account credentials are removed
         run: |
           set -euo pipefail
@@ -183,6 +196,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb python3-tk
           for screen in 1440x1000x24 390x640x24; do
+            xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_account_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/account-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_retired_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/retired-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_owner_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/owner-gui-$screen.json"
             xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_google_chat_oauth_gui.py linux/haos "$RUNNER_TEMP/google-chat-contracts/owner-oauth-gui-$screen.json"

@@ -27,7 +27,8 @@ def test_resource_capability_pins_original_message_account_sender_thread_kind_an
     selected,data,raw,proof,envelope=media();specs=specifications(selected,'google',account(),raw,proof,envelope)
     assert specs==[{'index':0,'resource':envelope['message_id']+'/attachments/resource1','mime':'image/png','kind':'image'}]
     assert all('unapproved.invalid' not in str(item) for item in specs)
-    with pytest.raises(ValueError):__import__('haos.gateway',fromlist=['GatewayPolicy']).GatewayPolicy({'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[]})
+    empty=__import__('haos.gateway',fromlist=['GatewayPolicy']).GatewayPolicy({'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[]})
+    with pytest.raises(PermissionError):empty.authorize('google',envelope)
 
 
 @pytest.mark.parametrize('case',['foreign-message','foreign-name','missing-ref','opaque-ref','extra-ref','bad-mime','unsupported-image','unsupported-video','command','changed-original','changed-envelope','withdrawn'])

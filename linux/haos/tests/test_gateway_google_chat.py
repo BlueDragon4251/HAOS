@@ -41,7 +41,8 @@ def test_stable_resource_authority_does_not_derive_rights_from_email_or_public_n
     data=event();first=admitted(data);data['message']['sender']['email']='owner@example.invalid';second=admitted(data)
     assert first['envelope']==second['envelope'] and first['raw_sha256']!=second['raw_sha256']
     assert first['envelope']['sender']=='users/123' and first['envelope']['thread']=='spaces/space1/threads/thread1'
-    with pytest.raises(ValueError):GatewayPolicy({'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[]})
+    assert GatewayPolicy({'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[]}).connectors['google']['platform']=='google_chat'
+    with pytest.raises(ValueError):GatewayPolicy({'version':1,'connectors':[{'id':'untrusted','platform':'arbitrary-plugin'}],'bindings':[]})
 
 
 @pytest.mark.parametrize('path,value',[

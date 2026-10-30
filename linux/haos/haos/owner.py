@@ -187,7 +187,7 @@ def main():
         gateway_sub.add_parser(action)
     setup = gateway_sub.add_parser("setup")
     setup.add_argument("connector")
-    setup.add_argument("platform", choices=["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a", "buzz"])
+    setup.add_argument("platform", choices=["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a", "buzz", "google_chat"])
     for action in ['buzz-account','buzz-outputs','buzz-outgoing']:
         gateway_sub.add_parser(action,help='no-send native Buzz account or private metadata inspection').add_argument('connector')
     buzz_auth=gateway_sub.add_parser('retry-buzz-auth',help='explicit saved-account authentication recheck; never sends')
@@ -271,6 +271,7 @@ def main():
     pair.add_argument("--identity", required=True)
     pair.add_argument("--scope", default="")
     pair.add_argument("--thread", default="")
+    pair.add_argument('--all-threads',action='store_true',help='explicit Google Chat whole-space thread approval; incompatible with an exact thread')
     pair.add_argument('--matrix-device',nargs=3,action='append',default=[],metavar=('DEVICE_ID','ED25519','CURVE25519'))
     pair.add_argument('--trust-topic-publishers',action='store_true',help='explicit ntfy approval of all publishers to the exact private topic')
     pair.add_argument('--homeassistant-shared-notifications',action='store_true',help='approve mission replies visible to every Home Assistant instance user')

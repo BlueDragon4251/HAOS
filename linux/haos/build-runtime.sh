@@ -16,7 +16,7 @@ python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
 # embedded download catalogue or silently choose Fedora's incompatible 3.14.
-uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk
+uv sync --frozen --python /usr/bin/python3.11 --no-python-downloads --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
 uv pip install --python .venv/bin/python --require-hashes --no-deps -r "$HAOS_RUNTIME_OVERLAY/requirements.txt"
 uv pip check --python .venv/bin/python
 # Fail the build on upstream registry drift. The setup process reads only this
@@ -114,6 +114,10 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_http.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-native-http-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_pairing.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-pairing-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_google_chat_codec.py" /usr/lib/haos/hermes /usr/lib/haos/runtime-provenance/google-chat-codec-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_google_chat_auth.py" /usr/lib/haos/runtime-provenance/google-chat-auth-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_google_chat_pubsub_custody.py" /usr/lib/haos/runtime-provenance/google-chat-pubsub-custody-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_google_chat_text.py" /usr/lib/haos/hermes /usr/lib/haos/runtime-provenance/google-chat-text-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-admission-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_tasks.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-tasks-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_native.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-native-build-probe.json

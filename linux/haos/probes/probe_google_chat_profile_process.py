@@ -78,8 +78,12 @@ def main():
     binding={'id':'owner','connector':'google','sender':'users/123','chat':'spaces/room1','thread':'spaces/room1/threads/thread1',
         'scope':scope(value),'identity':'personal','capabilities':['create','read'],'generation':'a'*64,'since':int(now.timestamp()*1000)-60000}
     policy={'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[binding]}
-    publication=directory/'policy.json'
+    publication=directory/'policy.json';production_configured=False
     def publish(selected):
+        if production_configured:
+            from haos.gateway_setup import persist
+            persist(selected,{'connectors':{'google':value}},config=publication.parent,gid=65534)
+            return
         pending=directory/'policy.next';pending.write_text(json.dumps(selected));pending.chmod(0o644);pending.replace(publication)
     publish(policy)
     original_path=profile/('google-chat-'+digest(scope(value)))/'originals.sqlite'
@@ -93,6 +97,10 @@ def main():
     controller_ipc=os.environ.get('HAOS_GOOGLE_CHAT_CONTROLLER_IPC','0')
     if controller_ipc not in {'0','1'}:raise ValueError('explicit private controller fixture mode required')
     controller_ipc=controller_ipc=='1'
+    production_serve=os.environ.get('HAOS_GOOGLE_CHAT_PRODUCTION_SERVE','0')
+    if production_serve not in {'0','1'} or production_serve=='1' and (not controller_ipc or scenario not in {'active','pubsub'}):
+        raise ValueError('production serve fixture requires explicit controller IPC and active HTTP or Pub/Sub scene')
+    production_serve=production_serve=='1'
     media_revoke=os.environ.get('HAOS_GOOGLE_CHAT_MEDIA_REVOKE','0')
     if media_revoke not in {'0','1'} or media_revoke=='1' and scenario!='voice':raise ValueError('explicit Google voice revocation fixture mode required')
     media_revoke=media_revoke=='1'
@@ -121,7 +129,7 @@ def main():
         from google.pubsub_v1.types import (PullRequest,PullResponse,ReceivedMessage,PubsubMessage,
             GetSubscriptionRequest,Subscription,AcknowledgeRequest,ModifyAckDeadlineRequest)
         from google.protobuf.empty_pb2 import Empty
-        value['inbound']={'mode':'pubsub','subscription':'projects/haos-fixture/subscriptions/haos-private'}
+        value['inbound']={'mode':'pubsub','subscription':'projects/haos-fixture/subscriptions/haos-private','trust_topic_publishers':True}
         def authenticate(context):
             assert dict(context.invocation_metadata()).get('authorization')=='Bearer local-profile-google-fixture-token'
         def subscription(request,context):
@@ -192,7 +200,7 @@ def main():
             if urlsplit(self.path).path=='/v1/spaces/room1/messages':
                 assert self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
                 query=parse_qs(urlsplit(self.path).query);body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                with sqlite3.connect(profile/'native.sqlite') as db:
+                with sqlite3.connect(Path('/var/lib/haos-gateway/native-inbox.db') if production_serve else profile/'native.sqlite') as db:
                     assert db.execute('SELECT state FROM google_chat_text_writes WHERE client_id=?',(query['messageId'][0],)).fetchone()[0]=='writing'
                 assert query['messageReplyOption']==['REPLY_MESSAGE_OR_FAIL'] and body['thread']['name']==binding['thread']
                 if scenario=='sendauth':
@@ -250,6 +258,26 @@ def main():
     api_server=ThreadingHTTPServer(('127.0.0.1',0),API);api_tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);api_tls.load_cert_chain(cert_file,key_file)
     api_server.socket=api_tls.wrap_socket(api_server.socket,server_side=True)
     api_thread=threading.Thread(target=api_server.serve_forever,daemon=True);api_thread.start()
+    credential_directory=None
+    if production_serve:
+        state=Path('/var/lib/haos-gateway');state.mkdir(mode=0o700);os.chown(state,65534,65534)
+        profile=state/'profiles';profile.mkdir(mode=0o700);os.chown(profile,65534,65534)
+        original_path=profile/('google-chat-'+digest(scope(value)))/'originals.sqlite'
+        configuration=Path('/etc/haos');configuration.mkdir(mode=0o755)
+        publication=configuration/'gateways.json';production_configured=True;publish(policy)
+        policy=json.loads(publication.read_text());binding=policy['bindings'][0]
+        credential_directory=Path('/run/google-chat-fixture-credentials');credential_directory.mkdir(mode=0o700)
+        credential=credential_directory/'gateway-credentials';credential.write_bytes((configuration/'gateway-credentials').read_bytes())
+        credential.chmod(0o400)
+        # A disposable named-UID kernel ACL models service-scoped read access:
+        # Root retains ownership; the controller's haos-gateway supplementary
+        # group can read public policy but cannot read or modify this secret.
+        import struct
+        def access(path,owner_permissions,user_permissions):
+            entries=[(1,owner_permissions,0xffffffff),(2,user_permissions,65534),(4,0,0xffffffff),
+                (16,user_permissions,0xffffffff),(32,0,0xffffffff)]
+            os.setxattr(path,'system.posix_acl_access',struct.pack('<I',2)+b''.join(struct.pack('<HHI',*row) for row in entries))
+        access(credential_directory,7,5);access(credential,4,4)
     driver=directory/'driver.py';driver.write_text('''import asyncio,json,sys
 from pathlib import Path
 from haos.gateway_runtime import require_runtime_identity
@@ -266,7 +294,8 @@ except PermissionError:
     assert 'google.oauth2.id_token' not in sys.modules and 'googleapiclient.http' not in sys.modules
     print(json.dumps({'denied_before_optional_SDK':True}));raise SystemExit(3)
 from haos.gateway_google_chat import PreparedGoogleChatPolicy
-from haos.gateway_google_chat_profile import build
+from haos.gateway_runtime import build_adapter
+def build(value,**context):return build_adapter('google_chat',value,google_chat_context=context)
 from haos.gateway_google_chat_auth import CERTS
 from haos.gateway_google_chat_http import single_request_http,token_response
 from haos.gateway_raw import NativeInbox
@@ -280,6 +309,14 @@ from urllib.parse import urlsplit
 from google_auth_httplib2 import AuthorizedHttp
 import os
 v=json.load(sys.stdin);publication=Path(v['policy']);initial=publication.read_bytes();parent=Path(v['profile'])
+if v['production_serve']:
+    secret=Path(v['credential_directory'])/'gateway-credentials'
+    for attempt in [lambda:os.open(secret,os.O_WRONLY),lambda:secret.chmod(0o600)]:
+        try:descriptor=attempt()
+        except PermissionError:pass
+        else:
+            if isinstance(descriptor,int):os.close(descriptor)
+            raise AssertionError('gateway could modify Root-owned service credential fixture')
 launcher=parent/'launcher';launcher.mkdir(mode=0o700,exist_ok=True);os.environ['HERMES_HOME']=str(launcher)
 def policy():return PreparedGoogleChatPolicy(json.loads(publication.read_text()))
 try:Path(v['owner']).read_bytes()
@@ -338,6 +375,64 @@ async def run():
                 return _subscriber_client(account,current,inbox.redactor,target='localhost:'+str(v['pubsub_port']),
                     roots=Path(v['ca']).read_bytes(),token_request=Request(http=TokenWire()))
             adapter._haos_google_subscriber_factory=subscriber
+        if v['production_serve']:
+            # Only endpoints/certificate responses are fixture substitutions.
+            # serve, its factory, Root publication, delivery loop, reconnect,
+            # credentials file, controller policy and Unix IPC are real.
+            from haos import gateway_runtime as runtime
+            await adapter.close_profile();inbox.close();relay.close()
+            original_factory=runtime.build_adapter;observed={};tasks=[]
+            def factory(platform,value,**context):
+                nonlocal adapter,current,inbox
+                assert platform=='google_chat' and set(context)=={'google_chat_context'}
+                adapter=original_factory(platform,value,**context);current=adapter._haos_google_check;inbox=adapter._haos_native.inbox
+                previous_error=adapter._haos_google_delivery_error
+                def inspect_error(error):
+                    import traceback
+                    observed.setdefault('error_traces',[]).append({'type':type(error).__name__,
+                        'frames':[(frame.filename,frame.lineno,frame.name) for frame in traceback.extract_tb(error.__traceback__)]})
+                    previous_error(error)
+                adapter._haos_google_delivery_error=inspect_error
+                adapter._new_authed_http=MethodType(http,adapter)
+                adapter._haos_google_media_http=MethodType(lambda self,authority:http(self,authority),adapter)
+                if v['scenario'].startswith('pubsub'):adapter._haos_google_subscriber_factory=subscriber
+                else:
+                    def certificates(url,method='GET',**kwargs):
+                        current();assert url==CERTS and method=='GET' and not kwargs
+                        return SimpleNamespace(status=200,data=json.dumps({'local-google-caller':v['caller_public']}).encode())
+                    observed['certificates']=certificates
+                observed['adapter']=adapter;return adapter
+            async def observe():
+                import sqlite3
+                ready=False;restarted=False;requested=False
+                while True:
+                    selected=observed.get('adapter')
+                    if selected is not None:
+                        if selected.is_connected and not v['scenario'].startswith('pubsub'):
+                            selected._haos_google_receiver.http_verifier.request=observed['certificates']
+                        if not ready and selected.is_connected:
+                            print(json.dumps({'ready':True}),flush=True);ready=True
+                        if ready and not requested and Path(v['reconnect']).exists():
+                            requested=True;await selected.disconnect()
+                        elif requested and selected.is_connected:restarted=True
+                        with sqlite3.connect('file:/var/lib/haos-gateway/inbox.db?mode=ro',uri=True) as db:
+                            parents=db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]
+                        state={'status':selected.native_health()['status'],'connected':selected.is_connected,'parent_records':parents,
+                            'restarted':restarted,'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0],
+                            'error_traces':observed.get('error_traces',[])}
+                        marker=parent/'profile-status.tmp';marker.write_text(json.dumps(state));marker.replace(parent/'profile-status.json')
+                    await asyncio.sleep(.05)
+            runtime.build_adapter=factory;os.environ['CREDENTIALS_DIRECTORY']=v['credential_directory']
+            service=asyncio.create_task(runtime.serve());observer=asyncio.create_task(observe())
+            try:
+                done,_=await asyncio.wait({service,observer},return_when=asyncio.FIRST_COMPLETED)
+                for task in done:await task
+                assert service.done(),'production observer stopped before service'
+            finally:
+                for task in [service,observer]:
+                    if not task.done():task.cancel()
+                await asyncio.gather(service,observer,return_exceptions=True);runtime.build_adapter=original_factory
+            return
         if v['scenario'] in {'auth','rate','tokenrate'}:
             assert not await adapter.connect() and not adapter.is_connected
             expected='authentication-refused' if v['scenario']=='auth' else 'rate-limited'
@@ -418,10 +513,12 @@ async def run():
         if component is not None:component.close()
 asyncio.run(run())
 ''');driver.chmod(0o755)
+    event_times={}
     def event(mid='shared',sender='users/123'):
+        created=(event_times.setdefault((mid,sender),datetime.datetime.now(datetime.timezone.utc)) if production_serve else now)
         result={'type':'MESSAGE','space':{'name':'spaces/room1','spaceType':'DIRECT_MESSAGE'},'message':{
             'name':'spaces/room1/messages/'+mid,'thread':{'name':binding['thread']},'sender':{'type':'HUMAN','name':sender},
-            'createTime':now.isoformat().replace('+00:00','Z'),'text':'Create a local plan'}}
+            'createTime':created.isoformat().replace('+00:00','Z'),'text':'Create a local plan'}}
         if scenario in {'media','mediaauth','mediarate','mediarange','medialarge','voice','video'}:
             resource=result['message']['name']+'/attachments/resource1'
             result['message']['attachment']=[{'name':resource,'attachmentDataRef':{'resourceName':resource,'attachmentUploadToken':'opaque-private-upload-reference-fixture'},'contentType':media_mime,
@@ -431,7 +528,8 @@ asyncio.run(run())
         'iat':int(now.timestamp()),'exp':int(now.timestamp())+3600}
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
     request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode(),
-        'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite'),'backend_url':'ws://127.0.0.1:1/explicit-not-inferred'}
+        'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite'),'backend_url':'ws://127.0.0.1:1/explicit-not-inferred',
+        'production_serve':production_serve,'credential_directory':str(credential_directory),'reconnect':str(directory/'reconnect')}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -477,12 +575,16 @@ from haos.controller import Controller,MAX_FRAME
 from haos.gateway_google_chat import PreparedGoogleChatPolicy
 from haos.store import MissionStore
 v=json.load(sys.stdin)
-assert os.geteuid()==65532 and os.getegid()==65532 and os.getgroups()==([65534] if v['scenario'] in {'voice','video'} else [])
+assert os.geteuid()==65532 and os.getegid()==65532 and os.getgroups()==([65534] if v['scenario'] in {'voice','video'} or v['production_serve'] else [])
+if v['production_serve']:
+ try:(Path(v['credential_directory'])/'gateway-credentials').read_bytes()
+ except PermissionError:pass
+ else:raise AssertionError('controller read another service private credentials')
 async def main():
  store=MissionStore(Path(v['controller_database']))
  controller=Controller(store,v['backend_url'],{0})
  controller.gateway_uids={65534};controller.agent_uid=65533
- controller.gateway_policy=lambda:PreparedGoogleChatPolicy(json.loads(Path(v['policy']).read_text()))
+ if not v['production_serve']:controller.gateway_policy=lambda:PreparedGoogleChatPolicy(json.loads(Path(v['policy']).read_text()))
  async def client(reader,writer):
   with redirect_stdout(sys.stderr):await controller.client(reader,writer,gateway=True)
  stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
@@ -512,7 +614,7 @@ asyncio.run(main())
 """);control_driver.chmod(0o644)
             control_process=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(control_driver),
                 stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
-                pass_fds=(listening.fileno(),),user=65532,group=65532,extra_groups=[65534] if scenario in {'voice','video'} else [],cwd=str(code),env=env,umask=0o077)
+                pass_fds=(listening.fileno(),),user=65532,group=65532,extra_groups=[65534] if scenario in {'voice','video'} or production_serve else [],cwd=str(code),env=env,umask=0o077)
             control_process.stdin.write(json.dumps({**request,'socket_fd':listening.fileno()}).encode())
             await control_process.stdin.drain();control_process.stdin.close();listening.close()
             ready=await asyncio.wait_for(control_process.stdout.readline(),15)
@@ -552,6 +654,12 @@ asyncio.run(main())
                 else:cases.append('actual_SDK_HTTP429_RetryAfter180_survives_disconnect_close_reopen_and_same_account_RSA_key_rotation_without_any_new_network_request')
                 return
             if line!=b'{"ready": true}\n':raise AssertionError((await child.stderr.read()).decode()[-1800:])
+            if production_serve:
+                sys.path.insert(0,'/repo/linux/haos/runtime')
+                from google_chat_serve_fixture import exercise as production_exercise
+                cases.extend(await production_exercise(scenario=scenario,profile=profile,original_path=original_path,publish=publish,policy=policy,
+                    event=event,token=token,port=port,ca_bytes=ca_bytes,queue=pubsub_messages,api_calls=api_calls,payloads=api_payloads,child=child,reconnect=directory/'reconnect'))
+                return
             if scenario.startswith('pubsub'):
                 async def wait_for(expected):
                     deadline=asyncio.get_running_loop().time()+10
@@ -820,7 +928,8 @@ asyncio.run(main())
         'actual_local_Google_voice_ASR_revocation':media_revoke,
         'actual_local_Google_video_thumbnail_and_controller_attach':scenario=='video',
         'Hermes_WebSocket_service_is_explicit_protocol_fixture_not_inference':scenario in {'voice','video'},
-        'GUI_live_Google_account_production_daemon_or_public_activation':False},indent=2))
+        'actual_shared_production_serve_loop':production_serve,
+        'GUI_live_Google_account_installed_systemd_or_external_delivery':False},indent=2))
 
 
 if __name__=='__main__':main()
