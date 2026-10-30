@@ -302,8 +302,8 @@ New enrollment requests `chat.messages.readonly` in addition to the native
 requires a user read scope for `messages.get`; create alone cannot generally
 reconcile an unclear user-authored file message. App authentication with
 `chat.bot` only reads messages visible to the app and is not a general substitute.
-Existing grants are never silently upgraded. The still-open Owner/file UI must
-explain the extra read consent and restrict native lookups to retained own
+Existing grants are never silently upgraded. The prepared Owner OAuth component explains the extra read consent; the
+public account/file UI must retain that explanation and restrict native lookups to retained own
 outbox operations. No general message-reading Agent capability is added.
 
 Rejected exchanges and rejected refreshes retain newly returned capabilities
@@ -320,10 +320,40 @@ wrong identity/nonce,400/429, post-body disconnect, audit failure, reopen/new to
 generation rate preservation, local-before-wire denial, bounded one-shot remote
 revocation and rejected exchange/refresh disposal. They use local Google-service
 substitutes and do not prove a live Google account, external file delivery or
-installed service acceptance. Authenticated Owner OAuth handoff/GUI and native
-outgoing files remain separate integration work; public count remains15/22.
+installed service acceptance. Authenticated Owner OAuth handoff and a separate Tk component are now prepared
+as described below. Native outgoing files and public account-page integration
+remain open; public count remains15/22.
 
 Source-bound lifecycle evidence:
 [private refresh/revocation/quarantine validation](evidence/2026-10-30/google-chat-private-oauth-lifecycle-validation.json).
 Earlier enrollment-only CI is separately pinned to its exact source:
 [enrollment checkpoint CI](evidence/2026-10-30/google-chat-private-oauth-enrollment-ci-status.json).
+
+Prepared Owner OAuth administration now uses the fixed installed helper and an
+actual live Root parent before dropping to the gateway UID. Its closed actions
+prepare a PKCE consent URL, consume a full state-bound callback, inspect only
+session/token/quarantine metadata, or explicitly withdraw an inspected token
+generation or rejected capsule. The SDK, client secret, verifier and issued
+credentials remain in the private worker; the Root caller receives bounded
+metadata and receipts. A missing private service state root is created securely
+before first setup. Existing insecure or symlinked custody is refused and left
+intact, without automatic ownership or permission repair.
+
+The prepared Tk OAuth component provides hidden client/callback inputs, explicit
+consent, read-scope explanation, the checked Google consent URL, status selection
+and separate withdrawal/disposal controls. It clears callback bytes before the
+asynchronous handoff and invalidates old sessions/selections after client,
+binding or connector changes. It distinguishes a local block from a confirmed
+remote revocation. These controls are still a separately tested component; the
+public Google account page, file publisher and installed service activation are
+not complete. Google Chat remains outside the public fifteen-gateway count.
+
+The corresponding process fixture runs the unmodified installed Root backend
+and private worker with the actual Google SDK. Only disposable namespace DNS,
+CA and Google HTTPS responses are local substitutes; systemctl's stopped state
+is explicit fixture data. Actual Tk tests substitute only the privileged backend
+responses, so they do not establish an installed Owner login or a live account.
+
+Exact-source checks: [Owner OAuth handoff and Tk validation](evidence/2026-10-30/google-chat-private-owner-oauth-validation.json).
+The previous lifecycle checkpoint's CI status is separately pinned:
+[145e35e CI](evidence/2026-10-30/google-chat-private-oauth-lifecycle-ci-status.json).

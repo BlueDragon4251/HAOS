@@ -195,3 +195,25 @@ class TokenVault:
         except BaseException:
             if db.in_transaction:db.execute('ROLLBACK')
             raise
+
+    def inventory(self,policy,connector,account):
+        private()
+        if policy.connectors.get(connector,{}).get('platform')!='google_chat':raise PermissionError('selected private Google Owner connector required')
+        exists=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='google_chat_user_tokens'").fetchone()
+        rows=self.db.execute('SELECT * FROM google_chat_user_tokens WHERE account_scope=? ORDER BY updated_at DESC LIMIT 129',(scope(account),)).fetchall() if exists else []
+        from .gateway_google_chat_oauth import SCOPES
+        values=[]
+        for record in rows[:128]:
+            row,payload,_conf=self.record(record,account)
+            state=self.db.execute('SELECT status FROM google_chat_oauth_transport WHERE token_id=?',(row['id'],)).fetchone()
+            budget=digest([row['account_scope'],row['subject'],payload['client_id']]);deadline=self.db.execute('SELECT not_before FROM google_chat_oauth_budget WHERE scope=?',(budget,)).fetchone()
+            wait=deadline[0] if deadline is not None else 0
+            if type(wait) not in {int,float} or not math.isfinite(wait) or not 0<=wait<=253402300799:raise Conflict('damaged private user token budget')
+            value={key:row[key] for key in ['id','account_scope','subject','client_sha256','status','updated_at','generation']}
+            value.update(public_client=json.loads(row['public_client']),transport_status=state['status'] if state is not None else 'ready',next_attempt=wait,
+                scopes=list(payload['scopes']),scope_upgrade_required=set(payload['scopes'])!=set(SCOPES),
+                current_file_grants=sum(binding['connector']==connector and binding['scope']==row['account_scope'] and binding['sender']==row['subject']
+                    and 'read' in binding['capabilities'] and binding.get('allow_outbound_media') is True for binding in policy.bindings.values()),
+                private_credentials_returned=False)
+            values.append({**value,'snapshot_sha256':digest(value)})
+        return {'tokens':values,'history_truncated':len(rows)>128,'network_requested':False,'private_credentials_returned':False}

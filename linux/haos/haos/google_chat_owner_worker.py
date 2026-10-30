@@ -1,4 +1,4 @@
-"""One stopped-service recovery action under the private gateway UID; no SDK."""
+"""One stopped-service recovery/OAuth action under the private gateway UID."""
 import ctypes
 import json
 import os
@@ -41,7 +41,7 @@ def main():
             or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1 or not isinstance(request['params'],dict)):
         raise PermissionError('closed authenticated private Google Chat Owner action required')
     action=request['action'];params=request['params'];connector=request['connector'];value=credentials(request['credentials'])
-    if action in {'source-profiles','outgoing'}:
+    if action in {'source-profiles','outgoing','oauth-sessions','oauth-tokens','oauth-quarantines'}:
         if params:raise ValueError('Google Chat inventory takes no implicit selector')
     elif action=='sources':
         if set(params)!={'profile'}:raise ValueError('one exact Google Chat source profile required')
@@ -52,7 +52,16 @@ def main():
     from .redaction import Redactor
     aliases=[value['service_account']['private_key']]
     if value['inbound']['mode']=='http':aliases.append(value['inbound']['tls']['private_key'])
+    if action=='oauth-begin':
+        from .gateway_google_chat_oauth import client
+        aliases.append(client(params.get('client'),value)['installed']['client_secret'])
+    if action=='oauth-finish' and isinstance(params.get('callback'),str):
+        from urllib.parse import urlsplit,parse_qs
+        aliases.extend(parse_qs(urlsplit(params['callback']).query,max_num_fields=8).get('code',[]))
     redactor=Redactor(aliases);lease=None;inbox=None;store=None
+    import logging
+    from .gateway_runtime import SafeFormatter
+    handler=logging.StreamHandler();handler.setFormatter(SafeFormatter(redactor));logging.basicConfig(level=logging.WARNING,handlers=[handler],force=True)
     try:
         current();prepare_runtime_home()
         from .gateway_line_profile import _directory
@@ -64,7 +73,54 @@ def main():
         if profiles.exists():
             _directory(profiles);profile=profiles/(selected or 'google-chat-'+digest(scope(value)))
             if profile.exists():lease=acquire_lease(profile)
-        if action=='source-profiles':
+        if action=='oauth-begin' and (profile is None or not profile.exists()):
+            from .gateway_google_chat_oauth import route,client
+            route(current(),connector,value,params.get('binding_id'),params.get('binding_digest'));client(params.get('client'),value)
+            if not profiles.exists():profiles.mkdir(mode=0o700)
+            _directory(profiles);profile=profiles/('google-chat-'+digest(scope(value)))
+            profile.mkdir(mode=0o700);lease=acquire_lease(profile)
+        if action.startswith('oauth-'):
+            from .gateway_google_chat_oauth import OAuthStore,HEX,route,client
+            from .gateway_raw import NativeInbox
+            from .gateway_google_chat_oauth_tokens import TokenVault
+            database=profile/'user-oauth.sqlite' if profile is not None else None
+            if database is None or not database.exists() and action!='oauth-begin':
+                if action not in {'oauth-sessions','oauth-tokens','oauth-quarantines'}:raise PermissionError('retained private OAuth profile required')
+                key={'oauth-sessions':'sessions','oauth-tokens':'tokens','oauth-quarantines':'quarantines'}[action]
+                result={key:[],'history_truncated':False,'network_requested':False,'private_bytes_returned' if key=='sessions' else 'private_credentials_returned':False}
+            else:
+                inbox=NativeInbox(database,redactor);oauth=OAuthStore(inbox)
+                if action=='oauth-begin':
+                    if (set(params)!={'binding_id','binding_digest','subject','client','owner_uid','note_sha256','confirmed'}
+                            or params['subject']!=route(current(),connector,value,params['binding_id'],params['binding_digest'])['sender']):
+                        raise PermissionError('closed current Owner user/client enrollment required')
+                    row=oauth.begin(current(),connector,value,params['client'],params['binding_id'],params['binding_digest'],
+                        owner_uid=params['owner_uid'],note_sha256=params['note_sha256'],confirmed=params['confirmed'])
+                    from .gateway_google_chat_oauth_sdk import authorization
+                    result=authorization(row)
+                elif action=='oauth-finish':
+                    if (set(params)!={'id','subject','callback','owner_uid','confirmed'} or params['confirmed'] is not True
+                            or not isinstance(params['id'],str) or not HEX.fullmatch(params['id'])):
+                        raise PermissionError('closed explicitly submitted Owner OAuth callback required')
+                    expected=inbox.db.execute('SELECT subject FROM google_chat_oauth_pending WHERE id=?',(params['id'],)).fetchone()
+                    if expected is None or expected['subject']!=params['subject']:raise PermissionError('OAuth selected user changed')
+                    from .gateway_google_chat_oauth_sdk import finish
+                    import asyncio
+                    result=asyncio.run(finish(oauth,current,connector,value,params['id'],params['callback'],owner_uid=params['owner_uid']))
+                elif action=='oauth-sessions':result=oauth.inventory()
+                elif action=='oauth-tokens':result=TokenVault(oauth).inventory(current(),connector,value)
+                elif action=='oauth-quarantines':
+                    from .gateway_google_chat_oauth_quarantine import inventory
+                    result=inventory(oauth,value)
+                else:
+                    import asyncio
+                    if action=='oauth-revoke':
+                        from .gateway_google_chat_oauth_revoke import revoke
+                        result=asyncio.run(revoke(oauth,current,connector,value,params,current))
+                    else:
+                        from .gateway_google_chat_oauth_quarantine import dispose
+                        result=asyncio.run(dispose(oauth,current,connector,value,params,current))
+        elif action=='source-profiles':
             names=[]
             if profiles.exists():
                 for path in profiles.iterdir():
@@ -94,10 +150,18 @@ def main():
                 if action=='outgoing':result=outgoing(inbox,current(),connector,value)
                 elif action=='retry-auth':result=retry_auth(inbox,current(),connector,value,params)
                 else:result=approve_retry(inbox,current(),connector,value,params)
-        current();checked=response(result,action,connector);encoded=json.dumps(checked,ensure_ascii=False,allow_nan=False)
+        current();checked=response(result,action,connector,request=params);encoded=json.dumps(checked,ensure_ascii=False,allow_nan=False)
         if len(encoded.encode())>262144 or redactor.text(encoded)!=encoded:raise PermissionError('bounded nonprivate Google Chat Owner result required')
         print(encoded)
-    except PermissionError:print(json.dumps({'error':'authority-refused'}))
+    except PermissionError as error:
+        from .gateway_google_chat_oauth_tokens import Deferred
+        if isinstance(error,Deferred):print(json.dumps({'error':'rate-limited' if error.status=='rate-limited' else 'authentication-refused','retry_after':error.retry_after}))
+        else:print(json.dumps({'error':'authority-refused'}))
+    except RuntimeError as error:
+        from .gateway_google_chat_oauth_sdk import EnrollmentFailure
+        if not isinstance(error,EnrollmentFailure):raise
+        category={'rate-limited':'rate-limited','identity-refused':'identity-refused','sdk-refused':'authentication-refused','exchange-uncertain':'transport-unavailable','storage-unavailable':'storage-unavailable'}.get(error.status,'authority-refused')
+        print(json.dumps({'error':category,'retry_after':min(86400,max(0,error.retry_after))}))
     except (ImportError,ModuleNotFoundError):print(json.dumps({'error':'runtime-unavailable'}))
     except (ValueError,OSError,sqlite3.Error,KeyError,TypeError):print(json.dumps({'error':'storage-unavailable'}))
     finally:
