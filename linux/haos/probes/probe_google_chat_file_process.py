@@ -396,12 +396,18 @@ finally:
         if scene.startswith('recover-'):
             item=owner_call('file-inspect',{'action':'files'})['files'][0]
             if scene=='recover-output-purge':
-                assert item['state']=='confirmed';before=len(requests);policy['bindings']=[];publication.write_text(json.dumps(policy))
-                output=owner_call('file-inspect',{'action':'outputs'})['outputs'][0]
-                disposed=owner_call('output-purge',{'row':output,'note':'explicit withdrawn local copy disposal','confirmed':True})
-                assert disposed['tombstones_retained'] and not disposed['remote_deletion_verified'] and not disposed['network_requested']
-                assert owner_call('output-purge',{'row':output,'note':'explicit withdrawn local copy disposal','confirmed':True})==disposed
-                assert len(requests)==before;decisions.append(disposed)
+                if os.environ.get('HAOS_GOOGLE_CHAT_HISTORICAL_OUTPUT'):
+                    sys.path.insert(0,'/repo/linux/haos/runtime')
+                    from google_chat_historical_output_fixture import exercise as historical_output
+                    decisions.append(historical_output(mode=os.environ['HAOS_GOOGLE_CHAT_HISTORICAL_OUTPUT'],runtime=runtime,code=code,env=env,
+                        publication=publication,secret=secret,policy=policy,value=value,native_database=native_database,database=database,requests=requests))
+                else:
+                    assert item['state']=='confirmed';before=len(requests);policy['bindings']=[];publication.write_text(json.dumps(policy))
+                    output=owner_call('file-inspect',{'action':'outputs'})['outputs'][0]
+                    disposed=owner_call('output-purge',{'row':output,'note':'explicit withdrawn local copy disposal','confirmed':True})
+                    assert disposed['tombstones_retained'] and not disposed['remote_deletion_verified'] and not disposed['network_requested']
+                    assert owner_call('output-purge',{'row':output,'note':'explicit withdrawn local copy disposal','confirmed':True})==disposed
+                    assert len(requests)==before;decisions.append(disposed)
             else:
                 action='retry-upload' if scene=='recover-upload' else 'retry-file';before=len(requests)
                 approved=owner_call('file-retry',{'row':item,'action':action,'note':'independent fixture source and non-delivery inspection','confirmed':True,'confirmed_not_delivered':action=='retry-file'})

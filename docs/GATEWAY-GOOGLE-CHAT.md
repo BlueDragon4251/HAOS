@@ -614,3 +614,31 @@ remain tested. Historical output association/purge, legacy missing-identity
 recovery and public GUI/CLI/daemon setup remain open; count stays15/22.
 
 Exact-source checks: [historical rejected credentials and regression](evidence/2026-10-30/google-chat-private-historical-quarantine-validation.json).
+
+
+## Historical output ownership
+
+Each retained output now has an immutable per-file connector/app association,
+independent of service-key epochs. It binds the exact delivery/offer, original
+credential hash, binding digest and public filename/MIME/checksum projection.
+Ownership fields and that immutable projection share a checksum. An authorized
+current Root output route records it before fetching bytes; a validated retained
+native FileLedger proof can recover the index for a legacy output. Metadata does
+not authorize reuse of an old file for a different account, source or grant.
+
+Current and historical Owner inventories can therefore find old output copies
+after key rotation or configuration removal. The separate Root historical worker
+also exposes explicit snapshot/ownership-bound local output disposal without a
+service-account key or optional SDK. Actual published original grants still
+block deletion. Failed audits roll back byte disposal; repeated decisions reuse
+the receipt. Ownership, checksum identity and audit tombstones remain after
+local bytes are purged, with no remote deletion or other-copy/WAL erasure claim.
+
+Legacy reindexing preserves bytes and accepts only an exact current Root
+binding/current credential or a validated native file proof. Unproven legacy
+rows remain unassociated and untouched rather than being assigned by filename,
+checksum coincidence, reused connector name or a new account. Explicit recovery
+for those orphaned rows and missing legacy account identity, plus public GUI/CLI
+and production activation, remain in progress. The public count stays15/22.
+
+Exact-source checks: [output ownership, historical Root disposal and regression](evidence/2026-10-30/google-chat-private-output-ownership-validation.json).

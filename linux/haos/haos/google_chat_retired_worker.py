@@ -40,16 +40,19 @@ def main():
     action=request['action'];params=request['params']
     if action=='profiles':
         if params:raise ValueError('historical profile inventory takes no selector')
-    elif action in {'tokens','quarantines'}:
+    elif action in {'tokens','quarantines','outputs'}:
         if set(params)!={'profile'}:raise ValueError('one exact historical profile required')
         profile_name(params['profile'])
     else:
-        required={'profile','identity_sha256','id','owner_uid','note_sha256','confirmed'}|({'generation'} if action=='revoke-token' else {'snapshot_sha256'})
+        required={'profile','identity_sha256','id','owner_uid','note_sha256','confirmed'}|({'generation'} if action=='revoke-token' else {'snapshot_sha256'})|({'connector','ownership_sha256'} if action=='purge-output' else set())
         if (set(params)!=required or params['owner_uid']!=request['owner_uid'] or params['confirmed'] is not True
-                or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['identity_sha256','id','note_sha256',*(['snapshot_sha256'] if action=='dispose-capsule' else [])])
+                or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['identity_sha256','id','note_sha256',*(['snapshot_sha256'] if action in {'dispose-capsule','purge-output'} else []),*(['ownership_sha256'] if action=='purge-output' else [])])
                 or action=='revoke-token' and (type(params['generation']) is not int or not 1<=params['generation']<2**53)):
             raise PermissionError('closed explicitly confirmed historical token withdrawal required')
         profile_name(params['profile'])
+        if action=='purge-output':
+            from .google_chat_owner_process import NAME
+            if not isinstance(params['connector'],str) or not NAME.fullmatch(params['connector']):raise ValueError('exact historical output connector required')
     def current():
         root_parent()
         if policy_snapshot()!=request['policy_sha256']:raise PermissionError('Root gateway policy changed during historical Owner action')
@@ -88,7 +91,21 @@ def main():
                 current()
                 if load(profile)!=identity:raise PermissionError('historical app identity changed during Owner action')
             selected();database=profile/'user-oauth.sqlite'
-            if not database.exists():
+            if action in {'outputs','purge-output'}:
+                global_database=Path('/var/lib/haos-gateway/native-inbox.db')
+                if not global_database.exists():
+                    if action!='outputs':raise PermissionError('retained historical output custody required')
+                    value={'outputs':[],'history_truncated':False,'network_requested':False,'private_bytes_returned':False}
+                else:
+                    from .gateway_raw import NativeInbox
+                    from .gateway_google_chat_file_recovery import outputs_identity,purge_identity
+                    inbox=NativeInbox(global_database,redactor)
+                    if action=='outputs':value=outputs_identity(inbox,current_policy(),identity,selected)
+                    else:
+                        if params['identity_sha256']!=account['identity_sha256']:raise PermissionError('historical output app changed after inspection')
+                        decision={k:params[k] for k in ['id','snapshot_sha256','connector','ownership_sha256','owner_uid','note_sha256','confirmed']}
+                        value=purge_identity(inbox,current_policy(),identity,decision,selected)
+            elif not database.exists():
                 if action not in {'tokens','quarantines'}:raise PermissionError('retained historical user token required')
                 value={action:[],'history_truncated':False,'network_requested':False,'private_credentials_returned':False}
             else:

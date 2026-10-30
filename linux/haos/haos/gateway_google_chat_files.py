@@ -35,7 +35,7 @@ def attachment(value):
 
 class FileLedger:
     def __init__(self,inbox):
-        self.db=inbox.db;self.redactor=inbox.redactor
+        self.inbox=inbox;self.db=inbox.db;self.redactor=inbox.redactor
         self.db.execute('''CREATE TABLE IF NOT EXISTS google_chat_file_writes(
             id TEXT PRIMARY KEY,connector TEXT NOT NULL,credential_scope TEXT NOT NULL,account_scope TEXT NOT NULL,
             proof TEXT NOT NULL,proof_sha256 TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,
@@ -93,6 +93,8 @@ class FileLedger:
                     wanted={'approved'} if phase in {'retry-approved','owner-retry-approved'} else {'confirmed'} if phase in {'uploaded','confirmed'} else ({'reconciling','consumed'} if action=='retry-file' else {'consumed'})
                     if audit is None or audit['state'] not in wanted:raise Conflict('Google file retry phase lacks its exact consumed Owner audit')
                 elif phase in {'retry-approved','owner-retry-approved'}:raise Conflict('Google file retry lacks an Owner generation')
+            from .gateway_google_chat_output_identity import from_file_proof
+            from_file_proof(self.inbox,identity,proof)
             return dict(row)
         count,used=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(proof)+length(attachment_ref)),0) FROM google_chat_file_writes').fetchone()
         if count>=65536 or used+len(encoded.encode())>16*1024*1024:raise Conflict('Google file journal full; Owner recovery required')

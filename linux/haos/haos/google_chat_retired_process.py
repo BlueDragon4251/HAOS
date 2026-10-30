@@ -5,9 +5,9 @@ import stat
 from .gateway import digest
 from .gateway_google_chat_identity import validate,account_scope
 from .gateway_google_chat_recovery import HEX,profile_name
-from .google_chat_owner_process import ERRORS,oauth_response
+from .google_chat_owner_process import ERRORS,oauth_response,file_response,_snapshot,_name
 
-ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule'})
+ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule','outputs','purge-output'})
 
 
 def _public_config():
@@ -82,8 +82,25 @@ def response(value,action,*,request=None,policy=None):
         if set(value)!={'account','result','active_authorization_returned'} or value['active_authorization_returned'] is not False:raise ValueError('closed selected historical account response required')
         identity=_identity(value['account']);selected=value['account']
         if request is not None and (selected['profile']!=request['profile']
-                or action in {'revoke-token','dispose-capsule'} and selected['identity_sha256']!=request['identity_sha256']):
+                or action in {'revoke-token','dispose-capsule','purge-output'} and selected['identity_sha256']!=request['identity_sha256']):
             raise ValueError('historical account changed after Owner selection')
+        if action=='outputs':
+            result=value['result']
+            if (not isinstance(result,dict) or set(result)!={'outputs','history_truncated','network_requested','private_bytes_returned'}
+                    or not isinstance(result['outputs'],list) or len(result['outputs'])>64):raise ValueError('closed historical output inventory required')
+            for row in result['outputs']:
+                if (not isinstance(row,dict) or not _name(row.get('connector')) or row.get('account_scope')!=account_scope(identity)
+                        or not _hash(row.get('ownership_sha256'))):raise ValueError('historical output app ownership required')
+                _snapshot(row)
+                public={k:v for k,v in row.items() if k not in {'connector','account_scope','ownership_sha256','snapshot_sha256'}}
+                public['snapshot_sha256']=digest(public)
+                file_response({**result,'outputs':[public]},'outputs',row['connector'])
+            # Validate flags even when no rows exist.
+            file_response({**result,'outputs':[]},'outputs','')
+            return value
+        if action=='purge-output':
+            file_response(value['result'],'output-purge','',request=request)
+            return value
         checked=oauth_response(value['result'],{'tokens':'oauth-tokens','revoke-token':'oauth-revoke','quarantines':'oauth-quarantines','dispose-capsule':'oauth-dispose'}[action],'',request=request)
         if action=='tokens':
             for row in checked['tokens']:

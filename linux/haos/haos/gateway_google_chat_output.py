@@ -79,6 +79,9 @@ class Output:
             raise Conflict('Google file source, account, grant or retained bytes changed')
         if any(secret.encode() in row['data'] for secret in self.adapter._haos_native.inbox.redactor.secrets if secret):
             raise PermissionError('private Google credential reflection refused')
+        from .gateway_google_chat_output_identity import retain
+        retain(self.adapter._haos_native.inbox,row,self.adapter._haos_native.connector,scope(self.adapter._haos_google_value),
+            digest(['current-owner-route',row['delivery_id'],row['binding_digest'],row['credential_scope']]))
         return dict(row)
 
     def resolve(self,delivery,projection):
@@ -152,6 +155,10 @@ class Output:
                     # purged/changed data cannot be restored. No Google I/O here.
                     self.db.execute('INSERT INTO google_chat_output_files VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                         (identity,delivery['id'],binding['id'],digest(binding),digest(self.adapter._haos_google_value),offer['id'],offer['size'],proof,offer['sha256'],filename,mime,b'','fetching',time.time()))
+                from .gateway_google_chat_output_identity import retain
+                retained=self.db.execute('SELECT * FROM google_chat_output_files WHERE id=?',(identity,)).fetchone()
+                retain(self.adapter._haos_native.inbox,retained,self.adapter._haos_native.connector,scope(self.adapter._haos_google_value),
+                    digest(['current-owner-route',retained['delivery_id'],retained['binding_digest'],retained['credential_scope']]))
                 data=bytearray()
                 while len(data)<offer['size']:
                     self.current(delivery)

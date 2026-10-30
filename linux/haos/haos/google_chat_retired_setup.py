@@ -89,3 +89,30 @@ def dispose(account,row,note,*,confirmed=False):
     params={'profile':account['profile'],'identity_sha256':account['identity_sha256'],'id':row['id'],'snapshot_sha256':row['snapshot_sha256'],
         'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True}
     return _invoke('dispose-capsule',params)
+
+
+def outputs(profile):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_google_chat_recovery import profile_name
+    return _invoke('outputs',{'profile':profile_name(profile)})
+
+
+def purge_output(account,row,note,*,confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_google_chat_recovery import HEX
+    from .google_chat_retired_process import _identity
+    from .google_chat_owner_process import NAME
+    if (confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000 or not isinstance(row,dict)
+            or any(not isinstance(row.get(k),str) or not HEX.fullmatch(row[k]) for k in ['id','snapshot_sha256','ownership_sha256'])
+            or not isinstance(row.get('connector'),str) or not NAME.fullmatch(row['connector']) or row.get('purge_allowed') is not True):
+        raise PermissionError('exakte freigegebene historische Ausgabebereinigung auswählen, begründen und bestätigen')
+    try:identity=_identity(account)
+    except (ValueError,KeyError,TypeError):raise PermissionError('historisches Ausgabe-App-Profil geändert; neu prüfen') from None
+    from .gateway_google_chat_identity import account_scope
+    if row.get('account_scope')!=account_scope(identity):raise PermissionError('Ausgabe gehört nicht zum ausgewählten historischen App-Profil')
+    params={'profile':account['profile'],'identity_sha256':account['identity_sha256'],
+        **{k:row[k] for k in ['id','snapshot_sha256','connector','ownership_sha256']},
+        'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True}
+    return _invoke('purge-output',params)

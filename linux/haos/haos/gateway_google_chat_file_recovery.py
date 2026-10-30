@@ -119,8 +119,10 @@ def output_view(policy,connector,row):
     if (not isinstance(row['filename'],str) or not re.fullmatch('result-[0-9]{1,6}\\.[a-z0-9]{1,10}',row['filename'])
             or not isinstance(row['mime'],str) or not re.fullmatch('[a-z0-9.+-]+/[a-z0-9.+-]+',row['mime'])):raise Conflict('Google output metadata is not public bounded descriptor data')
     try:
+        if policy is None:raise PermissionError('no active Root policy')
         binding=policy.current_binding({'binding_id':row['binding_id'],'binding_digest':row['binding_digest']})
-        grant=binding['connector']==connector and 'read' in binding['capabilities'] and binding.get('allow_outbound_media') is True
+        grant=(policy.connectors.get(binding['connector'],{}).get('platform')=='google_chat'
+            and 'read' in binding['capabilities'] and binding.get('allow_outbound_media') is True)
     except PermissionError:grant=False
     actual=hashlib.sha256(row['data']).hexdigest() if row['data'] else None
     healthy=(row['state']=='retained' and len(row['data'])==row['size'] and actual==row['sha256']
@@ -135,8 +137,13 @@ def output_view(policy,connector,row):
 
 def outputs(inbox,policy,connector,account,current):
     current();db=inbox.db
+    from .gateway_google_chat_output_identity import backfill
+    backfill(inbox,policy,connector,account)
     if not db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_output_files'").fetchone():rows=[]
-    else:rows=db.execute('SELECT * FROM google_chat_output_files WHERE credential_scope=? ORDER BY created_at DESC LIMIT 65',(digest(account),)).fetchall()
+    else:rows=db.execute('''SELECT f.* FROM google_chat_output_files f JOIN google_chat_output_owners o ON o.file_id=f.id
+        WHERE o.connector=? AND o.account_scope=? ORDER BY f.created_at DESC LIMIT 65''',(connector,scope(account))).fetchall()
+    from .gateway_google_chat_output_identity import owner
+    for row in rows:owner(inbox,row)
     values=[output_view(policy,connector,row) for row in rows[:64]];current()
     return {'outputs':values,'history_truncated':len(rows)>64,'network_requested':False,'private_bytes_returned':False}
 
@@ -154,8 +161,12 @@ def purge(inbox,policy,connector,account,request,current):
     def result(receipt):return {'id':request['id'],'receipt':receipt,'network_requested':False,'message_sent':False,
         'tombstones_retained':True,'remote_deletion_verified':False,'other_copies_backups_and_WAL_erasure_not_claimed':True}
     if old is not None:return result(old['receipt'])
+    from .gateway_google_chat_output_identity import backfill,owner
+    backfill(inbox,policy,connector,account)
     row=db.execute('SELECT * FROM google_chat_output_files WHERE id=?',(request['id'],)).fetchone()
-    if row is None or row['credential_scope']!=digest(account):raise PermissionError('selected retained Google output account required')
+    associated=owner(inbox,row) if row is not None else None
+    if associated is None or associated['connector']!=connector or associated['account_scope']!=scope(account):
+        raise PermissionError('selected retained Google output app/connector ownership required')
     view=output_view(policy,connector,row)
     if view['snapshot_sha256']!=request['snapshot_sha256']:raise Conflict('Google output changed after Owner inspection')
     if not view['purge_allowed']:raise PermissionError('withdraw original output grant before local file disposal')
@@ -167,6 +178,64 @@ def purge(inbox,policy,connector,account,request,current):
             (operation,row['id'],request['owner_uid'],request['note_sha256'],request['snapshot_sha256'],receipt,time.time()))
         if db.execute("UPDATE google_chat_output_files SET data=x'',state='purged' WHERE id=? AND state=?",(row['id'],row['state'])).rowcount!=1:
             raise Conflict('Google output disposal changed before commit')
+        db.execute('COMMIT')
+    except BaseException:
+        if db.in_transaction:db.execute('ROLLBACK')
+        raise
+    current();return result(receipt)
+
+
+def output_owned_view(inbox,policy,row,association):
+    value=output_view(policy,association['connector'],row)
+    value.pop('snapshot_sha256')
+    value.update(connector=association['connector'],account_scope=association['account_scope'],ownership_sha256=digest(association))
+    return {**value,'snapshot_sha256':digest(value)}
+
+
+def outputs_identity(inbox,policy,identity,current):
+    from .gateway_google_chat_identity import account_scope
+    from .gateway_google_chat_output_identity import backfill_identity,owner
+    current();expected=account_scope(identity);backfill_identity(inbox,expected);db=inbox.db
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_output_files'").fetchone():rows=[]
+    else:rows=db.execute('''SELECT f.* FROM google_chat_output_files f JOIN google_chat_output_owners o ON o.file_id=f.id
+        WHERE o.account_scope=? ORDER BY f.created_at DESC LIMIT 65''',(expected,)).fetchall()
+    values=[output_owned_view(inbox,policy,row,owner(inbox,row)) for row in rows[:64]];current()
+    return {'outputs':values,'history_truncated':len(rows)>64,'network_requested':False,'private_bytes_returned':False}
+
+
+def purge_identity(inbox,policy,identity,request,current):
+    fields={'id','snapshot_sha256','connector','ownership_sha256','owner_uid','note_sha256','confirmed'}
+    from .gateway_google_chat_identity import account_scope
+    from .gateway_google_chat_output_identity import owner,NAME
+    if (not isinstance(request,dict) or set(request)!=fields or request['confirmed'] is not True
+            or any(not isinstance(request[k],str) or not HEX.fullmatch(request[k]) for k in ['id','snapshot_sha256','ownership_sha256','note_sha256'])
+            or not isinstance(request['connector'],str) or not NAME.fullmatch(request['connector'])
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1):
+        raise PermissionError('exact inspected historical output app/connector decision required')
+    current();db=inbox.db;expected=account_scope(identity)
+    db.execute('''CREATE TABLE IF NOT EXISTS google_chat_output_owner_events(
+        id TEXT PRIMARY KEY,output_id TEXT NOT NULL,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,
+        snapshot_sha256 TEXT NOT NULL,receipt TEXT NOT NULL,created_at REAL NOT NULL)''')
+    operation=digest(['historical-output-purge',expected,request])
+    def result(receipt):return {'id':request['id'],'receipt':receipt,'network_requested':False,'message_sent':False,
+        'tombstones_retained':True,'remote_deletion_verified':False,'other_copies_backups_and_WAL_erasure_not_claimed':True}
+    old=db.execute('SELECT receipt FROM google_chat_output_owner_events WHERE id=?',(operation,)).fetchone()
+    if old is not None:return result(old['receipt'])
+    row=db.execute('SELECT * FROM google_chat_output_files WHERE id=?',(request['id'],)).fetchone()
+    associated=owner(inbox,row) if row is not None else None
+    if (associated is None or associated['account_scope']!=expected or associated['connector']!=request['connector']
+            or digest(associated)!=request['ownership_sha256']):raise PermissionError('historical output ownership changed after inspection')
+    view=output_owned_view(inbox,policy,row,associated)
+    if view['snapshot_sha256']!=request['snapshot_sha256']:raise Conflict('historical output bytes/state changed after inspection')
+    if not view['purge_allowed']:raise PermissionError('withdraw original output grant before historical byte disposal')
+    receipt=digest([operation,row['sha256'],time.time()]);db.execute('BEGIN IMMEDIATE')
+    try:
+        current()
+        if db.execute('SELECT COUNT(*) FROM google_chat_output_owner_events').fetchone()[0]>=65536:raise Conflict('Google output Owner history full')
+        db.execute('INSERT INTO google_chat_output_owner_events VALUES(?,?,?,?,?,?,?)',
+            (operation,row['id'],request['owner_uid'],request['note_sha256'],request['snapshot_sha256'],receipt,time.time()))
+        if db.execute("UPDATE google_chat_output_files SET data=x'',state='purged' WHERE id=? AND state=?",(row['id'],row['state'])).rowcount!=1:
+            raise Conflict('historical output state changed before disposal commit')
         db.execute('COMMIT')
     except BaseException:
         if db.in_transaction:db.execute('ROLLBACK')
