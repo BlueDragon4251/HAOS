@@ -28,12 +28,17 @@ async def retained(adapter,row,original):
     for index,item in enumerate(original['resources']):
         policy=current();source_fingerprint=digest([row['binding_digest'],row['fingerprint'],original['id'],item])
         prior=db.execute('SELECT * FROM dingtalk_input_media WHERE input_id=? AND resource_index=?',(row['id'],index)).fetchone()
+        cached=None
         if prior is not None:
             if (not isinstance(prior['mime'],str) or not re.fullmatch('[a-z0-9][a-z0-9.+-]{0,126}/[a-z0-9][a-z0-9.+-]{0,126}',prior['mime'])
                     or prior['fingerprint']!=digest([source_fingerprint,prior['upload_id'],prior['mime']])):
                 raise Conflict('retained DingTalk resource identity, bytes, MIME or grant changed')
-            cached=cache.replay(policy,prior['upload_id']);mime=prior['mime']
-        else:
+            # A receipt precedes blob insertion. After a crash, a missing blob
+            # may be read again only if its exact previously recorded hash/MIME
+            # is reproduced. Existing purged/damaged rows are never restored.
+            if db.execute('SELECT 1 FROM native_media_cache WHERE id=?',(prior['upload_id'],)).fetchone():
+                cached=cache.replay(policy,prior['upload_id']);mime=prior['mime']
+        if cached is None:
             state=db.execute('SELECT status,next_attempt FROM dingtalk_delivery_backoff WHERE account_scope=?',(account,)).fetchone()
             if (state is None or state['status'] not in {'ready','authentication-refused','rate-limited'}
                     or type(state['next_attempt']) not in {int,float} or not math.isfinite(state['next_attempt']) or state['next_attempt']<0):
@@ -55,9 +60,17 @@ async def retained(adapter,row,original):
                 raise PermissionError('resource source or grant changed during native read')
             meta=classify(approved,reply['mime'],reply['data'])
             if meta!=reply['descriptor']:raise Conflict('private native resource descriptor changed')
-            cached=cache.put(policy,native.connector,row['envelope'],reply['data'],meta['kind']);mime=reply['mime']
-            db.execute('INSERT INTO dingtalk_input_media VALUES(?,?,?,?,?)',
-                (row['id'],index,digest([source_fingerprint,cached['id'],mime]),cached['id'],mime))
+            expected=digest([native.connector,digest(policy.current_binding(row)),digest(row['envelope']),meta]);mime=reply['mime']
+            if prior is not None:
+                if prior['upload_id']!=expected or prior['mime']!=mime:
+                    raise Conflict('DingTalk recovery changed the first retained resource bytes or MIME')
+            else:
+                # This FULL-synchronous intent anchors the first verified bytes
+                # before a blob insertion can fail due to crash or capacity.
+                db.execute('INSERT INTO dingtalk_input_media VALUES(?,?,?,?,?)',
+                    (row['id'],index,digest([source_fingerprint,expected,mime]),expected,mime))
+            cached=cache.put(policy,native.connector,row['envelope'],reply['data'],meta['kind'])
+            if cached['id']!=expected:raise Conflict('private media identity differs from retained source intent')
         if cached['envelope_digest']!=digest(row['envelope']) or cached['connector']!=native.connector:
             raise Conflict('retained resource points to another message or connector')
         if cached['descriptor']['kind']=='image' and cached['id'] not in image_ids:

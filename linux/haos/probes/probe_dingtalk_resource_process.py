@@ -81,7 +81,8 @@ def main():
     voice=voice_buffer.getvalue()
     document=b'%PDF-1.4\nHAOS private transport fixture\n%%EOF\n'
     video=b'\0\0\0\x10ftypmp42\0\0\0\0'
-    state={'mode':'ok'};seen=[]
+    large_document=document*4096
+    state={'mode':'ok','intent_reads':0};seen=[]
     class Server(ThreadingHTTPServer):
         def handle_error(self,*_args):pass
     class Handler(BaseHTTPRequestHandler):
@@ -124,7 +125,8 @@ def main():
             if mode=='cdn-redirect-private':self.respond(302,b'',headers={'Location':'https://api.dingtalk.com/private-object'});return
             if mode=='cdn-403':self.respond(403,b'');return
             if mode=='cdn-429':self.respond(429,b'',headers={'Retry-After':'120'});return
-            data,mime=(voice,'audio/wav') if mode=='voice' else (document,'application/pdf') if mode=='document' else (video,'video/mp4') if mode=='video' else (image,'image/png')
+            data,mime=(large_document+(b' changed' if mode=='intent-changed' and state['intent_reads']>0 else b''),'application/pdf') if mode in {'intent-same','intent-changed'} else (voice,'audio/wav') if mode=='voice' else (document,'application/pdf') if mode=='document' else (video,'video/mp4') if mode=='video' else (image,'image/png')
+            if mode in {'intent-same','intent-changed'}:state['intent_reads']+=1
             self.respond(200,data,mime)
     # Second isolated alias is the actual fixed WSS peer, with its own TLS leaf.
     link=socket.socket(socket.AF_NETLINK,socket.SOCK_RAW,socket.NETLINK_ROUTE);link.bind((0,0))
@@ -180,7 +182,7 @@ async def main():
         policy=lambda:PreparedDingTalkPolicy(json.loads(Path('/etc/haos/gateways.json').read_text()))
         inbox=NativeInbox(base/'media-inbox.db',Redactor());relay=RelayInbox(base/'media-relay.db',Redactor())
         adapter=build(value,parent=parent,connector='dingtalk',policy=policy,inbox=inbox);cache=MediaCache(inbox);seen=[]
-        expected_kind=sys.argv[3].removeprefix('media-') if sys.argv[3] in {'media-voice','media-document','media-video'} else 'image'
+        expected_kind=sys.argv[3].removeprefix('media-') if sys.argv[3] in {'media-voice','media-document','media-video'} else 'document' if sys.argv[3].startswith('media-intent') else 'image'
         relay_before=relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]
         def receive(event):
             ids=event_media(event,'dingtalk');assert len(ids)==1 and event.raw_message is None and event.source.user_id_alt is None
@@ -203,6 +205,29 @@ async def main():
                 assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]==relay_before+1
                 print(json.dumps({'media_relay':True,'sha256':seen[0][1]}));return
             key=capture(adapter,base64.b64decode(proof['source_base64']))
+            if sys.argv[3].startswith('media-intent'):
+                import sqlite3
+                inbox.db.execute('CREATE TABLE IF NOT EXISTS dingtalk_input_media(input_id TEXT NOT NULL,resource_index INTEGER NOT NULL,fingerprint TEXT NOT NULL,upload_id TEXT NOT NULL,mime TEXT NOT NULL,PRIMARY KEY(input_id,resource_index))')
+                old_limit=inbox.db.execute('PRAGMA max_page_count').fetchone()[0]
+                pages=inbox.db.execute('PRAGMA page_count').fetchone()[0]
+                inbox.db.execute('PRAGMA max_page_count='+str(pages+4))
+                try:
+                    try:await dispatch_stored(adapter,key)
+                    except sqlite3.OperationalError as error:assert error.sqlite_errorcode==sqlite3.SQLITE_FULL
+                    else:raise AssertionError('real SQLite page budget did not interrupt blob insertion')
+                finally:inbox.db.execute('PRAGMA max_page_count='+str(old_limit))
+                intent=inbox.db.execute('SELECT * FROM dingtalk_input_media WHERE input_id=?',(key,)).fetchone()
+                assert intent is not None and not seen
+                assert inbox.db.execute('SELECT 1 FROM native_media_cache WHERE id=?',(intent['upload_id'],)).fetchone() is None
+                inbox.db.execute('UPDATE native_inbox SET next_attempt=0 WHERE id=?',(key,))
+                if sys.argv[3]=='media-intent-changed':
+                    from haos.gateway import Conflict
+                    try:await dispatch_stored(adapter,key)
+                    except Conflict:pass
+                    else:raise AssertionError('changed resource replaced first committed byte-hash intent')
+                    assert not seen and inbox.db.execute('SELECT 1 FROM native_media_cache WHERE id=?',(intent['upload_id'],)).fetchone() is None
+                    assert inbox.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()[0]=='failed'
+                    print(json.dumps({'intent_changed_refused':True}));return
             if sys.argv[3].startswith('media-error:'):
                 expected=sys.argv[3].split(':',1)[1];started=__import__('time').time()
                 from haos.gateway_dingtalk_admission import Refused
@@ -292,12 +317,22 @@ asyncio.run(main())
             assert json.loads(result.stdout)=={'media_relay':True,'sha256':hashlib.sha256(data).hexdigest()}
             assert seen[before:]==['/v1.0/oauth2/accessToken','/v1.0/robot/messageFiles/download','cdn']
             cases.append('actual_native_'+kind+'_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch')
+        for mode in ['intent-same','intent-changed']:
+            state.update(mode=mode,intent_reads=0);body.update(msgId='native-resource-'+mode,msgtype='file',
+                content={'downloadCode':'private-native-resource-code','fileName':'fixture.pdf'})
+            raw=json.dumps(body).encode();proof.update(source_base64=base64.b64encode(raw).decode(),source_sha256=hashlib.sha256(raw).hexdigest())
+            source.write_text(json.dumps(proof));before=len(seen);result=run(media='media-'+mode)
+            assert result.returncode==0,result.stderr[-2000:]
+            assert json.loads(result.stdout)==({'media_relay':True,'sha256':hashlib.sha256(large_document).hexdigest()}
+                if mode=='intent-same' else {'intent_changed_refused':True})
+            assert seen[before:]==['/v1.0/oauth2/accessToken','/v1.0/robot/messageFiles/download','cdn']*2
+            cases.append('actual_SQLite_full_after_resource_intent_before_blob_'+mode+'_recovery_preserves_first_hash_without_silent_replacement')
         state['mode']='ok';body.update(msgId='native-resource-from-real-WSS',msgtype='picture',content={'downloadCode':'private-native-resource-code'})
         raw=json.dumps(body).encode();proof.update(source_base64=base64.b64encode(raw).decode(),source_sha256=hashlib.sha256(raw).hexdigest())
         source.write_text(json.dumps(proof));before=len(seen);result=run(media='ws-media')
         assert result.returncode==0,result.stderr[-2000:]
         assert json.loads(result.stdout)=={'media_relay':True,'sha256':hashlib.sha256(image).hexdigest()}
-        assert seen[before:]==['/v1.0/gateway/connections/open','/v1.0/oauth2/accessToken','/v1.0/robot/messageFiles/download','cdn']
+        assert seen[before:]==['/v1.0/gateway/connections/open','/v1.0/oauth2/accessToken','/v1.0/robot/messageFiles/download','cdn'],seen[before:]
         assert ws_acks==[True] and not ws_errors,ws_errors
         cases.append('actual_native_verified_WSS_parent_pre_ACK_custody_Robot_SDK_binary_cache_media_relay_and_crash_retry_without_refetch')
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_UIDs':[0,65533,65534],

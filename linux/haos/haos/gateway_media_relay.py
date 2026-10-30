@@ -106,7 +106,12 @@ class MediaCache:
                 (identity,connector,digest(envelope),binding['id'],digest(binding),json.dumps(meta),data,'cached'))
             self.get(policy,identity)
             self.db.execute('COMMIT')
-        except BaseException:self.db.execute('ROLLBACK');raise
+        except BaseException:
+            # SQLITE_FULL may have already rolled back the transaction. Keep
+            # the original capacity error rather than masking it with a second
+            # rollback failure; the separately committed source intent survives.
+            if self.db.in_transaction:self.db.execute('ROLLBACK')
+            raise
         return self.get(policy,identity)
 
     def owner_inventory(self,policy):

@@ -134,8 +134,13 @@ MRO and context-bound local IDs. PNG/JPEG images, document bytes, voice bytes an
 ISO video containers retain their separately approved kinds; decoded audio/video
 cannot bypass consent through a document label. Resource and input replay retain
 byte hashes and reuse their committed cache/source pointers after handler failure.
-A missing-data/source-pointer crash window and administrative resource decisions
-still belong to the pending recovery work. Fourteen actual UID/network cases cover
+The first verified byte hash and MIME are now committed as a resource intent
+before blob insertion. If capacity/crash leaves that blob missing, recovery can
+fetch only the same hash/MIME; an existing purged/damaged cache row is never
+automatically restored. Changed bytes fail the input for explicit owner review,
+instead of triggering automatic repeated reads. SQLite-full rollback preserves
+the original capacity error even when SQLite already aborted its transaction.
+Administrative resource decisions still require their owner management path. Fourteen actual UID/network cases cover
 reads and sealed relay, and the fifteenth connects actual verified WSS capture,
 pre-ACK custody, Robot lookup, binary retrieval and relay crash/retry. The production
 public DNS resolver is exercised without mocks: global-looking fixture addresses
@@ -164,3 +169,9 @@ on actual profile recreation; neither recreation nor another attempt resends it.
 The probe synchronizes its receive-ACK assertion before deliberately killing a
 parent, so an unrelated intentionally interrupted callback cannot invalidate
 that fixture. No ACK, journal, worker-lifetime or no-resend assertion is removed.
+
+The extended seventeen-case real UID/network probe also imposes an actual SQLite
+page budget between the source intent and blob insertion. It verifies identical
+byte recovery after restoring capacity and quarantine of changed bytes. No write
+or UID/socket behavior is mocked. These cases retain the complete WSS-to-media
+relay checks; no assertion is weakened to make storage recovery pass.

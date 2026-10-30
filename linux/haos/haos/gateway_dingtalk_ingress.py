@@ -66,6 +66,11 @@ async def dispatch_stored(adapter, key):
             return state['accepted']
         except BaseException as error:
             native.inbox.retry(key)
+            if isinstance(error,Conflict):
+                # Immutable source/hash conflicts need an explicit owner
+                # decision; automatic retries must not keep reading changed
+                # content or attempt another mission admission.
+                native.inbox.db.execute("UPDATE native_inbox SET state='failed' WHERE id=? AND state='pending'",(key,))
             if isinstance(error,Refused) and error.retry_after:
                 native.inbox.db.execute("UPDATE native_inbox SET next_attempt=MAX(next_attempt,?) WHERE id=? AND state='pending'",
                     (time.time()+error.retry_after,key))
