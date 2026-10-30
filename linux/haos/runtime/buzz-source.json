@@ -4,7 +4,7 @@
   "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
   "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
   "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
-  "builder_image": "rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7",
+  "builder_image": "rust@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
   "rust_version": "1.98.1",
   "nostr_version": "0.44.7",
   "serde_json_version": "1.0.150",
@@ -20,5 +20,8 @@
       "package_version": "0.1.0"
     }
   },
-  "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1"
+  "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1",
+  "messages_original_sha256": "8c5ff2a85a92f1b726fa00d5ee416b4707fccf616394bff7e4bad5c122ee1243",
+  "bounded_query_cursor_extension": "HAOS_BUZZ_BEFORE_ID",
+  "maximum_glibc": "2.36"
 }

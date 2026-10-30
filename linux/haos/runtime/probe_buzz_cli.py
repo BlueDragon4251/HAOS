@@ -32,6 +32,7 @@ def main():
         with socket.socket() as chosen:chosen.bind(('127.0.0.1',0));port=chosen.getsockname()[1]
         origin='https://localhost:'+str(port);mode={'name':'ok'};calls=[];writes=[];auth_ids=[];escapes=[]
         profile=signed(0,json.dumps({'name':'haos-fixture','display_name':'HAOS Fixture'}),[])
+        read_event=signed(9,'Composite local history event',[['h','01234567-89ab-4cde-8012-3456789abcde']]);queries=[]
         async def exercise():
             from aiohttp import web
             async def handle(request):
@@ -46,7 +47,8 @@ def main():
                 auth_ids.append(auth['id']);calls.append(request.path)
                 if mode['name']=='auth':return web.json_response({'error':'unauthorized fixture'},status=401)
                 if mode['name']=='redirect':return web.Response(status=302,headers={'Location':origin+'/escape'})
-                if request.path=='/query':return web.json_response([profile])
+                if request.path=='/query':
+                    queries.append(json.loads(raw));return web.json_response([read_event] if mode['name']=='cursor' else [profile])
                 event=json.loads(raw);verified(event);writes.append(raw)
                 assert event['kind']==9 and event['pubkey']==public and ['h','01234567-89ab-4cde-8012-3456789abcde'] in event['tags']
                 if mode['name']=='rate' and len(writes)==1:
@@ -58,9 +60,10 @@ def main():
             runner=web.AppRunner(app,access_log=None);await runner.setup()
             tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(root/'certificate.pem',root/'key.pem')
             await web.TCPSite(runner,'127.0.0.1',port,ssl_context=tls).start()
-            async def run(args,text=None):
+            async def run(args,text=None,before_id=None):
                 env={'PATH':'/usr/bin:/bin','HOME':str(root),'LANG':'C.UTF-8','BUZZ_RELAY_URL':origin,'BUZZ_PRIVATE_KEY':scalar,
                     'BUZZ_OUTPUT_FORMAT':'json','BUZZ_TIMEOUT_SECS':'2','BUZZ_CONNECT_TIMEOUT_SECS':'2','SSL_CERT_FILE':str(root/'ca.pem')}
+                if before_id is not None:env['HAOS_BUZZ_BEFORE_ID']=before_id
                 process=await asyncio.create_subprocess_exec(str(cli),*args,stdin=asyncio.subprocess.PIPE if text is not None else asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,env=env)
                 try:out,err=await asyncio.wait_for(process.communicate(None if text is None else text.encode()),20)
@@ -89,6 +92,21 @@ def main():
                 mode['name']='redirect'
                 code,out,err=await run(['users','get']);assert code!=0 and not escapes,(code,out,err)
                 cases.append('reviewed_exact_source_default_HTTP_transport_overlay_refuses_302_without_following_or_forwarding_authentication')
+                mode['name']='cursor'
+                cursor='a'*64;timestamp=int(time.time())
+                read_args=['messages','get','--channel','01234567-89ab-4cde-8012-3456789abcde','--limit','50','--before',str(timestamp),'--since','1']
+                code,out,err=await run(read_args,before_id=cursor);assert code==0,(code,out,err)
+                assert json.loads(out)==[read_event]
+                assert isinstance(queries[-1],list) and len(queries[-1])==1
+                selection=queries[-1][0]
+                assert selection['until']==timestamp and selection['since']==1 and selection['before_id']==cursor
+                assert selection['#h']==['01234567-89ab-4cde-8012-3456789abcde'] and selection['limit']==50
+                cases.append('scoped_typed_composite_history_cursor_retains_exact_channel_time_bounds_and_complete_signed_native_message_fields')
+                count=len(calls)
+                code,out,err=await run(read_args,before_id='../untrusted');assert code==1 and len(calls)==count,(code,out,err)
+                no_timestamp=['messages','get','--channel','01234567-89ab-4cde-8012-3456789abcde']
+                code,out,err=await run(no_timestamp,before_id=cursor);assert code==1 and len(calls)==count,(code,out,err)
+                cases.append('invalid_or_unpaired_history_cursor_is_refused_before_HTTP_or_NIP98_request')
                 mode['name']='drop';writes.clear()
                 code,out,err=await run(args,'Ambiguous local message');assert code!=0 and len(writes)==3,(code,out,err)
                 assert writes[0]==writes[1]==writes[2] and len(set(auth_ids[-3:]))==3

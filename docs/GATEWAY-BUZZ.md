@@ -70,3 +70,54 @@ independent root mission/control dispatch, delivery/uncertainty recovery,
 owner account/discovery/pairing/recovery GUI, installed image packaging and
 build/CI wiring still need completion and source-bound evidence. No permission
 or completion is inferred from the successful prerequisites above.
+
+## Native WSS and durable original work (still private)
+
+The pinned Hermes preparation now adds a per-instance `_open_websocket` hook
+without changing native challenge signing, subscription construction, dispatch
+or cursor code. The private transport refuses redirects, pins the selected
+relay/public identity/challenge/attestation, restricts channel/membership filters,
+checks the current publication around I/O and bounds frames, queues and input
+rejection. Unknown senders do not trigger native username/media work or receive
+an implicit HAOS identity. Unsolicited “seen” reactions are not authorized output.
+
+The original-custody boundary verifies actual Nostr signatures before native
+cursor mutation, binds exact channel/thread/epoch/account, checks independent
+mention/media choices and retains the first canonical signed event in FULL
+SQLite. Nostr signature randomness is not a new semantic message: replay keeps
+the first valid original signature. Local native and parent-relay receipts do
+not claim root mission admission. No purged original is silently restored.
+
+The actual CLI now accepts a narrowly scoped read-only composite cursor through
+`HAOS_BUZZ_BEFORE_ID`, paired with the exact `--before` timestamp and unchanged
+channel/since bounds. It uses the official relay's existing `before_id` query
+field. This prevents the native 50-event window from being mistaken for complete
+catch-up when several messages have the same timestamp. Durable page/recovery
+integration still needs completion.
+
+A real UID/WSS/native-MessageEvent fixture exercises native NIP-42, signed CLI
+userinfo lookup, source custody before dispatch, local inbox/relay reopen,
+unknown sender and channel refusal, redirects, auth refusal and root-owned
+policy replacement. It is not a complete production profile or controller
+mission test. Eight actual CLI/TLS/cursor cases also pass.
+
+The first real CLI call under the disposable UID exposed a build ABI mismatch:
+the default Rust 1.98.1 slim builder required glibc 2.38 while the pinned Python
+process fixture has glibc 2.36. The same Rust version now uses the digest-pinned
+Bookworm builder; both resulting programs require at most glibc 2.34 (verified
+from ELF version records). Dependency versions, signature checks, actual UIDs
+and assertions were preserved. The native dependency tree is installed with
+its real package permissions for the private UID; inaccessible host-venv paths
+are not treated as an SDK/product failure.
+
+The expanded actual UID/WSS/custody fixture now passes eleven cases. Eight
+signed negative inputs cover signature, stale/future time, mention, thread,
+private-key reflection and voice approval. It also changes signature randomness
+for the same Nostr event ID, injects a real SQL acknowledgment failure after
+local inbox/relay commits, closes/reopens the journals and verifies exact
+reconciliation without another admission. Damaged retained bytes are rejected
+without silent restoration. These are local receipts; controller missions and
+production profile recovery remain a separate unfinished integration step.
+
+Source-bound evidence for this stage is in
+[evidence/2026-10-30/buzz-native-custody-validation.json](evidence/2026-10-30/buzz-native-custody-validation.json).

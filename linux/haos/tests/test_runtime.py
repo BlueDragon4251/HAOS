@@ -38,6 +38,21 @@ class A2AAdapter:
         except OSError:
             return None
 ''')
+    (upstream/'plugins/platforms/buzz').mkdir(parents=True)
+    (upstream/'plugins/platforms/buzz/adapter.py').write_text('''class BuzzAdapter:
+    async def _websocket_loop(self) -> None:
+        import websockets
+        while True:
+            try:
+                async with websockets.connect(
+                    self._websocket_url(), open_timeout=_WS_AUTH_TIMEOUT, close_timeout=5,
+                    ping_interval=20, ping_timeout=20, max_size=_WS_MAX_MESSAGE_BYTES,
+                    happy_eyeballs_delay=0.25,
+                ) as websocket:
+                    return websocket
+            except OSError:
+                raise
+''')
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
     source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix", "voice", "feishu", "dingtalk"],
               "security_versions": {"pyjwt": "2.15.1"}}
@@ -45,6 +60,7 @@ class A2AAdapter:
                                 ("uv.lock", "uv_lock_sha256", upstream),
                                 ("agent/auxiliary_client.py", "auxiliary_client_sha256", upstream),
                                 ('plugins/platforms/a2a/adapter.py','a2a_adapter_sha256',upstream),
+                                ('plugins/platforms/buzz/adapter.py','buzz_adapter_sha256',upstream),
                                 ("requirements.txt", "requirements_sha256", overlay)]:
         source[key] = hashlib.sha256((root / filename).read_bytes()).hexdigest()
     (overlay / "source.json").write_text(json.dumps(source))
@@ -54,10 +70,12 @@ class A2AAdapter:
 def test_check_does_not_mutate_upstream(inputs):
     before = (inputs[0] / "agent/auxiliary_client.py").read_bytes()
     transport=(inputs[0]/'plugins/platforms/a2a/adapter.py').read_bytes()
+    buzz=(inputs[0]/'plugins/platforms/buzz/adapter.py').read_bytes()
     runtime.prepare(*inputs, check_only=True)
     assert "2.13.0" in (inputs[0] / "pyproject.toml").read_text()
     assert (inputs[0] / "agent/auxiliary_client.py").read_bytes() == before
     assert (inputs[0]/'plugins/platforms/a2a/adapter.py').read_bytes()==transport
+    assert (inputs[0]/'plugins/platforms/buzz/adapter.py').read_bytes()==buzz
 
 
 def test_reviewed_constraint_is_applied(inputs):
@@ -69,7 +87,7 @@ def test_reviewed_constraint_is_applied(inputs):
 
 
 @pytest.mark.parametrize("file,root", [(".herald-os-upstream-sha", 0), ("pyproject.toml", 0),
-                                     ("uv.lock", 0), ("requirements.txt", 1), ("agent/auxiliary_client.py", 0),('plugins/platforms/a2a/adapter.py',0)])
+                                     ("uv.lock", 0), ("requirements.txt", 1), ("agent/auxiliary_client.py", 0),('plugins/platforms/a2a/adapter.py',0),('plugins/platforms/buzz/adapter.py',0)])
 def test_changed_inputs_are_refused_before_modification(inputs, file, root):
     path = inputs[root] / file
     path.write_text(path.read_text() + "tampered")

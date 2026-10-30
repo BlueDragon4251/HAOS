@@ -47,5 +47,6 @@
   },
   "gateway_compatibility_versions": {
     "alibabacloud-tea-openapi": "0.4.6"
-  }
+  },
+  "buzz_adapter_sha256": "bdfee004fb1fc5601be42f1ea69706b51f8f02fb4a390d5afe8f2e839fcc40e7"
 }

@@ -33,6 +33,19 @@ def patch_a2a(upstream,expected_sha256,*,check_only=False):
     if not check_only:path.write_text(text.replace(anchor,addition+anchor).replace(transport,'            with self._open_push_notification(req, timeout=10) as resp:\n'))
 
 
+
+def patch_buzz(upstream,expected_sha256,*,check_only=False):
+    """Expose only the native subscription's scoped WebSocket constructor."""
+    path=upstream/'plugins/platforms/buzz/adapter.py';data=path.read_bytes()
+    if hashlib.sha256(data).hexdigest()!=expected_sha256:raise ValueError('Buzz transport overlay belongs to another Hermes source')
+    anchor='    async def _websocket_loop(self) -> None:\n'
+    transport='                async with websockets.connect(\n                    self._websocket_url(), open_timeout=_WS_AUTH_TIMEOUT, close_timeout=5,\n'
+    addition='    def _open_websocket(self, **kwargs):\n        """Scoped socket transport; native authentication/subscription stay here."""\n        import websockets\n        return websockets.connect(self._websocket_url(), **kwargs)\n\n'
+    text=data.decode()
+    if text.count(anchor)!=1 or text.count(transport)!=1:raise ValueError('pinned Buzz subscription transport changed')
+    if not check_only:path.write_text(text.replace(anchor,addition+anchor).replace(transport,'                async with self._open_websocket(\n                    open_timeout=_WS_AUTH_TIMEOUT, close_timeout=5,\n'))
+
+
 def prepare(upstream: Path, overlay: Path, *, check_only=False):
     source = json.loads((overlay / "source.json").read_text())
     if (upstream / ".herald-os-upstream-sha").read_text().strip() != source["upstream_commit"]:
@@ -57,9 +70,11 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
         raise ValueError("upstream PyJWT constraint changed; review this overlay")
     patch_auxiliary(upstream, source["auxiliary_client_sha256"], check_only=True)
     patch_a2a(upstream,source['a2a_adapter_sha256'],check_only=True)
+    patch_buzz(upstream,source['buzz_adapter_sha256'],check_only=True)
     if not check_only:
         patch_auxiliary(upstream,source['auxiliary_client_sha256'])
         patch_a2a(upstream,source['a2a_adapter_sha256'])
+        patch_buzz(upstream,source['buzz_adapter_sha256'])
         path.write_text(text.replace(original, replacement))
 
 

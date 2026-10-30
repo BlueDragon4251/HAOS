@@ -87,22 +87,9 @@ class PreparedBuzzPolicy(GatewayPolicy):
     platforms=frozenset(SUPPORTED|{'buzz'})
 
     def __init__(self,value):
-        # Public policy only admits these flags for its implemented platforms;
-        # validate the prepared Buzz rows explicitly before that generic pass.
         if (not isinstance(value,dict) or not isinstance(value.get('bindings'),list) or len(value['bindings'])>512
                 or any(not isinstance(row,dict) for row in value['bindings'])):
             raise ValueError('bounded prepared Buzz identity bindings required')
-        copied={**value,'bindings':[]}
-        super().__init__(copied)
-        for row in value['bindings']:
-            if self.connectors.get(row.get('connector'),{}).get('platform')=='buzz':validate_binding(row)
-        # Retain the generic identity, route, cap and publication checks without
-        # changing the global public registry. Buzz flags are restored afterwards.
-        stripped=[]
-        for row in value['bindings']:
-            if self.connectors.get(row.get('connector'),{}).get('platform')=='buzz':
-                stripped.append({key:item for key,item in row.items() if key not in {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'}})
-            else:stripped.append(row)
-        super().__init__({**value,'bindings':stripped})
-        originals={row['id']:row for row in value['bindings']}
-        for name in self.bindings:self.bindings[name]=originals[name]
+        super().__init__(value)
+        for row in self.bindings.values():
+            if self.connectors[row['connector']]['platform']=='buzz':validate_binding(row)
