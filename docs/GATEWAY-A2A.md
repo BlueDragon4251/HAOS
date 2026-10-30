@@ -371,3 +371,43 @@ outcome acceptance, with foreign-peer and wrong-destination refusal. The
 callback fixture is now in build and protocol CI. No external callback was sent,
 and no live peer, installed OS or release acceptance is asserted. A2A remains
 private (13/22 public gateways) until complete owner/recovery GUI activation.
+
+### Prepared owner backend and private no-send inspection
+
+The prepared owner backend now saves real atomic policy/credential publications,
+maintains named peers and independent download/callback settings, and pairs an
+exact saved peer/context with explicit create/read/cancel/answer rights and five
+separate media/file/callback flags. TLS/key reuse must be explicitly selected
+for the exact saved identity; keys and PEMs are not read back into forms.
+Voice approval requires the existing real speech setup prerequisite. Changes to
+the account revoke all old connector grants and preserve historical journals.
+Prepared owner snapshot validation does not register A2A in the public runtime.
+
+Owner inspection selects the immutable installed interpreter and drops to the
+real gateway UID with no supplementary authority. Its worker rejects root and
+the agent UID, requires its actual root parent and a kernel parent-death guard,
+pins the saved policy publication, and performs no message send or mission
+creation. Local readiness checks cover the actual native runtime transport
+hook, trusted current TLS material and bindability of the configured listener;
+external reachability remains explicitly unverified.
+
+The same stopped-service worker reads private historical journals in read-only
+SQLite mode under the real profile lease. Bounded cursor pages expose exact task
+identities, retained originals, native states (including actual native rejection),
+media failures/backoff, uncertain transitions/controls and callback receipt states.
+Current-account/current-grant flags distinguish historical data after revocation
+or rotation. Raw original bodies, signed resource URIs, PEMs and private keys
+are excluded; the owner validates the returned finite schema and snapshot hashes.
+
+The expanded installed-process fixture now passes 45 cases, including seven
+foreign-UID owner-action refusals before SDK imports, real no-send UID/runtime/
+TLS/bind checks, read-only historical inspection, actual root-file save/pairing
+with a fresh grant epoch, canonical scope/callback snapshot refusal, and peer-key
+rotation revoking grants while preserving all tasks and resource/callback settings.
+The fixture substitutes only the systemd stop boundary in its explicit offline
+namespace; it does not establish installed service lifecycle, hardware, external
+reachability or complete GUI acceptance. Minimal/full regression each passes
+2,474 tests with two existing skips, and 172 actual root/kernel checks pass.
+The crypto-dependent owner snapshot cases run with real PEMs in the actual UID
+process fixture; minimal unit contracts require no optional SDK or crypto import.
+Owner GUI wiring, recovery actions and public activation remain outstanding.

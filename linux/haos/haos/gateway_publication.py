@@ -13,8 +13,16 @@ from .sandbox import trusted_json
 PENDING = 'gateway-publication.json'
 
 
+def owner_policy(value):
+    """Validate prepared owner data without registering an unfinished transport."""
+    if isinstance(value,dict) and isinstance(value.get('connectors'),list) and any(row.get('platform')=='a2a' for row in value['connectors'] if isinstance(row,dict)):
+        from .gateway_a2a import PreparedA2APolicy
+        return PreparedA2APolicy(value)
+    return GatewayPolicy(value)
+
+
 def validate_snapshot(policy, credentials):
-    GatewayPolicy(policy)
+    owner_policy(policy)
     if (not isinstance(credentials, dict) or set(credentials) not in ({'connectors'}, {'connectors', 'publication'})
             or not isinstance(credentials['connectors'], dict)
             or set(credentials['connectors']) != {row['id'] for row in policy['connectors']}):
@@ -23,6 +31,13 @@ def validate_snapshot(policy, credentials):
         raise PermissionError('gateway policy and credentials are from different owner publications')
     platforms={item['id']:item['platform'] for item in policy['connectors']}
     for name,row in credentials['connectors'].items():
+        if platforms[name]=='a2a':
+            from .gateway_a2a import credentials as a2a_credentials,scope
+            if a2a_credentials(row,verify_tls=False)!=row:raise ValueError('canonical private A2A server identity required')
+            if any(binding['connector']==name and (binding['sender'] not in row['peer_tokens'] or binding['scope']!=scope(row,binding['sender'])
+                    or binding.get('allow_callback') is True and binding['sender'] not in row.get('callbacks',{})) for binding in policy['bindings']):
+                raise ValueError('A2A peer/context/callback grant differs from saved server identity')
+            continue
         if platforms[name]=='dingtalk':
             from .gateway_dingtalk import credentials as dingtalk_credentials,scope
             if dingtalk_credentials(row)!=row:raise ValueError('canonical private DingTalk account required')
@@ -132,7 +147,7 @@ def finish(config, journal, gid):
             or type(journal['version']) is not int or journal['version'] != 1):
         raise ValueError('invalid gateway publication journal')
     validate_snapshot(journal['policy'], journal['credentials'])
-    GatewayPolicy(journal['previous_policy'])
+    owner_policy(journal['previous_policy'])
     if not journal['policy'].get('publication'):
         raise ValueError('gateway publication has no snapshot identity')
     for name in ('gateways.json', 'gateway-credentials'):

@@ -1,0 +1,94 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "226d4ceed4a2c29eefa3b88a40e6ae7039d8ebee",
+  "tested_source_tree_before_this_receipt": "5331dd81862d80d8e43982edcfec0e1a892d5786",
+  "source_files_sha256": {
+    "docs/GATEWAY-A2A.md": "096c671268a22bb73e6ad2c0ec6dac11ab70a3de479636b454b7799ed5d2d7dd",
+    "linux/haos/haos/a2a_owner_process.py": "1ffb80b286ec57b52b683bfddbdc528b9c5185a3f1f08b7813587a0d4f9ef6bd",
+    "linux/haos/haos/a2a_owner_setup.py": "d267eeb51185e4126ae91e68c6124ffb4cb0b4443f4316282890120ece1f6a21",
+    "linux/haos/haos/a2a_owner_worker.py": "2fcce6c02f1aff2e75d5ca1738efb50bfe379d66c3d52ad70325c857b0071f49",
+    "linux/haos/haos/gateway_publication.py": "350565e87819a65986e69baf61b4423deccf19ae6141fe5f2ff2e8245820b037",
+    "linux/haos/haos/gateway_setup.py": "577b0a779ecbe2133e25eb73c33e7f353e2a8c0bfa87b606ab0bc3b02e204656",
+    "linux/haos/haos/initial_setup.py": "1f194f3e1769e9d75c3c9c580cf5b902eb4e2aef34cd75bc56d966ee008035a8",
+    "linux/haos/probes/probe_a2a_profile_process.py": "404657020f49417687a48057458fbe77654f22f739b8c5132b53391472ad8069",
+    "linux/haos/tests/test_a2a_owner_setup.py": "411d97edb361d3dff0cec3302f7f53afa027c84cc0cc374a156551426b066424"
+  },
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 13,
+  "a2a_public_activation": false,
+  "unit_regression": {
+    "minimal": {
+      "passed": 2474,
+      "existing_skips": 2,
+      "log_sha256": "e2b14cb463c27479d4a299865f3d968f6938331c8eb239a9ac259ae5b75abc34"
+    },
+    "full": {
+      "passed": 2474,
+      "existing_skips": 2,
+      "log_sha256": "9b493c5dfaa36205b92cbeab352b02b4b97e57cfc28599de192e5ced9dbbaf7f"
+    }
+  },
+  "actual_root_kernel_suite": {
+    "passed": 172,
+    "log_sha256": "11d1d36ce62ce86a8e8bff32810aacbd827aa09a5150f8b3eee5e38559afa99c"
+  },
+  "actual_installed_UID_controller_TLS_owner_process": {
+    "cases": [
+      "actual_installed_readonly_code_dedicated_gateway_UID_and_verified_TLS_listener",
+      "actual_native_background_status_writer_uses_private_process_launcher_HOME_not_session_override_or_owner_HOME",
+      "actual_other_UID_cannot_read_account_journals_owner_canary_or_modify_code_or_construct_A2A_profile",
+      "actual_controller_Unix_socket_SO_PEERCRED_denies_foreign_UID_even_with_socket_group_access",
+      "actual_loopback_TCP_without_named_peer_token_has_no_A2A_rights",
+      "actual_native_MessageEvent_preserves_wire_client_deduplication_identity_through_retained_parent_relay",
+      "actual_root_controller_checks_expected_owner_grant_epoch_before_mission_admission",
+      "actual_gateway_UID_controller_Unix_admission_and_queue_receipt_do_not_complete_waiting_native_JSON_RPC",
+      "actual_concurrent_gateway_process_cannot_reuse_private_profile_lease",
+      "actual_SIGKILL_reopen_restores_working_native_task_and_replay_does_not_repeat_relay_or_root_mission",
+      "actual_UID_restart_then_complete_multichunk_root_output_commits_exact_native_task_available_over_verified_TLS",
+      "actual_native_CancelTask_uses_root_controller_and_lost_receipt_replay_does_not_repeat_cancellation_or_invent_terminal_task",
+      "actual_controller_terminal_cancellation_event_alone_completes_native_Future_and_JSON_RPC_as_cancelled",
+      "actual_Hermes_WebSocket_request_Controller_question_and_native_input_required_export_only_question_identity",
+      "actual_native_taskId_continuation_answers_exact_numeric_Hermes_question_through_root_without_new_task_mission_or_replayed_answer",
+      "new_wire_message_ID_cannot_reuse_old_question_epoch_or_request_permanent_approval_before_parent_dispatch",
+      "actual_native_continuation_SSE_keeps_original_task_ID_and_once_approval_reaches_exact_numeric_Hermes_request",
+      "actual_clarification_and_approval_same_native_task_Future_and_SSE_receive_final_controller_result_without_new_mission",
+      "actual_closed_Hermes_WebSocket_preserves_unconfirmed_answer_with_owner_action_and_no_automatic_or_new_ID_resend",
+      "actual_A2A_media_create_token_without_separate_kind_flags_cannot_fetch_or_admit_files",
+      "actual_native_A2A_early_SSE_precedes_complete_verified_TLS_file_read_then_four_exact_bytes_cross_real_media_and_controller_Unix_gates",
+      "actual_A2A_URI_capability_stays_private_and_agent_goal_has_only_native_opaque_file_carriers",
+      "actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission",
+      "actual_native_CancelTask_during_stalled_TLS_download_commits_root_absence_tombstone_then_closes_reader_and_native_Future_without_creating_mission",
+      "actual_gateway_UID_controller_Unix_request_cannot_admit_original_source_after_root_confirmed_prevention",
+      "actual_UID_profile_restart_retains_pre_admission_cancelled_native_source_and_never_refetches_or_replays_it_into_root_mission",
+      "actual_named_peer_TLS_native_push_config_RPC_uses_owner_destination_and_refuses_other_peer_or_unapproved_URL_without_exposing_signing_key",
+      "actual_installed_gateway_UID_native_callback_builder_HMAC_and_verified_HTTPS_sender_follow_root_outcome_acceptance_with_durable_HTTP_ack_not_recipient_read",
+      "actual_completed_task_SSE_replay_preserves_native_file_Parts_without_second_agent_file_read",
+      "actual_root_export_manifest_preserves_cross_chunk_code_examples_and_only_explicit_real_file_uses_bounded_authenticated_agent_HTTP_reader",
+      "actual_native_Task_file_Parts_and_TLS_artifact_endpoint_deliver_exact_snapshot_only_to_current_named_peer_without_paths_or_credentials",
+      "actual_artifact_download_has_durable_local_write_audit_without_claiming_remote_recipient_read",
+      "actual_TLS_long_UTF8_text_artifact_preserves_every_byte_with_read_only_grant_without_agent_file_export_or_native_response_overflow",
+      "separate_outbound_file_grant_is_required_before_any_root_snapshot_read_or_native_artifact_URL",
+      "actual_native_sixth_turn_anti_loop_rejection_is_never_replayed_by_private_pending_input_recovery_into_a_root_mission",
+      "actual_A2A_HTTPS_401_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_A2A_HTTPS_429_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task",
+      "actual_root_owned_policy_replacement_immediately_closes_gateway_listener_and_retained_peer_authority",
+      "actual_TLS_owner_snapshot_validation_refuses_wrong_peer_server_scope_and_callback_without_private_destination_or_key",
+      "actual_owner_backend_rejects_seven_foreign_UID_actions_before_SDK_and_private_inspection_worker_rejects_root_and_agent_UID",
+      "actual_root_owner_no_send_inspection_drops_to_gateway_UID_and_checks_installed_native_runtime_TLS_and_exclusive_bind_without_external_reachability_claim",
+      "actual_owner_private_UID_readonly_inventory_exposes_retained_tasks_media_auth_refusal_callback_receipts_and_withdrawn_grants_without_raw_URI_keys_or_new_missions",
+      "actual_root_owner_saved_TLS_and_named_peer_key_reuse_and_exact_context_pairing_publish_real_private_files_fresh_epoch_and_explicit_flags_without_message_or_mission",
+      "actual_root_peer_token_rotation_revokes_all_old_connector_grants_preserves_resource_callback_settings_and_all_historical_task_data_without_credentials_in_owner_audit"
+    ],
+    "passed": 45,
+    "actual_UID_TLS_kernel_flock_SIGKILL_SQLite_reopen": true,
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "actual_controller_Unix_socket_SO_PEERCRED": true,
+    "live_peer_inference_public_activation_or_release": false
+  },
+  "scope_limits": [
+    "Systemd service-stop boundary is an explicit offline fixture; UID, installed interpreter/path checks, real Root files/publications/crypto, worker parent checks and read-only private journals are actual.",
+    "GUI wiring/recovery actions/public activation remain unfinished.",
+    "No real external messages/callbacks, installed OS acceptance, model inference or hardware/release acceptance."
+  ]
+}

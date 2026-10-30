@@ -35,6 +35,7 @@ def main():
     subprocess.run([sys.executable,installer,str(staged),str(code/'hermes-source')],check=True)
     sys.path.insert(0,str(code/'hermes-source'))
     with Path('/etc/passwd').open('a') as stream:stream.write('haos-gateway:x:65534:65534:Disposable gateway:/nonexistent:/usr/sbin/nologin\n')
+    with Path('/etc/group').open('a') as stream:stream.write('haos-gateway:x:65534:\n')
     base=Path('/var/lib/haos-gateway');base.mkdir(mode=0o700);os.chown(base,65534,65534)
     work=Path(tempfile.mkdtemp(prefix='haos-a2a-process-'));work.chmod(0o755)
     sys.path[:0]=['/sdk',str(code),'/repo/linux/haos/runtime']
@@ -713,6 +714,89 @@ asyncio.run(exercise())
             else:raise AssertionError('withdrawn saved owner publication left listener reachable')
             cases.append('actual_root_owned_policy_replacement_immediately_closes_gateway_listener_and_retained_peer_authority')
             await stop(process)
+            # Disposable installed owner interpreter. The real private worker
+            # uses -E/-s and root-owned .pth entries, not caller PYTHONPATH.
+            import venv
+            installed=Path('/usr/lib/haos/hermes/.venv');venv.EnvBuilder(with_pip=False).create(installed)
+            site=installed/'lib/python3.11/site-packages';site.mkdir(parents=True,exist_ok=True)
+            (site/'haos-installed.pth').write_text('/sdk\n/usr/lib/haos\n/usr/lib/haos/hermes-source\n')
+            private=etc/'gateway-credentials';private.write_text(json.dumps({'connectors':{'a2a':value}}));private.chmod(0o600)
+            from haos.gateway_publication import validate_snapshot
+            owner_policy_value=json.loads((etc/'gateways.json').read_text());validate_snapshot(owner_policy_value,{'connectors':{'a2a':value}})
+            wrong_scope=json.loads(json.dumps(owner_policy_value));wrong_scope['bindings'][0]['scope']='a2a:'+'f'*64
+            missing_callback=json.loads(json.dumps(value));missing_callback.pop('callbacks')
+            callback_policy=json.loads(json.dumps(owner_policy_value));callback_policy['bindings'][0]['allow_callback']=True
+            for bad_policy,bad_private in [(wrong_scope,value),(callback_policy,missing_callback)]:
+                try:validate_snapshot(bad_policy,{'connectors':{'a2a':bad_private}})
+                except ValueError:pass
+                else:raise AssertionError('owner publication accepted scope or callback outside its private identity')
+            cases.append('actual_TLS_owner_snapshot_validation_refuses_wrong_peer_server_scope_and_callback_without_private_destination_or_key')
+            from haos import a2a_owner_setup,initial_setup,gateway_setup
+            from haos.a2a_owner_process import command as owner_command
+            isolated={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','HERMES_SAFE_MODE':'1'}
+            for denied_uid in [0,65533]:
+                denied_worker=subprocess.run(owner_command(),input='',capture_output=True,text=True,user=denied_uid,
+                    group=65534,extra_groups=[],cwd='/usr/lib/haos',env=isolated,timeout=10)
+                assert denied_worker.returncode!=0 and 'gateway runtime requires its unprivileged service UID/GID' in denied_worker.stderr,denied_worker.stderr
+            denied_code='''from haos import a2a_owner_setup as owner
+actions=[lambda:owner.configure('a2a',{}),lambda:owner.save_account('a2a',{},'alice',''),lambda:owner.saved('a2a'),
+lambda:owner.set_peer('a2a','alice',''),lambda:owner.remove_peer('a2a','alice'),
+lambda:owner.pair('owner','a2a','alice','ctx-input','personal',['create','read']),lambda:owner.inspect('a2a')]
+for action in actions:
+    try:action()
+    except PermissionError:continue
+    raise AssertionError('foreign UID entered A2A owner management')
+import sys
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+print('all-owner-actions-denied-before-sdk')
+'''
+            rejected=subprocess.run([str(installed/'bin/python'),'-E','-s','-c',denied_code],capture_output=True,text=True,
+                user=65533,group=65534,extra_groups=[],cwd='/usr/lib/haos',env=isolated,timeout=10)
+            assert rejected.returncode==0 and rejected.stdout.strip()=='all-owner-actions-denied-before-sdk',rejected.stderr
+            cases.append('actual_owner_backend_rejects_seven_foreign_UID_actions_before_SDK_and_private_inspection_worker_rejects_root_and_agent_UID')
+            # No systemd runs in this offline namespace. Only the service-stop
+            # boundary is a fixture; worker UID, saved files, runtime checks,
+            # parent lifetime, TLS validation and private journals are real.
+            original_quiesce=initial_setup.quiesce_for_setup;original_stopped=gateway_setup.stopped_gateway
+            initial_setup.quiesce_for_setup=lambda **kwargs:None;gateway_setup.stopped_gateway=lambda:None
+            try:
+                checked=a2a_owner_setup.inspect('a2a')
+                assert checked=={'runtime_ready':True,'tls_material_valid':True,'listener_bindable':True,
+                    'external_reachability_verified':False,'message_sent':False,'mission_created':False},checked
+                cases.append('actual_root_owner_no_send_inspection_drops_to_gateway_UID_and_checks_installed_native_runtime_TLS_and_exclusive_bind_without_external_reachability_claim')
+                inventory=a2a_owner_setup.inspect('a2a','sources')
+                assert 'tasks' in inventory,inventory
+                assert len(inventory['tasks'])>=17 and inventory['has_more'] is False
+                assert all(row['current_grant'] is False and row['original_retained'] is True for row in inventory['tasks'])
+                assert any(row['resources'].get('authentication-refused') for row in inventory['tasks'])
+                assert any(row['callbacks'].get('acknowledged') for row in inventory['tasks'])
+                assert len(store.list())==12 and all(secret not in json.dumps(inventory) for secret in [*value['peer_tokens'].values(),value['callbacks']['alice']['secret']])
+                cases.append('actual_owner_private_UID_readonly_inventory_exposes_retained_tasks_media_auth_refusal_callback_receipts_and_withdrawn_grants_without_raw_URI_keys_or_new_missions')
+                metadata=initial_setup.gateway_configuration()['a2a']['a2a']
+                assert all(secret not in json.dumps(metadata) for secret in [*value['peer_tokens'].values(),value['callbacks']['alice']['secret'],value['tls']['private_key']])
+                server_fields={key:metadata[key] for key in ['agent_name','port','public_url','bind_host','public_listener']}
+                saved_server=a2a_owner_setup.save_account('a2a',server_fields,'alice','',keep_tls=True,keep_token=True)
+                assert saved_server['configured'] is True
+                paired=a2a_owner_setup.pair('owner-ui','a2a','alice','ctx-owner-ui','personal',['create','read','cancel','answer'],
+                    allow_media=True,allow_outbound_media=True,allow_callback=True)
+                updated,stored=gateway_setup.load();paired_row=next(row for row in updated['bindings'] if row['id']=='owner-ui')
+                assert paired['paired'] is True and paired_row['sender']=='alice' and paired_row['scope']==grant['scope']
+                assert paired_row['generation'] not in {'a'*64,'b'*64} and paired_row['since']>1
+                assert paired_row['allow_media'] is True and paired_row['allow_voice'] is False and paired_row['allow_callback'] is True
+                assert stored['connectors']['a2a']['peer_tokens']['alice']==value['peer_tokens']['alice']
+                cases.append('actual_root_owner_saved_TLS_and_named_peer_key_reuse_and_exact_context_pairing_publish_real_private_files_fresh_epoch_and_explicit_flags_without_message_or_mission')
+                replacement='private_fixture_owner_rotation_'+'r'*32
+                before_count=len(inventory['tasks']);a2a_owner_setup.set_peer('a2a','alice',replacement)
+                updated,stored=gateway_setup.load()
+                assert updated['bindings']==[] and stored['connectors']['a2a']['peer_tokens']['alice']==replacement
+                assert stored['connectors']['a2a']['callbacks']==value['callbacks'] and stored['connectors']['a2a']['download_origins']==value['download_origins']
+                retained=a2a_owner_setup.inspect('a2a','sources')
+                assert len(retained['tasks'])==before_count and all(not row['current_account'] and not row['current_grant'] for row in retained['tasks'])
+                assert len(store.list())==12
+                audit=Path('/var/lib/haos-owner/audit.jsonl').read_text()
+                assert all(secret not in audit for secret in [replacement,*value['peer_tokens'].values(),value['callbacks']['alice']['secret']])
+                cases.append('actual_root_peer_token_rotation_revokes_all_old_connector_grants_preserves_resource_callback_settings_and_all_historical_task_data_without_credentials_in_owner_audit')
+            finally:initial_setup.quiesce_for_setup=original_quiesce;gateway_setup.stopped_gateway=original_stopped
         finally:
             if process.poll() is None:process.kill();await asyncio.to_thread(process.wait)
             if pending is not None:

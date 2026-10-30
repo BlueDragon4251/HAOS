@@ -728,6 +728,9 @@ def gateway_configuration():
         | {'reply_mode':_credentials['connectors'][row['id']].get('reply_mode','session')}
         for row in policy['connectors'] if row['platform']=='dingtalk'}
     if dingtalk:result['dingtalk']=dingtalk
+    if any(row['platform']=='a2a' for row in policy['connectors']):
+        from .a2a_owner_setup import public as a2a_public
+        result['a2a']={row['id']:a2a_public(_credentials['connectors'][row['id']]) for row in policy['connectors'] if row['platform']=='a2a'}
     return result
 
 

@@ -283,7 +283,7 @@ def stopped_gateway():
 
 
 def load(config=CONFIG):
-    from .gateway_publication import pending, validate_snapshot
+    from .gateway_publication import pending, validate_snapshot,owner_policy
     if pending(config):
         raise PermissionError("interrupted gateway publication; stop the gateway and recover-configuration")
     metadata = config.lstat()
@@ -291,7 +291,7 @@ def load(config=CONFIG):
         raise PermissionError("untrusted gateway configuration directory")
     policy = trusted_json(config / "gateways.json") if (config / "gateways.json").exists() else {
         "version": 1, "connectors": [], "bindings": []}
-    GatewayPolicy(policy)
+    owner_policy(policy)
     secret_path = config / "gateway-credentials"
     if secret_path.exists() and stat.S_IMODE(secret_path.lstat().st_mode) & 0o077:
         raise PermissionError("transport credential store must be root-private")
@@ -310,8 +310,9 @@ def renewed_policy(policy, previous):
     and relay records remain stored but cannot regain delivery authority through
     an identical later pairing, route edit reversal or stale policy submission.
     """
-    GatewayPolicy(policy)
-    old = GatewayPolicy(previous).bindings
+    from .gateway_publication import owner_policy
+    owner_policy(policy)
+    old = owner_policy(previous).bindings
     output = deepcopy(policy)
     for binding in output["bindings"]:
         before = old.get(binding["id"])
