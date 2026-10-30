@@ -1,0 +1,62 @@
+{
+  "source_commit": "007be951c254905a5b06837c999f64cbc890b7f8",
+  "source_tree": "6f78ee4161fc9db8a1e48000a1dc4bd689dbe756",
+  "recorded_at": "2026-10-30 02:21:26 UTC",
+  "runs": [
+    {
+      "id": 40987420614,
+      "name": "HAOS Graphical Initial Setup Security",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987420614"
+    },
+    {
+      "id": 40987420619,
+      "name": "CI",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987420619"
+    },
+    {
+      "id": 40987420611,
+      "name": "HAOS services and kernel boundaries",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987420611"
+    },
+    {
+      "id": 40987420617,
+      "name": "Arch package",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987420617"
+    },
+    {
+      "id": 40987420714,
+      "name": "HAOS pinned provider protocol contracts",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987420714"
+    },
+    {
+      "id": 40987416379,
+      "name": "HAOS pinned provider protocol contracts",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "007be951c254905a5b06837c999f64cbc890b7f8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40987416379"
+    }
+  ],
+  "limits": "All six CI runs passed for this exact public DingTalk source, including both full pinned contracts runs with 60-minute budget and actual kernel/UID checks. Fixtures remain local contract evidence, not live DingTalk account, external delivery, model inference, installed/hardware or release acceptance. Later A2A commits have their own source-bound tests and require separate CI."
+}
