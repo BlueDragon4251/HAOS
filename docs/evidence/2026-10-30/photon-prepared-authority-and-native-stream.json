@@ -1,0 +1,123 @@
+{
+  "recorded_UTC": "2026-10-30T18:32:16.219527+00:00",
+  "base_commit": "c0deff53b19659934b2f3e03c75a3a8432c23f8c",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "58148a3a82904f64bd4924e7a8023daaa15e72e7ce68c649eb563bfaf94461a1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon.py",
+      "sha256": "a02f54fab06c80b2187c5767fd603fb55cc1809ab389af7f491584824bc972c0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_admission.py",
+      "sha256": "fda6db0500f21e96e1193921673cd83d442b3574e0cbed12f508208780bac414"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_custody.py",
+      "sha256": "809934b87ea60002ea19f3d593a0336bc2289d0653754ab16eb4bbf00532963a"
+    },
+    {
+      "path": "linux/haos/runtime/prepare_photon.py",
+      "sha256": "0c38bbd3faa0cd8223a98b9d84e80235fa4111a73178ba6acb9461e9ae6cd4f5"
+    },
+    {
+      "path": "linux/haos/runtime/photon_bounded_stream.mjs",
+      "sha256": "b8218a7a4ceacdc1ba8de667f8a66cc2f9a7c81263fb87fe02975ea1c48105b8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_transport.mjs",
+      "sha256": "0665ef1c8abf3eb3da1580138ebad36e09ff5dcc06291fc737b30699933a41d3"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_admission.py",
+      "sha256": "c6228e7a65b79617375e474a99281cd5dcbc60464bc8207313aa50dc6139e451"
+    },
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "156622f99a8fd560adae82b90ce32e317c783b52643c3146872e3108ef08d977"
+    }
+  ],
+  "minimal_regression": "3106 passed, 2 skipped in 18.65s",
+  "full_pinned_runtime_regression": "3106 passed, 2 skipped in 20.01s",
+  "existing_kernel_UID_socket_credentials_regression": {
+    "result": "174 passed in 12.56s",
+    "scope": "existing production gateway.py one-line prepared Photon schema allowance; new standalone custody module was added afterwards and is covered by actual SQLite component tests, not this kernel run"
+  },
+  "native_transport": {
+    "schema": 1,
+    "passed": 13,
+    "cases": [
+      "native_sdk_refuses_before_mapping_or_automatic_contact_callback",
+      "native_vcard_download_is_refused_before_eager_sdk_conversion",
+      "native_poll_and_group_hydration_refused_before_rpc",
+      "failed_independent_custody_cannot_be_interpreted_as_admission",
+      "approved_text_uses_actual_native_message_and_sender_codec",
+      "actual_native_reply_keeps_target_id_without_quoted_message_hydration",
+      "actual_native_attachment_stream_obeys_bound_and_closes_native_rpc",
+      "lying_native_size_refused_and_rpc_closed",
+      "truncated_native_attachment_is_not_a_successful_marker",
+      "authority_rechecked_between_native_chunks_and_withdrawal_cancels_rpc",
+      "hung_native_stream_is_cancelled_at_total_deadline",
+      "oversize_metadata_refused_before_stream_open",
+      "incomplete_sdk_embedding_fails_closed"
+    ],
+    "actual_spectrum_version": "12.7.0",
+    "prepared_sdk_sha256": "a88336534bd4b6e68d2563333f386f44f70625e41984086b1841e3f2b62e99e0",
+    "native_rpc_frames": "local fixture",
+    "external_network": false,
+    "live_delivery_verified": false
+  },
+  "prepared_source": {
+    "schema": 1,
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "spectrum_version": "12.7.0",
+    "inputs": [
+      {
+        "path": "index.mjs",
+        "sha256": "f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e"
+      },
+      {
+        "path": "package.json",
+        "sha256": "46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24"
+      }
+    ],
+    "prepared": [
+      {
+        "path": "index.mjs",
+        "sha256": "6172d9f259e33b7895fcedc5d020f6b904e7d82179bc7f9cf2311eddefba06c7"
+      },
+      {
+        "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+        "sha256": "a88336534bd4b6e68d2563333f386f44f70625e41984086b1841e3f2b62e99e0"
+      }
+    ]
+  },
+  "new_component_tests": 70,
+  "CI": {
+    "new_Photon_workflow": "not yet executed on GitHub",
+    "previous_services_failure": 41106228143,
+    "exact_cause": "already-exited cgroup member /proc comm read in run_application_unit.py",
+    "separate_fix_commit": "c0deff53b19659934b2f3e03c75a3a8432c23f8c",
+    "actual_systemd_rerun": "pending"
+  },
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_verified": false,
+    "public_gateway_activation": false,
+    "GUI_or_installed_service_acceptance": false,
+    "release_acceptance": false
+  },
+  "next": "Fixed private launcher, Unix transport, actual adapter receive/replay and guarded replies; do not stop at this checkpoint"
+}

@@ -1,0 +1,45 @@
+name: HAOS Photon prepared contracts
+on:
+  pull_request:
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/gateway.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: photon-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepared-native-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - uses: actions/setup-node@v7
+        with: {node-version: '22'}
+      - name: Prepare exact pinned Hermes and immutable Photon dependency inputs
+        run: |
+          set -euo pipefail
+          bash scripts/sync-upstream.sh
+          SIDECAR="$PWD/upstream/hermes-agent/plugins/platforms/photon/sidecar"
+          npm ci --prefix "$SIDECAR" --ignore-scripts --no-audit --no-fund
+          mkdir -p "$RUNNER_TEMP/photon-contracts"
+          python linux/haos/runtime/prepare_photon.py "$SIDECAR" --check
+          python linux/haos/runtime/prepare_photon.py "$SIDECAR" --receipt "$RUNNER_TEMP/photon-contracts/prepared-source.json"
+          node --check "$SIDECAR/index.mjs"
+          node linux/haos/runtime/probe_photon_transport.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-transport.json"
+      - name: Independent grants and actual FULL SQLite custody without Hermes imports
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: photon-prepared-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/photon-contracts
+          if-no-files-found: error
