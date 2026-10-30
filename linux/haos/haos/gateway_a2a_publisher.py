@@ -91,7 +91,8 @@ class Publisher:
         if body is not None:
             from plugins.platforms.a2a import protocol
             states={'mission.completed':protocol.STATE_COMPLETED,'mission.failed':protocol.STATE_FAILED,
-                'mission.cancelled':protocol.STATE_CANCELED,'mission.request':protocol.STATE_INPUT_REQUIRED}
+                'mission.cancelled':protocol.STATE_CANCELED,'mission.request':protocol.STATE_INPUT_REQUIRED,
+                'gateway.answer-unconfirmed':protocol.STATE_INPUT_REQUIRED}
             state=states.get(context['kind'])
             if state is not None:
                 if context['kind']=='mission.request' and (context['request_id'] is None or context['request_method'] is None):

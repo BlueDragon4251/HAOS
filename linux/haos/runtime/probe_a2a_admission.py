@@ -71,6 +71,19 @@ def main():
         except PermissionError:pass
         else:raise AssertionError('read-only peer submitted a mission through SendMessage')
         cases.append('SendMessage_requires_independent_mission_create_permission_before_native_task_side_effects')
+        shared=Redactor();encoded=json.dumps(body).encode()
+        approve(policy(),'a2a',value,'alice',encoded,shared)
+        retained=tuple(shared.secrets)
+        for _ in range(500):approve(policy(),'a2a',value,'alice',encoded,shared)
+        assert tuple(shared.secrets)==retained and sum(len(s.encode()) for s in shared.secrets)<65536
+        for depth in range(3):
+            reflected=value['tls']['private_key']
+            for _ in range(depth):reflected=json.dumps(reflected)[1:-1]
+            rejected=deepcopy(body);rejected['params']['message']['parts']=[{'text':reflected}]
+            try:approve(policy(),'a2a',value,'alice',json.dumps(rejected).encode(),shared)
+            except Refused as error:assert error.reason=='private-reflection'
+            else:raise AssertionError('stable redaction lost private PEM or its bounded wire aliases')
+        cases.append('five_hundred_actual_codec_replays_keep_bounded_stable_redaction_without_losing_private_PEM_or_escaped_alias_refusal')
         from haos.gateway_a2a_cache import RawEvents
         from haos.gateway import Conflict
         active=[True]

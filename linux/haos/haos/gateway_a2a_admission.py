@@ -1,6 +1,7 @@
 """Bounded A2A wire admission behind token-derived identity and independent grants."""
 import hashlib
 import math
+import re
 import time
 
 from .gateway import GatewayPolicy,digest
@@ -41,9 +42,14 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
             or set(data['params']) not in ({'message'},{'message','contextId'})):
         raise Refused('unsupported-content')
     params=data['params'];message=params['message']
-    if (not isinstance(message,dict) or set(message)!={'messageId','contextId','role','parts'}
+    if (not isinstance(message,dict) or set(message) not in ({'messageId','contextId','role','parts'},{'messageId','contextId','role','parts','taskId','metadata'})
             or not isinstance(message['role'],str) or message['role'] not in {'ROLE_USER','user'}):
         raise Refused('unsupported-content')
+    if 'taskId' in message and (not isinstance(message['taskId'],str) or not re.fullmatch('task-[0-9a-f]{16}',message['taskId'])):
+        raise Refused('unsupported-content')
+    if 'taskId' in message and (not isinstance(message['metadata'],dict) or set(message['metadata'])!={'haosQuestionEpoch'}
+            or not isinstance(message['metadata']['haosQuestionEpoch'],str) or not re.fullmatch('[0-9a-f]{64}',message['metadata']['haosQuestionEpoch'])):
+        raise Refused('exact-question-epoch-required')
     try:
         identity=opaque(message['messageId']);context=opaque(message['contextId'])
     except ValueError:raise Refused('unsupported-content') from None
@@ -59,12 +65,15 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     from plugins.platforms.a2a import protocol,security
     text=protocol.extract_text(params)
     if (not text or len(text.encode())>32000 or protocol.extract_context_id(params)!=context):raise Refused('unsupported-content')
-    redactor.secrets=sorted(set([*redactor.secrets,*value['peer_tokens'].values(),value['tls']['private_key']]),key=len,reverse=True)
+    aliases=set([*value['peer_tokens'].values(),value['tls']['private_key']])
     # Credentials embedded in JSON escapes must not become agent input either.
     for _ in range(2):
         import json
-        redactor.secrets=sorted(set([*redactor.secrets,*(json.dumps(secret,ensure_ascii=ascii)[1:-1]
-            for secret in redactor.secrets for ascii in (True,False))]),key=len,reverse=True)
+        aliases|={json.dumps(secret,ensure_ascii=ascii)[1:-1] for secret in tuple(aliases) for ascii in (True,False)}
+    # Derive aliases only from fixed account material, never from the previous
+    # expansion. Escaping already escaped PEM aliases on every request grows
+    # exponentially and can exhaust a real long-lived worker during replay.
+    redactor.secrets=sorted(set(redactor.secrets)|aliases,key=len,reverse=True)
     if redactor.text(text)!=text:raise Refused('private-reflection')
     framed=security.wrap_inbound(peer,text)
     if not isinstance(framed,str) or len(framed.encode())>32000 or redactor.text(framed)!=framed:
@@ -74,7 +83,8 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     try:binding=policy.authorize(connector,envelope)
     except PermissionError:raise Refused('unapproved-route') from None
     validate_binding(binding)
-    if 'create' not in binding['capabilities']:raise Refused('mission-create-required')
+    required='answer' if 'taskId' in message else 'create'
+    if required not in binding['capabilities']:raise Refused('mission-'+required+'-required')
     # The server's authenticated receive instant is used: A2A's Message has no
     # trustworthy sender timestamp. Durable first admission binds the grant; an
     # old source cannot be recreated under a later generation on replay.
@@ -83,5 +93,6 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
         raise Refused('invalid-time')
     if binding['since']>=received*1000:raise Refused('pre-grant')
     policy.current_binding({'binding_id':binding['id'],'binding_digest':digest(binding)})
-    return {'envelope':envelope,'binding_id':binding['id'],'binding_digest':digest(binding),
+    return {**({'target_task_id':message['taskId'],'question_epoch':message['metadata']['haosQuestionEpoch']} if 'taskId' in message else {}),
+        'envelope':envelope,'binding_id':binding['id'],'binding_digest':digest(binding),
         'credential_scope':digest([connector,value]),'raw_sha256':hashlib.sha256(raw).hexdigest(),'received_at':received}

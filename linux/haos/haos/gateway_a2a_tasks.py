@@ -138,7 +138,8 @@ class Tasks:
             raise PermissionError('exact retained authenticated A2A source proof required')
         binding=self.policy().current_binding(proof)
         if (binding['connector']!=connector or binding['scope']!=scope(self.value,self.peer)
-                or binding['sender']!=self.peer or binding['chat']!=proof['envelope']['chat'] or 'create' not in binding['capabilities']):
+                or binding['sender']!=self.peer or binding['chat']!=proof['envelope']['chat']
+                or ('answer' if 'target_task_id' in proof else 'create') not in binding['capabilities']):
             raise PermissionError('source is not approved to create this exact A2A task')
         token=_SOURCE.set((self,connector,proof))
         try:yield
@@ -146,7 +147,8 @@ class Tasks:
 
     def create(self,task_id,context_id,peer,agent_slug='',tenant=''):
         self.current();state=_SOURCE.get()
-        if (state is None or state[0] is not self or state[2]['envelope']['chat']!=context_id or peer!=self.peer or agent_slug or tenant):
+        if (state is None or state[0] is not self or state[2]['envelope']['chat']!=context_id or peer!=self.peer or agent_slug or tenant
+                or 'target_task_id' in state[2]):
             raise PermissionError('native A2A task creation requires its exact retained source context')
         _,connector,proof=state
         with self.lock:

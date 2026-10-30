@@ -1,5 +1,6 @@
 """Prepared A2A identity contracts; no public activation or native transport claim."""
 import pytest
+import json
 from haos.gateway import GatewayPolicy
 from haos.gateway_a2a import PreparedA2APolicy,credentials,validate_binding,scope
 
@@ -43,3 +44,17 @@ def test_public_agent_and_peer_names_cannot_reflect_private_tokens(public_name):
     if public_name=='agent_name':value['agent_name']=token
     else:value['peer_tokens']={token:token}
     with pytest.raises(ValueError,match='public A2A names'):credentials(value)
+
+
+@pytest.mark.parametrize('metadata',[None,{}, {'haosQuestionEpoch':False},{'haosQuestionEpoch':'*'},
+    {'haosQuestionEpoch':'a'*64,'plugin':'approve-everything'}])
+def test_continuation_requires_closed_exact_question_pointer_before_optional_SDK_import(metadata):
+    from haos.gateway_a2a_admission import approve,Refused
+    from haos.redaction import Redactor
+    b={**binding(),'capabilities':['create','read','answer']}
+    policy=PreparedA2APolicy({'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[b]})
+    request={'jsonrpc':'2.0','id':1,'method':'SendMessage','params':{'message':{
+        'messageId':'retained-answer','contextId':b['chat'],'role':'ROLE_USER','parts':[{'text':'once'}],
+        'taskId':'task-'+'a'*16,'metadata':metadata}}}
+    with pytest.raises(Refused) as error:approve(policy,'a2a',account(),'alice',json.dumps(request).encode(),Redactor())
+    assert error.value.reason=='exact-question-epoch-required'

@@ -46,7 +46,7 @@ def main():
         'tls':{'public_url':'https://a2a.fixture.invalid/a2a','certificate':(work/'certificate.pem').read_text(),
             'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False}}
     grant={'id':'owner','connector':'a2a','sender':'alice','chat':'ctx-process-device','scope':scope(value,'alice'),'thread':'',
-        'identity':'personal','capabilities':['create','read','cancel'],'generation':'a'*64,'since':1}
+        'identity':'personal','capabilities':['create','read','cancel','answer'],'generation':'a'*64,'since':1}
     config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant]}
     etc=Path('/etc/haos');etc.mkdir(mode=0o755)
     def publish(data):
@@ -154,7 +154,9 @@ asyncio.run(exercise())
             raise AssertionError('worker exited: '+process.stderr.read())
         return json.loads(text)
     async def command(process,data):
-        process.stdin.write(json.dumps(data)+'\n');process.stdin.flush();return await line(process)
+        try:process.stdin.write(json.dumps(data)+'\n');process.stdin.flush()
+        except BrokenPipeError:raise AssertionError('worker failed: '+process.stderr.read()) from None
+        return await line(process)
     async def stop(process):
         if process.poll() is None:
             process.stdin.write(json.dumps({'method':'close'})+'\n');process.stdin.flush()
@@ -264,6 +266,141 @@ asyncio.run(exercise())
             terminal=(await pending).json()['result']['task']
             assert terminal['id']==second_task and terminal['status']['state']==protocol.STATE_CANCELED
             cases.append('actual_controller_terminal_cancellation_event_alone_completes_native_Future_and_JSON_RPC_as_cancelled')
+            # Real WebSocket JSON-RPC peer for the actual HermesConnection /
+            # Controller.question/respond path; no inference is substituted.
+            import websockets
+            from haos.hermes import HermesConnection
+            responses=[];peer_ready=asyncio.Event();question_frame=[None];backend_socket=[None]
+            async def backend(socket):
+                backend_socket[0]=socket;peer_ready.set()
+                async for text in socket:
+                    frame=json.loads(text);responses.append(frame)
+            backend_server=await websockets.serve(backend,'127.0.0.1',0)
+            backend_port=backend_server.sockets[0].getsockname()[1]
+            backend_client=await websockets.connect('ws://127.0.0.1:'+str(backend_port))
+            await peer_ready.wait()
+            controller.connection=HermesConnection(backend_client,controller.event,controller.question)
+            try:
+                third=json.loads(json.dumps(request));third['id']=10;third['params']['message']['messageId']='client-process-3'
+                pending=asyncio.create_task(client.post(address,headers=headers,json=third))
+                async with asyncio.timeout(10):
+                    while (await command(process,{'method':'counts'}))['relay']!=3:await asyncio.sleep(.02)
+                third_mid=(await command(process,{'method':'forward'}))['mission_id']
+                assert (await command(process,{'method':'pump'}))['delivered']==1
+                store.claim();controller.current=third_mid
+                session=store.get(third_mid)['session_id']
+                await backend_socket[0].send(json.dumps({'jsonrpc':'2.0','id':17,'method':'clarify','params':{
+                    'session_id':session,'question':'Choose the exact option.','private':'never export this tool parameter'}}))
+                async with asyncio.timeout(5):
+                    while store.get(third_mid)['state']!='waiting':await asyncio.sleep(.01)
+                assert (await command(process,{'method':'pump'}))['delivered']>=2
+                question=(await pending).json()['result']['task'];third_task=question['id']
+                assert question['status']['state']==protocol.STATE_INPUT_REQUIRED
+                assert 'never export' not in json.dumps(question)
+                cases.append('actual_Hermes_WebSocket_request_Controller_question_and_native_input_required_export_only_question_identity')
+                continuation=json.loads(json.dumps(third));continuation['id']=11
+                offered=question['metadata']['haosQuestion']
+                assert offered['requestId']=='17' and offered['method']=='clarify' and len(offered['epoch'])==64
+                continuation['params']['message'].update({'messageId':'client-process-3-answer','taskId':third_task,
+                    'metadata':{'haosQuestionEpoch':offered['epoch']},'parts':[{'text':'Approved option A.'}]})
+                pending=asyncio.create_task(client.post(address,headers=headers,json=continuation))
+                async with asyncio.timeout(10):
+                    while (await command(process,{'method':'counts'}))['relay']!=4:await asyncio.sleep(.02)
+                assert (await command(process,{'method':'forward'}))['mission_id']==third_mid
+                async with asyncio.timeout(5):
+                    while len(responses)!=1:await asyncio.sleep(.01)
+                assert responses==[{'jsonrpc':'2.0','id':17,'result':{'answer':'Approved option A.'}}]
+                assert len(store.list())==3 and store.get(third_mid)['state']=='running'
+                try:again=await client.post(address,headers=headers,json={**continuation,'id':12})
+                except httpx.TransportError as error:
+                    raise AssertionError('native continuation HTTP transport: '+json.dumps(await command(process,{'method':'health'}))) from error
+                assert again.json()['result']['task']['id']==third_task and len(responses)==1
+                assert await command(process,{'method':'counts'})=={'relay':4,'native_committed':4}
+                cases.append('actual_native_taskId_continuation_answers_exact_numeric_Hermes_question_through_root_without_new_task_mission_or_replayed_answer')
+                await backend_socket[0].send(json.dumps({'jsonrpc':'2.0','id':18,'method':'approval','params':{
+                    'session_id':session,'choices':['once','deny'],'private':'never export approval tool arguments'}}))
+                async with asyncio.timeout(5):
+                    while store.get(third_mid)['state']!='waiting':await asyncio.sleep(.01)
+                assert (await command(process,{'method':'pump'}))['delivered']>=2
+                approval=(await pending).json()['result']['task']
+                assert approval['id']==third_task and approval['status']['state']==protocol.STATE_INPUT_REQUIRED
+                next_question=approval['metadata']['haosQuestion']
+                assert next_question['requestId']=='18' and next_question['method']=='approval' and next_question['epoch']!=offered['epoch']
+                assert 'never export' not in json.dumps(approval)
+                for msg_id,epoch,body in [('stale-question-answer',offered['epoch'],'once'),('permanent-approval-answer',next_question['epoch'],'always')]:
+                    bad=json.loads(json.dumps(continuation));bad['params']['message'].update({'messageId':msg_id,
+                        'metadata':{'haosQuestionEpoch':epoch},'parts':[{'text':body}]})
+                    rejected=await client.post(address,headers=headers,json=bad)
+                    assert rejected.status_code==403 and 'error' in rejected.json()
+                    assert len(responses)==1 and await command(process,{'method':'counts'})=={'relay':4,'native_committed':4}
+                cases.append('new_wire_message_ID_cannot_reuse_old_question_epoch_or_request_permanent_approval_before_parent_dispatch')
+                approved=json.loads(json.dumps(continuation));approved['id']=13;approved['method']='SendStreamingMessage'
+                approved['params']['message'].update({'messageId':'client-process-3-approval',
+                    'metadata':{'haosQuestionEpoch':next_question['epoch']},'parts':[{'text':'once'}]})
+                async with client.stream('POST',address,headers=headers,json=approved) as streaming:
+                    assert streaming.status_code==200 and streaming.headers['content-type'].startswith('text/event-stream')
+                    lines=streaming.aiter_lines();early=[]
+                    while len(early)<2:
+                        text=await anext(lines)
+                        if text.startswith('data:'):early.append(json.loads(text[5:]))
+                    assert early[0]['result']['task']['id']==third_task and early[0]['result']['task']['status']['state']==protocol.STATE_WORKING
+                    assert early[1]['result']['statusUpdate']['status']['state']==protocol.STATE_WORKING
+                    async with asyncio.timeout(10):
+                        while (await command(process,{'method':'counts'}))['relay']!=5:await asyncio.sleep(.02)
+                    assert (await command(process,{'method':'forward'}))['mission_id']==third_mid
+                    async with asyncio.timeout(5):
+                        while len(responses)!=2:await asyncio.sleep(.01)
+                    assert responses[1]=={'jsonrpc':'2.0','id':18,'result':{'choice':'once'}}
+                    assert store.get(third_mid)['state']=='running' and len(store.list())==3
+                    cases.append('actual_native_continuation_SSE_keeps_original_task_ID_and_once_approval_reaches_exact_numeric_Hermes_request')
+                    store.settle(third_mid,'completed',result='Final result after explicit clarification and once approval.')
+                    assert (await command(process,{'method':'pump'}))['delivered']>=2
+                    remaining=[]
+                    async for text in lines:
+                        if text.startswith('data:'):remaining.append(json.loads(text[5:]))
+                    assert remaining[-1]['result']['statusUpdate']['taskId']==third_task
+                    assert remaining[-1]['result']['statusUpdate']['status']['state']==protocol.STATE_COMPLETED
+                    artifact=next(item['result']['artifactUpdate']['artifact'] for item in remaining if 'artifactUpdate' in item.get('result',{}))
+                    assert artifact['parts'][0]['text']=='Mission '+third_mid+': completed\nFinal result after explicit clarification and once approval.'
+                    cases.append('actual_clarification_and_approval_same_native_task_Future_and_SSE_receive_final_controller_result_without_new_mission')
+                fourth=json.loads(json.dumps(request));fourth['id']=14;fourth['params']['message']['messageId']='client-process-4'
+                pending=asyncio.create_task(client.post(address,headers=headers,json=fourth))
+                async with asyncio.timeout(10):
+                    while (await command(process,{'method':'counts'}))['relay']!=6:await asyncio.sleep(.02)
+                fourth_mid=(await command(process,{'method':'forward'}))['mission_id']
+                assert (await command(process,{'method':'pump'}))['delivered']==1
+                store.claim();controller.current=fourth_mid
+                await backend_socket[0].send(json.dumps({'jsonrpc':'2.0','id':19,'method':'clarify','params':{
+                    'session_id':store.get(fourth_mid)['session_id'],'question':'Owner must inspect if this connection is lost.'}}))
+                async with asyncio.timeout(5):
+                    while store.get(fourth_mid)['state']!='waiting':await asyncio.sleep(.01)
+                assert (await command(process,{'method':'pump'}))['delivered']>=2
+                lost_question=(await pending).json()['result']['task']
+                await backend_socket[0].close()
+                failed_answer=json.loads(json.dumps(fourth));failed_answer['id']=15
+                failed_answer['params']['message'].update({'messageId':'client-process-4-answer','taskId':lost_question['id'],
+                    'metadata':{'haosQuestionEpoch':lost_question['metadata']['haosQuestion']['epoch']},'parts':[{'text':'Explicit answer before peer transport loss is known.'}]})
+                pending=asyncio.create_task(client.post(address,headers=headers,json=failed_answer))
+                async with asyncio.timeout(10):
+                    while (await command(process,{'method':'counts'}))['relay']!=7:await asyncio.sleep(.02)
+                assert (await command(process,{'method':'forward'}))['mission_id']==fourth_mid
+                assert (await command(process,{'method':'pump'}))['delivered']>=2
+                unconfirmed=(await pending).json()['result']['task']
+                assert unconfirmed['id']==lost_question['id'] and unconfirmed['status']['state']==protocol.STATE_INPUT_REQUIRED
+                assert unconfirmed['metadata']=={'haosQuestionUnavailable':True,'haosAction':'inspect-owner-console'}
+                assert 'unconfirmed' in unconfirmed['status']['message']['parts'][0]['text'].lower()
+                replay=await client.post(address,headers=headers,json={**failed_answer,'id':16})
+                assert replay.json()['result']['task']['metadata']==unconfirmed['metadata']
+                fresh=json.loads(json.dumps(failed_answer));fresh['id']=17;fresh['params']['message']['messageId']='do-not-repeat-uncertain-answer'
+                refused=await client.post(address,headers=headers,json=fresh)
+                assert refused.status_code==403
+                assert len([e for e in store.events(fourth_mid) if e['kind']=='gateway.answer-dispatching'])==1
+                assert len([e for e in store.events(fourth_mid) if e['kind']=='gateway.answer-unconfirmed'])==1
+                assert len(responses)==2 and len(store.list())==4
+                cases.append('actual_closed_Hermes_WebSocket_preserves_unconfirmed_answer_with_owner_action_and_no_automatic_or_new_ID_resend')
+            finally:
+                await controller.connection.close();controller.connection=None;controller.current=None
+                backend_server.close();await backend_server.wait_closed()
             changed={**config,'bindings':[{**grant,'generation':'b'*64}]};publish(changed)
             async with asyncio.timeout(5):
                 while (await command(process,{'method':'health'}))['status']!='revoked':await asyncio.sleep(.02)

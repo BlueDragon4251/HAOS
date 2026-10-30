@@ -7,6 +7,7 @@ import io
 import json
 import re
 import socket
+import sys
 import threading
 from urllib.parse import urlsplit
 
@@ -25,6 +26,7 @@ class Server:
         self.capture=capture;self.cancel=cancel;self.loop=asyncio.get_running_loop();self.httpd=None;self.thread=None;self.watcher=None;self.sockets=set();self.socket_lock=threading.Lock();self.workers=set();self.pending=set();self.closing=None;self.closing_owner=None
         self.security=security_context(value);self.closed=False
         self.redactor=next(iter(adapters.values())).tasks.redactor
+        self.failure=None
         from plugins.platforms.a2a.protocol import RateLimiter
         self.limiter=RateLimiter();self.connections=threading.BoundedSemaphore(16);self.peer_lock=threading.Lock();self.peers=Counter()
 
@@ -89,6 +91,9 @@ class Server:
                 if broker.closed:raise PermissionError('private A2A listener closed')
                 if self.command=='GET' and isinstance(payload,dict) and 'served_agents' in payload:
                     payload={key:part for key,part in payload.items() if key!='served_agents'}
+                if getattr(self,'_adapter',None) is not None:
+                    from .gateway_a2a_question import decorate
+                    with self.adapter._haos_a2a_final_lock:payload=decorate(self.adapter,payload)
                 encoded=json.dumps(payload,ensure_ascii=False)
                 if broker.redactor.text(encoded)!=encoded:
                     raise PermissionError('private A2A credential in native JSON response')
@@ -146,7 +151,7 @@ class Server:
                     req_id=request['id'];method=request['method'];proof=None
                     if method in SEND:
                         proof=broker.parent(broker.capture(peer,raw))
-                        existing=self.adapter.tasks.by_source(proof['source_key'])
+                        existing=self.adapter._haos_a2a_lookup(proof)
                         if existing is not None:
                             binding=self.adapter.tasks.authorize(existing)
                             record=self.adapter.tasks.get(existing['task_id'])
@@ -187,7 +192,8 @@ class Server:
                         self._error(200,req_id,code,error.reason)
                 except (PermissionError,Conflict):
                     if not self._sent_headers:self._error(403,req_id,protocol.ERR_UNAUTHORIZED,'source or operation not approved')
-                except Exception:
+                except Exception as error:
+                    broker.failure=type(error).__name__
                     if not self._sent_headers:self._error(503,req_id,protocol.ERR_INVALID_PARAMS,'private A2A operation unavailable')
                 finally:
                     if leased:
@@ -227,7 +233,9 @@ class Server:
                 finally:
                     with broker.socket_lock:broker.sockets.discard(plain);broker.sockets.discard(wrapped);broker.workers.discard(threading.current_thread())
                     broker.connections.release()
-            def handle_error(self,*_args):pass
+            def handle_error(self,*_args):
+                error=sys.exc_info()[0]
+                broker.failure=error.__name__ if error is not None else 'transport-unavailable'
         self.httpd=Bounded((self.value['tls']['bind_host'],self.value['port']),self.handler())
         listener=self.httpd
         self.thread=threading.Thread(target=lambda:listener.serve_forever(poll_interval=.1),name='private-a2a-https',daemon=True);self.thread.start()

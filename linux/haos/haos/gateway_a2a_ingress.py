@@ -21,4 +21,4 @@ def envelope(event):
     if actual!=proof:raise PermissionError('native A2A parent source changed')
     # The native task ID is generated locally. The immutable wire client ID is
     # the controller/relay deduplication key; the task index proves their link.
-    return dict(proof['envelope'])
+    return adapter._haos_a2a_envelope(proof)

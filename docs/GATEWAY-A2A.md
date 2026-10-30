@@ -134,3 +134,47 @@ client. The fixture does not run model inference or the OS service supervisor.
 The 13-case process contract is now mandatory in pinned-runtime CI. No external
 peer, owner GUI, media/artifact/clarification completion, installed HAOS boot or
 release acceptance is claimed from it.
+
+## Exact clarification/approval continuation (private)
+
+A continuation uses the existing native task ID and an immutable source-to-
+question input journal. It does not create a new HAOS mission or replace the
+original task/source mapping. Each actual controller question is exposed in
+native JSON/SSE Task metadata as `haosQuestion` with `epoch`, `requestId` and
+`method`. A client must send that exact epoch as
+`message.metadata.haosQuestionEpoch` together with `message.taskId`; unrelated
+metadata, a stale epoch, another peer/context/grant and a second source for the
+same question are refused. Native wire IDs still deduplicate retries. These
+metadata values identify the question; they grant no authority themselves.
+The independent `answer` capability and current root binding epoch remain
+required. Approval answers are exactly `once` or `deny`; permanent/session
+approvals are unavailable.
+
+The retained answer is translated into the exact controller `/answer` operation
+inside the verified private parent-dispatch context. Actual native MessageEvent,
+TaskStore, Future, JSON and SSE codecs are retained. A continuation's working
+state describes processing/relaying that explicit answer; it does not assert
+that the controller has accepted it or that the mission has completed. Later
+controller question/final events resolve that same task. Native HTTP finalizers
+are held behind the complete local task/outcome-epoch commit, so a question
+cannot race the durable proof needed by its next answer. The pinned native
+sender used under this lock only resolves a Future and contains no suspension
+or network I/O.
+
+A real closed Hermes WebSocket leaves the answer unconfirmed. Its native task
+requires owner inspection (`haosQuestionUnavailable` and
+`haosAction: inspect-owner-console`); no fresh question token is invented.
+Replaying the original source, or inventing a new wire ID, does not re-send that
+uncertain answer. The 19-case offline process contract now exercises actual
+Controller/HermesConnection WebSocket requests and responses, numeric question
+IDs, successive clarification/approval epochs, early continuation SSE, exact
+`once`, stale/permanent denial, final result and real transport loss. It runs
+with the actual dedicated gateway UID, root Unix client and SO_PEERCRED gates;
+there is no agent inference, live external peer or full installed service test.
+
+Repeated admission derives private wire aliases only from fixed account material,
+not recursively from the previous aliases. Five hundred actual codec replays
+prove stable bounded retention while raw/private-PEM and both supported escaped
+forms remain refused. Runtime-status updates stay inside the dedicated private
+profile HOME. Media/artifacts, complete owner recovery/configuration and GUI,
+required callbacks and public activation remain outstanding.

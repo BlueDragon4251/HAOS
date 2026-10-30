@@ -82,6 +82,10 @@ def build(value,*,parent,connector,policy,inbox):
         facade._haos_a2a_profile=profile;facade._haos_a2a_indexes=indexes;facade._haos_a2a_peers=peers
         facade._haos_a2a_originals=originals
         facade._haos_a2a_check=pinned
+        def mark(connected):
+            with private_scope(profile,{'HERMES_SAFE_MODE':'1'}):
+                if connected:facade._mark_connected(listener_base=value['tls']['public_url'])
+                else:facade._mark_disconnected()
         db=originals.db
         db.execute('''CREATE TABLE IF NOT EXISTS a2a_profile_status(
             identity TEXT PRIMARY KEY,connector TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL)''')
@@ -89,14 +93,19 @@ def build(value,*,parent,connector,policy,inbox):
         def status(state):
             if state not in STATES:raise ValueError('finite private A2A status required')
             db.execute('UPDATE a2a_profile_status SET status=?,updated_at=? WHERE identity=?',(state,time.time(),initial))
-        def health():return dict(db.execute('SELECT connector,status,updated_at FROM a2a_profile_status WHERE identity=?',(initial,)).fetchone())
+        def health():
+            result=dict(db.execute('SELECT connector,status,updated_at FROM a2a_profile_status WHERE identity=?',(initial,)).fetchone())
+            failure=listener[0].failure if listener[0] is not None else None
+            known={'PermissionError','Conflict','TimeoutError','OSError','RuntimeError','ValueError','AttributeError','KeyError','TypeError','OperationalError','IntegrityError'}
+            result['transport_error']=failure if failure is None or failure in known else 'transport-unavailable'
+            return result
         listener=[None];worker=[None];lock=asyncio.Lock();close_task=[None]
 
         async def receive(event,proof,task_id):
             pinned();peer=proof['envelope']['sender'];index=indexes[peer];native=peers[peer]
             actual=originals.get(policy(),connector,value,peer,proof['id'])
             if actual!=proof:raise Conflict('native A2A input no longer matches original custody')
-            row=index.by_source(proof['source_key'])
+            row=native._haos_a2a_lookup(proof)
             if row is None or row['task_id']!=task_id:raise Conflict('native A2A input changed task/source mapping')
             key=inbox.admit(policy(),connector,proof['envelope'],{'raw_id':proof['id'],'task_id':task_id},received_at=proof['received_at'])
             retained=inbox.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()
@@ -128,25 +137,30 @@ def build(value,*,parent,connector,policy,inbox):
                 try:
                     pinned()
                     if listener[0] is None or listener[0].closed:
-                        facade._mark_disconnected();return
+                        mark(False);return
                     for peer,index in indexes.items():
                         selection=index.selection()
                         if selection is None:continue
                         where,args=selection
                         rows=index.db.execute('SELECT * FROM a2a_tasks WHERE '+where+" AND admitted_receipt='' ORDER BY updated_at LIMIT 128",args).fetchall()
+                        holders=','.join('?' for _ in args[3:])
+                        rows=[*rows,*index.db.execute("SELECT i.task_id,i.raw_id FROM a2a_task_inputs i JOIN a2a_tasks t ON t.task_id=i.task_id "
+                            "WHERE i.admitted_receipt='' AND t.connector=? AND t.peer=? AND t.credential_scope=? AND t.binding_digest IN ("+holders+") ORDER BY i.created_at LIMIT 32",args).fetchall()]
                         for row in rows:
                             proof=originals.get(policy(),connector,value,peer,row['raw_id'])
                             native=peers[peer]
+                            source=native._haos_a2a_lookup(proof)
+                            if source is None:raise Conflict('retained A2A input lost its native task mapping')
                             from gateway.platforms.event import MessageEvent,MessageType
                             event=MessageEvent(text=proof['envelope']['text'],message_type=MessageType.TEXT,message_id=row['task_id'],
-                                source=native.build_source(chat_id=row['context_id'],user_id=peer,user_name=peer,chat_type='dm',chat_name='a2a:'+peer))
+                                source=native.build_source(chat_id=source['context_id'],user_id=peer,user_name=peer,chat_type='dm',chat_name='a2a:'+peer))
                             with index.source(connector,proof):await native.handle_message(event)
                     status('listening')
                 except asyncio.CancelledError:raise
                 except PermissionError:
                     try:pinned()
                     except PermissionError:
-                        status('revoked');facade._mark_disconnected()
+                        status('revoked');mark(False)
                         if listener[0] is not None:await listener[0].close()
                         return
                     status('storage-unavailable')
@@ -160,7 +174,7 @@ def build(value,*,parent,connector,policy,inbox):
             if server is not None:await server.close()
             else:
                 for native in peers.values():await native.close_profile()
-            facade._mark_disconnected()
+            mark(False)
         async def open_listener():
             async with lock:
                 if closed[0]:raise PermissionError('private A2A profile closed')
@@ -174,7 +188,7 @@ def build(value,*,parent,connector,policy,inbox):
                     from .gateway_line_tls import context
                     tls=context(value['tls'],profile,webhook_path='/a2a')
                     listener[0]=Server(value,connector,dict(peers),pinned,policy,capture,cancel=cancel)
-                    listener[0].start(tls);pinned();facade._mark_connected();status('listening')
+                    listener[0].start(tls);pinned();mark(True);status('listening')
                     worker[0]=asyncio.create_task(recover());return True
                 except BaseException:
                     await halt();status('transport-unavailable');raise

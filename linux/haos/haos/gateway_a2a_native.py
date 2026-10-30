@@ -12,6 +12,7 @@ from .gateway_a2a_tasks import Tasks,_SOURCE
 from .gateway_matrix_profile import scope as private_scope
 
 _DELIVERY=ContextVar('haos_private_a2a_delivery',default=None)
+_OUTCOME=ContextVar('haos_private_a2a_outcome',default=None)
 
 
 def build(value,peer,home,current,policy,tasks,receive):
@@ -33,6 +34,8 @@ def build(value,peer,home,current,policy,tasks,receive):
     with private_scope(home,environment):
         adapter=durable_adapter(A2AAdapter(PlatformConfig(enabled=True,extra={'agents':[None],'advertised_toolsets':['haos_missions']})))
     adapter.tasks=tasks;adapter._loop=asyncio.get_running_loop()
+    from .gateway_a2a_inputs import Inputs
+    inputs=Inputs(tasks)
     adapter._haos_a2a_home=home;adapter._haos_a2a_environment=environment
     adapter._security_context=security_context({**value,'peer_tokens':{peer:value['peer_tokens'][peer]}})
     native_prepare=adapter._prepare_task.__func__;native_handle=adapter.handle_message.__func__
@@ -51,7 +54,7 @@ def build(value,peer,home,current,policy,tasks,receive):
     def source(event):
         check();state=_SOURCE.get()
         if state is None or state[0] is not tasks:raise PermissionError('unretained A2A event has no dispatch context')
-        proof=state[2];row=tasks.by_source(proof['source_key']);origin=proof['envelope'];native=event.source
+        proof=state[2];row=lookup(proof);origin=proof['envelope'];native=event.source
         if (row is None or row['task_id']!=event.message_id or row['raw_id']!=proof['id'] or native is None
                 or getattr(native.platform,'value',None)!='a2a' or native.user_id!=peer or native.chat_id!=origin['chat']
                 or native.is_bot is not False or event.internal or event.media_urls or event.text!=origin['text']
@@ -69,7 +72,8 @@ def build(value,peer,home,current,policy,tasks,receive):
     async def handle(self,event):
         proof,row=source(event)
         receipt=await receive(event,proof,row['task_id']);check()
-        tasks.admitted(row['task_id'],receipt)
+        if 'target_task_id' in proof:inputs.admitted(proof,receipt)
+        else:tasks.admitted(row['task_id'],receipt)
         with private_scope(home,environment):await native_handle(self,event)
         check()
         if event._gateway_accepted is not True:raise PermissionError('native A2A input was not durably accepted')
@@ -81,7 +85,23 @@ def build(value,peer,home,current,policy,tasks,receive):
         proof=state[2]
         if digest([proof['source_key'],digest([params,proof['envelope'],proof['binding_digest'],proof['credential_scope']])])!=proof['id']:
             raise PermissionError('native A2A parameters changed after original custody')
-        if tasks.by_source(proof['source_key']) is not None:raise Conflict('recover the original A2A task instead of dispatching it twice')
+        if lookup(proof) is not None:raise Conflict('recover the original A2A task instead of dispatching it twice')
+        if 'target_task_id' in proof:
+            row=inputs.prepare(proof);task_id=row['task_id'];record=tasks.get(task_id)
+            # A continuation retains the actual original native TaskStore ID.
+            # Its working state describes processing a queued clarification,
+            # not a completed mission or confirmation of the remote answer.
+            tasks.set_state(task_id,protocol.STATE_WORKING)
+            with private_scope(home,environment):
+                from gateway.platforms.event import MessageEvent,MessageType
+                future=self._add_pending(task_id,row['context_id'])
+                pending={'task_id':task_id,'context_id':row['context_id'],'peer':peer,'future':future,
+                    'created_iso':record['created_iso'],'started':__import__('time').time()}
+                event=MessageEvent(text=proof['envelope']['text'],message_type=MessageType.TEXT,message_id=task_id,
+                    source=self.build_source(chat_id=row['context_id'],chat_name='a2a:'+peer,chat_type='dm',user_id=peer,user_name=peer))
+                prepared[task_id]=pending;finalized.pop(task_id,None)
+                asyncio.run_coroutine_threadsafe(self.handle_message(event),self._loop)
+            return None,pending
         with private_scope(home,environment):terminal,pending=native_prepare(self,params,peer,agent=self._agents[''])
         if pending is not None:
             row=tasks.by_source(proof['source_key'])
@@ -96,6 +116,9 @@ def build(value,peer,home,current,policy,tasks,receive):
             if state==protocol.STATE_FAILED and reply in {'[client disconnected]','[agent did not reply in time]','[agent shutting down]'}:
                 record=tasks.get(task_id)
                 return record['state'],record['reply']
+            if (_OUTCOME.get()!=(self,task_id) and tasks.db.execute(
+                    "SELECT 1 FROM a2a_result_epochs WHERE task_id=? AND state='writing'",(task_id,)).fetchone()):
+                raise Conflict('native A2A outcome receipt is not committed')
             if task_id in finalized:return finalized[task_id]
             with private_scope(home,environment):result=native_finalize(self,pending,state,reply)
             committed=tasks.get(task_id)
@@ -151,44 +174,65 @@ def build(value,peer,home,current,policy,tasks,receive):
     from .gateway_a2a_result import Results
     results=Results(tasks)
     async def outcome(self,task_id,source_key,epoch,content,state):
-        from gateway.platforms.base import SendResult
         check()
         async with send_lock:
-            cached,desired,projected=results.begin(task_id,source_key,epoch,content,state)
-            if not cached:
-                record=tasks.get(task_id)
-                if task_id not in prepared:
-                    future=self._add_pending(task_id,record['context_id'])
-                    prepared[task_id]={'task_id':task_id,'context_id':record['context_id'],'peer':peer,'future':future,
-                        'created_iso':record['created_iso'],'started':record['created_at']}
-                pending=prepared[task_id]
-                if state==protocol.STATE_COMPLETED:
-                    delivery=[self,task_id,0];token=_DELIVERY.set(delivery)
-                    try:
-                        with private_scope(home,environment):sent=await native_send(self,record['context_id'],content,reply_to=task_id,metadata={'notify':True})
-                    finally:_DELIVERY.reset(token)
-                    resolved=sent.success is True and delivery[2]==1
-                else:resolved=native_resolve(self,task_id,state,content)
-                if not resolved or not pending['future'].done() or pending['future'].result()!=(state,content):
-                    raise Conflict('native A2A outcome did not resolve its exact retained task Future')
-                # A later controller event may legitimately finish a task after
-                # an input-required outcome. The immutable epochs remain separate.
-                finalized.pop(task_id,None)
-                self._finalize_task(pending,state,content);check()
-                results.confirm(task_id,source_key,epoch,content,state)
-            return SendResult(success=True,message_id=task_id,raw_response={'recipient_read_verified':False,'local_task_committed':True})
+            # The frozen native sender only resolves a Future; it never yields
+            # or performs I/O. Keep HTTP finalizers behind the complete durable
+            # outcome+epoch commit so question metadata cannot race its proof.
+            with finalize_lock:
+                token=_OUTCOME.set((self,task_id))
+                try:return await finish_outcome(self,task_id,source_key,epoch,content,state)
+                finally:_OUTCOME.reset(token)
+
+    async def finish_outcome(self,task_id,source_key,epoch,content,state):
+        from gateway.platforms.base import SendResult
+        cached,desired,projected=results.begin(task_id,source_key,epoch,content,state)
+        if not cached:
+            record=tasks.get(task_id)
+            if task_id not in prepared:
+                future=self._add_pending(task_id,record['context_id'])
+                prepared[task_id]={'task_id':task_id,'context_id':record['context_id'],'peer':peer,'future':future,
+                    'created_iso':record['created_iso'],'started':record['created_at']}
+            pending=prepared[task_id]
+            if state==protocol.STATE_COMPLETED:
+                delivery=[self,task_id,0];token=_DELIVERY.set(delivery)
+                try:
+                    with private_scope(home,environment):sent=await native_send(self,record['context_id'],content,reply_to=task_id,metadata={'notify':True})
+                finally:_DELIVERY.reset(token)
+                resolved=sent.success is True and delivery[2]==1
+            else:resolved=native_resolve(self,task_id,state,content)
+            if not resolved or not pending['future'].done() or pending['future'].result()!=(state,content):
+                raise Conflict('native A2A outcome did not resolve its exact retained task Future')
+            # A later controller event may legitimately finish a task after
+            # an input-required outcome. The immutable epochs remain separate.
+            finalized.pop(task_id,None)
+            self._finalize_task(pending,state,content);check()
+            results.confirm(task_id,source_key,epoch,content,state)
+        return SendResult(success=True,message_id=task_id,raw_response={'recipient_read_verified':False,'local_task_committed':True})
 
     async def connect(self,**_kwargs):raise PermissionError('A2A requires the separately bounded authenticated HTTPS server')
     native_emit=adapter._emit_terminal.__func__;native_sse=adapter._sse_write
     def emit(self,handler,task_id,context_id,state,reply,req_id=None):
-        check();record=tasks.get(task_id)
-        if record is None or record['context_id']!=context_id or record['state']!=state or record['reply']!=reply:
-            raise Conflict('native A2A stream outcome has no matching committed local task')
-        return native_emit(self,handler,task_id,context_id,state,reply,req_id=req_id)
+        with finalize_lock:
+            check();record=tasks.get(task_id)
+            if record is None or record['context_id']!=context_id or record['state']!=state or record['reply']!=reply:
+                raise Conflict('native A2A stream outcome has no matching committed local task')
+            return native_emit(self,handler,task_id,context_id,state,reply,req_id=req_id)
     def sse(self,handler,chunk):
         check()
         if not isinstance(chunk,str) or len(chunk.encode())>1024*1024 or tasks.redactor.text(chunk)!=chunk:
             raise PermissionError('bounded credential-free native A2A stream frame required')
+        if chunk.startswith('data:'):
+            import json
+            from .gateway_a2a_question import decorate
+            payload=json.loads(chunk[5:].strip());state=_SOURCE.get()
+            if state is not None and state[0] is tasks and 'target_task_id' in state[2]:
+                native_task=payload.get('result',{}).get('task')
+                if isinstance(native_task,dict) and native_task.get('status',{}).get('state')==protocol.STATE_SUBMITTED:
+                    payload['result']['task']=protocol.TaskStore.to_task(tasks.get(state[2]['target_task_id']))
+            chunk='data: '+json.dumps(decorate(self,payload),ensure_ascii=False)+'\n\n'
+            if len(chunk.encode())>1024*1024 or tasks.redactor.text(chunk)!=chunk:
+                raise PermissionError('private or excessive native A2A stream metadata')
         return native_sse(handler,chunk)
     native_card=adapter._build_card.__func__
     def card(self,public_url=None,agent=None):
@@ -211,8 +255,14 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter._finalize_task=MethodType(finalize,adapter);adapter._resolve_oldest_for_context=MethodType(resolve,adapter)
     adapter.send=MethodType(send,adapter);adapter.send_outcome=MethodType(outcome,adapter)
     adapter.connect=MethodType(connect,adapter);adapter.close_profile=MethodType(close,adapter)
+    def lookup(proof):
+        return inputs.lookup(proof) if 'target_task_id' in proof else tasks.by_source(proof['source_key'])
+    def envelope(proof):
+        return inputs.envelope(proof) if 'target_task_id' in proof else dict(proof['envelope'])
     adapter._advertised_skills=MethodType(skills,adapter);adapter._haos_a2a_check=check
     adapter._haos_a2a_source=source
+    adapter._haos_a2a_lookup=lookup;adapter._haos_a2a_envelope=envelope;adapter._haos_a2a_inputs=inputs
+    adapter._haos_a2a_final_lock=finalize_lock
     adapter._emit_terminal=MethodType(emit,adapter);adapter._sse_write=MethodType(sse,adapter)
     adapter._build_card=MethodType(card,adapter)
     check();return adapter
