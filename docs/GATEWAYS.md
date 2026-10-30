@@ -40,6 +40,10 @@ replies, separately approved media/local voice, root-controller exports,
 private upload custody and inspected account/source/history/reply recovery.
 See [Buzz setup and source-bound limits](GATEWAY-BUZZ.md).
 
+Google Chat private admission, native codec, SDK token, pre-ACK custody and
+bounded native text-write building blocks are being implemented; they remain
+outside public activation. See [current Google Chat scope](GATEWAY-GOOGLE-CHAT.md).
+
 The remaining HAOS integrations are
 google_chat, photon, raft, simplex, teams, wecom and whatsapp. Their bundled
 upstream modules alone do not count as working HAOS gateways. Complete each

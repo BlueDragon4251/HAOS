@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-30",
+  "parent": "62c5b4064f72ea61087a4f0c8c65d534bed945d0",
+  "source_files_sha256": [
+    {
+      "path": "docs/GATEWAYS.md",
+      "sha256": "e96171769e981c9d183c85be37932918d16b27b96863656e961a86db6a7213d4"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "b3e296bb2ccc1808d8f3d9c6f8b6236bf02d6391cedecbab9250603ac636b280"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_tls.py",
+      "sha256": "8bf8250241f6209b1922ec66d53f31b9441653cd6fbc3e08b8c20baa6a359a9f"
+    },
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "ee7a0d2e3c4c4e337703c8e4fd57c69a0e006aeec94d7286f2cea6f5ed9600c6"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "11c5626418306b8ab85d226efdaba8f3720a81019a9fbca71e13ad84306eab63"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat.py",
+      "sha256": "3f7cf270c0f65cd61f13a07da96ba0ecd5caa38a3c629336dd1bb1678e98e0a3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_admission.py",
+      "sha256": "5086d7e478a0a7c688267af82e639ab05af00e449e590b387e9b6cd12b9b27b7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_auth.py",
+      "sha256": "da92a7e8c79200ff7ba5dab3c36a4ee97544b3e95bb70e008e937d7f742b73ba"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_codec.py",
+      "sha256": "cf05dd1ba3beff49626558d7ca8ce192a39ff857987651cbcf46f478640e03a6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_custody.py",
+      "sha256": "4034d38e9a35a264d5d3d2f4caa508befc3251999861ba36afc8a5eca6e620e2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_http.py",
+      "sha256": "a4f1747bcfe380eff954876b4949b96ff54055ea8e1856f9087a061c9216f7fe"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_receive.py",
+      "sha256": "8ac9adb4cce0c50af58ddc086e6306e13ace92128d0bbf668fd21fdbe4b343fc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_text.py",
+      "sha256": "ec50050f868ebda6662830a9325e62e3f262cea059bf6a5866f0792f5c3bca1e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_auth.py",
+      "sha256": "2d5ff51b51ae6b2bc85f1baca2b6c680115a1606a078e581348d4bfda7279722"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_codec.py",
+      "sha256": "6f859d45d275922fc38ea034289bf5a21c25428cd12d9d5b855dcdae0320046b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_pubsub_custody.py",
+      "sha256": "b9240a7252c84373a000c8698223b637ce9495a97e5b17f124653ab1559137f1"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_text.py",
+      "sha256": "0dc8b49bbe4595d44d657ed1ec8c53b5865a1caef3ae9002f71b47662986f5f2"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat.py",
+      "sha256": "9093f5df978ce764477d1d4cf41575c85e6a8257cf9fa01e98d2519abdacea6b"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat_custody.py",
+      "sha256": "611da8065d9ba6d124452ab1776d95723bc5ec0226d3cf0297019a206dec281e"
+    }
+  ],
+  "pinned_Hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 15,
+  "google_chat_public_activation": false,
+  "validation": {
+    "minimal": {
+      "passed": 2677,
+      "existing_skips": 2
+    },
+    "full": {
+      "passed": 2677,
+      "existing_skips": 2
+    },
+    "actual_kernel_root_regression": 173
+  },
+  "native_receipts": {
+    "google-chat-native-codec": {
+      "passed": 7,
+      "cases": [
+        "actual_native_service_account_loader_uses_frozen_Google_SDK_and_exact_RSA_signed_bot_pubsub_scopes_without_ADC_or_live_network",
+        "actual_native_native_SPACE_codec_preserves_exact_stable_sender_and_thread_on_replay_despite_mutable_email_and_native_DM_counter",
+        "actual_native_addons_SPACE_codec_preserves_exact_stable_sender_and_thread_on_replay_despite_mutable_email_and_native_DM_counter",
+        "withdrawn_SPACE_grant_or_changed_original_refused_before_native_decode",
+        "actual_native_native_DIRECT_MESSAGE_codec_preserves_exact_stable_sender_and_thread_on_replay_despite_mutable_email_and_native_DM_counter",
+        "actual_native_addons_DIRECT_MESSAGE_codec_preserves_exact_stable_sender_and_thread_on_replay_despite_mutable_email_and_native_DM_counter",
+        "withdrawn_DIRECT_MESSAGE_grant_or_changed_original_refused_before_native_decode"
+      ],
+      "pinned_Hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+      "native_adapter_sha256": "9a649e63b382bee7aff12e412ddaef5589671776a77b0bc52bdf0d60d83fbb9c",
+      "actual_native_codec_and_service_account_SDK": true,
+      "ephemeral_local_RSA_key_only": true,
+      "transport_AUTH_persistence_UID_mission_media_GUI_live_account_or_public_activation": false
+    },
+    "google-chat-native-auth": {
+      "passed": 11,
+      "cases": [
+        "actual_Google_SDK_verifies_RSA_signature_official_issuer_exact_audience_verified_caller_and_expiry_with_no_token_return",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_aud",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_iss",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_email",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_email_verified",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_iat",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_iat",
+        "actual_Google_SDK_or_additional_exact_caller_gate_refuses_exp",
+        "actual_signature_tampering_duplicate_authorization_wrong_scheme_missing_and_injected_headers_refused",
+        "bounded_certificate_transport_refuses_foreign_URL_method_and_ambient_authorization_before_network",
+        "current_private_authority_is_required_before_any_certificate_or_token_work"
+      ],
+      "actual_Google_RSA_JWT_verification": true,
+      "certificate_endpoint_is_explicit_local_fixture": true,
+      "ephemeral_local_key_only": true,
+      "live_Google_token_HTTP_listener_PubSub_UID_mission_GUI_or_public_activation": false
+    },
+    "google-chat-native-pubsub-custody": {
+      "passed": 4,
+      "cases": [
+        "actual_Google_SDK_ACK_is_enqueued_only_after_an_independent_connection_observes_FULL_original_commit_and_process_reopen_replay_keeps_one_source",
+        "unknown_sender_and_malformed_event_have_durable_hash_only_refusal_before_actual_SDK_ACK_without_source_admission_or_content_in_audit",
+        "actual_SQL_commit_failure_produces_native_SDK_NACK_without_ACK_or_lost_original_then_can_retry",
+        "refusal_audit_commit_failure_also_NACKs_without_silent_drop_or_implicit_unknown_sender_authority"
+      ],
+      "actual_Google_PubSub_Message_ack_nack_and_SQLite_FULL": true,
+      "authenticated_subscriber_and_remote_ack_acceptance_are_not_exercised": true,
+      "UID_native_dispatch_missions_media_GUI_live_account_or_public_activation": false
+    },
+    "google-chat-native-text": {
+      "passed": 6,
+      "cases": [
+        "actual_native_send_and_Google_discovery_HTTP_create_use_stable_client_request_IDs_and_OR_FAIL_after_independent_connection_observes_FULL_write_intent_then_confirmed_replay_has_no_HTTP",
+        "post_body_disconnect_reopen_uses_only_exact_client_ID_GET_reconciliation_without_another_create_or_new_recipient",
+        "actual_HTTP_429_and_recovery_GET_404_never_automatically_repeat_begun_write_or_reinterpret_not_found_as_non_delivery",
+        "actual_native_HTTP_401_has_one_wire_attempt_no_redirect_auth_challenge_retry_or_fabricated_acceptance",
+        "actual_native_HTTP_302_has_one_wire_attempt_no_redirect_auth_challenge_retry_or_fabricated_acceptance",
+        "changed_content_cross_thread_and_revoked_grant_refused_before_HTTP_including_previously_confirmed_replies"
+      ],
+      "actual_native_send_Google_API_discovery_SDK_HTTP_and_FULL_SQLite": true,
+      "HTTP_server_and_account_auth_are_explicit_loopback_fixtures": true,
+      "UID_controller_outbox_media_GUI_live_account_recipient_delivery_or_public_activation": false
+    }
+  },
+  "frozen_Google_extra_versions": {
+    "google-cloud-pubsub": "2.39.0",
+    "google-api-python-client": "2.194.0",
+    "google-auth": "2.55.1",
+    "google-auth-oauthlib": "1.3.1",
+    "google-auth-httplib2": "0.3.1",
+    "httplib2": "0.32.0",
+    "pyasn1": "0.6.4"
+  },
+  "logs_sha256": [
+    {
+      "path": "google-chat-primitives-final-minimal.log",
+      "sha256": "4927806b80429c7c170c0c6a1d10739cb526c26880a2638524f4e247765dd635"
+    },
+    {
+      "path": "google-chat-primitives-final-kernel.log",
+      "sha256": "07b9fc08d6eac5c55257a7974122a0dc551ed69b7fe75127f052898c9995165c"
+    },
+    {
+      "path": "google-chat-primitives-final-full.log",
+      "sha256": "04122909cd1981f4be33c8a32adf9806da0245ac1b507f38c6ca3292b4623fcf"
+    },
+    {
+      "path": "google-chat-native-auth.log",
+      "sha256": "99712c83f8636ec31f8a35abcf560e255fa7cd55bccc7d0b61512fdbebfb1ffe"
+    },
+    {
+      "path": "google-chat-native-codec.log",
+      "sha256": "4dc344dfe5a9887ffc10a2d615f2a291899689d9687ff2202aa2bf59eeb1f52b"
+    },
+    {
+      "path": "google-chat-native-pubsub-custody.log",
+      "sha256": "069d140bda0629d42bcf5ee5b26de22b81188b8525980be69cc3e75f81f3daf3"
+    },
+    {
+      "path": "google-chat-native-text.log",
+      "sha256": "088dcbe4d9baa9c652e167c1c721f8d965780eb842ea143e6bf24f7ef7d1aae9"
+    }
+  ],
+  "acceptance_limits": [
+    "Google Chat remains outside the public registry, GUI and installed runtime extras.",
+    "Schema-only private key fixtures are not loaded as credentials; real SDK assertion/signature checks use ephemeral local RSA keys.",
+    "Certificate endpoint, account HTTP auth, loopback Chat API and SubscriberClient transport are explicit fixtures; no live Google token/subscription/callback/recipient acceptance.",
+    "Prepared native text ledger still requires production controller outbox authority and private profile/UID integration.",
+    "Kernel regression passes for existing integrations; it does not establish new Google Chat UID, listener, media/OAuth, GUI, mission or installed acceptance.",
+    "Dedicated prepared-contract CI has not executed at this source. No production dependency version changed."
+  ]
+}

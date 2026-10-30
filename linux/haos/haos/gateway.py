@@ -54,7 +54,7 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk','buzz'}
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk','buzz','google_chat'}
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media','allow_callback'} if connector and connector['platform']=='a2a'
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms','email','a2a'} else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:

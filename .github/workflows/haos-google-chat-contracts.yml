@@ -1,0 +1,46 @@
+name: HAOS prepared Google Chat contracts
+on:
+  pull_request:
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths: ['linux/haos/haos/gateway_google_chat*.py', 'linux/haos/runtime/**', 'linux/haos/tests/test_gateway_google_chat*.py', '.github/workflows/haos-google-chat-contracts.yml', 'upstream/UPSTREAM.lock']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: google-chat-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepared-native-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - name: Prepare exact frozen optional Google Chat SDK without public activation
+        run: |
+          set -euo pipefail
+          python -m pip install uv
+          bash scripts/sync-upstream.sh
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+      - name: Actual native codec token validation pre-ACK custody and bounded text HTTP fixtures
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/google-chat-contracts"
+          PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
+          "$PYTHON" linux/haos/runtime/probe_google_chat_codec.py upstream/hermes-agent "$RUNNER_TEMP/google-chat-contracts/codec.json"
+          "$PYTHON" linux/haos/runtime/probe_google_chat_auth.py "$RUNNER_TEMP/google-chat-contracts/auth.json"
+          "$PYTHON" linux/haos/runtime/probe_google_chat_pubsub_custody.py "$RUNNER_TEMP/google-chat-contracts/pubsub-custody.json"
+          "$PYTHON" linux/haos/runtime/probe_google_chat_text.py upstream/hermes-agent "$RUNNER_TEMP/google-chat-contracts/text.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: prepared-google-chat-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/google-chat-contracts/
+          if-no-files-found: error
+          retention-days: 7
