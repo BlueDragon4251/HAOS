@@ -56,14 +56,16 @@ def main():
                 requests.append(('POST',query,body));client=query['messageId'][0]
                 with sqlite3.connect(path) as db:
                     row=db.execute('SELECT state,client_id FROM google_chat_text_writes WHERE client_id=?',(client,)).fetchone();assert row==('writing',client)
-                assert query['messageReplyOption']==['REPLY_MESSAGE_OR_FAIL'] and len(query['requestId'][0])==36
+                assert len(query['requestId'][0])==36
+                if body.get('thread'):assert query['messageReplyOption']==['REPLY_MESSAGE_OR_FAIL']
+                else:assert 'messageReplyOption' not in query
                 if mode['next']=='auth':
                     mode['next']='ok';self.reply(401,{'error':{'code':401,'message':'local fixture auth refusal'}});return
                 if mode['next']=='redirect':
                     mode['next']='ok';self.send_response(302);self.send_header('Location','/foreign-target');self.send_header('Content-Length','0');self.end_headers();return
                 if mode['next']=='rate':mode['next']='ok';self.reply(429,{'error':{'code':429,'message':'local fixture rate limit'}});return
                 response={'name':'spaces/room1/messages/server.part'+str(len(stored)),'text':body['text'],
-                    'thread':body['thread'],'clientAssignedMessageId':client};stored[client]=response
+                    'thread':body.get('thread',{'name':'spaces/room1/threads/servernew'}),'clientAssignedMessageId':client};stored[client]=response
                 if mode['next']=='disconnect':
                     mode['next']='ok';self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
                 self.reply(200,response)
@@ -130,6 +132,24 @@ def main():
             else:raise AssertionError('withdrawn grant accepted')
             assert len(requests)==before
             cases.append('changed_content_cross_thread_and_revoked_grant_refused_before_HTTP_including_previously_confirmed_replies')
+            wide={**binding,'thread':'','all_threads':True,'generation':'b'*64}
+            policy.bindings['owner']=wide;route['binding_digest']=digest(wide)
+            for identifier,selected_thread in [('6'*64,'spaces/room1/threads/firstnew'),('7'*64,'spaces/room1/threads/secondnew')]:
+                operation['id']=identifier
+                result=await adapter.send(wide['chat'],'approved whole-space reply',metadata={'thread_id':selected_thread})
+                assert result.success and requests[-1][0]=='POST' and requests[-1][2]['thread']['name']==selected_thread
+            cases.append('explicit_whole_space_owner_grant_preserves_each_actual_source_thread_in_native_SDK_create_with_OR_FAIL_and_distinct_client_IDs')
+            operation['id']='8'*64
+            result=await adapter.send(wide['chat'],'approved root conversation reply',metadata={'thread_id':''})
+            assert result.success and 'thread' not in requests[-1][2]
+            cases.append('explicit_whole_space_consent_also_supports_no_thread_conversation_reply_without_inventing_a_target_thread')
+            before=len(requests);operation['id']='9'*64
+            try:await adapter.send(wide['chat'],'wrong space',metadata={'thread_id':'spaces/other/threads/invalid'})
+            except PermissionError:pass
+            else:raise AssertionError('whole-space approval crossed into another space')
+            assert len(requests)==before
+            cases.append('whole_space_native_send_still_refuses_foreign_space_thread_before_any_HTTP')
+
         try:asyncio.run(run())
         finally:inbox.close();server.shutdown();server.server_close();thread.join(timeout=2)
         receipt={'passed':len(cases),'cases':cases,'actual_native_send_Google_API_discovery_SDK_HTTP_and_FULL_SQLite':True,

@@ -22,8 +22,12 @@ def current_delivery(adapter,platform,chat,metadata):
             if not isinstance(latest,GatewayPolicy) or latest.connectors.get(connector,{}).get('platform')!=platform:
                 raise PermissionError
             binding=latest.current_binding(route)
+            thread_matches=binding['thread']==thread
+            if platform=='google_chat':
+                from .gateway_google_chat import thread_allowed
+                thread_matches=thread_allowed(binding,thread)
             if (binding['connector']!=connector or binding['chat']!=chat or binding['scope']!=scope
-                    or binding['thread']!=thread or 'read' not in binding['capabilities']):
+                    or not thread_matches or 'read' not in binding['capabilities']):
                 raise PermissionError
         except Exception:
             raise PermissionError('current exact owner delivery grant required') from None

@@ -15,7 +15,7 @@ from .gateway_dingtalk_admission import parse
 
 class Originals:
     def __init__(self,path,redactor):
-        self.store=NativeInbox(path,redactor);self.db=self.store.db
+        self.store=NativeInbox(path,redactor);self.db=self.store.db;self.redactor=self.store.redactor
         self.db.execute('PRAGMA max_page_count='+str(64*1024*1024//self.db.execute('PRAGMA page_size').fetchone()[0]))
         self.db.execute('''CREATE TABLE IF NOT EXISTS google_chat_originals(
             id TEXT PRIMARY KEY,connector TEXT NOT NULL,credential_scope TEXT NOT NULL,message_id TEXT NOT NULL,

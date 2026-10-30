@@ -1,0 +1,69 @@
+{
+  "source_commit": "6ee96ff0206e7cdba03ebe49a31e39ab1fc77f1e",
+  "source_tree": "ac24e10b310822e219beccd29780430fd0ff1dc2",
+  "runtime_checkpoint": "2af5f038c8c9c36a5704e8e0bdd775fc70896152",
+  "checked_date": "2026-10-30",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 41048667563,
+      "name": "Arch package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667869,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667442,
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667462,
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667416,
+      "name": "CI",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667501,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048667417,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048657206,
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048656987,
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41048657019,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed"
+    }
+  ],
+  "fixture_CI_not_live_account_installed_OS_or_release_acceptance": true
+}

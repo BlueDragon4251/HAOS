@@ -95,3 +95,85 @@ def test_real_google_dotted_message_resource_is_admitted_without_allowing_path_a
     for name in ['spaces/space1/messages/../other','spaces/space1/messages/a..b','spaces/space1/messages/a%2Fb']:
         data['message']['name']=name
         with pytest.raises(Refused):admitted(data)
+
+
+def test_whole_space_threads_require_explicit_owner_choice_and_keep_sender_account_space_boundaries():
+    selected=policy(thread='',all_threads=True)
+    first=admitted(selected=selected)
+    data=event();data['message']['thread']['name']='spaces/space1/threads/next'
+    assert admitted(data,selected)['envelope']['thread']=='spaces/space1/threads/next'
+    for changes in [{'sender':'users/456'},{'scope':'google-chat:'+'b'*64},{'chat':'spaces/another'},
+            {'thread':'spaces/other/threads/next'},{'thread':'*'}]:
+        with pytest.raises((PermissionError,ValueError)):
+            selected.authorize('google',{**first['envelope'],**changes})
+    with pytest.raises(Refused):admitted(selected=policy(thread='',all_threads=False))
+    with pytest.raises(ValueError):policy(all_threads=True)
+    with pytest.raises(ValueError):policy(thread='',all_threads='true')
+
+
+def test_whole_space_grant_cannot_shadow_a_separate_specific_thread_identity_in_either_order():
+    exact=binding();wide={**exact,'id':'wide','thread':'','all_threads':True,'identity':'different'}
+    for rows in [[exact,wide],[wide,exact]]:
+        with pytest.raises(ValueError,match='overlap'):
+            PreparedGoogleChatPolicy({'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':rows})
+
+
+def test_real_controller_queues_mission_and_status_replies_to_actual_source_threads_under_explicit_space_consent(tmp_path):
+    import asyncio
+    from haos.controller import Controller
+    from haos.store import MissionStore
+    store=MissionStore(tmp_path/'missions.sqlite');selected=policy(thread='',all_threads=True)
+    controller=Controller(store,'ws://127.0.0.1:9119/api/ws',{1000})
+    source=admitted(selected=selected)['envelope'];source={**source,'text':'Create a local plan'}
+    first=asyncio.run(controller.gateway.receive(selected,'google',source,controller))
+    other={**source,'thread':'spaces/space1/threads/second','message_id':'spaces/space1/messages/query2','text':'/status '+first['mission_id']}
+    assert asyncio.run(controller.gateway.receive(selected,'google',other,controller))['mission_id']==first['mission_id']
+    assert len(store.list())==1
+    routes=store.db.execute('SELECT id,thread,reply_to FROM gateway_routes ORDER BY thread').fetchall()
+    assert len(routes)==2 and len({r['id'] for r in routes})==2
+    assert {(r['thread'],r['reply_to']) for r in routes}=={(source['thread'],source['message_id']),(other['thread'],other['message_id'])}
+    pending=store.db.execute('SELECT r.thread FROM gateway_outbox o JOIN gateway_routes r ON r.id=o.route_id').fetchall()
+    assert {r[0] for r in pending}=={source['thread'],other['thread']}
+    assert asyncio.run(controller.gateway.receive(selected,'google',other,controller))['mission_id']==first['mission_id']
+    assert store.db.execute('SELECT COUNT(*) FROM gateway_routes').fetchone()[0]==2
+    store.close()
+
+
+def test_current_delivery_all_threads_keeps_exact_chat_scope_and_hash_and_rejects_revocation():
+    from types import SimpleNamespace
+    from haos.gateway import digest
+    from haos.gateway_delivery_authority import current_delivery
+    selected=policy(thread='',all_threads=True);row=selected.bindings['owner']
+    adapter=SimpleNamespace(_haos_native=SimpleNamespace(connector='google',policy=lambda:selected))
+    metadata={'haos_binding':{'binding_id':'owner','binding_digest':digest(row)},'haos_scope':row['scope'],'thread_id':'spaces/space1/threads/second'}
+    check=current_delivery(adapter,'google_chat',row['chat'],metadata);check()
+    with pytest.raises(PermissionError):current_delivery(adapter,'google_chat','spaces/other',metadata)
+    with pytest.raises(PermissionError):current_delivery(adapter,'google_chat',row['chat'],{**metadata,'thread_id':'spaces/other/threads/second'})
+    selected.bindings['owner']['all_threads']=False
+    with pytest.raises(PermissionError):check()
+
+
+def test_google_rate_delay_preserves_longer_provider_deadlines_and_rejects_malformed_hints():
+    from types import SimpleNamespace
+    from haos.gateway_google_chat_retry import retry_after
+    assert retry_after(SimpleNamespace(resp={'retry-after':'300'}))==300
+    assert retry_after(SimpleNamespace(resp={'retry-after':'1'}))==60
+    assert retry_after(SimpleNamespace(resp={'retry-after':'999999999'}))==86400
+    for value in ['-10','not-a-date','NaN','Inf','x'*129]:assert retry_after(SimpleNamespace(resp={'retry-after':value}))==60
+
+
+def test_private_token_response_captures_credentials_before_sdk_parsing_and_maps_errors_without_response_text():
+    from types import SimpleNamespace
+    from haos.gateway_google_chat_http import token_response,TokenError
+    from haos.redaction import Redactor
+    token='public-local-token-fixture';redactor=Redactor([]);url='https://oauth2.googleapis.com/token'
+    valid=json.dumps({'access_token':token,'token_type':'Bearer','expires_in':3600}).encode()
+    assert token_response(url,SimpleNamespace(status=200),valid,redactor=redactor)[1]==valid
+    assert redactor.text(token)=='[REDACTED]'
+    for raw in [b'not-json',b'{}',json.dumps({'access_token':token,'token_type':'Bearer','expires_in':'private-reflection-fixture'}).encode()]:
+        with pytest.raises(TokenError) as caught:token_response(url,SimpleNamespace(status=200),raw)
+        assert 'private-reflection-fixture' not in str(caught.value) and token not in str(caught.value)
+        assert caught.value.reason=='invalid-token-response'
+    with pytest.raises(TokenError) as caught:
+        token_response(url,SimpleNamespace(status=400),json.dumps({'error':'invalid_grant','error_description':token}).encode())
+    assert caught.value.reason=='invalid_grant' and token not in str(caught.value)

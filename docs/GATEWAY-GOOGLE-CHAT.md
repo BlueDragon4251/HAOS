@@ -78,8 +78,8 @@ local relay handoff, not a root-controller mission or live inference.
 
 ## Remaining before public activation
 
-- Complete private profile lifecycle, account identity checks, reconnect and
-  scheduling around the implemented authenticated HTTPS and Pub/Sub receivers.
+- Full production-daemon/root-socket acceptance of the prepared private profile,
+  including the complete Pub/Sub lifecycle around the verified SDK transport.
 - Durable native dispatch into the independent root mission/controller queue,
   cancellation, outbox authority and inspected owner recovery/status/logout.
 - Safe input attachments, local voice and video, sealed controller-exported
@@ -100,3 +100,50 @@ and [actual UID receive/relay checks](evidence/2026-10-30/google-chat-private-re
 Loopback HTTP, certificate and SDK ACK-queue fixtures do not establish live
 account privileges, subscription authorization, public callbacks, inference,
 external recipient delivery/read status, installed OS or release acceptance.
+
+## Private lifecycle and reply checkpoint
+
+Explicit whole-space thread consent is now a separate `all_threads` boolean;
+it cannot overlap a specific-thread grant for the same sender/account/space.
+Empty thread selection alone does not authorize other threads. Real controller
+component tests preserve each incoming thread and reply anchor in distinct
+mission/query routes. Pause/resume use the existing independent mission rights.
+
+The prepared private profile holds an actual kernel identity lease, validates
+native service-account credentials and the expected own bot membership before
+readiness, owns an authenticated HTTPS listener or bounded Pub/Sub client, and
+uses persistent originals, native and parent-relay queues. SDK account and
+callback-token work stays in the gateway identity. Its isolated Pub/Sub metadata
+plugin uses actual Google signing with bounded refresh requests, fresh policy
+checks and credential redaction before emitting bearer metadata. No ambient ADC,
+emulator, default unbounded refresh client or global SDK replacement is used.
+
+Controller event hashes and a matching original/native/parent receipt guard
+native text replies. Per-chunk client/request IDs, exact thread context and FULL
+intents precede writes; confirmed replay has no wire operation and an unclear
+write can only reconcile its exact client ID. The complete private HTTPS profile
+fixture exercises real SDK RSA token exchange, own-bot lookup, callback receive,
+controller-component outbox, native TLS reply, reconnect and immediate listener
+shutdown on publication withdrawal. Its controller component runs in the
+fixture gateway process; this is not root Unix-socket/production-daemon acceptance.
+
+Authentication failures stay blocked across close/reopen until owner recovery.
+HTTP Retry-After and actual gRPC RetryInfo produce persistent account deadlines.
+Disconnect, close, unrelated status updates and same-account key rotation cannot
+shorten them. Token-endpoint 429/5xx is surfaced before google-auth's internal
+retry loop, so the private lifecycle controls recovery. Token success responses
+are validated and private values enter the shared redactor before SDK parsing.
+
+Media/per-user OAuth, inspected owner recovery/provisioning and real GUI,
+installed runtime activation and full root-controller daemon acceptance remain
+open. These private lifecycle checks do not change the public count of 15/22.
+
+Current private lifecycle evidence:
+[profile and exact-thread reply validation](evidence/2026-10-30/google-chat-private-profile-validation.json).
+Five real-UID profile scenarios cover the connected loop, persisted HTTP401
+auth block, HTTP429 account wait across close/reopen/key rotation, token-endpoint
+429 without hidden SDK retry, and outgoing authentication failure stopping the
+listener. All use explicit local TLS/OAuth/Google-service fixture boundaries.
+Prior source CI is separately recorded in
+[6ee96ff results](evidence/2026-10-30/google-chat-private-receive-ci-status.json);
+those results do not establish later source revisions.

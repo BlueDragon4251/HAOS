@@ -54,7 +54,8 @@ class GatewayPolicy:
             extras=({'matrix_devices','allow_plaintext','require_mention'} if connector and connector['platform']=='matrix'
                 else {'trust_topic_publishers'} if connector and connector['platform']=='ntfy'
                 else {'homeassistant_shared_notifications','homeassistant_trust_system'} if connector and connector['platform']=='homeassistant'
-                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk','buzz','google_chat'}
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention','all_threads'} if connector and connector['platform']=='google_chat'
+                else {'allow_media','allow_voice','allow_video','allow_outbound_media','require_mention'} if connector and connector['platform'] in {'feishu','dingtalk','buzz'}
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media','allow_callback'} if connector and connector['platform']=='a2a'
                 else {'allow_media','allow_voice','allow_video','allow_outbound_media'} if connector and connector['platform'] in {'line','sms','email','a2a'} else set())
             if not fields <= set(binding) <= fields | {'generation','since'} | extras:
@@ -133,8 +134,11 @@ class GatewayPolicy:
         for key in ("sender", "chat", "scope", "thread", "message_id"):
             identifier(envelope[key], empty=key in {"scope", "thread"})
         for binding in self.bindings.values():
-            if binding["connector"] == connector and all(binding[k] == envelope[k] for k in ("sender", "chat", "scope", "thread")):
-                return binding
+            if binding["connector"] == connector and all(binding[k] == envelope[k] for k in ("sender", "chat", "scope")):
+                if binding['thread']==envelope['thread']:return binding
+                if envelope['platform']=='google_chat':
+                    from .gateway_google_chat import thread_allowed
+                    if thread_allowed(binding,envelope['thread']):return binding
         raise PermissionError("gateway sender is not paired for this exact route")
 
     def current_binding(self, route: dict):
@@ -287,11 +291,16 @@ class GatewayEngine:
                 mid = mission["id"]
                 self.media.attach(policy,connector,envelope,media,mid)
                 content = f"Mission {mid}: queued"
-            route_id = digest([mid, binding["id"], digest(binding)])
+            # Explicit Google whole-space consent still preserves the actual
+            # source thread for each mission/query route and every reply.
+            route_thread=envelope['thread'] if envelope['platform']=='google_chat' else binding['thread']
+            route_parts=[mid,binding['id'],digest(binding)]
+            if envelope['platform']=='google_chat':route_parts.append(route_thread)
+            route_id=digest(route_parts)
             self.store.db.execute("""INSERT OR IGNORE INTO gateway_routes
                 (id,mission_id,binding_id,binding_digest,connector,chat,thread,scope,reply_to)
                 VALUES(?,?,?,?,?,?,?,?,?)""", (route_id, mid, binding["id"], digest(binding), connector,
-                                              binding["chat"], binding["thread"], binding["scope"], envelope["message_id"]))
+                                              binding["chat"], route_thread, binding["scope"], envelope["message_id"]))
             state = "paused" if mission["state"] == "blocked" and mission["phase"] == PAUSED_PHASE else mission["state"]
             reply = {"mission_id": mid, "state": state}
             self.store.db.execute("""INSERT INTO gateway_inbox
@@ -299,7 +308,7 @@ class GatewayEngine:
                 VALUES(?,?,?,?,?,?,?,?)""",
                 (key, fingerprint, binding["id"], binding["identity"], time.time(), mid, json.dumps(reply), digest(binding)))
             self.store._event(mid, "gateway.received", {"connector": connector, "binding": binding["id"], "message_id": envelope["message_id"]})
-            if policy.connectors[connector]['platform'] in {'a2a','buzz'}:
+            if policy.connectors[connector]['platform'] in {'a2a','buzz','google_chat'}:
                 from .gateway_event_context import snapshot
                 self._queue(route_id,key,content,context=snapshot(self.store,mid,'gateway.receipt',key))
             elif policy.connectors[connector]['platform']=='sms':self._queue(route_id,key,content,limit=1600)
@@ -312,7 +321,7 @@ class GatewayEngine:
                 with self.store.transaction():
                     self.store._event(mid, "gateway.answer-unconfirmed", {"error": type(error).__name__})
                     context=None
-                    if policy.connectors[connector]['platform'] in {'a2a','buzz'}:
+                    if policy.connectors[connector]['platform'] in {'a2a','buzz','google_chat'}:
                         from .gateway_event_context import snapshot
                         context=snapshot(self.store,mid,'gateway.answer-unconfirmed',key+':answer')
                     self._queue(route_id, key + ":answer", "Answer delivery unconfirmed; inspect the live question in Herald before retrying.",context=context)
@@ -342,7 +351,7 @@ class GatewayEngine:
                         content = f"Mission {route['mission_id']}: {kind.removeprefix('mission.')}\n{payload.get('result') or payload.get('error') or ''}"
                     else:
                         continue
-                    if policy.connectors[route['connector']]['platform'] in {'a2a','buzz'}:
+                    if policy.connectors[route['connector']]['platform'] in {'a2a','buzz','google_chat'}:
                         from .gateway_event_context import snapshot
                         context=snapshot(self.store,route['mission_id'],kind,str(event['seq']),
                             request_id=payload.get('id') if kind=='mission.request' else None,
@@ -375,7 +384,7 @@ class GatewayEngine:
                 return None
             self.store.db.execute("UPDATE gateway_outbox SET state='sending',attempt=attempt+1,lease_until=? WHERE id=?", (now + 120, row["id"]))
             result={**dict(row), "attempt": row["attempt"] + 1}
-            if policy.connectors[row['connector']]['platform'] in {'a2a','buzz'}:
+            if policy.connectors[row['connector']]['platform'] in {'a2a','buzz','google_chat'}:
                 from .gateway_event_context import load
                 try:result['event_context']=load(self.store,result)
                 except Conflict:

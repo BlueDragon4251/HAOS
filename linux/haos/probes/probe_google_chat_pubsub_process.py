@@ -1,6 +1,9 @@
 """Disposable actual-UID Google SDK TLS/gRPC pull, custody and ACK/NACK fixture."""
 import datetime
 from concurrent.futures import ThreadPoolExecutor
+from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+import threading
+from urllib.parse import urlsplit,parse_qs
 import json
 import os
 from pathlib import Path
@@ -29,7 +32,7 @@ def main():
     sys.path[:0]=['/deps',str(code)]
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes,serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric import ec,rsa
     from cryptography.x509.oid import NameOID
     import grpc
     from google.pubsub_v1.types import PullRequest,PullResponse,AcknowledgeRequest,ModifyAckDeadlineRequest,ReceivedMessage,PubsubMessage
@@ -46,6 +49,9 @@ def main():
         'auth_provider_x509_cert_url':'https://www.googleapis.com/oauth2/v1/certs',
         'client_x509_cert_url':'https://www.googleapis.com/robot/v1/metadata/x509/'+email.replace('@','%40')},
         'bot_user':'users/999','inbound':{'mode':'pubsub','subscription':'projects/haos-fixture/subscriptions/haos-private'}}
+    service_key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
+    value['service_account']['private_key']=service_key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode()
+    service_public=service_key.public_key().public_bytes(serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo).decode()
     now=datetime.datetime.now(datetime.timezone.utc)
     binding={'id':'owner','connector':'google','sender':'users/123','chat':'spaces/room1','thread':'spaces/room1/threads/thread1',
         'scope':scope(value),'identity':'personal','capabilities':['create','read'],'generation':'a'*64,'since':int(now.timestamp()*1000)-60000}
@@ -62,7 +68,7 @@ def main():
     def event(mid,sender='users/123'):
         return json.dumps({'type':'MESSAGE','space':{'name':'spaces/room1','spaceType':'DIRECT_MESSAGE'},'message':{
             'name':'spaces/room1/messages/'+mid,'thread':{'name':binding['thread']},'sender':{'type':'HUMAN','name':sender},
-            'createTime':now.isoformat().replace('+00:00','Z'),'text':'/status'}}).encode()
+            'createTime':now.isoformat().replace('+00:00','Z'),'text':'Create a local plan' if mid=='publisher' else '/status'}}).encode()
     def pull(request,context):
         authenticate(context);assert request.subscription==value['inbound']['subscription'] and request.max_messages==1
         mode=state['mode'];state['requests'].append(('Pull',mode))
@@ -88,6 +94,37 @@ def main():
         'Acknowledge':grpc.unary_unary_rpc_method_handler(ack,request_deserializer=AcknowledgeRequest.deserialize,response_serializer=Empty.SerializeToString),
         'ModifyAckDeadline':grpc.unary_unary_rpc_method_handler(nack,request_deserializer=ModifyAckDeadlineRequest.deserialize,response_serializer=Empty.SerializeToString)}),))
     port=server.add_secure_port('localhost:0',grpc.ssl_server_credentials([(key_bytes,cert_bytes)]));assert port;server.start()
+    text_requests=[];text_responses={};token_grants=[]
+    class TextAPI(BaseHTTPRequestHandler):
+        def log_message(self,*args):pass
+        def reply(self,status,value):
+            data=json.dumps(value).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        def do_POST(self):
+            if urlsplit(self.path).path=='/oauth-token':
+                from google.auth import jwt
+                data=parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())
+                assert data['grant_type']==['urn:ietf:params:oauth:grant-type:jwt-bearer']
+                claims=jwt.decode(data['assertion'][0],certs={'a'*40:service_public},audience='https://oauth2.googleapis.com/token')
+                assert claims['iss']==email and set(claims['scope'].split())=={'https://www.googleapis.com/auth/chat.bot','https://www.googleapis.com/auth/pubsub'}
+                token_grants.append(True);self.reply(200,{'access_token':'local-private-transport-fixture','token_type':'Bearer','expires_in':3600});return
+            assert self.headers.get('Authorization')=='Bearer local-outbox-token-fixture'
+            query=parse_qs(urlsplit(self.path).query);body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));client_id=query['messageId'][0]
+            import sqlite3
+            with sqlite3.connect(profile/'native.sqlite') as db:
+                assert db.execute('SELECT state FROM google_chat_text_writes WHERE client_id=?',(client_id,)).fetchone()[0]=='writing'
+                assert db.execute("SELECT COUNT(*) FROM native_inbox WHERE state='committed'").fetchone()[0]>=1
+            text_requests.append(('POST',client_id,body))
+            response={'name':'spaces/room1/messages/server.'+str(len(text_requests)),'text':body['text'],
+                'thread':body.get('thread',{'name':'spaces/room1/threads/serverroot'}),'clientAssignedMessageId':client_id}
+            text_responses[client_id]=response;self.reply(200,response)
+        def do_GET(self):
+            client_id=urlsplit(self.path).path.rsplit('/',1)[1];text_requests.append(('GET',client_id))
+            self.reply(200 if client_id in text_responses else 404,text_responses.get(client_id,{'error':{'code':404,'message':'fixture unknown'}}))
+    text_server=ThreadingHTTPServer(('127.0.0.1',0),TextAPI)
+    tls_cert=directory/'api-cert.pem';tls_key=directory/'api-key.pem';tls_cert.write_bytes(cert_bytes);tls_key.write_bytes(key_bytes);tls_key.chmod(0o600)
+    import ssl
+    api_tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);api_tls.load_cert_chain(tls_cert,tls_key);text_server.socket=api_tls.wrap_socket(text_server.socket,server_side=True)
+    text_thread=threading.Thread(target=text_server.serve_forever,daemon=True);text_thread.start()
     driver=directory/'driver.py';driver.write_text('''import asyncio,json,os,sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -113,10 +150,21 @@ def current():
 try:Path(v['owner']).read_bytes()
 except PermissionError:pass
 else:raise AssertionError('gateway read owner data')
-channel=grpc.secure_channel('localhost:'+str(v['port']),grpc.composite_channel_credentials(
-    grpc.ssl_channel_credentials(root_certificates=v['certificate'].encode()),
-    grpc.metadata_call_credentials(lambda context,callback:callback((('authorization','Bearer local-private-transport-fixture'),),None))))
-client=SubscriberClient(transport=SubscriberGrpcTransport(channel=channel));store=Originals(Path(v['profile'])/'originals.sqlite',Redactor([]))
+from google.oauth2 import service_account
+from google_auth_httplib2 import Request
+from haos.gateway_google_chat_http import single_request_http,token_response
+from haos.gateway_google_chat_pubsub import _subscriber_client
+store=Originals(Path(v['profile'])/'originals.sqlite',Redactor([]))
+account=service_account.Credentials.from_service_account_info(v['value']['service_account'],scopes=['https://www.googleapis.com/auth/chat.bot','https://www.googleapis.com/auth/pubsub'])
+origin='https://localhost:'+str(v['text_port'])
+base=single_request_http(current,fixture_origin=origin,redactor=store.redactor);base.ca_certs=v['ca']
+class TokenWire:
+    def __getattr__(self,key):return getattr(base,key)
+    def request(self,uri,method='GET',body=None,headers=None,**kwargs):
+        assert uri=='https://oauth2.googleapis.com/token'
+        response,data=base.request(origin+'/oauth-token',method=method,body=body,headers=headers,**kwargs)
+        return token_response(uri,response,data,redactor=store.redactor)
+client=_subscriber_client(account,current,store.redactor,target='localhost:'+str(v['port']),roots=v['certificate'].encode(),token_request=Request(http=TokenWire()))
 receiver=Receiver('google',v['value'],store,lambda:PreparedGoogleChatPolicy(json.loads(publication.read_text())),current)
 if v['mode']=='sqlfail':store.db.execute("CREATE TEMP TRIGGER fail_original BEFORE INSERT ON google_chat_originals BEGIN SELECT RAISE(ABORT,'fixture disk failure'); END")
 transport=PullTransport(client,receiver,current)
@@ -134,7 +182,7 @@ async def exercise():
     home=Path(v['profile'])/'home';home.mkdir(mode=0o700,exist_ok=True);os.environ['HERMES_HOME']=str(home)
     from gateway.config import PlatformConfig
     from plugins.platforms.google_chat.adapter import GoogleChatAdapter
-    native_store=NativeInbox(Path(v['profile'])/'native.sqlite',Redactor([]));relay=RelayInbox(Path(v['profile'])/'relay.sqlite',Redactor([]))
+    native_store=NativeInbox(Path(v['profile'])/'native.sqlite',store.redactor);relay=RelayInbox(Path(v['profile'])/'relay.sqlite',store.redactor)
     with scope(home,{'HERMES_SAFE_MODE':'1'}):adapter=install(durable_adapter(GoogleChatAdapter(PlatformConfig(enabled=True))))
     adapter._haos_native=SimpleNamespace(connector='google',policy=lambda:PreparedGoogleChatPolicy(json.loads(publication.read_text())),inbox=native_store)
     adapter._haos_google_check=current;adapter._haos_google_originals=store;adapter._haos_google_value=v['value']
@@ -153,6 +201,41 @@ async def exercise():
     assert native_store.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()[0]=='committed'
     assert store.db.execute('SELECT admitted_receipt FROM google_chat_originals WHERE id=?',(result,)).fetchone()[0]
     assert await capture_stored(adapter,result)==key and await dispatch_stored(adapter,key) is False
+    if v['mode']=='publisher':
+        from googleapiclient.discovery import build
+        from google.oauth2.credentials import Credentials
+        from google_auth_httplib2 import AuthorizedHttp
+        from haos.gateway_google_chat_http import single_request_http
+        from haos.gateway_google_chat_delivery import Publisher
+        from haos.gateway_runtime import delivery_metadata
+        from haos.store import MissionStore
+        from haos.controller import Controller
+        component=MissionStore(Path(v['profile'])/'controller-component.sqlite')
+        controller=Controller(component,'ws://127.0.0.1:9119/api/ws',{65534})
+        source=store.db.execute('SELECT admitted_receipt FROM google_chat_originals WHERE id=?',(result,)).fetchone()[0]
+        original=json.loads(relay.db.execute('SELECT envelope FROM inbox WHERE id=?',(source,)).fetchone()[0])
+        await controller.gateway.receive(adapter._haos_native.policy(),'google',original,controller)
+        delivery=controller.gateway.next_delivery(adapter._haos_native.policy());metadata=delivery_metadata(delivery,'google_chat')
+        origin='https://localhost:'+str(v['text_port'])
+        def http():
+            transport=single_request_http(current,fixture_origin=origin,redactor=native_store.redactor);transport.ca_certs=v['ca']
+            return AuthorizedHttp(Credentials('local-outbox-token-fixture'),http=transport,max_refresh_attempts=0)
+        adapter._new_authed_http=http
+        adapter._chat_api=build('chat','v1',http=single_request_http(current,fixture_origin=origin),cache_discovery=False,static_discovery=True,client_options={'api_endpoint':origin+'/'})
+        publisher=Publisher(adapter)
+        sent=await publisher.send(delivery['chat'],delivery['content'],delivery['reply_to'],metadata)
+        assert sent.success and sent.message_id.startswith('spaces/room1/messages/server.')
+        assert (await publisher.send(delivery['chat'],delivery['content'],delivery['reply_to'],metadata)).message_id==sent.message_id
+        try:await adapter._create_message(delivery['chat'],{'text':'unscoped bypass'})
+        except PermissionError:pass
+        else:raise AssertionError('unscoped native create accepted')
+        try:await publisher.send(delivery['chat'],delivery['content'],delivery['reply_to'],{**metadata,'thread_id':'spaces/room1/threads/foreign'})
+        except PermissionError:pass
+        else:raise AssertionError('source route changed')
+        try:await publisher.send(delivery['chat'],delivery['content']+' changed',delivery['reply_to'],metadata)
+        except Exception:pass
+        else:raise AssertionError('root event bytes changed')
+        component.close()
     return result
 try:
     try:result=asyncio.run(exercise());outcome={'key':result,'failed':False}
@@ -170,7 +253,7 @@ finally:
 ''');driver.chmod(0o755)
     def invoke(uid,mode='accepted',groups=()):
         state['mode']=mode;request={'mode':mode,'value':value,'profile':str(profile),'policy':str(publication),
-            'owner':str(owner),'port':port,'certificate':cert_bytes.decode()}
+            'owner':str(owner),'port':port,'certificate':cert_bytes.decode(),'text_port':text_server.server_port,'ca':str(tls_cert)}
         child=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
             timeout=35,user=uid,group=uid,extra_groups=list(groups),cwd=str(code),umask=0o077,
             env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'})
@@ -187,6 +270,8 @@ finally:
         assert state['requests'][-2:]==[('Pull','accepted'),('Ack','accepted')]
         old=result['key'];status,result=invoke(65534);assert result['key']==old and result['originals']==1 and result['parent_records']==1
         cases.append('actual_pinned_native_Google_Chat_codec_and_durable_MRO_admit_only_retained_source_context_then_FULL_native_and_parent_relay_reopen_with_one_parent_record')
+        assert len(token_grants)==2
+        cases.append('actual_private_scoped_Google_auth_metadata_plugin_performs_real_SDK_RSA_OAuth_grant_over_verified_TLS_and_captures_bearer_before_native_gRPC_metadata_without_default_requests_or_global_auth_hooks')
         cases.append('actual_gateway_UID_Google_SDK_verified_local_TLS_gRPC_pull_and_server_ACK_observe_committed_FULL_original_then_fresh_process_replay_keeps_one_source_and_cannot_read_owner_canary')
         _,result=invoke(65534,'unknown');assert not result['failed'] and result['key'] is None and result['refusals']==1
         assert state['requests'][-1]==('Ack','unknown')
@@ -202,9 +287,13 @@ finally:
         _,result=invoke(65534,'gap');assert result['failed'] and result['parent_records']==2 and result['originals']==2
         _,result=invoke(65534,'gap-recover');assert not result['failed'] and result['parent_records']==2 and result['originals']==2
         cases.append('real_source_receipt_SQL_failure_after_parent_commit_recovers_on_fresh_UID_process_without_duplicate_parent_admission_or_lost_original')
+        _,result=invoke(65534,'publisher');assert not result['failed'],result
+        assert len(text_requests)==1 and text_requests[0][0]=='POST' and text_requests[0][2]['thread']['name']==binding['thread']
+        cases.append('actual_UID_retained_source_and_real_controller_component_outbox_context_drive_native_Google_send_with_FULL_intent_before_HTTP_confirmed_replay_no_wire_and_unscoped_changed_event_or_cross_thread_calls_refused')
         before=len(state['requests']);_,result=invoke(65534,'revoke');assert result['failed'] and state['requests'][before:]==[('Pull','revoke')]
         cases.append('root_publication_withdrawal_during_actual_TLS_pull_prevents_original_admission_and_ACK_then_actual_UID_closes_channel')
-    finally:server.stop(0).wait(3)
+    finally:
+        server.stop(0).wait(3);text_server.shutdown();text_server.server_close();text_thread.join(timeout=2)
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_gateway_UID_Google_SDK_TLS_gRPC_FULL_SQLite':True,
         'service_account_OAuth_and_remote_Google_subscription_are_fixtures':True,
         'actual_pinned_native_codec_and_durable_parent_relay':True,

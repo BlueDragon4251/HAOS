@@ -10,7 +10,7 @@ import time
 import uuid
 
 from .gateway import Conflict,digest
-from .gateway_google_chat import credentials,scope,resource,validate_binding
+from .gateway_google_chat import credentials,scope,resource,validate_binding,thread_allowed
 
 
 class TextLedger:
@@ -50,7 +50,7 @@ class TextLedger:
                 or any(secret in body['text'] for secret in self.redactor.secrets if secret)):
             raise PermissionError('bounded exact-route private Google Chat text reply required')
         thread=body.get('thread',{})
-        if not isinstance(thread,dict) or set(thread) not in (set(),{'name'}) or thread.get('name','')!=binding['thread']:
+        if not isinstance(thread,dict) or set(thread) not in (set(),{'name'}) or not thread_allowed(binding,thread.get('name','')):
             raise PermissionError('reply cannot cross or fall back from approved Google Chat thread')
         encoded=json.dumps(body,sort_keys=True,separators=(',',':'));pin=digest(self.value)
         client_id='client-'+operation[:56];request_id=str(uuid.uuid5(uuid.NAMESPACE_URL,'haos-google-chat:'+operation))

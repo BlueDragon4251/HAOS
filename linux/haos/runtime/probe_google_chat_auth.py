@@ -62,6 +62,13 @@ def main():
     except PermissionError:pass
     else:raise AssertionError('revoked callback authority accepted')
     cases.append('current_private_authority_is_required_before_any_certificate_or_token_work')
+    from google.api_core.exceptions import ResourceExhausted
+    from google.rpc.error_details_pb2 import RetryInfo
+    from google.protobuf.duration_pb2 import Duration
+    from haos.gateway_google_chat_retry import retry_after
+    error=ResourceExhausted('finite local quota fixture',details=[RetryInfo(retry_delay=Duration(seconds=180,nanos=1))])
+    assert retry_after(error)==181
+    cases.append('actual_Google_gRPC_RetryInfo_metadata_preserves_server_delay_and_rounds_partial_seconds_up')
     receipt={'passed':len(cases),'cases':cases,'actual_Google_RSA_JWT_verification':True,
         'certificate_endpoint_is_explicit_local_fixture':True,'ephemeral_local_key_only':True,
         'live_Google_token_HTTP_listener_PubSub_UID_mission_GUI_or_public_activation':False}

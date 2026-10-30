@@ -1,6 +1,49 @@
 """Per-client bounded HTTP with one transmission and no redirect/global hooks."""
 import time
+import json
+from types import SimpleNamespace
 from urllib.parse import urlsplit,parse_qs
+
+
+
+class TokenError(RuntimeError):
+    def __init__(self,category,status,delay,reason):
+        self.category=category;self.http_status=status;self.retry_after=delay;self.reason=reason
+        super().__init__('private Google token operation failed')
+
+
+def token_response(uri,response,data,*,redactor=None):
+    if uri!='https://oauth2.googleapis.com/token':return response,data
+    if response.status==200:
+        try:
+            from .gateway_line_ingress import _object
+            from .gateway_dingtalk_admission import finite
+            value=json.loads(data.decode('utf-8'),object_pairs_hook=_object,parse_constant=finite)
+            if (not isinstance(value,dict) or not isinstance(value.get('access_token'),str)
+                    or not 1<=len(value['access_token'])<=16384 or any(not 33<=ord(c)<=126 for c in value['access_token'])
+                    or value.get('token_type')!='Bearer' or type(value.get('expires_in')) is not int
+                    or not 1<=value['expires_in']<=86400):raise ValueError('invalid token response')
+            if redactor is not None:
+                from .redaction import Redactor
+                aliases=[value[k] for k in ['access_token','refresh_token','id_token','rapt_token'] if isinstance(value.get(k),str)]
+                if any(len(s)>16384 for s in aliases):raise ValueError('bounded private token fields required')
+                secrets=Redactor([*redactor.secrets,*aliases]).secrets
+                if len(secrets)>4096 or sum(len(s) for s in secrets)>8*1024*1024:raise ValueError('private redaction capacity reached')
+                redactor.secrets=secrets
+        except (ValueError,UnicodeError,TypeError,RecursionError):raise TokenError('authentication-refused',200,0,'invalid-token-response') from None
+        return response,data
+    from .gateway_google_chat_retry import retry_after
+    status=response.status;category='rate-limited' if status==429 else 'authentication-refused' if status in {400,401,403} else 'transport-unavailable'
+    reason='token-refused'
+    try:
+        from .gateway_line_ingress import _object
+        from .gateway_dingtalk_admission import finite
+        value=json.loads(data.decode('utf-8'),object_pairs_hook=_object,parse_constant=finite)
+        if isinstance(value,dict) and value.get('error') in {'invalid_grant','invalid_client','unauthorized_client','access_denied',
+                'temporarily_unavailable','rate_limit_exceeded','invalid_scope'}:reason=value['error']
+    except (ValueError,UnicodeError,TypeError,RecursionError):pass
+    delay=retry_after(SimpleNamespace(resp=response)) if status==429 else 0
+    raise TokenError(category,status,delay,reason)
 
 
 def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=None):
@@ -10,7 +53,8 @@ def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=Non
     if redactor is not None and not isinstance(redactor,Redactor):raise TypeError('shared private credential redactor required')
     if fixture_origin is not None:
         parsed=urlsplit(fixture_origin)
-        if parsed.scheme!='http' or parsed.hostname!='127.0.0.1' or not parsed.port or parsed.path not in {'','/'}:
+        if ((parsed.scheme,parsed.hostname) not in {('http','127.0.0.1'),('https','localhost')}
+                or not parsed.port or parsed.path not in {'','/'} or parsed.username or parsed.password or parsed.query or parsed.fragment):
             raise ValueError('only explicit loopback fixture transport override supported')
     class SingleRequestHttp(httplib2.Http):
         def __init__(self):
@@ -44,7 +88,10 @@ def single_request_http(current,*,fixture_origin=None,limit=1048576,redactor=Non
                 redactor.secrets=secrets
             headers=dict(headers or {});headers={k:v for k,v in headers.items() if k.lower()!='accept-encoding'}
             headers['accept-encoding']='identity'
-            return super().request(uri,method=method,body=body,headers=headers,redirections=0)
+            response,data=super().request(uri,method=method,body=body,headers=headers,redirections=0)
+            # google-auth otherwise retries token endpoint 429/5xx internally.
+            # Keep token errors finite and leave retry timing to the journal.
+            return token_response(uri,response,data,redactor=redactor)
 
         def _request(self,conn,host,absolute_uri,request_uri,method,body,headers,redirections,cachekey):
             # httplib2's default _conn_request reconnects and repeats a POST

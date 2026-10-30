@@ -3,7 +3,7 @@ import json
 import re
 from urllib.parse import urlsplit
 
-from .gateway import GatewayPolicy,SUPPORTED,digest
+from .gateway import GatewayPolicy,SUPPORTED,CAPABILITIES,digest
 
 PROJECT=re.compile(r'[a-z][a-z0-9-]{4,61}[a-z0-9]\Z')
 RESOURCE=re.compile(r'[A-Za-z0-9_-]{1,128}\Z')
@@ -80,8 +80,10 @@ def validate_binding(binding):
             or type(binding.get('since')) is not int or not 0<binding['since']<2**53):
         raise ValueError('exact account scope and fresh timed Google Chat owner grant required')
     caps=binding.get('capabilities')
-    if (not isinstance(caps,list) or not caps or any(not isinstance(c,str) or c not in {'create','read','answer','cancel'} for c in caps)
+    if (not isinstance(caps,list) or not caps or any(not isinstance(c,str) or c not in CAPABILITIES for c in caps)
             or len(set(caps))!=len(caps)):raise ValueError('explicit Google Chat mission capabilities required')
+    if 'all_threads' in binding and type(binding['all_threads']) is not bool:raise ValueError('explicit boolean approval for all Google Chat threads required')
+    if binding.get('all_threads') is True and binding['thread']:raise ValueError('choose one exact thread or explicit whole-space threads, never both')
     for flag in ['require_mention','allow_media','allow_voice','allow_video','allow_outbound_media']:
         if flag in binding and type(binding[flag]) is not bool:raise ValueError('separate boolean Google Chat media/mention consent required')
         if binding.get(flag) is True and flag!='require_mention' and ('read' if flag=='allow_outbound_media' else 'create') not in caps:
@@ -95,3 +97,24 @@ class PreparedGoogleChatPolicy(GatewayPolicy):
         super().__init__(value)
         for binding in self.bindings.values():
             if self.connectors[binding['connector']]['platform']=='google_chat':validate_binding(binding)
+        validate_overlaps(self)
+
+
+def thread_allowed(binding,thread):
+    if not isinstance(thread,str):return False
+    if thread==binding['thread']:return True
+    if binding.get('all_threads') is not True or binding['thread']!='':return False
+    try:resource(thread,'thread',space=binding['chat'])
+    except ValueError:return False
+    return True
+
+
+def validate_overlaps(policy):
+    groups={}
+    for binding in policy.bindings.values():
+        if policy.connectors[binding['connector']]['platform']!='google_chat':continue
+        key=tuple(binding[k] for k in ['connector','sender','chat','scope'])
+        previous=groups.setdefault(key,[])
+        if previous and (binding.get('all_threads') is True or any(row.get('all_threads') is True for row in previous)):
+            raise ValueError('Google Chat whole-space thread approval cannot overlap another grant for this sender/account/space')
+        previous.append(binding)
