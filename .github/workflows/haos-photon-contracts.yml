@@ -131,7 +131,14 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py linux/haos/tests/test_gateway_photon_status.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+      - name: Actual private UID recorded status without SDK or network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 512m \
+            -v "$PWD:/repo:ro" -e HAOS_DISPOSABLE_PHOTON_STATUS_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_status_process.py > "$RUNNER_TEMP/photon-contracts/recorded-status.json"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

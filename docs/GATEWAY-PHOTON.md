@@ -4,6 +4,15 @@ Photon is **not yet an accepted HAOS gateway**. The accepted local software
 count remains 16/22. The pinned Hermes adapter and its Spectrum 12.7.0 Node
 sidecar are the integration target; listing the plugin is not completion.
 
+The prepared recorded-status reader uses only connector and account/credential
+fingerprints. It takes a read-only SQLite snapshot under the actual gateway UID,
+checks private database/WAL/SHM custody, and needs neither SDK imports, network
+access nor the active profile lease. Key rotation cannot hide the stable account
+retry budget. Malformed states, partial status schemas and missing budgets are
+refused without repair. Returned metadata explicitly says it is recorded, not
+live verification. This reader is not yet an Owner GUI/CLI setup path; that
+authenticated integration and source/cursor recovery remain pending.
+
 Photon provides managed iMessage transport. It does not require the Owner to
 operate a Mac relay. Actual account entitlement, a provisioned project, assigned
 line and external delivery require a later account-specific acceptance. Shared
