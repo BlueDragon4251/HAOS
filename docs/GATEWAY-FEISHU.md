@@ -1,0 +1,522 @@
+# Feishu / Lark
+
+The current software path connects the pinned native adapter through the HAOS
+public registry, owner GUI/CLI, private account worker, authenticated WebSocket
+or HTTPS webhook, independent timed grants, durable input/output, incoming
+media/voice, sealed outgoing files/audio, revocation and inspected recovery.
+This is the twelfth public software integration. External tenant permissions,
+real recipients, installed boot and hardware acceptance remain separate.
+
+In **Verwaltung → Gateways**, select `feishu`, choose the fixed Feishu or Lark
+brand and enter the app ID, private app secret, exact tenant key and bot open ID.
+Configure the platform app's `im.message.receive_v1` event and required bot,
+message and media permissions. WebSocket uses outgoing verified HTTPS/WSS and
+requires no incoming port. HTTPS webhook additionally requires verification
+token, encrypt key, trusted matching certificate/private key, local listener
+port and public `https://hostname/feishu/webhook` route. External forwarding and
+reachability must be checked separately. The GUI imports only private, single
+link, bounded PEM files; it never displays saved private credentials.
+
+Save, run **Feishu-Konto ohne Nachricht prüfen**, then grant an exact sender
+`ou_…`, chat `oc_…` and optional native topic `omt_…`. An empty topic approves
+only unthreaded input. Bot mention is required in groups unless explicitly
+changed. Account scope is derived from the saved app/brand/tenant/bot identity;
+bot self-grants and changed unsaved identity are refused. Account/secret changes
+withdraw prior grants. Media, voice, video and outbound files have separate
+permissions. Local speech setup is required for incoming voice and non-Opus
+outgoing audio conversion. The no-send check verifies the bot ID and deliberately
+does not claim tenant identity or external delivery.
+
+Start the gateway after pairing. The management window displays finite transport
+states and retained deadlines. Authentication retry requires an explicit owner
+action; it preserves rate deadlines, source custody and unclear delivery intents.
+Owner inspection stops the service. Upload and reply recovery is per exact part
+and attempt, requires independent non-acceptance evidence and leaves controller
+outbox reconciliation as a separate decision. Confirmed parts cannot be released
+and are reused. Source management independently disposes selected original or
+webhook bytes only after the original grant changes/withdraws, retaining audit
+and replay tombstones. Controller/agent copies and backups are unaffected.
+
+Owner CLI provides `gateway setup CONNECTOR feishu`, `feishu-account`,
+`retry-feishu-auth`, `feishu-sources`, `purge-feishu-source`,
+`approve-feishu-retry` and `approve-feishu-part-retry`; `--help` describes exact
+selectors and explicit inspection flags. Existing owner authentication,
+stopped-service gates and separate unprivileged ledger identities remain in use.
+
+The development notes below retain earlier private implementation checkpoints
+and their individual fixture limits. Statements about activation still being
+pending describe those historical checkpoints; the current entry points and
+requirements are the ones above. Exact combined validation is recorded in the
+[activation receipt](evidence/2026-10-29/feishu-public-activation-validation.json). No fixture establishes
+live account, external delivery, inference, installed OS or release acceptance.
+
+## Historical private implementation and boundary evidence
+
+
+Feishu remains outside the public HAOS gateway registry and GUI. Installing the
+bundled adapter or SDK is not a working authorized HAOS gateway. Eleven other
+public paths are listed in [Gateways](GATEWAYS.md).
+
+Current private paths include authenticated HTTPS, supervised native WebSocket,
+source custody/replay, native text replies, separate owner recovery decisions,
+and incoming resource bytes through the native SDK into sealed controller
+attachments, plus a native/offline local-ASR composition. Private outgoing media is also connected below. Public setup/GUI,
+source disposal, complete media recovery and final activation are still open. Loopback fixtures are not
+live account or installed-system acceptance.
+
+The frozen runtime now includes the pinned upstream `feishu` extra: actual
+Lark OpenAPI 1.6.8 and requests-toolbelt 1.0.0. The existing eight extras and
+hash-pinned overlay, including MSAL 1.39.0, remain unchanged. Preparation checks
+the exact upstream source hashes and refuses an unreviewed extra set. The
+native SDK probe uses real Hermes builders, real Lark models and actual
+loopback HTTP for tenant-token acquisition, bot lookup, authentication failure
+and rate limits. It does not contact a real Feishu/Lark app or send a message.
+
+Prepared private identity validation requires an exact app ID/secret, explicit
+Feishu or Lark brand, tenant key and bot open ID. No arbitrary API URL, plugin
+settings, display-name or alternative user-ID authorization is accepted. Sender
+open IDs, chat IDs, optional native topic IDs and fresh timed owner grants are
+separate. Account scope binds brand/app/tenant/bot. Media permissions default
+to denied and require appropriate mission rights. Websocket mode accepts no
+unused webhook secrets; webhook mode requires verification token, encryption
+key and reviewed HTTPS listener material for `/feishu/webhook`.
+
+Actual Lark event decoding retains millisecond timestamps as strings and
+keeps `thread_id` distinct from the quoted `root_id`. Its SDK token cache uses
+app-ID keys; the private read boundary now namespaces tokens by complete
+credential identity and brand. The supervised socket-mode boundary and native
+single-reply limits are described below. HAOS does not delegate owner identity
+to upstream allow-all or pairing defaults.
+
+Prepared private HTTPS/WS authentication, persistent ingress, native replay,
+incoming media and single-reply delivery are implemented and tested below.
+Public activation and complete owner GUI/recovery integration
+remain open; offline voice composition evidence is described below.
+Local SDK and identity tests do not establish live-account, external delivery,
+installed OS or hardware acceptance.
+
+
+Independent input projection now checks bounded duplicate-free finite JSON,
+application and both tenant fields, exact open sender/chat/native topic, user
+role, own-bot exclusion and both original millisecond time boundaries before
+calling the native codec. Group mentions require exact bot open-ID metadata;
+quoted roots, display names, user-ID aliases and @all do not grant access.
+This function consumes already authenticated bytes; it does not authenticate
+webhooks or sockets by itself.
+
+The actual Lark model and pinned Hermes normalizer produce text, rich posts,
+mention/command handling and resource descriptors without a client, download or
+local file write. Header/body snapshots and current grant hashes are checked
+again; private credential reflection is refused. Image/document, audio and video
+permissions remain separate even when the native SDK labels a video resource as
+`file`. Rich-post tags and duplicate resource keys require all corresponding
+owner approvals. The real SDK fixture reproduced and caught the initial video
+consent mismatch; fixed fixtures retain their negative assertions.
+
+This pure codec is one part of the private integration; authenticated transport,
+custody/dispatch, resource reads and reply delivery are separate boundaries below.
+Owner GUI and final activation remain unfinished.
+
+
+Private original-event custody now commits bounded immutable bytes before the
+native input receipt. An opaque reference keeps large UTF-8 originals out of the
+64 KiB native payload field. Full-synchronous SQLite/WAL, physical/logical quotas,
+current-publication callbacks and source/credential/codec hashes protect replay.
+Changed transport delivery IDs retain the first original; changed message bodies,
+old credential epochs, damaged proofs and revoked grants are refused. Real SQLite
+quota and in-transaction authority-withdrawal faults preserve previous records.
+No original is automatically purged. Close/reopen tests cover commit gaps; they
+are not a real machine power-cut acceptance.
+
+The retained text bridge runs the actual pinned Feishu decoder under an exact
+native claim. It uses canonical app open IDs even when upstream prefers user-ID
+aliases, binds account scope, bypasses volatile burst buffers in favor of durable
+HAOS acceptance, and retains reply context after native payload compaction.
+Actual relay/controller fixtures create a scoped mission and handle status and
+cancel commands. A real relay-SQLite-full fault retains pending input and retries
+without a second mission. Raw callbacks/cards/synthetic events and all unreviewed
+connect/send paths remain denied in the standalone ingress guard; only the
+prepared private profile below installs reviewed lifecycle/reply methods.
+Quote API reads remain unconnected. Incoming media uses the separate retained
+resource path below. In the isolated decoder probe, transport authentication,
+publication/service identity and direct controller invocation are fixtures;
+separate process/HTTPS/WS probes establish those transport boundaries. No live
+external message or installed acceptance is established.
+
+Private SDK reads now have a closed transport boundary: only fixed-brand HTTPS
+origins, tenant/app-token acquisition, bot-account lookup and an independently
+approved exact message read are admitted. Native Lark request serialization,
+authentication and response models remain in use. TLS verification stays on;
+redirects, caller transport options, custom Host/framing headers, unregistered
+bearer tokens, unsupported asynchronous transport and unbounded responses are
+refused. Publication and grant callbacks are checked before and during reads.
+HTTP errors retain finite authentication/rate-limit/transport diagnostics.
+Token caches are namespaced by the full private credential identity and brand;
+a cached token must also have been observed by the current boundary. SDK debug
+records are redacted without propagating raw records to parent log handlers.
+The actual native-SDK TLS probe covers trusted/untrusted issuers, account-cache
+reuse, credential rotation, exact-message permissions, revocation, redirect and
+401/429/500 responses, malformed/duplicate/nonfinite/oversize/truncated bodies.
+Only fixture code substitutes API origins with loopback and trusts its temporary
+CA. The read contract is now used by the kernel-authenticated account worker
+below. It grants no message-write capability or public gateway activation.
+
+The prepared account check also runs in a disposable private gateway subprocess.
+Both parent and worker enforce the actual unprivileged gateway UID/GID without
+supplementary groups. The fixed root-owned interpreter runs with `-E -s`, a
+minimal environment, bounded stdin/stdout/stderr, CPU/address-space/file limits,
+a hard alarm and kernel parent-death SIGKILL. Every boundary rereads the trusted
+root publication; pending publication, wrong account scope, own-bot grants,
+unsafe policy permissions and changed snapshots refuse access. Cancellation and
+withdrawal kill and join the child. This action can obtain a tenant access token
+and query bot information, but cannot send a message or fetch arbitrary URLs.
+Its result confirms only an exact returned bot open ID: this API does not prove
+the separately supplied tenant key, so `tenant_identity_verified` remains false.
+
+`probes/probe_feishu_process.py` exercises the actual native SDK and verified
+TLS with real root/gateway/agent UIDs in a guarded fresh Docker namespace with
+network disabled. Only that fixture adds its CA to disposable trust stores and
+resolves the fixed Feishu API domain to a loopback HTTPS server; production code
+and endpoint constants are unchanged. It checks policy-file gates, false bot
+identity, 401/429, cancellation, live policy withdrawal, denied agent access to
+private credentials and a running worker's input, and actual parent-death
+SIGKILL with process reaping. It is not an installed service or owner GUI test.
+Feishu remains outside the public registry until its transport, deliveries,
+media, recovery and owner setup are connected and verified together.
+
+A private fixed `/feishu/webhook` HTTPS receive application now verifies fresh
+exact timestamp/nonce/signature headers against the actual pinned Hermes
+validator. Case-duplicated signature headers, wrong mandatory verification
+tokens and signatures, stale deliveries and unknown owner routes are refused.
+Encrypted events use the actual Lark SDK AES decoder after signature validation
+and strict canonical base64/body bounds. Signed, token-verified URL challenges
+create no sender authority or mission. The application rejects insecure HTTP,
+query routes and compressed request bodies, bounds concurrent body reads and
+volatile source/rate budgets, and returns finite errors without private data.
+
+Before a successful event ACK, authenticated wire bytes (including original
+ciphertext), nonce identity and immutable independent approval are committed in
+a private bounded FULL-synchronous SQLite journal, followed by original/native
+input custody. Native decoding and mission dispatch remain independently
+replayable. Reuse of a nonce with different bytes cannot replace a receipt.
+Previously retained authenticated originals can recover after a commit gap and
+live freshness expiry, while new stale requests stay refused. Quota exhaustion
+and policy withdrawal leave existing receipts intact; there is no automatic
+owner-data deletion. Verification/encryption secrets and the TLS key are
+registered with redaction before native text projection.
+
+The native webhook probe uses actual signatures, independently generated AES
+ciphertext, the real Lark decoder, native Hermes message dispatch and verified
+loopback HTTPS. It checks duplicate raw HTTP headers (a raw TLS request avoids
+HTTP-client header normalization), unknown senders, nonce conflicts, physical
+SQLite quota and a real SQLite-triggered storage failure followed by reopen and
+freshness-expiry recovery. The prepared profile below now owns the private
+long-running listener lifecycle. Owner publication/GUI, socket transport,
+outgoing media and full owner recovery integration remain necessary
+before public activation.
+
+The prepared webhook profile now enforces the actual private gateway UID,
+fresh root publication, exact timed account grants, an exclusive kernel profile
+lease and immutable native credentials. Activation requires an installed durable
+handler, verified owner TLS material and a successful no-send private bot check.
+It binds only the fixed HTTPS receive route, with decompression disabled, and
+replays authenticated retained originals/native inputs in a bounded background
+loop. Policy withdrawal closes the listener; close cancels/reaps tasks and
+releases the lease while retaining journals. Persisted finite account/TLS/rate/
+storage/source statuses do not expose private exceptions. Each prepared profile
+currently needs its own listener port; shared Feishu HTTPS multiplexing and
+socket-mode integration are described separately below.
+
+The expanded real-UID process probe checks actual profile creation, duplicate
+lease refusal, native HTTPS input→durable relay dispatch, remote replay and
+listener shutdown after an actual root policy replacement. All SDK/API targets
+stay loopback in a disposable network-disabled namespace. The public factory,
+owner GUI and public root publication still reject Feishu; this private profile
+alone is not an activated complete gateway.
+
+Private outgoing text/Markdown replies now use the actual pinned Hermes send
+formatter, post codec and SDK reply builder. The original independently admitted
+message, current binding digest, exact chat/native topic, body, native payload
+and stable UUID are sealed together. One durable intent permits at most one
+native reply API write. Native retries, post-to-text retry, top-level fallback,
+changed UUIDs and alternate reply paths cannot escape that capability. The
+separate reply boundary reuses verified fixed-domain TLS, bounded responses,
+redaction, private observed token cache and fresh root/grant checks; the original
+read boundary still grants no writes.
+
+The private worker accepts only closed account/reply actions. A reply source
+must match the current owner route and approved original bytes; its output is
+only confirmed native acceptance, a finite definite rejection, or uncertainty.
+A successful receipt needs exact native message/chat identity and the approved
+topic when present. It does not prove recipient reading. The publisher joins
+committed native input to retained source context, checks originals and writes a
+FULL-synchronous intent before launching the worker. Confirmed receipts suppress
+replay; body/source/authority changes conflict. In-flight/uncertain outcomes
+remain quarantined across publisher reopen and later attempts. There is no
+blind resend after a dropped response. Physical journal limits preserve older
+receipts and require owner recovery rather than automatic deletion.
+
+Actual HTTP/native-API rate-limit rejections create a persistent account pause,
+shared across deliveries with the same private account. Reopening the publisher
+or changing the delivery ID does not bypass the pause. Authentication refusals
+remain blocked for that credential identity. Known pre-write transport failure
+can retry within the bounded outbox attempts; unknown write outcome cannot.
+Media output is explicitly refused until the separate private byte path exists.
+
+Evidence includes native formatter/builder fixtures, real native SDK writes to
+verified loopback TLS (drop/429/redirect/missing source/invalid-post fallback),
+and real UID/profile/worker/SQLite cases: confirmed replay suppression, changed
+body denial, uncertain reopen/later-attempt suppression and persistent account
+backoff on a native rate code returned with HTTP 200. These are fixture replies
+only, never external Feishu delivery or live-account acceptance. Actual process kill during an outgoing write is now verified below; complete
+public owner adjudication/recovery still needs frontend integration. Public Feishu activation remains off.
+
+The native private process probe now withholds an API reply after receiving a
+write, verifies the committed `writing` intent through a separate read-only
+SQLite connection, and sends actual SIGKILL to the gateway process. Its worker
+also dies through the kernel parent-death guard and is reaped by the disposable
+init. A new gateway process reopens the same profile, quarantines the in-flight
+intent and preserves previously confirmed receipts without another API write.
+The fixture waits for the real account pause to expire and signals readiness
+before measuring SDK startup/write progress; it does not edit clocks or the
+pause journal. This is a process-crash test, not a power-loss or installed OS
+acceptance. Native connect/disconnect status writes now run inside the private
+profile HOME context rather than falling back to the service's global HOME.
+
+Offline private recovery exposes bounded delivery/account metadata without
+message bodies or credentials. An exact inspected snapshot, current connector
+read authority, authenticated-owner handoff, evidence hash and explicit
+independent non-delivery confirmation are required to mark a private attempt
+`owner-retry-approved`. The immutable decision is idempotent; confirmed native
+acceptance, changed snapshots and ambiguous confirmation are refused. It sends
+nothing and does not clear account pauses or change the controller obligation.
+The separate controller UID must reconcile that outbox itself. Feishu delivered
+adjudication accepts only its own native message-ID format. Neither operation
+is exposed through model/transport RPC. Public owner command/GUI wiring remains
+open while Feishu is disabled.
+
+The SDK-free offline probe exercises actual root/agent/gateway/controller UIDs
+and their separate ledgers in a disposable network-disabled namespace: denied
+wrong-role helpers, private inventory, stale/confirmed-state refusal, idempotent
+gateway approval, separate controller retry, and exact native receipt validation.
+Owner policy, initial ledger states and service-stop control are fixtures; this
+does not claim a graphical owner session or real external delivery inspection.
+
+The private WS frame guard now keeps the actual Lark protobuf parser, fragment
+assembler, dispatcher and ACK encoder behind bounded frame/header/fragment
+limits. Missing required protobuf fields, duplicate headers, cards, invalid
+sequence/count aliases, changed partial assemblies and excessive aggregate data
+are refused before dispatch. At most 32 partial messages/16 fragments per message
+are retained for five real seconds. Peer configuration cannot create a zero-delay
+ping loop; partial valid configuration preserves existing safe defaults.
+Incoming SDK dispatch runs inline with receive backpressure rather than spawning
+an unbounded task per frame. The SDK thread waits for the actual owning loop's
+SQLite capture and requires an explicit opaque durable receipt; that internal
+receipt is not returned in the ACK. Storage failure returns native SDK 500,
+while successful ACK follows original/native input commit. This guard still
+needs authenticated endpoint discovery and actual WS TLS/profile lifecycle;
+its probe uses a fixture socket sender and does not establish socket identity.
+
+The frame probe uses actual native protobuf/assembly/ACK and pinned Hermes input
+normalization with real private SQLite, an actual SDK-to-owner thread handoff,
+real fragment TTL expiry and a real SQLite-triggered storage failure. Fixture
+corrections retained assertions: native protobuf needs SeqID/LogID; the fixture
+ACK inspector itself must also inspect SQLite on its owning loop, rather than
+reading the connection from the simulated socket thread. SQLite thread checks
+remain enabled. Public Feishu registry/GUI remains disabled.
+
+The private native WS discovery guard now confines the actual SDK's AppID/
+AppSecret POST to the selected fixed Feishu/Lark HTTPS endpoint. It requires an
+explicit private connection scope, verifies TLS, refuses HTTP redirects/errors,
+limits response bytes/deadline, validates native configuration and admits only
+returned WSS URLs under the selected official brand. Caller URLs, userinfo,
+alternate ports, ambiguous query IDs, unsafe paths and plaintext WS are refused.
+Native SDK URL parsing and HTTP model decoding remain in use. Actual WSS uses
+verified TLS, bounded messages/queues, disabled compression and no redirects;
+caller proxy/TLS/socket options cannot override those limits. Only the SDK's
+module aliases are wrapped, not the process-wide requests/websockets modules.
+Native WS diagnostics retain severity without raw payload/URI/exception text.
+Endpoint URLs and opaque query capabilities are registered for redaction;
+public device/service routing IDs are deliberately not credential values.
+
+The actual SDK discovery/WSS probe checks verified loopback HTTP and WSS,
+Native protobuf→original/input SQLite→actual wire ACK, untrusted WSS issuer,
+HTTP/WSS redirects, status errors, malformed/oversized endpoint data, withdrawal
+and diagnostic secrecy. A goal containing digit `1` and restoration of its
+opaque original prove that public routing ID `service_id=1` does not poison
+redaction or input receipts. Brand origins, allowed fixture hosts/ports and CA
+trust are changed only inside this disposable contract probe. This probe alone
+does not establish kernel UID separation, process supervision or a live account.
+The public registry/GUI remains disabled.
+
+
+The prepared private profile now also supports native WebSocket mode. A fixed,
+root-owned SDK worker runs under the private gateway UID, with a private home,
+parent-death SIGKILL, bounded startup, address space, file descriptors and frame
+queues. The parent checks fresh root publication every 100 ms and kills the
+worker on withdrawal. No caller command, endpoint, proxy or TLS override crosses
+this boundary. Shutdown makes the generation inactive before waiting for the
+child; a late event cannot acquire input authority.
+
+The native SDK receives success only after the independent parent has admitted
+the exact original bytes into the FULL-synchronous original, reply-context and
+native input journals. The parent checks canonical base64, checksum and strict
+sequence; it returns only an opaque durable receipt. Failure, unknown senders,
+withdrawal or unavailable storage produces no successful acknowledgement.
+Ephemeral endpoint tickets stay inside the worker; normalization there refuses
+reflection into goals or resource names before parent admission. SDK stdout is
+separated from the private receipt protocol and stderr is discarded boundedly.
+
+The pinned Hermes native WS runner and actual SDK remain responsible for
+connection and native frame encoding. Hidden SDK reconnect is disabled: the
+profile creates a new supervised child after a persisted 2–60 second backoff.
+Authentication and TLS refusals stop automatic reconnect; rate refusal retains
+a 60-second deadline. Original-event and NativeInbox identity survive disconnect,
+process restart and duplicate delivery; reconnect never resends an outgoing
+reply. The account check precedes initial activation, and the same independent
+native decoder and durable RelayInbox path serves both HTTPS and WS profiles.
+
+These are private integration paths. Public owner configuration, outgoing media,
+source disposal/recovery UI and final gateway activation remain unfinished.
+No live tenant, external delivery, installed-system or hardware acceptance is
+claimed by these loopback SDK/process fixtures.
+
+
+Private incoming media now uses an exact source-bound resource capability. The
+worker independently validates the retained original, current binding digest,
+resource index and separate media/voice/video flags, then calls the actual pinned
+SDK request builder, binary decoder and native download/cache helper. It may
+read only that message/key and the native type selector; an audio/media-to-file
+fallback retains the same resource and cannot bypass authentication or rate
+refusal. No arbitrary URL, host path, SDK client option or asynchronous API is
+exposed to the agent.
+
+Binary responses require verified TLS, no redirects/compression/partial ranges,
+a bounded read deadline and at most 8 MiB per file (2 MiB for model images).
+Both advertised sizes and unadvertised streaming sizes are bounded. API-shaped
+JSON errors are distinguished from real JSON documents with attachment headers.
+Private token reflection is refused. Vendor filenames and response headers are
+replaced before native decoding; only bytes, a checked MIME/descriptor and an
+opaque request binding leave the worker. Cancellation, owner withdrawal and
+parent death terminate the entire credential-bearing worker.
+
+The parent stores approved bytes in the existing FULL-synchronous private media
+cache. A source/index mapping binds the original, grant, byte ID and MIME; replay
+checks that mapping and its message/connector identity. Audio or video MIME in a
+file still needs its separate consent. Aggregate model-image limits apply,
+identical attachments share an opaque media ID, and cached retries do not fetch
+or decode a resource again. Account authentication blocks and 60-second rate
+backoff are shared with private reply delivery. Native source construction and
+dispatch remain in use, while document paths cannot be opened or inlined by the
+parent decoder. Only sealed `haos-media:` references enter the durable relay and
+independent controller media/mission ledger.
+
+The disposable process fixture checks actual root/gateway/agent UIDs, verified
+fixed-origin SDK reads, image/audio/video byte descriptors, a larger binary
+response, cancellation/revocation, real relay SQLite failure, cached retry,
+duplicate suppression and a controller mission with exact attachment bytes.
+Controller policy/calls and source transport authentication in that composition
+are explicit fixtures; separate WS/HTTPS probes establish their transport paths.
+The video sample establishes bounded ISO-header/byte handling, not playback.
+The separate voice composition probe uses the real pinned native decoder,
+private SQLite caches, relay, controller and actual offline local speech model.
+Six cases cover separate voice consent, unknown sender, actual transcription
+into a text-only agent prompt, replay, invalid audio and withdrawal after ASR.
+It seeds an explicitly declared retained-resource fixture instead of replacing
+any UID check or SDK transport; resource retrieval has the separate process/TLS
+proofs above. Private speech transport and agent terminal are fixtures, so the
+result is not live Feishu, LLM inference, installed service or hardware
+acceptance. Outgoing media, owner GUI, source disposal and final activation
+remain open; the public Feishu registry remains disabled.
+
+
+Private outgoing files now come from the controller's authenticated, immutable
+completed-session artifact exports. Native MEDIA extraction must agree with the
+explicit markers. Separate output/read consent is required; without consent the
+paths are stripped and no artifact is read. Only bounded bytes/checksums and
+sanitized names enter the private native image/file upload worker.
+
+Actual pinned multipart builders and SDK uploads are checked against the exact
+wire artifact. A FULL-synchronous per-part intent precedes each API write.
+Confirmed upload keys are retained privately and reused across attempts; dropped
+connections, malformed success or missing IDs become uncertain and never trigger
+a second upload. Native media replies use the actual uploaded-key helper and SDK,
+with fixed original recipient/topic and stable UUID, and their own durable
+per-part journal. Confirmed replies replay locally; uncertain replies do not
+resend. Native retries, post/route fallback and new-topic creation remain closed.
+The prepared profile and generic delivery metadata/export path are connected,
+while public registry activation remains disabled.
+
+Local probes establish authenticated backend artifact reads, native SDK/TLS
+uploads and replies, real gateway/agent/root UID checks, cancellation/revocation,
+write intent before a withheld response, SIGKILL/restart quarantine and no second
+write on confirmed or uncertain replay. Their source/connection declarations are
+fixtures, not live tenant or recipient acceptance. Existing Opus and native
+file/image/video formats are routed by the pinned codec. Non-Opus voice conversion is described below. Multi-part owner adjudication,
+source disposal and complete owner setup/GUI still need completion before activation.
+
+An actual encoding-negotiation fixture reproduced a valid gzip response being
+mistaken for truncation when compressed Content-Length was compared with decoded
+bytes. The private JSON boundary now requests identity encoding and refuses
+unexpected compression. A separate actual SDK DEBUG fixture reproduced escaped
+app-secret text in serialized authentication diagnostics; the boundary now
+registers JSON/repr spellings in addition to the original secret. Neither fix
+weakens byte limits or negative assertions.
+
+
+Non-Opus outgoing audio now uses a fixed `opus` operation on the existing
+credential-free local speech socket. This requires the explicitly enabled local
+speech service; no provider key, remote encoder, caller path or command is
+accepted. The pinned PyAV decoder/encoder enforces the existing 8 MiB and
+120-second limits, produces mono Ogg/Opus, and verifies the decoded duration.
+`[[as_document]]` retains document routing instead of voice conversion.
+
+The gateway retains exact converted bytes in a FULL-synchronous per-offer ledger
+bound to the original artifact, delivery and current grant. Concurrent preparation
+reuses the first committed bytes, avoiding nondeterministic Ogg serial changes on
+retry. Shared byte quotas are checked again after encoding under a write lock.
+The owner cache inventory exposes metadata only. Explicit inspected disposal
+requires grant withdrawal, atomically records an audit and retains a tombstone;
+replaying the old offer never regenerates deleted bytes.
+
+The native codec probe covers FLAC/WAV/MP3/M4A and invalid, playlist and excessive
+duration inputs. The actual UID/socket-activation probe runs conversion under the
+separate speech identity for both authorized caller identities, including a
+90-second reply larger than the text-transcript limit and authority withdrawal.
+The actual authenticated backend-export composition also checks conversion and
+stable repeated preparation; its speech RPC transport is explicitly a fixture,
+while the codec is real. No external Feishu voice delivery is established.
+
+
+Private multipart recovery now inventories upload and media-reply intents
+separately, with exact part/operation/attempt snapshots. Upload keys and original
+receipt bodies stay private; the owner sees receipt checksums. A withdrawal of
+output/read rights denies recovery. Confirmed native acceptance cannot be
+released. An uncertain or definite rejected selected part requires independent
+non-acceptance confirmation plus a bounded inspection-note digest. The atomic
+owner audit does not send, clear account backoff or reconcile the controller
+outbox; that remains a separate owner decision. Later parts which have never
+started may begin in a later authorized overall attempt. Previous uncertain
+writes stay quarantined and confirmed parts remain reused.
+
+The actual SDK/TLS/UID process probe includes recovery after an uncertain upload
+and after an uncertain reply: no automatic second write occurs before the
+inspected decision; exactly the selected native operation repeats afterward.
+Source/connection declarations and independent non-acceptance evidence in these
+loopback cases remain fixtures, not real remote observations.
+
+Offline source management separately inventories opaque Feishu profile originals
+and webhook-wire stores without returning message bodies, headers, keys or raw
+proofs. Disposal requires the original grant to be changed/withdrawn, an exact
+current snapshot and an explicit inspected decision. Byte removal and its owner
+audit commit in one private SQLite transaction. Source/nonce identities remain
+as tombstones; authenticated redelivery never silently restores deleted bytes.
+The two stores require separate decisions, and controller/agent copies or backups
+are untouched. Active webhook capacity excludes removed byte payloads while
+retaining a separate finite metadata limit.
+
+Actual native source-capture and signed/AES/HTTPS webhook probes verify these
+disposal/reopen properties. A separate network-disabled real-UID owner helper
+probe checks both source kinds under the gateway identity and refuses root,
+agent and controller use of that helper. Its source metadata is explicitly
+fixture data. Public CLI/GUI integration and final activation remain open.

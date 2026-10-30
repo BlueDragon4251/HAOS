@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-30",
+  "parent": "89700036c4bae59fe1e58992592ec89a80012315",
+  "source_files_sha256": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "b1f13ec54b582958d62ccfbbbadc4793f41053f83dd8443df1960a44d26e91c9"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "62e034ea7c61312da6df0de0b19b9c285a6599dda9e433bf163ca32000cf6d28"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_oauth.py",
+      "sha256": "56290d4a63a2c9f9ae74556e05654e03a5deea4ae97f7e5b65e3974c47ab4c63"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_oauth_sdk.py",
+      "sha256": "0c635e90c71903ac8f73d0868147fa2fe56b0b67aeb6819835f3f85dc4ba6647"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_oauth_process.py",
+      "sha256": "f9f175319b8b153a74725e85017c079fd68076f5d82bef6f5d3d88c8f4c20633"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat_oauth.py",
+      "sha256": "85c6c5b13f0adb9670641367f3a650202620cad7a8ee5ba61da3ba9dc1bfade4"
+    }
+  ],
+  "full_and_minimal": {
+    "passed_each": 2775,
+    "existing_skips_each": 2,
+    "excluded_file": "test_backup.py, covered by real root/kernel run"
+  },
+  "root_kernel_passed": 173,
+  "new_private_OAuth_SQLite_schema_cases": 43,
+  "actual_private_UID_OAuth_SDK_TLS_RSA_PKCE_and_token_custody": {
+    "passed": 12,
+    "cases": [
+      "actual_Root_agent_and_supplementary_root_group_are_refused_before_optional_OAuth_SDK_import",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_ok",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_subject",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_nonce",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_audience",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_signature",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_missing-refresh",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_partial-scope",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_auth",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_rate",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_redirect",
+      "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_audit"
+    ],
+    "actual_private_UID_Google_Flow_PKCE_Token_SDK_TLS_RSA_and_FULL_SQLite": true,
+    "Google_token_and_certificate_endpoints_are_explicit_local_fixtures": true,
+    "service_account_is_schema_only_for_user_OAuth_scope": true,
+    "actual_verified_user_token_private_FULL_persistence_and_pending_secret_compaction": true,
+    "refresh_revoke_Owner_handoff_GUI_outbound_files_live_account_or_public_activation": false
+  },
+  "logs_sha256": [
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-minimal.log",
+      "sha256": "3c972d8bdc6778b3ba02823b66b8f9136d70430c3e8cf7e0932ecd6579fd58c9"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-full.log",
+      "sha256": "676405a618fb3207332d9bf8e568747f6ab55e8f354c0ba6dafc5993efcc9e65"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-kernel.log",
+      "sha256": "af8bddae3e3249af7005b8734190d2030a069ac24f5e7a721a380874413af2a5"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-custody-contracts.log",
+      "sha256": "90683946fdf603f18d1fd7d64f5bc56dbec99cefc495430d7b8d7afd59e10fa6"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-process.json",
+      "sha256": "1a0f063269388fdf82c0cff9f8e70031e882241a0d78d034ac90d9556e84f746"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-oauth-process.err",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "public_software_gateways": 15,
+  "not_claimed": [
+    "Google public activation",
+    "complete OAuth refresh/revoke/rejected-exchange cleanup",
+    "authenticated Owner OAuth handoff or GUI",
+    "native file output",
+    "live Google account privileges",
+    "external delivery/read",
+    "full Root Unix IPC/production serve",
+    "Google-specific local ASR/video process acceptance",
+    "installed OS/GUI or release artifacts"
+  ]
+}

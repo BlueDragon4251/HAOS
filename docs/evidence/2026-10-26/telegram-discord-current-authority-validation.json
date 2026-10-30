@@ -1,0 +1,551 @@
+{
+  "baseline_commit": "c64bd36ca6728ca3cfb55e89aefaeb6697ecf9b7",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_discord.py",
+      "sha256": "e704868ad607be32d5de7c5d11106b98ce13079848ba35f8d2c2619ef0a7c7e9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_telegram.py",
+      "sha256": "b63055d5757393abccb6530f1b69f60a6680bedd4625b7193eaa4dd14f3fd001"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "d8a7357595f23839e6a9d8198bd69d6cae62824e41171b477e7fb01a0fd9bb43"
+    },
+    {
+      "path": "linux/haos/runtime/probe_discord_delivery.py",
+      "sha256": "c93594437f2286dd28bb83987d1643667d5f541b41ac36af5e677ea92796cf8e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_telegram_delivery.py",
+      "sha256": "3e2683582beb282bdc8a83ed59b631021d9f832668d115f8b95843f0bbd5eb23"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_delivery.py",
+      "sha256": "9a65e02f2c1a67d09655b77b9272c4c56eb5cac98d337abd725dd5ae66a18b65"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_delivery_authority.py",
+      "sha256": "7b6614d4f051405ef29ba9487ee4f1953efa492fe00f698fe11a994ae4e3ac99"
+    }
+  ],
+  "isolated_baseline_reproduction": {
+    "baseline_commit": "c64bd36ca6728ca3cfb55e89aefaeb6697ecf9b7",
+    "isolated_runtime_copy": true,
+    "workspace_reset": false,
+    "cases": {
+      "telegram": {
+        "exit_code": 1,
+        "failure": "forged-binding",
+        "fixture_source_files": [
+          {
+            "path": "linux/haos/runtime/probe_telegram_delivery.py",
+            "sha256": "3e2683582beb282bdc8a83ed59b631021d9f832668d115f8b95843f0bbd5eb23"
+          }
+        ]
+      },
+      "discord": {
+        "exit_code": 1,
+        "failure": "forged-binding",
+        "fixture_source_files": [
+          {
+            "path": "linux/haos/runtime/probe_discord_delivery.py",
+            "sha256": "c93594437f2286dd28bb83987d1643667d5f541b41ac36af5e677ea92796cf8e"
+          }
+        ]
+      }
+    }
+  },
+  "baseline_source_files": [
+    {
+      "path": "linux/haos/haos/gateway_discord.py",
+      "sha256": "9fbbf0db3324ab8eb097bbb7b4fcb3644f791b57c2bf51ce3a405029dc043b1e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_telegram.py",
+      "sha256": "f0f12e16c028d53a54a3e476c38a1ef6a42393824f5f3099e16d29b8421b2877"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+    }
+  ],
+  "native_delivery": {
+    "telegram": {
+      "actual_native_telegram_send_cases": [
+        {
+          "case": "read-disconnect",
+          "http_send_attempts": 1,
+          "durable_state": "uncertain"
+        },
+        {
+          "case": "server-parser-error",
+          "http_send_attempts": 1,
+          "durable_state": "uncertain"
+        },
+        {
+          "case": "missing-thread",
+          "http_send_attempts": 1,
+          "durable_state": "failed"
+        },
+        {
+          "case": "rate-limit",
+          "http_send_attempts": 1,
+          "durable_state": "pending"
+        },
+        {
+          "case": "forbidden",
+          "http_send_attempts": 1,
+          "durable_state": "failed"
+        },
+        {
+          "case": "malformed-receipt",
+          "http_send_attempts": 1,
+          "durable_state": "uncertain"
+        },
+        {
+          "case": "invalid-id",
+          "http_send_attempts": 1,
+          "durable_state": "uncertain"
+        },
+        {
+          "case": "parse-rejected",
+          "http_send_attempts": 2,
+          "durable_state": "delivered"
+        },
+        {
+          "case": "success",
+          "http_send_attempts": 1,
+          "durable_state": "delivered"
+        },
+        {
+          "case": "forged-binding",
+          "http_send_attempts": 0,
+          "durable_state": "failed"
+        },
+        {
+          "case": "missing-binding",
+          "http_send_attempts": 0,
+          "durable_state": "failed"
+        },
+        {
+          "case": "policy-unavailable",
+          "http_send_attempts": 0,
+          "durable_state": "failed"
+        },
+        {
+          "case": "no-read-grant",
+          "http_send_attempts": 0,
+          "durable_state": "failed"
+        },
+        {
+          "case": "revoke-between-chunks",
+          "http_send_attempts": 1,
+          "durable_state": "uncertain"
+        },
+        {
+          "case": "revoke-before-format-fallback",
+          "http_send_attempts": 1,
+          "durable_state": "failed"
+        },
+        {
+          "case": "connect-refused",
+          "http_send_attempts": 0,
+          "durable_state": "pending"
+        }
+      ],
+      "actual_sdk_and_sqlite_reopen": true,
+      "no_thread_downgrade_or_ambiguous_replay": true,
+      "external_messages_sent": false,
+      "source_sha256": {
+        "probe_telegram_delivery.py": "3e2683582beb282bdc8a83ed59b631021d9f832668d115f8b95843f0bbd5eb23",
+        "gateway_telegram.py": "b63055d5757393abccb6530f1b69f60a6680bedd4625b7193eaa4dd14f3fd001",
+        "gateway_delivery.py": "26600594611c839a7b6f175b8e2f26e67aad6e2e16b348e7bb4399c864a5b158",
+        "gateway_ingress.py": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede",
+        "gateway_runtime.py": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+      }
+    },
+    "discord": {
+      "actual_native_sdk_http_outbox_cases": [
+        {
+          "case": "success",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "nonce-retry",
+          "actual_http_requests": 2,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "ambiguous-forbidden",
+          "actual_http_requests": 2,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "server-fake-reply",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "rate-limit",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "forbidden",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "reply-refused",
+          "actual_http_requests": 2,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "malformed",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "invalid-id",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "disconnect",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "wrong-guild",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "forum",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "partial-rate-limit",
+          "actual_http_requests": 2,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "thread-success",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "wrong-thread",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "connect-refused",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "forged-binding",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "missing-binding",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "policy-unavailable",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "no-read-grant",
+          "actual_http_requests": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "revoke-between-chunks",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "revoke-before-reply-fallback",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "revoke-before-nonce-retry",
+          "actual_http_requests": 1,
+          "reopened_outbox_state": "uncertain"
+        }
+      ],
+      "external_discord_connected": false,
+      "remote_server_nonce_dedup_live_tested": false,
+      "source_files": [
+        {
+          "path": "probe_discord_delivery.py",
+          "sha256": "c93594437f2286dd28bb83987d1643667d5f541b41ac36af5e677ea92796cf8e"
+        },
+        {
+          "path": "gateway_discord.py",
+          "sha256": "e704868ad607be32d5de7c5d11106b98ce13079848ba35f8d2c2619ef0a7c7e9"
+        },
+        {
+          "path": "gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+        }
+      ]
+    },
+    "slack": {
+      "actual_native_sdk_http_outbox_cases": [
+        {
+          "case": "success",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "server-format",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "format-refused",
+          "actual_http_posts": 2,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "rate-limit",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "forbidden",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "unknown-error",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "malformed",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "invalid-ts",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "wrong-receipt",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "disconnect",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "connect-refused",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "wrong-team",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "wrong-channel",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "thread-success",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "forged-binding",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "missing-binding",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "no-read-grant",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "policy-unavailable",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "revoke-between-chunks",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "revoke-before-format-fallback",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "failed"
+        }
+      ],
+      "external_slack_connected": false,
+      "source_files": [
+        {
+          "path": "probe_slack_delivery.py",
+          "sha256": "9a65e02f2c1a67d09655b77b9272c4c56eb5cac98d337abd725dd5ae66a18b65"
+        },
+        {
+          "path": "gateway_slack.py",
+          "sha256": "8f03fd9bbb989a99bce9401ee7a3dd5a392fcbdb231becb43d76f0ec77b59b64"
+        },
+        {
+          "path": "gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+        }
+      ]
+    }
+  },
+  "native_regression": {
+    "telegram_polling": {
+      "native_disconnect_holds_then_reconnects": false,
+      "native_drop_pending_request_forced_false": true,
+      "actual_ptb_getupdates_offsets": [
+        0,
+        0,
+        13,
+        13
+      ],
+      "real_sqlite_insert_failure_then_sdk_retry": 1,
+      "offset_advanced_only_after_independent_sqlite_reader_saw_commit": true,
+      "unknown_sender_not_admitted": true,
+      "shutdown_cancelled_fixture_polls": 1,
+      "actual_native_adapter_text_codec_and_application_handlers": true,
+      "external_telegram_connected": false,
+      "legacy_native_receipts_preserved_and_not_trusted_for_admission": true,
+      "source_sha256": {
+        "probe_telegram_polling.py": "27a5f6c659edcdebfa51f33be0895becdd5051ab162c6fc94056aa021034d3b2",
+        "gateway_telegram.py": "b63055d5757393abccb6530f1b69f60a6680bedd4625b7193eaa4dd14f3fd001",
+        "gateway_ingress.py": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede",
+        "gateway_runtime.py": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+      }
+    },
+    "discord_ingress": {
+      "actual_sdk_native_discord_cases": [
+        "exact owner sender guild channel",
+        "unknown sender guild channel refused",
+        "failed admission can retry same actual SDK message",
+        "committed duplicate remains idempotent",
+        "unsupported media refused before native download",
+        "actual SDK thread exact route admitted and other thread refused",
+        "revocation and out-of-context native auth refused"
+      ],
+      "external_discord_connected": false,
+      "websocket_ack_durability_tested": false,
+      "source_files": [
+        {
+          "path": "probe_discord_ingress.py",
+          "sha256": "ffc107d847f1d5895d1ccc5020bd5bd7eaf11ca020397d87977cc318d8e7c999"
+        },
+        {
+          "path": "gateway_discord.py",
+          "sha256": "e704868ad607be32d5de7c5d11106b98ce13079848ba35f8d2c2619ef0a7c7e9"
+        },
+        {
+          "path": "gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+        }
+      ]
+    },
+    "discord_history": {
+      "actual_sdk_http_history_recovery_cases": [
+        "failed durable admission leaves actual SDK history cursor unchanged",
+        "only approved post-grant messages admitted; older and unknown-sender messages excluded",
+        "reopened durable history input reaches native SDK decoder and HAOS relay once",
+        "crash after raw commit before cursor update retains idempotent recovery",
+        "revocation while actual HTTP request is outstanding prevents admission",
+        "repaired grant starts after its new boundary and cannot revive historic input",
+        "legacy grant without original boundary performs no automatic history fetch",
+        "original snowflake time survives commit; expired missed input retained without execution",
+        "future provider identity cannot skip the durable history cursor",
+        "three actual reversed REST pages advance only across committed or definitively refused input",
+        "actual SDK permission refusal persists safe status visible to owner recovery"
+      ],
+      "external_discord_connected": false,
+      "deleted_remote_messages_recoverable": false,
+      "source_files": [
+        {
+          "path": "probe_discord_history.py",
+          "sha256": "744eadd9d48a4a780ff6e7b7530451e3c6aaa0c12d8ea6d4c0d428c653159765"
+        },
+        {
+          "path": "gateway_discord_history.py",
+          "sha256": "71ebf3843d3f98fefcac7ca2cf4005905cf15859a68481a883a184f2819104e0"
+        },
+        {
+          "path": "gateway.py",
+          "sha256": "fc4b872ecfaa178ef751b18e0b668dfa73a4a1397a705b7543506f2a124b08f4"
+        },
+        {
+          "path": "gateway_setup.py",
+          "sha256": "d47ebc51056af865d4a594252e073a97a9b4e71ece930fb13e6ce893e2c59682"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "66655b7473cc618ee746f06038fadd4564993c92fa66574bfb8f06b5f9898647"
+        }
+      ]
+    }
+  },
+  "full_runtime": {
+    "passed": 1202,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath": {
+    "passed": 1202,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_recovery": {
+    "passed": 55,
+    "new_platforms_in_atomic_owner_file_cases": [
+      "telegram",
+      "discord"
+    ],
+    "network": "none"
+  },
+  "existing_local_excluded_file": "linux/haos/tests/test_backup.py",
+  "new_ci_skips": false,
+  "workspace_reset": false,
+  "external_messages_live_accounts_installed_or_release_accepted": false
+}

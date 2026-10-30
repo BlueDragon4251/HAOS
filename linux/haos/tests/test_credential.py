@@ -28,3 +28,74 @@ def test_invalid_credentials_cannot_launch_a_backend(monkeypatch, value):
     monkeypatch.setattr("haos.launch.os.execv", lambda *args: pytest.fail("invalid credential launched backend"))
     with pytest.raises(ValueError, match="credential"):
         launch.main()
+
+
+def test_runtime_model_config_seals_current_and_exact_legacy_without_mutation():
+    import copy
+    import fcntl
+    import json
+    import os
+    import pytest
+    from haos.provider_routes import ProviderRoutes
+    from haos.sandbox import runtime_provider_config
+    policy = ProviderRoutes({'version': 1, 'provider': 'local', 'endpoint': 'http://127.0.0.1:11434/v1',
+        'models': ['fixture-model'], 'default_model': 'fixture-model', 'api_mode': 'chat_completions',
+        'requests_per_day': 200, 'requests_per_minute': 120})
+    expected = policy.client_config()
+    assert expected['agent'] == {'api_max_retries': 1, 'auto_recovery_cycles': 0}
+    for client in (expected, {key: value for key, value in expected.items() if key != 'agent'}):
+        before = copy.deepcopy(client)
+        descriptor = runtime_provider_config(policy, client)
+        try:
+            assert json.loads(os.read(descriptor, 65536)) == expected
+            assert os.get_inheritable(descriptor)
+            for mutation in (lambda: os.write(descriptor, b'x'), lambda: os.ftruncate(descriptor, 0), lambda: os.ftruncate(descriptor, 65536)):
+                with pytest.raises(OSError): mutation()
+            assert fcntl.fcntl(descriptor, getattr(fcntl, "F_GET_SEALS", 1034)) & getattr(fcntl, "F_SEAL_WRITE", 8)
+        finally: os.close(descriptor)
+        assert client == before
+    for changes in ({'agent': {'api_max_retries': 3, 'auto_recovery_cycles': 0}},
+            {'agent': {}}, {'model': {**expected['model'], 'base_url': 'https://unapproved.invalid'}}, {'unknown': True}):
+        with pytest.raises(PermissionError): runtime_provider_config(policy, {**expected, **changes})
+
+
+def test_sandbox_uses_a_separate_read_only_model_config_descriptor():
+    import pytest
+    args = command([], 7, certificates=[], provider_fd=8, provider_config_fd=9, ui_fd=10)
+    assert '/etc/haos/provider-client.json' not in args
+    target = args.index('/home/agent/.hermes/config.yaml')
+    assert args[target - 4:target] == ['--perms', '0400', '--ro-bind-data', '9']
+    for bad in (True, -1, 2, 7, 8, 10):
+        with pytest.raises(ValueError): command([], 7, certificates=[], provider_fd=8, provider_config_fd=bad, ui_fd=10)
+    with pytest.raises(ValueError): command([], 7, certificates=[], provider_config_fd=9)
+
+
+def test_sealed_legacy_model_alias_migration_preserves_owner_data_and_rejects_other_changes():
+    import copy
+    import json
+    import os
+    import pytest
+    from haos.provider_routes import ProviderRoutes
+    from haos.sandbox import runtime_provider_config
+    first = {'version': 1, 'provider': 'local', 'endpoint': 'http://127.0.0.1:11434/v1',
+        'models': ['first'], 'default_model': 'first', 'api_mode': 'chat_completions',
+        'requests_per_day': 200, 'requests_per_minute': 120}
+    routes = ProviderRoutes({'version': 2, 'default': 'alpha', 'routes': {'alpha': first,
+        'model': {**first, 'models': ['second'], 'default_model': 'second'}}, 'fallbacks': {}})
+    expected = routes.client_config()
+    old = routes.client_config(legacy_names=True)
+    assert old['providers']['haos-model']['default_model'] == 'second'
+    for client in (expected, old, {key: value for key, value in old.items() if key != 'agent'}):
+        before = copy.deepcopy(client)
+        descriptor = runtime_provider_config(routes, client)
+        try:
+            derived = json.loads(os.read(descriptor, 65536))
+            assert derived == expected and derived['providers']['haos-model']['default_model'] == 'first'
+            with pytest.raises(OSError): os.write(descriptor, b'changed')
+        finally: os.close(descriptor)
+        assert client == before
+    for base in (expected, old):
+        altered = copy.deepcopy(base); altered['providers']['haos-model']['base_url'] = 'https://unapproved.invalid'
+        with pytest.raises(PermissionError): runtime_provider_config(routes, altered)
+        altered = copy.deepcopy(base); altered['agent']['api_max_retries'] = 3
+        with pytest.raises(PermissionError): runtime_provider_config(routes, altered)

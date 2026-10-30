@@ -1,0 +1,93 @@
+{
+  "actual_native_sdk_http_outbox_cases": [
+    {
+      "case": "success",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "server-format",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "format-refused",
+      "actual_http_posts": 2,
+      "reopened_outbox_state": "delivered"
+    },
+    {
+      "case": "rate-limit",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "pending"
+    },
+    {
+      "case": "forbidden",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "unknown-error",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "malformed",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "invalid-ts",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "wrong-receipt",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "disconnect",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "uncertain"
+    },
+    {
+      "case": "connect-refused",
+      "actual_http_posts": 0,
+      "reopened_outbox_state": "pending"
+    },
+    {
+      "case": "wrong-team",
+      "actual_http_posts": 0,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "wrong-channel",
+      "actual_http_posts": 0,
+      "reopened_outbox_state": "failed"
+    },
+    {
+      "case": "thread-success",
+      "actual_http_posts": 1,
+      "reopened_outbox_state": "delivered"
+    }
+  ],
+  "external_slack_connected": false,
+  "source_files": [
+    {
+      "path": "probe_slack_delivery.py",
+      "sha256": "eab8f249afbf858318758cae5b5d2f87d5f8560a5fc24c1d5a78c478f7fa779b"
+    },
+    {
+      "path": "gateway_slack.py",
+      "sha256": "7de8c7c426bd8a5df7db50baf55ad93f3d4a9357a09f759ad7cc61194cd7e9e9"
+    },
+    {
+      "path": "gateway_ingress.py",
+      "sha256": "149329d0b1407c776ef69e0b5e16582d8c8050a656707df66c54b6b70d926822"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "f7e5df8f9611635c8ed2691a704aede2c0493581d0cdbc00e9f320da88b9017a"
+    }
+  ]
+}

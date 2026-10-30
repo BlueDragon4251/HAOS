@@ -1,0 +1,161 @@
+{
+  "date_utc": "2026-10-30",
+  "ci_source_commit": "720556a35d2c1ae68cf83c77bf0dc4114b595db4",
+  "ci_source_tree": "357bf5891f240d947e50003ab2fe383bf4e890b9",
+  "merge_checkout_commit": "7b4d0f3a8bfe4523c6da0e8aa83da3c00ffc5553",
+  "merge_checkout_tree": "357bf5891f240d947e50003ab2fe383bf4e890b9",
+  "all_six_workflows_success_after_explicit_failed_job_rerun": true,
+  "workflow_runs": [
+    {
+      "id": 41002031480,
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 41002031442,
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 41002031455,
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 41002031499,
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 41002031440,
+      "conclusion": "success",
+      "attempt": 2
+    },
+    {
+      "id": 41002026113,
+      "conclusion": "success",
+      "attempt": 1
+    }
+  ],
+  "initial_CI_failure": {
+    "run": 41002031440,
+    "attempt": 1,
+    "job": 123888411433,
+    "step": "Real virtual Wayland and controller socket restart gates",
+    "failure": "75-second disposable GUI deadline, without phase diagnostics",
+    "cause_established": false
+  },
+  "change": "Keep 75-second deadline, compositor default, all actual sandbox/input/capture/restart assertions; add the same bounded failure diagnostics on deadline and source-bound failure status artifacts, plus fixed browser fixture phase labels. No raw protocol logs included.",
+  "local_validation": {
+    "source_commit": "226d4ceed4a2c29eefa3b88a40e6ae7039d8ebee",
+    "work_tree_dirty": true,
+    "weston": "weston 14.0.2",
+    "niri": null,
+    "actual_virtual_niri": false,
+    "compositor_shell": "kiosk-shell.so",
+    "actual_virtual_wayland": true,
+    "installed_niri": false,
+    "physical_hardware": false,
+    "real_model_turn": false,
+    "session_is_explicit_fixture": true,
+    "protocol": {
+      "browser": {
+        "mission_toplevels": 7,
+        "surface_commits": 37
+      },
+      "integration": {
+        "mission_toplevels": 1,
+        "surface_commits": 20
+      },
+      "theme": {
+        "mission_toplevels": 1,
+        "surface_commits": 8
+      }
+    },
+    "gates": {
+      "browser": {
+        "checks": {
+          "typed_actual_fields": true,
+          "captured_actual_pixels": true,
+          "renderer_sandbox": true,
+          "no_caller_scripts": true,
+          "network_canary_denied": true,
+          "chooser_intercepted": true,
+          "clipboard_shortcut_denied": true,
+          "mission_and_window_denials": true,
+          "closed_window_denied": true,
+          "mission_cleanup": true,
+          "actual_form_inspection": true,
+          "sensitive_fields_masked": true,
+          "visible_text_from_actual_layout": true,
+          "hidden_and_form_text_excluded": true,
+          "actual_scrolling_verified": true,
+          "multiple_windows_isolated": true,
+          "window_and_scroll_budgets_enforced": true
+        },
+        "source_commit": "226d4ceed4a2c29eefa3b88a40e6ae7039d8ebee",
+        "shared_memory_total_bytes": 5226233856,
+        "shared_memory_lowest_free_bytes": 5169238016
+      },
+      "integration": {
+        "checks": {
+          "actual_input_and_inspection": true,
+          "actual_capture": true,
+          "actual_read_without_body_persistence": true,
+          "private_bodies_absent_from_audit": true,
+          "unauthorized_methods_denied": true,
+          "lost_ack_not_reexecuted": true,
+          "controller_restart_blocks_mission": true,
+          "durable_audit_survives": true,
+          "actual_fragmented_readiness_framed": true,
+          "real_queue_mission_theme_schema_and_revision": true,
+          "real_queue_theme_preview_and_private_pixels": true,
+          "agent_native_lease_and_unsupported_activation_denied": true,
+          "real_queue_guarded_theme_activation_and_shell_verified": true,
+          "real_queue_broken_renderer_update_rolls_back": true
+        },
+        "source_commit": "226d4ceed4a2c29eefa3b88a40e6ae7039d8ebee",
+        "shared_memory_total_bytes": 5226233856,
+        "shared_memory_lowest_free_bytes": 5180641280
+      },
+      "theme": {
+        "checks": {
+          "actual_preview_and_renderer_confirmed": true,
+          "actual_fixed_linux_outputs": true,
+          "actual_unusable_renderer_rolls_back": true,
+          "prior_renderer_restored": true,
+          "unreadable_draft_never_activates": true,
+          "missing_or_wrong_shell_denied": true,
+          "renderer_remains_sandboxed": true,
+          "actual_mission_data_stage_preview_and_guarded_apply": true,
+          "mission_capability_broken_renderer_rolls_back": true,
+          "expired_component_lease_cannot_activate": true,
+          "other_mission_revision_cannot_activate": true
+        },
+        "source_commit": "226d4ceed4a2c29eefa3b88a40e6ae7039d8ebee",
+        "shared_memory_total_bytes": 5226233856,
+        "shared_memory_lowest_free_bytes": 5186998272
+      }
+    }
+  },
+  "source_files_sha256": {
+    "scripts/test-gui-wayland.py": "1523b03e3b1aa2a077f6cf6fa65df97b5e84b3cec3a958e267f981a3c5841d24",
+    "apps/desktop/scripts/test-gui-broker.mjs": "ef6e990531d2031d6a98344247fae6ad2c911bb513233c7e95e6405f2554ff51"
+  },
+  "public_package_fixture": [
+    {
+      "file": "weston_14.0.2-1_amd64.deb",
+      "sha256": "cb2cddfc082a6f14d15e4682cdbb9778439f9b89123ed41356f108ccb3ebb48e"
+    },
+    {
+      "file": "libweston-14-0_14.0.2-1_amd64.deb",
+      "sha256": "882469912622c4ef2b0cf85d9cba56906250a6da7e935580feca868bb7dfe942"
+    }
+  ],
+  "scope_limits": [
+    "Local Weston 14.0.2 uses kiosk shell; CI Weston 13 uses desktop shell. The local run is not an exact reproduction of the initial CI failure.",
+    "Local receipt truthfully records source226d4ce and dirty worktree; reviewed script hashes identify the diagnostic change.",
+    "Unchanged failing CI source passed explicit rerun without weakened gates; first timeout cause remains unproven.",
+    "No physical display, installed desktop, real inference or release acceptance."
+  ]
+}

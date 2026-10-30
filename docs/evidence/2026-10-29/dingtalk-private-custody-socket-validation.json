@@ -1,0 +1,112 @@
+{
+  "parent_commit": "626b2d1bc38a2aa69c8394ba6971bc8927657f1b",
+  "recorded_at": "2026-10-29T22:56:02.669428+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "405d12e95adba904237fe33338f0fed8fcd62dad443772e5dc4be6ff9e24a213"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "6fbd90e1df1895e0d51ad7e82241112e142e92102795cc481734f12029ef2cf3"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "9eec7998752f7dd2e9c730bf3db2d98d6f9520fd4b8c914567942e8a4391900a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_cache.py",
+      "sha256": "d882cdc0aa45e1253c1f442ea2bb0bde45bce316ff5359f84e01e3ea3c70e66d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_frames.py",
+      "sha256": "38853176d6a185f9b0f386c685b5f2163bc68e78a0044dbc5767245dad60b99f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ws_process.py",
+      "sha256": "937fec2dff5ab342aae562dec3e0954edea594a144a353bc6b7b38eec5f764a7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ws_worker.py",
+      "sha256": "d4922e022607dd6eb9eac5620e4eabe6fadc4f682b97565f94020cb3348cf08f"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_ws_process.py",
+      "sha256": "44d693a8a91768b087b5373a6ef25eb0fdfbaddabfd7f09dbdd5deee3a0e9698"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_custody.py",
+      "sha256": "77b629671e895a18caed5b72a1aa9ae7dec0e6e8a7ff43ab271898db3fcdc1ba"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_ws_process.py",
+      "sha256": "4df7205802972f1e968303c2a7c4e30cf7eaf833d329169604d2097e1e228c9f"
+    }
+  ],
+  "validation": {
+    "minimal_runtime": {
+      "passed": 2183,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; prior unchanged root suite covers backup"
+    },
+    "full_pinned_10_extra_runtime": {
+      "passed": 2183,
+      "existing_skips": 2
+    },
+    "native_SDK_SQLite_custody": {
+      "cases": [
+        "actual_native_callback_ACK_codec_only_after_FULL_original_and_input_commits_visible_to_separate_connections",
+        "actual_native_callback_replay_ACK_preserves_one_durable_input",
+        "reopen_preserves_exact_private_session_bearing_original_and_pending_input",
+        "replay_refreshed_session_capability_cannot_replace_first_retained_reply_route",
+        "conflicting_body_replay_never_ACKed_or_replaces_original",
+        "conflicting_timestamp_replay_never_ACKed_or_replaces_original",
+        "unknown_sender_no_ACK_reaction_plugin_or_input",
+        "wrong_corporation_no_ACK_reaction_plugin_or_input",
+        "robot_no_ACK_reaction_plugin_or_input",
+        "original_committed_input_failure_gets_no_ACK_and_replay_recovers_same_input",
+        "withdrawn_publication_refuses_ACK_and_private_original_read",
+        "wildcard_EVENT_unreviewed_version_duplicate_keys_nonfinite_payload_no_ACK",
+        "actual_native_ACK_requires_exact_durable_receipt_not_boolean_or_volatile_success",
+        "actual_native_route_backpressure_and_capture_cancellation_leave_no_ACK",
+        "damaged_retained_original_refused_before_native_decode"
+      ],
+      "scope": "Local real SDK and SQLite custody; socket, current-publication callback and IDs are fixtures.",
+      "external_messages_or_installed_acceptance": false
+    },
+    "actual_UID_WSS_process": {
+      "passed": 9,
+      "cases": [
+        "actual_gateway_UID_native_SDK_discovery_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "fresh_parent_supervised_worker_reconnect_replays_one_original_one_input",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_WSS_401_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect",
+        "actual_WSS_429_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect",
+        "actual_WSS_302_finite_diagnostic_one_discovery_no_hidden_SDK_retry_or_redirect"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "current_owner_publication_service_supervisor_and_external_account_are_fixtures": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "shell_and_workflow_parse": "passed"
+  },
+  "limits": [
+    "DingTalk remains private; public software gateways still 12/22.",
+    "Native SDK discovery/callback/ACK are real; private HAOS lifecycle replaces unsafe native SDK.start behavior.",
+    "Socket reconnect orchestration and current owner publication in the process probe are fixtures; production profile/retry ledger still pending.",
+    "No mission, external message, live account, installed-system, hardware or release acceptance."
+  ],
+  "fixture_corrections": [
+    "Negative receipt loop initially shadowed the retained original receipt variable; renamed loop variable, preserving all assertions."
+  ]
+}

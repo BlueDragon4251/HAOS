@@ -1,0 +1,291 @@
+{
+  "native": {
+    "actual_native_aws_http_cases": [
+      "mantle:iam:json",
+      "mantle:iam:stream",
+      "mantle:iam:truncated",
+      "mantle:iam:rate-limit",
+      "mantle:iam:terminal-framing",
+      "mantle:bearer:json",
+      "mantle:bearer:stream",
+      "mantle:bearer:truncated",
+      "mantle:bearer:rate-limit",
+      "mantle:bearer:terminal-framing",
+      "claude:iam:json",
+      "claude:iam:stream",
+      "claude:iam:truncated",
+      "claude:iam:rate-limit",
+      "claude:iam:terminal-framing",
+      "claude:bearer:json",
+      "claude:bearer:stream",
+      "claude:bearer:truncated",
+      "claude:bearer:rate-limit",
+      "claude:bearer:terminal-framing"
+    ],
+    "actual_sdk_private_credential_chain": null,
+    "botocore_sigv4_verified_cryptographically": true,
+    "mantle_endpoint_and_protocol_derived_from_pinned_rules": true,
+    "actual_anthropic_bedrock_binary_eventstream": true,
+    "claude_signed_thinking_replay": true,
+    "per_route_iam_and_bearer_no_global_env_changes": true,
+    "early_stream_and_truncation_rate_limit": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_files": [
+      {
+        "path": "probe_aws_native.py",
+        "sha256": "22bd6a558ac3392d038273561a38b280f5e1ccead1f16fe2bfb3d18cb7748268"
+      },
+      {
+        "path": "provider_cloud.py",
+        "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+      },
+      {
+        "path": "provider_bedrock_messages.py",
+        "sha256": "01ff63e2281ae22f4d8063742530e52fc503640d1c2acaffedc1db20e45ef17f"
+      },
+      {
+        "path": "provider_profiles.py",
+        "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+      },
+      {
+        "path": "provider_policy.py",
+        "sha256": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285"
+      },
+      {
+        "path": "provider_proxy.py",
+        "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+      },
+      {
+        "path": "provider_sse.py",
+        "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+      }
+    ]
+  },
+  "profile": {
+    "actual_native_aws_http_cases": [
+      "mantle:iam:json",
+      "mantle:iam:stream",
+      "mantle:iam:truncated",
+      "mantle:iam:rate-limit",
+      "mantle:iam:terminal-framing",
+      "claude:iam:json",
+      "claude:iam:stream",
+      "claude:iam:truncated",
+      "claude:iam:rate-limit",
+      "claude:iam:terminal-framing"
+    ],
+    "actual_sdk_private_credential_chain": "profile",
+    "botocore_sigv4_verified_cryptographically": true,
+    "mantle_endpoint_and_protocol_derived_from_pinned_rules": true,
+    "actual_anthropic_bedrock_binary_eventstream": true,
+    "claude_signed_thinking_replay": true,
+    "per_route_iam_and_bearer_no_global_env_changes": true,
+    "early_stream_and_truncation_rate_limit": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_files": [
+      {
+        "path": "probe_aws_native.py",
+        "sha256": "22bd6a558ac3392d038273561a38b280f5e1ccead1f16fe2bfb3d18cb7748268"
+      },
+      {
+        "path": "provider_cloud.py",
+        "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+      },
+      {
+        "path": "provider_bedrock_messages.py",
+        "sha256": "01ff63e2281ae22f4d8063742530e52fc503640d1c2acaffedc1db20e45ef17f"
+      },
+      {
+        "path": "provider_profiles.py",
+        "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+      },
+      {
+        "path": "provider_policy.py",
+        "sha256": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285"
+      },
+      {
+        "path": "provider_proxy.py",
+        "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+      },
+      {
+        "path": "provider_sse.py",
+        "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+      }
+    ]
+  },
+  "default-chain": {
+    "actual_native_aws_http_cases": [
+      "mantle:iam:json",
+      "mantle:iam:stream",
+      "mantle:iam:truncated",
+      "mantle:iam:rate-limit",
+      "mantle:iam:terminal-framing",
+      "claude:iam:json",
+      "claude:iam:stream",
+      "claude:iam:truncated",
+      "claude:iam:rate-limit",
+      "claude:iam:terminal-framing"
+    ],
+    "actual_sdk_private_credential_chain": "default-chain",
+    "botocore_sigv4_verified_cryptographically": true,
+    "mantle_endpoint_and_protocol_derived_from_pinned_rules": true,
+    "actual_anthropic_bedrock_binary_eventstream": true,
+    "claude_signed_thinking_replay": true,
+    "per_route_iam_and_bearer_no_global_env_changes": true,
+    "early_stream_and_truncation_rate_limit": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_files": [
+      {
+        "path": "probe_aws_native.py",
+        "sha256": "22bd6a558ac3392d038273561a38b280f5e1ccead1f16fe2bfb3d18cb7748268"
+      },
+      {
+        "path": "provider_cloud.py",
+        "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+      },
+      {
+        "path": "provider_bedrock_messages.py",
+        "sha256": "01ff63e2281ae22f4d8063742530e52fc503640d1c2acaffedc1db20e45ef17f"
+      },
+      {
+        "path": "provider_profiles.py",
+        "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+      },
+      {
+        "path": "provider_policy.py",
+        "sha256": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285"
+      },
+      {
+        "path": "provider_proxy.py",
+        "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+      },
+      {
+        "path": "provider_sse.py",
+        "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+      }
+    ]
+  },
+  "sts": {
+    "actual_native_sts_assume_role_http_calls": 2,
+    "source_sigv4_verified_cryptographically": true,
+    "native_session_cache_and_expired_role_refresh": true,
+    "concurrent_request_keeps_its_frozen_signer_and_redactor": true,
+    "private_credential_files_only_in_fixture": true,
+    "live_account_tested": false,
+    "source_sha256": {
+      "probe_aws_identity.py": "861bc01c2848ef3158f06b62aef140688b68844bbfecfead515e89b9f1b3a266",
+      "provider_cloud.py": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84",
+      "provider_proxy.py": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+    }
+  },
+  "catalog": {
+    "actual_codex_catalog_helper_http": true,
+    "actual_boto3_control_plane_signing": true,
+    "aws_explicit_profile_default_chain_catalog_cases": 3,
+    "generated_routing_cases_match_upstream": 143,
+    "static_catalog_is_not_entitlement": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_sha256": {
+      "probe_model_catalog.py": "1299b1d6dc19753403c857fc1c114e33cd02e242d6736baf93f50a50c2403f49",
+      "provider_discovery.py": "e394c9461c4e5e030d44d81120b0360f2c99b2a50965f24666942bd0f92253b9",
+      "provider_cloud.py": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84",
+      "provider_proxy.py": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f",
+      "provider_registry.py": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b",
+      "hermes_registry.json": "d9c4aed5920df94837226b4b13da3e96ef5e0031cd67d2af9223b02d5bb7f0b5"
+    }
+  },
+  "converse": {
+    "actual_signed_or_bearer_boto3_replay_cases": [
+      "iam:json-replay",
+      "iam:stream-replay",
+      "bearer:json-replay",
+      "bearer:stream-replay"
+    ],
+    "actual_http_requests": 8,
+    "distinct_private_routes_same_provider_endpoint_model": false,
+    "ordered_signed_redacted_text_tool_next_turn_replay": true,
+    "actual_hermes_stream_detail_accumulator": true,
+    "early_delta_before_upstream_terminal": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_files": [
+      {
+        "path": "probe_converse_replay.py",
+        "sha256": "892a6e2655d43b13d5dd0e381ae71fd5d5f84fd2143c5786838636d12cc4c2f2"
+      },
+      {
+        "path": "provider_cloud.py",
+        "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+      },
+      {
+        "path": "provider_profiles.py",
+        "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+      },
+      {
+        "path": "provider_bedrock_replay.py",
+        "sha256": "f477d468782aa42c2ce14ec6caa71eb688fd58fc68104a93d7d188c7a8a1c705"
+      },
+      {
+        "path": "provider_response_replay.py",
+        "sha256": "b17fff8db45b8088d201d30e7e180bedff1607c28c61536caae258ec5136eef4"
+      },
+      {
+        "path": "provider_moa_streams.py",
+        "sha256": "c296ef974fb67da1d39076a652be6a139f88cab0fcabbbb9ce8ed7ba7bd71e5d"
+      },
+      {
+        "path": "provider_proxy.py",
+        "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+      }
+    ]
+  },
+  "converse-routes": {
+    "actual_signed_or_bearer_boto3_replay_cases": [
+      "iam:json-replay",
+      "iam:stream-replay",
+      "bearer:json-replay",
+      "bearer:stream-replay"
+    ],
+    "actual_http_requests": 16,
+    "distinct_private_routes_same_provider_endpoint_model": true,
+    "ordered_signed_redacted_text_tool_next_turn_replay": true,
+    "actual_hermes_stream_detail_accumulator": true,
+    "early_delta_before_upstream_terminal": true,
+    "live_provider_tested": false,
+    "python": "3.11.16",
+    "source_files": [
+      {
+        "path": "probe_converse_replay.py",
+        "sha256": "892a6e2655d43b13d5dd0e381ae71fd5d5f84fd2143c5786838636d12cc4c2f2"
+      },
+      {
+        "path": "provider_cloud.py",
+        "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+      },
+      {
+        "path": "provider_profiles.py",
+        "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+      },
+      {
+        "path": "provider_bedrock_replay.py",
+        "sha256": "f477d468782aa42c2ce14ec6caa71eb688fd58fc68104a93d7d188c7a8a1c705"
+      },
+      {
+        "path": "provider_response_replay.py",
+        "sha256": "b17fff8db45b8088d201d30e7e180bedff1607c28c61536caae258ec5136eef4"
+      },
+      {
+        "path": "provider_moa_streams.py",
+        "sha256": "c296ef974fb67da1d39076a652be6a139f88cab0fcabbbb9ce8ed7ba7bd71e5d"
+      },
+      {
+        "path": "provider_proxy.py",
+        "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+      }
+    ]
+  }
+}

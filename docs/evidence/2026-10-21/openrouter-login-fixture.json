@@ -1,0 +1,28 @@
+{
+  "actual_native_pkce_cases": [
+    "success",
+    "denied",
+    "rate-limit",
+    "missing-key",
+    "invalid-key",
+    "non-json",
+    "empty-code",
+    "cancel",
+    "short-body"
+  ],
+  "case_count": 9,
+  "native_private_pool_status_broker_logout": true,
+  "authorization_code_and_tokens_not_printed": true,
+  "failed_login_preserves_existing_account": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_openrouter_login.py",
+      "sha256": "02f6c83a29f3628213f16e83b03b8bc4604a91e4dfee2f9ec68afc73b51b3152"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "5153e82b404ab4df5feb484d1310858971e93ac65308f0db5fa3ed8aab79506a"
+    }
+  ]
+}

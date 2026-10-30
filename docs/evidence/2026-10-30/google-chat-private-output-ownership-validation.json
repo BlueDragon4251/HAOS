@@ -1,0 +1,695 @@
+{
+  "recorded_UTC": "2026-10-30T17:00:14.586716+00:00",
+  "base_commit": "765b75f6faa7e5a8aec884bee7654ee45e511239",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "2dfaa57503cd10deefb4fa317d7a3b3ba596ae9cc835435efbebc79b0a6ce7a9"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "181546926dbb212753d80de5a1d73d6930e055ee6ab8f5ac4f29d9da9d9549d5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_output_identity.py",
+      "sha256": "05d896c1a78c8b018efe26d97b0acb43005ca0464f02a770d066594d33e52f62"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_output.py",
+      "sha256": "e26cee3495742c124610642e1820d5ee79ed3882a24a45cc82b2021369091a5c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_files.py",
+      "sha256": "1737b2670b0af1310fc99ce24a078389023dd08429232d6cd5cafb21bce467dc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_file_recovery.py",
+      "sha256": "0cc572b57f78d26b875762c8a5b8a674a72fcb15ac5a14032895904056963b23"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_process.py",
+      "sha256": "332ef4034f49e59a6399ae7706b80ae077c7a2e031513ea875bc4de0b4c7acdc"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_setup.py",
+      "sha256": "352f573febee666dbf985f4f329ed12b7729a38a0f551e37a3ee34fe5799584a"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_worker.py",
+      "sha256": "d4d473f57ceacb00c280b08945bcbc0afc0e78129f0bac8c6752ee659d0ae341"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_file_process.py",
+      "sha256": "27b43c160182407055950514c37af67ebdb2ab2782ea4876914e21fd3de064f6"
+    },
+    {
+      "path": "linux/haos/runtime/google_chat_historical_output_fixture.py",
+      "sha256": "33122bb9139ef66114b5c266ed2164efe34ab460dae0d07caad92c36f028b56c"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat_output_identity.py",
+      "sha256": "1582e4cbfb48b927949caea81a6642ac285ebe7435817dd3183f8d5bdc35fb91"
+    }
+  ],
+  "minimal_no_Hermes_source": {
+    "passed": 2943,
+    "existing_skips": 2
+  },
+  "frozen_Hermes_source": {
+    "passed": 2943,
+    "existing_skips": 2
+  },
+  "actual_root_kernel": {
+    "passed": 173,
+    "new_skips_or_kernel_mocks": false
+  },
+  "targeted_contracts": 134,
+  "actual_historical_output_process_modes": {
+    "removed": {
+      "scene": "recover-output-purge",
+      "passed": 1,
+      "process": {
+        "scene": "recover-output-purge",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-output-purge",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "mode": "removed",
+          "receipt": {
+            "id": "574e0f8d9d40549e358107329cde36d320cabe75b9227f995e1077f875cfe9b9",
+            "receipt": "14baf800d35059b5b433b41c79511ff24733eb8517ab699ddb82f7b1ea7fab93",
+            "network_requested": false,
+            "message_sent": false,
+            "tombstones_retained": true,
+            "remote_deletion_verified": false,
+            "other_copies_backups_and_WAL_erasure_not_claimed": true
+          },
+          "active_grant_refused": true,
+          "actual_Root_private_UID_with_optional_SDK_and_Hermes_source_hidden": true,
+          "original_retained_bytes_preserved_until_explicit_decision": true,
+          "ownership_tombstone_and_Owner_audit_preserved": true,
+          "no_network_or_remote_deletion": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "rotated": {
+      "scene": "recover-output-purge",
+      "passed": 1,
+      "process": {
+        "scene": "recover-output-purge",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-output-purge",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "mode": "rotated",
+          "receipt": {
+            "id": "07c98a9056b5b656ee96ae8a42636f2c714996580e595dd912888769097afe19",
+            "receipt": "148cc784720b6331b4563a451e11b9e8c2e2777cb08aa1b509bb24580b0608b8",
+            "network_requested": false,
+            "message_sent": false,
+            "tombstones_retained": true,
+            "remote_deletion_verified": false,
+            "other_copies_backups_and_WAL_erasure_not_claimed": true
+          },
+          "active_grant_refused": true,
+          "actual_Root_private_UID_with_optional_SDK_and_Hermes_source_hidden": true,
+          "original_retained_bytes_preserved_until_explicit_decision": true,
+          "ownership_tombstone_and_Owner_audit_preserved": true,
+          "no_network_or_remote_deletion": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "legacy": {
+      "scene": "recover-output-purge",
+      "passed": 1,
+      "process": {
+        "scene": "recover-output-purge",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-output-purge",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "mode": "legacy",
+          "receipt": {
+            "id": "11c871b0d541946c4a98914ea03a8c9a8f60e4dddf20223b8f88186ee1bcde64",
+            "receipt": "13577dcfe8beb591bdccc17a3270572263d50e29bd2ccbb5bf532349e32cfde7",
+            "network_requested": false,
+            "message_sent": false,
+            "tombstones_retained": true,
+            "remote_deletion_verified": false,
+            "other_copies_backups_and_WAL_erasure_not_claimed": true
+          },
+          "active_grant_refused": true,
+          "actual_Root_private_UID_with_optional_SDK_and_Hermes_source_hidden": true,
+          "original_retained_bytes_preserved_until_explicit_decision": true,
+          "ownership_tombstone_and_Owner_audit_preserved": true,
+          "no_network_or_remote_deletion": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    }
+  },
+  "actual_native_file_regression_scenes": {
+    "publisher": {
+      "scene": "publisher",
+      "passed": 1,
+      "process": {
+        "scene": "publisher",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "publisher",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "recover-create": {
+      "scene": "recover-create",
+      "passed": 1,
+      "process": {
+        "scene": "recover-create",
+        "initial_state": [
+          "uploaded",
+          "writing"
+        ],
+        "final_state": "writing",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": false,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "a1e6c698c485881ef4df7c9cfb19ed65e311b22062ea63a3483b966448c18ad4",
+          "action": "retry-file",
+          "generation": 1,
+          "receipt": "76aca13c0efb7745fe6664267022a6fe9ed67a5028a419801a29db9206ddb7f3",
+          "approval_recorded": true,
+          "network_requested": false,
+          "message_sent": false,
+          "same_source_user_file_and_stable_ids_required": true,
+          "late_acceptance_check_before_create_required": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "bot-token",
+        "bot-membership",
+        "read-own-write",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "recover-read-disconnect": {
+      "scene": "recover-read-disconnect",
+      "passed": 1,
+      "process": {
+        "scene": "recover-read-disconnect",
+        "initial_state": [
+          "uploaded",
+          "writing"
+        ],
+        "final_state": "writing",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": false,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-read-disconnect",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-read-disconnect",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-read-disconnect",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "84c4317198b1ae5381d09063b6bab64ebc07e63c04329b2e45c559733bd10e46",
+          "action": "retry-file",
+          "generation": 1,
+          "receipt": "a9719514aff3f8ee6d64875e05f242972066bdb7c9f8c02fb8f30bf739e20fa7",
+          "approval_recorded": true,
+          "network_requested": false,
+          "message_sent": false,
+          "same_source_user_file_and_stable_ids_required": true,
+          "late_acceptance_check_before_create_required": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "bot-token",
+        "bot-membership",
+        "read-own-write",
+        "bot-token",
+        "bot-membership",
+        "read-own-write"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "recover-read-body": {
+      "scene": "recover-read-body",
+      "passed": 1,
+      "process": {
+        "scene": "recover-read-body",
+        "initial_state": [
+          "uploaded",
+          "writing"
+        ],
+        "final_state": "writing",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": false,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-read-body",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-read-body",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-read-body",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "9037df95fd1c73bd4f55eb137933c4942f599b4356895651aafed7e38cb66f5b",
+          "action": "retry-file",
+          "generation": 1,
+          "receipt": "8d86d8c5ab71f4f812ce4894fa187741d9e9ba58efea703562d1c0fcccfff451",
+          "approval_recorded": true,
+          "network_requested": false,
+          "message_sent": false,
+          "same_source_user_file_and_stable_ids_required": true,
+          "late_acceptance_check_before_create_required": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "bot-token",
+        "bot-membership",
+        "read-own-write",
+        "bot-token",
+        "bot-membership",
+        "read-own-write"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "recover-output-purge": {
+      "scene": "recover-output-purge",
+      "passed": 1,
+      "process": {
+        "scene": "recover-output-purge",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-output-purge",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "99e1f8bdc9d506fa9b960cd732dee31c9793d6b713858d46fff992bc0f7d1ad9",
+          "receipt": "3139df1e449ea19a9c09dc59d388e96c5091f20e76da17d43a0b6f1e949bf155",
+          "network_requested": false,
+          "message_sent": false,
+          "tombstones_retained": true,
+          "remote_deletion_verified": false,
+          "other_copies_backups_and_WAL_erasure_not_claimed": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    }
+  },
+  "execution": {
+    "network": "none",
+    "container": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+    "actual_Root_parent_private_UID_65534_and_SQLite": true,
+    "actual_native_Google_file_upload_and_source_bound_publisher_before_cleanup": true,
+    "historical_metadata_and_purge_without_optional_SDK_or_Hermes_runtime_paths": true,
+    "key_rotation_active_config_removal_and_legacy_index_removal_are_disposable_fixture_operations": true,
+    "systemctl_Google_CA_DNS_and_agent_artifact_service": "explicit fixtures, not live/installed acceptance"
+  },
+  "properties": [
+    "Per-file connector/stable-app ownership survives private service-key epochs and is never rebound",
+    "Checksum covers ownership fields and immutable delivery/offer/file metadata",
+    "Legacy index recovered only from exact current Root binding/current credential or validated retained native FileLedger proof",
+    "Unproven withdrawn legacy rows remain unassociated and unchanged",
+    "Historical outputs need only public app descriptor, actual Root policy snapshot and private lease; no fabricated active policy or key",
+    "Any actual unchanged original Google read/outbound grant blocks local byte deletion",
+    "Explicit exact ownership/snapshot Owner decision, FULL audit transaction, idempotent receipt, retained ownership/tombstones",
+    "Audit failure rolls back byte disposal and new metadata never restores missing/corrupt/purged bytes",
+    "No source bytes, private references or service-account/user token material returned in metadata"
+  ],
+  "limits": [
+    "Unassociated legacy output recovery and missing legacy account identity recovery remain in progress",
+    "Public GUI/CLI/setup/production daemon/installed packaging still open; public count15/22",
+    "No live Google delivery, inference, Owner-login/systemd/hardware or release acceptance",
+    "No remote deletion or secure erasure of WAL/other copies/backups claimed"
+  ]
+}

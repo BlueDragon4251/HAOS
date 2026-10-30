@@ -1,0 +1,222 @@
+{
+  "parent_commit": "8c3c9494f60a616f69f52a16ee1b91aa819822f5",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "3d6789e15fe9a88cbb86a6a8c1cff6f354802c565f82eb771d0fd2d3e96ff4dd"
+    },
+    {
+      "path": "docs/GATEWAY-SMS.md",
+      "sha256": "9a6b78028aa5482fe87e137fe9c702fdab7376b0b889fe091a9d4576d8984c67"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "c965aac8f2af7eefd48ab712ae2e318b1bd58605d2ced0c65a45f369834d20ba"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "a4cedb03c25461f252f06d88b346e8365c839da70a62e8db12fdc80250daa95d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "2b7331d30c00b92d9ff269b3be37d562210e649e3571e8c2d7caf1ff51039136"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_output.py",
+      "sha256": "1e6592fead3af92a412a880bd472ab0a46455f369926d7039c7c3d88bd09a1d6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_recovery.py",
+      "sha256": "0eeb9ba9d9d5cbff6d8f60f9e0ac427ccb8863ecc3de5d37ceb26db39371d372"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "081f7e56e046f128a0c4c201bcd3889cb4c59f56753e536f13bf6d11d78b3914"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "f5e852aa6d035cd044eaef3b95f87eca3ff1af842c8cc50ba493ad4645cc02d8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_outbound.py",
+      "sha256": "f29233cd69bc5872e0fd6636a8c34f5b01c135ebfef84072a7c71578a486ef8d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "e9c0ae1dbd585bf052a1f597301fbd2902906b72ec308dba387f758f17936beb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms.py",
+      "sha256": "cddc1ec73837b5d75ae9275fa90899eb0107e090cd786047f51f98b1d152683f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_delivery.py",
+      "sha256": "bbfba3a3cbce1ecae76ad05e8343df20fd6889a17c3dff545a795a29dcec1e5f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_ingress.py",
+      "sha256": "35e03dca44f025a19f0dc1a144e2d5c22874080ab23c0db7cd5757773727a221"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_media.py",
+      "sha256": "aa079bef4971d76dbaf68951463924e6164cb5046a5cac2e3fe3379618dc60f0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_profile.py",
+      "sha256": "f0d6d53afdd7abb611c24957dd3cd4d10754ed180e8c53a8e4b720ea0c61beee"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_recovery.py",
+      "sha256": "77b29f29d804064427438458c8776c0419b3166b42bdeefea6b2f8b9b749fa44"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_rest.py",
+      "sha256": "eaf47bb6c016c5e26dbdc5afbba788bb3649ffe33c799c839b63f539b00834d5"
+    },
+    {
+      "path": "linux/haos/haos/hermes_media.py",
+      "sha256": "e0bf07cde387c21e89263710546e932275a937ad3c8a05f711c652725d0143d8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_sms.py",
+      "sha256": "5f8a26aa6f48a03eb5bad21bbb847302bac8bbac7ae118193f9525cd63da9faa"
+    },
+    {
+      "path": "linux/haos/runtime/probe_sms_output.py",
+      "sha256": "3703fc52286b4049e633ab076233999d60520ce725e0bfd3552a5c0416353391"
+    },
+    {
+      "path": "linux/haos/tests/test_controller_media.py",
+      "sha256": "9cf9514f092a1becaa7c157f3feeaf628511bb1b342e3c2ed66f4eab5a71ed3e"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media_relay.py",
+      "sha256": "b774c352aee8168380ffd6df85f5738df834410740bce5ada41e40393a3ba584"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_sms.py",
+      "sha256": "c49a239750ef0aac9bec63dd1044dd5e2f345f6142cc1dee85a1f6c5663d1cee"
+    }
+  ],
+  "public_sms_setup_enabled": false,
+  "tests": {
+    "minimal_python311": {
+      "passed": 1517,
+      "skipped": 2
+    },
+    "full_frozen_python311": {
+      "passed": 1517,
+      "skipped": 2
+    },
+    "root_authority_kernel_boundaries": {
+      "passed": 87
+    },
+    "separate_uid_media_peer": {
+      "passed": 6
+    },
+    "native_sms": {
+      "passed": 27,
+      "cases": [
+        "actual_native_private_account_auth_codec_and_owned_sms_number_verified_before_listener",
+        "line_and_sms_share_one_verified_tls_listener_with_independent_owner_profiles",
+        "shared_listener_keeps_real_line_signature_codec_and_no_health_owner_or_plugin_routes",
+        "closing_line_removes_its_route_without_disconnecting_sms_on_the_shared_socket",
+        "bad_signature_refused_before_private_message_lookup_or_mission",
+        "signed_unknown_sender_never_gets_lookup_reply_or_mission",
+        "actual_signed_https_provider_body_timestamp_native_decoder_and_durable_relay",
+        "duplicate_signed_message_uses_durable_identity_without_new_lookup_or_admission",
+        "authenticated_provider_mismatch_cannot_create_mission",
+        "authenticated_provider_old_cannot_create_mission",
+        "signed_mms_without_separate_media_consent_performs_no_private_lookup_or_download",
+        "previously_ignored_old_mms_cannot_gain_authority_from_a_fresh_owner_grant",
+        "actual_mms_empty_body_native_decoder_and_four_private_media_kinds_with_no_remote_paths",
+        "verified_official_cdn_redirect_never_forwards_account_auth_or_cookies",
+        "actual_controller_chunked_mms_admission_preserves_image_document_voice_and_3gp_bytes",
+        "foreign_or_plaintext_mms_redirect_is_refused_without_a_second_request",
+        "mms_encoded_content_is_refused_without_partial_admission",
+        "mms_oversized_content_is_refused_without_partial_admission",
+        "mms_partial_content_is_refused_without_partial_admission",
+        "missed_webhook_is_recovered_from_authenticated_filtered_api_and_actual_native_decoder_with_explicit_origin",
+        "repeated_recovery_sweep_deduplicates_the_same_provider_message",
+        "foreign_provider_pagination_is_refused_without_advancing_durable_recovery_cursor",
+        "actual_native_sms_formatter_form_sender_and_exact_server_receipt_after_private_write_intent",
+        "confirmed_same_attempt_never_repeats_native_sms_http_write",
+        "aborted_native_sms_write_is_uncertain_and_same_attempt_is_never_repeated",
+        "explicit_native_sms_rate_refusal_pauses_profile_and_retains_wait_deadline",
+        "new_profile_reacquires_private_lease_without_bypassing_persistent_rate_deadline"
+      ],
+      "actual_pinned_sms_and_verified_loopback_https": true,
+      "prepared_only_not_public_setup_yet": true,
+      "tls_verification_disabled": false,
+      "external_sms_charges_accounts_or_delivery": false
+    },
+    "native_sms_output": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 9,
+      "cases": [
+        "real_private_account_and_mms_number_verification_before_sender_and_https_output_listener",
+        "actual_authenticated_backend_exports_four_exact_completed_source_session_artifacts",
+        "actual_native_sms_form_extended_only_with_three_approved_mms_urls_after_durable_intent",
+        "fixture_provider_fetches_all_native_mms_bytes_from_actual_grant_bound_https_listener",
+        "confirmed_mms_write_is_not_repeated",
+        "document_uses_real_bounded_download_link_while_supported_audio_video_and_image_use_mms",
+        "sms_only_number_uses_download_links_without_claiming_mms_support",
+        "foreign_or_other_delivery_urls_are_refused_before_native_send",
+        "owner_revocation_immediately_blocks_every_media_download"
+      ],
+      "actual_backend_native_sms_mms_and_verified_tls": true,
+      "fixture_completed_mission_and_provider_resources": true,
+      "external_accounts_mms_charges_inference_or_installed_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    },
+    "native_line_output_regression": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 18,
+      "cases": [
+        "pinned_native_output_extension_catalog_is_covered",
+        "actual_authenticated_backend_exports_four_explicit_completed_session_artifacts",
+        "verified_https_capability_downloads_match_all_original_bytes",
+        "actual_native_image_voice_video_and_document_link_builders_one_journaled_push",
+        "confirmed_media_attempt_replay_never_repeats_native_http_push",
+        "native_media_capability_supports_bounded_byte_ranges_and_refuses_invalid_ranges",
+        "owner_cache_inventory_includes_output_bytes_without_download_tokens_or_paths",
+        "explicit_owner_controller_inventory_and_purge_preserve_output_tombstone_and_mission",
+        "native_media_401_does_not_repeat_the_same_attempt",
+        "native_media_429_does_not_repeat_the_same_attempt",
+        "native_media_abort_does_not_repeat_the_same_attempt",
+        "new_publisher_preserves_uncertain_media_write_and_does_not_resend",
+        "forged_or_foreign_media_url_refused_before_request",
+        "owner_revocation_immediately_blocks_all_existing_download_capabilities",
+        "revoked_output_cannot_be_exported_or_republished",
+        "owner_gateway_cache_purge_requires_withdrawal_and_keeps_private_audit",
+        "expired_download_capability_refused",
+        "read_without_output_opt_in_delivers_safe_text_without_file_paths_or_exports"
+      ],
+      "actual_native_backend_line_builders_and_verified_https": true,
+      "completed_mission_and_session_are_explicit_fixtures": true,
+      "external_delivery_inference_or_installed_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    }
+  },
+  "unchanged_test_exclusion": "linux/haos/tests/test_backup.py requires separate installed/restic environment; kernel authority probes run separately with real root/UID",
+  "limitations": [
+    "No external SMS/MMS account, charges, handset receipt, inference, installed systemd or hardware acceptance.",
+    "Owner GUI/CLI, SMS process crash and voice composition proofs remain open.",
+    "New-source GitHub CI and artifact builds not claimed."
+  ]
+}

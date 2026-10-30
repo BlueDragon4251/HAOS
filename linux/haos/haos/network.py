@@ -80,9 +80,9 @@ def install(uid: int, table: str = TABLE):
     descriptor = Path("/etc/haos/provider.json")
     enabled = descriptor.exists() or descriptor.is_symlink()
     if enabled:
-        from .provider_policy import ProviderPolicy
+        from .provider_routes import ProviderRoutes
         from .sandbox import trusted_json
-        ProviderPolicy(trusted_json(descriptor))
+        ProviderRoutes(trusted_json(descriptor))
     script = rules(uid, table, read_resolvers(), provider=enabled)
     # Check and apply whole transactions; never flush other host firewall tables.
     for args in ([NFT, "--check", "--file", "-"], [NFT, "--file", "-"]):

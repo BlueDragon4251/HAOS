@@ -1,0 +1,62 @@
+{
+  "actual_native_aws_http_cases": [
+    "mantle:iam:json",
+    "mantle:iam:stream",
+    "mantle:iam:truncated",
+    "mantle:iam:rate-limit",
+    "mantle:iam:terminal-framing",
+    "mantle:bearer:json",
+    "mantle:bearer:stream",
+    "mantle:bearer:truncated",
+    "mantle:bearer:rate-limit",
+    "mantle:bearer:terminal-framing",
+    "claude:iam:json",
+    "claude:iam:stream",
+    "claude:iam:truncated",
+    "claude:iam:rate-limit",
+    "claude:iam:terminal-framing",
+    "claude:bearer:json",
+    "claude:bearer:stream",
+    "claude:bearer:truncated",
+    "claude:bearer:rate-limit",
+    "claude:bearer:terminal-framing"
+  ],
+  "botocore_sigv4_verified_cryptographically": true,
+  "mantle_endpoint_and_protocol_derived_from_pinned_rules": true,
+  "actual_anthropic_bedrock_binary_eventstream": true,
+  "claude_signed_thinking_replay": true,
+  "per_route_iam_and_bearer_no_global_env_changes": true,
+  "early_stream_and_truncation_rate_limit": true,
+  "live_provider_tested": false,
+  "python": "3.11.16",
+  "source_files": [
+    {
+      "path": "probe_aws_native.py",
+      "sha256": "2d7085c50cf6fb31883a3314468cb00eb6cd7fcd0200b800aa2bf17a34129529"
+    },
+    {
+      "path": "provider_cloud.py",
+      "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+    },
+    {
+      "path": "provider_bedrock_messages.py",
+      "sha256": "01ff63e2281ae22f4d8063742530e52fc503640d1c2acaffedc1db20e45ef17f"
+    },
+    {
+      "path": "provider_profiles.py",
+      "sha256": "743e1986a88e1f0a1aa4d01c0c07b028931de12b41bb54ffccc47434b57fd1ff"
+    },
+    {
+      "path": "provider_policy.py",
+      "sha256": "3c8c0dca401334cbd0fa620a38d559db7da332532a83997c8d46463fc247a285"
+    },
+    {
+      "path": "provider_proxy.py",
+      "sha256": "63512bb2ef6c45b3e389dc5e5e042411cd9206677c54be89a58db38138cebdc1"
+    },
+    {
+      "path": "provider_sse.py",
+      "sha256": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c"
+    }
+  ]
+}

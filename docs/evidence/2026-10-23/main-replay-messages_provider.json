@@ -1,0 +1,21 @@
+{
+  "actual_anthropic_sdk_api_key_and_subscription_json_sse": true,
+  "actual_pinned_subscription_body_and_header_contract": true,
+  "signed_thinking_replay_preserved": true,
+  "forced_tool_alias_collision_mcp_names_restored": true,
+  "multiline_sse_and_early_delta_before_terminal": true,
+  "native_fast_mode_body_beta_preserved": true,
+  "actual_native_alias_positive_negative_checks": 32,
+  "actual_native_alias_fallback_http_requests": 2,
+  "reflected_private_tokens_redacted": true,
+  "actual_loopback_http_cases": 6,
+  "live_provider_tested": false,
+  "python": "3.11.16",
+  "source_sha256": {
+    "probe_messages_provider.py": "1f06049584cb651349567350f42851fc876014d38b2a353cde4fe04ec5a6e36e",
+    "provider_profiles.py": "733af9ae4c75f1cb49d7b866e8531737ced3da804a73829d8e63a53c07e7ed24",
+    "provider_messages.py": "02fd41c41f4e6cca72408d60f012b78e901bb047886dd1b10259ae1b8c83abb5",
+    "provider_sse.py": "122a0660c2f628de7fc7750fb96e658102f0ce2cf98125be48303212fe1efd5c",
+    "provider_proxy.py": "637ddcc2b4c5b7bb8011d5d2f08dad1bdf941107c40e3098c9e0f7cedc94d948"
+  }
+}

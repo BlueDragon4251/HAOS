@@ -121,6 +121,28 @@ describe('PackageWatcher', () => {
     }
   }
 
+  it('keeps the last usable project while an external image is truncated', async () => {
+    const dir = await project()
+    const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
+    const first = await writePackage(dir, { manifest: twoLayers(), assets })
+    const sizes: number[] = []
+    const watcher = new PackageWatcher(dir, first, contents => sizes.push(contents.assets[imageFileFor(B)]))
+    watcher.start()
+    try {
+      const file = path.join(dir, 'images', imageFileFor(B))
+      await fs.truncate(file, 0)
+      await watcher.check()
+      expect(sizes).toEqual([])
+      await expect(readPackage(dir)).rejects.toThrow(/empty/)
+      const replacement = encodePng({ width: 2, height: 2, channels: 4, data: Uint8Array.from({ length: 16 }, (_, i) => (i * 97) % 256) })
+      await fs.writeFile(file, replacement)
+      await watcher.check()
+      expect(sizes).toEqual([replacement.byteLength])
+    } finally {
+      watcher.stop()
+    }
+  })
+
   it('reports a change made elsewhere, but not Herald saving its own work', { timeout: 10_000 }, async () => {
     const dir = await project()
     const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
@@ -171,6 +193,34 @@ describe('PackageWatcher', () => {
       expect(sizes).toEqual([after])
     } finally {
       watcher.stop()
+    }
+  })
+
+  it('polls image changes after the watched package directories were replaced', { timeout: 10_000 }, async () => {
+    const dir = await project()
+    const assets = { [imageFileFor(A)]: rgba(8, 4, 1), [maskFileFor(A)]: gray(8, 4, 2), [imageFileFor(B)]: rgba(2, 2, 3) }
+    const first = await writePackage(dir, { manifest: twoLayers(), assets })
+    const sizes: number[] = []
+    const watcher = new PackageWatcher(dir, first, contents => sizes.push(contents.assets[imageFileFor(B)]), 20, 80)
+    watcher.start()
+    try {
+      // Actual kernel watches follow the old directory inodes. Recreate the
+      // package at its original path without modifying its manifest content.
+      const moved = `${dir}.moved`
+      await fs.rename(dir, moved)
+      await fs.cp(moved, dir, { recursive: true })
+      await settle()
+      expect(sizes).toEqual([])
+      const file = path.join(dir, 'images', imageFileFor(B))
+      const before = (await fs.stat(file)).size
+      await fs.writeFile(file, encodePng({ width: 2, height: 2, channels: 4, data: Uint8Array.from({ length: 16 }, (_, i) => (i * 97) % 256) }))
+      const after = (await fs.stat(file)).size
+      expect(after).not.toBe(before)
+      await until(() => sizes.length > 0)
+      expect(sizes).toEqual([after])
+    } finally {
+      watcher.stop()
+      await fs.rm(`${dir}.moved`, { recursive: true, force: true })
     }
   })
 })

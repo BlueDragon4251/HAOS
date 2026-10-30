@@ -1,0 +1,14 @@
+{
+  "actual_codex_catalog_helper_http": true,
+  "actual_boto3_control_plane_signing": true,
+  "generated_routing_cases_match_upstream": 143,
+  "static_catalog_is_not_entitlement": true,
+  "live_provider_tested": false,
+  "python": "3.11.16",
+  "source_sha256": {
+    "probe_model_catalog.py": "efb9888a0ad5034fd9f50300f6d7c6a4ededfa676a8817321e31bf7fad540218",
+    "provider_discovery.py": "9d4ffaeaebb8361ad3a6c34d7abc0c9e1cecd52374fee13560aab06ab8c542c0",
+    "provider_registry.py": "0249837bc220561d1ccbcb827ebde342452f9c58671d68af530c1c61b096465b",
+    "hermes_registry.json": "d9c4aed5920df94837226b4b13da3e96ef5e0031cd67d2af9223b02d5bb7f0b5"
+  }
+}

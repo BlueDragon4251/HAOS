@@ -1,0 +1,521 @@
+{
+  "description": "Public IRC owner CLI/GUI and independent native runtime integration",
+  "parent_commit": "87b9c0b72a2b171ba4c5339bf08399c36b575100",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "5e5813aad56d0da200a4772e1fa9c4779b44283ad610593497ef1b9b0c3def2f"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "68592879e271d1792bd9656f9406a239e1b88f9cf6931030d5f860cb16049775"
+    },
+    {
+      "path": "linux/haos/haos/gateway_irc_ingress.py",
+      "sha256": "98f85dce3539bc667def613f5ba8ae72eecae9158c0d06e1cb5b752e06471552"
+    },
+    {
+      "path": "linux/haos/haos/gateway_irc_profile.py",
+      "sha256": "b7ed44912c17200a192ba64aaa31d45d2f85c553b7ecc697b851ab02c04e1211"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "e963d990e81804970afcaac40e88072b07fad5addf7ec05069bc1ebf5ed8a454"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "6e448c1cfdcd52d01a2d99fa6944836073d5ea046a9cbc833dfd841bc2760fa1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "b8377bafe0873ea69a4468b2bab13eb2ce69e6bc0636392c360cddb104ae6f10"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "c06c57b51d69b9a289bd5e98f43f5f918c39da0d09499d67c3986998b4bb5c0f"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "5650fe5743c458f1ce26553091a7e81ff63697d9916548ce6a636c0442a9732a"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "5028b2ba1f98d504831797e9add44cb301cff5881abeb08875d014260213b654"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "3679f470422da8a754699bc3ab454e00b4ce2d5413cce6b1abef1c2c95bd4c4a"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "2ed29a0035781783829b0c27d3bb95509393e12ee8d288e792dc9923a3766670"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "2ef25bfd199765076c06d83d763e427359bcaeba13cda4dd300d444fe450133d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_delivery.py",
+      "sha256": "30d1b80fa3264d3d10edc5a26c7d4dd919473c4a85fa11fbf8f3a385f7c1f6c8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_ingress.py",
+      "sha256": "478c59f0d09c11494b2556f7dd824610397804445b4c365344bf294b8893054f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_owner_gui.py",
+      "sha256": "905b8b3356548193fe9963752acfee728ea7cae7343087b723f70e852f8a8e0b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_profile.py",
+      "sha256": "c5f6b3cd58830cb2d7cd19db34cf1145f55eff44e23a30e44058a8cf591dd6f8"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_transport.py",
+      "sha256": "21f83ff6f6a678ca50a46b58dc99d652bc46d1a153c97adb551fd0eb0e6193a0"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_ingress.py",
+      "sha256": "cd787769b1b995f32f50e48dd99830ef38464144a0e44778a63ba8468b43e52b"
+    },
+    {
+      "path": "linux/haos/tests/test_initial_setup.py",
+      "sha256": "38cb7a3ed43fa62e816b717f3dad9c893fd1d2f72027f8d19072690c2f32fbe0"
+    }
+  ],
+  "minimal_runtime": {
+    "passed": 1278,
+    "existing_skips": 2,
+    "local_exclusion": "linux/haos/tests/test_backup.py"
+  },
+  "full_pinned_runtime": {
+    "passed": 1278,
+    "existing_skips": 2,
+    "local_exclusion": "linux/haos/tests/test_backup.py"
+  },
+  "actual_root_uid_publication_and_recovery": {
+    "passed": 71,
+    "network": "none",
+    "mocked_uid": false
+  },
+  "gui": [
+    {
+      "passed": 10,
+      "cases": [
+        "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+        "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+        "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+        "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+        "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+        "actual_authentication_recheck_control_calls_offline_backend",
+        "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+        "connector_change_cannot_inherit_anonymous_connection_approval",
+        "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+        "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+      ],
+      "actual_tk_controls": true,
+      "python": "3.13.5",
+      "backend_handoff_fixture_only": true,
+      "root_authority_and_actual_sdk_acceptance_separate": true,
+      "live_network_or_installed_owner_session": false
+    },
+    {
+      "passed": 10,
+      "cases": [
+        "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+        "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+        "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+        "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+        "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+        "actual_authentication_recheck_control_calls_offline_backend",
+        "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+        "connector_change_cannot_inherit_anonymous_connection_approval",
+        "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+        "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+      ],
+      "actual_tk_controls": true,
+      "python": "3.13.5",
+      "backend_handoff_fixture_only": true,
+      "root_authority_and_actual_sdk_acceptance_separate": true,
+      "live_network_or_installed_owner_session": false
+    }
+  ],
+  "gui_other_platform_regression": [
+    {
+      "display": ":103",
+      "probe": "irc",
+      "receipt": {
+        "passed": 9,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "homeassistant",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "ntfy",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":103",
+      "probe": "matrix",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "irc",
+      "receipt": {
+        "passed": 9,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "homeassistant",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "ntfy",
+      "receipt": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "display": ":104",
+      "probe": "matrix",
+      "receipt": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    }
+  ],
+  "native": [
+    {
+      "passed": 32,
+      "cases": [
+        "public_policy_accepts_exact_reviewed_irc_but_refuses_unknown_plugins",
+        "actual_pinned_parser_does_not_decode_ircv3_tags_without_reviewed_boundary",
+        "actual_native_codec_after_observable_commit_uses_server_account_not_nickname",
+        "same_server_message_identity_cannot_repeat_mission_admission",
+        "nick_change_does_not_change_authenticated_account_route",
+        "nickname_impersonation_without_account",
+        "client_only_account_tag",
+        "duplicate_account_tag",
+        "missing_server_time",
+        "missing_stable_server_identity",
+        "naive_timestamp",
+        "escaped_account",
+        "wrong_command",
+        "direct_message_not_channel",
+        "unaddressed_channel_text",
+        "ctcp_not_mission",
+        "line_injection",
+        "oversized_frame",
+        "server_prefix_not_person",
+        "unnegotiated_server-time_denied",
+        "unnegotiated_message-tags_denied",
+        "unnegotiated_account-tag_denied",
+        "known_nickname_cannot_authorize_unknown_server_account",
+        "authenticated_account_on_different_server_is_not_same_owner",
+        "before_owner_grant",
+        "future_original_time",
+        "direct_native_callbacks_cannot_bypass_retained_account",
+        "actual_sqlite_reopen_replays_failed_local_admission_without_network",
+        "actual_native_decode_and_durable_relay_never_receive_reflected_private_password_or_sasl_wire_aliases",
+        "actual_native_codec_canonicalizes_channel_case_but_preserves_exact_authenticated_account_case",
+        "actual_native_local_channel_codec_requires_exact_canonical_owner_channel",
+        "owner_withdrawal_blocks_retained_native_event"
+      ],
+      "actual_pinned_native_irc_codec_and_sqlite": true,
+      "public_gateway_enabled": true,
+      "network_requested": false,
+      "tls_or_capability_negotiation_accepted": false,
+      "live_account_or_installed_acceptance": false
+    },
+    {
+      "passed": 45,
+      "cases": [
+        "actual_verified_tls_multiline_cap_negotiation_join_keepalive_and_native_account_admission",
+        "raw_and_native_standalone_send_remain_denied_before_outbox_implementation",
+        "owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input",
+        "real_server_time_tags_on_capabilities_registration_join_and_ping_preserve_native_admission",
+        "actual_tls_server_password_refused_never_admits_messages",
+        "actual_tls_unknown_case_mapping_never_admits_messages",
+        "actual_tls_duplicate_control_tags_never_admits_messages",
+        "actual_tls_early_registration_never_admits_messages",
+        "actual_tls_no_account_capability_never_admits_messages",
+        "actual_tls_eof_never_admits_messages",
+        "actual_tls_oversized_never_admits_messages",
+        "actual_tls_bad_utf8_never_admits_messages",
+        "actual_tls_incomplete_frame_never_admits_messages",
+        "actual_tls_timeout_never_admits_messages",
+        "actual_tls_cap_nak_never_admits_messages",
+        "actual_tls_partial_ack_never_admits_messages",
+        "actual_tls_changed_nickname_never_admits_messages",
+        "actual_tls_wrong_join_never_admits_messages",
+        "actual_tls_cap_loss_closes_confirmed_subscription",
+        "actual_tls_live_eof_closes_confirmed_subscription",
+        "actual_tls_kick_closes_confirmed_subscription",
+        "actual_tls_part_closes_confirmed_subscription",
+        "actual_tls_nick_change_closes_confirmed_subscription",
+        "private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log",
+        "live_private_server_mutation_revokes_actual_tls_connection",
+        "live_private_port_mutation_revokes_actual_tls_connection",
+        "live_private_channel_mutation_revokes_actual_tls_connection",
+        "live_private_use_tls_mutation_revokes_actual_tls_connection",
+        "live_private_server_password_mutation_revokes_actual_tls_connection",
+        "live_private_nickserv_password_mutation_revokes_actual_tls_connection",
+        "live_private_nickname_mutation_revokes_actual_tls_connection",
+        "real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames",
+        "real_tls_untrusted_ca_refused_before_irc_credentials_or_frames",
+        "actual_tls_sasl_logout_closes_socket_and_refuses_implicit_reauthentication",
+        "actual_tls_sasl_good_private_account_authenticated_before_registration",
+        "actual_tls_sasl_chunked_private_account_authenticated_before_registration",
+        "actual_tls_sasl_exact_chunk_private_account_authenticated_before_registration",
+        "actual_tls_sasl_refused_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_wrong_account_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_missing_account_confirmation_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_wrong_challenge_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_missing_mechanism_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_no_capability_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_early_registration_never_authorizes_registration_or_messages",
+        "native_plaintext_configuration_refused_before_connection"
+      ],
+      "actual_local_tls_ircv3_and_pinned_native_codec": true,
+      "fixture_only_loopback_destination_and_disposable_ca": true,
+      "public_gateway_enabled": true,
+      "live_server_account_nickserv_sasl_delivery_or_installed_acceptance": false
+    },
+    {
+      "passed": 20,
+      "cases": [
+        "shared_factory_requires_exact_private_context_and_never_enables_unknown_plugin_hooks",
+        "actual_native_factory_uses_private_home_and_explicit_connection_identity",
+        "actual_kernel_lease_refuses_second_active_identity_before_any_network",
+        "actual_profile_continuous_tls_native_account_input_and_local_relay",
+        "actual_registered_private_factory_mission_outbox_native_send_correlated_echo_and_durable_ack",
+        "actual_tls_profile_readiness_preserves_reopened_mission_outbox_offline_and_first_online_attempt",
+        "actual_eof_reconnect_preserves_explicit_unrecoverable_remote_gap",
+        "concurrent_close_joins_workers_and_releases_kernel_lease_once",
+        "real_server_authentication_refusal_is_sticky_across_connect_profile_and_actual_database_reopen",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_authentication_refusal",
+        "prepared_audited_owner_recheck_is_offline_and_fresh_profile_performs_real_next_account_authentication",
+        "explicit_credential_rotation_permits_new_real_authentication_and_preserves_old_refusal_rows",
+        "actual_server_throttle_deadline_survives_cancel_close_and_database_reopen_without_early_request",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_throttle",
+        "independent_local_replay_reopens_real_failed_admission_while_live_tls_has_no_new_message",
+        "actual_shared_service_supervisor_stop_joins_private_profile_workers",
+        "owner_generation_change_revokes_running_idle_tls_profile_without_inheritance",
+        "close_during_real_tls_handshake_cancels_connect_and_releases_kernel_lease",
+        "private_profile_close_joins_actual_active_native_send_and_preserves_partial_intent_without_extra_chunk",
+        "creation_only_profile_receives_with_original_caps_and_never_gains_outbound_authority"
+      ],
+      "actual_native_profile_tls_kernel_lease_and_sqlite": true,
+      "fixture_only_loopback_destination_ca_and_short_reconnect_delay": true,
+      "public_gateway_enabled": true,
+      "unseen_remote_events_recovered": false,
+      "external_server_account_delivery_or_installed_acceptance": false
+    },
+    {
+      "passed": 39,
+      "cases": [
+        "actual_pinned_native_send_uses_markdown_builder_and_verified_correlated_server_echo_not_local_millisecond_id",
+        "same_confirmed_outbox_attempt_returns_durable_receipt_without_another_write",
+        "actual_private_journal_reopen_preserves_confirmation_without_another_native_send",
+        "real_tls_echo_inside_batch_does_not_confirm_before_withheld_batch_end",
+        "actual_tls_drop_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_silent_cannot_fabricate_native_delivery_or_trigger_resend",
+        "same_uncertain_native_outbox_attempt_is_never_resent_while_connection_remains_live",
+        "actual_tls_ack_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_wrong_sender_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_wrong_channel_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_modified_body_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_msgid_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_account_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_naive_time_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_missing_label_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_empty_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_type_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_duplicate_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_drop_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_end_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_batch_wrong_origin_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_sasl_account_mismatch_cannot_fabricate_native_delivery_or_trigger_resend",
+        "actual_tls_sasl_secret_msgid_cannot_fabricate_native_delivery_or_trigger_resend",
+        "native_server_echo_accepts_standard_channel_and_own_nickname_case_variants_without_changing_owner_route",
+        "actual_tls_sasl_account_and_correlated_own_account_echo_are_required_together",
+        "missing_forged_or_extra_outbox_authority_and_invalid_attempts_never_dispatch",
+        "redirected_targets_and_byte_bounded_or_control_injected_payloads_never_dispatch",
+        "current_exact_owner_route_without_read_permission_cannot_send",
+        "close_after_real_dispatch_cancels_joins_and_retains_uncertain_intent_without_resend",
+        "actual_uncertain_native_journal_reopen_cannot_repeat_the_same_mission_outbox_attempt",
+        "real_mission_outbox_uncertainty_survives_reopen_and_requires_audited_owner_decision_before_new_actual_native_attempt",
+        "actual_tls_missing_batch_cannot_enable_native_delivery",
+        "actual_tls_missing_echo-message_cannot_enable_native_delivery",
+        "actual_tls_missing_labeled-response_cannot_enable_native_delivery",
+        "actual_native_send_after_additive_legacy_schema_migration_preserves_old_intent_and_exposes_only_safe_owner_proof",
+        "actual_sqlite_intent_failure_prevents_every_native_socket_side_effect",
+        "actual_sqlite_confirmation_failure_never_fabricates_success_or_resends_accepted_message",
+        "actual_native_utf8_chunker_preserves_order_and_requires_distinct_server_ids_for_all_chunks",
+        "current_owner_revocation_after_first_confirmed_chunk_prevents_next_native_write"
+      ],
+      "actual_pinned_native_send_tls_and_private_sqlite": true,
+      "public_gateway_enabled": true,
+      "server_echo_is_not_recipient_delivery_proof": true,
+      "fixture_only_loopback_target_and_disposable_ca": true,
+      "external_account_message_or_installed_acceptance": false
+    }
+  ],
+  "live_account_external_delivery_installed_owner_or_release_acceptance": false,
+  "separate_prepared_profile_actual_process_regression": {
+    "passed": 3,
+    "cases": [
+      "actual_gateway_uid_installed_frozen_sdk_and_system_trusted_tls_write_precedes_real_sigkill",
+      "actual_agent_uid_cannot_read_or_open_the_crashed_gateway_private_journal_or_owner_secret",
+      "new_actual_gateway_process_reacquires_kernel_lease_and_preserves_writing_intent_as_uncertain_without_resend"
+    ],
+    "actual_uid_cases": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_sigkill": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": false,
+    "external_connections_or_recipient_acceptance": false,
+    "installed_haos_accepted": false
+  }
+}

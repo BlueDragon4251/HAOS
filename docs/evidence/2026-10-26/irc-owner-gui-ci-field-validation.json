@@ -1,0 +1,24 @@
+{
+  "source_commit_before_change": "6fb371573fb6f99921c7607143a708f59c3b7c9c",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "ac2e030be433f6eb9ebcb28ede4a734b34aecbff30779229fa831f22c5990e8a"
+    }
+  ],
+  "failure_job": 121674732424,
+  "cause": "Actual masked Bot-Token field moved into platform-specific frame; legacy fixture searched only direct page children.",
+  "change": "Recursively locate labels, keeping paired-entry selection within the same parent and retaining all interaction assertions.",
+  "actual_workflow_embedded_gui_programs": [
+    {
+      "screen": "1280x800",
+      "exit_code": 0
+    },
+    {
+      "screen": "640x480",
+      "exit_code": 0
+    }
+  ],
+  "python": "3.13.5",
+  "live_or_installed_acceptance": false
+}

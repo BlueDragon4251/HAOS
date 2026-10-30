@@ -1,0 +1,48 @@
+{
+  "base_commit": "0668497e2feb4972a82bf999acf47c972838c3ed",
+  "actual_native_sdk_http_outbox_cases": 16,
+  "full_tests": {
+    "passed": 1008,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1008,
+    "existing_skips": 2
+  },
+  "root_uid_unix_socket_gateway_probes": {
+    "passed": 19,
+    "kernel_mocked": false
+  },
+  "archived_predecessor_fixture_failure": "server-fake-reply caused 2 actual sends; corrected path causes 1",
+  "before_log_sha256": "26f0b929b08c38f5b0f782894dda062b14ccd8bbfbfd04f7a2a77343cc43c738",
+  "external_discord_connected": false,
+  "remote_server_nonce_dedup_live_tested": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_discord.py",
+      "sha256": "2258d741f47878b0ae91f557f143c64491c407e391f30a3629938f847f9412d6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "62875aad6110aa391531791fa913ad9f27b53f6824b759b16d1d9fdb92e16d27"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "ea72dd351d1cf804bbec6d7101ddfe2ff0fcf82ecfa4b113fc94fe1dafe7a3ac"
+    },
+    {
+      "path": "linux/haos/runtime/probe_discord_delivery.py",
+      "sha256": "7bd27ab8b9e39987de6a02f6ac70ca8d0629c0dda52070d04b740be0183d14fc"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "7a5126b5e88cb15d4a6b52d98134773bb07c844d51dc4f4fd865d6e3fdb86934"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "2f68b60a4466e52638abc3bb71308741aef441658b5d255190e4cc8bd0249e92"
+    }
+  ],
+  "contracts_sha256": "0a9ea2133a0caba64c475e33c4c2cc8a7dcbf6bf345b316b01dacde438326e08"
+}

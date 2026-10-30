@@ -1,0 +1,230 @@
+{
+  "parent_commit": "50fcdabcb6970e9248d44b9731697b4913f4e828",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "981681f8f76827c1c97df9f64b3619017cc69d1b4abc7a5f5e6545716b8712ae"
+    },
+    {
+      "path": "docs/GATEWAY-SMS.md",
+      "sha256": "d9ffc90033383a8e4e486cf65650967287e3cd6334adc61b7f8db941fdb4f447"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "362bf376e23582e989fdae694dab0f93006941b5edae2f218c7e52af93b2a7ae"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "548a492843cc24e11d600006b492807a91b628989ddbe47394bcefe81a2e7407"
+    },
+    {
+      "path": "linux/haos/haos/gateway_https.py",
+      "sha256": "febd67fe77293c0cef43506827ba31fb095ee03460439e4c07278ecfd7a4f4d9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_profile.py",
+      "sha256": "aed6f6669bbdb2c47965404872ed8702a1ac7e9f4a23f4505521d85d93ec4646"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_tls.py",
+      "sha256": "0dbc087372e7e6d3cd5ac4b6d6b071e1eeb77653dc1d845b06d4e0ee9bdcab91"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms.py",
+      "sha256": "5713cfe2ce8be82b1e0f20f73851304b43f4781f231b964b853966ff5931a19a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_delivery.py",
+      "sha256": "aa9f78cbf3d41ce43f79c866522c1db0e923229543fcc5bb55821a7dc82ee92b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_ingress.py",
+      "sha256": "dcb7ca76574956425def5fd409766825bfbdce1420b8a6d50c718c44530d8e57"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_profile.py",
+      "sha256": "3fa85882b72e41358f47ec8249bad42e9a2956f88d4dbc6c7c684d075b1e5b42"
+    },
+    {
+      "path": "linux/haos/haos/gateway_sms_rest.py",
+      "sha256": "974ea6883868c6db79562be33ffed29f1556fdfd62650728540b9fb077528dc5"
+    },
+    {
+      "path": "linux/haos/runtime/probe_sms.py",
+      "sha256": "24d05496c5ce10e71f109f0f37756c3be94877e58cba3f444862e01928df61aa"
+    },
+    {
+      "path": "linux/haos/runtime/webhook_tls_fixture.py",
+      "sha256": "b47afbf8435503b97d906d4f721bd431192cf54a59486ef6b6e810b03df60fe7"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_sms.py",
+      "sha256": "fadb1bffed6f00a8f945f5325648ab7190c61e708185de7d420e519cf0b6e6d0"
+    }
+  ],
+  "minimal_and_complete_frozen_runtime_each": {
+    "passed": 1513,
+    "existing_skips": 2,
+    "existing_local_exclusion": "test_backup.py; mandatory actual-root CI unchanged"
+  },
+  "sms_unit_cases": 32,
+  "sms_native": {
+    "passed": 15,
+    "cases": [
+      "actual_native_private_account_auth_codec_and_owned_sms_number_verified_before_listener",
+      "line_and_sms_share_one_verified_tls_listener_with_independent_owner_profiles",
+      "shared_listener_keeps_real_line_signature_codec_and_no_health_owner_or_plugin_routes",
+      "closing_line_removes_its_route_without_disconnecting_sms_on_the_shared_socket",
+      "bad_signature_refused_before_private_message_lookup_or_mission",
+      "signed_unknown_sender_never_gets_lookup_reply_or_mission",
+      "actual_signed_https_provider_body_timestamp_native_decoder_and_durable_relay",
+      "duplicate_signed_message_uses_durable_identity_without_new_lookup_or_admission",
+      "authenticated_provider_mismatch_cannot_create_mission",
+      "authenticated_provider_old_cannot_create_mission",
+      "actual_native_sms_formatter_form_sender_and_exact_server_receipt_after_private_write_intent",
+      "confirmed_same_attempt_never_repeats_native_sms_http_write",
+      "aborted_native_sms_write_is_uncertain_and_same_attempt_is_never_repeated",
+      "explicit_native_sms_rate_refusal_pauses_profile_and_retains_wait_deadline",
+      "new_profile_reacquires_private_lease_without_bypassing_persistent_rate_deadline"
+    ],
+    "actual_pinned_sms_and_verified_loopback_https": true,
+    "prepared_only_not_public_setup_yet": true,
+    "tls_verification_disabled": false,
+    "external_sms_charges_accounts_or_delivery": false
+  },
+  "line_shared_listener_regression": {
+    "profile": {
+      "passed": 33,
+      "cases": [
+        "no_owner_pairing_cannot_create_profile_or_start_identity_network",
+        "private_profile_rejects_symlinked_parent_before_native_or_network_use",
+        "actual_registered_adapter_uses_private_home_and_exclusive_kernel_lease_without_network_at_build",
+        "profile_publisher_cannot_send_before_verified_bot_identity_and_listener_connection",
+        "native_bot_info_verifies_exact_destination_before_fixed_loopback_listener_start",
+        "actual_profile_listener_commit_and_native_replay_worker_deliver_exact_owner_event",
+        "actual_common_factory_root_engine_outbox_native_push_remote_receipt_and_durable_ack",
+        "offline_private_profile_keeps_pending_outbox_at_zero_attempts_until_verified_reconnection",
+        "actual_profile_repeated_signed_webhook_cannot_duplicate_local_admission",
+        "private_profile_close_reopen_reacquires_kernel_lease_and_replays_retained_local_failure",
+        "owner_epoch_change_is_denied_at_http_admission_before_worker_observes_revocation",
+        "current_owner_withdrawal_stops_idle_listener_and_worker_without_inheriting_authority",
+        "creation_only_profile_has_no_publisher_or_inherited_outbound_authority",
+        "native_outbound_401_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+        "native_outbound_401_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+        "native_outbound_401_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+        "native_outbound_403_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+        "native_outbound_403_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+        "native_outbound_403_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+        "native_outbound_429_pauses_listener_preserves_unsent_queue_and_persists_profile_block",
+        "native_outbound_429_block_survives_reopen_and_owner_recheck_retains_throttle_until_expiry",
+        "native_outbound_429_recovery_sends_previously_unsent_obligation_once_with_original_attempt_budget",
+        "native_identity_401_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_401_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_403_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_403_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_wrong-bot_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_wrong-bot_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_429_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_429_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_redirect_never_authenticates_or_opens_listener",
+        "actual_occupied_listener_port_reports_failure_and_reconnects_after_release",
+        "closed_profile_rejects_new_network_and_releases_lease"
+      ],
+      "actual_registered_native_adapter_http_sqlite_and_kernel_lease": true,
+      "fixture_only_loopback_identity_target": true,
+      "public_gateway_enabled": true,
+      "fixture_profile_listener": "127.0.0.1 only; external verified TLS ingress not configured here",
+      "external_or_installed_acceptance": false
+    },
+    "root_owner_tls": {
+      "passed": 47,
+      "cases": [
+        "actual_x509_chain_hostname_key_time_and_system_trust_validation_accepts_explicit_fixture_ca",
+        "tls_wrong_hostname_refused_before_listener",
+        "tls_expired_refused_before_listener",
+        "tls_plaintext_public_url_refused_before_listener",
+        "tls_public_ip_url_refused_before_listener",
+        "tls_wrong_path_refused_before_listener",
+        "tls_embedded_url_credential_refused_before_listener",
+        "tls_unapproved_public_bind_refused_before_listener",
+        "tls_false_public_consent_refused_before_listener",
+        "tls_invalid_private_key_refused_before_listener",
+        "tls_oversized_chain_refused_before_listener",
+        "actual_mismatched_private_key_refused",
+        "actual_root_private_single_link_pem_descriptor_reads",
+        "actual_pem_certificate_world-readable_refused",
+        "actual_pem_certificate_symlink_refused",
+        "actual_pem_certificate_hardlink_refused",
+        "actual_pem_certificate_non-pem_refused",
+        "actual_pem_certificate_oversized_refused",
+        "actual_pem_private_key_world-readable_refused",
+        "actual_pem_private_key_symlink_refused",
+        "actual_pem_private_key_hardlink_refused",
+        "actual_pem_private_key_non-pem_refused",
+        "actual_pem_private_key_oversized_refused",
+        "actual_cli_private_prompts_verified_public_consent_and_atomic_root_publication",
+        "actual_runtime_redactor_excludes_private_pem_and_channel_credentials",
+        "actual_owner_public_listener_refuses_missing_consent_without_configuration_mutation",
+        "actual_cli_invalid_port_rejected_without_input_echo_or_credential_mutation",
+        "actual_cli_pair_derives_saved_bot_scope_and_publishes_exact_sender_grant",
+        "actual_graphical_backend_derives_bot_scope_and_publishes_fresh_timed_grant",
+        "actual_graphical_media_opt_in_persisted_and_missing_create_refused_without_mutation",
+        "actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted",
+        "actual_owner_gui_cli_voice_approval_requires_configured_speech_create_and_resets_on_default_repair",
+        "actual_owner_video_and_output_opt_ins_persist_and_require_separate_create_read_rights",
+        "actual_cli_video_output_opt_ins_and_default_repair_withdrawal",
+        "actual_pairing_refuses_self_bot_wrong_destination_and_threads_without_mutation",
+        "actual_credential_and_listener_rotation_withdraws_old_grants_without_data_deletion",
+        "actual_repairing_renews_epoch_and_publication_rejects_cross_bot_credential_mix",
+        "actual_expired_pem_remains_inspectable_but_strict_activation_refuses_it",
+        "actual_owner_can_replace_expired_certificate_without_resetting_retained_data",
+        "actual_foreign_uid_cannot_read_pem_credentials_or_invoke_owner_mutations",
+        "actual_remove_preserves_owner_canary_and_audits_no_secrets",
+        "untrusted_certificate_chain_refused",
+        "actual_private_tls_material_is_atomic_single_link_mode_600_and_reused_without_overwrite",
+        "conflicting_existing_tls_material_is_preserved_and_requires_owner_recovery",
+        "actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds",
+        "actual_profile_https_refuses_wrong_client_hostname_before_signed_admission",
+        "actual_registered_native_profile_verified_https_hmac_private_relay_and_native_decode"
+      ],
+      "actual_x509_verified_https_and_native_profile": true,
+      "fixture_only_system_ca_loopback_and_identity_target": true,
+      "tls_verification_disabled": false,
+      "public_gateway_enabled": true,
+      "actual_root_owner_lifecycle": true,
+      "service_quiescence_and_audit_location_are_fixtures": true,
+      "external_dns_router_line_acceptance_or_installed_acceptance": false
+    },
+    "actual_uid_sigkill_image": {
+      "passed": 5,
+      "cases": [
+        "actual_gateway_uid_verifies_https_hmac_and_native_https_document_download_before_private_media_relay_commit",
+        "actual_gateway_uid_serves_only_private_byte_backed_output_over_verified_https_before_crash",
+        "actual_gateway_uid_native_verified_https_push_has_durable_intent_before_real_sigkill",
+        "actual_agent_uid_receives_no_credential_payload_and_cannot_read_private_native_relay_or_owner_credentials_after_crash",
+        "new_gateway_process_reacquires_kernel_lease_retains_committed_input_and_never_resends_uncertain_native_push"
+      ],
+      "actual_uid_cases": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_sigkill": true,
+      "tls_verification_disabled": false,
+      "public_gateway_enabled": true,
+      "agent_fixture_received_no_credentials": true,
+      "incoming_document_bytes_verified_after_process_restart": true,
+      "outgoing_native_media_process_case": true,
+      "fixture_only_disposable_ca_and_loopback_targets": true,
+      "external_connections_or_recipient_acceptance": false,
+      "installed_haos_accepted": false
+    }
+  },
+  "ci": "parent 50fcdab all six gates green; new source pending",
+  "limitations": [
+    "SMS is deliberately not public yet",
+    "media/owner GUI/recovery integration still open",
+    "no external account, SMS charges, recipient or installed acceptance"
+  ]
+}

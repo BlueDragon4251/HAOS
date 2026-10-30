@@ -1,0 +1,55 @@
+{
+  "source_base_commit": "bba61f7114147b0205d1628f80e9fe4a415e46d7",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "python": "3.11.16",
+  "minimal_without_hermes": {
+    "passed": 813,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 813,
+    "skipped": 2
+  },
+  "root_only_backup_file": "required separately in CI",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_registry.py",
+      "sha256": "d50bc5cbf3742a0a3dd56a96ce3bdf1cb73f9d5107af593425564389de92578c"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "fdd57a87a44376552bcb65c7540506524b7d4a62ec1ae741224d0bea7b5c6beb"
+    },
+    {
+      "path": "linux/haos/haos/provider_setup.py",
+      "sha256": "85b3cdef5c4c6c979e9b5baef0d0cffdf7afa12dcd955d1cecf9f144d4c75371"
+    },
+    {
+      "path": "linux/haos/runtime/probe_cloud_inference.py",
+      "sha256": "b04ef84bfc7227b6b4601d5aa321190df1544e22114db7032a7c68f22b344fee"
+    },
+    {
+      "path": "linux/haos/runtime/probe_http_provider_matrix.py",
+      "sha256": "7239e1cf1fb80ed393bf6f543922dbe2fd1acb525ab1c58547b0514cd6c36970"
+    },
+    {
+      "path": "linux/haos/runtime/probe_model_catalog.py",
+      "sha256": "efb9888a0ad5034fd9f50300f6d7c6a4ededfa676a8817321e31bf7fad540218"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_discovery.py",
+      "sha256": "d86ee26d8b6abf57b49c7158be4c03c571f014b4304db594c1d9f1688c79e7d3"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "e136fb1da80f4905c646774ba47a2a4654f20a5efc7bf52616a1a6477c6dd099"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "97d880fbf2bacac0c1d41c08081bfc57b5006113d72775c8e01a7a8fe434937f"
+    }
+  ],
+  "live_model_inference_tested": false,
+  "installed_boot_tested": false
+}

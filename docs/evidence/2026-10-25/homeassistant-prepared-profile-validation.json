@@ -1,0 +1,194 @@
+{
+  "baseline_commit": "505eb657b9690f07f220ae61b7b21363d406986a",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_profile.py",
+      "sha256": "539cf20e386fe6eb76429d610868abe6bd3fa6446185b4a475f6e61ad3abfac1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_transport.py",
+      "sha256": "6d30f9656b8169c66495c53b1bd3a4bda057401aa275bc6121abd0df0e20f10d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_profile.py",
+      "sha256": "0c7656f924bf847ebad166f92d2435d83dd5a38fdafc59064e9481a87ce73d48"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_transport.py",
+      "sha256": "f57d540c34538e20563eb91929e07ab1fd6ef561ddd9ae5804cdd3ba8e4f9e7d"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_homeassistant_ingress.py",
+      "sha256": "2931f905aea57897b535bf4340cabe61859771c02844e57578e97fdde2e58825"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "fc83a9e6c10e6d75adff2a52f129781458e99beb199026ce149c6fd34f2bab80"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "d86846b2d4cef0294c37fecd1af7d7700c0fb8647c539df1939b5adfd1c8639d"
+    }
+  ],
+  "native_profile": {
+    "passed": 22,
+    "cases": [
+      "prepared_profile_does_not_enable_public_homeassistant_policy",
+      "private_factory_never_connects_before_explicit_start",
+      "actual_kernel_flock_refuses_parallel_homeassistant_profile",
+      "private_native_imports_leave_unrelated_home_untouched",
+      "disconnected_profile_cannot_publish",
+      "actual_profile_native_auth_stream_durable_capture_and_relay",
+      "profile_send_requires_exact_outbox_identity_and_current_owner_route",
+      "profile_refuses_extra_binding_fields_before_native_post",
+      "profile_refuses_truthy_notification_flag_before_native_post",
+      "profile_refuses_unbounded_reply_identity_before_native_post",
+      "actual_private_profile_send_uses_native_rest_and_separate_authenticated_receipt_witness",
+      "actual_eof_reconnect_preserves_idempotency_and_reports_unrecoverable_gap",
+      "explicit_disconnect_reconnect_retains_raw_journal_and_profile",
+      "owner_regrant_revokes_running_profile_without_automatic_inheritance",
+      "concurrent_profile_close_releases_lease_once_and_closes_sockets",
+      "authentication_refusal_is_sticky_across_connect_close_and_actual_profile_reopen",
+      "credential_rotation_reuses_private_home_with_new_authenticated_identity",
+      "actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event",
+      "independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle",
+      "actual_http429_retry_after_survives_close_and_profile_reopen_without_early_request",
+      "close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease",
+      "plain_http_and_arbitrary_plugin_configuration_are_refused"
+    ],
+    "actual_native_profile_ws_kernel_lease_and_sqlite": true,
+    "loopback_target_replacement_only_in_fixture": true,
+    "public_gateway_enabled": false,
+    "reconnect_delay_shortened_only_in_fixture": true,
+    "unseen_remote_events_recovered": false,
+    "external_account_notification_tls_or_installed_acceptance": false
+  },
+  "native_transport": {
+    "passed": 24,
+    "cases": [
+      "actual_native_auth_and_subscribe_wait_for_exact_server_ack_before_authority",
+      "actual_authenticated_loopback_ws_frame_reaches_native_codec_only_after_durable_capture",
+      "actual_socket_eof_revokes_transport_health_and_stream_authority",
+      "actual_native_handshake_refuses_redirect_without_token_log_or_input",
+      "actual_native_handshake_refuses_http401_without_token_log_or_input",
+      "actual_native_handshake_refuses_http429_without_token_log_or_input",
+      "actual_native_handshake_refuses_wrong-first_without_token_log_or_input",
+      "actual_native_handshake_refuses_auth-invalid_without_token_log_or_input",
+      "actual_native_handshake_refuses_early-event_without_token_log_or_input",
+      "actual_native_handshake_refuses_duplicate-ack_without_token_log_or_input",
+      "actual_native_handshake_refuses_wrong-id_without_token_log_or_input",
+      "actual_native_handshake_refuses_bool-id_without_token_log_or_input",
+      "actual_bounded_ws_bad-event-id_has_no_ingress_authority",
+      "actual_bounded_ws_duplicate-event_has_no_ingress_authority",
+      "actual_bounded_ws_oversize_has_no_ingress_authority",
+      "superseded_native_socket_cannot_borrow_new_subscription_proof_or_revoke_it",
+      "unimplemented_notification_and_standalone_fallback_have_no_send_capability",
+      "native_session_cannot_disable_tls_or_add_an_unapproved_proxy",
+      "private_native_rest_and_ws_sessions_cannot_call_device_services_or_other_origins",
+      "token_rotation_revokes_existing_authenticated_socket_proof",
+      "owner_regrant_revokes_existing_native_subscription_proof",
+      "owner_regrant_during_held_native_ack_cannot_complete_authentication_proof",
+      "real_held_ws_handshake_has_bounded_deadline_and_closes_without_native_auth_proof",
+      "actual_caller_cancellation_closes_native_ws_and_does_not_enable_auth_or_input"
+    ],
+    "actual_pinned_auth_subscription_codec_and_aiohttp": true,
+    "loopback_ws_target_replacement_only_in_fixture": true,
+    "held_timeout_case_fixture_deadline_seconds": 0.05,
+    "public_gateway_enabled": false,
+    "external_account_or_tls_or_notification_accepted": false,
+    "agent_device_tools_enabled": false,
+    "installed_service_accepted": false
+  },
+  "native_delivery_regression": {
+    "passed": 26,
+    "cases": [
+      "shared_instance_audience_requires_explicit_owner_grant_before_any_post",
+      "native_http_and_authenticated_ws_verify_exact_real_notification_id",
+      "native_unicode_chunks_preserve_complete_message",
+      "native_single_post_400",
+      "native_single_post_401",
+      "native_single_post_403",
+      "native_single_post_404",
+      "native_single_post_413",
+      "native_single_post_429",
+      "native_single_post_500",
+      "native_single_post_302",
+      "native_unproven_missing_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-message_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-id_cannot_use_random_sdk_uuid",
+      "native_unproven_duplicate-proof_cannot_use_random_sdk_uuid",
+      "native_unproven_wrong-result-id_cannot_use_random_sdk_uuid",
+      "native_unproven_auth-invalid_cannot_use_random_sdk_uuid",
+      "native_unproven_lost_cannot_use_random_sdk_uuid",
+      "unconfirmed_missing_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "unconfirmed_wrong-result-id_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "unconfirmed_duplicate-proof_closes_witness_and_next_distinct_obligation_reauthenticates",
+      "cancelled_witness_closes_connection_and_never_resends_previous_obligation",
+      "partial_notification_then_429_never_retries_complete_reply",
+      "revoke_after_first_native_post_prevents_next_chunk_and_receipt_claim",
+      "direct_native_send_has_no_shared_notification_capability",
+      "token_rotation_revokes_old_private_notification_publisher"
+    ],
+    "actual_pinned_send_codec_rest_ws_and_outbox": true,
+    "homeassistant_core_protocol_reference": "9eb964b8b95fddc61ec4841277fbce7ce32dc586",
+    "loopback_targets_replaced_only_in_fixture": true,
+    "public_gateway_enabled": false,
+    "shared_audience_requires_explicit_owner_grant": true,
+    "external_notification_or_tls_account_accepted": false,
+    "agent_device_tools_enabled": false,
+    "installed_service_accepted": false
+  },
+  "native_ingress_regression": {
+    "passed": 24,
+    "cases": [
+      "public_owner_policy_still_refuses_unfinished_homeassistant",
+      "actual_native_state_codec_after_observable_commit_uses_original_context_user_entity_and_stable_id",
+      "raw_replay_cannot_repeat_native_relay_admission",
+      "direct_native_callback_is_denied",
+      "service_context_without_authenticated_user",
+      "invented_sender_in_payload_cannot_replace_missing_authenticated_context",
+      "new_state_context_user_mismatch",
+      "new_state_context_id_mismatch",
+      "entity_identity_mismatch",
+      "naive_original_timestamp",
+      "missing_original_update_timestamp",
+      "unchanged_state_has_no_mission",
+      "invalid_state_type",
+      "invalid_attributes_type",
+      "invalid_old_state_type",
+      "unrelated_event_type",
+      "oversized_native_metadata",
+      "unknown_authentic_context_user_is_not_automatically_paired",
+      "native_watch_all_filter_cannot_widen_owner_entity_authority",
+      "future_original_timestamp_has_no_replay_authority",
+      "original_before_owner_grant_is_refused",
+      "native_admission_failure_keeps_raw_obligation_pending",
+      "actual_sqlite_reopen_retry_is_not_consumed_by_native_cooldown",
+      "regrant_revokes_retained_and_old_capture_snapshot_authority"
+    ],
+    "actual_pinned_native_decoder": true,
+    "actual_sqlite_and_relay": true,
+    "public_gateway_enabled": false,
+    "transport_authentication_accepted": false,
+    "external_connections": false,
+    "homeassistant_device_tools_enabled_for_agent": false,
+    "live_or_installed_acceptance": false
+  },
+  "full_runtime_tests": {
+    "passed": 1161,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath_tests": {
+    "passed": 1161,
+    "existing_skips": 2
+  },
+  "local_excluded_file": "linux/haos/tests/test_backup.py",
+  "existing_root_uid_socket_recovery_tests": {
+    "passed": 47,
+    "actual_disposable_container_network": "none"
+  },
+  "new_ci_skips": false,
+  "public_homeassistant_setup_enabled": false,
+  "unseen_remote_history_recovered": false,
+  "installed_or_live_acceptance": false
+}

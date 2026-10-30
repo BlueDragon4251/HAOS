@@ -1,0 +1,1065 @@
+{
+  "recorded_UTC": "2026-10-30T21:10:31.519539+00:00",
+  "base_commit": "10cd78493c3883283c29f1219bfddadee469541e",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "4a73920541114c161fc137fffb9aa85ee2b7a4f9cfa51fe2f3078f65d7d52ca7"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "d85bdc435954258f88d0a911c42bc5dacb58e2dec8b3c82078d83d655fe9bf4f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_health.py",
+      "sha256": "0a60169b91d0129a0a729d8bbb89a242cf99f14490516fc1a9d7043c7d5bfdf9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_profile.py",
+      "sha256": "cb7c2a4741e13fc6785e7c12c8fd6171ed87894a82fc6023389dc8bfdecb134c"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_profile.py",
+      "sha256": "737db8e8bf3e5a9349b6d2d6239076d6634f0df13953f44f6a48e24c17c27b7f"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_health.py",
+      "sha256": "091a547cf7887b869f3d69bebbaaf9f5df27a7e119d6a69a7b9418ca22ed2a9f"
+    }
+  ],
+  "minimal_regression": "3276 passed, 2 skipped in 32.22s",
+  "full_frozen_regression": "3276 passed, 2 skipped in 31.83s",
+  "actual_native_check_count": 194,
+  "actual_native_scenes": [
+    {
+      "passed": 7,
+      "scenario": "normal",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 72,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 7,
+      "scenario": "dedicated",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SubscribeGroupEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {},
+        "timer_ticks": 91,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 8,
+      "scenario": "health-withdraw",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "actual_SIGSTOP_Node_health_wait_cannot_delay_independent_owner_withdrawal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 341,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 6,
+      "scenario": "health-store-refusal",
+      "cases": [
+        "actual_SQL_status_write_refusal_does_not_prevent_Node_withdrawal",
+        "close_preserves_storage_failure_for_caller",
+        "failed_status_write_still_closes_original_journal",
+        "actual_kernel_profile_lease_is_released",
+        "repeated_close_is_safe",
+        "no_parent_delivery_or_leftover_native_socket"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 18,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 7,
+      "scenario": "http401-status-loss",
+      "cases": [
+        "actual_native_HTTP401_is_recorded_before_damage",
+        "actual_Node_stops_after_authentication_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_refusal_cannot_retry",
+        "reopen_refuses_lost_original_auth_status_without_recreation",
+        "failed_rebuild_releases_actual_kernel_profile_lease",
+        "damaged_status_cannot_issue_another_vendor_HTTP_request"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http403",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "http429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "grpc401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 27,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "grpc429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 25,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "wrong-line",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "refresh401",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 2,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "refresh429",
+      "cases": [
+        "actual_native_SDK_refusal_recorded_finitely",
+        "actual_Node_stopped_after_refusal",
+        "no_source_or_parent_delivery",
+        "same_instance_cannot_retry_around_budget_or_terminal_state",
+        "reopened_profile_cannot_retry_around_persisted_refusal"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 2,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {},
+        "refused_auth": 0,
+        "emitted": 0,
+        "cancelled": {},
+        "timer_ticks": 0,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 11,
+      "scenario": "reply-confirmed",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_native_Python_sidecar_SDK_reply_builder_and_protobuf_wire",
+        "confirmed_receipt_replay_does_not_issue_second_RPC"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SendTextMessage": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 73,
+        "writes": [
+          {
+            "chat": "any;-;+15550100001",
+            "reply_to": "spc-6426bd89-8ec5-4397-8208-26fb0db1aba8"
+          }
+        ],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 13,
+      "scenario": "reply-restart",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_native_Python_sidecar_SDK_reply_builder_and_protobuf_wire",
+        "confirmed_receipt_replay_does_not_issue_second_RPC",
+        "actual_Node_profile_database_reopen_preserves_confirmed_receipt",
+        "confirmed_reply_after_process_restart_has_no_new_native_write"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 2,
+          "POST /projects/fixture-project/imessage/tokens": 2,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SendTextMessage": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 63,
+        "writes": [
+          {
+            "chat": "any;-;+15550100001",
+            "reply_to": "spc-9e261a0a-b1e4-45fe-9c3e-3f539bfe15e4"
+          }
+        ],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 11,
+      "scenario": "reply-disconnect",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_keeps_failed_transport_revoked",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_peer_write_without_receipt_remains_uncertain",
+        "no_automatic_native_RPC_retry_or_resend"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SendTextMessage": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 83,
+        "writes": [
+          {
+            "chat": "any;-;+15550100001",
+            "reply_to": "spc-5df66db4-7c4b-4741-90e9-c352aad9a5fa"
+          }
+        ],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 12,
+      "scenario": "reply-reset",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_keeps_failed_transport_revoked",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_TLS_connection_loss_after_write_does_not_replay_RPC_to_live_peer",
+        "actual_peer_write_without_receipt_remains_uncertain",
+        "no_automatic_native_RPC_retry_or_resend"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SendTextMessage": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 51,
+        "writes": [
+          {
+            "chat": "any;-;+15550100001",
+            "reply_to": "spc-8cf40195-79dd-42d6-a4a5-8de56c1bd839"
+          }
+        ],
+        "transport_resets": 1,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 11,
+      "scenario": "reply-sql-refusal",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_SQL_gate_failure_prevents_any_native_RPC",
+        "unconsumed_write_permission_atomically_cancelled"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {},
+        "timer_ticks": 65,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 11,
+      "scenario": "reply-withdraw",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "implicit_URL_file_and_direct_transport_writes_refused_before_IO",
+        "changed_recipient_and_unretained_source_refused_before_native_write",
+        "actual_peer_write_without_receipt_remains_uncertain",
+        "no_automatic_native_RPC_retry_or_resend"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "SendTextMessage": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 60,
+        "writes": [
+          {
+            "chat": "any;-;+15550100001",
+            "reply_to": "spc-c45385dc-c211-4c28-8932-99f8b90d8da4"
+          }
+        ],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 10,
+      "scenario": "media-image",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "actual_native_attachment_stream_and_codec_preserve_exact_private_bytes",
+        "durable_parent_receipt_includes_only_source_bound_opaque_media_identity",
+        "unknown_sender_and_replay_do_not_repeat_attachment_RPC"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 73,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 10,
+      "scenario": "media-document",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "actual_native_attachment_stream_and_codec_preserve_exact_private_bytes",
+        "durable_parent_receipt_includes_only_source_bound_opaque_media_identity",
+        "unknown_sender_and_replay_do_not_repeat_attachment_RPC"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 49,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 10,
+      "scenario": "media-voice-caf",
+      "cases": [
+        "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+        "unknown_sender_hash_only_refusal_before_native_mapping",
+        "approved_native_SDK_sidecar_Python_codec_durable_relay",
+        "duplicate_native_message_exactly_one_parent_row",
+        "original_and_native_custody_have_parent_receipt",
+        "actual_native_stream_advances_durable_cursor",
+        "owner_withdrawal_stops_actual_Node_and_Unix_control",
+        "actual_native_attachment_stream_and_codec_preserve_exact_private_bytes",
+        "durable_parent_receipt_includes_only_source_bound_opaque_media_identity",
+        "unknown_sender_and_replay_do_not_repeat_attachment_RPC"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 80,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "media-truncated",
+      "cases": [
+        "actual_native_attachment_TLS_gRPC_source_and_policy",
+        "unknown_sender_or_missing_media_consent_cannot_fetch",
+        "failed_or_withdrawn_media_has_no_native_or_parent_receipt",
+        "durable_cursor_does_not_skip_unfinished_original",
+        "actual_Node_stops_on_failed_or_revoked_media"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 41,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "media-withdraw",
+      "cases": [
+        "actual_native_attachment_TLS_gRPC_source_and_policy",
+        "unknown_sender_or_missing_media_consent_cannot_fetch",
+        "failed_or_withdrawn_media_has_no_native_or_parent_receipt",
+        "durable_cursor_does_not_skip_unfinished_original",
+        "actual_Node_stops_on_failed_or_revoked_media"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 40,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "media-unapproved",
+      "cases": [
+        "actual_native_attachment_TLS_gRPC_source_and_policy",
+        "unknown_sender_or_missing_media_consent_cannot_fetch",
+        "failed_or_withdrawn_media_has_no_native_or_parent_receipt",
+        "durable_cursor_does_not_skip_unfinished_original",
+        "actual_Node_stops_on_failed_or_revoked_media"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1,
+          "SubscribePollEvents": 1
+        },
+        "timer_ticks": 25,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 0
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    },
+    {
+      "passed": 5,
+      "scenario": "media-storage-refusal",
+      "cases": [
+        "actual_native_attachment_TLS_gRPC_source_and_policy",
+        "unknown_sender_or_missing_media_consent_cannot_fetch",
+        "failed_or_withdrawn_media_has_no_native_or_parent_receipt",
+        "durable_cursor_does_not_skip_unfinished_original",
+        "actual_Node_stops_on_failed_or_revoked_media"
+      ],
+      "counts": {
+        "http": {
+          "GET /projects/fixture-project/": 1,
+          "POST /projects/fixture-project/imessage/tokens": 1,
+          "GET /projects/fixture-project/platforms/": 1
+        },
+        "grpc": {
+          "SubscribeMessageEvents": 1,
+          "CatchUpEvents": 1,
+          "SubscribePollEvents": 1,
+          "DownloadAttachment": 1
+        },
+        "refused_auth": 0,
+        "emitted": 3,
+        "cancelled": {
+          "SubscribeMessageEvents": 1
+        },
+        "timer_ticks": 29,
+        "writes": [],
+        "transport_resets": 0,
+        "downloads_closed": 1
+      },
+      "live_Photon_verified": false,
+      "controller_IPC_verified": false,
+      "OS_release_artifact": false,
+      "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+    }
+  ],
+  "actual_SQLite_health_tests": "31 passed in 0.22s",
+  "prior_module_comparison": {
+    "profile_source_commit": "10cd78493c3883283c29f1219bfddadee469541e",
+    "profile_sha256": "5caa4c1bfd63edc624195f289c3c856048fb7d726cdf26ac816f0b5afb85faa8",
+    "scope": "Only this immutable public profile module substituted in the current disposable fixture, all other modules current; not a whole old-build acceptance",
+    "failed_close_assertion": "failed status write retained closed-profile lease",
+    "failed_reopen_assertion": "native authentication refusal was recreated as a fresh status",
+    "current_unchanged_assertions_pass": true
+  },
+  "implementation": [
+    "Final status SQL error remains visible, but after completed async transport stop a finally block closes originals and kernel lease; interruption of transport stop does not release custody prematurely",
+    "Separate FULL original journal remembers status identities before native connect can start; lost/changed remembered central status rows cannot be recreated as fresh login state",
+    "Partial/missing schemas beside known native records, missing/nonfinite stable account budgets and damaged/over-cap status history are refused without rewriting existing status/budget data",
+    "Native HTTP401 then actual status-row loss refuses reopened profile and any further vendor HTTP request, preserving missing row and releasing failed-build lease",
+    "Native SQL status-write failure still stops the actual private Node within unchanged withdrawal deadline and releases original journal/profile lease, preserving failure and idempotent close"
+  ],
+  "related_prior_kernel_proof": {
+    "commit": "10cd78493c3883283c29f1219bfddadee469541e",
+    "receipt": "photon-owner-source-recovery.json",
+    "passed": 174,
+    "scope": "prior complete kernel suite; unchanged public kernel/Owner gate paths, not rerun for this private status/close change"
+  },
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_verified": false,
+    "installed_OS_or_Owner_GUI_verified": false,
+    "public_Photon_activation": false,
+    "final_release_artifact": false
+  },
+  "next": "Finish remaining recorded-status cross-journal diagnostics, preserve known missing originals, explicit auth/cursor recovery, Owner account/setup/login, sealed outgoing media and full controller/missions path before17. Then remaining5gateways."
+}

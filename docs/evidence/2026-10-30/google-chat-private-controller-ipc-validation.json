@@ -1,0 +1,112 @@
+{
+  "recorded_UTC": "2026-10-30T15:55:07.492638+00:00",
+  "base_commit": "ead292bc7f03ee2966fb0ccc80ff08a45ce86e65",
+  "source_files": [
+    {
+      "path": "linux/haos/probes/probe_google_chat_profile_process.py",
+      "sha256": "6cf4c1cda6e9ce8e03fce1d9b57f027bc7070f08cb69818a526e2b1941a46298"
+    },
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "0e8fe93bde66deeca90cee6f6a468aa4d23bd897f729ff1fa6de6f8d032129ee"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "74784d0526aa6aa1cc59bba9c1724f018bfd1fc38e90c6e98363253b2c4a3f77"
+    }
+  ],
+  "changed_runtime_code": false,
+  "actual_process_scenes": {
+    "pubsub": {
+      "passed": 7,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_private_profile_real_TLS_gRPC_GetSubscription_and_RSA_OAuth_metadata_before_connected_pull",
+        "actual_PubSub_profile_ACK_checks_FULL_original_or_unknown_sender_hash_refusal_before_real_SDK_acknowledge",
+        "actual_PubSub_native_codec_relay_controller_component_and_native_TLS_reply_loop_has_two_unique_outputs",
+        "actual_PubSub_disconnect_reconnect_revalidates_account_and_subscription_then_replay_preserves_one_source_and_one_reply",
+        "actual_Root_grant_withdrawal_stops_PubSub_profile_cancels_blocked_real_TLS_RPC_and_never_accepts_or_ACKs_queued_source"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": true,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": false,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "local_ASR_video_decode_GUI_live_Google_account_production_daemon_or_public_activation": false
+    },
+    "active": {
+      "passed": 11,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_private_UID_listener_verifies_system_trusted_TLS_material_and_Google_SDK_RSA_token_then_returns_HTTP200_only_after_FULL_original_custody_and_replay_keeps_one_original",
+        "authenticated_unknown_sender_receives_only_durable_hash_refusal_without_native_decode_or_mission_rights",
+        "actual_TLS_callback_refuses_missing_duplicate_wrong_audience_and_wrong_caller_tokens_without_body_admission_or_secret_errors",
+        "actual_SQL_failure_returns_retryable_HTTP503_without_success_ACK_and_next_inspected_source_can_be_retained",
+        "only_fixed_query_free_callback_path_is_exposed_no_arbitrary_plugin_listener",
+        "actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records",
+        "actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs",
+        "actual_native_profile_disconnect_and_reconnect_close_and_rebind_TLS_with_the_same_private_lease_and_journals_and_fresh_real_SDK_account_auth_checks",
+        "actual_root_publication_withdrawal_stops_native_profile_and_TLS_listener_without_another_callback_message_or_success_ACK"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": false,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": false,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "local_ASR_video_decode_GUI_live_Google_account_production_daemon_or_public_activation": false
+    },
+    "media": {
+      "passed": 12,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_private_UID_listener_verifies_system_trusted_TLS_material_and_Google_SDK_RSA_token_then_returns_HTTP200_only_after_FULL_original_custody_and_replay_keeps_one_original",
+        "authenticated_unknown_sender_receives_only_durable_hash_refusal_without_native_decode_or_mission_rights",
+        "actual_TLS_callback_refuses_missing_duplicate_wrong_audience_and_wrong_caller_tokens_without_body_admission_or_secret_errors",
+        "actual_SQL_failure_returns_retryable_HTTP503_without_success_ACK_and_next_inspected_source_can_be_retained",
+        "only_fixed_query_free_callback_path_is_exposed_no_arbitrary_plugin_listener",
+        "actual_private_UID_source_bound_Google_discovery_MediaIoBaseDownload_TLS_GET_native_attachment_codec_FULL_retention_and_real_controller_media_begin_chunk_receive_attach_preserve_exact_PNG_bytes_with_no_foreign_downloadURI_fetch_or_duplicate_download_on_replay",
+        "actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records",
+        "actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs",
+        "actual_native_profile_disconnect_and_reconnect_close_and_rebind_TLS_with_the_same_private_lease_and_journals_and_fresh_real_SDK_account_auth_checks",
+        "actual_root_publication_withdrawal_stops_native_profile_and_TLS_listener_without_another_callback_message_or_success_ACK"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": false,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": true,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "local_ASR_video_decode_GUI_live_Google_account_production_daemon_or_public_activation": false
+    }
+  },
+  "execution": {
+    "network": "none",
+    "container_image": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+    "gateway_UID": 65534,
+    "controller_UID": 65532,
+    "agent_negative_UID": 65533,
+    "socket": "Root-created bound Unix FD inherited into actual Controller process",
+    "controller_database": "UID65532 private0700 parent,0600 database,umask077",
+    "Google_endpoints": "explicit local TLS/gRPC service fixtures; actual SDK clients and RSA",
+    "prepared_policy": "explicit Controller.gateway_policy fixture callback; no production/public activation"
+  },
+  "passed_process_cases": 30,
+  "previous_source_contracts": {
+    "source_commit": "ead292bc7f03ee2966fb0ccc80ff08a45ce86e65",
+    "minimal_tests": 70,
+    "frozen_Hermes_tests": 70,
+    "receipt": "docs/evidence/2026-10-30/google-chat-private-full-pubsub-profile-validation.json"
+  },
+  "fixture_correction": "Initial in-process Root controller fixture correctly failed the gateway-read negative test because its ambient umask created0644 DB; replaced with separate service-UID controller process, private0700 directory and077 umask, matching actual service boundary. No production permissions/peer authorization changed.",
+  "limits": [
+    "No live Google delivery or inference",
+    "No Google ASR/video process here",
+    "Prepared policy callback is explicit fixture; production serve/public GUI and installed acceptance still open",
+    "Public software count15/22"
+  ]
+}

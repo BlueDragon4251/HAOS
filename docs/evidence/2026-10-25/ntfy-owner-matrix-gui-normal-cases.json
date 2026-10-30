@@ -1,0 +1,15 @@
+{
+  "passed": 7,
+  "cases": [
+    "real_tk_complete_private_identity_handoff_and_secret_clearing",
+    "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+    "local_device_draft_does_not_grant_backend_authority",
+    "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+    "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+    "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+    "actual_scrollable_compact_or_normal_owner_layout"
+  ],
+  "external_connections": false,
+  "privileged_backend_accepted": false,
+  "installed_setup_accepted": false
+}

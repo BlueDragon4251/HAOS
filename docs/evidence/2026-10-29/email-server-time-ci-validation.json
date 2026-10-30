@@ -1,0 +1,74 @@
+{
+  "parent_commit": "118b96982980805be226da4fa2a1e7a36c6a2e5b",
+  "failed_CI_source": "0ecad43f6255f1ff0cd930049c372114bbce7a2d",
+  "failed_CI_jobs": [
+    123405546252,
+    123405523223
+  ],
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "187e003bd5c91b395beffc28a715f2a9a4aceea16d6a2805bdcf7c3e919bed57"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_profile.py",
+      "sha256": "1106105617770517b0c62895621a746f11b8454e725c8fe56715d119800280ca"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_process.py",
+      "sha256": "d8aeba29539902c7dd691413f002cd7301666d56ae2b68b69f0fbe2d8a09ce1a"
+    }
+  ],
+  "cause": "Fixed IMAP fixture INTERNALDATE 28-Oct-2026 13:00 +0200 expired under unchanged 86400-second NativeInbox policy at 29-Oct 11:00 UTC. Local diagnostics reproduce expired state, attempt zero, no dispatch exception.",
+  "change": "Use fresh server receipt time with explicit +0200 offset; retain old sender Date and assert recent server timestamp. No assertion or expiry/UID/protocol gate weakened. Private profile lifecycle status HOME is independently corrected.",
+  "checks": {
+    "minimal_without_Hermes_source": "1934 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1934 passed, 2 existing skips",
+    "actual_UID_email_native_TLS_worker_profile_outputs_revocation_cancellation_parent_death_and_deadline": "19 passed"
+  },
+  "native_report": {
+    "passed": 19,
+    "cases": [
+      "actual_gateway_uid_private_worker_imports_root_owned_runtime_and_authenticates_native_verified_tls_without_sending",
+      "actual_gateway_uid_worker_transfers_exact_bounded_header_bytes_with_same_connection_uidvalidity_and_internaldate",
+      "actual_gateway_uid_worker_search_uses_current_root_grant_date_and_returns_all_sorted_bounded_uid_resources",
+      "actual_gateway_uid_streams_exact_large_approved_body_over_private_bounded_binary_ipc_without_model_or_smtp_send",
+      "actual_uid_worker_refuses_unapproved_mime_after_bounded_inspection_without_transferring_full_source_to_parent",
+      "actual_uid_worker_returns_exact_bounded_mime_manifest_and_binary_source_only_under_current_explicit_media_grant",
+      "actual_gateway_uid_streams_four_private_outputs_including_maximum_document_png_wav_and_mp4_into_native_smtp_without_host_paths_or_duplicate_replay",
+      "secured_legacy_text_only_confirmation_remains_readable_without_journal_rewrite_or_another_smtp_write",
+      "uncertain_write_stays_blocked_across_reopen_until_explicit_owner_non_delivery_audit_then_one_new_controller_attempt_is_confirmed_and_cached",
+      "actual_native_smtp_temporary_refusal_disconnects_profile_and_persistent_retry_deadline_cannot_be_reset_by_reopening",
+      "actual_gateway_uid_durable_reply_context_native_smtp_intent_and_acceptance_never_repeat_confirmed_or_uncertain_writes_across_attempts",
+      "actual_gateway_uid_receiver_runs_native_account_search_header_body_capture_replay_and_durable_private_relay",
+      "actual_agent_uid_cannot_invoke_the_private_worker_even_with_direct_installed_module_execution",
+      "actual_agent_uid_receives_no_credentials_and_cannot_read_private_secret_stdin_or_process_environment",
+      "actual_root_policy_change_kills_and_joins_blocked_native_worker_during_imap_greeting",
+      "actual_parent_cancellation_kills_and_joins_blocked_private_worker_before_returning",
+      "actual_cancellation_during_pending_process_creation_waits_for_spawn_then_kills_and_joins_before_parent_returns",
+      "actual_parent_sigkill_immediately_kills_credential_worker_and_pid1_reaps_it_without_waiting_for_network_deadline",
+      "actual_worker_hard_deadline_terminates_blocking_native_constructor_and_parent_joins_it"
+    ],
+    "actual_uids": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_private_subprocess_and_kernel_termination": true,
+    "actual_native_clients_and_verified_tls": true,
+    "loopback_account_and_owner_grants_are_fixtures": true,
+    "actual_atomic_root_publication": true,
+    "public_email_gateway_enabled": true,
+    "external_email_accounts_or_delivery_or_installed_acceptance": false
+  },
+  "log_sha256": {
+    "email-current-server-time-process-final.log": "9469c7c13347e4d7afdcc736759bf0012092049999690ecffe78d11e2b1c1d0e",
+    "email-current-time-minimal.log": "ad2089f229a6ed9f79ef956bcffe8fe01c5627be9109d4e43ef5ad6593dff1a9",
+    "email-current-time-full.log": "721490f3b346a316299240b871ab6c416bed3f0e8aa8758d4bcecf66260a2a0d",
+    "email-after-feishu-crash-CI-diagnostic.log": "f8089f6b08aa7306c55eb57bedb77d86b524e756444203e3cb2857a9c577e9c0"
+  },
+  "limitations": [
+    "CI follow-up still needs fresh completion after push.",
+    "All mail endpoints/accounts/owner permissions are disposable loopback fixtures, not live delivery or installed acceptance."
+  ]
+}

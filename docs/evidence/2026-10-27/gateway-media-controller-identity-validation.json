@@ -1,0 +1,132 @@
+{
+  "parent_commit": "b16c3ef80dbd86eeb2f75eae8ed2766374ac5c12",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-MEDIA.md",
+      "sha256": "00e85e9a0cd221f369bc188be4226ae5b80f2e44379f76849c2fe4640fb4e1bf"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "d51c9e935ed3686f810dba88f43f784f98946e8e0488fb65d0ae315318454772"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "52d15d226c995f38a8790eb4113f46511eaccea4192d520604558d395f750764"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "6417cd59b98cb273d1084dada8447ab26abe1eb17d9cc564433d8b0c5b6bcb1a"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "07fb198c0524a3d14ef34acaa7393be025b684cb47b409126256a17a281163f9"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "422da1eb35b6f5fda1ecb26ab3cd6c539c861ddf912a913907eac93912984f86"
+    },
+    {
+      "path": "linux/haos/runtime/line_owner_fixture.py",
+      "sha256": "34a470bb5dff3de9ff978493bbcb54ef9e10f5aa17313ffc5967f9ebb9e75992"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_media.py",
+      "sha256": "b864983d80a68b235d97003f190a2ba605dcb2aa7df628a2560d194c58091f41"
+    },
+    {
+      "path": "linux/haos/tests/test_owner.py",
+      "sha256": "21ef91980b6e4c541a62ebaf54f2d971db57ffa101d32d8f37cdac9aa4bc6607"
+    }
+  ],
+  "suites": [
+    {
+      "name": "identity-minimal",
+      "summary": "1399 passed, 2 skipped in 8.24s",
+      "sha256": "07f44aeb99a8a081593ada0f00f21a731c9fd76f1ca566048ff9b9b85eecb3bd"
+    },
+    {
+      "name": "identity-full",
+      "summary": "1399 passed, 2 skipped in 8.29s",
+      "sha256": "ccd5a35b791288dbaf400cf2a014dfa026839862cc88585d9230aa435766df89"
+    },
+    {
+      "name": "identity-root",
+      "summary": "87 passed in 18.42s",
+      "sha256": "c5583a9745660caca38015500c4629d5aec6c293860d03072b836f64a367b8f5"
+    }
+  ],
+  "probes": {
+    "line-owner": {
+      "receipt": {
+        "passed": 44,
+        "cases": [
+          "actual_x509_chain_hostname_key_time_and_system_trust_validation_accepts_explicit_fixture_ca",
+          "tls_wrong_hostname_refused_before_listener",
+          "tls_expired_refused_before_listener",
+          "tls_plaintext_public_url_refused_before_listener",
+          "tls_public_ip_url_refused_before_listener",
+          "tls_wrong_path_refused_before_listener",
+          "tls_embedded_url_credential_refused_before_listener",
+          "tls_unapproved_public_bind_refused_before_listener",
+          "tls_false_public_consent_refused_before_listener",
+          "tls_invalid_private_key_refused_before_listener",
+          "tls_oversized_chain_refused_before_listener",
+          "actual_mismatched_private_key_refused",
+          "actual_root_private_single_link_pem_descriptor_reads",
+          "actual_pem_certificate_world-readable_refused",
+          "actual_pem_certificate_symlink_refused",
+          "actual_pem_certificate_hardlink_refused",
+          "actual_pem_certificate_non-pem_refused",
+          "actual_pem_certificate_oversized_refused",
+          "actual_pem_private_key_world-readable_refused",
+          "actual_pem_private_key_symlink_refused",
+          "actual_pem_private_key_hardlink_refused",
+          "actual_pem_private_key_non-pem_refused",
+          "actual_pem_private_key_oversized_refused",
+          "actual_cli_private_prompts_verified_public_consent_and_atomic_root_publication",
+          "actual_runtime_redactor_excludes_private_pem_and_channel_credentials",
+          "actual_owner_public_listener_refuses_missing_consent_without_configuration_mutation",
+          "actual_cli_invalid_port_rejected_without_input_echo_or_credential_mutation",
+          "actual_cli_pair_derives_saved_bot_scope_and_publishes_exact_sender_grant",
+          "actual_graphical_backend_derives_bot_scope_and_publishes_fresh_timed_grant",
+          "actual_graphical_media_opt_in_persisted_and_missing_create_refused_without_mutation",
+          "actual_cli_media_opt_in_and_graphical_repair_default_withdrawal_persisted",
+          "actual_pairing_refuses_self_bot_wrong_destination_and_threads_without_mutation",
+          "actual_credential_and_listener_rotation_withdraws_old_grants_without_data_deletion",
+          "actual_repairing_renews_epoch_and_publication_rejects_cross_bot_credential_mix",
+          "actual_expired_pem_remains_inspectable_but_strict_activation_refuses_it",
+          "actual_owner_can_replace_expired_certificate_without_resetting_retained_data",
+          "actual_foreign_uid_cannot_read_pem_credentials_or_invoke_owner_mutations",
+          "actual_remove_preserves_owner_canary_and_audits_no_secrets",
+          "untrusted_certificate_chain_refused",
+          "actual_private_tls_material_is_atomic_single_link_mode_600_and_reused_without_overwrite",
+          "conflicting_existing_tls_material_is_preserved_and_requires_owner_recovery",
+          "actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds",
+          "actual_profile_https_refuses_wrong_client_hostname_before_signed_admission",
+          "actual_registered_native_profile_verified_https_hmac_private_relay_and_native_decode"
+        ],
+        "actual_x509_verified_https_and_native_profile": true,
+        "fixture_only_system_ca_loopback_and_identity_target": true,
+        "tls_verification_disabled": false,
+        "public_gateway_enabled": true,
+        "actual_root_owner_lifecycle": true,
+        "service_quiescence_and_audit_location_are_fixtures": true,
+        "external_dns_router_line_acceptance_or_installed_acceptance": false
+      },
+      "sha256": "f613473a749097d0dd72d159c4c2ee5393074b2b7dbfc19cbdfc78758232f351"
+    }
+  },
+  "changes": [
+    "Controller media list/purge now uses existing fixed offline gateway_recovery worker as actual haos-control UID, never root-opened ledger",
+    "Missing, replaced, multiply linked or unsafe private ledger/sidecars use existing private_store refusal checks",
+    "Worker receives only exact IDs, authenticated owner UID, inspection hash and confirmation; no raw notes, credentials or caller database path",
+    "Inventory bounds recent purged metadata to128 while retaining every tombstone/audit and every active upload",
+    "Previous root-opened owner media fixture replaced by two real NSS/chroot/default-path UID worker cases; no kernel gate mocked and no new skip"
+  ],
+  "limits": [
+    "No real owner/recovery data removed; all mutation fixtures disposable",
+    "No claim that all LINE media/voice, all gateways, model inference, installed boot or releases are complete",
+    "b16c3ef CI has both provider runs, general CI and GUI green at fresh check; services and Arch still running, newer patch requires separate CI"
+  ]
+}

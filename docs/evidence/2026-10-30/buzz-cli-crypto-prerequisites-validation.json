@@ -1,0 +1,155 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "6bb69105e97bd9c22c8ab882c3b5345181f40a09",
+  "tested_source_tree_before_this_receipt": "70c1dc60ad67f9f13c640205c3e9674897c7c25a",
+  "source_files_sha256": {
+    "docs/GATEWAY-BUZZ.md": "28a3b1dd958e40ec28507edbbe41a8a46ba69af47386ef23be09f85f7c409146",
+    "linux/haos/haos/gateway_buzz.py": "7d0317e387c7af95ee546c2b7cec10daee7b242bf0243158133010af61bb2723",
+    "linux/haos/haos/gateway_buzz_crypto.py": "d039717c03bb010fd9f0295ae1d9e29318f95ea2bd6e329068720ac08113c44b",
+    "linux/haos/probes/probe_buzz_verify_process.py": "9747eb2deb9881a9730d015a30a46e3d2eecf85a516289839d31c2a7ddfb981f",
+    "linux/haos/runtime/buzz-source.json": "ba4646c9b9ff52c60ffb05464101b51826413aaa2a91381dc23266212f41ca75",
+    "linux/haos/runtime/buzz-verify/Cargo.lock": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+    "linux/haos/runtime/buzz-verify/Cargo.toml": "a5f5c522ec0d6b613c31ad479b8f0402ca7904273729c9ff339875ab8a37a740",
+    "linux/haos/runtime/buzz-verify/src/main.rs": "35dec345b2bb991f9af5cafa0f2e995093259deb62abf0a415413bf810bed93b",
+    "linux/haos/runtime/prepare_buzz.py": "d45b61ceeef3f16fda5f97fee0dbbe1d8fffa0e8914a8a6cad19581df9f5f153",
+    "linux/haos/runtime/probe_buzz_cli.py": "14544a386bd060eabc8fb4e55b76aa6c126fc4a0b8a2c66a78e9535e12ad6d27",
+    "linux/haos/runtime/probe_buzz_crypto.py": "6d16961ff92d52b7262df14799946f535e3035649edf7a6d7b77bdabaf279f0d",
+    "linux/haos/tests/test_gateway_buzz.py": "e9e65f1b5a6771fd11c579a2f19e7a08ca9ac7e3a065c8d0147a37b718ad8eff"
+  },
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 14,
+  "buzz_public_activation": false,
+  "official_program_source": {
+    "repository": "https://github.com/block/buzz",
+    "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+    "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
+    "builder_image": "rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7",
+    "rust_version": "1.98.1",
+    "nostr_version": "0.44.7",
+    "serde_json_version": "1.0.150",
+    "helper_lock_sha256": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+    "programs": {
+      "buzz": {
+        "package": "buzz-cli",
+        "package_version": "0.1.0",
+        "version_flag_supported": false
+      },
+      "haos-buzz-verify": {
+        "package": "haos-buzz-verify",
+        "package_version": "0.1.0"
+      }
+    },
+    "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1"
+  },
+  "prepared_program_source": {
+    "repository": "https://github.com/block/buzz",
+    "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+    "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
+    "builder_image": "rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7",
+    "rust_version": "1.98.1",
+    "nostr_version": "0.44.7",
+    "serde_json_version": "1.0.150",
+    "helper_lock_sha256": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+    "programs": {
+      "buzz": {
+        "package": "buzz-cli",
+        "package_version": "0.1.0",
+        "version_flag_supported": false
+      },
+      "haos-buzz-verify": {
+        "package": "haos-buzz-verify",
+        "package_version": "0.1.0"
+      }
+    },
+    "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1",
+    "client_prepared_sha256": "653115105e48f2aac0c9a5445011163b694adbb0e1337f180967dd04888fb89b"
+  },
+  "regression": {
+    "minimal_passed": 2520,
+    "full_passed": 2520,
+    "existing_skips_each": 2,
+    "actual_root_kernel_passed": 172,
+    "logs_sha256": {
+      "minimal": "2d23d17204e0c41f31aec9912fe9e12574a18af85f7484c210b2f27642386880",
+      "full": "c99ec53323611ef2295fba3e66afd2313677771713e9ce05b3d8c0ef7e113706",
+      "kernel": "4569fcba607746f77a726b41e5ceb4f17a5c7609a53669d931b60a958bef5ea5",
+      "redaction-gate": "aa38e920b0a769965aa9a8b282f2171e288d87628031bab803e5f7a1629afcfb"
+    }
+  },
+  "actual_crypto_interop": {
+    "passed": 10,
+    "cases": [
+      "actual_frozen_Hermes_NIP42_BIP340_auth_signature_and_event_identity_verified_by_official_nostr_0447_SDK",
+      "actual_native_Schnorr_signing_and_official_Rust_event_verification_agree_on_complete_UTF8_channel_message_and_tags",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_0",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_1",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_2",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_3",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_4",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_5",
+      "actual_official_SDK_rejects_tampered_digest_signature_or_signed_source_field_6",
+      "fixed_offline_verifier_rejects_malformed_and_oversized_input_without_echoing_signed_content_or_parser_errors"
+    ],
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "official_nostr_SDK": "0.44.7",
+    "verifier_sha256": "ee5725b77bf7c43e9c43260ecc46de069ef18a973a8f9d38615afcba2336a6f2",
+    "scope": "actual frozen Hermes signing code and compiled official Rust SDK; deterministic public local fixtures only",
+    "actual_UID_relay_TLS_ingress_mission_delivery_GUI_or_public_activation": false
+  },
+  "actual_CLI_HTTPS_NIP98_and_delivery": {
+    "passed": 6,
+    "cases": [
+      "actual_pinned_official_Rust_CLI_queries_verified_TLS_relay_with_SDK_verified_NIP98_identity_method_URL_payload_and_nonce_without_private_key_on_wire",
+      "actual_native_CLI_message_builder_signing_and_HTTP_acceptance_receipt_preserve_exact_content_channel_and_event_id",
+      "definite_429_retries_exact_same_signed_event_body_and_identity_with_bounded_native_delay_and_fresh_NIP98_nonce",
+      "actual_401_refuses_authentication_without_automatic_retry_or_false_account_readiness",
+      "reviewed_exact_source_default_HTTP_transport_overlay_refuses_302_without_following_or_forwarding_authentication",
+      "post_body_disconnect_retries_only_same_idempotent_native_event_then_reports_delivery_unknown_not_retryable_for_new_CLI_invocation"
+    ],
+    "official_buzz_commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "cli_sha256": "87137a140fc0a59bd19d312efc6ce0ea8d1c1c9ec8975d8978507d882fd9e585",
+    "scope": "actual compiled pinned official CLI plus exact no-redirect constructor overlay and official Rust signature verifier, trusted fixture CA and local TLS relay",
+    "private_UID_HAOS_ingress_mission_live_relay_GUI_or_public_activation": false
+  },
+  "actual_installed_UID_provenance_and_official_SDK": {
+    "passed": 9,
+    "cases": [
+      "actual_installed_root_owned_digest_checked_offline_Rust_SDK_helper_executes_only_from_private_gateway_UID_without_secret_environment",
+      "actual_private_UID_helper_rejects_tampered_signed_event_without_echoing_untrusted_content_or_creating_mission",
+      "actual_root_and_agent_UID_cannot_enter_gateway_crypto_service_before_SDK_execution",
+      "actual_private_UID_with_root_supplementary_group_is_refused_before_SDK_execution",
+      "changed_executable_bytes_are_refused_before_spawn_despite_same_path_owner_and_mode",
+      "group_or_world_writable_program_is_refused_before_execution",
+      "multiply_linked_executable_is_refused_before_execution",
+      "symlinked_executable_is_refused_before_execution",
+      "actual_gateway_and_agent_UID_cannot_modify_installed_program_or_provenance_or_read_owner_canary"
+    ],
+    "actual_UID_installed_root_owned_code_and_compiled_official_SDK": true,
+    "live_relay_ingress_mission_delivery_GUI_or_public_activation": false
+  },
+  "builds": {
+    "official_CLI_frozen": {
+      "log_sha256": "0c138374b1f00b2203ab75dc6b2884362a36997cffb978a7682c19a70455ebf1",
+      "original_binary_sha256": "d370ed31fac4ff1c083de64b5d3c5e0d736b9fa402af8a7abb68930abaa14447"
+    },
+    "prepared_CLI_frozen": {
+      "log_sha256": "6fdd937ae4cdf4e16bd6a1b95c1fd8fb9c43f3f27ad0a0c4745829f27977b9d2",
+      "binary_sha256": "87137a140fc0a59bd19d312efc6ce0ea8d1c1c9ec8975d8978507d882fd9e585"
+    },
+    "official_SDK_verifier_frozen": {
+      "log_sha256": "7a6df637185bd383aecd6ccd11d187b79bd1388efd9c14bb086f829076bd05b7",
+      "exact_official_dependency_identities_and_checksums": 107
+    }
+  },
+  "limits": [
+    "Prerequisites only: no complete HAOS native ingress/egress lifecycle, persistent source/history/media/mission integration, owner GUI, image packaging or build/CI wiring yet.",
+    "No public Buzz registry activation, live account, external relay, real inference, installed OS, hardware or release acceptance.",
+    "Actual CLI TLS peer and CA are explicit local fixtures; no external message sent.",
+    "CLI --version is unsupported. Package/source/lock/compiler and actual executable digests identify this build.",
+    "The official CLI profile read returns projected user metadata, not a signed-event object; the fixture asserts that real shape. Incoming message signature verification remains independent."
+  ]
+}

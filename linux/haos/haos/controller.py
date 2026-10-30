@@ -108,10 +108,37 @@ class Controller:
         params = request.get("params", {})
         if not isinstance(params, dict):
             raise ValueError("params must be an object")
+        if request.get('method')=='gateway.cancel-source':
+            return self.gateway.source_cancellations.cancel(policy,params)
         if request.get("method") == "gateway.receive":
-            return await self.gateway.receive(policy, params["connector"], params["envelope"], self)
+            if set(params)-{'connector','envelope','media','binding'}:raise ValueError('unsupported gateway admission fields')
+            if 'media' in params and params['media'] is None:raise ValueError('explicit media IDs must be a list')
+            if policy.connectors.get(params.get('connector'),{}).get('platform')=='a2a' or 'binding' in params:
+                from .gateway import digest
+                binding=policy.authorize(params['connector'],params['envelope'])
+                if params.get('binding')!={'binding_id':binding['id'],'binding_digest':digest(binding)}:
+                    raise PermissionError('exact current controller gateway grant epoch required')
+            return await self.gateway.receive(policy, params["connector"], params["envelope"], self,media=params.get('media'))
+        if request.get('method')=='gateway.media.begin':
+            if policy.connectors.get(params.get('connector'),{}).get('platform')=='a2a':
+                from .gateway import digest
+                binding=policy.authorize(params['connector'],params['envelope'])
+                if params.get('binding')!={'binding_id':binding['id'],'binding_digest':digest(binding)}:
+                    raise PermissionError('exact current controller A2A media grant epoch required')
+                params={key:value for key,value in params.items() if key!='binding'}
+            return self.gateway.media.begin(policy,params)
+        if request.get('method')=='gateway.media.chunk':
+            return self.gateway.media.chunk(policy,params)
+        if request.get('method') in {'gateway.output.begin','gateway.output.chunk','gateway.output.manifest'}:
+            from .gateway_outbound import Exports
+            if not hasattr(self,'gateway_exports'):self.gateway_exports=Exports(self)
+            if request['method']=='gateway.output.manifest':return self.gateway_exports.manifest(params)
+            if request['method']=='gateway.output.begin':return await self.gateway_exports.begin(params)
+            return self.gateway_exports.chunk(params)
         if request.get("method") == "gateway.next":
-            return self.gateway.next_delivery(policy)
+            if set(params)-{'ready'}:raise ValueError('unsupported gateway queue selection')
+            if 'ready' in params and params['ready'] is None:raise ValueError('explicit ready connectors must be a list')
+            return self.gateway.next_delivery(policy,ready_connectors=params.get('ready'))
         if request.get("method") == "gateway.ack":
             return self.gateway.acknowledge(policy, params["id"], params["result"])
         raise PermissionError("gateway method denied")
@@ -236,6 +263,9 @@ class Controller:
         except (ValueError, KeyError, PermissionError, Conflict, TimeoutError) as exc:
             print(json.dumps({"event": "control.denied", "actor": actor, "reason": type(exc).__name__}), flush=True)
             reply = {"ok": False, "error": self.store.redactor.text(str(exc))}
+            if (isinstance(exc,Conflict) and isinstance(locals().get('request'),dict)
+                    and request.get('method') in {'gateway.media.begin','gateway.media.chunk'}):
+                reply['media_retryable']=True
         except Exception:
             # Exceptions can embed request text, URLs and credentials; journal only their type.
             print(json.dumps({"event": "control.error", "actor": actor}), flush=True)
@@ -262,9 +292,39 @@ class Controller:
                 if self.store.get(row["id"])["cancel_requested"]:
                     self.store.settle(row["id"], "cancelled")
                     return
+                attachments=(self.gateway.media.for_mission(self.gateway_policy(),row['id'])
+                    if self.gateway.media.has_mission(row['id']) else [])
+                refs=[]
+                if attachments:
+                    from .hermes_media import attach
+                    for item in attachments:
+                        # Owner revocation between two local byte transfers also
+                        # stops the next transfer and the eventual model prompt.
+                        self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                        if item['descriptor']['kind']=='voice':
+                            def current_voice():
+                                self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                                current=self.store.get(row['id'])
+                                if current['state'] not in ACTIVE or current['cancel_requested'] or time.time()>=current['deadline'] or self.stop.is_set():
+                                    raise Conflict('voice mission is no longer dispatchable')
+                            current_voice()
+                            transcript=self.gateway.media.transcript(self.gateway_policy(),row['id'],item['id'])
+                            if transcript is None:
+                                from .speech_client import transcribe
+                                transcript=await transcribe(item['data'],current_voice)
+                                current_voice()
+                                transcript=self.gateway.media.save_transcript(self.gateway_policy(),row['id'],item['id'],transcript)
+                            current_voice()
+                            refs.append('Approved sender voice request (locally transcribed):\n'+transcript['transcript'])
+                        else:
+                            refs.extend(await attach(self.connection,session['session_id'],[item]))
+                    self.gateway.media.check_mission(self.gateway_policy(),row['id'],[value['id'] for value in attachments])
+                if self.store.get(row['id'])['cancel_requested']:
+                    self.store.settle(row['id'],'cancelled');return
                 self.store.dispatching(row["id"])
                 reply = await self.connection.request("prompt.submit", {
-                    "session_id": session["session_id"], "text": mission_prompt(row["goal"]), "surface": "herald_os"})
+                    "session_id": session["session_id"], "text": mission_prompt(row["goal"])+
+                        ('\n\nSession attachments:\n'+'\n'.join(refs) if refs else ''), "surface": "herald_os"})
                 if not isinstance(reply, dict) or reply.get("status") != "streaming":
                     raise Conflict("Hermes did not acknowledge an exclusive streaming turn")
                 while not self.finished.is_set():
@@ -287,7 +347,10 @@ class Controller:
         except Exception as exc:
             if self.store.get(row["id"])["state"] in ACTIVE:
                 # Do not put the URL (which contains an authentication token) in the ledger.
-                self.store.unavailable(row["id"], type(exc).__name__)
+                from .speech import SpeechRefused
+                reason=('Local voice transcription unavailable: inspect the local model/service and audio format/duration'
+                    if isinstance(exc,SpeechRefused) else type(exc).__name__)
+                self.store.unavailable(row["id"], reason)
         finally:
             if self.connection:
                 await self.connection.close()

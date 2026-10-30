@@ -1,0 +1,161 @@
+{
+  "send": {
+    "actual_native_telegram_send_cases": [
+      {
+        "case": "read-disconnect",
+        "http_send_attempts": 1,
+        "durable_state": "uncertain"
+      },
+      {
+        "case": "server-parser-error",
+        "http_send_attempts": 1,
+        "durable_state": "uncertain"
+      },
+      {
+        "case": "missing-thread",
+        "http_send_attempts": 1,
+        "durable_state": "failed"
+      },
+      {
+        "case": "rate-limit",
+        "http_send_attempts": 1,
+        "durable_state": "pending"
+      },
+      {
+        "case": "forbidden",
+        "http_send_attempts": 1,
+        "durable_state": "failed"
+      },
+      {
+        "case": "malformed-receipt",
+        "http_send_attempts": 1,
+        "durable_state": "uncertain"
+      },
+      {
+        "case": "invalid-id",
+        "http_send_attempts": 1,
+        "durable_state": "uncertain"
+      },
+      {
+        "case": "parse-rejected",
+        "http_send_attempts": 2,
+        "durable_state": "delivered"
+      },
+      {
+        "case": "success",
+        "http_send_attempts": 1,
+        "durable_state": "delivered"
+      },
+      {
+        "case": "connect-refused",
+        "http_send_attempts": 0,
+        "durable_state": "pending"
+      }
+    ],
+    "actual_sdk_and_sqlite_reopen": true,
+    "no_thread_downgrade_or_ambiguous_replay": true,
+    "external_messages_sent": false,
+    "source_sha256": {
+      "probe_telegram_delivery.py": "0fcfb599dfa1b40cdf123664c1195bef681d67c95eeb403f120475d8be7a5227",
+      "gateway_telegram.py": "f0f12e16c028d53a54a3e476c38a1ef6a42393824f5f3099e16d29b8421b2877",
+      "gateway_delivery.py": "26600594611c839a7b6f175b8e2f26e67aad6e2e16b348e7bb4399c864a5b158",
+      "gateway_ingress.py": "1082ee8e75d6bb769334a958445e98dadbfa563627223d73b192df19aa4b5d7b",
+      "gateway_runtime.py": "5b91296d3958c836810ae4a62cee4d78b75f89282a7a8cd40b1542570013f585"
+    }
+  },
+  "send-gateway": {
+    "telegram": {
+      "native_adapter_constructed": true,
+      "native_event_contract": true,
+      "connected": false,
+      "external_delivery_tested": false
+    },
+    "discord": {
+      "native_adapter_constructed": true,
+      "native_event_contract": true,
+      "connected": false,
+      "external_delivery_tested": false
+    }
+  },
+  "send-polling": {
+    "native_disconnect_holds_then_reconnects": false,
+    "native_drop_pending_request_forced_false": true,
+    "actual_ptb_getupdates_offsets": [
+      0,
+      0,
+      13,
+      13
+    ],
+    "real_sqlite_insert_failure_then_sdk_retry": 1,
+    "offset_advanced_only_after_independent_sqlite_reader_saw_commit": true,
+    "unknown_sender_not_admitted": true,
+    "shutdown_cancelled_fixture_polls": 1,
+    "actual_native_adapter_text_codec_and_application_handlers": true,
+    "external_telegram_connected": false,
+    "legacy_native_receipts_preserved_and_not_trusted_for_admission": true,
+    "source_sha256": {
+      "probe_telegram_polling.py": "27a5f6c659edcdebfa51f33be0895becdd5051ab162c6fc94056aa021034d3b2",
+      "gateway_telegram.py": "f0f12e16c028d53a54a3e476c38a1ef6a42393824f5f3099e16d29b8421b2877",
+      "gateway_ingress.py": "1082ee8e75d6bb769334a958445e98dadbfa563627223d73b192df19aa4b5d7b",
+      "gateway_runtime.py": "5b91296d3958c836810ae4a62cee4d78b75f89282a7a8cd40b1542570013f585"
+    }
+  },
+  "send-held": {
+    "native_disconnect_holds_then_reconnects": true,
+    "native_drop_pending_request_forced_false": true,
+    "actual_ptb_getupdates_offsets": [
+      0,
+      0,
+      13,
+      13
+    ],
+    "real_sqlite_insert_failure_then_sdk_retry": 0,
+    "offset_advanced_only_after_independent_sqlite_reader_saw_commit": true,
+    "unknown_sender_not_admitted": true,
+    "shutdown_cancelled_fixture_polls": 1,
+    "actual_native_adapter_text_codec_and_application_handlers": true,
+    "external_telegram_connected": false,
+    "legacy_native_receipts_preserved_and_not_trusted_for_admission": true,
+    "source_sha256": {
+      "probe_telegram_polling.py": "27a5f6c659edcdebfa51f33be0895becdd5051ab162c6fc94056aa021034d3b2",
+      "gateway_telegram.py": "f0f12e16c028d53a54a3e476c38a1ef6a42393824f5f3099e16d29b8421b2877",
+      "gateway_ingress.py": "1082ee8e75d6bb769334a958445e98dadbfa563627223d73b192df19aa4b5d7b",
+      "gateway_runtime.py": "5b91296d3958c836810ae4a62cee4d78b75f89282a7a8cd40b1542570013f585"
+    }
+  },
+  "send-native-ingress": {
+    "actual_native_adapter_dispatch_cases": [
+      "telegram",
+      "discord"
+    ],
+    "synchronous_durable_admission_and_reopen": true,
+    "native_background_and_debounce_baseline_verified": true,
+    "no_background_or_debounce_mission_dispatch": true,
+    "exact_sender_and_native_prefilter_revocation": true,
+    "unknown_native_plugin_discovery_disabled": true,
+    "storage_failure_not_accepted": true,
+    "actual_readonly_sqlite_and_changed_replay_refused": true,
+    "transport_connected_or_external_delivery_tested": false,
+    "native_source_sha256": [
+      {
+        "module": "gateway.platforms.base",
+        "sha256": "502a8371735acfb016968d6df5bac3394b21d292f1b64b5a988df3dafeb7549f"
+      },
+      {
+        "module": "plugins.platforms.telegram.adapter",
+        "sha256": "2e18f91d2abeaa70e23b2b7e6e9d469a372f11f243dc161c158206d0e413bd79"
+      },
+      {
+        "module": "plugins.platforms.discord.adapter",
+        "sha256": "fbf2a368995b2165c159acff66926b87244ef6aa8dde8eabe5a596b46077acd3"
+      }
+    ],
+    "source_sha256": {
+      "probe_gateway_ingress.py": "c5aecaf447c6c6b78779c82802e5d45a53ec28824d1bcd527e09ec3a760d4ef2",
+      "gateway_ingress.py": "1082ee8e75d6bb769334a958445e98dadbfa563627223d73b192df19aa4b5d7b",
+      "gateway_runtime.py": "5b91296d3958c836810ae4a62cee4d78b75f89282a7a8cd40b1542570013f585",
+      "gateway.py": "b5e26ec7fbb982c27202046f9c7c65a173ce797091cf873fc896cbbcf85c6fec",
+      "gateway_relay.py": "abb29abeb5349ccaa2b6b592002241377edbcce5764d141d1a0bc57b0e94557f"
+    }
+  }
+}

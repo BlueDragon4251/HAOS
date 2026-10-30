@@ -1,0 +1,653 @@
+{
+  "parent_commit": "0e2777500f50e02b707cc217ca110daf560c1943",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "python": "3.11.16",
+  "scope": "Public owner LINE text setup; media/voice integration and external/installed acceptance remain open",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-initial-setup.yml",
+      "sha256": "42030eb56916a058eb0d68da00e7ee63289b38c8b09eb8c3d52da566b7067d23"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "2c21f45e0b6062d1e813a24405a6708311f87a30af3f6e1cdbac08e9d275e884"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "e95e2e833f6a2675c8cc23c7157462b948db3b7cadc631688977151387d898f7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "1423d8da42abef341428e78f1688ebc687e6d4979dea8f9762a8cc686eeee2e2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_listener.py",
+      "sha256": "a51f696b4bd7a2cc83b79c0b6c78d87fee9c095488f07aa27f9d4a219459c6b4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_profile.py",
+      "sha256": "f27a22e114cc227fc034ebf0c1e1e8cd99422b2b760bb751a469cc20b537a51a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_tls.py",
+      "sha256": "4805067b7f3bdcff20ba946344438ae553aa2b1d2ed7b941f78739dfbe891152"
+    },
+    {
+      "path": "linux/haos/haos/gateway_publication.py",
+      "sha256": "7a2e3fad4b7c6ba091ff967ce3306f5167cb0ad255e72855ff7ab1070d3d5dc3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "f69f72d42358f0051472497923cbec2cae2092707ef0e8a159a89166fa2f3770"
+    },
+    {
+      "path": "linux/haos/haos/gateway_recovery.py",
+      "sha256": "a0841b9038369bf59155ee60a3d8aefd91b55e36eca7c2118dc9480b2bd82475"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "02507dc1885a794fd0375bb7e1738f52d5bb66308883413724e39417bf6c018f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "d163a13876e6a11b8aec027b5776dd15fd290f13cd765ce8485c828132021440"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup.py",
+      "sha256": "a4707b4a5d1cf31559a66520b2f5aca943a6c646bb1624b0354ba6bba4c379fb"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "9975791be1ede0bb7bf9dec8609d9ebe17f37f4a74598e8ff7cd90d164733bb0"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "e0a43616d68b7b8a8abcdd19320809431b0a6e74a96251f64edbf5b2198d4c69"
+    },
+    {
+      "path": "linux/haos/runtime/line_owner_fixture.py",
+      "sha256": "1456a79ee53b39a621402fd2b8d31bfd3f4b3cbbc880a4dc6c9fcca387016568"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_delivery.py",
+      "sha256": "afa54b15538cab08aa19646d7b48dd57eaf77c286183805f29f9af8d0b4c888a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_ingress.py",
+      "sha256": "fce2f33a263ae999cb73d03b60ad9a057e35e790f4809ab1ada9c5c3e96f1874"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_listener.py",
+      "sha256": "1bc69781b29f0328374bedf16e687b56eae4d86e4729386127703439811e7689"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_owner_gui.py",
+      "sha256": "7c3ffee8a4a0e3beef79b01f358b1a42ef5e7eadf29a4b0bcae030b9b834a653"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_profile.py",
+      "sha256": "221b594bd99efb05e55ed07fe989ced3737b324fb747e507cc6e1a8e8eefc4d6"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_recovery_gui.py",
+      "sha256": "6373a1aaaa57de161c09b15546d8cd6289695ac8b072dd2a7fc0d88b3881e923"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_tls.py",
+      "sha256": "27a8357524307b18c163113e67a86ed8740646a219bfa4469ebaf70cc53f15be"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_line_ingress.py",
+      "sha256": "27726caf709c300a583e0223d771b98d2538347f9002721a9729fa466b4a86f0"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_recovery.py",
+      "sha256": "ce2c3d61385ed3b2cd79474556dd5adf0d9c743aa818a1d8edbda37347e2e5e9"
+    },
+    {
+      "path": "linux/haos/tests/test_hermes_capabilities.py",
+      "sha256": "b3b20e8b9a8f168b30af5208097f879daaa569d2556f4e0367abe2984a84763f"
+    },
+    {
+      "path": "linux/haos/tests/test_line_owner_files.py",
+      "sha256": "2d50f0bb1965509d68196777538dba2c10a9f069b03ed80abe956da76b82349b"
+    },
+    {
+      "path": "linux/image/packages.txt",
+      "sha256": "44e672a2980c4b43cbfe0951cab107a3ec921b31378ebe082118c95a4876fa8e"
+    }
+  ],
+  "local_suites": [
+    {
+      "runtime": "minimal",
+      "summary": "1348 passed, 2 skipped in 7.51s",
+      "log_sha256": "e3a5e8bbd1f825f042458af7171648ae920967b668d9dd5daeda5701c7e77c8d"
+    },
+    {
+      "runtime": "full",
+      "summary": "1348 passed, 2 skipped in 7.35s",
+      "log_sha256": "4565428938ae09dbfabc3e08d59a9aca084887a4431e76c224abf46a87b5fa0d"
+    },
+    {
+      "runtime": "root",
+      "summary": "83 passed in 16.58s",
+      "log_sha256": "de231cd4b6b86dbaa4e9873fc167f0e8497c551fe2a2f6fd8624e11bf464170c"
+    }
+  ],
+  "native": [
+    {
+      "passed": 36,
+      "cases": [
+        "public_line_requires_exact_independent_owner_route",
+        "actual_native_hmac_and_text_codec_after_observable_commit_strip_single_use_reply_capability",
+        "same_signed_event_cannot_repeat_local_admission",
+        "reflected_channel_secret_access_and_single_use_reply_tokens_redacted_before_persistence_and_native_decode",
+        "unknown_user",
+        "unknown_group",
+        "missing_user",
+        "standby",
+        "media",
+        "missing_original_time",
+        "boolean_time",
+        "invalid_event_id",
+        "empty_text",
+        "ambiguous_source",
+        "tampered_body",
+        "invalid_signature",
+        "oversized_body",
+        "wrong_destination",
+        "stale_event",
+        "future_event",
+        "oversized_batch",
+        "duplicate_signed_json_rejected",
+        "raw_native_connect_denied",
+        "raw_native__handle_webhook_denied",
+        "raw_native__dispatch_event_denied",
+        "raw_native__handle_message_event_denied",
+        "raw_native__handle_postback_event_denied",
+        "raw_native__download_media_denied",
+        "raw_native__handle_media_denied",
+        "raw_native_send_denied",
+        "raw_native_send_typing_denied",
+        "raw_native_send_image_file_denied",
+        "raw_native_send_voice_denied",
+        "raw_native_send_video_denied",
+        "actual_sqlite_reopen_retries_failed_local_admission_without_external_side_effect",
+        "owner_withdrawal_blocks_retained_native_event"
+      ],
+      "actual_pinned_hmac_and_native_codec_and_sqlite": true,
+      "public_gateway_enabled": true,
+      "listener_or_external_message_or_account_acceptance": false
+    },
+    {
+      "passed": 13,
+      "cases": [
+        "actual_signed_http_200_only_after_observable_private_sqlite_commit_without_reply_capability",
+        "remote_redelivery_returns_success_without_duplicate_durable_input",
+        "missing_signature",
+        "tampered_body",
+        "duplicate_signature",
+        "oversized_request",
+        "no_native_auxiliary_route_/line/media/token/file",
+        "no_native_auxiliary_route_/line/webhook/health",
+        "no_native_auxiliary_route_/plugins/line",
+        "signed_malformed_json_is_rejected_without_admission",
+        "actual_sqlite_commit_failure_returns_503_without_private_error_or_false_ack",
+        "same_remote_event_can_be_redelivered_after_actual_storage_recovery",
+        "current_owner_withdrawal_prevents_new_http_admission_without_restart"
+      ],
+      "actual_loopback_http_and_native_hmac_and_sqlite": true,
+      "public_gateway_enabled": true,
+      "tls_ingress_proxy_or_external_webhook_or_account_acceptance": false
+    },
+    {
+      "passed": 25,
+      "cases": [
+        "actual_native_markdown_codec_and_push_after_observable_write_intent_uses_remote_receipt_not_native_none",
+        "confirmed_same_attempt_returns_journaled_receipt_without_another_native_push",
+        "same_attempt_changed_content_refused_before_socket",
+        "actual_native_client_push_without_context_cannot_open_socket",
+        "native_http_401_classified_without_redirect_or_repeat",
+        "native_http_403_classified_without_redirect_or_repeat",
+        "native_http_429_classified_without_redirect_or_repeat",
+        "native_http_500_classified_without_redirect_or_repeat",
+        "native_http_abort_classified_without_redirect_or_repeat",
+        "native_http_redirect_classified_without_redirect_or_repeat",
+        "native_http_huge_classified_without_redirect_or_repeat",
+        "native_http_missing-request-id_classified_without_redirect_or_repeat",
+        "native_http_missing-message-id_classified_without_redirect_or_repeat",
+        "native_http_wrong-count_classified_without_redirect_or_repeat",
+        "native_http_duplicate-id_classified_without_redirect_or_repeat",
+        "native_ellipsis_truncation_and_oversized_utf16_bubble_refused_before_side_effect",
+        "actual_sqlite_intent_failure_prevents_every_native_side_effect",
+        "confirmed_receipt_survives_actual_sqlite_reopen_without_repeat",
+        "actual_sqlite_confirmation_failure_and_reopen_preserve_uncertainty_without_resend",
+        "native_reply_token_cannot_trigger_reply_then_push_fallback",
+        "actual_cancel_after_http_write_preserves_intent_and_never_reposts_same_attempt",
+        "actual_native_https_refuses_unknown_certificate_without_http_request",
+        "actual_native_https_refuses_wrong_hostname_without_http_request",
+        "actual_native_https_push_accepts_explicit_fixture_ca_with_hostname_verification",
+        "current_owner_withdrawal_prevents_native_push"
+      ],
+      "actual_pinned_native_codec_push_and_loopback_http_sqlite": true,
+      "fixture_only_loopback_target": true,
+      "fixture_only_disposable_ca": true,
+      "tls_verification_disabled": false,
+      "public_gateway_enabled": true,
+      "external_account_or_recipient_receipt_or_installed_acceptance": false
+    },
+    {
+      "passed": 24,
+      "cases": [
+        "no_owner_pairing_cannot_create_profile_or_start_identity_network",
+        "private_profile_rejects_symlinked_parent_before_native_or_network_use",
+        "actual_registered_adapter_uses_private_home_and_exclusive_kernel_lease_without_network_at_build",
+        "profile_publisher_cannot_send_before_verified_bot_identity_and_listener_connection",
+        "native_bot_info_verifies_exact_destination_before_fixed_loopback_listener_start",
+        "actual_profile_listener_commit_and_native_replay_worker_deliver_exact_owner_event",
+        "actual_common_factory_root_engine_outbox_native_push_remote_receipt_and_durable_ack",
+        "offline_private_profile_keeps_pending_outbox_at_zero_attempts_until_verified_reconnection",
+        "actual_profile_repeated_signed_webhook_cannot_duplicate_local_admission",
+        "private_profile_close_reopen_reacquires_kernel_lease_and_replays_retained_local_failure",
+        "owner_epoch_change_is_denied_at_http_admission_before_worker_observes_revocation",
+        "current_owner_withdrawal_stops_idle_listener_and_worker_without_inheriting_authority",
+        "creation_only_profile_has_no_publisher_or_inherited_outbound_authority",
+        "native_identity_401_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_401_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_403_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_403_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_wrong-bot_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_wrong-bot_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_429_blocks_listener_and_survives_owner_epoch_profile_reopen",
+        "explicit_offline_owner_recheck_429_preserves_rate_limit_and_requires_fresh_native_verification",
+        "native_identity_redirect_never_authenticates_or_opens_listener",
+        "actual_occupied_listener_port_reports_failure_and_reconnects_after_release",
+        "closed_profile_rejects_new_network_and_releases_lease"
+      ],
+      "actual_registered_native_adapter_http_sqlite_and_kernel_lease": true,
+      "fixture_only_loopback_identity_target": true,
+      "public_gateway_enabled": true,
+      "fixture_profile_listener": "127.0.0.1 only; external verified TLS ingress not configured here",
+      "external_or_installed_acceptance": false
+    },
+    {
+      "passed": 18,
+      "cases": [
+        "actual_x509_chain_hostname_key_time_and_system_trust_validation_accepts_explicit_fixture_ca",
+        "tls_wrong_hostname_refused_before_listener",
+        "tls_expired_refused_before_listener",
+        "tls_plaintext_public_url_refused_before_listener",
+        "tls_public_ip_url_refused_before_listener",
+        "tls_wrong_path_refused_before_listener",
+        "tls_embedded_url_credential_refused_before_listener",
+        "tls_unapproved_public_bind_refused_before_listener",
+        "tls_false_public_consent_refused_before_listener",
+        "tls_invalid_private_key_refused_before_listener",
+        "tls_oversized_chain_refused_before_listener",
+        "actual_mismatched_private_key_refused",
+        "untrusted_certificate_chain_refused",
+        "actual_private_tls_material_is_atomic_single_link_mode_600_and_reused_without_overwrite",
+        "conflicting_existing_tls_material_is_preserved_and_requires_owner_recovery",
+        "actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds",
+        "actual_profile_https_refuses_wrong_client_hostname_before_signed_admission",
+        "actual_registered_native_profile_verified_https_hmac_private_relay_and_native_decode"
+      ],
+      "actual_x509_verified_https_and_native_profile": true,
+      "fixture_only_system_ca_loopback_and_identity_target": true,
+      "tls_verification_disabled": false,
+      "public_gateway_enabled": true,
+      "actual_root_owner_lifecycle": false,
+      "service_quiescence_and_audit_location_are_fixtures": true,
+      "external_dns_router_line_acceptance_or_installed_acceptance": false
+    }
+  ],
+  "actual_root_tls_owner_authority": {
+    "passed": 42,
+    "cases": [
+      "actual_x509_chain_hostname_key_time_and_system_trust_validation_accepts_explicit_fixture_ca",
+      "tls_wrong_hostname_refused_before_listener",
+      "tls_expired_refused_before_listener",
+      "tls_plaintext_public_url_refused_before_listener",
+      "tls_public_ip_url_refused_before_listener",
+      "tls_wrong_path_refused_before_listener",
+      "tls_embedded_url_credential_refused_before_listener",
+      "tls_unapproved_public_bind_refused_before_listener",
+      "tls_false_public_consent_refused_before_listener",
+      "tls_invalid_private_key_refused_before_listener",
+      "tls_oversized_chain_refused_before_listener",
+      "actual_mismatched_private_key_refused",
+      "actual_root_private_single_link_pem_descriptor_reads",
+      "actual_pem_certificate_world-readable_refused",
+      "actual_pem_certificate_symlink_refused",
+      "actual_pem_certificate_hardlink_refused",
+      "actual_pem_certificate_non-pem_refused",
+      "actual_pem_certificate_oversized_refused",
+      "actual_pem_private_key_world-readable_refused",
+      "actual_pem_private_key_symlink_refused",
+      "actual_pem_private_key_hardlink_refused",
+      "actual_pem_private_key_non-pem_refused",
+      "actual_pem_private_key_oversized_refused",
+      "actual_cli_private_prompts_verified_public_consent_and_atomic_root_publication",
+      "actual_runtime_redactor_excludes_private_pem_and_channel_credentials",
+      "actual_owner_public_listener_refuses_missing_consent_without_configuration_mutation",
+      "actual_cli_invalid_port_rejected_without_input_echo_or_credential_mutation",
+      "actual_cli_pair_derives_saved_bot_scope_and_publishes_exact_sender_grant",
+      "actual_graphical_backend_derives_bot_scope_and_publishes_fresh_timed_grant",
+      "actual_pairing_refuses_self_bot_wrong_destination_and_threads_without_mutation",
+      "actual_credential_and_listener_rotation_withdraws_old_grants_without_data_deletion",
+      "actual_repairing_renews_epoch_and_publication_rejects_cross_bot_credential_mix",
+      "actual_expired_pem_remains_inspectable_but_strict_activation_refuses_it",
+      "actual_owner_can_replace_expired_certificate_without_resetting_retained_data",
+      "actual_foreign_uid_cannot_read_pem_credentials_or_invoke_owner_mutations",
+      "actual_remove_preserves_owner_canary_and_audits_no_secrets",
+      "untrusted_certificate_chain_refused",
+      "actual_private_tls_material_is_atomic_single_link_mode_600_and_reused_without_overwrite",
+      "conflicting_existing_tls_material_is_preserved_and_requires_owner_recovery",
+      "actual_expired_tls_profile_stays_inspectable_without_network_or_aborting_other_connector_builds",
+      "actual_profile_https_refuses_wrong_client_hostname_before_signed_admission",
+      "actual_registered_native_profile_verified_https_hmac_private_relay_and_native_decode"
+    ],
+    "actual_x509_verified_https_and_native_profile": true,
+    "fixture_only_system_ca_loopback_and_identity_target": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": true,
+    "actual_root_owner_lifecycle": true,
+    "service_quiescence_and_audit_location_are_fixtures": true,
+    "external_dns_router_line_acceptance_or_installed_acceptance": false
+  },
+  "gui": [
+    {
+      "probe": "line_owner",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 13,
+        "cases": [
+          "actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token",
+          "actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits",
+          "actual_file_buttons_load_separate_private_pem_without_showing_bytes",
+          "actual_setup_handoff_captures_all_inputs_then_clears_tokens_and_pem",
+          "actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights",
+          "actual_auth_recheck_uses_real_owner_backend_without_sending",
+          "actual_endpoint_edit_discards_private_tokens_and_certificate_material",
+          "actual_background_pem_import_is_discarded_after_context_revision",
+          "actual_public_bind_requires_separate_captured_consent_and_clears_it_after_submit",
+          "actual_invalid_port_never_reaches_backend_or_echoes_raw_input",
+          "actual_connector_edit_withdraws_stale_private_inputs",
+          "actual_platform_change_clears_and_hides_line_credentials",
+          "actual_owner_controls_fit_available_screen_width"
+        ],
+        "actual_tk": true,
+        "backend_handoffs_are_fixtures": true,
+        "external_or_installed_acceptance": false
+      }
+    },
+    {
+      "probe": "line_recovery",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 8,
+        "cases": [
+          "line_owner_setup_is_available_without_claiming_live_readiness",
+          "actual_sqlite_profile_listening_does_not_claim_public_tls_or_external_webhook_readiness",
+          "actual_owner_sees_distinct_authentication_and_bot_identity_refusals",
+          "actual_owner_sees_retained_tls_refusal_and_safe_certificate_replacement_guidance",
+          "actual_owner_sees_retained_throttle_deadline",
+          "actual_owner_sees_revocation_and_data_preservation",
+          "actual_private_outgoing_states_and_server_acceptance_proof_never_claim_recipient_receipt_or_expose_private_internal_hashes",
+          "actual_sqlite_invalid_retained_proof_is_refused_before_ui_rendering"
+        ],
+        "actual_tk_and_private_sqlite_metadata": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_checked_separately": true,
+        "public_line_enabled": true,
+        "external_or_installed_owner_acceptance": false
+      }
+    },
+    {
+      "probe": "irc_owner",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 12,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "masked_private_channel_key_reaches_real_backend_handoff_and_clears_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "changing_channel_cannot_inherit_a_key_approved_for_the_previous_channel",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+          "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "probe": "homeassistant_owner",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "probe": "ntfy_owner",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "probe": "matrix_owner",
+      "resolution": "1280x800",
+      "result": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "probe": "line_owner",
+      "resolution": "640x480",
+      "result": {
+        "passed": 13,
+        "cases": [
+          "actual_dropdown_restores_public_line_context_and_exact_bot_scope_without_generic_token",
+          "actual_help_explains_dns_tls_router_cgnat_shared_replies_and_media_recipient_limits",
+          "actual_file_buttons_load_separate_private_pem_without_showing_bytes",
+          "actual_setup_handoff_captures_all_inputs_then_clears_tokens_and_pem",
+          "actual_pair_handoff_binds_exact_sender_chat_destination_and_selected_mission_rights",
+          "actual_auth_recheck_uses_real_owner_backend_without_sending",
+          "actual_endpoint_edit_discards_private_tokens_and_certificate_material",
+          "actual_background_pem_import_is_discarded_after_context_revision",
+          "actual_public_bind_requires_separate_captured_consent_and_clears_it_after_submit",
+          "actual_invalid_port_never_reaches_backend_or_echoes_raw_input",
+          "actual_connector_edit_withdraws_stale_private_inputs",
+          "actual_platform_change_clears_and_hides_line_credentials",
+          "actual_owner_controls_fit_available_screen_width"
+        ],
+        "actual_tk": true,
+        "backend_handoffs_are_fixtures": true,
+        "external_or_installed_acceptance": false
+      }
+    },
+    {
+      "probe": "line_recovery",
+      "resolution": "640x480",
+      "result": {
+        "passed": 8,
+        "cases": [
+          "line_owner_setup_is_available_without_claiming_live_readiness",
+          "actual_sqlite_profile_listening_does_not_claim_public_tls_or_external_webhook_readiness",
+          "actual_owner_sees_distinct_authentication_and_bot_identity_refusals",
+          "actual_owner_sees_retained_tls_refusal_and_safe_certificate_replacement_guidance",
+          "actual_owner_sees_retained_throttle_deadline",
+          "actual_owner_sees_revocation_and_data_preservation",
+          "actual_private_outgoing_states_and_server_acceptance_proof_never_claim_recipient_receipt_or_expose_private_internal_hashes",
+          "actual_sqlite_invalid_retained_proof_is_refused_before_ui_rendering"
+        ],
+        "actual_tk_and_private_sqlite_metadata": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_checked_separately": true,
+        "public_line_enabled": true,
+        "external_or_installed_owner_acceptance": false
+      }
+    },
+    {
+      "probe": "irc_owner",
+      "resolution": "640x480",
+      "result": {
+        "passed": 12,
+        "cases": [
+          "actual_owner_dropdown_restores_saved_irc_endpoint_channel_and_bound_scope_without_unused_bot_token",
+          "actual_owner_help_explains_authenticated_accounts_shared_channel_server_requirements_and_echo_limits",
+          "masked_sasl_and_server_passwords_reach_real_backend_handoff_and_are_cleared_after_submit",
+          "masked_private_channel_key_reaches_real_backend_handoff_and_clears_after_submit",
+          "anonymous_connection_requires_explicit_unchecked_choice_and_does_not_inherit_sasl_credentials",
+          "actual_exact_account_channel_network_and_rights_reach_owner_pairing_backend",
+          "changing_channel_cannot_inherit_a_key_approved_for_the_previous_channel",
+          "actual_authentication_recheck_control_calls_offline_backend",
+          "endpoint_change_clears_both_private_credentials_and_updates_visible_exact_scope",
+          "connector_change_cannot_inherit_anonymous_connection_approval",
+          "platform_switch_clears_private_irc_material_and_restores_other_platform_controls",
+          "actual_owner_inspection_shows_irc_outage_gap_and_server_echo_without_recipient_delivery_claim"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "probe": "homeassistant_owner",
+      "resolution": "640x480",
+      "result": {
+        "passed": 11,
+        "cases": [
+          "real_tk_selects_homeassistant_restores_public_server_and_disables_invented_scope_thread",
+          "real_owner_page_and_saved_binding_details_explain_shared_audience_and_unrecoverable_remote_gap",
+          "native_event_gateway_does_not_offer_nonfunctional_chat_command_rights",
+          "masked_token_and_https_server_reach_actual_configuration_handoff_then_secret_entry_is_cleared",
+          "owner_auth_recheck_control_calls_offline_backend_without_pairing_or_send",
+          "read_permission_cannot_pair_without_explicit_all_instance_users_notification_consent",
+          "explicit_human_actor_entity_and_shared_notification_consent_reach_pairing_backend",
+          "explicit_system_entity_trust_has_distinct_sender_and_no_claim_of_authenticated_human_identity",
+          "server_edit_requires_fresh_system_and_shared_audience_consent_and_clears_system_sender",
+          "connector_edit_cannot_inherit_previous_instance_or_system_authority",
+          "platform_switch_clears_private_token_and_restores_other_platform_permissions"
+        ],
+        "actual_tk_controls": true,
+        "python": "3.13.5",
+        "backend_handoff_fixture_only": true,
+        "root_authority_and_actual_sdk_acceptance_separate": true,
+        "live_network_or_installed_owner_session": false
+      }
+    },
+    {
+      "probe": "ntfy_owner",
+      "resolution": "640x480",
+      "result": {
+        "passed": 11,
+        "cases": [
+          "real_tk_public_metadata_prefills_exact_topic_and_disables_invented_sender_scope_thread",
+          "real_owner_page_explains_topic_acl_and_absent_individual_sender_identity",
+          "existing_saved_binding_details_explicitly_show_shared_topic_publisher_authority",
+          "actual_masked_token_server_and_topic_reach_backend_and_secret_entry_is_cleared",
+          "real_owner_auth_retry_control_calls_offline_backend_without_pairing_or_send",
+          "unchecked_all_publishers_trust_cannot_call_pairing_backend",
+          "explicit_topic_publisher_trust_and_selected_rights_reach_exact_pairing_backend",
+          "topic_server_or_connector_edit_requires_fresh_explicit_publisher_confirmation",
+          "platform_change_clears_secret_and_topic_authority_without_cross_platform_sender_reuse",
+          "actual_owner_status_renders_redacted_ntfy_auth_error_and_persistent_retry_deadline",
+          "real_scrollable_normal_or_compact_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    },
+    {
+      "probe": "matrix_owner",
+      "resolution": "640x480",
+      "result": {
+        "passed": 7,
+        "cases": [
+          "real_tk_complete_private_identity_handoff_and_secret_clearing",
+          "actual_device_discovery_control_hands_off_and_prefills_public_keys_without_granting",
+          "local_device_draft_does_not_grant_backend_authority",
+          "real_tk_exact_route_devices_rights_and_safe_defaults_reach_pair_backend",
+          "platform_changes_clear_private_identity_and_unsubmitted_device_grants",
+          "actual_owner_status_renders_safe_auth_and_history_errors_without_secrets",
+          "actual_scrollable_compact_or_normal_owner_layout"
+        ],
+        "external_connections": false,
+        "privileged_backend_accepted": false,
+        "installed_setup_accepted": false
+      }
+    }
+  ],
+  "embedded_existing_workflow_gui_programs": [
+    "1280x800 passed",
+    "640x480 passed"
+  ],
+  "public_text_setup_platform_count": 9,
+  "complete_line_platform_acceptance": false,
+  "service_quiescence_and_audit_directory_are_explicit_fixtures": true,
+  "extra_test_skips_or_replaced_kernel_tests": false,
+  "external_messages_accounts_dns_firewall_router_or_installed_acceptance": false,
+  "release_artifacts_built_or_released": false,
+  "ci": "Must be checked separately at the eventual exact implementation SHA; local receipts are not GitHub CI evidence"
+}

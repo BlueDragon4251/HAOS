@@ -1,0 +1,233 @@
+{
+  "parent_commit": "544e166cf2d56e997eb2b7db2f8afde935444a7c",
+  "recorded_at": "2026-10-29T22:51:18.639128+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "54fba7f4a61bb3bce1494d984d75ca8767713f2ad8bcef19cdaa289ffa08fa3e"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "719a8fdd21abeb093b1af292e6e892183edf96e4e5a922f96fa86023152bc377"
+    },
+    {
+      "path": "docs/GATEWAYS.md",
+      "sha256": "5c56900b42aa09ba6b0dfb674be175d050a997f4c521e1865919969ce46f54f7"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "24440a1cfba038490f0a23a4ab2e52e25cd5e8388924112710f0818365dc7d6b"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "a7148c4610fd2cb25f79c4bf7bcd793b188b2b8f9ff49a8922fca1f926c7d580"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "2cf6a7101cf58a8182e27eb2a909f289d32680cd083901c9a00d6260793b79f4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk.py",
+      "sha256": "4f86392b9569099fc071ebf0bc6c5d3e9ba3e31755abb4ff1042fd8033102330"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_admission.py",
+      "sha256": "3a3407de186c65c747372b1274851f31893ab4380b022ce219e5de48efb59fe3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_http.py",
+      "sha256": "2ce6f8206a3cac4df3a9c82389268e2eb4388b899470cff962a95c74bf9a76fc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_process.py",
+      "sha256": "b77c085ce99f0f37f9dca673d580ad9ec64327f12b205691f603bde17ad3dad2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_worker.py",
+      "sha256": "961877bbca068f3c9befcc11132be04dc6dd8b262b96f44e2e877e263c576af3"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_process.py",
+      "sha256": "19ce898b925abbee7c263c58336482d83363c32a09765c602b21bb8fcbfbc741"
+    },
+    {
+      "path": "linux/haos/runtime/prepare.py",
+      "sha256": "1425673f576e98be6a84f4594019e31669cf75d52a95007a7057144d13e13fb3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_admission.py",
+      "sha256": "ef38e43fbc95cf14124c5bc7841eda3989120016af0c5d8420055435fc4295f7"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_compatibility.py",
+      "sha256": "90e66dd05f7ce41826fe265e7a71218457db60f4ba02b511111ba842c38f6932"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_http.py",
+      "sha256": "73714c88f866cbfdfb13e620ccc5255c81353ece300aa48d67838950d5be0245"
+    },
+    {
+      "path": "linux/haos/runtime/requirements.txt",
+      "sha256": "dc6013cd6f37d1dbb718771eb5444d1eff9700a66204402863a2b06f43dd6bbb"
+    },
+    {
+      "path": "linux/haos/runtime/source.json",
+      "sha256": "fe8728419007cfbb276893479ca03effe8b9965e57325c33a44bbeb20c404293"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk.py",
+      "sha256": "785413c4e87fd43cffe41ff9a024bce5f586578b760cd26d12a3dc04d1054310"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_admission.py",
+      "sha256": "8e085130365d5113110e3619c24901f4497f87039908d69dddfdd18e9039f8ef"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_http.py",
+      "sha256": "e36e39ca8330d751c5c861e113cb8dcbfe7a96a5fa32b9f0378a3457845700e9"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_process.py",
+      "sha256": "86c059113a90e4374dfa92f8d82957bef474ffc020292fa39f02527e4efc62c4"
+    },
+    {
+      "path": "linux/haos/tests/test_runtime.py",
+      "sha256": "13dab4176ed1d24417426ed7c9d0701da160314c62668fe148480dfa84ff2858"
+    }
+  ],
+  "validation": {
+    "minimal_suite": {
+      "passed": 2169,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; covered in disposable root suite"
+    },
+    "full_10_extra_suite": {
+      "passed": 2169,
+      "existing_skips": 2
+    },
+    "actual_root_UID_backup_boundaries": {
+      "passed": 150,
+      "scope": "existing shared boundaries; no new DingTalk root-policy admission claim"
+    },
+    "native_admission": {
+      "passed": 12,
+      "cases": [
+        "actual_DingTalk_ChatbotMessage_and_pinned_native_text_codec_preserve_canonical_sender_without_staff_display_admin_alias_authority",
+        "actual_native_picture_projection_requires_matching_independent_media_permission",
+        "actual_native_file_projection_requires_matching_independent_media_permission",
+        "actual_native_image_projection_requires_matching_independent_media_permission",
+        "actual_native_video_file_projection_requires_matching_independent_media_permission",
+        "actual_native_vendor_voice_transcript_stays_voice_and_requires_voice_consent_without_claiming_local_ASR",
+        "actual_native_rich_text_and_resource_projection_keep_the_same_source_without_remote_resource_resolution",
+        "native_resolver_picture_alias_is_canonicalized_for_actual_SDK_codec_without_mutating_original_bytes",
+        "conflicting_native_download_aliases_fail_before_any_resource_resolution",
+        "raw_native_rich_video_requires_video_consent_even_when_pinned_codec_labels_it_document",
+        "actual_native_text_projection_refuses_app_secret_full_session_URL_and_decoded_reply_capability_reflection",
+        "SDK_staff_alias_does_not_substitute_for_exact_independently_approved_sender_ID"
+      ],
+      "actual_pinned_DingTalk_SDK_and_native_codecs": true,
+      "transport_authentication_owner_publication_and_socket_denial_are_fixtures": true,
+      "native_vendor_voice_transcript_is_fixture_no_local_ASR": true,
+      "public_dingtalk_enabled": false,
+      "network_resources_missions_external_messages_or_installed_acceptance": false
+    },
+    "native_HTTP_TLS": {
+      "passed": 23,
+      "cases": [
+        "actual_native_SDK_token_builder_and_verified_TLS_preserve_vendor_metadata_and_reuse_only_observed_private_cache",
+        "actual_SDK_connection_builder_has_only_native_chatbot_subscription_and_no_extra_IP_probe_or_forwarded_cookie",
+        "another_private_boundary_cannot_reuse_an_unobserved_SDK_access_token",
+        "changed_private_SDK_cache_metadata_is_refused_before_network",
+        "actual_SDK_native_expiry_buffer_refreshes_short_lived_tokens_without_mocking_time",
+        "actual_SDK_401_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_429_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_500_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_redirect_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_encoding_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_duplicate_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_nonfinite_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_large_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_bad-ttl_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_bad-token_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_truncated_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_drop_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_native_discovery_bad-endpoint_cannot_become_an_unreviewed_socket_capability",
+        "actual_native_discovery_bad-ticket_cannot_become_an_unreviewed_socket_capability",
+        "actual_TLS_untrusted_issuer_refused_before_auth_request_without_verify_false",
+        "actual_SDK_wildcard_event_subscription_is_denied_before_HTTP",
+        "changed_private_client_identity_cannot_request_another_app_token",
+        "owner_withdrawal_during_actual_HTTP_read_cannot_return_a_cached_or_fresh_capability"
+      ],
+      "actual_native_SDK_requests_and_verified_loopback_TLS": true,
+      "API_origin_and_fixture_CA_substitution_only_in_this_probe": true,
+      "owner_publication_and_UID_are_fixtures": true,
+      "public_dingtalk_enabled": false,
+      "external_accounts_messages_or_installed_acceptance": false
+    },
+    "native_compatibility": {
+      "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+      "versions": {
+        "alibabacloud-tea-openapi": "0.4.6",
+        "cryptography": "50.0.0"
+      },
+      "cases": [
+        "actual_tea_rsa_sign_cryptography50_pkcs8",
+        "actual_tea_rsa_sign_cryptography50_bare_pkcs8",
+        "actual_tea_rsa_sign_cryptography50_sdk_mislabeled_pkcs8",
+        "actual_tea_signature_dispatch_RSA_SHA256",
+        "actual_tea_signature_dispatch_HMAC_SHA256",
+        "actual_tea_reviewed_retry_header_None",
+        "actual_tea_reviewed_retry_header_",
+        "actual_tea_reviewed_retry_header_invalid",
+        "actual_tea_reviewed_retry_header_0",
+        "actual_tea_reviewed_retry_header_-1",
+        "actual_tea_reviewed_retry_header_1",
+        "actual_tea_reviewed_retry_header_300"
+      ],
+      "scope": "Local SDK compatibility only; no live app, delivery or authorization acceptance."
+    },
+    "actual_UID_private_process": {
+      "passed": 9,
+      "cases": [
+        "actual_0_UID_denied_before_credentials_or_private_SDK_request",
+        "actual_65533_UID_denied_before_credentials_or_private_SDK_request",
+        "actual_gateway_UID_native_Hermes_and_SDK_verified_TLS_ok_no_send_result_without_secret_or_false_corporation_robot_claim",
+        "actual_gateway_UID_native_Hermes_and_SDK_verified_TLS_401_no_send_result_without_secret_or_false_corporation_robot_claim",
+        "actual_gateway_UID_native_Hermes_and_SDK_verified_TLS_429_no_send_result_without_secret_or_false_corporation_robot_claim",
+        "actual_cancel_kills_and_joins_private_credential_bearing_worker_while_agent_cannot_read_input_or_owner_data",
+        "actual_revoke_kills_and_joins_private_credential_bearing_worker_while_agent_cannot_read_input_or_owner_data",
+        "actual_parent_SIGKILL_triggers_kernel_worker_parent_death_SIGKILL_and_reaping",
+        "actual_native_SDK_dribbling_HTTP_cannot_outlive_real_30_second_worker_alarm"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_Hermes_SDK_TLS_parent_lifetime_and_kernel_permissions": true,
+      "API_domain_loopback_only_in_fixture_hosts": true,
+      "owner_publication_and_service_manager_are_fixtures": true,
+      "public_dingtalk_enabled": false,
+      "real_external_account_messages_or_installed_acceptance": false
+    },
+    "pip_check": "138 packages; all compatible; actual exit 0",
+    "prepare_pristine_original_input_check": "actual exit 0; exact marker and all three original input hashes",
+    "shell_and_workflow_parse": "passed"
+  },
+  "limits": [
+    "DingTalk remains private and is not one of the 12 public gateways.",
+    "No live authentication, delivery, inference, installed-system, hardware or release acceptance.",
+    "Only app authentication is represented by the account result; corporation and robot identity are not verified.",
+    "Full pre-ACK custody, supervised WSS, delivery, media, recovery and owner GUI remain pending."
+  ],
+  "dependency_review": {
+    "targeted_overlay": "alibabacloud-tea-openapi 0.4.5 to 0.4.6, vendor declared Crypto <51 on Python >=3.9",
+    "unchanged_core": [
+      "cryptography 50.0.0",
+      "msal 1.39.0"
+    ],
+    "code_diff_review": "version and retry-header-based throttling classification; RSA/HMAC implementation unchanged",
+    "hash_pinned_wheel_sha256": "c9e1727b9fb2936f487d050fc3590c99f9f2065256dc3a927e5b61f414674ed6"
+  }
+}

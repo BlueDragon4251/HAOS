@@ -1,0 +1,46 @@
+{
+  "base_commit": "6e5dc2ff92e97d8e271f9a705d4afaa201b41c63",
+  "source_sha256": {
+    "linux/haos/runtime/probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "linux/haos/runtime/probe_native_account_flows.py": "d13cc131aeda4d948d55ba0b90db7a5d102204b74ad084982a943eba8cac06ec",
+    "linux/haos/runtime/probe_account_providers.py": "8e40a70274a3bbd85c6f1898e0eb6ae636c503f3887a9a0cad5ac9e3a00e22ac",
+    "linux/haos/runtime/probe_codex_account.py": "f18c3f1ab7697acb3bda85f37362460312def571431a20af583ec11462486827",
+    "linux/haos/runtime/probe_anthropic_account.py": "db15782e71ec5accad1ca8171a6cd81b21a53821234af2a12ea02e0443fbe20e",
+    "linux/haos/runtime/probe_openrouter_login.py": "c9ebf831a6878aad09a6de0cabd29a4404b0dbc636e95545760f3d70b92e41ef",
+    "linux/haos/runtime/probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "http_profiles": 39,
+  "actual_local_service_profiles": [
+    "lmstudio",
+    "local"
+  ],
+  "http_matrix_cases": 410,
+  "additional_real_account_broker_sdk_http_cases": {
+    "nous_xai_minimax_global_cn": 40,
+    "qwen_copilot": 10,
+    "codex": 8,
+    "anthropic": 5,
+    "openrouter": 5
+  },
+  "account_credentials": "actual pinned private storage and refresh/exchange; synthetic fixtures only",
+  "asserted_cases": [
+    "JSON with local tools where protocol permits",
+    "early SSE before withheld completion",
+    "incomplete stream rejected without retry",
+    "HTTP 401 redacted",
+    "HTTP 429 redacted",
+    "durable ledger status and usage"
+  ],
+  "codex": "native streamed-only admission retained; no JSON acceptance claimed",
+  "local_service_credentials": "none; no vendor or local capability in upstream headers",
+  "minimal_suite": {
+    "passed": 840,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 840,
+    "existing_skips": 2
+  },
+  "live_accounts_inference_or_installed_tested": false,
+  "ci_for_this_change": "pending push"
+}

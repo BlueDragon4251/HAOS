@@ -12,6 +12,17 @@ def test_root_required(monkeypatch):
         lambda: initial_setup.configure_update("dev", True),
         lambda: initial_setup.configure_ghcr("owner", "private"),
         lambda: initial_setup.configure_provider("openai", "gpt-model", "secret"),
+        lambda: initial_setup.import_cloud_credential("vertex", "/no-such-file"),
+        lambda: initial_setup.gateway_configuration(),
+        lambda: initial_setup.manage_gateway("start"),
+        lambda: initial_setup.manage_gateway("revoke", "fixture"),
+        lambda: initial_setup.gateway_process_status(),
+        lambda: initial_setup.gateway_ingress(),
+        lambda: initial_setup.retry_ntfy_gateway_auth("topic"),
+        lambda: initial_setup.reconcile_gateway_ingress({}, 'retry', 'fixture'),
+        lambda: initial_setup.gateway_deliveries(),
+        lambda: initial_setup.reconcile_gateway_delivery({},'retry','fixture'),
+        lambda: initial_setup.resume_runtime(),
     ):
         with pytest.raises(PermissionError):
             call()
@@ -22,6 +33,103 @@ def test_no_existing_owner_may_be_reenrolled(monkeypatch):
     monkeypatch.setattr(initial_setup, "owners", lambda: [{"username": "present", "uid": 1002}])
     with pytest.raises(PermissionError):
         initial_setup.create_initial_owner("other", "secret", "secret")
+
+
+def test_graphical_native_ingress_recovery_preserves_selected_receipt_and_quiesces_first(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(('stop',kwargs)))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(('owner',vars(args))))
+    with pytest.raises(ValueError):initial_setup.gateway_ingress(-1)
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_ingress({},'retry','fixture')
+    assert calls==[]
+    initial_setup.gateway_ingress(10)
+    row={'ingress_id':'a'*64,'attempt':8,'state':'failed'}
+    initial_setup.reconcile_gateway_ingress(row,'retry','inspected fixture')
+    assert calls==[('stop',{'gateway_only':True}),('owner',{'gateway_action':'ingress','after':10}),
+        ('stop',{'gateway_only':True}),('owner',{'gateway_action':'reconcile-ingress','ingress_id':'a'*64,
+        'attempt':8,'state':'failed','decision':'retry','note':'inspected fixture'})]
+
+
+def test_graphical_slack_setup_keeps_two_credentials_private_and_rejects_bad_input_before_stopping(monkeypatch):
+    from haos import gateway_setup,owner
+    from copy import deepcopy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[];saved=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'load',lambda:({'version':1,'connectors':[],'bindings':[]},{'connectors':{}}))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((deepcopy(p),deepcopy(c))))
+    monkeypatch.setattr(owner,'audit',lambda *args:calls.append(args))
+    bot='xoxb-'+'x'*24;app='xapp-'+'y'*24
+    for token,app_token in [(bot,''),(bot,bot),(bot+','+bot,app),(bot,app+'\n')]:
+        with pytest.raises(ValueError):initial_setup.configure_gateway('slack-main','slack',token,app_token)
+    assert calls==[] and saved==[]
+    initial_setup.configure_gateway('slack-main','slack',bot,app)
+    assert saved[0][1]=={'connectors':{'slack-main':{'token':bot,'app_token':app}}}
+    assert calls[0]=={'gateway_only':True}
+    assert bot not in repr(calls) and app not in repr(calls)
+
+
+def test_graphical_delivery_retry_requires_owner_evidence_before_quiescing(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(('stop',kwargs)))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(('owner',vars(args))))
+    row={'delivery_id':'a'*64,'attempt':1,'state':'uncertain'}
+    with pytest.raises(ValueError):initial_setup.gateway_deliveries(-1)
+    with pytest.raises(PermissionError):initial_setup.reconcile_gateway_delivery(row,'retry','inspected')
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_delivery(row,'delivered','inspected',None)
+    with pytest.raises(ValueError):initial_setup.reconcile_gateway_delivery(row,'discard','inspected',None,True)
+    assert calls==[]
+    initial_setup.gateway_deliveries(5)
+    initial_setup.reconcile_gateway_delivery(row,'retry','inspected',None,True)
+    assert calls==[('stop',{}),('owner',{'gateway_action':'deliveries','after':5}),('stop',{}),
+        ('owner',{'gateway_action':'reconcile-delivery','delivery_id':'a'*64,'attempt':1,'decision':'retry',
+            'note':'inspected','receipt':None,'confirm_not_delivered':True})]
+
+
+@pytest.mark.parametrize('gate',['administrator','user','incomplete-wizard'])
+def test_graphical_runtime_start_cannot_bypass_firstboot_gates(monkeypatch,gate):
+    from haos import owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'account_status',lambda:{'complete':gate!='administrator'})
+    monkeypatch.setattr(initial_setup,'normal_user_ready',lambda:gate!='user')
+    monkeypatch.setattr(initial_setup,'setup_in_progress',lambda:gate=='incomplete-wizard')
+    calls=[];monkeypatch.setattr(owner,'runtime_action',lambda verb:calls.append(verb))
+    with pytest.raises(PermissionError):initial_setup.resume_runtime()
+    assert calls==[]
+
+
+def test_completed_owner_runtime_start_uses_fixed_existing_owner_action(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'account_status',lambda:{'complete':True})
+    monkeypatch.setattr(initial_setup,'normal_user_ready',lambda:True)
+    monkeypatch.setattr(initial_setup,'setup_in_progress',lambda:False)
+    calls=[];monkeypatch.setattr(owner,'runtime_action',lambda verb:calls.append(verb))
+    assert initial_setup.resume_runtime()=={'started':True} and calls==['start']
+
+
+def test_owner_runtime_action_uses_only_fixed_units_and_preserves_policy_start(monkeypatch):
+    from haos import owner
+    monkeypatch.setattr(owner.os,'geteuid',lambda:0)
+    monkeypatch.setattr(owner,'Path',lambda value:SimpleNamespace(exists=lambda:value=='/etc/haos/provider.json'))
+    calls=[];events=[]
+    monkeypatch.setattr(owner.subprocess,'run',lambda args,**kwargs:calls.append((args,kwargs)))
+    monkeypatch.setattr(owner,'audit',lambda kind,details:events.append((kind,details)))
+    with pytest.raises(ValueError):owner.runtime_action('restart-anything')
+    assert calls==[]
+    owner.runtime_action('start')
+    assert [args for args,_ in calls]==[
+        ['/usr/bin/systemctl','start','haos-provider.socket'],
+        ['/usr/bin/systemctl','start','haos-controller.service','haos-hermes.service','haos-policy.service'],
+        ['/usr/bin/systemctl','start','haos-gateway.service']]
+    assert all(options=={'check':True,'timeout':60} for _,options in calls)
+    assert events==[('runtime.start',{})]
+    monkeypatch.setattr(owner.os,'geteuid',lambda:1000)
+    with pytest.raises(PermissionError):owner.runtime_action('start')
 
 
 def test_initial_owner_requires_repeated_password_before_stopping_services(monkeypatch):
@@ -152,3 +260,248 @@ def test_finalize_requires_observer_name_even_after_tty2_enrollment(monkeypatch)
                         lambda: (_ for _ in ()).throw(PermissionError("missing display name")))
     with pytest.raises(PermissionError, match="missing display name"):
         initial_setup.finalize()
+
+
+def test_graphical_gateway_pairing_retains_exact_scope_thread_and_selected_rights(monkeypatch):
+    from copy import deepcopy
+    from haos import gateway_setup, owner
+    from haos.gateway import GatewayPolicy
+    policy = {'version': 1, 'connectors': [{'id': 'discord-main', 'platform': 'discord'}], 'bindings': []}
+    saved, actions = [], []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    monkeypatch.setattr(gateway_setup, 'load', lambda: (deepcopy(policy), {'connectors': {}}))
+    monkeypatch.setattr(gateway_setup, 'persist', lambda value, credentials: saved.append(value))
+    monkeypatch.setattr(initial_setup, 'quiesce_for_setup', lambda **kwargs: actions.append(kwargs))
+    monkeypatch.setattr(owner, 'audit', lambda *args: None)
+    initial_setup.pair_gateway_sender('owner-chat', 'discord-main', 'sender-1', 'channel-1', 'personal',
+        ('create', 'read', 'answer'), scope='guild-1', thread='thread-1')
+    assert actions == [{'gateway_only': True}] and len(saved) == 1
+    configured = GatewayPolicy(saved[0])
+    envelope = {'platform': 'discord', 'sender': 'sender-1', 'chat': 'channel-1', 'scope': 'guild-1',
+        'thread': 'thread-1', 'message_id': 'fixture-message', 'is_bot': False, 'text': 'fixture'}
+    assert configured.authorize('discord-main', envelope)['capabilities'] == ['create', 'read', 'answer']
+    for key, value in [('sender', 'other'), ('chat', 'other'), ('scope', ''), ('thread', ''), ('scope', 'other'), ('thread', 'other')]:
+        with pytest.raises(PermissionError):
+            configured.authorize('discord-main', {**envelope, key: value})
+    actions.clear(); saved.clear()
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('invalid', 'discord-main', 'sender-1', 'channel-1', 'personal', scope='bad\nscope')
+    assert not actions and not saved
+
+
+def test_gateway_management_exposes_metadata_and_rejects_unknown_selection_before_stopping(monkeypatch):
+    from haos import gateway_setup
+    policy = {'version': 1, 'connectors': [{'id': 'bot', 'platform': 'telegram'}], 'bindings': []}
+    actions = []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    monkeypatch.setattr(gateway_setup, 'load', lambda: (policy, {'connectors': {'bot': {'token': 'private-fixture-token'}}}))
+    monkeypatch.setattr(initial_setup, 'quiesce_for_setup', lambda **kwargs: actions.append(('stop', kwargs)))
+    monkeypatch.setattr(gateway_setup, 'owner_gateway', lambda args: actions.append((args.gateway_action, getattr(args, 'connector', None))))
+    assert initial_setup.gateway_configuration() == {'connectors': policy['connectors'], 'bindings': []}
+    assert 'private-fixture-token' not in repr(initial_setup.gateway_configuration())
+    for action, selected in [('setup', ''), ('revoke', 'missing'), ('remove', 'missing'), ('start', 'bot')]:
+        with pytest.raises(ValueError):
+            initial_setup.manage_gateway(action, selected)
+    assert not actions
+    initial_setup.manage_gateway('start')
+    initial_setup.manage_gateway('remove', 'bot')
+    assert actions == [('start', None), ('stop', {'gateway_only': True}), ('remove', 'bot')]
+
+
+def test_gateway_process_status_uses_only_fixed_service_and_public_fields(monkeypatch):
+    calls = []
+    monkeypatch.setattr(initial_setup.os, 'geteuid', lambda: 0)
+    def status(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout='LoadState=loaded\nActiveState=active\nSubState=running\nResult=success\nExecMainStatus=0\n')
+    monkeypatch.setattr(initial_setup.subprocess, 'run', status)
+    assert initial_setup.gateway_process_status()['ActiveState'] == 'active'
+    assert calls == [['/usr/bin/systemctl', 'show', '--property=LoadState,ActiveState,SubState,Result,ExecMainStatus', 'haos-gateway.service']]
+
+
+def test_graphical_mattermost_setup_canonicalizes_private_owner_server_before_publication(monkeypatch):
+    from haos import gateway_setup,owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    calls=[];saved=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:calls.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'load',lambda:({'version':1,'connectors':[],'bindings':[]},{'connectors':{}}))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(owner,'audit',lambda *args:calls.append(args))
+    for token,url in [('x'*26,'http://owner.invalid'),('x'*26,'https://user:pass@owner.invalid'),('x'*26+',list','https://owner.invalid')]:
+        with pytest.raises(ValueError):initial_setup.configure_gateway('mm','mattermost',token,'',url)
+    assert not calls and not saved
+    initial_setup.configure_gateway('mm','mattermost','x'*26,'','https://Owner.Invalid:443/prefix/')
+    assert saved[0][1]=={'connectors':{'mm':{'token':'x'*26,'server_url':'https://owner.invalid/prefix'}}}
+    assert calls[0]=={'gateway_only':True} and 'x'*26 not in repr(calls)
+
+
+def test_ntfy_graphical_owner_configuration_validates_before_stop_and_never_exposes_token(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[],'bindings':[]}
+    credentials={'connectors':{}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(policy,credentials))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    from haos import owner
+    monkeypatch.setattr(owner,'audit',lambda *_args:None)
+    with pytest.raises(ValueError):initial_setup.configure_gateway('topic','ntfy','u:p',server_url='http://unsafe.invalid',topic='private')
+    assert not saved and not stopped
+    initial_setup.configure_gateway('topic','ntfy','u:p',server_url='https://Owner.Invalid:443/prefix/',topic='private')
+    assert credentials['connectors']['topic']=={'token':'u:p','server_url':'https://owner.invalid/prefix','topic':'private'}
+    assert stopped==[{'gateway_only':True}]
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['ntfy']=={'topic':{'server_url':'https://owner.invalid/prefix','topic':'private'}}
+    assert 'u:p' not in repr(metadata)
+
+
+def test_ntfy_pairing_requires_explicit_all_publishers_trust_and_exact_topic(monkeypatch):
+    from haos import gateway_setup,owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    config={'version':1,'connectors':[{'id':'topic','platform':'ntfy'}],'bindings':[]}
+    stored={'connectors':{'topic':{'token':'private-fixture-token','server_url':'https://owner.invalid','topic':'private'}}}
+    import copy
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(config),copy.deepcopy(stored)))
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append(p))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    monkeypatch.setattr(owner,'audit',lambda *_args:None)
+    for sender,chat,scope,thread,trust in [('private','private','','',False),('pretend-owner','private','','',True),
+            ('private','private','invented','',True),('private','private','','invented',True),('another','another','','',True)]:
+        with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','topic',sender,chat,'personal',
+            scope=scope,thread=thread,trust_topic_publishers=trust)
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('owner','topic','private','private','personal',trust_topic_publishers=True,ntfy_server_url='https://unsaved.invalid')
+    assert not saved and not stopped
+    initial_setup.pair_gateway_sender('owner','topic','private','private','personal',('create','read'),trust_topic_publishers=True)
+    assert len(saved)==1 and saved[0]['bindings'][0]['trust_topic_publishers'] is True
+    assert GatewayPolicy(saved[0]).bindings['owner']['capabilities']==['create','read']
+
+
+def test_ntfy_owner_auth_retry_validates_selection_before_stopping_and_uses_offline_owner_backend(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'topic','platform':'ntfy'},{'id':'other','platform':'telegram'}],'bindings':[]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:stopped.append(kwargs))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'authentication_blocks_cleared':1,'network_requested':False})
+    for invalid in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_ntfy_gateway_auth(invalid)
+    assert not calls and not stopped
+    result=initial_setup.retry_ntfy_gateway_auth('topic')
+    assert result=={'authentication_blocks_cleared':1,'network_requested':False}
+    assert stopped==[{'gateway_only':True}] and calls[0].gateway_action=='retry-ntfy-auth' and calls[0].connector=='topic'
+
+
+def test_homeassistant_owner_configuration_and_consent_validate_before_service_stop(monkeypatch):
+    import copy
+    from haos import gateway_setup, owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[{'id':'ha','platform':'homeassistant'}],'bindings':[]}
+    credentials={'connectors':{'ha':{'token':'private-fixture-token','server_url':'https://owner.invalid'}}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(credentials)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    with pytest.raises(ValueError):initial_setup.configure_gateway('ha','homeassistant','private-fixture-token',server_url='http://unsafe.invalid')
+    for options in [{},{'homeassistant_shared_notifications':1},
+                    {'homeassistant_shared_notifications':True,'homeassistant_server_url':'https://unsaved.invalid'},
+                    {'homeassistant_shared_notifications':True,'homeassistant_trust_system':True}]:
+        with pytest.raises(ValueError):
+            initial_setup.pair_gateway_sender('human','ha','a'*32,'light.owner','owner',**options)
+    with pytest.raises(ValueError):
+        initial_setup.pair_gateway_sender('system','ha','system','light.owner','owner',homeassistant_shared_notifications=True)
+    assert not saved and not stopped
+    initial_setup.configure_gateway('ha','homeassistant','private-fixture-token',server_url='https://Owner.Invalid:443/')
+    assert saved[-1][1]['connectors']['ha']==credentials['connectors']['ha']
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['homeassistant']=={'ha':{'server_url':'https://owner.invalid'}}
+    assert 'private-fixture-token' not in repr(metadata)
+    for sender,trust in [('a'*32,False),('system',True)]:
+        initial_setup.pair_gateway_sender('route','ha',sender,'light.owner','owner',
+            homeassistant_shared_notifications=True,homeassistant_trust_system=trust,
+            homeassistant_server_url='https://owner.invalid')
+        binding=GatewayPolicy(saved[-1][0]).bindings['route']
+        assert binding['sender']==sender and binding['homeassistant_trust_system'] is trust
+    assert stopped==[{'gateway_only':True}]*3
+
+
+def test_homeassistant_owner_auth_retry_uses_offline_backend_after_exact_selection(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'ha','platform':'homeassistant'},{'id':'other','platform':'ntfy'}],'bindings':[]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'network_requested':False})
+    for selection in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_homeassistant_gateway_auth(selection)
+    assert not calls and not stopped
+    assert initial_setup.retry_homeassistant_gateway_auth('ha')=={'network_requested':False}
+    assert calls[0].gateway_action=='retry-homeassistant-auth' and calls[0].connector=='ha'
+    assert stopped==[{'gateway_only':True}]
+
+
+def test_irc_owner_configuration_requires_explicit_auth_mode_before_stop_and_exposes_no_private_material(monkeypatch):
+    import copy
+    from haos import gateway_setup,owner
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[],'bindings':[]};stored={'connectors':{}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(stored)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append((p,c)))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    for options in [{},{'anonymous':1},{'sasl_username':'bot-account'},
+            {'anonymous':True,'sasl_username':'bot-account','sasl_password':'private-fixture'}]:
+        with pytest.raises(ValueError):initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',**options)
+    assert not saved and not stopped
+    initial_setup.configure_irc_gateway('irc','irc.fixture.invalid',6697,'haos-bot','#haos',
+        sasl_username='bot-account',sasl_password='private-sasl-fixture',server_password='private-server-fixture',channel_password='private-channel-key-fixture')
+    assert stopped==[{'gateway_only':True}]
+    assert saved[0][1]['connectors']['irc']['sasl_password']=='private-sasl-fixture'
+    assert saved[0][1]['connectors']['irc']['channel_password']=='private-channel-key-fixture'
+    monkeypatch.setattr(gateway_setup,'load',lambda:saved[0])
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['irc']=={'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}}
+    assert 'private-sasl-fixture' not in repr(metadata) and 'private-server-fixture' not in repr(metadata)
+    assert 'private-channel-key-fixture' not in repr(metadata)
+
+
+def test_irc_owner_pairing_uses_saved_exact_network_and_never_approves_unsaved_endpoint_or_unregistered_nickname(monkeypatch):
+    import copy
+    from haos import gateway_setup,owner
+    from haos.gateway import GatewayPolicy
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    policy={'version':1,'connectors':[{'id':'irc','platform':'irc'}],'bindings':[]}
+    stored={'connectors':{'irc':{'server':'irc.fixture.invalid','port':6697,'nickname':'haos-bot','channel':'#haos'}}}
+    saved=[];stopped=[]
+    monkeypatch.setattr(gateway_setup,'load',lambda:(copy.deepcopy(policy),copy.deepcopy(stored)))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:saved.append(p))
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(owner,'audit',lambda *_:None)
+    for sender,chat,options in [('owner-account','#other',{}),('Nick!user@host','#haos',{}),
+        ('owner-account','#haos',{'irc_server':'unsaved.invalid'}),('owner-account','#haos',{'irc_port':6667}),
+        ('owner-account','#haos',{'irc_channel':'#other'}),('owner-account','#haos',{'thread':'invented'})]:
+        with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','irc',sender,chat,'owner',**options)
+    assert not saved and not stopped
+    initial_setup.pair_gateway_sender('owner','irc','Owner-Account','#haos','owner',irc_server='irc.fixture.invalid',irc_port=6697,irc_channel='#haos')
+    binding=GatewayPolicy(saved[0]).bindings['owner']
+    assert binding['scope']=='irc.fixture.invalid:6697' and binding['sender']=='Owner-Account' and binding['thread']==''
+
+
+def test_irc_owner_auth_recheck_only_accepts_its_configured_connector_and_calls_offline_backend(monkeypatch):
+    from haos import gateway_setup
+    monkeypatch.setattr(initial_setup.os,'geteuid',lambda:0)
+    monkeypatch.setattr(initial_setup,'gateway_configuration',lambda:{'connectors':[{'id':'irc','platform':'irc'},{'id':'other','platform':'telegram'}]})
+    calls=[];stopped=[]
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kw:stopped.append(kw))
+    monkeypatch.setattr(gateway_setup,'owner_gateway',lambda args:calls.append(args) or {'network_requested':False})
+    for bad in ['missing','other',None]:
+        with pytest.raises(ValueError):initial_setup.retry_irc_gateway_auth(bad)
+    assert not calls and not stopped
+    assert initial_setup.retry_irc_gateway_auth('irc')=={'network_requested':False}
+    assert calls[0].gateway_action=='retry-irc-auth' and stopped==[{'gateway_only':True}]

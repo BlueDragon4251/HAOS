@@ -1,0 +1,58 @@
+{
+  "base_commit": "fdd8bb8",
+  "before": "actual private AWS SDK profile reflected a session token through the native broker response because redaction knew only the profile name",
+  "full_tests": {
+    "passed": 964,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 964,
+    "existing_skips": 2
+  },
+  "actual_native_aws_http_cases": 40,
+  "actual_sts_refresh_calls": 2,
+  "aws_catalog_identities": 3,
+  "actual_converse_calls": 24,
+  "local_exclusion": "unchanged root-only test_backup.py; root/UID/kernel tests remain mandatory in CI",
+  "all_five_predecessor_ci_gates_successful": "c962fbc8b37cb3bb8e5aa5922ae7667675165665",
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_cloud.py",
+      "sha256": "cee8b81ab300becb2dae0b1c342cc827fc9f23fde359e4197591625485330d84"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "4e36515a8bfa38ef993ab64aa1855391c7f48491dd36efb52eded8060e51803f"
+    },
+    {
+      "path": "linux/haos/haos/provider_discovery.py",
+      "sha256": "e394c9461c4e5e030d44d81120b0360f2c99b2a50965f24666942bd0f92253b9"
+    },
+    {
+      "path": "linux/haos/runtime/probe_aws_native.py",
+      "sha256": "22bd6a558ac3392d038273561a38b280f5e1ccead1f16fe2bfb3d18cb7748268"
+    },
+    {
+      "path": "linux/haos/runtime/probe_aws_identity.py",
+      "sha256": "861bc01c2848ef3158f06b62aef140688b68844bbfecfead515e89b9f1b3a266"
+    },
+    {
+      "path": "linux/haos/runtime/probe_model_catalog.py",
+      "sha256": "1299b1d6dc19753403c857fc1c114e33cd02e242d6736baf93f50a50c2403f49"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_cloud.py",
+      "sha256": "7d1a577e4003086eacf3e711ec75b2913c8bc38842085c8952dd17028c93aae8"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "29fdcea0a81f170908340c72cff62a93ba8840981eabd5048715301a2e57cbca"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "327a4d74a1ec4020af5c141ae35eddba75522fa524e1c9705a489838ffa748a4"
+    }
+  ],
+  "contracts_sha256": "5292071dea218de10431036cf6bd4ac741a141c1bc0edb4885aedf867f61cac7"
+}

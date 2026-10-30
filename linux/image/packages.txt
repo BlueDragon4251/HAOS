@@ -68,6 +68,7 @@ python3
 python3.11
 python3.11-devel
 python3-pyyaml
+python3-cryptography
 python3-pillow
 openssl
 git
@@ -131,6 +132,7 @@ restic
 
 # Dedicated graphical administrator first-boot seat (not normal Electron/root).
 python3-tkinter
+xterm
 xorg-x11-server-Xorg
 xorg-x11-xinit
 xorg-x11-xauth

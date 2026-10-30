@@ -55,3 +55,21 @@ def test_replay_revocation_expiry_and_secrets_are_enforced_before_forwarding(tmp
     assert inbox.db.execute("SELECT state FROM inbox WHERE state='expired'").fetchone()
     inbox.close()
     assert b"fixture-credential-value" not in path.read_bytes()
+
+
+def test_repair_during_outage_cannot_re_admit_or_forward_a_revoked_generation(tmp_path):
+    from haos.gateway_setup import renewed_policy
+    first = renewed_policy(configuration(), {**configuration(), 'bindings': []})
+    path = tmp_path/'relay.db'
+    inbox = RelayInbox(path, Redactor())
+    key = inbox.admit(GatewayPolicy(first), 'first', envelope())
+    inbox.close()
+    repaired = renewed_policy(configuration(), {**configuration(), 'bindings': []})
+    inbox = RelayInbox(path, Redactor())
+    with pytest.raises(Conflict): inbox.admit(GatewayPolicy(repaired), 'first', envelope())
+    assert inbox.next(GatewayPolicy(repaired)) is None
+    assert inbox.db.execute('SELECT state FROM inbox WHERE id=?', (key,)).fetchone()[0] == 'revoked'
+    new = {**envelope(), 'message_id': 'fresh-after-repair'}
+    new_key = inbox.admit(GatewayPolicy(repaired), 'first', new)
+    assert inbox.next(GatewayPolicy(repaired))['id'] == new_key
+    inbox.close()

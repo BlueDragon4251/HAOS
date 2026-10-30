@@ -1,0 +1,63 @@
+{
+  "source_commit": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+  "source_tree": "d4cd3a3db70242e026d9498e060a37272dd38810",
+  "recorded_at": "2026-10-30 01:42:06 UTC",
+  "runs": [
+    {
+      "id": 40983799728,
+      "name": "HAOS Graphical Initial Setup Security",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983799728"
+    },
+    {
+      "id": 40983799426,
+      "name": "CI",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983799426"
+    },
+    {
+      "id": 40983799616,
+      "name": "HAOS services and kernel boundaries",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983799616"
+    },
+    {
+      "id": 40983799683,
+      "name": "Arch package",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983799683"
+    },
+    {
+      "id": 40983799544,
+      "name": "HAOS pinned provider protocol contracts",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983799544"
+    },
+    {
+      "id": 40983791696,
+      "name": "HAOS pinned provider protocol contracts",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "ddb723b2feeb81ff6b55d68d00f72c20a5bd6687",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40983791696"
+    }
+  ],
+  "limits": "Five completed successful runs, including PR pinned contracts. The separate push contracts job ended cancelled at the configured 35-minute budget during private gateway process tests; no all-six-success claim. The cancellation log and completed partial cases do not substitute for its unfinished checks.",
+  "next": "Increase the full contracts budget to 60 minutes without removing or skipping any check; run the public DingTalk owner source again."
+}

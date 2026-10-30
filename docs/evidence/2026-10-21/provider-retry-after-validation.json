@@ -1,0 +1,36 @@
+{
+  "base_commit": "b55985ab2885d67db10cd5cac29cd8ac8950cbfa",
+  "source_sha256": {
+    "linux/haos/haos/provider_retry.py": "29e6902a3da435a5a407b269fa402eef7d6ca4a2dece87c27c6681556b138b69",
+    "linux/haos/haos/provider_proxy.py": "06800515f469098b96979f8d5c0637148e0647fe455209434060dcc1841d510e",
+    "linux/haos/haos/provider_native.py": "3b93c700fd9b2293a224731d73aac278a2872dc9a003612cf2ca003e0095be13",
+    "linux/haos/haos/provider_bedrock_messages.py": "87b6361205b9d9c179b110e8f8de2eb99f975cb8e75eec133c56225230e3110b",
+    "linux/haos/runtime/probe_bedrock_provider.py": "0e4e751927f8b55c4acb33be7074238d923b21e82ac8c376b5d25a585743eec5",
+    "linux/haos/runtime/probe_native_provider.py": "dd69b02519fdc431c70d65122280f28080bb0e68aa7dd8e86f40e794ebaf6f41",
+    "linux/haos/runtime/probe_aws_native.py": "2d7085c50cf6fb31883a3314468cb00eb6cd7fcd0200b800aa2bf17a34129529",
+    "linux/haos/runtime/probe_http_provider_matrix.py": "066479ef577b528baf58aaf0e72c9f3ff3021027cdcb82814da876ba4df1d712",
+    "linux/haos/tests/test_provider_retry.py": "a1ecb3379734fe07f44be0912c015c3ea42b1c235d617a42dd33900fc1c9afff",
+    "linux/haos/tests/test_provider.py": "10c93ec3d9c6b57a6ecd7a0d8a381ab691d651f53560a599a5174303fd9d80e0",
+    "linux/haos/tests/test_provider_cloud.py": "c17991f807211dd8f917c3722af60ad9f6eabdcc9838a934c297292546848570",
+    "linux/haos/tests/test_provider_routes.py": "bb793b0e9f419bc0a0489e96c598ed0b832b9f0639c0a0ed8207290fb0116ab5"
+  },
+  "minimal_suite": {
+    "passed": 860,
+    "existing_skips": 2
+  },
+  "full_runtime_suite": {
+    "passed": 860,
+    "existing_skips": 2
+  },
+  "actual_model_http_matrix_cases": 410,
+  "actual_native_gemini_cases": 6,
+  "actual_converse_cases": 6,
+  "actual_native_aws_iam_bearer_mantle_claude_cases": 20,
+  "native_and_http_retry_after_asserted": "17 seconds only on rate limit; other error headers withheld",
+  "real_http_503_asserted": true,
+  "reproduced_then_fixed_during_implementation": "prior target Retry-After must not survive a failing fallback credential admission",
+  "public_retry_timing": "integer or HTTP date; numeric output 0..86400; no arbitrary error-header forwarding",
+  "private_token_reflection_refused": true,
+  "live_inference_accounts_or_installed_tested": false,
+  "ci_for_this_change": "pending push"
+}

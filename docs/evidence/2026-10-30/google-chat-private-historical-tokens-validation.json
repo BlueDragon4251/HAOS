@@ -1,0 +1,323 @@
+{
+  "recorded_UTC": "2026-10-30T16:40:53.911347+00:00",
+  "base_commit": "b7c5cf4954918897788034bf89ac7388aa8b3a0e",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "dd93899b713c395777b0330b2e324be14ff21c305d597cff9bab2d2ffd67438e"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "54ffa2f1828e12ba2269922e8eb6ddc187337b821140f4d2e11ecf7c7878055c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_oauth.py",
+      "sha256": "af440727c55bffd187fea6e34ceecc635b27270d920c81b29790a54d4cc44e27"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_oauth_revoke.py",
+      "sha256": "561a228f6bfa011621760176de81b90ccdf95ea559c589ba9ee72945240a0725"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_oauth_tokens.py",
+      "sha256": "a45c615957828f542e062426a585b45c531e6edc4ed481e0f6dd8e137356d8fe"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_process.py",
+      "sha256": "66fbc6c9405af02bcade85640e71a1c018a73fc4cdfcb094fac6059de2a32eef"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_setup.py",
+      "sha256": "2e25df9c8d82347b828e5d9f7d30b4e84a0e7e5a1a4d55ab4ce19f7bf37daf11"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_worker.py",
+      "sha256": "515c9f84af031b3e313eefdc9663aad5f1eb2d8af342bb7eec1b732afe987faa"
+    },
+    {
+      "path": "linux/haos/runtime/google_chat_retired_fixture.py",
+      "sha256": "b028d30f150eefd24542d808dbe374f3fe0710461c95e58cb2434906ebf5ae0d"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_owner_oauth_process.py",
+      "sha256": "90f24fbe70baf747ede4aa0465558ed005e68ed28ae234b463029a2082781968"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_retired_process.py",
+      "sha256": "f8118a31264102829caf168d86fadb616e52267c3e64252c94c1b363911ce35d"
+    }
+  ],
+  "unit_minimal_no_Hermes_source": {
+    "passed": 2919,
+    "existing_skips": 2
+  },
+  "unit_frozen_Hermes_source": {
+    "passed": 2919,
+    "existing_skips": 2
+  },
+  "real_root_kernel_tests": {
+    "passed": 173,
+    "new_skips_or_kernel_mocks": false
+  },
+  "targeted_contract_tests": 101,
+  "actual_process_scenes": {
+    "historical_owner": {
+      "passed": 15,
+      "cases": [
+        "actual_Root_backend_private_UID_closed_empty_OAuth_inventories_do_not_create_token_database_or_send_network_requests",
+        "actual_Root_first_setup_creates_missing_private_service_state_but_refuses_existing_insecure_or_symlinked_custody_without_chown_chmod_or_deletion",
+        "actual_gateway_UID_cannot_call_five_Root_OAuth_backend_entry_points",
+        "actual_fixed_Owner_worker_ROOT_parent_private_UID_native_Flow_default_Google_TLS_endpoint_RSA_subject_verification_and_FULL_token_acceptance_return_only_closed_receipt",
+        "actual_Root_private_UID_token_status_exposes_only_exact_public_client_scopes_generation_budget_and_snapshot_without_token_readback",
+        "actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction",
+        "actual_Root_historical_worker_lists_private_public_identity_and_tokens_after_connector_and_service_account_credentials_are_removed_without_fabricating_active_grants_or_requesting_network",
+        "actual_Root_historical_token_metadata_remains_available_with_active_config_and_all_service_account_credentials_absent",
+        "actual_fixed_Root_private_UID_historical_metadata_with_real_retained_OAuth_tokens_runs_without_optional_SDK_or_Hermes_source_on_runtime_path_and_without_network",
+        "actual_historical_worker_denies_Root_agent_supplementary_Root_group_and_PID1_parent_and_private_UID_cannot_call_Root_backend",
+        "actual_historical_worker_kernel_profile_flock_and_changed_private_identity_block_status_or_withdrawal_without_network_or_automatic_identity_repair",
+        "actual_historical_private_worker_PR_SET_PDEATHSIG_and_NoNewPrivs_stop_the_worker_when_its_authenticated_Root_parent_dies",
+        "actual_Root_historical_withdrawal_requires_explicit_confirmation_exact_app_snapshot_and_no_pending_publication_before_any_HTTP",
+        "actual_Root_to_private_UID_historical_revocation_without_service_account_key_commits_local_denial_before_one_fixed_Google_TLS_POST_and_replay_returns_original_audited_receipt_without_new_IO",
+        "real_Root_and_private_credential_audits_persist_actor_and_receipts_without_secret_material_or_external_chat_message_requests"
+      ],
+      "actual_Root_backend_fixed_worker_private_UID_RSA_PKCE_default_HTTPS_and_FULL_SQLite": true,
+      "systemctl_state_is_explicit_fixture": true,
+      "Google_DNS_and_CA_are_substituted_only_in_disposable_network_none_namespace": true,
+      "service_account_schema_only_for_user_OAuth_component": true,
+      "live_Google_account_installed_Owner_login_GUI_or_public_activation": false
+    },
+    "OAuth_lifecycle": {
+      "passed": 40,
+      "cases": [
+        "actual_Root_agent_and_supplementary_root_group_are_refused_before_optional_OAuth_SDK_import",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_ok",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_subject",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_nonce",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_audience",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_signature",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_missing-refresh",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_partial-scope",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_auth",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_rate",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_redirect",
+        "actual_private_UID_Google_Flow_PKCE_single_TLS_exchange_RSA_identity_and_no_replay_audit",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_cached",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_ok",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_no-id-token",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_subject",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_nonce",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_partial-scope",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_auth",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_rate",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_disconnect",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_audit",
+        "actual_private_UID_Google_credentials_SDK_FULL_refresh_rate_auth_and_local_withdrawal_revoked-local",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_ok",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_refused",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_rate",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_disconnect",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_redirect",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_body",
+        "actual_private_UID_local_denial_before_bounded_TLS_revocation_and_no_repeated_decision_POST_audit",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_0_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_1_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_2_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_3_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_4_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_5_access-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_6_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_7_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_8_refresh-token",
+        "actual_private_UID_rejected_enrollment_capsule_never_becomes_active_and_explicit_TLS_disposal_clears_payload_after_receipt_without_replay_9_refresh-token"
+      ],
+      "actual_private_UID_Google_Flow_PKCE_Token_SDK_TLS_RSA_and_FULL_SQLite": true,
+      "Google_token_and_certificate_endpoints_are_explicit_local_fixtures": true,
+      "service_account_is_schema_only_for_user_OAuth_scope": true,
+      "actual_verified_user_token_private_FULL_persistence_and_pending_secret_compaction": true,
+      "actual_private_UID_SDK_refresh_and_local_withdrawal": true,
+      "actual_local_denial_before_remote_revocation_TLS_and_durable_replay": true,
+      "actual_rejected_enrollment_disposal_without_active_grant": true,
+      "actual_rejected_refresh_disposal_with_original_enrollment_preserved": true,
+      "Owner_handoff_GUI_outbound_files_live_account_or_public_activation": false
+    },
+    "active_Owner_OAuth": {
+      "passed": 8,
+      "cases": [
+        "actual_Root_backend_private_UID_closed_empty_OAuth_inventories_do_not_create_token_database_or_send_network_requests",
+        "actual_Root_first_setup_creates_missing_private_service_state_but_refuses_existing_insecure_or_symlinked_custody_without_chown_chmod_or_deletion",
+        "actual_gateway_UID_cannot_call_five_Root_OAuth_backend_entry_points",
+        "actual_fixed_Owner_worker_ROOT_parent_private_UID_native_Flow_default_Google_TLS_endpoint_RSA_subject_verification_and_FULL_token_acceptance_return_only_closed_receipt",
+        "actual_Root_private_UID_token_status_exposes_only_exact_public_client_scopes_generation_budget_and_snapshot_without_token_readback",
+        "actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction",
+        "actual_authenticated_Root_handoff_can_revoke_after_all_file_grants_are_withdrawn_and_repeated_decision_returns_existing_receipt_without_HTTP",
+        "real_Root_and_private_credential_audits_persist_actor_and_receipts_without_secret_material_or_external_chat_message_requests"
+      ],
+      "actual_Root_backend_fixed_worker_private_UID_RSA_PKCE_default_HTTPS_and_FULL_SQLite": true,
+      "systemctl_state_is_explicit_fixture": true,
+      "Google_DNS_and_CA_are_substituted_only_in_disposable_network_none_namespace": true,
+      "service_account_schema_only_for_user_OAuth_component": true,
+      "live_Google_account_installed_Owner_login_GUI_or_public_activation": false
+    },
+    "file_publisher": {
+      "scene": "publisher",
+      "passed": 1,
+      "process": {
+        "scene": "publisher",
+        "initial_state": [
+          "uploaded",
+          "confirmed"
+        ],
+        "final_state": "confirmed",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": true,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "publisher",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    },
+    "file_recovery": {
+      "scene": "recover-create",
+      "passed": 1,
+      "process": {
+        "scene": "recover-create",
+        "initial_state": [
+          "uploaded",
+          "writing"
+        ],
+        "final_state": "writing",
+        "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+        "own_echo_blocked_before_create_response": false,
+        "Root_artifact_methods_are_explicit_fixtures": false,
+        "controller_Unix_IPC_not_exercised": true,
+        "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+        "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+      },
+      "private_process_phases": [
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "writing"
+          ],
+          "final_state": "writing",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": false,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        },
+        {
+          "scene": "recover-create",
+          "initial_state": [
+            "uploaded",
+            "confirmed"
+          ],
+          "final_state": "confirmed",
+          "actual_private_UID_native_MediaFileUpload_sealed_Root_bytes_and_Google_discovery": true,
+          "own_echo_blocked_before_create_response": true,
+          "Root_artifact_methods_are_explicit_fixtures": false,
+          "controller_Unix_IPC_not_exercised": true,
+          "actual_source_codec_relay_controller_export_and_private_publisher_components": true,
+          "no_arbitrary_host_path_fallback_or_legacy_email_identity": true
+        }
+      ],
+      "actual_Root_offline_decisions": [
+        {
+          "id": "a7246bcff9320895ff7a9cca66b5c7ac83f37e90048964e6f9908e8e03775f07",
+          "action": "retry-file",
+          "generation": 1,
+          "receipt": "04218cbceb968b81f16de78661389ea2566fd5a23ee89574deb93ffbda4539ee",
+          "approval_recorded": true,
+          "network_requested": false,
+          "message_sent": false,
+          "same_source_user_file_and_stable_ids_required": true,
+          "late_acceptance_check_before_create_required": true
+        }
+      ],
+      "observed_operations": [
+        "token",
+        "certificates",
+        "bot-token",
+        "bot-membership",
+        "agent-session-artifact-read",
+        "upload",
+        "create",
+        "bot-token",
+        "bot-membership",
+        "read-own-write",
+        "create",
+        "own-echo-blocked-before-response",
+        "bot-text-create"
+      ],
+      "actual_Root_OAuth_then_private_UID_native_file_SDK_TLS_and_FULL_journals": true,
+      "all_endpoints_CA_DNS_namespace_local": true,
+      "PubSub_profile_and_production_controller_Unix_IPC_not_tested": true,
+      "systemctl_and_agent_artifact_service_are_explicit_fixtures": true,
+      "actual_RSA_service_account_bot_identity_check": true,
+      "live_Google_account_external_delivery_production_IPC_or_public_activation": false
+    }
+  },
+  "execution": {
+    "network": "none",
+    "process_container": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+    "kernel_container": "sha256:a68a2d333af6e5964b2f73160f19d5151bb1fa974b18cf3af3d8ba6104898dad",
+    "private_gateway_UID": 65534,
+    "actual_authenticated_Root_parent": true,
+    "actual_flock_parent_death_NoNewPrivs_Root_policy_and_identity_guards": true,
+    "active_connector_all_service_account_credentials_and_configuration_removed_before_historical_calls": true,
+    "metadata_with_optional_SDK_and_Hermes_runtime_paths_removed": true,
+    "actual_default_Google_SDK_OAuth_enrollment_then_fixed_TLS_revocation": true,
+    "Google_DNS_CA_endpoints_and_systemctl_state": "explicit disposable fixtures; no live Google/account or installed acceptance"
+  },
+  "properties": [
+    "No fake active policy/connector/service-account key for historical token validation or withdrawal",
+    "Full credentials/current route checks retained on active enrollment/refresh/file API paths",
+    "Actual published file-grant count is read-only status; active_authorization_returned=false",
+    "Private tokens/client secrets are captured by bounded shared redaction and never returned by Owner protocol",
+    "FULL local denial plus exact-generation transport barrier precedes one bounded fixed revocation request",
+    "Repeat decision returns retained receipt without another HTTP request",
+    "Stale app snapshot, pending Root publication, actual profile lock, identity tampering and foreign UID/parent fail before external I/O"
+  ],
+  "limits": [
+    "Historical quarantine disposal, legacy missing-identity recovery, historical output association and GUI/CLI still in progress",
+    "Public registry/production daemon/installed packaging and usable full Google setup still open",
+    "No real Google entitlement/delivery/inference, installed Owner login/systemd, hardware or release acceptance",
+    "Public software count15/22"
+  ]
+}

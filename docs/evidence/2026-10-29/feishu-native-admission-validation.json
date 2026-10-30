@@ -1,0 +1,59 @@
+{
+  "parent_commit": "446bd35cbaa0b994cd3b71c04765c07f9d03e796",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "29afb2b65a143837265646f340ea8b0169ee5d147e4b611b3ac6357c5dda2e2f"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "e0862d301fe6b289c5aa85cd91c774e9ccdeaa96f19cf836486c6acf16e8dbd5"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "cfadd4135f849297d7f31d23d8f4c770c808a17edbd9a2730f44e3bfe9df5baf"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_admission.py",
+      "sha256": "da7e29979fadbca41ea64b0c5087934a6ee3ccfc11158e0832b30c6668e79ab0"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_admission.py",
+      "sha256": "d9b5b5d453d68d22a2bdffd6ccb06c64b8487df1ae1c1f47f5067cfcfda05848"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_admission.py",
+      "sha256": "78c14ebc9ce1e4f66fa712af9a21a5252c9af29244537df8b21d387d7910e42d"
+    }
+  ],
+  "checks": {
+    "minimal_without_hermes_source": "1841 passed, 2 existing skips",
+    "full_frozen_feishu_runtime": "1841 passed, 2 existing skips",
+    "actual_Lark_models_and_native_Hermes_codec_after_HAOS_projection": "14 passed",
+    "workflow_and_build_syntax": "YAML parses and bash -n passes"
+  },
+  "log_sha256": {
+    "feishu-admission-final-minimal.log": "dde2b20016ed777053a4fda03b5c73c16aff6858eea159401ac5e420ffb9db29",
+    "feishu-admission-full.log": "5171aac0b3ee39cb813e136fb54a3afc11101ad05a3324806034e60c5ef60e41",
+    "feishu-native-admission-fixed.json": "90ac850167df7fa821f560d0c39001dfd3a4d1b8190aa50e462f4eb151c0629d",
+    "feishu-native-admission-fixed.log": "90ac850167df7fa821f560d0c39001dfd3a4d1b8190aa50e462f4eb151c0629d"
+  },
+  "public_gateway_paths": 11,
+  "public_feishu_enabled": false,
+  "contracts": [
+    "bounded duplicate-free finite event/body JSON; exact app and both tenant fields",
+    "exact user open-ID/chat/native thread and current timed owner grant; no user-ID/name/quoted-root aliases",
+    "exact bot mention metadata by default in groups; optional mention opt-out never grants an unknown sender",
+    "actual pinned text/post/mention/command and resource normalization without downloads or files",
+    "separate image/document/voice/video permissions including native media-to-file selectors and mixed rich-post duplicate keys",
+    "raw-body/credential/grant snapshot and secret-reflection checks"
+  ],
+  "initial_failure_and_fix": "The actual native video fixture initially failed because the pinned normalizer maps top-level media to resource_type=file. Authorization now derives media permissions from authenticated message/post semantics separately from the wire resource selector. Original negative video assertions remain, with added mixed/tagged-post cases.",
+  "limits": [
+    "Transport authentication and events are fixtures; helpers require already authenticated bytes and do not establish socket/webhook authenticity.",
+    "No persistent capture/dispatch, downloads, voice execution, replies or public owner GUI connected yet.",
+    "No external messages, live accounts, agent missions, installed OS, hardware or release acceptance.",
+    "Ordinary backup-file exclusion and two existing skips unchanged."
+  ]
+}

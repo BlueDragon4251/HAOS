@@ -1,0 +1,21 @@
+{
+  "fresh_broker_and_main_agent_pairs": 3,
+  "unchanged_capability_restart_preserves_replay": true,
+  "same_route_model_endpoint": true,
+  "native_replay_on_wire": [
+    false,
+    true,
+    false
+  ],
+  "revoked_generation_replay_forwarded": false,
+  "limited_capability_and_private_key_changed": true,
+  "host_tools_granted": false,
+  "live_account_tested": false,
+  "source_sha256": {
+    "probe_agent_replay_generation.py": "ccb56c15918fe3eafe88bc3e6389276534729a84f0546d4d23755032e5076e73",
+    "provider_replay.py": "586c6ae0fc13b68a4041d39026063f7f16f8dbc7253698a00584ff93c9887e97",
+    "provider_moa_streams.py": "c296ef974fb67da1d39076a652be6a139f88cab0fcabbbb9ce8ed7ba7bd71e5d",
+    "provider_profiles.py": "9c4a8115a464e5695f1d3fbe2469a4303a6b492902f3ebdbc1d4c1b475b49f32",
+    "provider_proxy.py": "63512bb2ef6c45b3e389dc5e5e042411cd9206677c54be89a58db38138cebdc1"
+  }
+}

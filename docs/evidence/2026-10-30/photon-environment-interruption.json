@@ -1,0 +1,39 @@
+{
+  "base_commit": "c63334b3100529c8cb4621d43b26bfbc13ccfe40",
+  "base_tree": "b3e0437412d9a498bcc7c62e5d27c5eb29d058fb",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "last_verified_local_source": "c63334b3100529c8cb4621d43b26bfbc13ccfe40",
+  "last_verified_local_checks": {
+    "minimal": 3276,
+    "full_frozen": 3276,
+    "existing_skips": 2,
+    "native_checks": 206,
+    "native_scenarios": 28,
+    "private_status": 12,
+    "Root_owner": 9
+  },
+  "interruption": "Execution environment became unavailable; exec-server transport closed during the next Owner-process probe patch. No successful execution result for that patch or the planned Auth-recovery tests.",
+  "reconstruction": "Eight Auth-recovery source files reconstructed from the successful edits in the conversation onto the freshly verified GitHub base. Local files could not be re-read; byte identity with inaccessible local WIP is not asserted.",
+  "status": "WORK IN PROGRESS, UNTESTED; not a gateway acceptance, inference, external delivery, installed OS or release result.",
+  "reconstructed_files": [
+    "linux/haos/haos/gateway_photon_journal.py",
+    "linux/haos/haos/gateway_photon_health.py",
+    "linux/haos/haos/photon_owner_process.py",
+    "linux/haos/haos/photon_owner_worker.py",
+    "linux/haos/haos/photon_owner_setup.py",
+    "linux/haos/haos/photon_owner_cli.py",
+    "linux/haos/haos/photon_owner_gui.py",
+    "linux/haos/haos/gateway_photon_auth_retry.py"
+  ],
+  "pending": [
+    "Verify syntax and existing regression via CI",
+    "Finish actual Root/private-UID auth-retry probe, stale/replayed decision and budget-trigger rollback cases",
+    "Finish actual Tk auth-retry controls and consent/error tests",
+    "Compare preserved local WIP against the remote reconstruction if workspace returns; do not reset or discard it",
+    "Complete remaining Photon account/setup/login, explicit cursor recovery, sealed output and production controller integration before count17"
+  ],
+  "external_gateway_messages_sent": false,
+  "merged": false,
+  "PR_remains_draft": true
+}

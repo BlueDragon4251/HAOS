@@ -1,0 +1,355 @@
+{
+  "source_base_commit": "df385f585408508a7b5a980ff63903190a3a6549",
+  "source_working_tree_dirty": true,
+  "python": "3.11.16",
+  "upstream_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 785,
+    "skipped": 2,
+    "excluded_root_only": [
+      "linux/haos/tests/test_backup.py"
+    ]
+  },
+  "full_pinned_runtime_with_hermes": {
+    "passed": 785,
+    "skipped": 2,
+    "excluded_root_only": [
+      "linux/haos/tests/test_backup.py"
+    ]
+  },
+  "additional_probes": [
+    {
+      "name": "account_providers",
+      "receipt_sha256": "c7666e6782f73786e92c53286317ece716a3f24e6c9e2445406e51939bb17229",
+      "receipt": {
+        "actual_upstream_copilot_exchange_refresh_cache": true,
+        "actual_upstream_qwen_refresh_private_persistence": true,
+        "actual_loopback_http": true,
+        "live_provider_tested": false
+      }
+    },
+    {
+      "name": "aws_native",
+      "receipt_sha256": "b50af81af68ddf68a90e719959d2a377a5f54da625e2c4d019cde2d947ed94e4",
+      "receipt": {
+        "actual_native_aws_http_cases": [
+          "mantle:iam:json",
+          "mantle:iam:stream",
+          "mantle:iam:truncated",
+          "mantle:iam:rate-limit",
+          "mantle:bearer:json",
+          "mantle:bearer:stream",
+          "mantle:bearer:truncated",
+          "mantle:bearer:rate-limit",
+          "claude:iam:json",
+          "claude:iam:stream",
+          "claude:iam:truncated",
+          "claude:iam:rate-limit",
+          "claude:bearer:json",
+          "claude:bearer:stream",
+          "claude:bearer:truncated",
+          "claude:bearer:rate-limit"
+        ],
+        "botocore_sigv4_verified_cryptographically": true,
+        "mantle_endpoint_and_protocol_derived_from_pinned_rules": true,
+        "actual_anthropic_bedrock_binary_eventstream": true,
+        "claude_signed_thinking_replay": true,
+        "per_route_iam_and_bearer_no_global_env_changes": true,
+        "early_stream_and_truncation_rate_limit": true,
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "source_files": [
+          {
+            "path": "probe_aws_native.py",
+            "sha256": "3fe96b26e5a9595107ecd3bf9cf29c609bc1f4db8750d16a8915cdd128d39574"
+          },
+          {
+            "path": "provider_cloud.py",
+            "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+          },
+          {
+            "path": "provider_bedrock_messages.py",
+            "sha256": "5c1713d10500aa5730a89a59b354402ec10c0cce77196de755d6166e61e39744"
+          },
+          {
+            "path": "provider_profiles.py",
+            "sha256": "b67abae232adc1ae2a9925e66821733a838cf101d444041b3c0b0dcf04aa5306"
+          },
+          {
+            "path": "provider_policy.py",
+            "sha256": "a93cdfdd56661c4e2c296ea2a3397b252c608198ccf35553fa96926346f7e341"
+          },
+          {
+            "path": "provider_proxy.py",
+            "sha256": "e2a27abe01846bd5bd1423cdbf91d0522bd85b54a81676cee640e44ff15bf64d"
+          }
+        ]
+      }
+    },
+    {
+      "name": "bedrock_provider",
+      "receipt_sha256": "a8c45870165e6c3a5bf4163c814b85a85d9582f04e5a690e652d6225ae235e5c",
+      "receipt": {
+        "provider": "bedrock",
+        "actual_boto3_signing_eventstream": true,
+        "actual_loopback_http": true,
+        "checks": [
+          "json-tools",
+          "stream-tools",
+          "truncated",
+          "rate-limit",
+          "json-no-usage",
+          "stream-no-usage"
+        ],
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "sdk_versions": {
+          "boto3": "1.42.89",
+          "botocore": "1.42.89"
+        },
+        "source_sha256": {
+          "probe_bedrock_provider.py": "a15e0b592ccd12e06bda2016dae12d4e6089450b5f40c20725164f212bd4e6c7",
+          "provider_cloud.py": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423",
+          "provider_proxy.py": "e2a27abe01846bd5bd1423cdbf91d0522bd85b54a81676cee640e44ff15bf64d",
+          "provider_policy.py": "a93cdfdd56661c4e2c296ea2a3397b252c608198ccf35553fa96926346f7e341"
+        }
+      }
+    },
+    {
+      "name": "cloud_tokens",
+      "receipt_sha256": "d558ca2f53898d13592241a3493c06e8ab40e759355dda8a72a7069e70864fc9",
+      "receipt": {
+        "actual_google_service_account_jwt_signing_refresh_cache": true,
+        "actual_google_authorized_user_refresh_cache": true,
+        "actual_azure_msal_client_credentials_refresh_cache": true,
+        "actual_loopback_http": true,
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "sdk_versions": {
+          "google-auth": "2.55.1",
+          "azure-identity": "1.25.3",
+          "msal": "1.39.0"
+        },
+        "source_files": [
+          {
+            "path": "probe_cloud_tokens.py",
+            "sha256": "c3f61fc81e799b471640d5e7d06914704db909654ac3950dc16eadea312b1415"
+          },
+          {
+            "path": "provider_cloud.py",
+            "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+          },
+          {
+            "path": "provider_proxy.py",
+            "sha256": "e2a27abe01846bd5bd1423cdbf91d0522bd85b54a81676cee640e44ff15bf64d"
+          }
+        ]
+      }
+    },
+    {
+      "name": "converse_replay",
+      "receipt_sha256": "b9f621dafa3b6d8267584e33f6276cdb64a8bad1f43819f0682792007c30b4e2",
+      "receipt": {
+        "actual_signed_or_bearer_boto3_replay_cases": [
+          "iam:json-replay",
+          "iam:stream-replay",
+          "bearer:json-replay",
+          "bearer:stream-replay"
+        ],
+        "actual_http_requests": 8,
+        "ordered_signed_redacted_text_tool_next_turn_replay": true,
+        "actual_hermes_stream_detail_accumulator": true,
+        "early_delta_before_upstream_terminal": true,
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "source_files": [
+          {
+            "path": "probe_converse_replay.py",
+            "sha256": "32ae9c136a4b34f1cc5a33c26eaf500104af668df1102185b75e8e9fc3b6ae8e"
+          },
+          {
+            "path": "provider_cloud.py",
+            "sha256": "9591ea1c46c5b907705dfdb079eaf2acf6856614cc282787dc21bccfee5b0423"
+          },
+          {
+            "path": "provider_profiles.py",
+            "sha256": "b67abae232adc1ae2a9925e66821733a838cf101d444041b3c0b0dcf04aa5306"
+          },
+          {
+            "path": "provider_bedrock_replay.py",
+            "sha256": "f477d468782aa42c2ce14ec6caa71eb688fd58fc68104a93d7d188c7a8a1c705"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moa_provider",
+      "receipt_sha256": "0785bdf61411237a5d2dc1f5e0d5086b62f0f4a7f638b54a914bef45ebee1bbd",
+      "receipt": {
+        "provider": "moa",
+        "actual_upstream_fanout_and_aggregation": true,
+        "broker_bound_requests": 3,
+        "private_provider_keys_in_agent_config": false,
+        "live_provider_tested": false
+      }
+    },
+    {
+      "name": "model_catalog",
+      "receipt_sha256": "e3d39c3167cfc7c489ef0083f1f58c7e6490c4ef657a0d9165f49de3a06bb4a0",
+      "receipt": {
+        "actual_codex_catalog_helper_http": true,
+        "actual_boto3_control_plane_signing": true,
+        "generated_routing_cases_match_upstream": 131,
+        "static_catalog_is_not_entitlement": true,
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "source_sha256": {
+          "probe_model_catalog.py": "f735b81800eab9659e2f17a86a21d5755348468520dfb0d2bb32f6d19ede518c",
+          "provider_discovery.py": "a327762a2ed35ed76653008da834726dfc9a1eedabf7eb05bb6bbd2a73d9a0e7",
+          "hermes_registry.json": "d9c4aed5920df94837226b4b13da3e96ef5e0031cd67d2af9223b02d5bb7f0b5"
+        }
+      }
+    },
+    {
+      "name": "native_provider",
+      "receipt_sha256": "b5f506d368eabbb6111665f5365ba4c51576ebf9cfe56570215e8d3dd911aaa4",
+      "receipt": {
+        "provider": "gemini",
+        "pinned_native_codec": true,
+        "actual_loopback_http": true,
+        "checks": [
+          "json-tools",
+          "stream-tools",
+          "truncated",
+          "rate-limit"
+        ],
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "sdk_versions": {
+          "httpx": "0.28.1"
+        },
+        "source_sha256": {
+          "probe_native_provider.py": "fc2cc59b6466beecdbf4c920d1939f3f26402529113b49400e8e9cf9e7275979",
+          "provider_native.py": "b3ba948ee223d83395a61a3c2f633897da2975c4bf4245bae2fa401aef422f64",
+          "provider_proxy.py": "e2a27abe01846bd5bd1423cdbf91d0522bd85b54a81676cee640e44ff15bf64d",
+          "provider_policy.py": "a93cdfdd56661c4e2c296ea2a3397b252c608198ccf35553fa96926346f7e341"
+        }
+      }
+    },
+    {
+      "name": "provider",
+      "receipt_sha256": "d03bb1235a1f55d682dbf2acc0b572bab05c41076593cf36bfee528fe2d98e04",
+      "receipt": {
+        "native_runtime_resolver": true,
+        "native_responses_tool_contract": true,
+        "native_broker_profile_projection": true,
+        "oauth_resolver_present": true,
+        "provider_connected": false,
+        "model_turn_tested": false
+      }
+    },
+    {
+      "name": "provider_profiles",
+      "receipt_sha256": "a0a14b8473f85e702d1c15255046782f925a93af9d38e9421113dc014e694383",
+      "receipt": {
+        "actual_pinned_provider_wire_cases": [
+          "actual:native-wire-kwargs",
+          "ai-gateway:native-wire-kwargs",
+          "alibaba:native-wire-kwargs",
+          "alibaba-cn:native-wire-kwargs",
+          "alibaba-coding-plan:native-wire-kwargs",
+          "alibaba-coding-plan-cn:native-wire-kwargs",
+          "alibaba-token-plan:native-wire-kwargs",
+          "alibaba-token-plan-cn:native-wire-kwargs",
+          "anthropic:native-wire-kwargs",
+          "arcee:native-wire-kwargs",
+          "azure-foundry:native-wire-kwargs",
+          "bedrock:native-wire-kwargs",
+          "commandcode:native-wire-kwargs",
+          "commandcode-anthropic:native-wire-kwargs",
+          "copilot:native-wire-kwargs",
+          "copilot-acp:native-wire-kwargs",
+          "custom:native-wire-kwargs",
+          "deepinfra:native-wire-kwargs",
+          "deepseek:native-wire-kwargs",
+          "fireworks:native-wire-kwargs",
+          "gemini:native-wire-kwargs",
+          "gmi:native-wire-kwargs",
+          "huggingface:native-wire-kwargs",
+          "kilocode:native-wire-kwargs",
+          "kimi-coding:native-wire-kwargs",
+          "kimi-coding-cn:native-wire-kwargs",
+          "lmstudio:native-wire-kwargs",
+          "local:native-wire-kwargs",
+          "meta-ai:native-wire-kwargs",
+          "minimax:native-wire-kwargs",
+          "minimax-cn:native-wire-kwargs",
+          "minimax-oauth:native-wire-kwargs",
+          "nebius-token-factory:native-wire-kwargs",
+          "nous:native-wire-kwargs",
+          "novita:native-wire-kwargs",
+          "nvidia:native-wire-kwargs",
+          "ollama-cloud:native-wire-kwargs",
+          "openai-api:native-wire-kwargs",
+          "openai-codex:native-wire-kwargs",
+          "opencode-go:native-wire-kwargs",
+          "opencode-zen:native-wire-kwargs",
+          "openrouter:native-wire-kwargs",
+          "qwen-oauth:native-wire-kwargs",
+          "router:native-wire-kwargs",
+          "stepfun:native-wire-kwargs",
+          "tencent-tokenhub:native-wire-kwargs",
+          "tencent-tokenplan:native-wire-kwargs",
+          "upstage:native-wire-kwargs",
+          "vertex:native-wire-kwargs",
+          "xai:native-wire-kwargs",
+          "xai-oauth:native-wire-kwargs",
+          "xiaomi:native-wire-kwargs",
+          "zai:native-wire-kwargs"
+        ],
+        "network_disabled_during_projection": true,
+        "agent_profiles_have_only_broker_capability": true,
+        "upstream_client_and_auth_hooks_not_delegated": true,
+        "openrouter_reasoning_replay_through_broker": true,
+        "live_provider_tested": false,
+        "python": "3.11.16",
+        "native_anthropic_signed_thinking_replay_through_broker": true,
+        "bedrock_private_replay_excluded_from_other_provider_profiles": true,
+        "source_sha256": {
+          "probe_provider_profiles.py": "f4d3d0cb8596cbd6f0638ce746bf0b47f44a56fe207dac8025ae307be7c1af3b",
+          "provider_profiles.py": "b67abae232adc1ae2a9925e66821733a838cf101d444041b3c0b0dcf04aa5306",
+          "sandbox.py": "9de1dfce06f2b9f34f183827f0653523ee4910e7b2deca545a105f4a9200fe5b",
+          "serve.py": "ab360fc026115d72eeb85aa9746a0dad468e5ee321bac0863da475a9c3fb79e0"
+        }
+      }
+    }
+  ],
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_messages.py",
+      "sha256": "23d6f5b7419271e59eb63d466e9bea2023f5c95baec87eb5075e338ceeb89459"
+    },
+    {
+      "path": "linux/haos/haos/provider_proxy.py",
+      "sha256": "e2a27abe01846bd5bd1423cdbf91d0522bd85b54a81676cee640e44ff15bf64d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_messages_provider.py",
+      "sha256": "1f06049584cb651349567350f42851fc876014d38b2a353cde4fe04ec5a6e36e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_http_provider_matrix.py",
+      "sha256": "b32d56f8ea4917430c74c6f6f1b1aee56e7b0bde00d0a893f2f4817704d23f6e"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "744cc2fddf815cf9fecd8fe43822e7ac2ce62eb28c0de3ea8ede1ca50f5263cd"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "6ea0604bec2e9b1a773378c66760f152b2ef590c51e4009dbb18c84f135b0e41"
+    }
+  ],
+  "live_inference_tested": false,
+  "installed_boot_tested": false
+}

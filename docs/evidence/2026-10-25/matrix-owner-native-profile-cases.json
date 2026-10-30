@@ -1,0 +1,31 @@
+{
+  "passed": 23,
+  "cases": [
+    "real_profile_flock_prevents_duplicate_identity_writers",
+    "actual_native_connect_auth_crypto_sync_and_private_recovery_workers",
+    "native_home_and_secrets_remain_scoped_without_global_home_mutation",
+    "actual_connected_profile_native_text_reaches_real_mission_outbox",
+    "profile_crypto_sync_lock_and_native_status_files_are_private",
+    "actual_disconnect_closes_sdk_and_stops_recovery_worker",
+    "actual_reconnect_reuses_account_and_retained_cursor_without_replaying_mission",
+    "superseded_client_loses_private_http_authority",
+    "closing_releases_lock_and_preserves_identity_and_recovery_files",
+    "token_rotation_and_fresh_factory_preserve_same_device_account",
+    "actual_owner_transport_metadata_retains_safe_auth_error_without_credentials",
+    "actual_live_auth_refusal_is_fatal_until_owner_restart_or_correction",
+    "actual_startup_rate_limit_deadline_survives_close_and_fresh_factory",
+    "native_owner_corrected_profile_recovers_after_persisted_rate_limit",
+    "actual_gateway_service_supervisor_connects_and_stops_native_profile_and_workers",
+    "native_wrong_device_never_resets_or_deletes_stored_crypto",
+    "actual_initial_sync_refusal_keeps_disconnected_send_guard_and_closes_client",
+    "retained_undecryptable_initial_page_does_not_starve_live_sync",
+    "actual_late_session_unblocks_independent_recovery_worker_once_with_original_time",
+    "actual_connected_profile_distributes_olm_keys_and_peer_decrypts_megolm_outbox_answer",
+    "concurrent_close_cancels_actual_pending_native_auth_and_releases_profile",
+    "owner_connector_revocation_stops_worker_and_prevents_native_send",
+    "actual_sqlite_status_failure_still_closes_sdk_journal_and_profile_lock"
+  ],
+  "external_connections": false,
+  "installed_service_accepted": false,
+  "live_account_accepted": false
+}

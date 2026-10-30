@@ -1,0 +1,85 @@
+{
+  "parent_commit": "127bab743772472869444191ff7c51e6860ff20e",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "73bce566349a023f9cb39101fd0961e02f1163bff4e4d962c039abf5a7b3ba72"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "a03a0f83319fe56573ea9adfaa0dbd9b0517ab26c03eb495f264033a6f85ba30"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu.py",
+      "sha256": "1f27ec3750006e60dbac0adfe25e69eeae760281cbecb398c139d2a735960c42"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_process.py",
+      "sha256": "e34c8e65852adad1dbc70d9ede10e4977b61ec802b40580b4821cd8f322e8be8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_worker.py",
+      "sha256": "c3f238f1ba0329013cbc62cdf35317f91c26d3bbf4966a4896545ea1ffe960d9"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_process.py",
+      "sha256": "910467110eff5c9fe8c5a1e0bf8ca0f659cb8001e99999f3da40787c48b9ab67"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_process.py",
+      "sha256": "5026fc014695a42587dccbfc675a9f53feba4fd54d76fc83be8748cb3ffdce88"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1872 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1872 passed, 2 existing skips",
+    "actual_UID_native_SDK_TLS_process_kernel_parent_death": "15 passed",
+    "workflow_yaml": "parsed"
+  },
+  "native_process_report": {
+    "passed": 15,
+    "cases": [
+      "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+      "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+      "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+      "actual_private_worker_wrong-bot_refused_without_false_success",
+      "actual_private_worker_401_refused_without_false_success",
+      "actual_private_worker_429_refused_without_false_success",
+      "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+      "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+      "actual_root_wrong-scope_refused_before_private_SDK_network",
+      "actual_root_own-bot_refused_before_private_SDK_network",
+      "actual_root_writable-policy_refused_before_private_SDK_network",
+      "actual_root_pending-publication_refused_before_private_SDK_network",
+      "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+      "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+      "actual_root_identity_is_refused_before_worker_reads_or_network"
+    ],
+    "actual_uids": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+    "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+    "owner_publication_and_account_are_fixtures": true,
+    "public_feishu_enabled": false,
+    "external_messages_live_account_or_installed_acceptance": false
+  },
+  "log_sha256": {
+    "feishu-process-final.log": "7dd161454a6149f3b003a927667084636aa4cceafe86e1c93662a354b1895576",
+    "feishu-worker-minimal.log": "a3a9cafe222d1590afd3f61b4d7536187e049087b02f75f887fb1f0db09f589e",
+    "feishu-worker-full.log": "9e23c6997e38ccae5c2d265c61c713e95892cfdf7c04ddcba921566c3f0d3785"
+  },
+  "fixture_corrections": [
+    "Initial TLS rejection correctly exposed missing disposable CA trust in the separate SDK certifi bundle; added fixture CA only inside disposable container, production verify stays enabled.",
+    "Kernel has no optional proc task children file; discover actual child PID and UID through proc status instead.",
+    "Synchronize worker PID discovery before triggering cancellation; agent fixture receives no credentials."
+  ],
+  "limitations": [
+    "Owner publication is a prepared root-owned fixture; no public Feishu publication/GUI exists yet.",
+    "No actual external account, external message, installed service or hardware test.",
+    "Authenticated event transport, outgoing delivery, media, GUI and full recovery remain open."
+  ]
+}

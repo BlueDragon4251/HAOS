@@ -1,0 +1,53 @@
+{
+  "base_commit": "8b4da8482ff567dadc3d4907b0b5439b3ff20b45",
+  "all_five_predecessor_ci_gates_successful": true,
+  "actual_sdk_http_history_cases": 11,
+  "full_tests": {
+    "passed": 1032,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1032,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 26,
+  "actual_tk_resolutions": [
+    "1280x800",
+    "640x480"
+  ],
+  "external_slack_connected": false,
+  "remote_deleted_messages_recoverable": false,
+  "full_media_voice_complete": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "956ad0b1bd6e4c08e3a44f7d5b333edf91112022cb1390c10a14a92b1295ce1a"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "c7d171bdcd3c1cd02cde9492cf177935c2bf2e494a430a8f2d4b9b3635ca9c14"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "798fe04baf347eb98e61a7459208ad7db8630992f8af95829866924544f71a42"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "791f94eb4b10286d5ca7a6054cf1736ff0fadef2815199b748f8d411b9874e93"
+    },
+    {
+      "path": "linux/haos/haos/gateway_slack_history.py",
+      "sha256": "30fc130e62e81ff5af03cf5969ea002a836f7c61d32eb4634ded8c42d11ca08e"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "f027f77e7e97f0cf6081c0f979fd41ca616c42cdb7ad41d19323516ebd6ee34b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_history.py",
+      "sha256": "350ce4c8d5a43f4d1b2a5d5ed54f37e87f5886a5578d31b6f29e293737689d74"
+    }
+  ],
+  "contracts_sha256": "096cd8f75e6aeea0435992419c738d58ae1742f84ef7db23b75a2f4a9751c2fd"
+}

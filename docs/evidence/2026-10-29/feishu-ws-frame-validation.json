@@ -1,0 +1,81 @@
+{
+  "parent_commit": "0ecad43f6255f1ff0cd930049c372114bbce7a2d",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "18e5e19627384d1d3610d07a6de3aabdb412d961c9c8bf3f076de0304460fb46"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "5446b797066214c90683e894f8e083c6011d49d58cca90fb6885f31f342aae0b"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "1fca70fc72e00f5f74c1eaea575c06e4919df712c0d804a1d098d330518c9621"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_ws_frames.py",
+      "sha256": "9f78533aac02da0999c9bd1412894d9c326a8ab724b9a319c5f5d603de1a0edb"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_ws_frames.py",
+      "sha256": "4dc65e9bf2309ef959664966b3cbece0d1ec595b09624e8e07e4564926eba677"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_ws_frames.py",
+      "sha256": "47a43d93fcd7c2605ca6812b8ad48576b0a99346089c26506994b360eb36ca34"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1934 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1934 passed, 2 existing skips",
+    "native_WS_frame_codec_ACK_actual_thread_SQLite_and_TTL": "14 passed",
+    "build_shell_and_diff": "passed"
+  },
+  "native_report": {
+    "passed": 14,
+    "cases": [
+      "actual_SDK_protobuf_event_handler_ACK_is_encoded_only_after_native_original_and_input_SQLite_commit",
+      "actual_SDK_replayed_frame_preserves_one_durable_native_input",
+      "actual_native_SDK_assembles_out_of_order_fragments_and_ACKs_only_complete_committed_event",
+      "oversized_total_negative_or_out_of_range_sequence_and_alias_numbers_refused_before_SDK_allocation",
+      "duplicate_proto_headers_missing_required_fields_cards_and_oversized_payload_never_reach_event_callback_or_ACK",
+      "changed_duplicate_fragment_or_fragment_count_cannot_replace_existing_assembly",
+      "aggregate_fragment_size_refused_before_mutating_retained_partial_buffer",
+      "bounded_partial_message_count_preserves_existing_32_incomplete_assemblies",
+      "real_fragment_TTL_expiry_releases_only_volatile_unacknowledged_assemblies",
+      "partial_real_SDK_configuration_preserves_safe_defaults_and_refuses_busy_loop_interval",
+      "actual_SQLite_capture_failure_returns_native_SDK_500_not_success_ACK",
+      "actual_SDK_thread_blocks_for_owning_loop_SQLite_capture_without_cross_thread_database_use",
+      "actual_SDK_receive_loop_applies_inline_commit_backpressure_and_disconnects_on_stream_failure_without_task_fanout",
+      "current_owner_withdrawal_prevents_native_frame_processing"
+    ],
+    "actual_SDK_protobuf_assembly_ACK_native_codec_and_SQLite": true,
+    "actual_thread_to_owner_loop_handoff": true,
+    "socket_send_and_transport_authentication_are_fixtures": true,
+    "connected_WS_TLS_endpoint_kernel_identity_or_live_account_verified": false,
+    "public_feishu_enabled": false
+  },
+  "log_sha256": {
+    "feishu-ws-frames-final.json": "764663d46ae54ca99826487efe8117414dc8e624dacdc2f98d1a54ecfd67a4c6",
+    "feishu-ws-frames-final.log": "45a355b2d2854327f88acfeee48ac66b96342558ec441cea49120fed7ff0df08",
+    "feishu-ws-frames-minimal.log": "b8012d22f7c5b767eea3acb6f008f274a400ed7581d66375ceffbcab031d2431",
+    "feishu-ws-frames-full.log": "a1d6673dbe1b6b37ae5ec06f596cdee31e739dfb51505ee4a25995c1d7498b9c"
+  },
+  "limitations": [
+    "Socket sender and transport authentication are fixtures.",
+    "No connected WSS/TLS endpoint, kernel socket identity, external account or real delivery is claimed.",
+    "Endpoint discovery, actual socket profile/reconnection, media/voice and public owner GUI remain open.",
+    "Public Feishu registry disabled."
+  ],
+  "parent_CI": {
+    "source": "0ecad43f6255f1ff0cd930049c372114bbce7a2d",
+    "successful_gates": 4,
+    "failed_provider_contract_job_ids": [
+      123405546252,
+      123405523223
+    ],
+    "failure": "Existing email process fixture uses fixed 28-Oct-2026 13:00 +0200 server date; its integration input expires after 24 hours. Local metadata proves state expired/attempt zero. Follow-up correction is separately in progress; no CI success claimed."
+  }
+}

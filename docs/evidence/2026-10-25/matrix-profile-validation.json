@@ -1,0 +1,71 @@
+{
+  "base_commit": "727c210aea7898612588ceb6cd032f1e2227e6f5",
+  "actual_native_profile_cases": 20,
+  "stdlib_profile_credential_cases": 19,
+  "regression_cases": {
+    "crypto": 13,
+    "identity": 15,
+    "sync": 14,
+    "http": 17,
+    "ingress": 18,
+    "delivery_without_recipient_guard": 21,
+    "history": 16,
+    "recipients": 17
+  },
+  "full_tests": {
+    "passed": 1103,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1103,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 38,
+  "base_all_five_ci_gates_successful": true,
+  "matrix_publicly_enabled": false,
+  "external_account_or_delivery_accepted": false,
+  "installed_service_or_boot_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "ee7b448ca555c9311ab282914d43cb4eec0e9785c13a11b28918f363841bb72e"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "cbf69208ad532cd6c30ac3274605c67e05c328b3a4f065b6237d9e6854393726"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_http.py",
+      "sha256": "a8a365726619623cd87bdb6416e7cdcebdc4fa888da3140cad4e3424acb09595"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_sync.py",
+      "sha256": "af298d458fda6fb5beb7b544fb2134ca1285760b80b4e8da79b85c6e3258efa6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_profile.py",
+      "sha256": "95873b775a969785d6e910c7cb30c41b6e56e9d46b5bff4101ee45a97e07c39c"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_profile.py",
+      "sha256": "deeeb13adc72350bca886b9fe19d7e1b9d01437393733409bb100e14914dab20"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_matrix_profile.py",
+      "sha256": "90efdf6d2b25b38f29cd2fe1cc709b8234441c2c1ff789802e2d69ce3b82f5ae"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_authority.py",
+      "sha256": "ed107ada97b536b6b4f58b9ec49ef9c45b737518d1e861766580d062c68f128b"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "1976e5c322b11328d2c34d025d436150761de1773f7b0149bbe75c692beb038b"
+    },
+    {
+      "path": "docs/GATEWAY-MISSIONS.md",
+      "sha256": "061335b728a076aaf26fd76992212ed09bd1cb18f701ec34598c92d468170075"
+    }
+  ]
+}

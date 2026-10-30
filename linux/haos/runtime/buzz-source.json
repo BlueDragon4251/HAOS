@@ -1,0 +1,36 @@
+{
+  "repository": "https://github.com/block/buzz",
+  "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+  "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+  "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+  "archive_size": 50978319,
+  "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
+  "builder_image": "rust@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
+  "rust_version": "1.98.1",
+  "nostr_version": "0.44.7",
+  "serde_json_version": "1.0.150",
+  "helper_lock_sha256": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+  "programs": {
+    "buzz": {
+      "package": "buzz-cli",
+      "package_version": "0.1.0",
+      "version_flag_supported": false
+    },
+    "haos-buzz-verify": {
+      "package": "haos-buzz-verify",
+      "package_version": "0.1.0"
+    }
+  },
+  "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1",
+  "messages_original_sha256": "8c5ff2a85a92f1b726fa00d5ee416b4707fccf616394bff7e4bad5c122ee1243",
+  "bounded_query_cursor_extension": "HAOS_BUZZ_BEFORE_ID",
+  "history_parser": "cmd_get_messages rejects invalid response JSON instead of substituting an empty list",
+  "HTTP_response_body_limits": {"success":8388608,"error":65536,"encoding":"strict UTF-8","scope":"actual CLI handle_response header and decoded chunk bounds"},
+  "prepublish_guard": "HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission",
+  "signed_replay": "HAOS_BUZZ_REPLAY_FD-v1: bounded SDK-verified original from inherited descriptor, exact own identity, same prepublication guard, no new signature",
+  "native_media_body_limit": "8388608 bytes before allocation, scoped native request/connect deadlines, bounded native error handler, actual Blossom signer unchanged",
+  "media_validation_original_sha256": "8416b3801cca06f1912ca8988a12db53895d1a5bf6f436851b86dc58b88239c4",
+  "generic_file_upload": "HAOS_BUZZ_GENERIC_FILES-v1: exact pinned relay MIME subset, sealed input, 8MiB before read, scoped deadline and bounded native response",
+  "uploaded_manifest": "HAOS_BUZZ_UPLOADED_FD-v1: sealed root-owned upload descriptors, actual native imeta builder, one guarded message for up to four files",
+  "maximum_glibc": "2.36"
+}

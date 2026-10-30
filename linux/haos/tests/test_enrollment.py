@@ -31,7 +31,7 @@ def root_file_identity(monkeypatch, tmp_path, uid=0):
     monkeypatch.setattr(e.os, "fchown", chown)
 
 
-@pytest.mark.parametrize("name", ["root", "hermes", "haos-agent", "haos-control", "haos-gateway", "haos-provider", "haos-viewer", "observer", "haos-a-test", "haos-a-"+'a'*24, "a;id", "-a", "A", "a" * 32])
+@pytest.mark.parametrize("name", ["root", "hermes", "haos-agent", "haos-control", "haos-gateway", "haos-provider", "haos-viewer", "haos-speech", "observer", "haos-a-test", "haos-a-"+'a'*24, "a;id", "-a", "A", "a" * 32])
 def test_reject_unsafe_or_reserved_identity(name):
     with pytest.raises((PermissionError, ValueError)):
         e.validate_name(name, "observer")
@@ -83,7 +83,8 @@ def test_only_fixed_cli_requires_new_password_authentication():
 
 
 @pytest.mark.parametrize("shared,groups", [(True, []), (False, [SimpleNamespace(gr_name="wheel", gr_gid=1500, gr_mem=[])]),
-                                         (False, [SimpleNamespace(gr_name="haos-ui", gr_gid=2000, gr_mem=["owner"])])])
+                                         (False, [SimpleNamespace(gr_name="haos-ui", gr_gid=2000, gr_mem=["owner"])]),
+                                         (False, [SimpleNamespace(gr_name="haos-speech", gr_gid=2000, gr_mem=["owner"])])])
 def test_account_rejects_aliases_and_authority_groups(monkeypatch, shared, groups):
     entry = SimpleNamespace(pw_name="owner", pw_uid=1500, pw_gid=1500)
     alias = SimpleNamespace(pw_name="alias", pw_uid=1500, pw_gid=1500)

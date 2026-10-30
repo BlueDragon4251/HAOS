@@ -1,0 +1,94 @@
+{
+  "parent_commit": "c6f72b151f64c329b1a204c5f480f8a147169093",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "09b0b307e0a476df6052c463563f72b8ad7e541551b2ddacf18f22c5ea85fa13"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "393c98c2ac9721353a6c9c4e2d459950e61ecff68773ebeea8478973b2891420"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "0bb732ed7ec8bbc8622e91c0d7fba8a6976300e28979a42131ed96f55495a3dd"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "6f6ee3c1380d4585329bdcec2d73094461345b566f3f2e5c51c6141589d3fcae"
+    },
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "35c1fbcbc2b5ea2e8a9545e313ae12d7c802507eee1f11d08aa3b1032bc8d589"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu.py",
+      "sha256": "87035b6004916d22e4b5346b8cfe67ecd259fc3d8f60f63f9a8e249aeb6f0914"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_tls.py",
+      "sha256": "d17df5b04ba9187c1e005979db458755874d6f4258449fdec78d220b064924c1"
+    },
+    {
+      "path": "linux/haos/runtime/prepare.py",
+      "sha256": "5865b2397bac476e5f2def23e24a6bf837ee3f8ca3291d8e50c5239b3e4be8ee"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_sdk.py",
+      "sha256": "4f565a11736a92c29107ee6a992f9d69717ec5116a3b8c2d5a5f68520567a71a"
+    },
+    {
+      "path": "linux/haos/runtime/source.json",
+      "sha256": "d51bdc298607c0cb815a9681031cee95c7f997b85a5418ee326fe69aee42b987"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu.py",
+      "sha256": "05c8f9a89902f38a523ddc07b46f4a21b7777abcae15f061607a083d7d47ffe7"
+    },
+    {
+      "path": "linux/haos/tests/test_runtime.py",
+      "sha256": "3e320b10c07b9ba387766755715b1829ef90b32041beb10c9a9a6a40105e2282"
+    }
+  ],
+  "checks": {
+    "minimal_without_hermes_source": "1790 passed, 2 existing skips",
+    "full_frozen_feishu_runtime": "1790 passed, 2 existing skips",
+    "actual_gateway_kernel_uid_socket_suite": "92 passed",
+    "native_Hermes_Lark_SDK_builders_models_and_loopback_HTTP": "9 passed",
+    "frozen_sync_plus_existing_hash_overlay": "succeeded; uv pip check compatible",
+    "workflow_and_build_syntax": "YAML parses and bash -n passes"
+  },
+  "runtime_delta": {
+    "added": {
+      "requests-toolbelt": "1.0.0",
+      "lark-oapi": "1.6.8"
+    },
+    "removed": {},
+    "changed": {}
+  },
+  "lock_wheel_hashes": {
+    "lark-oapi==1.6.8": "9b443a5d47a7d204dd42dc40896c8b75087cc35788e45c48c140806d7df7e5e8",
+    "requests-toolbelt==1.0.0": "cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06"
+  },
+  "log_sha256": {
+    "feishu-identity-final-minimal.log": "077f346ffc9b7cb93a3bc206481499bce2909f6cd9bd4de1e3332c53783526be",
+    "feishu-identity-final-full-aligned.log": "4a9f79344906d9e29adafcc35d796ec0c529e25a805a3054d6fcc18001eabecb",
+    "feishu-identity-kernel.log": "d05ba2dcf7f32bb0bb1b04887c8ef3357336cee192704396219c351bd5421b8a",
+    "feishu-frozen-sync.log": "69ad2c72d4cb44e5ed103ea6d1150ce845b3f6f763c937bf12a2e9b64fe01e9a",
+    "feishu-overlay-install.log": "f4c02ec0f8d1b2cc4cb7795c3520e26d318f86dbea2de7a3bea6195582c62394",
+    "feishu-native-sdk-final.json": "369d92899e198233faa5f84626f7cad0a19fbb2a256e5cd07dc8d6ef9d431482",
+    "feishu-native-sdk-final.log": "369d92899e198233faa5f84626f7cad0a19fbb2a256e5cd07dc8d6ef9d431482",
+    "feishu-runtime-package-delta.json": "7637e98f0f27c687be15b01456a46b9de4b2bf1daeeb871c0de8c60bb39954fb"
+  },
+  "public_gateway_paths": 11,
+  "public_feishu_enabled": false,
+  "limits": [
+    "Feishu identity/SDK foundation only; no HAOS transport/delivery/recovery/GUI integration yet.",
+    "Native SDK HTTP destinations are loopback fixtures with invented app credentials; no external messages or live account.",
+    "No installed OS, hardware or release artifact acceptance.",
+    "Initial runtime preparation correctly refused an already-overlaid source copy; in the isolated new copy only, exact original metadata/auxiliary hashes were verified before reapplying the approved overlay. Existing working upstream/runtime and owner data were preserved.",
+    "Pytest and its two pinned local test dependencies are development-only; the final package comparison preserves all prior versions and adds only the two frozen Feishu SDK packages.",
+    "Ordinary suite backup exclusion and two existing skips unchanged; actual kernel tests remain separate."
+  ]
+}

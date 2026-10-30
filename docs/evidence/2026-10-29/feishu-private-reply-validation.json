@@ -1,0 +1,137 @@
+{
+  "parent_commit": "23fcdae06552f94599b95eb13592b6a9c240d869",
+  "parent_CI": "all six successful; freshly checked before saving this follow-up, not attributed to its uncommitted source",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "5989aaaf40dbbf1219606d240874f189855cc8610d8123432c88d2d01af670a0"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "5244ff1641878ea41ae282137f49362e865d3e1661e311410064db9933f98803"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "9611bde66b5998fca71ef2b7098a26ef2ffc246f3e39fce9c40432cfa88a574d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_http.py",
+      "sha256": "bade4afcde3d32da33cd6a2a63d73775b0f4fca16d394ba4bcf0e547a2252ad8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_reply_http.py",
+      "sha256": "ea0a58e27343bedcb4578497f72b82460bb8785db8cbb62765da0dc87ed87905"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_send.py",
+      "sha256": "647f7566a74a0bb80d80512a0de4195942818beb04d24332ff834ced85fb7d37"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_delivery.py",
+      "sha256": "4a2f4d3c2e678751b99dd1da2c087814efec643ed44a2d25300dde07b1df1834"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_process.py",
+      "sha256": "e61ef2b32f5093c30ae3b6e529cabefd27ac197d52a07e58ac0249df15a97130"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_worker.py",
+      "sha256": "a5b2cef4ffc4d4c8e515f34e42bec1fdb9aac6005e6d6fe88a939512a946d86e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_profile.py",
+      "sha256": "0dda255679c14a6c6f98be4a533cf5a1770edc575f2535661fbc6c0864d18352"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_process.py",
+      "sha256": "27cffd4dcf424925829ccede6c0f957165267324b544f59dd48150522dca3076"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_reply_http.py",
+      "sha256": "4432cf2a87c577df55e0bfab97d6c63fafeef12199d86e3719cbb76af1f7fd46"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_send_codec.py",
+      "sha256": "941a85f0de3846c169f002e8d92c6c1c7bf62b800e5872d0339a9c6c61770888"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_process.py",
+      "sha256": "a2c221eccb6cf18e68f1d06e5e0d469b3a5f4f83933d770e4072c747a8e07432"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_reply_http.py",
+      "sha256": "f2cf65c0b50d000a01aad36ed256f2aa41fb0b6eb2751464b4bb9f5c5b0a4191"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1915 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1915 passed, 2 existing skips",
+    "actual_native_read_SDK_TLS_regression": "19 passed",
+    "native_reply_formatter_send_and_SDK_builders": "5 passed, API response stub explicitly limited to codec fixture",
+    "native_reply_SDK_verified_TLS": "11 passed",
+    "actual_UID_private_profile_worker_reply_SQLite_and_backoff": "21 passed",
+    "build_shell_workflow_yaml_and_diff": "passed"
+  },
+  "native_process_report": {
+    "passed": 21,
+    "cases": [
+      "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+      "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+      "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+      "actual_private_worker_wrong-bot_refused_without_false_success",
+      "actual_private_worker_401_refused_without_false_success",
+      "actual_private_worker_429_refused_without_false_success",
+      "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+      "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+      "actual_root_wrong-scope_refused_before_private_SDK_network",
+      "actual_root_own-bot_refused_before_private_SDK_network",
+      "actual_root_writable-policy_refused_before_private_SDK_network",
+      "actual_root_pending-publication_refused_before_private_SDK_network",
+      "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+      "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+      "actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check",
+      "actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate",
+      "actual_private_worker_native_reply_confirmation_is_durable_duplicate_suppressed_and_changed_body_denied",
+      "actual_native_reply_connection_drop_remains_uncertain_across_publisher_reopen_and_new_attempt_without_second_write",
+      "actual_native_HTTP_200_rate_code_persists_account_backoff_across_publisher_reopen_and_other_delivery_without_new_API_write",
+      "actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input",
+      "actual_root_identity_is_refused_before_worker_reads_or_network"
+    ],
+    "actual_uids": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+    "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+    "owner_publication_and_account_are_fixtures": true,
+    "public_feishu_enabled": false,
+    "external_messages_live_account_or_installed_acceptance": false
+  },
+  "log_sha256": {
+    "feishu-reply-minimal-final.log": "3e180fff86982d72c1cfc7274db394b072c60b9cd08158c6e74901d26390c1fe",
+    "feishu-reply-full.log": "abd249741a7d3e5269d8d4d0e9579976603e8673b7a2a9f1a0ba812869b3f66e",
+    "feishu-reply-read-regression.json": "299dcd71d939fcd4fed931c2fddd8212572cfbc7d77322d525bedc6d3bda9d48",
+    "feishu-reply-read-regression.log": "299dcd71d939fcd4fed931c2fddd8212572cfbc7d77322d525bedc6d3bda9d48",
+    "feishu-send-codec-final.json": "c21be4f4b8df76a7b567c939b597f5f9fdcc9f8f792905e5d0a6428d6d44c146",
+    "feishu-send-codec-final.log": "c21be4f4b8df76a7b567c939b597f5f9fdcc9f8f792905e5d0a6428d6d44c146",
+    "feishu-reply-http-final.json": "d7cd5b0611ebbf8240db10f4cb72b05c6935272af0a5943bd10270ddb381b0c7",
+    "feishu-reply-http-final.log": "d7cd5b0611ebbf8240db10f4cb72b05c6935272af0a5943bd10270ddb381b0c7",
+    "feishu-reply-process-backoff.log": "6ef7c21358a7d64bb629daa4581fc58aebe69dd6a8af09947e4b1cea21a42e20"
+  },
+  "contracts": [
+    "one native reply to committed independently admitted original, current exact chat/topic/read grant and stable UUID",
+    "sealed actual native text/post codec, no hidden retry/post fallback/top-level route escape",
+    "FULL-synchronous write intent before private worker launch; exact native acceptance or known rejection or uncertainty only",
+    "confirmed duplicate suppressed and changed body denied; unknown response quarantined after publisher reopen and later attempt",
+    "account rate backoff and authentication block persist independently of publication and delivery IDs",
+    "no private credentials in SDK/native diagnostics or finite worker results"
+  ],
+  "limitations": [
+    "Actual SIGKILL during outgoing write and owner independent adjudication/recovery remain to verify/integrate.",
+    "Media/voice, websocket and public owner publication/GUI still open.",
+    "All network replies only to local fixtures; no real external account, external messages, recipient-read proof, installed OS or hardware acceptance.",
+    "Feishu remains publicly disabled."
+  ]
+}

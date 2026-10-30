@@ -1,0 +1,56 @@
+{
+  "base_commit": "1881a2076c814f0ca821aa7d1849e4e9f572e19f",
+  "before": "same actual PTB/SQLite probe against an immutable archived predecessor advanced offset while local admission failed; no successful receipt",
+  "before_log_sha256": "59a805f4600889697493d44c80b4c297337902aaa6b15ab7735976248a53cfde",
+  "actual_native_sdk_failure_and_disconnect_cases": 2,
+  "observed_offsets_per_case": [
+    0,
+    0,
+    13,
+    13
+  ],
+  "independent_sqlite_reader_saw_commit_before_confirmation": true,
+  "legacy_native_receipt_file_preserved": true,
+  "same_process_replacement_adapter_namespace_checked": true,
+  "full_tests": {
+    "passed": 979,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 979,
+    "existing_skips": 2
+  },
+  "unchanged_local_root_only_backup_exclusion": true,
+  "external_telegram_connected": false,
+  "all_five_predecessor_ci_gates_successful": "1881a2076c814f0ca821aa7d1849e4e9f572e19f",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_telegram.py",
+      "sha256": "421b2db7e95c33c03e29c4a3ee387b6f653a04fe2977af84d52b9790fe8f4f6a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "1d239ccfb5900c9ee89fe249f9a01c19e761b9416937edd60a9f9f6180859846"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f26c927c5f3db2b4fa4b3d57d0b14294b3abb07b31344c516c1e12a7d6eaeae3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_telegram_polling.py",
+      "sha256": "27a5f6c659edcdebfa51f33be0895becdd5051ab162c6fc94056aa021034d3b2"
+    },
+    {
+      "path": "linux/haos/runtime/probe_gateway_ingress.py",
+      "sha256": "c5aecaf447c6c6b78779c82802e5d45a53ec28824d1bcd527e09ec3a760d4ef2"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "13ddb4984bc88e63dd6c1c43b43b3c167be632e7eb34ecc1c41501a5d82cbd8d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "3f317fceed8659349c3a1bc8210375ac208d2425bd1a33d674342f9aabbb2acb"
+    }
+  ]
+}

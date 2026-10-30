@@ -1,5 +1,16 @@
 # Known limitations
 
+- 2026-10-24 gateway continuation: native Telegram, Discord and Slack text paths
+  now have owner setup and exact sender/context grants. Slack uses separate
+  private bot/app tokens, durable capture before Socket Mode ACK, actual SDK
+  reconnect, reviewed outgoing certainty and platform-specific owner recovery.
+  These are local SDK/HTTP/WebSocket/kernel contracts, not live provider or
+  external delivery acceptance. Owner-bounded Slack history recovery now has
+  actual local SDK/HTTP/SQLite proof; remote retention and permissions remain
+  prerequisites. Complete media/voice, nineteen further gateways, Android continuous
+  desktop control, optional phone firstboot and consistent installed artifacts
+  remain open. Exact sources: `evidence/2026-10-24/slack-owner-delivery-validation.json`.
+
 - October 11 continuation: the exact `699bc82` diagnostic replay reached the
   installed theme gate but its observer subprocess exited 1; the old wrapper
   concealed the assertion. New fixed, private-safe diagnostic phases preserve

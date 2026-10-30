@@ -1,0 +1,43 @@
+{
+  "model_fixture_source_sha256": {
+    "probe_codex_account.py": "f18c3f1ab7697acb3bda85f37362460312def571431a20af583ec11462486827",
+    "probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "actual_refreshed_codex_broker_sdk_model_cases": [
+    "success:stream",
+    "success:abort",
+    "success:401",
+    "success:429",
+    "pending:stream",
+    "pending:abort",
+    "pending:401",
+    "pending:429"
+  ],
+  "model_case_count": 8,
+  "actual_codex_account_cases": [
+    "success",
+    "pending",
+    "invalid-device",
+    "device-rate-limit",
+    "denied",
+    "missing-code",
+    "missing-token",
+    "refresh-denied",
+    "refresh-rate-limit"
+  ],
+  "case_count": 9,
+  "actual_device_pkce_refresh_rotation": true,
+  "native_private_storage_status_broker_logout": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_codex_account.py",
+      "sha256": "f18c3f1ab7697acb3bda85f37362460312def571431a20af583ec11462486827"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "fcd72c6ff721bd2509213addf9137b534582d9c1fc9367f38512892896d962e5"
+    }
+  ]
+}

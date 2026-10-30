@@ -1,0 +1,49 @@
+{
+  "recorded_UTC": "2026-10-30T20:44:29.497467+00:00",
+  "base_commit": "854d6c67c61f1ac03830b5101420b97f64d50dec",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "c6ebc6fd81cfce21888cd42e29a27b6ed9c7daa87868e7f4e79cc73aca2d3cac"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "a0034daa42a7221b2fcb4c77daf35d5e99c454545f61e50ca91bd8134e5c6f99"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_status.py",
+      "sha256": "d61bc90644d9f3e58e4aad113a15aebf78e52e3f4021f677fa8c59113a02be90"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_status_process.py",
+      "sha256": "f02c090250d62ac751c67b4df78e908fc99692b7bbe9761434501f73d1a1dc34"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_status.py",
+      "sha256": "d4b7c51b84c35abed6a0af6536de459a05641dce3b07b522f0249de1615500b2"
+    }
+  ],
+  "actual_private_status": {
+    "passed": 8,
+    "cases": [
+      "actual_private_UID_absent_status_never_creates_a_journal",
+      "actual_WAL_snapshot_selects_exact_account_credential_connector_without_mutation",
+      "rotated_key_without_profile_cannot_hide_persisted_account_retry_budget",
+      "actual_kernel_profile_lease_does_not_block_readonly_status_or_require_service_stop",
+      "malformed_status_missing_budget_and_partial_schema_refused_without_repair_or_private_payload",
+      "actual_kernel_database_WAL_and_SHM_permissions_checked_without_repair",
+      "actual_hardlink_and_symlink_status_paths_refused_and_preserved",
+      "withdrawn_authority_denied_and_optional_network_SDKs_never_imported"
+    ],
+    "actual_UID_SQLite_WAL_kernel_lease_and_filesystem": true,
+    "optional_SDK_or_Hermes_imported": false,
+    "network_requested": false,
+    "foreign_Root_agent_and_supplementary_Root_group_denied": true
+  },
+  "minimal_regression": "3229 passed, 2 skipped in 17.47s",
+  "full_frozen_regression": "3229 passed, 2 skipped in 18.04s",
+  "scope": "SDK-free readonly status component and actual UID/filesystem/WAL/lease checks; not yet an authenticated Owner GUI/CLI path, public Photon activation, live account or installed OS acceptance",
+  "external_messages_sent": false
+}

@@ -13,6 +13,27 @@ from haos import gateway_setup, owner
 from haos.store import Conflict, MissionStore
 
 
+@pytest.mark.parametrize('receipt',['42','1.2','0.000001','1792800000.000042'])
+def test_slack_owner_recovery_requires_inspected_platform_timestamp(tmp_path,receipt):
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'slack'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':'U42','chat':'C123','scope':'T999','thread':'',
+         'identity':'principal','capabilities':['create','read']}]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'bot',{'platform':'slack','sender':'U42','chat':'C123','scope':'T999','thread':'',
+            'message_id':'1792800000.000001','is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy)
+        engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request={'delivery_id':delivery['id'],'attempt':1,'decision':'delivered','owner_uid':1000,
+            'note_sha256':'a'*64,'receipt':receipt,'confirmed_not_delivered':False}
+        if receipt=='1792800000.000042':
+            assert reconcile(store,policy,request)['state']=='delivered'
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()
+
+
 @pytest.fixture
 def outbox(tmp_path):
     tmp_path.chmod(0o700)
@@ -30,6 +51,52 @@ def outbox(tmp_path):
     engine.acknowledge(policy, delivery["id"], {"attempt": 1, "status": "uncertain"})
     yield store, engine, config, delivery
     store.close()
+
+
+@pytest.mark.parametrize('receipt',['line_push_'+'a'*64,'1234','irc_echo_'+'a'*64,'line_push_'+'z'*64])
+def test_line_owner_recovery_checks_server_acceptance_receipt_without_resending(tmp_path,receipt):
+    sender='U'+'a'*32;scope='U'+'d'*32
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'line'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':sender,'chat':sender,'scope':scope,'thread':'',
+         'identity':'principal','capabilities':['create','read'],'generation':'b'*64,'since':1}]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'bot',{'platform':'line','sender':sender,'chat':sender,'scope':scope,'thread':'',
+            'message_id':'a'*64,'is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy)
+        engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request=decision(delivery,decision='delivered',receipt=receipt,confirmed_not_delivered=False)
+        if receipt=='line_push_'+'a'*64:
+            assert reconcile(store,policy,request)['state']=='delivered'
+            assert engine.next_delivery(policy) is None
+            assert store.db.execute('SELECT receipt FROM gateway_outbox').fetchone()[0]==receipt
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()
+
+
+@pytest.mark.parametrize('receipt',['sms_push_'+'a'*64,'1234','irc_echo_'+'a'*64,'sms_push_'+'z'*64])
+def test_sms_owner_recovery_checks_server_acceptance_receipt_without_resending(tmp_path,receipt):
+    sender='+12025550101';scope='AC'+'a'*32+':+12025550100'
+    policy=GatewayPolicy({'version':1,'connectors':[{'id':'bot','platform':'sms'}],'bindings':[
+        {'id':'paired','connector':'bot','sender':sender,'chat':sender,'scope':scope,'thread':'',
+         'identity':'principal','capabilities':['create','read'],'generation':'b'*64,'since':1}]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'bot',{'platform':'sms','sender':sender,'chat':sender,'scope':scope,'thread':'',
+            'message_id':'a'*64,'is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy)
+        engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request=decision(delivery,decision='delivered',receipt=receipt,confirmed_not_delivered=False)
+        if receipt=='sms_push_'+'a'*64:
+            assert reconcile(store,policy,request)['state']=='delivered'
+            assert engine.next_delivery(policy) is None
+            assert store.db.execute('SELECT receipt FROM gateway_outbox').fetchone()[0]==receipt
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()
 
 
 def decision(delivery, **changes):
@@ -178,3 +245,31 @@ def test_owner_wrapper_checks_stopped_services_before_reading_or_delegating(monk
     with pytest.raises(PermissionError, match="active"):
         owner_delivery(None, {})
     assert calls == (["gateway"] if guard == "gateway" else ["gateway", "runtime"])
+
+
+@pytest.mark.parametrize('reason',['media-export-unavailable','media-export-or-format-refused','private-vendor-body-with-credentials'])
+def test_recovery_exposes_only_reviewed_public_media_failure_codes(outbox,reason):
+    store,_,_,_=outbox
+    store.db.execute("UPDATE gateway_outbox SET state='failed',error=?",(reason,))
+    row=unresolved(store)['deliveries'][0]
+    if reason.startswith('media-export-'):assert row['reason']==reason
+    else:assert 'reason' not in row and reason not in str(row)
+
+
+@pytest.mark.parametrize('receipt',['haos-dingtalk-'+'a'*64,'1234','haos-dingtalk:'+'a'*64,'haos-dingtalk-'+'z'*64])
+def test_dingtalk_owner_reconciliation_accepts_only_local_API_acceptance_proof_without_resend(tmp_path,receipt):
+    from test_gateway_dingtalk import binding
+    b=binding();policy=GatewayPolicy({'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[b]})
+    store=MissionStore(tmp_path/'missions.db');engine=GatewayEngine(store)
+    try:
+        asyncio.run(engine.receive(policy,'dingtalk',{'platform':'dingtalk','sender':b['sender'],'chat':b['chat'],
+            'scope':b['scope'],'thread':'','message_id':'observed-source','is_bot':False,'text':'fixture mission'},None))
+        delivery=engine.next_delivery(policy);engine.acknowledge(policy,delivery['id'],{'attempt':1,'status':'uncertain'})
+        request=decision(delivery,decision='delivered',receipt=receipt,confirmed_not_delivered=False)
+        if receipt=='haos-dingtalk-'+'a'*64:
+            assert reconcile(store,policy,request)['state']=='delivered' and engine.next_delivery(policy) is None
+            assert store.db.execute('SELECT receipt FROM gateway_outbox').fetchone()[0]==receipt
+        else:
+            with pytest.raises(ValueError):reconcile(store,policy,request)
+            assert store.db.execute('SELECT state FROM gateway_outbox').fetchone()[0]=='uncertain'
+    finally:store.close()

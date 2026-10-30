@@ -1,0 +1,108 @@
+{
+  "recorded_UTC": "2026-10-30T20:26:17.633075+00:00",
+  "base_commit": "411a82c8024080b0dd23b69bd17b7c30aa00dd45",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "bc8d37e3f84586c6e98c1a77868114c42c0339214409330e0333e9ee033d23f2"
+    },
+    {
+      "path": "docs/GATEWAY-SPEECH.md",
+      "sha256": "346d0f9202b6b6db7b4c67d5ea23fcf33b5917537c67070323cecdc903c33996"
+    },
+    {
+      "path": "linux/haos/haos/speech.py",
+      "sha256": "6a570c88f83db7d0539d95b617c21bab0c9c9ae94be0964b0423fd71ecca0c37"
+    },
+    {
+      "path": "linux/haos/probes/probe_speech_process.py",
+      "sha256": "eb5861aac24d49828eb7cd6a9aaa0b0f56a3934d428fd7dec62e20c0d7379f71"
+    },
+    {
+      "path": "linux/haos/runtime/caf_fixture.py",
+      "sha256": "f15850cbc58b81a5befbbb95602d6049459e5abab643ebcb5c2d3c461e1ce020"
+    },
+    {
+      "path": "linux/haos/runtime/probe_speech_backend.py",
+      "sha256": "1129cd46a896c78f1c68cacc7c9e03ef8709219aaa1d6000758d500d957f87ac"
+    }
+  ],
+  "native_backend": {
+    "passed": 11,
+    "cases": [
+      "actual_decoder_empty_refused",
+      "actual_decoder_unknown_refused",
+      "actual_decoder_too_long_refused",
+      "actual_decoder_three_channels_refused",
+      "actual_decoder_playlist_refused",
+      "actual_flac_decode_preserves_reference_duration_as_bounded_mono_pcm",
+      "actual_aac_m4a_container_roundtrip_is_accepted_without_external_protocols",
+      "actual_CAF_decoder_preserves_exact_approved_PCM_without_external_protocols",
+      "actual_CAF_cannot_bypass_existing_two_minute_voice_limit",
+      "actual_pinned_hermes_local_engine_recognizes_reference_without_account_or_lazy_install",
+      "actual_pinned_hermes_local_engine_recognizes_Photon_CAF_voice_without_cloud_or_path_input"
+    ],
+    "native": {
+      "source_sha256": "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715",
+      "samples": 176000,
+      "sample_rate": 16000,
+      "model_revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "provider": "local"
+    },
+    "external_account_line_voice_or_installed_acceptance": false
+  },
+  "actual_Speech_UID_and_controller_Unix_RPC": {
+    "passed": 18,
+    "cases": [
+      "actual_pinned_hermes_whisper_transcription_under_separate_uid",
+      "actual_Photon_CAF_decode_and_native_Whisper_under_separate_credential_free_speech_UID",
+      "actual_Photon_CAF_checked_controller_UID_Unix_RPC_to_pinned_speech_worker",
+      "actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity",
+      "actual_container_network_disabled_and_reviewed_model_bytes_used_offline",
+      "actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket",
+      "actual_gateway_uid_rpc_runs_bounded_pinned_worker_and_refuses_extra_caller_path",
+      "actual_client_disconnect_kills_and_joins_native_worker_without_orphan",
+      "actual_controller_uid_checked_client_accepts_root_activated_socket_and_aborts_on_owner_callback_revocation",
+      "actual_gateway_and_controller_UID_Opus_conversion_uses_separate_credential_free_worker_and_checked_receipt",
+      "actual_90_second_Opus_reply_exceeds_text_reply_limit_and_preserves_duration_without_truncation",
+      "actual_gateway_and_controller_UID_AMR_NB_conversion_uses_separate_credential_free_worker_checked_duration_and_owner_revocation",
+      "actual_90_second_AMR_reply_exceeds_text_reply_limit_without_truncation_or_unbounded_source",
+      "actual_gateway_and_controller_UID_MP4_preview_runs_in_credential_free_worker_with_source_bound_PNG_dimensions_and_duration",
+      "actual_checked_thumbnail_client_preserves_long_binary_reply_and_revocation_kills_worker",
+      "actual_root_owner_activation_checks_real_frozen_sdk_and_model_then_publishes_closed_readable_config_without_redownload",
+      "actual_root_owner_disable_archives_configuration_and_preserves_all_model_data",
+      "actual_sdk_metadata_version_mismatch_refuses_owner_activation_without_mutating_retained_settings"
+    ],
+    "native_receipt": {
+      "source_sha256": "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715",
+      "model_revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "transcript_sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec",
+      "samples": 176000,
+      "caf_source_sha256": "059a253065eadc6611796066a04d116437d849b263185fde555db560a41c4648",
+      "caf_transcript_sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec"
+    },
+    "actual_uid": 65530,
+    "owner_service_control_is_fixture": true,
+    "external_stt_account_or_line_voice_acceptance": false,
+    "live_gateway_video_playback_or_installed_acceptance": false
+  },
+  "baseline_decoder_failure": {
+    "source_commit": "411a82c8024080b0dd23b69bd17b7c30aa00dd45",
+    "source_module": "linux/haos/haos/speech.py",
+    "fixture": "actual pinned PyAV-encoded valid CAF from approved public reference audio; same new backend fixture before format allowlist correction",
+    "error": "SpeechRefused: audio cannot be decoded as bounded voice",
+    "log_sha256": "918fa326fabb3cecd96f587beca378cf124e31a4deb18cc2e5e4de5a41b0e2f6"
+  },
+  "minimal_regression": "3207 passed, 2 skipped in 23.17s",
+  "full_frozen_regression": "3207 passed, 2 skipped in 21.73s",
+  "claims": {
+    "actual_pinned_local_ASR": true,
+    "actual_Speech_UID_and_kernel_Unix_RPC": true,
+    "external_messages_sent": false,
+    "full_Photon_native_media_controller_acceptance": false,
+    "live_Photon_account_or_OS_release": false
+  },
+  "next": "Actual native Photon attachment RPC pipeline, complete controller/media transfer and output, secure Owner account/GUI/CLI and inspected recovery before17; continue remaining five gateways."
+}

@@ -1,0 +1,25 @@
+{
+  "provider": "moa",
+  "actual_upstream_fanout_and_aggregation": true,
+  "broker_bound_requests": 3,
+  "private_provider_keys_in_agent_config": false,
+  "live_provider_tested": false,
+  "derived_auxiliary_client_sha256": "a6652992f7aa2483db345d7d1510f5b219d32c9de0859dd4dd6269126e4fddaa",
+  "delayed_reference_finalization_handoff": true,
+  "native_protocols_by_route": {
+    "ref-one": "codex_responses",
+    "ref-two": "chat_completions",
+    "acting": "anthropic_messages"
+  },
+  "outer_stream": true,
+  "aborted_native_stream_refused": false,
+  "first_aggregator_delta_before_terminal": true,
+  "source_sha256": {
+    "probe_moa_provider.py": "f053475d570b842b895346e4cb7e255f2263f6c2adfad4da736522d2b06feb71",
+    "provider_proxy.py": "ad3d736ebaf09dd1867ce777e3b8015e9d70d74e89756bdd3b8e9288e9291caf",
+    "provider_moa_streams.py": "540a308bdf47c4f54783a28442abac6a1c5fbbfc26a1d21bd8e00be9c361cd19",
+    "provider_profiles.py": "7812df91847efc62899c0601943720f7ce546b2da5508bc83cfccccb7d71c8ed",
+    "prepare.py": "e4d7bceae623348e733879e401affbd215fff7dc86a89a224372c41d8f497c59",
+    "source.json": "fbcdc3f424ff17aa3272843d01df9fbb444cfe6950b96a015bcbe621cedbd078"
+  }
+}

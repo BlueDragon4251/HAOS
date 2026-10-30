@@ -1,0 +1,50 @@
+{
+  "base_commit": "37280186cb478dbe911c5a1c14c17c83ffdfc620",
+  "before": "actual Anthropic SDK JSON lost arbitrary reserved-name tool input and renamed protocol-shaped nested user data; streaming input was unchanged",
+  "full_tests": {
+    "passed": 959,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 959,
+    "existing_skips": 2
+  },
+  "local_exclusion": "unchanged root-only test_backup.py; root/UID/kernel CI remains required",
+  "live_provider_tested": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/provider_messages.py",
+      "sha256": "407c5eb0af48c27f83099ccfb03502cfd81abc94f4c48a1bf337860e4af85180"
+    },
+    {
+      "path": "linux/haos/haos/provider_response_replay.py",
+      "sha256": "9932ccad8f8a232c04de4ab4566ae5b8a03abe67e6d8fbe8170d80303e6cd100"
+    },
+    {
+      "path": "linux/haos/runtime/probe_messages_provider.py",
+      "sha256": "92fdc9ae63f52428cd664ad535caab7214622126346e4a789960980256fe3589"
+    },
+    {
+      "path": "linux/haos/tests/test_provider.py",
+      "sha256": "91271b35f852268eb440fb31e81a8bcaa4a1f30add03afede63806097cf17af4"
+    }
+  ],
+  "receipts": [
+    {
+      "file": "tool-arguments-messages.json",
+      "sha256": "849d3379f7fa46724251cf1d68803c9f7dac0949b860cbe2e9f84ab0c9edacbb"
+    },
+    {
+      "file": "tool-arguments-http.json",
+      "sha256": "5dd939dfe2c93750fe0c3bcb62921b9a541c87784110f3defc319fee34c1c509"
+    },
+    {
+      "file": "tool-arguments-aws.json",
+      "sha256": "d99ea40f23640ce1b25e832d38414cb6073ba8d612a53bf15d29d817ebdcb37d"
+    },
+    {
+      "file": "tool-arguments-moa.json",
+      "sha256": "8ac8e041d95b0197d577a3fbbda979837b6cb4f0de410bead573a4bd9ccc3919"
+    }
+  ]
+}

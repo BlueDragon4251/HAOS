@@ -1,0 +1,62 @@
+{
+  "source_base_commit": "f1bff80ed1dbc92b010ed2133c619d4bee256795",
+  "source_working_tree_dirty": true,
+  "upstream": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "minimal_without_hermes": {
+    "passed": 822,
+    "skipped": 2
+  },
+  "full_with_pinned_hermes": {
+    "passed": 822,
+    "skipped": 2
+  },
+  "http_profile_sdk_cases": 351,
+  "native_gemini_http_cases": 6,
+  "native_aws_http_cases": 20,
+  "converse_cases": 6,
+  "converse_replay_http_requests": 8,
+  "cloud_sdk_http_cases": 49,
+  "native_messages_sdk_cases": 6,
+  "root_backup_uid_tests": "separate required CI gate",
+  "live_inference_tested": false,
+  "installed_boot_tested": false,
+  "regression_reproduced_before_fix": {
+    "source": "f1bff80ed1dbc92b010ed2133c619d4bee256795",
+    "gemini": "finish event forwarded before short HTTP body failure",
+    "mantle": "missing last HTTP chunk accepted by stdlib readline"
+  },
+  "source_files": [
+    {
+      "path": "docs/PROVIDER-PARITY.md",
+      "sha256": "def87e4596d2933ca5896e140dd15894a224ad2cf90ff60684eeafc6e3c35093"
+    },
+    {
+      "path": "linux/haos/haos/provider_bedrock_messages.py",
+      "sha256": "813c827fc7077aae4d6e7973b09efb097cf09b677949566d1b0d3ac7020acf58"
+    },
+    {
+      "path": "linux/haos/haos/provider_native.py",
+      "sha256": "3f063cc825fcb9cacf130a5696b2ce84388b9bfff6052cb101d0678ea247e1f0"
+    },
+    {
+      "path": "linux/haos/haos/provider_sse.py",
+      "sha256": "bf7642024c65a142f012f738eca2cb73c3d17465a5c2402ff2109b234c6d00f6"
+    },
+    {
+      "path": "linux/haos/runtime/probe_aws_native.py",
+      "sha256": "c966edc5e39f572e7277baaf82e51d9bdc5151107bbfca2e16e87db8edea2516"
+    },
+    {
+      "path": "linux/haos/runtime/probe_http_provider_matrix.py",
+      "sha256": "8da0f3ceb85b7cd961bd50f70f882458c07069d0ce6a83233fc4b8c14ba49aa0"
+    },
+    {
+      "path": "linux/haos/runtime/probe_native_provider.py",
+      "sha256": "d1386a44c6e28758bc0b04b2b4a1e4fc02076dbe62819b1e9706cd0ed3ebdce2"
+    },
+    {
+      "path": "linux/haos/tests/test_provider_sse.py",
+      "sha256": "ec4e188378989a0699cd656ba47488c228bbe32865d464e42e5f5448f37c7a99"
+    }
+  ]
+}

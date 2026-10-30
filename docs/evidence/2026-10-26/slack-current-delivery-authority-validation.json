@@ -1,0 +1,241 @@
+{
+  "baseline_commit": "f640a04081505dc091ef3b777b0e70f65352068e",
+  "baseline_negative_probe_exit_code": 1,
+  "baseline_negative_probe_failure": "forged-binding produced delivered instead of failed",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_delivery_authority.py",
+      "sha256": "de1eba4c6eab8d04e714055e2fde95350a4afd77dd2ef2910dc4e08ebdd82756"
+    },
+    {
+      "path": "linux/haos/haos/gateway_slack.py",
+      "sha256": "8f03fd9bbb989a99bce9401ee7a3dd5a392fcbdb231becb43d76f0ec77b59b64"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "4397e7fb886d0bc38aa0b20ab0fd3f84d1a5a6ae8305f4c639df7965186231c3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_delivery.py",
+      "sha256": "f90ec2827614723193929796d0cfab0b3e0918dce108f70ba87eec309a05c39d"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_delivery_authority.py",
+      "sha256": "713f26ace3bd6981b7f4572566ce80acd5a81a8d3c6e0c16797c06ac89603304"
+    }
+  ],
+  "baseline_negative_fixture_source_files": [
+    {
+      "path": "linux/haos/runtime/probe_slack_delivery.py",
+      "sha256": "9e0be2e4d49b9b773f60a8ca4ae82b8d0490b92335726d36c442cd04f068c57a"
+    }
+  ],
+  "native_delivery": {
+    "actual_native_sdk_http_outbox_cases": [
+      {
+        "case": "success",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "delivered"
+      },
+      {
+        "case": "server-format",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "format-refused",
+        "actual_http_posts": 2,
+        "reopened_outbox_state": "delivered"
+      },
+      {
+        "case": "rate-limit",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "pending"
+      },
+      {
+        "case": "forbidden",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "unknown-error",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "malformed",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "invalid-ts",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "wrong-receipt",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "disconnect",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "connect-refused",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "pending"
+      },
+      {
+        "case": "wrong-team",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "wrong-channel",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "thread-success",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "delivered"
+      },
+      {
+        "case": "forged-binding",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "missing-binding",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "policy-unavailable",
+        "actual_http_posts": 0,
+        "reopened_outbox_state": "failed"
+      },
+      {
+        "case": "revoke-between-chunks",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "uncertain"
+      },
+      {
+        "case": "revoke-before-format-fallback",
+        "actual_http_posts": 1,
+        "reopened_outbox_state": "failed"
+      }
+    ],
+    "external_slack_connected": false,
+    "source_files": [
+      {
+        "path": "probe_slack_delivery.py",
+        "sha256": "f90ec2827614723193929796d0cfab0b3e0918dce108f70ba87eec309a05c39d"
+      },
+      {
+        "path": "gateway_slack.py",
+        "sha256": "8f03fd9bbb989a99bce9401ee7a3dd5a392fcbdb231becb43d76f0ec77b59b64"
+      },
+      {
+        "path": "gateway_ingress.py",
+        "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+      },
+      {
+        "path": "gateway_runtime.py",
+        "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+      }
+    ]
+  },
+  "native_regression": {
+    "slack_ingress": {
+      "actual_sdk_socket_bolt_cases": [
+        "real Hermes task-local secret scopes isolate app tokens and refuse ambient provider credentials",
+        "actual SDK Socket Mode ACK follows independent-reader-visible capture; native Bolt reaches relay",
+        "different transport envelopes for same Slack message remain idempotent",
+        "unknown sender channel or workspace acknowledged as refused without HAOS authority",
+        "real SQLite capture failure suppresses SDK ACK and same source can retry",
+        "actual Bolt decoder failure after ACK survives reopen and reaches relay once",
+        "exact Slack thread admitted through native builder; other thread refused",
+        "current grant revocation and out-of-context native authority fail closed",
+        "late SDK callbacks cannot touch closed journal or acknowledge fresh input during shutdown",
+        "full actual native connect and SDK reconnect authenticate both tokens and durably receive from local WebSocket",
+        "same native adapter disconnect/reconnect creates one fresh authenticated Socket Mode receiver"
+      ],
+      "external_slack_connected": false,
+      "owner_gui_is_separate_fixture": true,
+      "full_gateway_live_media_history_acceptance_complete": false,
+      "source_files": [
+        {
+          "path": "probe_slack_ingress.py",
+          "sha256": "1baecdd1fec46daf4370a1a264aaa8d495bf0525ae043d2f3706fbc0cddcd1eb"
+        },
+        {
+          "path": "gateway_slack.py",
+          "sha256": "8f03fd9bbb989a99bce9401ee7a3dd5a392fcbdb231becb43d76f0ec77b59b64"
+        },
+        {
+          "path": "gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+        }
+      ]
+    },
+    "slack_history": {
+      "actual_sdk_http_history_cases": [
+        "real SDK descending pages retain one window; failed raw commit cannot advance page cursor",
+        "only exact authorized post-grant messages are captured; boundary equality and unknown sender refused",
+        "reopened raw input uses actual native decoder once; overlapping inclusive windows remain idempotent",
+        "crash after raw commit before provider cursor write replays without duplicate retained input",
+        "actual SDK invalid-cursor refusal restarts the same retained window safely",
+        "real SDK rate-limit delay survives scheduling and fixed permission status is owner-visible",
+        "root grant is rechecked after real HTTP completes, before admission or cursor advancement",
+        "repaired grants start a fresh boundary and legacy grants do not fetch historic conversations",
+        "original provider timestamp is atomic and expired missed messages stay retained without execution",
+        "future or out-of-window provider data cannot advance committed history floor",
+        "actual SDK replies endpoint and native decoder preserve exact thread grant; parent is not a flat grant"
+      ],
+      "external_slack_connected": false,
+      "remote_retention_deleted_messages_recoverable": false,
+      "source_files": [
+        {
+          "path": "probe_slack_history.py",
+          "sha256": "350ce4c8d5a43f4d1b2a5d5ed54f37e87f5886a5578d31b6f29e293737689d74"
+        },
+        {
+          "path": "gateway_slack_history.py",
+          "sha256": "30fc130e62e81ff5af03cf5969ea002a836f7c61d32eb4634ded8c42d11ca08e"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+        },
+        {
+          "path": "gateway_raw_recovery.py",
+          "sha256": "ea37f8b57d1612bdcafe3181d1b3dbe014802cc3361da50e250dc609b8c5fd80"
+        }
+      ]
+    }
+  },
+  "full_runtime": {
+    "passed": 1201,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath": {
+    "passed": 1201,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_recovery": {
+    "passed": 51,
+    "new_actual_root_policy_file_to_gateway_uid_cases": 2,
+    "network": "none"
+  },
+  "existing_local_excluded_file": "linux/haos/tests/test_backup.py",
+  "new_ci_skips": false,
+  "other_transport_authority_checks_not_changed": true,
+  "external_messages_live_accounts_installed_or_release_accepted": false
+}

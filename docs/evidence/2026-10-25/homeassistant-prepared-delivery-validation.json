@@ -1,0 +1,63 @@
+{
+  "base_commit": "c05e02b7af6c237a8073285ae1179636ff2f852a",
+  "native_homeassistant_cases": {
+    "ingress": 24,
+    "websocket_auth_subscription": 23,
+    "notification_delivery_and_outbox": 22
+  },
+  "actual_reopened_mission_outbox_cases_included": 6,
+  "public_homeassistant_enabled": false,
+  "reviewed_public_text_gateway_paths": 6,
+  "explicit_shared_notification_audience_required": true,
+  "actual_root_uid_socket_regression_cases": 47,
+  "full_tests": {
+    "passed": 1151,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1151,
+    "existing_skips": 2
+  },
+  "external_notification_or_tls_account_accepted": false,
+  "agent_device_tools_enabled": false,
+  "installed_boot_or_release_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway.py",
+      "sha256": "fc4b872ecfaa178ef751b18e0b668dfa73a4a1397a705b7543506f2a124b08f4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_ingress.py",
+      "sha256": "1571e41758ff5aeb229199c4dce4ad4027e052b27b90e90ac73d6a7dafe783d1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_delivery.py",
+      "sha256": "44186d5779bc0f1980b8eebb9bab5dfe52fc8d288eefb38328d2428aaafaa10e"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_delivery.py",
+      "sha256": "16522e2618f01b37c6f4cae1eb74d48b9b44cc6305b7cdbc0ecd4e0c26fee716"
+    },
+    {
+      "path": "linux/haos/runtime/homeassistant-protocol-source.json",
+      "sha256": "7e5d63743f156a9c6a934e06f77b68d23276d46324602578e0b7c720f2384fe8"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_homeassistant_ingress.py",
+      "sha256": "849275c46365426a6d806f78c2c1f295752fddf013c569621552e48de89af860"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "1085ccd264efcb4f25795248d8581cf299f882dcb11e0b6eb8bd9204a8f119e0"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "c852b05ed28d8e89d903c038295b9dcf3e5b3fe115a4e09deaf9a48db1f78c4d"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "4ea833be97c172e94ffedf6d7821a4e3ad93ba5167b931d73dd55182f9b01991"
+    }
+  ]
+}

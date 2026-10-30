@@ -1,0 +1,22 @@
+{
+  "passed": 14,
+  "cases": [
+    "actual_sync_http_and_sdk_callback_follow_independent_raw_commit",
+    "same_cursor_response_variants_do_not_duplicate_durable_receiver",
+    "swallowed_native_handler_error_retains_page_after_transport_capture",
+    "reopened_journal_replays_actual_sdk_event_without_new_http",
+    "nested_background_dispatch_failure_remains_recoverable",
+    "new_protocol_pages_advance_while_failed_old_decode_is_retained",
+    "malformed_transport_cursor_cannot_acknowledge_input",
+    "actual_sqlite_failure_rolls_back_raw_row_and_checkpoint",
+    "stale_transport_request_cannot_replace_captured_cursor",
+    "another_private_identity_does_not_inherit_cursor_or_pending_pages",
+    "limited_timeline_marker_retained_before_raw_page_compaction",
+    "cancelled_actual_sdk_callback_retains_input_and_cleans_up_for_retry",
+    "actual_missing_crypto_session_retains_encrypted_page",
+    "late_fixture_key_unblocks_actual_decryption_and_nested_decoder"
+  ],
+  "external_connections": false,
+  "haos_matrix_gateway_enabled": false,
+  "mission_authorization_or_execution_tested": false
+}

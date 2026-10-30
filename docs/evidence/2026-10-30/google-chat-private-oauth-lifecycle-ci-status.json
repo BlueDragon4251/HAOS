@@ -1,0 +1,88 @@
+{
+  "collected_at_UTC": "2026-10-30T14:21:02.507442+00:00",
+  "source_commit": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+  "source_tree": "ad017b7ba86655f899effe59fac052286e633311",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 41068829726,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829726"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068830023,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "Arch package",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068830023"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068829885,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829885"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068829849,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829849"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068829899,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829899"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068829841,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829841"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41068829985,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "pending",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068829985"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068818897,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068818897"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41068818812,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068818812"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41068818793,
+      "headSha": "145e35ec2cee17ecae37cbacb41c8bf05da58622",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "pending",
+      "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41068818793"
+    }
+  ],
+  "scope": "Reported run status API only. Pending runs do not count as successful; no artifact logs or installed/live acceptance asserted."
+}

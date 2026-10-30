@@ -1,0 +1,62 @@
+{
+  "date_utc": "2026-10-30",
+  "source_commit": "675346e343d73e03789a8bab8079662eb374a3d8",
+  "source_tree": "a7fda1af61ef0eb5f15187341c162cd452afd5b2",
+  "runs": [
+    {
+      "id": 41005850303,
+      "name": "HAOS Graphical Initial Setup Security",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "pull_request"
+    },
+    {
+      "id": 41005850313,
+      "name": "CI",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "pull_request"
+    },
+    {
+      "id": 41005850305,
+      "name": "HAOS services and kernel boundaries",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "pull_request"
+    },
+    {
+      "id": 41005850339,
+      "name": "Arch package",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "pull_request"
+    },
+    {
+      "id": 41005850328,
+      "name": "HAOS pinned provider protocol contracts",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "pull_request"
+    },
+    {
+      "id": 41005845697,
+      "name": "HAOS pinned provider protocol contracts",
+      "head_sha": "675346e343d73e03789a8bab8079662eb374a3d8",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "event": "push"
+    }
+  ],
+  "note": "All six completed successfully before 6bb6910 was pushed; no predecessor contract run canceled by that push. These are not results for 6bb6910 or current Buzz prerequisite source."
+}

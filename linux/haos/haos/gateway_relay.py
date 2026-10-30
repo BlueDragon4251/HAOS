@@ -25,29 +25,35 @@ class RelayInbox:
             state TEXT NOT NULL DEFAULT 'pending', attempt INTEGER NOT NULL DEFAULT 0,
             created_at REAL NOT NULL, next_attempt REAL NOT NULL DEFAULT 0, mission_id TEXT
         ); PRAGMA user_version=1;""")
+        if 'media' not in {row[1] for row in self.db.execute('PRAGMA table_info(inbox)')}:
+            self.db.execute("ALTER TABLE inbox ADD COLUMN media TEXT NOT NULL DEFAULT '[]'")
 
     def close(self):
         self.db.close()
 
-    def admit(self, policy, connector, envelope):
+    def admit(self, policy, connector, envelope, *, media=None):
+        from .gateway_media import references,authorize as authorize_media
+        media=references([] if media is None else media)
         binding = policy.authorize(connector, envelope)
+        if media:authorize_media(policy,connector,envelope)
         if not isinstance(envelope["text"], str) or not 1 <= len(envelope["text"].strip()) <= 32000:
             raise ValueError("transport text must contain 1–32000 characters")
         key = digest([connector, envelope["scope"], envelope["chat"], envelope["thread"], envelope["message_id"]])
-        fingerprint = digest(envelope)
+        fingerprint = digest([envelope,media]) if media else digest(envelope)
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            old = self.db.execute("SELECT fingerprint FROM inbox WHERE id=?", (key,)).fetchone()
+            old = self.db.execute("SELECT fingerprint,binding_id,binding_digest FROM inbox WHERE id=?", (key,)).fetchone()
             if old:
-                if old[0] != fingerprint:
+                if (old["fingerprint"] != fingerprint or old["binding_id"] != binding["id"]
+                        or old["binding_digest"] != digest(binding)):
                     raise Conflict("transport replay changed content")
             else:
                 if self.db.execute("SELECT COUNT(*) FROM inbox WHERE state='pending'").fetchone()[0] >= 4096:
                     raise Conflict("transport admission queue is full")
                 sanitized = {**envelope, "text": self.redactor.text(envelope["text"])}
                 self.db.execute("""INSERT INTO inbox
-                    (id,fingerprint,connector,binding_id,binding_digest,envelope,created_at) VALUES(?,?,?,?,?,?,?)""",
-                    (key, fingerprint, connector, binding["id"], digest(binding), json.dumps(sanitized), time.time()))
+                    (id,fingerprint,connector,binding_id,binding_digest,envelope,created_at,media) VALUES(?,?,?,?,?,?,?,?)""",
+                    (key, fingerprint, connector, binding["id"], digest(binding), json.dumps(sanitized), time.time(),json.dumps(media)))
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
@@ -67,6 +73,8 @@ class RelayInbox:
                 self.db.execute("UPDATE inbox SET state='expired' WHERE id=?", (item["id"],))
                 continue
             item["envelope"] = json.loads(item["envelope"])
+            from .gateway_media import references
+            item['media']=references(json.loads(row['media']))
             return item
         return None
 

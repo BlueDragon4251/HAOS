@@ -1,0 +1,56 @@
+{
+  "source_commit": "62c5b4064f72ea61087a4f0c8c65d534bed945d0",
+  "source_tree": "bf4c0db1cf1e9f887a06019515aca1e9d5dc600e",
+  "checked_date": "2026-10-30",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 41044186272,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044186289,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044186270,
+      "name": "CI",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044186267,
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044186281,
+      "name": "Arch package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044186271,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044180297,
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41044180212,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed"
+    }
+  ],
+  "fixture_CI_not_live_account_installed_OS_or_release_acceptance": true
+}

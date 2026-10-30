@@ -1,0 +1,46 @@
+{
+  "base_commit": "47c7ead7fa85f4e641b544d4f28ce2272cb7f693",
+  "base_all_five_ci_gates_successful": true,
+  "actual_pinned_decoder_sqlite_relay_cases": 24,
+  "public_homeassistant_enabled": false,
+  "reviewed_public_text_gateway_paths": 6,
+  "authenticated_websocket_accepted": false,
+  "homeassistant_device_tools_enabled_for_agent": false,
+  "full_tests": {
+    "passed": 1147,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1147,
+    "existing_skips": 2
+  },
+  "external_account_or_delivery_accepted": false,
+  "installed_service_boot_or_release_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_ingress.py",
+      "sha256": "a249f1ec91056caa9770b3ec5e87a5962f61500911693fd4de894048d0a23ed3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_ingress.py",
+      "sha256": "b80e7af3ebb32c2d42426caf03462d9019ad61c48b24e8ac0c237ed83d63aece"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_homeassistant_ingress.py",
+      "sha256": "d7a8bcb4e1cc969007b76f4a19cd00f5092c39c5c7549fc2424e8992edcb735d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "879647b8eae0ff8adda3c58637857cea12a7a5f26d381ce5c64559282abf4d1b"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "da95ba2f8c4e2677854a0a005d4d262dc3d7647d7d1a9c31e99b556476d5ac39"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "c354815b4199d8ed0faca16c67dea6bd7ca18eac563f2ebea6068c6e541f4c43"
+    }
+  ]
+}

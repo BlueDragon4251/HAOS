@@ -1,0 +1,85 @@
+{
+  "parent_commit": "54c3997bb69b87f1f7d54492cdfde17a2dac9e3a",
+  "recorded_at": "2026-10-30T00:04:11.196101+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "5488883f10a03ac6379a2f0b85f3c8b70d2c908f580f7a6f89e7596cf1195a97"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ingress.py",
+      "sha256": "6b2a5f34b09d07bd56b5efc205980cb69a1302df1befd2f254735b673f3417b7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_media.py",
+      "sha256": "4e8f58ecb5d423b8a6223df10fa752ed32916984d62b35b6b60123d039ae0fc7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "d0c1d56714df89aa7f64d753ff9ec76e475891ecd32344a1837496ce7e6966d9"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_resource_process.py",
+      "sha256": "97fc6e8593b5feb1376374fb676e351db60fa1be353e759d21b13858bfe40003"
+    }
+  ],
+  "validation": {
+    "minimal_runtime": {
+      "passed": 2249,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; tested in actual root suite"
+    },
+    "full_pinned_10_extra_runtime": {
+      "passed": 2249,
+      "existing_skips": 2
+    },
+    "actual_root_UID_backup": {
+      "passed": 150
+    },
+    "actual_UID_SQLite_full_resource_recovery_and_WSS": {
+      "passed": 17,
+      "cases": [
+        "actual_0_UID_denied_before_native_resource_request",
+        "actual_65533_UID_denied_before_native_resource_request",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_ok",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_private-dns",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-redirect-private",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-401",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-429",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-403",
+        "actual_native_Hermes_retained_image_dispatch_sealed_ID_media_cache_relay_crash_retry_and_replay_never_refetch_bytes_or_leak_codes",
+        "actual_native_media_cdn-403_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_media_cdn-429_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_voice_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_document_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_video_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_SQLite_full_after_resource_intent_before_blob_intent-same_recovery_preserves_first_hash_without_silent_replacement",
+        "actual_SQLite_full_after_resource_intent_before_blob_intent-changed_recovery_preserves_first_hash_without_silent_replacement",
+        "actual_native_verified_WSS_parent_pre_ACK_custody_Robot_SDK_binary_cache_media_relay_and_crash_retry_without_refetch"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_production_public_resolver_no_mocks": true,
+      "synthetic_global_IP_on_loopback_in_network_none_namespace": true,
+      "native_API_and_CDN_have_different_origins_no_account_headers_or_cookies_forwarded": true,
+      "owner_publication_and_source_are_fixtures": true,
+      "live_account_mission_or_installed_acceptance": false,
+      "voice_PCM_transport_only_no_local_ASR_or_playback_acceptance": true
+    }
+  },
+  "implementation": [
+    "Commit the first observed resource hash/MIME intent before inserting its binary blob.",
+    "A missing blob may be fetched again only with that exact first hash/MIME; purged or damaged existing cache rows are not restored.",
+    "Keep SQLITE_FULL when SQLite already rolled back, instead of masking it with a second ROLLBACK error.",
+    "Immutable source conflicts fail the input for explicit owner review, instead of automatically rereading changed content."
+  ],
+  "limits": [
+    "DingTalk remains private; public gateway software remains 12/22.",
+    "No controller mission, live account, external delivery, ASR/playback, installed-system, hardware or release acceptance.",
+    "Administrative recovery/GUI, stable post-expiry replies and outgoing media/local voice remain pending."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "base_commit": "dd7c9fda4f66551cd5e660ad96ae983cb9631fd9",
+  "actual_native_history_cases": 16,
+  "regression_cases": {
+    "crypto": 13,
+    "identity": 15,
+    "sync": 14,
+    "http": 17,
+    "ingress": 18,
+    "delivery": 21
+  },
+  "full_tests": {
+    "passed": 1083,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1083,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_gateway_cases": 37,
+  "matrix_publicly_enabled": false,
+  "external_account_or_delivery_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "ec81ec21b3e5fae0a2e117eed816f852097021aaf8bf13a92473f063a766e6bd"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "d5b4080dfaa25949f0378334525e47f19384900ab1fab4bba778033449b18097"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_sync.py",
+      "sha256": "819954f02c4ac62a3bf5c0273441f57180550c7951d522bb53bed18e64e85c1c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_history.py",
+      "sha256": "48f6a1831ec6543027b75f1bf1074b8100bdee2a9dbfcf79bd362126f27bc2b5"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_history.py",
+      "sha256": "532d33968440400231341680db2e6b97d580f1ef5a9a31754225b8733b44666b"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "a45035123b74d5fd29e11fbd7e5bd0abb3723b38093e79f37865cffc8ff13b3c"
+    },
+    {
+      "path": "docs/GATEWAY-MISSIONS.md",
+      "sha256": "cc919a3b13a018afbd7cc31e802cefd1b4348b34fa73d969db1ba0115fdb5151"
+    }
+  ]
+}

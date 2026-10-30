@@ -1,0 +1,199 @@
+name: HAOS Photon prepared contracts
+on:
+  pull_request:
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/photon_owner*.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/owner.py', 'linux/haos/haos/initial_setup_gui.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths: ['linux/haos/haos/gateway_photon*.py', 'linux/haos/haos/photon_owner*.py', 'linux/haos/haos/gateway_setup.py', 'linux/haos/haos/owner.py', 'linux/haos/haos/initial_setup_gui.py', 'linux/haos/haos/gateway.py', 'linux/haos/haos/gateway_delivery_authority.py', 'linux/haos/tests/test_gateway_photon*.py', 'linux/haos/probes/probe_photon*.py', 'linux/haos/build-runtime.sh', 'linux/haos/runtime/*photon*', '.github/workflows/haos-photon-contracts.yml', 'upstream/UPSTREAM.lock']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: photon-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  installed-private-process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare actual pinned image-install inputs
+        run: |
+          set -euo pipefail
+          bash scripts/sync-upstream.sh
+          mkdir -p "$RUNNER_TEMP/photon-install" "$RUNNER_TEMP/photon-installed-runtime"
+          chmod 0777 "$RUNNER_TEMP/photon-installed-runtime"
+          curl --fail --silent --show-error --proto '=https' --max-time 180 --max-filesize 64000000 \
+            https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz --output "$RUNNER_TEMP/photon-node.tar.xz"
+      - name: Actual official Node and locked SDK installation with lifecycle scripts disabled
+        run: |
+          set -euo pipefail
+          docker run --rm --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$PWD/upstream/hermes-agent:/input/hermes:ro" \
+            -v "$RUNNER_TEMP/photon-node.tar.xz:/input/node.tar.xz:ro" \
+            -v "$RUNNER_TEMP/photon-installed-runtime:/output" \
+            -e HAOS_DISPOSABLE_PHOTON_INSTALL=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_install.py > "$RUNNER_TEMP/photon-install/install.log" 2>&1
+          cp "$RUNNER_TEMP/photon-installed-runtime/install-receipt.json" "$RUNNER_TEMP/photon-install/install.json"
+          cp "$RUNNER_TEMP/photon-installed-runtime/photon/source.json" "$RUNNER_TEMP/photon-install/installed-source.json"
+      - name: Actual private UID program checks and production Node lifetime without external network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+            -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+            -e HAOS_DISPOSABLE_PHOTON_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_process.py > "$RUNNER_TEMP/photon-install/private-process.json" 2> "$RUNNER_TEMP/photon-install/private-process.err"
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - name: Prepare exact frozen Python runtime for the actual private Photon profile
+        run: |
+          set -euo pipefail
+          python -m pip install uv
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+          curl --fail --silent --show-error --proto '=https' --max-time 90 --max-filesize 2000000 \
+            https://raw.githubusercontent.com/openai/whisper/86098128c0b4f24f0e2aa2994de830614b474227/tests/jfk.flac \
+            --output "$RUNNER_TEMP/photon-public-reference.flac"
+          echo "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715  $RUNNER_TEMP/photon-public-reference.flac" | sha256sum --check
+      - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
+        run: |
+          set -euo pipefail
+          for fixture_case in normal dedicated health-withdraw health-store-refusal http401 http401-status-loss http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal original-journal-missing original-schema-missing; do
+            docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-public-reference.flac:/public-input/reference.flac:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case "$fixture_case" \
+              > "$RUNNER_TEMP/photon-install/private-native-$fixture_case.json" 2> "$RUNNER_TEMP/photon-install/private-native-$fixture_case.err"
+          done
+      - name: Prior observer must fail the same actual blocked-health withdrawal test
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin ca53134d0b1519a11fa55a2ed8c77127c23121cf
+          git show ca53134d0b1519a11fa55a2ed8c77127c23121cf:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-profile.py"
+          sha256sum "$RUNNER_TEMP/photon-install/prior-profile.py" > "$RUNNER_TEMP/photon-install/prior-profile.sha256"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case health-withdraw \
+              > "$RUNNER_TEMP/photon-install/prior-blocked-health.log" 2>&1; then
+            echo 'Prior observer unexpectedly passed the unchanged withdrawal deadline'
+            exit 1
+          fi
+          python -c 'import pathlib,sys; assert "actual profile ignored owner withdrawal" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-blocked-health.log"
+      - name: Prior close must retain the actual lease when its status write fails
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 10cd78493c3883283c29f1219bfddadee469541e
+          git show 10cd78493c3883283c29f1219bfddadee469541e:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-storage-profile.py"
+          sha256sum "$RUNNER_TEMP/photon-install/prior-storage-profile.py" > "$RUNNER_TEMP/photon-install/prior-storage-profile.sha256"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-storage-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case health-store-refusal \
+              > "$RUNNER_TEMP/photon-install/prior-failed-close.log" 2>&1; then
+            echo 'Prior close unexpectedly released custody despite its failed status write'
+            exit 1
+          fi
+          python -c 'import pathlib,sys; assert "failed status write retained closed-profile lease" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-failed-close.log"
+      - name: Prior initializer must fail the same actual missing-original custody test
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin cb6190a5da3c76487705614df71a933e2c2ed5b7
+          git show cb6190a5da3c76487705614df71a933e2c2ed5b7:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-original-profile.py"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-original-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case original-journal-missing \
+              > "$RUNNER_TEMP/photon-install/prior-missing-original.log" 2>&1; then
+            echo 'Prior initializer unexpectedly refused lost original custody'
+            exit 1
+          fi
+          python -c 'import pathlib,sys; assert "known Photon original custody was recreated without owner decision" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-missing-original.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: photon-installed-private-process-${{ github.sha }}
+          path: ${{ runner.temp }}/photon-install
+          if-no-files-found: error
+  prepared-native-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - uses: actions/setup-node@v7
+        with: {node-version: '22'}
+      - name: Prepare exact pinned Hermes and immutable Photon dependency inputs
+        run: |
+          set -euo pipefail
+          bash scripts/sync-upstream.sh
+          python -m pip install uv
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+          SIDECAR="$PWD/upstream/hermes-agent/plugins/platforms/photon/sidecar"
+          npm ci --prefix "$SIDECAR" --ignore-scripts --no-audit --no-fund
+          mkdir -p "$RUNNER_TEMP/photon-contracts"
+          python linux/haos/runtime/prepare_photon.py "$SIDECAR" --check
+          python linux/haos/runtime/prepare_photon.py "$SIDECAR" --receipt "$RUNNER_TEMP/photon-contracts/prepared-source.json"
+          node --check "$SIDECAR/index.mjs"
+          node linux/haos/runtime/probe_photon_transport.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-transport.json"
+          node linux/haos/runtime/probe_photon_resume.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-resume.json"
+          node linux/haos/runtime/probe_photon_cloud.mjs "$RUNNER_TEMP/photon-contracts/cloud-boundary.json"
+          upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_photon_codec.py upstream/hermes-agent "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-codec.json"
+      - name: Independent grants and actual FULL SQLite custody without Hermes imports
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py linux/haos/tests/test_gateway_photon_outbox.py linux/haos/tests/test_gateway_photon_status.py linux/haos/tests/test_gateway_photon_recovery.py linux/haos/tests/test_gateway_photon_owner_protocol.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+      - name: Actual private UID recorded status without SDK or network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 512m \
+            -v "$PWD:/repo:ro" -e HAOS_DISPOSABLE_PHOTON_STATUS_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_status_process.py > "$RUNNER_TEMP/photon-contracts/recorded-status.json"
+      - name: Actual Root Owner handoff, CLI and private recovery without network
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 128 --memory 768m \
+            -v "$PWD:/repo:ro" -e HAOS_DISPOSABLE_PHOTON_OWNER_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_owner_process.py > "$RUNNER_TEMP/photon-contracts/owner-recovery.json"
+      - name: Actual Tk recovery controls at desktop and compact resolutions
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb python3-tk
+          for screen in 1280x800x24 640x480x24; do
+            xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_photon_owner_gui.py linux/haos "$RUNNER_TEMP/photon-contracts/owner-gui-$screen.json"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: photon-prepared-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/photon-contracts
+          if-no-files-found: error

@@ -1,0 +1,506 @@
+name: HAOS pinned provider protocol contracts
+on:
+  pull_request:
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/haos/gateway*.py'
+      - 'linux/haos/haos/initial_setup*.py'
+      - 'linux/haos/haos/owner.py'
+      - 'linux/haos/haos/*_owner_*.py'
+      - 'linux/haos/install.sh'
+      - 'linux/haos/probes/**'
+      - 'linux/haos/tests/test_gateway*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths:
+      - 'linux/haos/haos/provider_*.py'
+      - 'linux/haos/haos/hermes_*'
+      - 'linux/haos/haos/gateway*.py'
+      - 'linux/haos/haos/initial_setup*.py'
+      - 'linux/haos/haos/owner.py'
+      - 'linux/haos/haos/*_owner_*.py'
+      - 'linux/haos/install.sh'
+      - 'linux/haos/probes/**'
+      - 'linux/haos/tests/test_gateway*'
+      - 'linux/haos/runtime/**'
+      - 'linux/haos/tests/test_provider*'
+      - 'upstream/UPSTREAM.lock'
+      - '.github/workflows/haos-provider-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: provider-contracts-${{ github.ref }}
+  # Preserve running exhaustive UID/SDK checks; GitHub coalesces pending revisions.
+  cancel-in-progress: false
+jobs:
+  pinned-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Prepare the exact immutable Hermes runtime and frozen SDK dependencies
+        run: |
+          python -m pip install uv
+          bash scripts/sync-upstream.sh
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+      - name: Compare the generated registry and execute real local protocol probes
+        env:
+          PYTHONPATH: upstream/hermes-agent
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/provider-contracts" "$RUNNER_TEMP/provider-home"
+          export HERMES_HOME="$RUNNER_TEMP/provider-home"
+          PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
+          "$PYTHON" linux/haos/runtime/export_registry.py upstream/hermes-agent "$RUNNER_TEMP/provider-contracts/registry.json"
+          cmp "$RUNNER_TEMP/provider-contracts/registry.json" linux/haos/haos/hermes_registry.json
+          "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/media-native-backend.json"
+          "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-media-native-backend.json" --sms
+          "$PYTHON" linux/haos/runtime/probe_media_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/email-media-native-backend.json" --email
+          "$PYTHON" linux/haos/runtime/probe_artifact_backend.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/artifact-native-backend.json"
+          "$PYTHON" linux/haos/runtime/probe_gateway.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway.json"
+          "$PYTHON" linux/haos/runtime/probe_gateway_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/gateway-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_discord_history.py linux/haos "$RUNNER_TEMP/provider-contracts/discord-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_slack_history.py linux/haos "$RUNNER_TEMP/provider-contracts/slack-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_mattermost_history.py linux/haos "$RUNNER_TEMP/provider-contracts/mattermost-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_crypto.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-crypto.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_identity.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-identity.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_sync.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-sync.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_http.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-http.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_history.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-history.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_recipients.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-recipients.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_homeassistant_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/homeassistant-prepared-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_homeassistant_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/homeassistant-prepared-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_homeassistant_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/homeassistant-prepared-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_homeassistant_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/homeassistant-prepared-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_irc_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_irc_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_irc_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_irc_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/irc-prepared-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_line_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_line_listener.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-listener.json"
+          "$PYTHON" linux/haos/runtime/probe_line_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_line_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_line_media.py linux/haos "$RUNNER_TEMP/provider-contracts/line-media.json"
+          "$PYTHON" linux/haos/runtime/probe_line_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/line-output.json"
+          "$PYTHON" linux/haos/runtime/probe_line_tls.py linux/haos "$RUNNER_TEMP/provider-contracts/line-prepared-tls.json"
+          "$PYTHON" linux/haos/runtime/probe_sms.py linux/haos "$RUNNER_TEMP/provider-contracts/sms-prepared-native.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_capture.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-original-capture.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_ws_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ws-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_resource_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-resource-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_ws_frames.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ws-frames.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_send_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-codec.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_reply_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-reply-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_upload_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-upload-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_media_reply_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-media-reply-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/feishu-output.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_webhook.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-authenticated-webhook.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_http.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-private-http.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-admission.json"
+          "$PYTHON" linux/haos/runtime/probe_feishu_sdk.py linux/haos "$RUNNER_TEMP/provider-contracts/feishu-native-sdk.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_compatibility.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-compatibility.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_resource_lookup.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-resource-lookup.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_upload.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-upload.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_robot_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_media_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/dingtalk-output.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_http.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-http.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_pairing.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-native.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-admission.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_tasks.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-tasks.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_native.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-native.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_controller.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-controller.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_https.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-https.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_media.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-media.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_artifacts.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-artifacts.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_callbacks.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-callbacks.json"
+          "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
+          "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"
+          "$PYTHON" linux/haos/runtime/probe_email_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/email-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_email_media.py linux/haos "$RUNNER_TEMP/provider-contracts/email-media.json"
+          "$PYTHON" linux/haos/runtime/probe_email_smtp.py linux/haos "$RUNNER_TEMP/provider-contracts/email-smtp.json"
+          "$PYTHON" linux/haos/runtime/probe_email_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/email-output.json"
+          "$PYTHON" linux/haos/runtime/probe_sms_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/sms-output.json"
+          "$PYTHON" linux/haos/runtime/probe_ntfy_profile.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-profile.json"
+          "$PYTHON" linux/haos/runtime/probe_ntfy_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_ntfy_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-transport.json"
+          "$PYTHON" linux/haos/runtime/probe_ntfy_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/ntfy-native-ingress.json"
+          "$PYTHON" linux/haos/runtime/probe_matrix_account.py linux/haos "$RUNNER_TEMP/provider-contracts/matrix-native-account.json"
+          "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-polling.json"
+          "$PYTHON" linux/haos/runtime/probe_telegram_polling.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-held.json" held
+          "$PYTHON" linux/haos/runtime/probe_telegram_delivery.py linux/haos "$RUNNER_TEMP/provider-contracts/telegram-delivery.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_fallback_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-builder-matrix.json"
+          for scenario in reasoning developer responses messages reasoning-stream developer-stream responses-stream messages-stream vertex vertex-stream reserved-tools reserved-tools-stream reserved-tools-reverse reserved-tools-reverse-stream context-aliases context-aliases-stream; do
+            "$PYTHON" linux/haos/runtime/probe_provider_fallback_wire.py linux/haos "$RUNNER_TEMP/provider-contracts/fallback-$scenario.json" "$scenario"
+          done
+          for mode in chat responses messages chat-legacy responses-legacy messages-legacy; do
+            "$PYTHON" linux/haos/runtime/probe_agent_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-no-replay.json" "$mode"
+          done
+          for mode in chat chat-stream chat-moa chat-moa-stream responses messages responses-aliases messages-aliases chat-same-model responses-same-model messages-same-model opencode-chat opencode-chat-stream opencode-responses opencode-messages opencode-chat-moa opencode-chat-moa-stream; do
+            "$PYTHON" linux/haos/runtime/probe_agent_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/main-agent-$mode-fallback-replay.json" "$mode"
+          done
+          for mode in sdk-json moa-json moa-stream native-sdk-json native-moa-json native-moa-stream sdk-json-same-model moa-json-same-model moa-stream-same-model native-sdk-json-same-model native-moa-json-same-model native-moa-stream-same-model; do
+            "$PYTHON" linux/haos/runtime/probe_chat_tool_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/chat-tools-$mode.json" "$mode"
+          done
+          "$PYTHON" linux/haos/runtime/probe_agent_replay_generation.py linux/haos "$RUNNER_TEMP/provider-contracts/agent-replay-generation.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_route_names.py linux/haos "$RUNNER_TEMP/provider-contracts/provider-route-names.json"
+          "$PYTHON" linux/haos/runtime/probe_router_reasoning.py linux/haos "$RUNNER_TEMP/provider-contracts/router-reasoning.json"
+          "$PYTHON" linux/haos/runtime/probe_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/provider.json"
+          "$PYTHON" linux/haos/runtime/probe_native_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/gemini.json"
+          "$PYTHON" linux/haos/runtime/probe_bedrock_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/bedrock.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa.json"
+          for scenario in mixed stream mixed-stream mixed-messages-stream mixed-stream-abort mixed-messages-stream-abort reference-disconnect; do
+            "$PYTHON" linux/haos/runtime/probe_moa_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-$scenario.json" "$scenario"
+          done
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-scope.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_moa_fallback_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-fallback-json-replay.json" json
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_scope.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-chat-scope.json" chat
+          for task in moa_reference moa_aggregator; do
+            "$PYTHON" linux/haos/runtime/probe_moa_no_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/$task-no-replay.json" "$task"
+          done
+          "$PYTHON" linux/haos/runtime/probe_moa_stream_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/moa-stream-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_account_providers.py linux/haos "$RUNNER_TEMP/provider-contracts/accounts.json"
+          "$PYTHON" linux/haos/runtime/probe_qwen_device.py linux/haos "$RUNNER_TEMP/provider-contracts/qwen-device.json"
+          "$PYTHON" linux/haos/runtime/probe_vertex_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/vertex-catalog.json"
+          "$PYTHON" linux/haos/runtime/probe_model_catalog.py linux/haos "$RUNNER_TEMP/provider-contracts/catalog.json"
+          "$PYTHON" linux/haos/runtime/probe_cloud_tokens.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-tokens.json"
+          "$PYTHON" linux/haos/runtime/probe_cloud_inference.py linux/haos "$RUNNER_TEMP/provider-contracts/cloud-model-http.json"
+          "$PYTHON" linux/haos/runtime/probe_native_account_flows.py linux/haos "$RUNNER_TEMP/provider-contracts/native-accounts.json"
+          "$PYTHON" linux/haos/runtime/probe_openrouter_login.py linux/haos "$RUNNER_TEMP/provider-contracts/openrouter-login.json"
+          "$PYTHON" linux/haos/runtime/probe_codex_account.py linux/haos "$RUNNER_TEMP/provider-contracts/codex-account.json"
+          "$PYTHON" linux/haos/runtime/probe_copilot_device.py linux/haos "$RUNNER_TEMP/provider-contracts/copilot-device.json"
+          "$PYTHON" linux/haos/runtime/probe_anthropic_account.py linux/haos "$RUNNER_TEMP/provider-contracts/anthropic-account.json"
+          "$PYTHON" linux/haos/runtime/probe_provider_profiles.py linux/haos "$RUNNER_TEMP/provider-contracts/wire-profiles.json"
+          "$PYTHON" linux/haos/runtime/probe_messages_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/messages.json"
+          "$PYTHON" linux/haos/runtime/probe_http_provider_matrix.py linux/haos "$RUNNER_TEMP/provider-contracts/http-matrix.json"
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-native.json"
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-profile.json" profile
+          "$PYTHON" linux/haos/runtime/probe_aws_native.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-default-chain.json" default-chain
+          "$PYTHON" linux/haos/runtime/probe_aws_identity.py linux/haos "$RUNNER_TEMP/provider-contracts/aws-identity.json"
+          "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-replay.json"
+          "$PYTHON" linux/haos/runtime/probe_converse_replay.py linux/haos "$RUNNER_TEMP/provider-contracts/converse-route-scope.json" route-scope
+          "$PYTHON" linux/haos/runtime/install_copilot.py "$RUNNER_TEMP/haos-copilot"
+          "$PYTHON" linux/haos/runtime/probe_acp_provider.py linux/haos "$RUNNER_TEMP/provider-contracts/acp.json" "$RUNNER_TEMP/haos-copilot/copilot"
+      - name: Verify pinned local speech engine with reviewed public audio and model
+        run: |
+          set -euo pipefail
+          PYTHON=upstream/hermes-agent/.venv/bin/python
+          "$PYTHON" linux/haos/runtime/fetch_speech_fixture.py linux/haos "$RUNNER_TEMP/haos-speech-fixture"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_speech_backend.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/speech-native.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_line_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/line-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_sms_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/sms-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_email_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/email-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_feishu_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/feishu-voice.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_a2a_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/a2a-voice.json"
+          "$PYTHON" linux/haos/runtime/probe_audio_opus.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-opus.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_audio_amr.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-amr.json"
+          "$PYTHON" linux/haos/runtime/probe_media_thumbnail.py linux/haos "$RUNNER_TEMP/provider-contracts/media-thumbnail.json"
+      - name: Verify actual A2A gateway UID TLS controller peer credentials and crash recovery
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/reference.flac:/public-input/reference.flac:ro" \
+            -v "$PWD/linux/haos/probes/probe_a2a_profile_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_A2A_PROFILE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/a2a-profile-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/a2a-profile-process.json"
+      - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g --tmpfs /tmp:mode=1777,size=256m \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/model:/public-model:ro" \
+            -v "$RUNNER_TEMP/haos-speech-fixture/reference.flac:/public-input/reference.flac:ro" \
+            -e HAOS_DISPOSABLE_SPEECH_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_speech_process.py > "$RUNNER_TEMP/provider-contracts/speech-kernel-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/speech-kernel-process.json"
+      - name: Verify media broker actual kernel peers and private ledger without optional SDKs
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/media-kernel-peers.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 -e HAOS_MEDIA_CONTROL_PLATFORM=email \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 -e HAOS_MEDIA_CONTROL_PLATFORM=dingtalk \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-kernel-peers.json"
+      - name: Verify LINE owner CLI publication private PEM and actual UID denial
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --read-only --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g --tmpfs /tmp:mode=1777,size=128m \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" -w /repo \
+            -e PYTHONPATH=/repo/upstream/hermes-agent:/deps -e PYTHONDONTWRITEBYTECODE=1 \
+            -e HERMES_HOME=/tmp/line-owner-home -e HERMES_SAFE_MODE=1 -e HAOS_DISPOSABLE_LINE_OWNER=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 linux/haos/runtime/probe_line_tls.py linux/haos > "$RUNNER_TEMP/provider-contracts/line-owner-authority.json"
+          cat "$RUNNER_TEMP/provider-contracts/line-owner-authority.json"
+      - name: Execute Matrix account helper under actual gateway UID and local TLS
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_matrix_account_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_MATRIX_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/matrix-account-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/matrix-account-process.json"
+      - name: Verify IRC sender UID isolation and actual process crash recovery
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_irc_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_IRC_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/irc-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/irc-delivery-process.json"
+      - name: Verify LINE ingress sender UID isolation and actual crash recovery
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_line_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_LINE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/line-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/line-delivery-process.json"
+          # Repeat with actual native image output and the same real SIGKILL.
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_line_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_LINE_PROCESS=1 -e HAOS_LINE_PROCESS_MEDIA=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/line-media-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/line-media-delivery-process.json"
+      - name: Verify SMS ingress sender UID isolation and actual crash recovery
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_sms_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_SMS_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/sms-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/sms-delivery-process.json"
+          # Repeat with actual native image output and the same real SIGKILL.
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_sms_delivery_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_SMS_PROCESS=1 -e HAOS_SMS_PROCESS_MEDIA=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/sms-media-delivery-process.json"
+      - name: Verify private Feishu and DingTalk UID isolation delivery crash recovery and owner decisions
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_ws_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_WS_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-ws-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-ws-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_resource_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_RESOURCE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-resource-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_upload_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_UPLOAD_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-upload-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-upload-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_feishu_recovery_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_FEISHU_RECOVERY=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/feishu-owner-recovery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/feishu-owner-recovery-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_ws_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_WS_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-ws-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_pairing_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PAIRING_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-pairing-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_profile_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_PROFILE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-profile-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_REPLY_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_upload_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_UPLOAD_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-upload-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-upload-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_REPLY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_media_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_MEDIA_REPLY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_media_delivery_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_MEDIA_DELIVERY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-delivery-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-delivery-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_REPLY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot -e HAOS_DINGTALK_REPLY_CONVERSATION=group \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-group-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-group-reply-worker-process.json"
+          docker run --rm --network none --cap-add NET_ADMIN --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_resource_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_RESOURCE_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-resource-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-resource-worker-process.json"
+      - name: Verify private email worker UID isolation revocation cancellation and hard deadline
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_email_process.py:/probe.py:ro" \
+            -e PYTHONPATH=/deps -e HAOS_DISPOSABLE_EMAIL_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_email_recovery_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_EMAIL_RECOVERY=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-owner-recovery-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-owner-recovery-process.json"
+      - name: Verify actual root email publication and private UID custody
+        run: |
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_email_publication_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_EMAIL_PUBLICATION=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-publication-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/email-publication-process.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: provider-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/provider-contracts/*.json
+          if-no-files-found: error
+          retention-days: 14

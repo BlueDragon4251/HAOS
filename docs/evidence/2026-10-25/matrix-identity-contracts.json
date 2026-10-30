@@ -1,0 +1,22 @@
+{
+  "passed": 14,
+  "cases": [
+    "actual_native_whoami_matches_explicit_user_and_device",
+    "actual_sdk_initial_key_publication_requires_matching_server_keys",
+    "unverified_device_and_unsolicited_key_requests_not_enabled",
+    "same_private_identity_reopens_actual_existing_crypto_store",
+    "actual_device_change_refused_without_deleting_accounts_or_sessions",
+    "mismatched_server_keys_never_trigger_device_delete_or_replacement",
+    "curve_identity_mismatch_also_refused_without_destructive_recovery",
+    "legacy_pickle_key_never_silently_repicks_or_replaces_owner_material",
+    "actual_http_wrong_user_refused_before_crypto_setup",
+    "actual_http_wrong_device_refused_before_crypto_setup",
+    "actual_http_missing_device_refused_before_crypto_setup",
+    "actual_http_revoked_token_refused_before_crypto_setup",
+    "real_legacy_recovery_file_preserved_without_deserializing_or_deleting",
+    "real_profile_symlink_refused_before_database_open"
+  ],
+  "external_connections": false,
+  "haos_matrix_gateway_enabled": false,
+  "real_account_device_verification": false
+}

@@ -1,0 +1,33 @@
+{
+  "actual_sdk_socket_bolt_cases": [
+    "real Hermes task-local secret scopes isolate app tokens and refuse ambient provider credentials",
+    "actual SDK Socket Mode ACK follows independent-reader-visible capture; native Bolt reaches relay",
+    "different transport envelopes for same Slack message remain idempotent",
+    "unknown sender channel or workspace acknowledged as refused without HAOS authority",
+    "real SQLite capture failure suppresses SDK ACK and same source can retry",
+    "actual Bolt decoder failure after ACK survives reopen and reaches relay once",
+    "exact Slack thread admitted through native builder; other thread refused",
+    "current grant revocation and out-of-context native authority fail closed",
+    "late SDK callbacks cannot touch closed journal or acknowledge fresh input during shutdown"
+  ],
+  "external_slack_connected": false,
+  "full_slack_owner_setup_and_delivery_complete": false,
+  "source_files": [
+    {
+      "path": "probe_slack_ingress.py",
+      "sha256": "6a304c8b1b50c86359ccc40275c216161870a6d1c14e3998525b59ec09973052"
+    },
+    {
+      "path": "gateway_slack.py",
+      "sha256": "b58d9605ac5101f92c91c03b0d7952cc8dfdaad146637bf9917f2e212eb20b37"
+    },
+    {
+      "path": "gateway_ingress.py",
+      "sha256": "46364e2982152af4304be3c492e75bac8d1b8209003cfbc8b4d175443afc11ce"
+    },
+    {
+      "path": "gateway_runtime.py",
+      "sha256": "8f818be57dffe0dab1b86b518dbe6f5d308789949fc3e93e976f593d5df0648f"
+    }
+  ]
+}

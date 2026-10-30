@@ -1,0 +1,21 @@
+{
+  "passed": 7,
+  "cases": [
+    "actual_root_process_is_refused_before_network_or_secret_use",
+    "actual_agent_uid_cannot_invoke_gateway_account_helper",
+    "actual_gateway_uid_frozen_sdk_entry_verifies_system_trusted_local_tls_and_public_device_signature",
+    "actual_helper_wrong_device_cannot_reach_device_query",
+    "actual_helper_single_redacted_account_refusal_401",
+    "actual_helper_single_redacted_account_refusal_429",
+    "actual_helper_native_signature_failure_yields_no_approval_candidate"
+  ],
+  "actual_uid_cases": [
+    0,
+    65533,
+    65534
+  ],
+  "tls_verification_disabled": false,
+  "external_connections": false,
+  "installed_haos_accepted": false,
+  "live_account_accepted": false
+}

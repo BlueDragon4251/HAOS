@@ -1,0 +1,157 @@
+{
+  "date": "2026-10-30",
+  "parent": "b80b89ec9db6c2e257b5f5d260a5f12117af77b7",
+  "source_files_sha256": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "71e15a0f5b98e057506ed685c79aa550f4bb94efb845c85417700581209debd8"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "e670480463a869b5d3acb0bcffb80bd090301189925756af5f26e12a1672188c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat.py",
+      "sha256": "73672aa44b7e49c935b76e674236565ae94d41ad258e4aea72d8ecb4e09e3ce5"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_owner_gui.py",
+      "sha256": "664d6078c301460ad18657bf5ec287548dfd59ba2e6422a7f438c39adbb28252"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_owner_process.py",
+      "sha256": "21164bbaac0166bae7332878aa2deb830b4a03d54d84571808b756deefb1d462"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_owner_setup.py",
+      "sha256": "80bed15f824cd137381f4d697d5c3a9d23dd18a99de6f03bad741d6579c01f48"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_owner_worker.py",
+      "sha256": "08dfcf20ff97319457cf3b60704b6908d267b234056e01a52d085c70e88bdc73"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_owner_process.py",
+      "sha256": "15c683427ca71d2c8156bca024f5dda58270c713fb506741a00f86f6a7382ea2"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_owner_gui.py",
+      "sha256": "eca0e691f8a43588a4299e717a138f0b7d52efec377308987efcefc417b4bd12"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_owner_process.py",
+      "sha256": "efdc038104c116699db7e57ef130f09d99230d2bd3fe7b77a1616166c0b17ab9"
+    }
+  ],
+  "full_and_minimal": {
+    "passed_each": 2708,
+    "existing_skips_each": 2,
+    "excluded_file": "test_backup.py, covered by real root/kernel run"
+  },
+  "root_kernel_passed": 173,
+  "Owner_schema_SQLite_and_recovery_passed": 25,
+  "actual_private_UID_Owner_process": {
+    "passed": 10,
+    "cases": [
+      "actual_fixed_installed_Root_backend_passes_closed_stdin_to_live_Root_parent_private_UID_worker_and_empty_inspection_does_not_create_native_journal_or_import_optional_SDK",
+      "actual_root_foreign_UID_supplementary_root_group_PID1_parent_and_unprivileged_parent_are_denied_and_private_UID_cannot_call_Root_backend",
+      "Root_backend_requires_quiescent_service_before_private_handoff_using_explicit_systemctl_state_fixture",
+      "actual_Root_backend_refuses_nonprivate_credential_file_mismatched_publication_and_pending_publication_before_private_handoff",
+      "actual_UID_owned_originals_are_inspected_as_payload_free_hashed_snapshots_and_active_grant_disposal_is_denied_by_Root_backend",
+      "actual_Root_to_private_UID_reply_inspection_and_exact_part_decision_preserve_confirmed_sibling_and_durably_audit_one_idempotent_approval_without_network",
+      "actual_Root_private_UID_auth_recheck_commits_private_Owner_audit_and_clears_only_auth_block_without_shortening_either_rate_deadline",
+      "real_Root_backend_private_UID_disposal_after_exact_withdrawn_snapshot_compacts_payload_bearing_original_and_proof_keeps_audit_and_is_idempotent",
+      "real_kernel_flock_refuses_Owner_recovery_while_private_profile_is_in_use_even_if_fixture_service_state_claims_inactive",
+      "actual_PR_SET_PDEATHSIG_kills_private_worker_after_authenticated_Root_parent_dies_instead_of_accepting_reparenting_to_PID1"
+    ],
+    "actual_Root_backend_private_UID_parent_credentials_flock_SQLite_and_parent_lifetime": true,
+    "systemctl_service_state_is_explicit_fixture": true,
+    "Google_account_external_delivery_GUI_installed_service_or_public_activation": false
+  },
+  "actual_Tk_desktop_and_compact": [
+    {
+      "passed": 9,
+      "cases": [
+        "actual_Tk_reply_parts_show_payload_free_exact_group_and_part_hashes_with_read_only_details",
+        "actual_Tk_blocks_missing_confirmations_and_confirmed_sibling_retry_and_row_selection_resets_note_and_both_consents",
+        "actual_Tk_freezes_exact_uncertain_part_snapshot_and_both_consents_for_backend_then_clears_after_audited_decision",
+        "actual_Tk_historical_profile_selection_requires_fresh_source_inspection_and_disposal_freezes_exact_withdrawn_snapshot",
+        "actual_Tk_connector_switch_invalidates_loaded_reply_selection_and_previous_auth_confirmation_before_any_backend_decision",
+        "actual_Tk_auth_recheck_uses_explicit_current_connector_confirmation_and_nonsecret_note_without_send_action",
+        "actual_async_Tk_discards_slow_inspection_response_after_connector_change_instead_of_reusing_old_snapshots",
+        "actual_Tk_closed_response_schema_discards_unexpected_payload_fields_before_rendering_details",
+        "actual_Tk_profile_edits_clear_previously_selected_snapshot_and_Owner_confirmation"
+      ],
+      "actual_Tk_Wizard_async_queue_and_recovery_component": true,
+      "screen": [
+        1440,
+        1000
+      ],
+      "privileged_owner_backend_calls_are_explicit_fixtures": true,
+      "real_UID_backend_tested_separately": true,
+      "full_account_GUI_public_activation_live_Google_or_installed_GUI_acceptance": false
+    },
+    {
+      "passed": 9,
+      "cases": [
+        "actual_Tk_reply_parts_show_payload_free_exact_group_and_part_hashes_with_read_only_details",
+        "actual_Tk_blocks_missing_confirmations_and_confirmed_sibling_retry_and_row_selection_resets_note_and_both_consents",
+        "actual_Tk_freezes_exact_uncertain_part_snapshot_and_both_consents_for_backend_then_clears_after_audited_decision",
+        "actual_Tk_historical_profile_selection_requires_fresh_source_inspection_and_disposal_freezes_exact_withdrawn_snapshot",
+        "actual_Tk_connector_switch_invalidates_loaded_reply_selection_and_previous_auth_confirmation_before_any_backend_decision",
+        "actual_Tk_auth_recheck_uses_explicit_current_connector_confirmation_and_nonsecret_note_without_send_action",
+        "actual_async_Tk_discards_slow_inspection_response_after_connector_change_instead_of_reusing_old_snapshots",
+        "actual_Tk_closed_response_schema_discards_unexpected_payload_fields_before_rendering_details",
+        "actual_Tk_profile_edits_clear_previously_selected_snapshot_and_Owner_confirmation"
+      ],
+      "actual_Tk_Wizard_async_queue_and_recovery_component": true,
+      "screen": [
+        390,
+        640
+      ],
+      "privileged_owner_backend_calls_are_explicit_fixtures": true,
+      "real_UID_backend_tested_separately": true,
+      "full_account_GUI_public_activation_live_Google_or_installed_GUI_acceptance": false
+    }
+  ],
+  "logs_sha256": [
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-minimal.log",
+      "sha256": "686ab55bc34a03beb324c6a34c4484faa9ac6468a8b32330efe63104c72154a5"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-full.log",
+      "sha256": "94f08403230fbb5c8db1f944dcac83578c4aa6ec1133611e3c09f38306a2455c"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-kernel.log",
+      "sha256": "fb151d93dde7c010db3b26a2a9b109e769f2c5755f72f00ef90ac0051e123bc1"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-schema.log",
+      "sha256": "50886ddae3b374c3062fbe873c12bb786017c5a8ded064cfcd76ee5e5e79b05e"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-process.err",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-gui-desktop.log",
+      "sha256": "f70e96824963a102842f3d8147092e8166055fed748cc5681a36af57e037af8e"
+    },
+    {
+      "path": "/workspace/haos-validation/cloud-continuation/google-chat-owner-gui-compact.log",
+      "sha256": "f70e96824963a102842f3d8147092e8166055fed748cc5681a36af57e037af8e"
+    }
+  ],
+  "public_software_gateways": 15,
+  "not_claimed": [
+    "Google public activation",
+    "full account or OAuth/media GUI",
+    "real Google account privileges",
+    "external delivery or read",
+    "full root-controller production serve",
+    "installed systemd quiescence, login or GUI",
+    "release artifacts"
+  ]
+}

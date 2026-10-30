@@ -1,0 +1,56 @@
+{
+  "parent_commit": "6c230074b1cf7a610988cd2fc038f85e210e17f1",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "linux/haos/probes/probe_line_delivery_process.py",
+      "sha256": "b61e7c824740b259b17419b0d61ca0856f9ac40d0786e5742f7103936981ac2e"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "29e6f116b0109980c727672997163c61cb014d910e0fa3faa1dc72840f11be04"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_profile.py",
+      "sha256": "f27a22e114cc227fc034ebf0c1e1e8cd99422b2b760bb751a469cc20b537a51a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_line_delivery.py",
+      "sha256": "67dda3a24edc37fedd08a54e80424a02cf784cc07b883b22e03ae95def078350"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "02507dc1885a794fd0375bb7e1738f52d5bb66308883413724e39417bf6c018f"
+    },
+    {
+      "path": "linux/haos/runtime/install_package.py",
+      "sha256": "fb704a9caf94af02a49edf0b33bf89e1398e4329fa363ce330352041c083ae76"
+    }
+  ],
+  "actual_process": {
+    "passed": 4,
+    "cases": [
+      "actual_unprivileged_gateway_installed_public_profile_accepts_verified_https_hmac_and_commits_native_relay",
+      "actual_gateway_uid_native_verified_https_push_has_durable_intent_before_real_sigkill",
+      "actual_agent_uid_cannot_read_private_native_relay_or_owner_credentials_after_crash",
+      "new_gateway_process_reacquires_kernel_lease_retains_committed_input_and_never_resends_uncertain_native_push"
+    ],
+    "actual_uid_cases": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_sigkill": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": true,
+    "fixture_only_disposable_ca_and_loopback_targets": true,
+    "external_connections_or_recipient_acceptance": false,
+    "installed_haos_accepted": false
+  },
+  "container": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+  "network": "none; disposable namespace loopback only",
+  "service_uid_is_mocked": false,
+  "startup_identity_guard_called_before_credentials": true,
+  "actual_os_installed_systemd_or_external_acceptance": false,
+  "ci": "New exact-source runs remain required; do not transfer predecessor results"
+}

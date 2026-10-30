@@ -1,0 +1,300 @@
+{
+  "parent_commit": "3ad1a18c94b72c193ac7acdaa2ce49df52abbbd8",
+  "recorded_at": "2026-10-30T00:13:08.965856+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "4444a67283b5419a503f36e6b6a48e5939004ec769b47345d5f9382e254d5c48"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "0d1f6ce506c48b52a9421c80344e66a2344f031c23144c9b2da2fb76bd238cc4"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "07e036dbc8beadbf8494984817400a26f5094930604fc7d2706e3896e192c58a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk.py",
+      "sha256": "fd35b3ffd516f8858753164ca988f610061087d14f3a9003a239a0e17d59ff93"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_reply_process.py",
+      "sha256": "32a04e32bdf57aa88f950ce1f7ed3464046ae824deeb0ed8417845d51d2b46c4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_reply_worker.py",
+      "sha256": "b9d1086476ba20bdef9e6be4429696b3522f0192e3aa9b577d32d99800874e12"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_robot_reply.py",
+      "sha256": "84088ecb133518c5730f4d0ce8b874ed6eaf65597aefe7cde5322beefef50a96"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_send.py",
+      "sha256": "d4f268b9b3c8c7771830f6c564bbe4d7bac2a68de420eec81bfb27f2fb4089f1"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_tea.py",
+      "sha256": "90b44265ea65a795ceadeaf88a090b1a4974cbe27eb7ae50f22e1bb899926012"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_reply_process.py",
+      "sha256": "fbfa48c537165e57b3fda01b48a256a0b14b13757efb01f75ab3553176227255"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_robot_reply.py",
+      "sha256": "5bd59afa99e247eae13c2add355bf28f4ff33ae31d81d04f4d1889ad28ea05c1"
+    }
+  ],
+  "validation": {
+    "minimal_runtime": {
+      "passed": 2249,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; exercised in actual root suite"
+    },
+    "full_pinned_10_extra_runtime": {
+      "passed": 2249,
+      "existing_skips": 2
+    },
+    "actual_root_UID_backup": {
+      "passed": 150
+    },
+    "actual_Robot_SDK_TLS": {
+      "cases": [
+        "actual_Robot_SDK_oto_verified_TLS_ok_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_401_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_403_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_429_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_302_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_500_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_drop_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_truncated_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_duplicate_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_nonfinite_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_large_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_wrong-type_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_encoding_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_missing-key_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_private-key_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_untrusted-tls_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_withdraw_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_invalid-recipient_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_flow-controlled_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_oto_verified_TLS_foreign-recipient_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_ok_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_401_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_403_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_429_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_302_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_500_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_drop_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_truncated_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_duplicate_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_nonfinite_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_large_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_wrong-type_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_encoding_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_missing-key_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_private-key_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_untrusted-tls_one_write_no_implicit_fallback_honest_acceptance",
+        "actual_Robot_SDK_group_verified_TLS_withdraw_one_write_no_implicit_fallback_honest_acceptance",
+        "canonical_opaque_sender_authority_required_staff_hint_only_routes_exact_source",
+        "owner_selected_stable_Robot_mode_does_not_require_or_fallback_to_expired_session"
+      ],
+      "scope": "Pinned Hermes token and SDK helper, actual generated Robot group/OTO builders, SPI and response models; real verified local TLS. Fixture substitutes only origins and CA.",
+      "kernel_UID_parent_journal_live_delivery_or_installed_acceptance": false,
+      "passed": 39
+    },
+    "native_session_SDK_TLS": {
+      "cases": [
+        "actual_native_sender_verified_TLS_httpx_ok_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_native-error_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_401_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_429_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_302_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_500_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_drop_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_truncated_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_bool-code_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_duplicate_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_nonfinite_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_large_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_wrong-type_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_encoding_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_native_sender_verified_TLS_httpx_withdraw_one_write_closed_vendor_ACK_honest_local_receipt_or_refusal_uncertainty",
+        "actual_original_native_projection_refuses_wrong_source_hash_message_private_reflection_attempt_and_encoding",
+        "creation_only_owner_grant_cannot_authorize_native_reply",
+        "expired_original_session_refused_without_write_or_implicit_alternate_route"
+      ],
+      "scope": "Actual native sender and httpx with real verified loopback TLS; only fixture transport substitutes the official origin.",
+      "parent_journal_UID_live_messages_and_installed_acceptance": false,
+      "passed": 18
+    },
+    "native_resource_lookup_SDK_TLS": {
+      "cases": [
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_ok_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_401_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_429_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_500_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_302_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_bad-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_ip-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_app-secret-in-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_token-in-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_bool-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_duplicate_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_nonfinite_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_large_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_drop_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_truncated_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_encoding_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_untrusted-tls_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_withdraw_one_closed_request_no_token_or_code_to_agent",
+        "actual_SDK_builder_changed_resource_or_robot_identity_refused_before_network",
+        "unobserved_private_token_cannot_authorize_Robot_lookup"
+      ],
+      "scope": "Actual Hermes token/media helpers and Robot SDK request/SPI/response over real verified loopback TLS; only API origins and fixture CA are substituted.",
+      "binary_content_fetch_UID_mission_live_account_or_installed_acceptance": false,
+      "passed": 20
+    },
+    "actual_UID_robot_OTO": {
+      "passed": 15,
+      "cases": [
+        "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+        "actual_native_reply_private_worker_vendor_ACK_and_per_write_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_native_reply_cancel-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_revoke-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_orphan-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_deadline-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "reply_mode": "robot",
+      "conversation": "oto",
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "actual_UID_robot_group": {
+      "passed": 15,
+      "cases": [
+        "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+        "actual_native_reply_private_worker_vendor_ACK_and_per_write_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_native_reply_cancel-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_revoke-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_orphan-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_deadline-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "reply_mode": "robot",
+      "conversation": "group",
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "actual_UID_session": {
+      "passed": 15,
+      "cases": [
+        "actual_gateway_UID_native_Hermes_profile_verified_TLS_WSS",
+        "actual_SDK_ACK_after_private_FULL_original_and_native_input_commit",
+        "actual_production_profile_reconnect_replays_one_original_one_input_one_native_Hermes_relay_obligation",
+        "actual_agent_UID_cannot_read_credentials_original_bearer_session_SQLite_WAL_owner_or_worker_stdin",
+        "actual_parent_FULL_write_intent_precedes_HTTP_and_dropped_reply_is_quarantined_without_resend_across_attempt_or_profile_restart",
+        "actual_native_reply_private_worker_vendor_ACK_and_per_write_journal_confirmed_replay_emit_one_HTTP_write_and_no_fake_remote_ID",
+        "actual_root_policy_withdrawal_terminates_and_joins_private_continuous_worker_without_ticket_disclosure",
+        "actual_parent_SIGKILL_causes_kernel_PDEATHSIG_SIGKILL_of_socket_worker",
+        "actual_native_reply_cancel-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_revoke-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_orphan-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_native_reply_deadline-write_terminates_private_worker_and_retains_begun_write_without_implicit_retry",
+        "actual_profile_WSS_401_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_429_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery",
+        "actual_profile_WSS_302_persistent_block_or_deadline_survives_connect_close_and_profile_reopen_without_another_discovery"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "public_dingtalk_enabled": false,
+      "reply_mode": "session",
+      "conversation": "oto",
+      "API_WSS_domains_mapped_only_in_offline_fixture_hosts": true,
+      "owner_publication_and_external_account_are_fixtures_profile_supervisor_is_actual": true,
+      "live_messages_missions_or_installed_acceptance": false
+    },
+    "actual_UID_media_recovery_WSS": {
+      "passed": 17,
+      "cases": [
+        "actual_0_UID_denied_before_native_resource_request",
+        "actual_65533_UID_denied_before_native_resource_request",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_ok",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_private-dns",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-redirect-private",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-401",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-429",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-403",
+        "actual_native_Hermes_retained_image_dispatch_sealed_ID_media_cache_relay_crash_retry_and_replay_never_refetch_bytes_or_leak_codes",
+        "actual_native_media_cdn-403_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_media_cdn-429_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_voice_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_document_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_video_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_SQLite_full_after_resource_intent_before_blob_intent-same_recovery_preserves_first_hash_without_silent_replacement",
+        "actual_SQLite_full_after_resource_intent_before_blob_intent-changed_recovery_preserves_first_hash_without_silent_replacement",
+        "actual_native_verified_WSS_parent_pre_ACK_custody_Robot_SDK_binary_cache_media_relay_and_crash_retry_without_refetch"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_production_public_resolver_no_mocks": true,
+      "synthetic_global_IP_on_loopback_in_network_none_namespace": true,
+      "native_API_and_CDN_have_different_origins_no_account_headers_or_cookies_forwarded": true,
+      "owner_publication_and_source_are_fixtures": true,
+      "live_account_mission_or_installed_acceptance": false,
+      "voice_PCM_transport_only_no_local_ASR_or_playback_acceptance": true
+    }
+  },
+  "implementation": [
+    "Owner-selected robot reply mode preserves existing session behavior without automatic route fallback.",
+    "Actual OrgGroupSend or singleton BatchSendOTO SDK builders after retained canonical source authorization.",
+    "Confirmed responses carry local queue-acceptance proof only; uncertain writes remain quarantined across crash, retry, revocation and process lifetime expiry.",
+    "Build and CI execute native Robot SDK matrix and actual UID process probes for both routes."
+  ],
+  "limits": [
+    "DingTalk remains private; public gateway software remains 12/22.",
+    "No live account, real external message, controller mission, installed-system, hardware or release acceptance.",
+    "Outgoing media/local voice and complete owner configuration/management/recovery remain open."
+  ]
+}

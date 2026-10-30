@@ -1,0 +1,10 @@
+{
+  "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "spectrum_version": "12.7.0",
+  "node": {
+    "version": "24.19.0",
+    "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz",
+    "sha256": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
+    "checksums_url": "https://nodejs.org/dist/v24.19.0/SHASUMS256.txt"
+  }
+}

@@ -53,6 +53,35 @@ def bounded_file(path, limit):
     return path.read_bytes()
 
 
+def diagnose(root,log_path,name,code,compositor,shm_total,shm_free):
+    # Only the explicitly disposable probe's own bounded failure label,
+    # never complete protocol logs, profiles, sessions or journal data.
+    output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
+    print(f'Disposable {name} process exit: {code}', flush=True)
+    print(json.dumps({'disposable_shared_memory_total_bytes': shm_total,
+                      'disposable_shared_memory_lowest_free_bytes': shm_free}), flush=True)
+    print('Disposable compositor exit: ' + str(compositor.poll()), flush=True)
+    server_output = bounded_file(root / 'compositor.log', 8 * 1024 * 1024).decode('utf-8', errors='replace')
+    server_errors = [line for line in server_output.splitlines() if re.search(r'\b(?:error|fatal|invalid|disconnect)\b', line, re.I)]
+    for line in server_errors[-4:]:
+        print('Disposable compositor error: ' + line[:640], flush=True)
+    phases = re.findall(r'^HAOS_(?:GUI|THEME)_FIXTURE_PHASE ([a-z-]{1,64})$', output, re.M)
+    if phases:
+        print('Disposable GUI last phase: ' + phases[-1], flush=True)
+    for line in output.splitlines():
+        if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Actual theme activation gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
+            print(line[:640], flush=True)
+    # A native compositor/protocol failure can exit Chromium before
+    # JavaScript's catch executes. Only this credential-free fixture's
+    # last bounded error lines, never ordinary Wayland protocol traffic.
+    native_errors = [line for line in output.splitlines() if
+        (re.search(r'(?:ERROR|FATAL):[A-Za-z0-9_./:-]+\]', line) and 'dbus/' not in line)
+        or re.search(r'\b(?:wl_display|wp_viewport)[@#]\d+.*\berror\b', line)]
+    for line in native_errors[-6:]:
+        line = re.sub(r'(?:https?|data|file):\S+', '[redacted-url]', line)
+        print('Disposable native error: ' + line[:800], flush=True)
+
+
 def main():
     if os.environ.get("HAOS_DISPOSABLE_SCREEN_TEST") != "1" or os.geteuid() == 0:
         raise PermissionError("explicit non-root disposable fixture required")
@@ -77,6 +106,10 @@ def main():
               "--shell=" + os.environ.get("HAOS_TEST_WESTON_SHELL", "desktop-shell.so")]
     compositor = nested = client = None
     identity = source()
+    (evidence / "status.json").write_text(json.dumps({**identity,"status":"running"})+"\n")
+    (evidence / "status.json").chmod(0o600)
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as output:output.write(f"evidence={evidence}\n")
     try:
         with (root / "compositor.log").open("wb") as log:
             compositor = subprocess.Popen([weston, *flags], env=compositor_env, stdout=log, stderr=log, start_new_session=True)
@@ -136,36 +169,12 @@ def main():
                 shm = os.statvfs('/dev/shm')
                 shm_free = min(shm_free, shm.f_bavail * shm.f_frsize)
                 if time.monotonic() >= client_deadline:
-                    raise subprocess.TimeoutExpired('disposable GUI gate', 75)
+                    diagnose(root,log_path,name,'deadline',compositor,shm_total,shm_free)
+                    raise subprocess.TimeoutExpired('disposable GUI gate: '+name, 75)
                 time.sleep(0.025)
             code = client.returncode
             if code != 0:
-                # Only the explicitly disposable probe's own bounded failure label,
-                # never complete protocol logs, profiles, sessions or journal data.
-                output = bounded_file(log_path, 8 * 1024 * 1024).decode('utf-8', errors='replace')
-                print(f'Disposable {name} process exit: {code}', flush=True)
-                print(json.dumps({'disposable_shared_memory_total_bytes': shm_total,
-                                  'disposable_shared_memory_lowest_free_bytes': shm_free}), flush=True)
-                print('Disposable compositor exit: ' + str(compositor.poll()), flush=True)
-                server_output = bounded_file(root / 'compositor.log', 8 * 1024 * 1024).decode('utf-8', errors='replace')
-                server_errors = [line for line in server_output.splitlines() if re.search(r'\b(?:error|fatal|invalid|disconnect)\b', line, re.I)]
-                for line in server_errors[-4:]:
-                    print('Disposable compositor error: ' + line[:640], flush=True)
-                phases = re.findall(r'^HAOS_(?:GUI|THEME)_FIXTURE_PHASE ([a-z-]{1,64})$', output, re.M)
-                if phases:
-                    print('Disposable GUI last phase: ' + phases[-1], flush=True)
-                for line in output.splitlines():
-                    if line.startswith(('Actual GUI capability gate failed:', 'Actual native/socket GUI gate failed:', 'Actual theme activation gate failed:', 'Error:', 'SyntaxError:', 'TypeError:', 'ReferenceError:')):
-                        print(line[:640], flush=True)
-                # A native compositor/protocol failure can exit Chromium before
-                # JavaScript's catch executes. Only this credential-free fixture's
-                # last bounded error lines, never ordinary Wayland protocol traffic.
-                native_errors = [line for line in output.splitlines() if
-                    (re.search(r'(?:ERROR|FATAL):[A-Za-z0-9_./:-]+\]', line) and 'dbus/' not in line)
-                    or re.search(r'\b(?:wl_display|wp_viewport)[@#]\d+.*\berror\b', line)]
-                for line in native_errors[-6:]:
-                    line = re.sub(r'(?:https?|data|file):\S+', '[redacted-url]', line)
-                    print('Disposable native error: ' + line[:800], flush=True)
+                diagnose(root,log_path,name,code,compositor,shm_total,shm_free)
                 raise AssertionError('real Wayland GUI probe failed: ' + name)
             stop(client)
             client = None
@@ -199,10 +208,15 @@ def main():
                   "session_is_explicit_fixture": True, "protocol": protocol, "gates": reports}
         (evidence / "virtual-wayland.json").write_text(json.dumps(report, indent=2) + "\n")
         (evidence / "virtual-wayland.json").chmod(0o600)
+        (evidence / "status.json").write_text(json.dumps({**identity,"status":"passed"})+"\n")
         print(json.dumps({"evidence": str(evidence), **report}))
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
                 output.write(f"evidence={evidence}\n")
+    except BaseException as error:
+        # Only a finite failure class; raw Wayland/protocol logs stay private.
+        (evidence / "status.json").write_text(json.dumps({**identity,"status":"failed","error_type":type(error).__name__})+"\n")
+        raise
     finally:
         stop(client)
         stop(nested)

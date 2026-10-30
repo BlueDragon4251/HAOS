@@ -1,0 +1,90 @@
+{
+  "parent_commit": "3a7e94db7cfeb53fec48131374d2e8294fd23c39",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "0c931264ce1b2bbebb78ad99e8ec7896106070b3a80471bfdc0343829e11f098"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f1b31a1d169723dd5859e10427a19307bebc1a6937661000e1d5c19db096eaed"
+    },
+    {
+      "path": "linux/haos/probes/probe_media_control_process.py",
+      "sha256": "42d60998ef49ce2cd9c820d8b144d66f62f5b8d72649d6d1901a366fa667df79"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_request_frame.py",
+      "sha256": "aaca3c4efdfa483f8d9be9bbcfe0825da11ca21ae00446405c980a12e4f22c95"
+    }
+  ],
+  "before_fix_actual_runtime_client_failed_with_controller_rejection": true,
+  "frame_byte_limit_unchanged": 131072,
+  "unicode_characters_transferred_without_truncation": 32000,
+  "tests": {
+    "minimal_python311": {
+      "passed": 1679,
+      "skipped": 2
+    },
+    "full_frozen_python311": {
+      "passed": 1679,
+      "skipped": 2
+    },
+    "actual_kernel_authority": {
+      "passed": 89
+    },
+    "email_kernel_peers": {
+      "passed": 7,
+      "cases": [
+        "actual_gateway_uid_uploads_over_kernel_peer_authenticated_socket_without_reading_controller_ledger",
+        "actual_gateway_runtime_client_transfers_32000_multibyte_characters_over_real_kernel_socket_without_truncation_or_frame_limit_increase",
+        "actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger",
+        "actual_agent_peer_cannot_request_output_exports_and_gateway_cannot_invent_a_host_path_export",
+        "actual_gateway_uid_cannot_gain_owner_methods_through_forged_uid_zero_and_owner_json_fields",
+        "actual_owner_policy_withdrawal_blocks_a_later_chunk_on_the_same_connection_interface",
+        "actual_new_owner_epoch_cannot_rebind_old_upload_and_requires_new_durable_media_admission"
+      ],
+      "actual_uids": [
+        0,
+        65532,
+        65533,
+        65534
+      ],
+      "actual_kernel_so_peercred": true,
+      "socket_filesystem_permission_is_not_the_negative_gate": true,
+      "gateway_platform": "email",
+      "prepared_email_policy_is_fixture": true,
+      "optional_hermes_sdk_imported": false,
+      "external_or_installed_acceptance": false
+    },
+    "line_kernel_peers": {
+      "passed": 7,
+      "cases": [
+        "actual_gateway_uid_uploads_over_kernel_peer_authenticated_socket_without_reading_controller_ledger",
+        "actual_gateway_runtime_client_transfers_32000_multibyte_characters_over_real_kernel_socket_without_truncation_or_frame_limit_increase",
+        "actual_agent_uid_reaches_permissive_socket_but_is_denied_before_any_frame_and_cannot_read_private_ledger",
+        "actual_agent_peer_cannot_request_output_exports_and_gateway_cannot_invent_a_host_path_export",
+        "actual_gateway_uid_cannot_gain_owner_methods_through_forged_uid_zero_and_owner_json_fields",
+        "actual_owner_policy_withdrawal_blocks_a_later_chunk_on_the_same_connection_interface",
+        "actual_new_owner_epoch_cannot_rebind_old_upload_and_requires_new_durable_media_admission"
+      ],
+      "actual_uids": [
+        0,
+        65532,
+        65533,
+        65534
+      ],
+      "actual_kernel_so_peercred": true,
+      "socket_filesystem_permission_is_not_the_negative_gate": true,
+      "gateway_platform": "line",
+      "prepared_email_policy_is_fixture": false,
+      "optional_hermes_sdk_imported": false,
+      "external_or_installed_acceptance": false
+    }
+  },
+  "limits": [
+    "Prepared email policy/publication is a fixture; public email setup remains disabled.",
+    "No replacement of actual UID/socket tests with mocks/skips; the three unit preflight tests only select a nonexistent private fixture socket.",
+    "Existing backup file exclusion unchanged. No external message, inference, account, installed or release acceptance."
+  ]
+}

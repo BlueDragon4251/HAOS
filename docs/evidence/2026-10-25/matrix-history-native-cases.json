@@ -1,0 +1,23 @@
+{
+  "passed": 16,
+  "cases": [
+    "actual_v1_migration_preserves_existing_sync_cursor",
+    "actual_sdk_pagination_native_raw_relay_and_missions_keep_sync_cursor",
+    "history_replay_unknown_sender_wrong_thread_and_original_age_do_not_create_missions",
+    "empty_page_with_new_token_does_not_erase_remaining_history",
+    "reopened_history_page_recovers_after_cursor_commit_without_another_http_read",
+    "safe_persisted_single_http_error_401",
+    "safe_persisted_single_http_error_403",
+    "safe_persisted_single_http_error_404",
+    "safe_persisted_single_http_error_429",
+    "safe_persisted_single_http_error_500",
+    "refuse_wrong_start_without_advancing_gap",
+    "refuse_wrong_room_without_advancing_gap",
+    "refuse_wrong_loop_without_advancing_gap",
+    "actual_sqlite_failure_rolls_back_history_input_and_cursor_together",
+    "multi_page_cursor_cycle_cannot_restart_history",
+    "old_gap_snapshot_cannot_read_under_new_owner_generation"
+  ],
+  "external_connections": false,
+  "installed_matrix_gateway_enabled": false
+}

@@ -1,0 +1,229 @@
+{
+  "baseline_commit": "8a77dcaa7a0d65880765e321408931e62d9dadb6",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_profile.py",
+      "sha256": "541ccfd4dd53686fea56933100a6d661c69d5995c0fc7975cbb6044d0d69d411"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_delivery.py",
+      "sha256": "d6d0579b146bfd50a797e84c67f69134677276833d80b2c9d9331d8c475c7cfb"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_delivery.py",
+      "sha256": "0a4e967328dd6832c86ea282a13224912c4d3a5776d5a958c5a8fd68ae8fa66b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_slack_delivery.py",
+      "sha256": "b82eed329ba3e5c018a761a6bc7690e7c18aa4437ad6270b99d2b1ee2d60e82c"
+    }
+  ],
+  "actual_native_homeassistant_profile": {
+    "passed": 29,
+    "cases": [
+      "prepared_profile_does_not_enable_public_homeassistant_policy",
+      "shared_factory_requires_exact_private_context_before_native_import_or_connection",
+      "private_factory_never_connects_before_explicit_start",
+      "actual_kernel_flock_refuses_parallel_homeassistant_profile",
+      "private_native_imports_leave_unrelated_home_untouched",
+      "disconnected_profile_cannot_publish",
+      "actual_profile_native_auth_stream_durable_capture_and_relay",
+      "profile_send_requires_exact_outbox_identity_and_current_owner_route",
+      "profile_refuses_extra_binding_fields_before_native_post",
+      "profile_refuses_truthy_notification_flag_before_native_post",
+      "profile_refuses_unbounded_reply_identity_before_native_post",
+      "actual_private_profile_send_uses_native_rest_and_separate_authenticated_receipt_witness",
+      "shared_dispatch_metadata_connects_actual_mission_outbox_to_native_receipt_and_reopened_delivery_state",
+      "actual_eof_reconnect_preserves_idempotency_and_reports_unrecoverable_gap",
+      "explicit_disconnect_reconnect_retains_raw_journal_and_profile",
+      "owner_regrant_revokes_running_profile_without_automatic_inheritance",
+      "concurrent_profile_close_releases_lease_once_and_closes_sockets",
+      "authentication_refusal_is_sticky_across_connect_close_and_actual_profile_reopen",
+      "prepared_owner_auth_recheck_does_no_network_io_and_next_start_performs_real_native_auth",
+      "owner_metadata_preserves_explicit_unrecoverable_gap_after_successful_reauthentication",
+      "credential_rotation_reuses_private_home_with_new_authenticated_identity",
+      "actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event",
+      "independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle",
+      "actual_shared_service_supervisor_does_not_bypass_persisted_native_authentication_refusal",
+      "actual_shared_supervisor_stop_joins_private_profile_workers_and_closes_native_sessions",
+      "actual_http429_seconds_retry_after_survives_close_and_profile_reopen_without_early_request",
+      "actual_http429_http-date_retry_after_survives_close_and_profile_reopen_without_early_request",
+      "close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease",
+      "plain_http_and_arbitrary_plugin_configuration_are_refused"
+    ],
+    "actual_native_profile_ws_kernel_lease_and_sqlite": true,
+    "loopback_target_replacement_only_in_fixture": true,
+    "public_gateway_enabled": false,
+    "reconnect_delay_shortened_only_in_fixture": true,
+    "unseen_remote_events_recovered": false,
+    "external_account_notification_tls_or_installed_acceptance": false
+  },
+  "actual_public_dispatch_regression": {
+    "matrix_delivery": {
+      "passed": 21,
+      "cases": [
+        "actual_native_format_sdk_plaintext_and_reopened_outbox",
+        "actual_native_root_thread_preserved",
+        "single_native_http_400",
+        "single_native_http_401",
+        "single_native_http_403",
+        "single_native_http_404",
+        "single_native_http_413",
+        "single_native_http_429",
+        "single_native_http_500",
+        "single_native_http_302",
+        "lost_receipt_does_not_trigger_native_e2ee_retry",
+        "malformed_success_receipt_stays_uncertain",
+        "partial_chunks_then_refusal_stays_uncertain",
+        "revocation_between_chunks_stops_before_second_send",
+        "forged_binding_cannot_send",
+        "scope_substitution_cannot_send",
+        "thread_substitution_cannot_send",
+        "raw_sdk_send_outside_private_context_has_no_write_authority",
+        "encrypted_room_cannot_downgrade_or_infer_outbound_device_approval",
+        "unavailable_encryption_state_cannot_downgrade",
+        "plaintext_needs_explicit_owner_consent"
+      ],
+      "external_connections": false,
+      "recipient_guard_installed": false,
+      "installed_service_accepted": false
+    },
+    "mattermost_delivery": {
+      "passed": 18,
+      "cases": [
+        "native_exact_flat_receipt",
+        "native_exact_thread_receipt",
+        "native_single_post_400",
+        "native_single_post_401",
+        "native_single_post_403",
+        "native_single_post_404",
+        "native_single_post_413",
+        "native_single_post_429",
+        "native_single_post_500",
+        "native_single_post_302",
+        "native_http_date_retry_after_retains_reopened_pending_outbox",
+        "wrong_route_201_stays_uncertain",
+        "lost_http_receipt_stays_uncertain",
+        "partial_chunk_then_refusal_stays_uncertain",
+        "revoke_between_chunks_never_posts_again",
+        "actual_team_mismatch_no_post",
+        "forged_binding_generation_no_post",
+        "real_connector_refusal_before_post_can_retry"
+      ],
+      "external_connections": false
+    },
+    "slack_delivery": {
+      "actual_native_sdk_http_outbox_cases": [
+        {
+          "case": "success",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "server-format",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "format-refused",
+          "actual_http_posts": 2,
+          "reopened_outbox_state": "delivered"
+        },
+        {
+          "case": "rate-limit",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "forbidden",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "unknown-error",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "malformed",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "invalid-ts",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "wrong-receipt",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "disconnect",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "uncertain"
+        },
+        {
+          "case": "connect-refused",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "pending"
+        },
+        {
+          "case": "wrong-team",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "wrong-channel",
+          "actual_http_posts": 0,
+          "reopened_outbox_state": "failed"
+        },
+        {
+          "case": "thread-success",
+          "actual_http_posts": 1,
+          "reopened_outbox_state": "delivered"
+        }
+      ],
+      "external_slack_connected": false,
+      "source_files": [
+        {
+          "path": "probe_slack_delivery.py",
+          "sha256": "b82eed329ba3e5c018a761a6bc7690e7c18aa4437ad6270b99d2b1ee2d60e82c"
+        },
+        {
+          "path": "gateway_slack.py",
+          "sha256": "7de8c7c426bd8a5df7db50baf55ad93f3d4a9357a09f759ad7cc61194cd7e9e9"
+        },
+        {
+          "path": "gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "gateway_runtime.py",
+          "sha256": "089de4babf9eb24029a62371e023d02647f294b0131ab822fef7de3e3b6d59c5"
+        }
+      ]
+    }
+  },
+  "full_runtime": {
+    "passed": 1190,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath": {
+    "passed": 1190,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_recovery": {
+    "passed": 49,
+    "network": "none"
+  },
+  "existing_local_excluded_file": "linux/haos/tests/test_backup.py",
+  "new_ci_skips": false,
+  "public_homeassistant_policy_or_setup_enabled": false,
+  "live_or_installed_acceptance": false
+}

@@ -1,0 +1,30 @@
+{
+  "actual_pinned_device_cases": [
+    "success",
+    "pending",
+    "slow-down",
+    "denied",
+    "expired",
+    "invalid-device",
+    "invalid-token"
+  ],
+  "case_count": 7,
+  "native_pending_slowdown_and_denial": true,
+  "invalid_login_preserves_existing_account": true,
+  "private_tokens_not_printed": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_copilot_device.py",
+      "sha256": "2ca0069fffbc192458c9f1738138f1b68aa0346e6741a10748fecfb50a7df581"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "5d1460c9a2eba10706cd71e65c20777bd5b619a10051c920a7f910529e7c69db"
+    },
+    {
+      "path": "haos/provider_copilot.py",
+      "sha256": "0cc8f51b880986500aef7353aee6937d3a00e978bc89698f1ccf800300c880fb"
+    }
+  ]
+}

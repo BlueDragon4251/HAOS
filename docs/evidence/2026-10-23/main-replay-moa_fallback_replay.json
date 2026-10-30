@@ -1,0 +1,75 @@
+{
+  "outer_completion_style": "stream",
+  "native_wire_style": "SSE",
+  "cases": [
+    {
+      "mode": "codex_responses",
+      "native_sdk_streams": 3,
+      "http_dispatches": [
+        [
+          1,
+          "primary",
+          false
+        ],
+        [
+          1,
+          "fallback",
+          false
+        ],
+        [
+          2,
+          "primary",
+          false
+        ],
+        [
+          2,
+          "fallback",
+          true
+        ],
+        [
+          3,
+          "primary",
+          false
+        ]
+      ]
+    },
+    {
+      "mode": "anthropic_messages",
+      "native_sdk_streams": 3,
+      "http_dispatches": [
+        [
+          1,
+          "primary",
+          false
+        ],
+        [
+          1,
+          "fallback",
+          false
+        ],
+        [
+          2,
+          "primary",
+          false
+        ],
+        [
+          2,
+          "fallback",
+          true
+        ],
+        [
+          3,
+          "primary",
+          false
+        ]
+      ]
+    }
+  ],
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_moa_fallback_replay.py": "1aeb050084b186a42813cc922bef780f20c411a99475d6c8012008dbaa7d1998",
+    "provider_moa_streams.py": "1d76379407caee9bd0d87a08be295a0e6ae3f545204a2289911c981ff1b327ed",
+    "provider_proxy.py": "637ddcc2b4c5b7bb8011d5d2f08dad1bdf941107c40e3098c9e0f7cedc94d948",
+    "provider_fallback.py": "93eae06ad67e656d897b62b344f30c87e602f89dce9f3d46880ebe4007db621b"
+  }
+}

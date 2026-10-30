@@ -10,6 +10,15 @@ from haos.policy import resolve_volume, validate_policy
 from haos.sandbox import command, trusted_json
 
 
+def test_public_provider_wire_policy_is_read_only_and_bound_only_with_model_capability():
+    without = command([], 3, certificates=[])
+    assert "/run/haos-credentials/provider-policy.json" not in without
+    with_model = command([], 3, certificates=[], provider_fd=5)
+    target = with_model.index("/run/haos-credentials/provider-policy.json")
+    assert with_model[target - 2:target] == ["--ro-bind", "/etc/haos/provider.json"]
+    assert "/etc/haos/provider-credentials" not in with_model
+
+
 def test_policy_uses_stable_identity_and_cannot_inject_paths_or_mount_options():
     identifier = "UUID:abcd-1234"
     grants = validate_policy({"version": 1, "volumes": [{"id": identifier, "mode": "read-only"}]})

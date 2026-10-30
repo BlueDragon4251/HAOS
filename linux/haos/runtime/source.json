@@ -2,9 +2,19 @@
   "upstream_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
   "pyproject_sha256": "6f969b9fdff95e7269ec808361e3ae8be5357036e6257e53a3306878cf8c41dd",
   "uv_lock_sha256": "5b3798f326209475abca8ef7cbf7c9406f12e687c28c0b540dfe597466f48590",
+  "auxiliary_client_sha256": "e83807074f3577ac3980f43bfd578ffcc95efb591e38a9427d0e7d33ec7d8e4a",
+  "a2a_adapter_sha256": "3a540adc9b7f6e572d151e2584b6fb48fa5c19a3692a004b516fa8a608d0c4ef",
   "extras": [
     "web",
-    "messaging"
+    "messaging",
+    "anthropic",
+    "bedrock",
+    "vertex",
+    "azure-identity",
+    "matrix",
+    "voice",
+    "feishu",
+    "dingtalk"
   ],
   "python": "3.11",
   "platform": "x86_64-unknown-linux-gnu",
@@ -15,6 +25,28 @@
     "tornado": "6.5.9",
     "urllib3": "2.8.0"
   },
-  "requirements_sha256": "303a806c67afd8b798dc360c2629e8dd2dd6dd41fb06c65c102175448e625d96",
-  "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514"
+  "requirements_sha256": "dc6013cd6f37d1dbb718771eb5444d1eff9700a66204402863a2b06f43dd6bbb",
+  "verification_run": "https://github.com/BlueDragon4251/HAOS/actions/runs/37818579514",
+  "provider_versions": {
+    "msal": "1.39.0"
+  },
+  "gateway_versions": {
+    "mautrix": "0.21.1",
+    "python-olm": "3.2.16",
+    "aiosqlite": "0.22.1",
+    "asyncpg": "0.31.0",
+    "aiohttp-socks": "0.11.0",
+    "pycryptodome": "3.23.0",
+    "python-socks": "2.8.1",
+    "base58": "2.1.1",
+    "unpaddedbase64": "2.1.0"
+  },
+  "dingtalk_versions": {
+    "dingtalk-stream": "0.24.3",
+    "alibabacloud-dingtalk": "2.2.42"
+  },
+  "gateway_compatibility_versions": {
+    "alibabacloud-tea-openapi": "0.4.6"
+  },
+  "buzz_adapter_sha256": "bdfee004fb1fc5601be42f1ea69706b51f8f02fb4a390d5afe8f2e839fcc40e7"
 }

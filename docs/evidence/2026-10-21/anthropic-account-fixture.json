@@ -1,0 +1,25 @@
+{
+  "actual_native_anthropic_account_cases": [
+    "success",
+    "bad-state",
+    "empty-code",
+    "denied",
+    "missing-token",
+    "non-json",
+    "short-body"
+  ],
+  "case_count": 7,
+  "actual_pkce_state_private_pool_expiry_refresh_broker_status_logout": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_anthropic_account.py",
+      "sha256": "e5465e7bb21bfbd42a8a2372439101e35329be4fcb7720ce6a18abfc2d4d87ef"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "e9b85b8cc3bc805c5c056bc016d4762b4f790638241e32a20ba24d74b0934151"
+    }
+  ],
+  "native_terminal_echo_disabled_and_restored": true
+}

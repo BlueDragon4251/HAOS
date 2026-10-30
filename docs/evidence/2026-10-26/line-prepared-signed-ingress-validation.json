@@ -1,0 +1,79 @@
+{
+  "parent_commit": "e17bb012187425bf3b0fd1624edd45c91df60bfa",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_line_ingress.py",
+      "sha256": "f9cd492cf3d7dca1bfa27efc395dd37a4400332ab72abdff998f6b142d6befc1"
+    },
+    {
+      "path": "linux/haos/runtime/probe_line_ingress.py",
+      "sha256": "9204250198f901b1884e1627d8544093bb2d9439d89d0dd5ca9a5e371d9600c2"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_line_ingress.py",
+      "sha256": "ed35e3adeadc92e2c642383aeb11d328a05726d571a79ef8bdd4ac26cb19f64a"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "022bb6a1ca5db689f21f47f2ce7c22068d27ae9546e2763701ababa8e017fa9e"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "ccf4afd7d4b1d135220139880e8083bd171d5d234a23e3ba17a4420108c4d7fd"
+    }
+  ],
+  "native_probe": {
+    "passed": 35,
+    "cases": [
+      "prepared_line_not_publicly_enabled",
+      "actual_native_hmac_and_text_codec_after_observable_commit_strip_single_use_reply_capability",
+      "same_signed_event_cannot_repeat_local_admission",
+      "unknown_user",
+      "unknown_group",
+      "missing_user",
+      "standby",
+      "media",
+      "missing_original_time",
+      "boolean_time",
+      "invalid_event_id",
+      "empty_text",
+      "ambiguous_source",
+      "tampered_body",
+      "invalid_signature",
+      "oversized_body",
+      "wrong_destination",
+      "stale_event",
+      "future_event",
+      "oversized_batch",
+      "duplicate_signed_json_rejected",
+      "raw_native_connect_denied",
+      "raw_native__handle_webhook_denied",
+      "raw_native__dispatch_event_denied",
+      "raw_native__handle_message_event_denied",
+      "raw_native__handle_postback_event_denied",
+      "raw_native__download_media_denied",
+      "raw_native__handle_media_denied",
+      "raw_native_send_denied",
+      "raw_native_send_typing_denied",
+      "raw_native_send_image_file_denied",
+      "raw_native_send_voice_denied",
+      "raw_native_send_video_denied",
+      "actual_sqlite_reopen_retries_failed_local_admission_without_external_side_effect",
+      "owner_withdrawal_blocks_retained_native_event"
+    ],
+    "actual_pinned_hmac_and_native_codec_and_sqlite": true,
+    "public_gateway_enabled": false,
+    "listener_or_external_message_or_account_acceptance": false
+  },
+  "minimal_runtime": {
+    "passed": 1289,
+    "existing_skips": 2
+  },
+  "full_frozen_runtime": {
+    "passed": 1289,
+    "existing_skips": 2
+  },
+  "local_exclusion": "linux/haos/tests/test_backup.py",
+  "public_line_enabled": false,
+  "external_or_installed_acceptance": false
+}

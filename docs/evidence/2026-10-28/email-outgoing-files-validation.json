@@ -1,0 +1,388 @@
+{
+  "parent_commit": "7f1a4b0dcde74e828a0696002bcb16bc7b3af75d",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "67285a4afae81ae794c6042783c760bca2fcf935ace59f54ebce8aabb0957821"
+    },
+    {
+      "path": "docs/GATEWAY-EMAIL.md",
+      "sha256": "842fb8743b395e19d3b7e7e5e03f529571273deb65c225d3e5ba55258c6be1e1"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "187dbd179f5ccda3daa0e94e8e1b272091db8fd9733b8c1f2fe2789d5b536655"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_delivery.py",
+      "sha256": "2a50860ac235134996ecfd696e41a1909c2a6949517ad9ce640f16779f8b7738"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_frame.py",
+      "sha256": "7c05bf4549f92c320aa4207e51e67683f221bd82383c227378ee888f1a4bf457"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_output.py",
+      "sha256": "5954346c858585d4df211bcd29d0f7f49537ec15e8910fa115fabce5fc2bfb53"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_process.py",
+      "sha256": "b020e5c29e284edc96157998b63697bb5fa7ce21c1d6553d21f4a4d6dbe5f630"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_profile.py",
+      "sha256": "d00397fbd794c5931866ba2ac270c3e93ce3423245c88ebbea3821602967e74c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_smtp.py",
+      "sha256": "1e9cc3adfa39751cbffb251a37476337622365a4ed4308922d1e36527a6745be"
+    },
+    {
+      "path": "linux/haos/haos/gateway_email_worker.py",
+      "sha256": "aaa3dc4d7133e0f79f6f215e1a52e1ded622b4748a71f2a9050ac4d221eb7c1d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_outbound.py",
+      "sha256": "380272aaa36403642de98ee1abacf519e52a6248434ff007fe82bb9fa9cda916"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "d49a5502466aa6d2e1ded8b282a5633f37f46bddfb8ca9bda15baf39c96a72da"
+    },
+    {
+      "path": "linux/haos/probes/probe_email_process.py",
+      "sha256": "96b48ebe98a84ef393312577da4d9b00dd4b6c3397d84a51704785825efb8359"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_output.py",
+      "sha256": "b9b8541cb2d2e75fa3131be8974cb187c1e248ff032f8a7e03c6a1c92fbd4059"
+    },
+    {
+      "path": "linux/haos/runtime/probe_email_smtp.py",
+      "sha256": "dea601b9fda0840d2deaed4e7a10375cb8ba8a532680e66ed05aba5ec4cb6ed1"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email_frame.py",
+      "sha256": "d83e0d45aa44b5426bac4480b03d66c0b74c8a161c689318dce63a66ec274710"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_email_smtp.py",
+      "sha256": "a3ab28730d4302fa178cab7ed61fa3218bd41d466e938752b745af7c1c6f4dcc"
+    }
+  ],
+  "public_email_gateway_enabled": false,
+  "tests": {
+    "minimal_python311": {
+      "passed": 1695,
+      "skipped": 2
+    },
+    "full_frozen_python311": {
+      "passed": 1695,
+      "skipped": 2
+    },
+    "actual_kernel_authority": {
+      "passed": 89
+    },
+    "actual_mail_process": {
+      "passed": 18,
+      "cases": [
+        "actual_gateway_uid_private_worker_imports_root_owned_runtime_and_authenticates_native_verified_tls_without_sending",
+        "actual_gateway_uid_worker_transfers_exact_bounded_header_bytes_with_same_connection_uidvalidity_and_internaldate",
+        "actual_gateway_uid_worker_search_uses_current_root_grant_date_and_returns_all_sorted_bounded_uid_resources",
+        "actual_gateway_uid_streams_exact_large_approved_body_over_private_bounded_binary_ipc_without_model_or_smtp_send",
+        "actual_uid_worker_refuses_unapproved_mime_after_bounded_inspection_without_transferring_full_source_to_parent",
+        "actual_uid_worker_returns_exact_bounded_mime_manifest_and_binary_source_only_under_current_explicit_media_grant",
+        "actual_gateway_uid_streams_four_private_outputs_including_maximum_document_png_wav_and_mp4_into_native_smtp_without_host_paths_or_duplicate_replay",
+        "secured_legacy_text_only_confirmation_remains_readable_without_journal_rewrite_or_another_smtp_write",
+        "actual_native_smtp_temporary_refusal_disconnects_profile_and_persistent_retry_deadline_cannot_be_reset_by_reopening",
+        "actual_gateway_uid_durable_reply_context_native_smtp_intent_and_acceptance_never_repeat_confirmed_or_uncertain_writes_across_attempts",
+        "actual_gateway_uid_receiver_runs_native_account_search_header_body_capture_replay_and_durable_private_relay",
+        "actual_agent_uid_cannot_invoke_the_private_worker_even_with_direct_installed_module_execution",
+        "actual_agent_uid_receives_no_credentials_and_cannot_read_private_secret_stdin_or_process_environment",
+        "actual_root_policy_change_kills_and_joins_blocked_native_worker_during_imap_greeting",
+        "actual_parent_cancellation_kills_and_joins_blocked_private_worker_before_returning",
+        "actual_cancellation_during_pending_process_creation_waits_for_spawn_then_kills_and_joins_before_parent_returns",
+        "actual_parent_sigkill_immediately_kills_credential_worker_and_pid1_reaps_it_without_waiting_for_network_deadline",
+        "actual_worker_hard_deadline_terminates_blocking_native_constructor_and_parent_joins_it"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_private_subprocess_and_kernel_termination": true,
+      "actual_native_clients_and_verified_tls": true,
+      "loopback_account_and_root_publication_are_fixtures": true,
+      "public_email_gateway_enabled": false,
+      "external_email_accounts_or_delivery_or_installed_acceptance": false
+    },
+    "actual_backend_exports": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 5,
+      "cases": [
+        "actual_authenticated_backend_exports_only_exact_marked_completed_source_session_files_as_private_bytes",
+        "durable_controller_snapshot_does_not_reread_a_changed_agent_file_on_repeated_preparation",
+        "arbitrary_or_unmarked_host_path_cannot_become_an_email_output_export",
+        "owner_withdrawal_refuses_the_old_delivery_before_any_further_private_read",
+        "fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads"
+      ],
+      "actual_authenticated_backend_artifact_reader": true,
+      "completed_session_and_connected_mail_transport_are_fixtures": true,
+      "prepared_only_not_public": true,
+      "smtp_write_worker_isolation_external_mail_or_inference_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    },
+    "line_output_regression": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 18,
+      "cases": [
+        "pinned_native_output_extension_catalog_is_covered",
+        "actual_authenticated_backend_exports_four_explicit_completed_session_artifacts",
+        "verified_https_capability_downloads_match_all_original_bytes",
+        "actual_native_image_voice_video_and_document_link_builders_one_journaled_push",
+        "confirmed_media_attempt_replay_never_repeats_native_http_push",
+        "native_media_capability_supports_bounded_byte_ranges_and_refuses_invalid_ranges",
+        "owner_cache_inventory_includes_output_bytes_without_download_tokens_or_paths",
+        "explicit_owner_controller_inventory_and_purge_preserve_output_tombstone_and_mission",
+        "native_media_401_does_not_repeat_the_same_attempt",
+        "native_media_429_does_not_repeat_the_same_attempt",
+        "native_media_abort_does_not_repeat_the_same_attempt",
+        "new_publisher_preserves_uncertain_media_write_and_does_not_resend",
+        "forged_or_foreign_media_url_refused_before_request",
+        "owner_revocation_immediately_blocks_all_existing_download_capabilities",
+        "revoked_output_cannot_be_exported_or_republished",
+        "owner_gateway_cache_purge_requires_withdrawal_and_keeps_private_audit",
+        "expired_download_capability_refused",
+        "read_without_output_opt_in_delivers_safe_text_without_file_paths_or_exports"
+      ],
+      "actual_native_backend_line_builders_and_verified_https": true,
+      "completed_mission_and_session_are_explicit_fixtures": true,
+      "external_delivery_inference_or_installed_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    },
+    "sms_output_regression": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 9,
+      "cases": [
+        "real_private_account_and_mms_number_verification_before_sender_and_https_output_listener",
+        "actual_authenticated_backend_exports_four_exact_completed_source_session_artifacts",
+        "actual_native_sms_form_extended_only_with_three_approved_mms_urls_after_durable_intent",
+        "fixture_provider_fetches_all_native_mms_bytes_from_actual_grant_bound_https_listener",
+        "confirmed_mms_write_is_not_repeated",
+        "document_uses_real_bounded_download_link_while_supported_audio_video_and_image_use_mms",
+        "sms_only_number_uses_download_links_without_claiming_mms_support",
+        "foreign_or_other_delivery_urls_are_refused_before_native_send",
+        "owner_revocation_immediately_blocks_every_media_download"
+      ],
+      "actual_backend_native_sms_mms_and_verified_tls": true,
+      "fixture_completed_mission_and_provider_resources": true,
+      "external_accounts_mms_charges_inference_or_installed_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    },
+    "native_codec": {
+      "passed": 15,
+      "cases": [
+        "actual_native_dmarc_authenticated_mime_body_decode",
+        "actual_native_dkim_authenticated_mime_body_decode",
+        "actual_native_spf_authenticated_mime_body_decode",
+        "untrusted_authentication_case_0_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_1_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_2_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_3_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_4_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_5_refused_before_native_body_or_attachment_use",
+        "untrusted_authentication_case_6_refused_before_native_body_or_attachment_use",
+        "native_header_body_pass_never_writes_or_exposes_unapproved_attachment_paths",
+        "actual_native_compat32_folded_message_id_is_canonicalized_only_at_outer_header_whitespace",
+        "folded_message_id_normalization_cannot_admit_multiple_ids_or_internal_control_syntax",
+        "duplicate_sender_header_refused_before_native_decode",
+        "out_of_range_imap_uid_refused"
+      ],
+      "actual_pinned_native_email_codecs": true,
+      "prepared_only_not_public": true,
+      "network_accounts_delivery_or_installed_acceptance": false
+    },
+    "native_transport": {
+      "passed": 38,
+      "cases": [
+        "actual_native_tls_imap_and_smtp_authenticate_verified_hostname_and_readonly_uid_state_without_message_send",
+        "tls_announced_oversized_imap_literal_refused_before_reading_its_body",
+        "tls_owner_revocation_blocks_next_native_command_and_cleanup_does_not_change_remote_mail",
+        "tls_imap_delete_flag_mutation_is_denied_before_any_remote_command",
+        "tls_smtp_probe_cannot_send_mail_without_a_separate_durable_write_capability",
+        "tls_changed_native_tls_flag_refused_before_connection_or_credentials",
+        "tls_incorrect_certificate_hostname_refused_before_imap_password",
+        "tls_imap-auth-refused_preserved_as_failure_without_outgoing_message",
+        "tls_smtp-auth-refused_preserved_as_failure_without_outgoing_message",
+        "tls_actual_native_header_fetch_uses_authenticated_internaldate_and_body_peek_not_sender_date_or_read_flags",
+        "tls_changed_private_uid_resource_is_refused_before_header_admission",
+        "tls_mailbox_epoch_change_is_refused_before_any_private_uid_header_fetch",
+        "tls_actual_native_bounded_uid_search_uses_server_since_date_and_preserves_all_ordered_resources",
+        "tls_search-outside_is_refused_before_cursor_advance",
+        "tls_search-duplicate_is_refused_before_cursor_advance",
+        "tls_actual_full_message_and_native_body_decode_follow_independent_timed_source_approval",
+        "tls_unapproved_sender_is_refused_before_full_message_or_attachment_download",
+        "tls_new_grant_does_not_download_old_body_even_with_an_authenticated_sender",
+        "tls_changed_full_resource_headers_are_refused_before_durable_admission",
+        "actual_native_starttls_imap_and_smtp_authenticate_verified_hostname_and_readonly_uid_state_without_message_send",
+        "starttls_announced_oversized_imap_literal_refused_before_reading_its_body",
+        "starttls_owner_revocation_blocks_next_native_command_and_cleanup_does_not_change_remote_mail",
+        "starttls_imap_delete_flag_mutation_is_denied_before_any_remote_command",
+        "starttls_smtp_probe_cannot_send_mail_without_a_separate_durable_write_capability",
+        "starttls_changed_native_tls_flag_refused_before_connection_or_credentials",
+        "starttls_incorrect_certificate_hostname_refused_before_imap_password",
+        "starttls_imap-auth-refused_preserved_as_failure_without_outgoing_message",
+        "starttls_smtp-auth-refused_preserved_as_failure_without_outgoing_message",
+        "starttls_actual_native_header_fetch_uses_authenticated_internaldate_and_body_peek_not_sender_date_or_read_flags",
+        "starttls_changed_private_uid_resource_is_refused_before_header_admission",
+        "starttls_mailbox_epoch_change_is_refused_before_any_private_uid_header_fetch",
+        "starttls_actual_native_bounded_uid_search_uses_server_since_date_and_preserves_all_ordered_resources",
+        "starttls_search-outside_is_refused_before_cursor_advance",
+        "starttls_search-duplicate_is_refused_before_cursor_advance",
+        "starttls_actual_full_message_and_native_body_decode_follow_independent_timed_source_approval",
+        "starttls_unapproved_sender_is_refused_before_full_message_or_attachment_download",
+        "starttls_new_grant_does_not_download_old_body_even_with_an_authenticated_sender",
+        "starttls_changed_full_resource_headers_are_refused_before_durable_admission"
+      ],
+      "actual_pinned_imap_smtp_clients_and_verified_tls": true,
+      "prepared_only_not_public": true,
+      "worker_supervision_is_not_part_of_this_protocol_probe": true,
+      "external_accounts_mail_delivery_or_installed_acceptance": false
+    },
+    "native_admission": {
+      "passed": 9,
+      "cases": [
+        "native_authenticated_headers_match_exact_owner_source_without_creating_or_inventing_a_body_goal",
+        "unapproved-sender_source_refused_before_full_body_or_attachments",
+        "authentication-refused_source_refused_before_full_body_or_attachments",
+        "authentication-refused_source_refused_before_full_body_or_attachments",
+        "self-or-automated_source_refused_before_full_body_or_attachments",
+        "self-or-automated_source_refused_before_full_body_or_attachments",
+        "unapproved-thread_source_refused_before_full_body_or_attachments",
+        "new_owner_epoch_cannot_promote_old_received_mail",
+        "exact_root_thread_remains_stable_across_nested_replies"
+      ],
+      "actual_native_header_auth_and_independent_owner_policy": true,
+      "prepared_only_not_public": true,
+      "full_body_mission_or_external_acceptance": false
+    },
+    "native_ingress": {
+      "passed": 6,
+      "cases": [
+        "approved_actual_native_body_is_durable_before_native_dispatch_or_root_mission",
+        "actual_pinned_dispatch_source_and_durable_relay_reach_independent_controller_mission_without_model_or_smtp_send",
+        "native_input_replay_after_compaction_never_creates_a_second_mission",
+        "authenticated_body_control_command_reaches_exact_root_parser_without_subject_reinterpretation_or_new_mission",
+        "credential_reflection_and_oversized_native_goal_are_explicit_source_refusals_without_poisoning_the_receiving_loop",
+        "owner_epoch_withdrawal_after_durable_capture_blocks_dispatch_without_deleting_source"
+      ],
+      "actual_native_codec_journals_relay_and_controller": true,
+      "account_auth_headers_and_direct_controller_transport_are_fixtures": true,
+      "prepared_only_not_public": true,
+      "external_accounts_smtp_messages_model_inference_or_installed_acceptance": false
+    },
+    "native_media": {
+      "passed": 7,
+      "cases": [
+        "exact_manifest_is_retained_before_native_attachment_codec_or_mission_admission",
+        "actual_unmodified_native_attachment_cache_and_dispatch_leave_no_host_paths_or_original_filename_escape_in_the_event",
+        "actual_native_mime_bytes_cross_durable_relay_into_exact_independent_controller_image_document_voice_and_video_custody",
+        "source_and_media_replay_after_controller_ack_and_transient_compaction_never_create_a_second_mission",
+        "image_document_consent_does_not_approve_voice_or_partially_admit_a_mixed_message",
+        "exact_control_commands_with_attachments_are_refused_instead_of_reinterpreted",
+        "owner_withdrawal_between_full_source_capture_and_attachment_decode_retains_source_without_upload_or_execution"
+      ],
+      "actual_native_attachment_cache_dispatch_relay_and_controller": true,
+      "prepared_only_not_public": true,
+      "headers_accounts_and_controller_transport_are_fixtures": true,
+      "external_delivery_agent_backend_or_local_asr_acceptance": false
+    },
+    "native_smtp": {
+      "passed": 20,
+      "cases": [
+        "tls_actual_native_builder_and_smtp_lifecycle_deliver_exact_single_recipient_thread_and_unicode_body_to_fixture",
+        "tls_changed_recipient_thread_or_header_injection_refused_before_any_connection",
+        "tls_auth_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "tls_recipient_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "tls_temporary_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "tls_permanent_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "tls_disconnect_after_data_remains_unknown_not_confirmed_or_retried",
+        "tls_longline_terminal_response_is_bounded_and_unknown_instead_of_a_local_500_safe_rejection",
+        "tls_multiline_terminal_response_is_bounded_and_unknown_instead_of_a_local_500_safe_rejection",
+        "tls_owner_withdrawal_after_recipient_command_blocks_data_and_cleanup_sends_no_new_mail",
+        "starttls_actual_native_builder_and_smtp_lifecycle_deliver_exact_single_recipient_thread_and_unicode_body_to_fixture",
+        "starttls_changed_recipient_thread_or_header_injection_refused_before_any_connection",
+        "starttls_auth_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "starttls_recipient_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "starttls_temporary_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "starttls_permanent_uses_finite_explicit_rejection_without_server_body_or_credentials",
+        "starttls_disconnect_after_data_remains_unknown_not_confirmed_or_retried",
+        "starttls_longline_terminal_response_is_bounded_and_unknown_instead_of_a_local_500_safe_rejection",
+        "starttls_multiline_terminal_response_is_bounded_and_unknown_instead_of_a_local_500_safe_rejection",
+        "starttls_owner_withdrawal_after_recipient_command_blocks_data_and_cleanup_sends_no_new_mail"
+      ],
+      "actual_native_mime_builder_and_smtp_lifecycle": true,
+      "loopback_tls_server_only": true,
+      "prepared_only_not_public": true,
+      "durable_intent_worker_supervision_external_delivery_or_recipient_receipt": false
+    }
+  },
+  "reproduced_before_fix": [
+    "An actual private worker already existed while its process-creation future remained pending; cancelling the caller returned without kill/join. The real-UID probe failed its process-absence assertion before the fix."
+  ],
+  "limits": [
+    "No added skips or mocked replacement of actual kernel/UID/socket checks; existing backup file exclusion unchanged.",
+    "Backend session/mission completion and SMTP account/server/root publication are local fixtures. Actual authenticated artifact reading and actual native SMTP/attachment encoding are exercised; no external email or inference.",
+    "Four actual SMTP attachments include an exact 8 MiB document, PNG, generated WAV and encoded MP4; account-specific server size limits still apply.",
+    "Secured legacy text-only confirmation fingerprints remain usable, with no record rewrite or duplicate send.",
+    "Email remains public-off until audited owner recovery, source inventory/purge and full owner CLI/GUI are connected. No installed/QEMU/HP/Android or release acceptance claimed."
+  ],
+  "secured_parent_ci": {
+    "commit": "7f1a4b0dcde74e828a0696002bcb16bc7b3af75d",
+    "all_six_success": true,
+    "run_ids": [
+      40778370863,
+      40778370471,
+      40778370412,
+      40778370785,
+      40778370447,
+      40778362156
+    ]
+  },
+  "intermediate_ci": {
+    "commit": "3a7e94db7cfeb53fec48131374d2e8294fd23c39",
+    "success": [
+      40777040526,
+      40777040496,
+      40777040458,
+      40777040709
+    ],
+    "cancelled": [
+      40777040581,
+      40777031352
+    ],
+    "cancelled_runs_are_not_counted_as_success": true
+  }
+}

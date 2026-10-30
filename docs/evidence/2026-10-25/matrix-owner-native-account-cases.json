@@ -1,0 +1,18 @@
+{
+  "passed": 10,
+  "cases": [
+    "actual_sdk_query_and_native_signature_return_only_public_keys_with_owner_approval_pending",
+    "actual_native_device_signature_failure_is_refused",
+    "signed_device_user_must_match_exact_owner_query",
+    "signed_device_wildcard_is_not_an_owner_identity",
+    "actual_whoami_foreign-account_cannot_authorize_query",
+    "actual_whoami_foreign-device_cannot_authorize_query",
+    "actual_whoami_missing-device_cannot_authorize_query",
+    "single_safe_account_refusal_401",
+    "single_safe_account_refusal_429",
+    "partial_federation_failure_cannot_become_complete_device_discovery"
+  ],
+  "external_connections": false,
+  "live_account_accepted": false,
+  "physical_device_approval_accepted": false
+}

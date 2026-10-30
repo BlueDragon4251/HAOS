@@ -1,0 +1,29 @@
+{
+  "passed": 19,
+  "cases": [
+    "small_actual_http_frame_admitted_before_held_terminal_stream_end",
+    "actual_stream_cursor_tracks_last_committed_native_source",
+    "cursor_survives_actual_database_and_client_reopen",
+    "persisted_reconnect_deadline_prevents_immediate_retry",
+    "actual_reconnect_supplies_durable_since_cursor_and_partial_line_cannot_advance_it",
+    "actual_http_safe_persisted_single_attempt_401",
+    "actual_http_safe_persisted_single_attempt_403",
+    "actual_http_safe_persisted_single_attempt_404",
+    "actual_http_safe_persisted_single_attempt_429",
+    "actual_http_safe_persisted_single_attempt_302",
+    "actual_http_oversize_has_no_native_admission",
+    "actual_http_duplicate_has_no_native_admission",
+    "actual_http_old_has_no_native_admission",
+    "credential_rotation_invalidates_old_subscription_before_network",
+    "actual_sqlite_cursor_failure_preserves_committed_raw_pending_obligation",
+    "retained_pending_input_recovers_without_another_http_fetch",
+    "continuous_supervisor_reconnect_and_independent_pending_replay_recover_failed_admission",
+    "continuous_supervisor_close_cancels_real_stream_and_recovery_tasks",
+    "revocation_prevents_new_http_request"
+  ],
+  "actual_loopback_http_and_native_decoder": true,
+  "loopback_endpoint_replacement_only_in_fixture": true,
+  "public_gateway_enabled": false,
+  "external_subscription_or_publish": false,
+  "tls_live_account_accepted": false
+}

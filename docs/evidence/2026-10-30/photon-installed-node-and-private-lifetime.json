@@ -1,0 +1,222 @@
+{
+  "recorded_UTC": "2026-10-30T19:24:33.903531+00:00",
+  "base_commit": "8a97419b3b5e6dd232d117c63e524a67059c7718",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "8db99d323127dc382ea4d217a6eba7a02f9defcca68c28e07bc87d8b949252b9"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "afc6a384f81375c6e4adcd5000312fada7cd3e9c351603c69e7332c75e747ea5"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_process.py",
+      "sha256": "c47b9a28bab6a683652533aedf598419555a79518a868cf791a77b61752eeea3"
+    },
+    {
+      "path": "linux/haos/runtime/install_photon.py",
+      "sha256": "b93a5f326a04e593c14e5d117e8b5995ae9281f3b60312244205c8b74335b8ca"
+    },
+    {
+      "path": "linux/haos/runtime/photon-source.json",
+      "sha256": "874a09e0551b11b94dd85306cb0e65e6bcc608f67f571362978c75b455b04d92"
+    },
+    {
+      "path": "linux/haos/runtime/prepare_photon.py",
+      "sha256": "2a9dd36dece4cefb47832f2ea7c8a8460a1f6a2c5529c3fa03c5cb18a6c6891e"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_install.py",
+      "sha256": "650f2d1428ef6ca3998d69ca05a74a903e8fbb2a9d5f283d24b287248102431f"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_process.py",
+      "sha256": "2fb49906c9a2805f135ed71ee2c0d0cc55b4ab43bada8d01425af0688031a8b0"
+    }
+  ],
+  "actual_image_component_install": {
+    "schema": 1,
+    "actual_installer": true,
+    "node": "24.19.0",
+    "spectrum": "12.7.0",
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "runtime_programs": 12,
+    "source_sha256": "b44413ae3574930f27b444e36bf337fe2c014481ec90bb92f71a98d15f3a7506",
+    "dependency_lifecycle_scripts": false,
+    "network_scope": "public locked npm dependencies only; no messaging SDK connection",
+    "live_Photon_verified": false,
+    "private_UID_process_verified": false,
+    "OS_release_artifact": false
+  },
+  "installed_program_provenance": {
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "spectrum_version": "12.7.0",
+    "node": {
+      "version": "24.19.0",
+      "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz",
+      "sha256": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
+      "checksums_url": "https://nodejs.org/dist/v24.19.0/SHASUMS256.txt"
+    },
+    "schema": 1,
+    "prepared": {
+      "schema": 1,
+      "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+      "spectrum_version": "12.7.0",
+      "inputs": [
+        {
+          "path": "../adapter.py",
+          "sha256": "7dcedacead3b762166acbb0309e372d9eedf81b28efa7adce692122130775a68"
+        },
+        {
+          "path": "index.mjs",
+          "sha256": "f00d51e138790f6a32822f9c137610d9fc9454b3355a49e645dcd13d37a3529e"
+        },
+        {
+          "path": "package.json",
+          "sha256": "46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313"
+        },
+        {
+          "path": "send-format.mjs",
+          "sha256": "827c6c0b3a7fd3b731365ecd17bb52d65b05c9a53e67795922ec2ebb79de58fe"
+        },
+        {
+          "path": "stream-staleness.mjs",
+          "sha256": "fc77b20e29c8b759b1f45ec4b34d115b37859966b277e2583b1ae0fe8c73e141"
+        },
+        {
+          "path": "patch-spectrum-mixed-attachments.mjs",
+          "sha256": "0d1ed02316cc8ddb3fbcf985c1a5c511361bf03609c7d5ae21d594f5510c68b7"
+        },
+        {
+          "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+          "sha256": "2f7e13c432ad4e84f96b76eb3d59062d70d3d7e46737a7e15198a47ecda6ef24"
+        },
+        {
+          "path": "node_modules/@spectrum-ts/core/dist/authoring.js",
+          "sha256": "f96d907578eb44bb74b51203f4b3f2bb70d44364f5cef819b05b9899a9be6852"
+        }
+      ],
+      "prepared": [
+        {
+          "path": "index.mjs",
+          "sha256": "6172d9f259e33b7895fcedc5d020f6b904e7d82179bc7f9cf2311eddefba06c7"
+        },
+        {
+          "path": "node_modules/@spectrum-ts/imessage/dist/index.js",
+          "sha256": "48ad4889440b60db098c4f6fa7646175edd63747dc691926924abe350c280048"
+        },
+        {
+          "path": "node_modules/@spectrum-ts/core/dist/authoring.js",
+          "sha256": "3318813bf5a9746018add0b0e0645be50fbc0591998d63b6e61e1dd2a2897867"
+        },
+        {
+          "path": "../adapter.py",
+          "sha256": "9d32b8700b55665f470b9e88c7bc6a712d6b0108d15d942b5244f408a90c0377"
+        }
+      ]
+    },
+    "programs": [
+      {
+        "name": "node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+      },
+      {
+        "name": "launcher",
+        "sha256": "54431485331bcbca2caed3d724882dc47c2d82cf68d0c6bd7c16531ddb6c9ed5"
+      },
+      {
+        "name": "bounded-stream",
+        "sha256": "b8218a7a4ceacdc1ba8de667f8a66cc2f9a7c81263fb87fe02975ea1c48105b8"
+      },
+      {
+        "name": "sidecar",
+        "sha256": "6172d9f259e33b7895fcedc5d020f6b904e7d82179bc7f9cf2311eddefba06c7"
+      },
+      {
+        "name": "format",
+        "sha256": "827c6c0b3a7fd3b731365ecd17bb52d65b05c9a53e67795922ec2ebb79de58fe"
+      },
+      {
+        "name": "staleness",
+        "sha256": "fc77b20e29c8b759b1f45ec4b34d115b37859966b277e2583b1ae0fe8c73e141"
+      },
+      {
+        "name": "compatibility",
+        "sha256": "0d1ed02316cc8ddb3fbcf985c1a5c511361bf03609c7d5ae21d594f5510c68b7"
+      },
+      {
+        "name": "imessage",
+        "sha256": "48ad4889440b60db098c4f6fa7646175edd63747dc691926924abe350c280048"
+      },
+      {
+        "name": "stream",
+        "sha256": "3318813bf5a9746018add0b0e0645be50fbc0591998d63b6e61e1dd2a2897867"
+      },
+      {
+        "name": "adapter",
+        "sha256": "9d32b8700b55665f470b9e88c7bc6a712d6b0108d15d942b5244f408a90c0377"
+      },
+      {
+        "name": "manifest",
+        "sha256": "46d0f09d403e8d67261e23d5114dda13654179234ff748959923b8806c186cca"
+      },
+      {
+        "name": "lockfile",
+        "sha256": "2368d0b886d149c69dfb1fb2201ed7868bd751de2a88467b7848f2649241a313"
+      }
+    ]
+  },
+  "actual_offline_private_process": {
+    "schema": 1,
+    "passed": 17,
+    "cases": [
+      "actual_private_UID_GID_accepts_only_verified_fixed_Node_command",
+      "actual_kernel_root_cannot_use_gateway_command",
+      "actual_kernel_agent_cannot_use_gateway_command",
+      "actual_kernel_supplementary-root_cannot_use_gateway_command",
+      "actual_kernel_saved-root-uid_cannot_use_gateway_command",
+      "actual_kernel_saved-root-gid_cannot_use_gateway_command",
+      "actual_installed_spectrum_version_drift_refused",
+      "actual_installed_hermes_commit_drift_refused",
+      "actual_installed_schema_drift_refused",
+      "actual_source_bytes_cannot_change_behind_trusted_metadata",
+      "actual_writable_program_refused",
+      "actual_hardlinked_program_refused",
+      "actual_foreign_owned_program_refused",
+      "actual_missing_NoNewPrivileges_refused_before_any_child_or_credentials_handoff",
+      "actual_production_Node_bootstrap_is_stopped_on_owner_withdrawal_before_SDK_init",
+      "actual_parent_hard_exit_kills_production_Node_bootstrap_before_SDK_init",
+      "actual_official_Node_private_UID_flags_and_readonly_SDK_resume_probe_pass"
+    ],
+    "actual_node": "24.19.0",
+    "scope": "actual verified installed programs, kernel identities, NoNewPrivileges, production bootstrap and Unix peer, early withdrawal and parent death",
+    "substitution": "initial resume RPC held before SDK/cloud initialization",
+    "live_Photon_verified": false,
+    "native_gRPC_verified": false,
+    "OS_release_artifact": false
+  },
+  "minimal_regression": "3151 passed, 2 skipped in 22.34s",
+  "full_frozen_regression": "3151 passed, 2 skipped in 22.62s",
+  "existing_kernel_regression_reference": "photon-durable-resume-and-ingress.json (174 passed); new private-UID/process checks above are additional and do not replace those gates",
+  "fixture_input_and_test_corrections": [
+    "official Node tar root directory without trailing slash accepted only as a directory",
+    "npm uses two distinct empty config files to avoid duplicate config loading",
+    "actual installed program directory permissions normalized; private checkout permissions preserved",
+    "saved-ID cases constructed inside actor before command guard because exec resets saved IDs"
+  ],
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_connection": false,
+    "native_gRPC_fixture_verified": false,
+    "full_service_GUI_acceptance": false,
+    "OS_ISO_APK_release_acceptance": false
+  },
+  "next": "Implement actual native HTTP/gRPC profile, scoped replies/auth/rate/reconnect, full controller path, secure account device GUI/CLI and inspected recovery; continue without stopping"
+}

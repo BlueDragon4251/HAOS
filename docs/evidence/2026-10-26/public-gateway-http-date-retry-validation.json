@@ -1,0 +1,369 @@
+{
+  "baseline_commit": "04f96b1b476ec359cfbc0c314d5c96d2b142b3f2",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_retry.py",
+      "sha256": "23c39ccf0d8e2247244eb0a5f696d722a64a0ac21f5f286fa6ea7da57d4195b3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_matrix_http.py",
+      "sha256": "eaa421158acacf8c4bf6bd651a0308fc613a012debdf04f1db70afb5282460d3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_mattermost.py",
+      "sha256": "f60a5ff84bab32480e75b4a032b4ae41f51ab014186e6b09c53d59857c188419"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_delivery.py",
+      "sha256": "6d7b8ef7b38e7a33c9f3a341f989565648d5944fe79e224dcebca132f05b698d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_transport.py",
+      "sha256": "59c45a091d587735851259f5c879279447e6d3d6a7a9b2aa8289c4bb6202c4c7"
+    },
+    {
+      "path": "linux/haos/runtime/probe_matrix_http.py",
+      "sha256": "b1df0ab545b6dcf956e7c50c3d3a4ba1eb33851eb2764c7904c894d8d9677781"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_delivery.py",
+      "sha256": "d79fe00171e17261dab375da507a75cc6d46cac33b40724cd6629f41b30c0e62"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_history.py",
+      "sha256": "c49ae4be16181c18d4333bfc2cf630471cbd66d68ece308f2ee132ac85b11f7a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_ntfy_delivery.py",
+      "sha256": "cc92714c9ca9ce282b94ffc6544d2bedc395017b67bf284cb1abbbfae4cd5a0f"
+    },
+    {
+      "path": "linux/haos/runtime/probe_ntfy_transport.py",
+      "sha256": "072b2c69a26fd05baf3c2ed008f818dba24f652a24a1fe1ad0501a0b7fca8160"
+    }
+  ],
+  "native_probes": {
+    "ntfy_transport": {
+      "passed": 21,
+      "cases": [
+        "small_actual_http_frame_admitted_before_held_terminal_stream_end",
+        "actual_stream_cursor_tracks_last_committed_native_source",
+        "cursor_survives_actual_database_and_client_reopen",
+        "persisted_reconnect_deadline_prevents_immediate_retry",
+        "actual_reconnect_supplies_durable_since_cursor_and_partial_line_cannot_advance_it",
+        "actual_http_safe_persisted_single_attempt_401",
+        "actual_http_safe_persisted_single_attempt_403",
+        "actual_http_safe_persisted_single_attempt_404",
+        "actual_http_safe_persisted_single_attempt_429",
+        "actual_http_safe_persisted_single_attempt_302",
+        "actual_http_date_retry_deadline_survives_reopen_without_early_stream_request",
+        "actual_http_oversize_has_no_native_admission",
+        "actual_http_duplicate_has_no_native_admission",
+        "actual_http_old_has_no_native_admission",
+        "actual_http_reflected_has_no_native_admission",
+        "credential_rotation_invalidates_old_subscription_before_network",
+        "actual_sqlite_cursor_failure_preserves_committed_raw_pending_obligation",
+        "retained_pending_input_recovers_without_another_http_fetch",
+        "continuous_supervisor_reconnect_and_independent_pending_replay_recover_failed_admission",
+        "continuous_supervisor_close_cancels_real_stream_and_recovery_tasks",
+        "revocation_prevents_new_http_request"
+      ],
+      "actual_loopback_http_and_native_decoder": true,
+      "loopback_endpoint_replacement_only_in_fixture": true,
+      "public_gateway_enabled": true,
+      "external_subscription_or_publish": false,
+      "tls_live_account_accepted": false
+    },
+    "ntfy_delivery": {
+      "passed": 33,
+      "cases": [
+        "actual_native_codec_publishes_only_exact_owner_topic_and_validated_server_receipt",
+        "native_unicode_chunks_preserve_all_bytes_without_silent_truncation",
+        "actual_native_http_conservative_single_attempt_400",
+        "actual_native_http_conservative_single_attempt_401",
+        "actual_native_http_conservative_single_attempt_403",
+        "actual_native_http_conservative_single_attempt_404",
+        "actual_native_http_conservative_single_attempt_413",
+        "actual_native_http_conservative_single_attempt_429",
+        "actual_native_http_conservative_single_attempt_500",
+        "actual_native_http_conservative_single_attempt_302",
+        "actual_native_http_date_retry_after_defers_single_unpublished_reply",
+        "native_receipt_missing_never_fabricates_success_or_resends",
+        "native_receipt_wrong-topic_never_fabricates_success_or_resends",
+        "native_receipt_malformed_never_fabricates_success_or_resends",
+        "native_receipt_oversize_never_fabricates_success_or_resends",
+        "native_receipt_lost_never_fabricates_success_or_resends",
+        "native_receipt_credential-id_never_fabricates_success_or_resends",
+        "partial_chunk_success_then_429_never_retries_whole_reply",
+        "owner_revocation_after_first_chunk_blocks_second_native_post",
+        "mutable_caller_binding_cannot_inherit_regrant_between_chunks",
+        "actual_reopened_mission_outbox_success_delivered",
+        "actual_reopened_mission_outbox_rate_pending",
+        "actual_reopened_mission_outbox_server-error_uncertain",
+        "actual_reopened_mission_outbox_lost_uncertain",
+        "actual_reopened_mission_outbox_partial_uncertain",
+        "actual_reopened_mission_outbox_missing_uncertain",
+        "direct_native_send_and_unscoped_http_post_have_no_publication_authority",
+        "oversized_whole_reply_is_refused_before_any_dispatch",
+        "native_utf8_basic_auth_spaces",
+        "native_utf8_basic_auth_colon",
+        "native_basic_auth_refusal_redacts_raw_and_encoded_credentials",
+        "credential_rotation_revokes_old_publisher_before_network",
+        "vendor_secret_error_bodies_never_enter_native_logs"
+      ],
+      "actual_pinned_native_send_and_http": true,
+      "loopback_endpoint_replacement_only_in_fixture": true,
+      "public_gateway_enabled": true,
+      "external_publish_accepted": false,
+      "installed_service_accepted": false
+    },
+    "ntfy_profile": {
+      "passed": 23,
+      "cases": [
+        "prepared_factory_does_not_connect_or_send_before_explicit_start",
+        "actual_flock_refuses_duplicate_live_topic_profile",
+        "native_identity_home_and_kernel_lease_are_private",
+        "disconnected_profile_has_no_native_send_authority",
+        "actual_private_lifecycle_stream_native_capture_and_relay_commit",
+        "connected_profile_sends_actual_native_reply_only_under_exact_retained_route",
+        "profile_refuses_forged_scope_thread_metadata_and_grant_without_http",
+        "disconnect_closes_real_stream_publisher_and_workers",
+        "same_profile_reconnect_preserves_cursor_and_native_admission_idempotence",
+        "reconnect_replaces_closed_publisher_with_new_guarded_native_send",
+        "concurrent_profile_close_releases_one_kernel_lease_without_deleting_state",
+        "fresh_factory_reuses_profile_and_persisted_cursor_without_duplicate_relay",
+        "real_401_survives_restart_and_stops_automatic_credential_retry",
+        "explicit_owner_auth_recheck_reuses_same_credentials_and_cursor_without_regrant_or_duplicate_input",
+        "explicit_credential_rotation_reuses_private_profile_and_preserves_existing_receipts",
+        "actual_native_basic_auth_ingress_redacts_raw_and_encoded_credentials_before_relay",
+        "owner_revocation_stops_native_profile_health_and_reply_authority",
+        "actual_native_factory_and_status_never_write_unrelated_process_global_home",
+        "private_factory_refuses_unbounded_or_ambiguous_credential_configuration",
+        "symlink_and_hardlinked_profile_leases_are_refused_without_touching_neighbor",
+        "group_readable_private_profile_is_refused",
+        "symlink_parent_is_refused_before_any_native_import_or_network",
+        "private_factory_cannot_bypass_independent_owner_policy"
+      ],
+      "actual_native_factory_http_sqlite_and_flock": true,
+      "loopback_target_replacement_only_in_fixture": true,
+      "public_gateway_enabled": true,
+      "external_subscription_or_delivery_accepted": false,
+      "installed_service_or_boot_accepted": false
+    },
+    "matrix_http": {
+      "passed": 20,
+      "cases": [
+        "owner_homeserver_requires_unambiguous_https",
+        "private_account_proof_required_before_sync",
+        "actual_whoami_and_sync_codecs_cross_confirmed_boundary",
+        "explicit_room_read_crosses_actual_sdk_path_encoding",
+        "foreign_rooms_and_destructive_or_unsolicited_writes_refused_before_http",
+        "actual_sdk_send_needs_explicit_local_callback_not_account_presence",
+        "bounded_typed_single_request_401",
+        "bounded_typed_single_request_429",
+        "bounded_typed_single_request_500",
+        "bounded_typed_single_request_302",
+        "actual_native_retry_after_native-ms-priority_and_http_date",
+        "actual_native_retry_after_missing-native-ms_and_http_date",
+        "actual_native_retry_after_invalid-native-ms_and_http_date",
+        "explicit_sdk_retry_argument_cannot_replay_request",
+        "malformed_success_body_has_no_native_result",
+        "response_size_is_bounded_before_json_decode",
+        "appservice_impersonation_query_has_no_authority",
+        "token_replacement_needs_new_identity_proof",
+        "another_origin_cannot_receive_private_auth_header",
+        "actual_sdk_preserves_owner_deployment_prefix"
+      ],
+      "external_connections": false,
+      "haos_matrix_gateway_enabled": false,
+      "mission_authorization_accepted": false
+    },
+    "matrix_profile": {
+      "passed": 23,
+      "cases": [
+        "real_profile_flock_prevents_duplicate_identity_writers",
+        "actual_native_connect_auth_crypto_sync_and_private_recovery_workers",
+        "native_home_and_secrets_remain_scoped_without_global_home_mutation",
+        "actual_connected_profile_native_text_reaches_real_mission_outbox",
+        "profile_crypto_sync_lock_and_native_status_files_are_private",
+        "actual_disconnect_closes_sdk_and_stops_recovery_worker",
+        "actual_reconnect_reuses_account_and_retained_cursor_without_replaying_mission",
+        "superseded_client_loses_private_http_authority",
+        "closing_releases_lock_and_preserves_identity_and_recovery_files",
+        "token_rotation_and_fresh_factory_preserve_same_device_account",
+        "actual_owner_transport_metadata_retains_safe_auth_error_without_credentials",
+        "actual_live_auth_refusal_is_fatal_until_owner_restart_or_correction",
+        "actual_startup_rate_limit_deadline_survives_close_and_fresh_factory",
+        "native_owner_corrected_profile_recovers_after_persisted_rate_limit",
+        "actual_gateway_service_supervisor_connects_and_stops_native_profile_and_workers",
+        "native_wrong_device_never_resets_or_deletes_stored_crypto",
+        "actual_initial_sync_refusal_keeps_disconnected_send_guard_and_closes_client",
+        "retained_undecryptable_initial_page_does_not_starve_live_sync",
+        "actual_late_session_unblocks_independent_recovery_worker_once_with_original_time",
+        "actual_connected_profile_distributes_olm_keys_and_peer_decrypts_megolm_outbox_answer",
+        "concurrent_close_cancels_actual_pending_native_auth_and_releases_profile",
+        "owner_connector_revocation_stops_worker_and_prevents_native_send",
+        "actual_sqlite_status_failure_still_closes_sdk_journal_and_profile_lock"
+      ],
+      "external_connections": false,
+      "installed_service_accepted": false,
+      "live_account_accepted": false
+    },
+    "matrix_delivery": {
+      "passed": 21,
+      "cases": [
+        "actual_native_format_sdk_plaintext_and_reopened_outbox",
+        "actual_native_root_thread_preserved",
+        "single_native_http_400",
+        "single_native_http_401",
+        "single_native_http_403",
+        "single_native_http_404",
+        "single_native_http_413",
+        "single_native_http_429",
+        "single_native_http_500",
+        "single_native_http_302",
+        "lost_receipt_does_not_trigger_native_e2ee_retry",
+        "malformed_success_receipt_stays_uncertain",
+        "partial_chunks_then_refusal_stays_uncertain",
+        "revocation_between_chunks_stops_before_second_send",
+        "forged_binding_cannot_send",
+        "scope_substitution_cannot_send",
+        "thread_substitution_cannot_send",
+        "raw_sdk_send_outside_private_context_has_no_write_authority",
+        "encrypted_room_cannot_downgrade_or_infer_outbound_device_approval",
+        "unavailable_encryption_state_cannot_downgrade",
+        "plaintext_needs_explicit_owner_consent"
+      ],
+      "external_connections": false,
+      "recipient_guard_installed": false,
+      "installed_service_accepted": false
+    },
+    "matrix_history": {
+      "passed": 16,
+      "cases": [
+        "actual_v1_migration_preserves_existing_sync_cursor",
+        "actual_sdk_pagination_native_raw_relay_and_missions_keep_sync_cursor",
+        "history_replay_unknown_sender_wrong_thread_and_original_age_do_not_create_missions",
+        "empty_page_with_new_token_does_not_erase_remaining_history",
+        "reopened_history_page_recovers_after_cursor_commit_without_another_http_read",
+        "safe_persisted_single_http_error_401",
+        "safe_persisted_single_http_error_403",
+        "safe_persisted_single_http_error_404",
+        "safe_persisted_single_http_error_429",
+        "safe_persisted_single_http_error_500",
+        "refuse_wrong_start_without_advancing_gap",
+        "refuse_wrong_room_without_advancing_gap",
+        "refuse_wrong_loop_without_advancing_gap",
+        "actual_sqlite_failure_rolls_back_history_input_and_cursor_together",
+        "multi_page_cursor_cycle_cannot_restart_history",
+        "old_gap_snapshot_cannot_read_under_new_owner_generation"
+      ],
+      "external_connections": false,
+      "installed_service_accepted": false
+    },
+    "mattermost_delivery": {
+      "passed": 18,
+      "cases": [
+        "native_exact_flat_receipt",
+        "native_exact_thread_receipt",
+        "native_single_post_400",
+        "native_single_post_401",
+        "native_single_post_403",
+        "native_single_post_404",
+        "native_single_post_413",
+        "native_single_post_429",
+        "native_single_post_500",
+        "native_single_post_302",
+        "native_http_date_retry_after_retains_reopened_pending_outbox",
+        "wrong_route_201_stays_uncertain",
+        "lost_http_receipt_stays_uncertain",
+        "partial_chunk_then_refusal_stays_uncertain",
+        "revoke_between_chunks_never_posts_again",
+        "actual_team_mismatch_no_post",
+        "forged_binding_generation_no_post",
+        "real_connector_refusal_before_post_can_retry"
+      ],
+      "external_connections": false
+    },
+    "mattermost_history": {
+      "passed": 16,
+      "cases": [
+        "three_actual_http_pages_retain_every_original",
+        "inclusive_overlap_is_idempotent",
+        "history_uses_actual_native_decoder_and_relay",
+        "crash_after_raw_commit_reopens_without_duplicate",
+        "crash_before_cursor_commit_repeats_safely",
+        "deleted_remote_anchor_restarts_same_floor_without_duplicate",
+        "actual_http_rate-limited_is_persisted",
+        "actual_http_permission-denied_is_persisted",
+        "actual_http_date_history_deadline_survives_sqlite_reopen_without_early_get",
+        "malformed_page_never_advances_cursor",
+        "future_history_rejected_before_raw_admission",
+        "revoke_during_http_has_no_raw_authority",
+        "repaired_grant_starts_at_new_owner_boundary",
+        "legacy_grant_without_time_has_no_history_read",
+        "original_age_retains_expired_input_without_execution",
+        "only_exact_owner_thread_is_retained"
+      ],
+      "external_connections": false
+    },
+    "mattermost_ingress": {
+      "passed": 21,
+      "cases": [
+        "native_ws_requires_real_auth_ack_before_healthy",
+        "unauthenticated_post_has_no_haos_authority",
+        "actual_ws_decoder_commits_raw_before_relay_with_actual_scope",
+        "native_duplicate_does_not_repeat_durable_admission",
+        "large_escaped_unicode_post_preserves_native_text",
+        "actual_same_adapter_reconnect_keeps_durable_dedup",
+        "unknown_sender_refused_before_native_preparation",
+        "wrong_thread_refused_before_native_preparation",
+        "media_refused_before_native_preparation",
+        "system_refused_before_native_preparation",
+        "missing_mention_refused_before_native_preparation",
+        "edited_refused_before_native_preparation",
+        "malformed_props_refused_before_native_preparation",
+        "actual_server_bot_identity_refused",
+        "actual_server_team_mismatch_refused",
+        "reopened_raw_decoder_recovery",
+        "revoked_generation_cannot_execute_retained_input",
+        "native_session_redirect_rejected_before_forwarding",
+        "real_ws_auth_refusal_is_fatal_and_unhealthy",
+        "owner_receives_safe_persisted_auth_status_without_token",
+        "actual_ws_redirect_refused_before_token_challenge"
+      ],
+      "external_connections": false,
+      "source_files": [
+        {
+          "path": "linux/haos/haos/gateway_mattermost.py",
+          "sha256": "f60a5ff84bab32480e75b4a032b4ae41f51ab014186e6b09c53d59857c188419"
+        },
+        {
+          "path": "linux/haos/haos/gateway_ingress.py",
+          "sha256": "bcb6918b53540b0c256c097540d843ff461369935f8d22e46458c384022e8ede"
+        },
+        {
+          "path": "linux/haos/haos/gateway_runtime.py",
+          "sha256": "61e71630faf84ad757e86007ffe0ef14c822cb21966a5f5183312f161f075e0c"
+        }
+      ]
+    }
+  },
+  "native_case_total": 212,
+  "full_runtime": {
+    "passed": 1190,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath": {
+    "passed": 1190,
+    "existing_skips": 2
+  },
+  "actual_root_uid_socket_recovery": {
+    "passed": 49,
+    "network": "none"
+  },
+  "existing_local_excluded_file": "linux/haos/tests/test_backup.py",
+  "new_ci_skips": false,
+  "history_fixture_explicit_clock_advanced_after_verified_deadline_only": true,
+  "live_tls_accounts_external_messages_installed_or_release_accepted": false
+}

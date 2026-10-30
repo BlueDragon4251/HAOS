@@ -1,0 +1,20 @@
+{
+  "source_files": [
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "48ce7c48433ffe217f922c4c1a07e2006521bc8014be679f45c9ad7e0c5f8df5"
+    }
+  ],
+  "implementation_commit": "101373c37fd6bc4787a83f88016536a181ca8fb6",
+  "actual_root_uid_socket_and_recovery_cases": 63,
+  "homeassistant_additional_outbox_decisions": [
+    "retry",
+    "delivered",
+    "discard"
+  ],
+  "actual_ledger_uid": 65534,
+  "owner_private_file_access": "denied",
+  "preserves_mission_attempt_and_owner_audit": true,
+  "network_requested": false,
+  "installed_or_external_delivery_acceptance": false
+}

@@ -1,0 +1,41 @@
+{
+  "model_fixture_source_sha256": {
+    "probe_openrouter_login.py": "c9ebf831a6878aad09a6de0cabd29a4404b0dbc636e95545760f3d70b92e41ef",
+    "probe_account_model_http.py": "206e43d454ea9bb8728af55991ea93445c84fea532139a44a91174f4eb892e33",
+    "probe_http_provider_matrix.py": "04a4cbb348dd8953847485cfd14ea9151cb05b9e26d346ac8394632da4044156"
+  },
+  "actual_authorized_account_broker_sdk_model_cases": [
+    "json",
+    "stream",
+    "abort",
+    "401",
+    "429"
+  ],
+  "model_case_count": 5,
+  "actual_native_pkce_cases": [
+    "success",
+    "denied",
+    "rate-limit",
+    "missing-key",
+    "invalid-key",
+    "non-json",
+    "empty-code",
+    "cancel",
+    "short-body"
+  ],
+  "case_count": 9,
+  "native_private_pool_status_broker_logout": true,
+  "authorization_code_and_tokens_not_printed": true,
+  "failed_login_preserves_existing_account": true,
+  "live_account_tested": false,
+  "source_files": [
+    {
+      "path": "runtime/probe_openrouter_login.py",
+      "sha256": "c9ebf831a6878aad09a6de0cabd29a4404b0dbc636e95545760f3d70b92e41ef"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    }
+  ]
+}

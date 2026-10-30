@@ -1,0 +1,26 @@
+{
+  "passed": 18,
+  "cases": [
+    "installed_controller_refuses_prepared_matrix_policy",
+    "actual_crypto_native_codec_and_raw_relay_create_one_real_haos_mission",
+    "copied_wire_event_cannot_inherit_private_crypto_proof",
+    "provider_replay_has_one_durable_mission",
+    "unknown_sender_cannot_gain_haos_authority",
+    "wrong_thread_cannot_gain_haos_authority",
+    "old_original_cannot_gain_haos_authority",
+    "foreign_room_refused_before_crypto_or_profile_lookup",
+    "explicit_mention_requirement_is_not_bypassed",
+    "media_does_not_download_before_an_approved_media_path_exists",
+    "network_encryption_flags_cannot_replace_private_crypto_proof",
+    "old_capture_snapshot_cannot_reauthorize_new_grant_generation",
+    "unapproved_actual_device_cannot_create_mission",
+    "exact_owner_thread_survives_actual_native_builder",
+    "actual_reopened_raw_input_recovers_native_decoder_and_real_mission",
+    "plaintext_requires_explicit_new_owner_grant",
+    "original_age_is_not_renewed_by_native_recovery",
+    "shared_haos_mission_engine_enforces_capabilities_after_native_decode"
+  ],
+  "external_connections": false,
+  "installed_matrix_gateway_enabled": false,
+  "live_account_accepted": false
+}

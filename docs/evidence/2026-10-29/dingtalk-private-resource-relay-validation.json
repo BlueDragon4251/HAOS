@@ -1,0 +1,247 @@
+{
+  "parent_commit": "412655b35011ee423afb4d758f642db0bb6cd7ef",
+  "recorded_at": "2026-10-29T23:52:11.908276+00:00",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "59ce82b40f383b4407f173fef6a3e7284cf5ee4bf42831e31241669fa7c594fb"
+    },
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "b2cf50d66c0f09aa57632c83d31a4fd97413b7f39c3029c28899196f13dc536d"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "24ca9900064048455dde6bcaa9912f29404750fb2901e4b3a04c1bf1131033d0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_admission.py",
+      "sha256": "c1a61fe5abe15c024e726a6ff87bdf8b916b7cc3082630701f428dcc3ddc1fb6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_download.py",
+      "sha256": "f19c0ca3576541e88f00c467b432764999a3a69f77be46bbed5ca000eacbb9e0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_http.py",
+      "sha256": "611d717cb1f95fc5196ac8bbcf57c4a085af142747fcb522e6c6f07ec6ef0136"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ingress.py",
+      "sha256": "0be377475ad463db03d087873750fec0d720fef15b77ff2d217f8e8beea4a0dc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_media.py",
+      "sha256": "f960cba1e24afa51b6e9971ee083bf10e5cf4fd9340a8d1696951c436369db9a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_resource.py",
+      "sha256": "ae19a11ba3c0e9ba30bff27aae581092cdb90791bb5229f412d389b80ece7339"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_resource_process.py",
+      "sha256": "a4501e1e255196420a82c56e0150e0d6c1300f2958655d5e9310ca67220f3bcf"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_resource_worker.py",
+      "sha256": "8421e28151b7c8fa662e8d0866568e315fce480a923ea4e9ea337b61464901ea"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_tea.py",
+      "sha256": "cb616d5dc9784b154e584f646bad61039a9dee124d3c2b0a02a2f0c409f6870e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_ws_worker.py",
+      "sha256": "9eac0ad8ec48530442f2930986a2f45bca0792a0c65fb1db1b76faf099b8d64e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media.py",
+      "sha256": "41517d9f9a7e74f438624911653ff98792e6af43735711e600ec08b45c9a6d91"
+    },
+    {
+      "path": "linux/haos/haos/gateway_media_relay.py",
+      "sha256": "494513a2ba5158c3314a8636bcc81050ff30bb8ad29b679191c8d7a21c95ce61"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "3994a9d20da4920f0482a00772e92516c92c655591651e0c8c15210e11cd705d"
+    },
+    {
+      "path": "linux/haos/probes/probe_dingtalk_resource_process.py",
+      "sha256": "3b1aedad819b1077deefda88e1de43f9b442a350db25afa0bc3abd6d837d3086"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_admission.py",
+      "sha256": "723d882f05423e49efb74e6cbdf7f3d71a8b0e3d71c6fd4f21e566a765e3c2f4"
+    },
+    {
+      "path": "linux/haos/runtime/probe_dingtalk_resource_lookup.py",
+      "sha256": "a46daa8c38c8fff0022a9e9012a1b461a82c6278a17750250a5540bd527cb8ee"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_download.py",
+      "sha256": "2f5f603573e1eaeba2e864df4f676e68482658d7141e491d1213d6aadc7b3d6f"
+    }
+  ],
+  "validation": {
+    "minimal_runtime": {
+      "passed": 2249,
+      "existing_skips": 2,
+      "local_exclusion": "test_backup.py; covered by actual root suite"
+    },
+    "full_pinned_10_extra_runtime": {
+      "passed": 2249,
+      "existing_skips": 2
+    },
+    "actual_root_UID_backup_boundaries": {
+      "passed": 150
+    },
+    "actual_native_Robot_lookup_SDK_TLS": {
+      "cases": [
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_ok_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_401_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_429_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_500_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_302_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_bad-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_ip-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_app-secret-in-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_token-in-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_bool-url_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_duplicate_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_nonfinite_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_large_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_drop_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_truncated_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_encoding_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_untrusted-tls_one_closed_request_no_token_or_code_to_agent",
+        "actual_Hermes_fetch_download_url_Robot_generated_SDK_SPI_response_model_verified_TLS_withdraw_one_closed_request_no_token_or_code_to_agent",
+        "actual_SDK_builder_changed_resource_or_robot_identity_refused_before_network",
+        "unobserved_private_token_cannot_authorize_Robot_lookup"
+      ],
+      "scope": "Actual Hermes token/media helpers and Robot SDK request/SPI/response over real verified loopback TLS; only API origins and fixture CA are substituted.",
+      "binary_content_fetch_UID_mission_live_account_or_installed_acceptance": false
+    },
+    "actual_native_admission": {
+      "passed": 14,
+      "cases": [
+        "actual_DingTalk_ChatbotMessage_and_pinned_native_text_codec_preserve_canonical_sender_without_staff_display_admin_alias_authority",
+        "actual_native_picture_projection_requires_matching_independent_media_permission",
+        "actual_native_file_projection_requires_matching_independent_media_permission",
+        "actual_native_image_projection_requires_matching_independent_media_permission",
+        "actual_native_video_file_projection_requires_matching_independent_media_permission",
+        "actual_native_vendor_voice_transcript_stays_voice_and_requires_voice_consent_without_claiming_local_ASR",
+        "actual_native_rich_text_and_resource_projection_keep_the_same_source_without_remote_resource_resolution",
+        "native_resolver_picture_alias_is_canonicalized_for_actual_SDK_codec_without_mutating_original_bytes",
+        "conflicting_native_download_aliases_fail_before_any_resource_resolution",
+        "raw_native_rich_video_requires_video_consent_even_when_pinned_codec_labels_it_document",
+        "actual_native_text_projection_refuses_app_secret_full_session_URL_and_decoded_reply_capability_reflection",
+        "actual_native_resource_download_code_cannot_reflect_into_agent_text",
+        "actual_native_resource_code_refuses_control_characters_before_private_SDK_request",
+        "SDK_staff_alias_does_not_substitute_for_exact_independently_approved_sender_ID"
+      ],
+      "actual_pinned_DingTalk_SDK_and_native_codecs": true,
+      "transport_authentication_owner_publication_and_socket_denial_are_fixtures": true,
+      "native_vendor_voice_transcript_is_fixture_no_local_ASR": true,
+      "public_dingtalk_enabled": false,
+      "network_resources_missions_external_messages_or_installed_acceptance": false
+    },
+    "unchanged_native_token_HTTP": {
+      "passed": 23,
+      "cases": [
+        "actual_native_SDK_token_builder_and_verified_TLS_preserve_vendor_metadata_and_reuse_only_observed_private_cache",
+        "actual_SDK_connection_builder_has_only_native_chatbot_subscription_and_no_extra_IP_probe_or_forwarded_cookie",
+        "another_private_boundary_cannot_reuse_an_unobserved_SDK_access_token",
+        "changed_private_SDK_cache_metadata_is_refused_before_network",
+        "actual_SDK_native_expiry_buffer_refreshes_short_lived_tokens_without_mocking_time",
+        "actual_SDK_401_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_429_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_500_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_redirect_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_encoding_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_duplicate_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_nonfinite_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_large_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_bad-ttl_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_bad-token_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_truncated_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_SDK_drop_response_refused_with_finite_private_diagnostic_and_no_hidden_retry_or_secret_log",
+        "actual_native_discovery_bad-endpoint_cannot_become_an_unreviewed_socket_capability",
+        "actual_native_discovery_bad-ticket_cannot_become_an_unreviewed_socket_capability",
+        "actual_TLS_untrusted_issuer_refused_before_auth_request_without_verify_false",
+        "actual_SDK_wildcard_event_subscription_is_denied_before_HTTP",
+        "changed_private_client_identity_cannot_request_another_app_token",
+        "owner_withdrawal_during_actual_HTTP_read_cannot_return_a_cached_or_fresh_capability"
+      ],
+      "actual_native_SDK_requests_and_verified_loopback_TLS": true,
+      "API_origin_and_fixture_CA_substitution_only_in_this_probe": true,
+      "owner_publication_and_UID_are_fixtures": true,
+      "public_dingtalk_enabled": false,
+      "external_accounts_messages_or_installed_acceptance": false
+    },
+    "unchanged_native_text_ingress": {
+      "cases": [
+        "actual_pinned_DingTalk_on_message_and_durable_MRO_commit_exact_independent_source_to_relay_without_staff_alias_raw_secret_or_volatile_session_authority",
+        "committed_native_input_replay_cannot_invoke_handler_or_create_second_relay_obligation",
+        "real_native_decode_handler_failure_retains_retry_and_native_volatile_dedup_does_not_consume_retry",
+        "actual_native_vendor_recognized_voice_goal_uses_separate_voice_consent_without_claiming_HAOS_ASR",
+        "explicit_false_durable_handler_result_is_ignored_never_a_mission_acceptance",
+        "unconnected_private_resource_stays_retained_and_cannot_enter_native_agent_input_as_code_or_URL",
+        "direct_native_callback_and_source_build_cannot_bypass_durable_context",
+        "unconnected_native_reply_token_and_reaction_methods_have_no_ambient_private_capability",
+        "withdrawn_publication_prevents_new_capture_before_native_decode"
+      ],
+      "scope": "Actual pinned handler/MRO and SQLite relay with fixture current-publication callback; controller unavailable.",
+      "actual_controller_mission_live_message_or_installed_acceptance": false
+    },
+    "actual_UID_DNS_TLS_binary_and_native_sealed_relay": {
+      "passed": 15,
+      "cases": [
+        "actual_0_UID_denied_before_native_resource_request",
+        "actual_65533_UID_denied_before_native_resource_request",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_ok",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_private-dns",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-redirect-private",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-401",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_api-429",
+        "actual_private_UID_native_Hermes_token_Robot_SDK_public_numeric_DNS_verified_TLS_binary_cdn-403",
+        "actual_native_Hermes_retained_image_dispatch_sealed_ID_media_cache_relay_crash_retry_and_replay_never_refetch_bytes_or_leak_codes",
+        "actual_native_media_cdn-403_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_media_cdn-429_retains_pending_input_without_global_account_block_or_early_retry",
+        "actual_native_voice_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_document_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_video_resource_sealed_ID_relay_bytes_and_grant_bound_crash_replay_without_refetch",
+        "actual_native_verified_WSS_parent_pre_ACK_custody_Robot_SDK_binary_cache_media_relay_and_crash_retry_without_refetch"
+      ],
+      "actual_UIDs": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_production_public_resolver_no_mocks": true,
+      "synthetic_global_IP_on_loopback_in_network_none_namespace": true,
+      "native_API_and_CDN_have_different_origins_no_account_headers_or_cookies_forwarded": true,
+      "owner_publication_and_source_are_fixtures": true,
+      "live_account_mission_or_installed_acceptance": false,
+      "voice_PCM_transport_only_no_local_ASR_or_playback_acceptance": true
+    },
+    "new_unit_guards": {
+      "passed": 44
+    },
+    "shell_and_workflow_parse": "passed"
+  },
+  "corrections": [
+    "Pinned DaraRequest defaults port=80 and DaraCore.to_number(None)=0 were established with actual generated SDK requests; actual private network destination remains HTTPS 443 with fixed deadlines.",
+    "httpcore wraps SSLCertVerificationError in exception arguments; bounded type-only traversal now returns the correct finite TLS refusal without releasing exception text.",
+    "The native SDK ignores an extraneous top-level text field on a picture message; the resource-code reflection fixture now uses the actual rich-text shape, preserving its strict rejection assertion.",
+    "Missing private service account now fails with PermissionError before credentials or optional SDK imports, rather than leaking a KeyError."
+  ],
+  "limits": [
+    "DingTalk remains private; public gateway software count is 12/22.",
+    "Actual native byte retrieval and relay are exercised, with source/owner publication and controller mission acceptance explicitly fixtures.",
+    "Voice/PDF/ISO container fixtures prove private byte transport/consent, not ASR, playback or document rendering.",
+    "Missing-data/source-pointer recovery, administrative resource recovery, outgoing media, stable post-expiry reply, local voice, owner GUI and public activation remain pending.",
+    "No real account, external messages, installed-system, hardware or release acceptance."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "repository": "https://github.com/ircv3/ircv3-specifications",
+  "commit": "1b4050eecfd0e2c605c413080b555a41261e8696",
+  "purpose": "Read-only protocol reference; no external runtime code imported",
+  "source_files": [
+    {
+      "path": "extensions/labeled-response.md",
+      "sha256": "661aa2d1bdc85da700e121eeebf61e29f40118f143a9073f5cddf51d5394ba3e"
+    },
+    {
+      "path": "extensions/echo-message.md",
+      "sha256": "69e077368140d2e930f88c9de9d174f533dfa2f19cd582bdd1eadc9f3653cc7b"
+    },
+    {
+      "path": "extensions/batch.md",
+      "sha256": "060a349a031cb246357322825ec051f2a6e11f596fe10ad290de6194ceddce78"
+    }
+  ],
+  "required_delivery_capabilities": [
+    "echo-message",
+    "labeled-response",
+    "batch"
+  ],
+  "complete_batch_required": true,
+  "bare_ack_is_not_message_echo": true,
+  "echo_may_be_faked_for_silently_blocked_messages_per_specification": true,
+  "recipient_receipt_verified": false,
+  "live_server_compatibility_accepted": false
+}

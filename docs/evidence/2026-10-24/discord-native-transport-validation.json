@@ -1,0 +1,57 @@
+{
+  "base_commit": "c32e06ccd47b00341f371cd8343a411cfcb63151",
+  "full_tests": {
+    "passed": 1000,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1000,
+    "existing_skips": 2
+  },
+  "actual_local_sdk_websocket_cases": 5,
+  "actual_native_ingress_cases": 7,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "external_discord_connected": false,
+  "long_outage_history_recovery_tested": false,
+  "all_five_predecessor_ci_gates_successful": "c32e06ccd47b00341f371cd8343a411cfcb63151",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_raw.py",
+      "sha256": "d68e80924fd4a31c3c70bac9a7d14f6787b0ab9a59da14e1f219c2c83a12a882"
+    },
+    {
+      "path": "linux/haos/haos/gateway_discord.py",
+      "sha256": "ccdb4f5c42767e622e71ff5e591e299f0f0bf24b63a7d556cd58c46222ee45d7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "0f06b70c50891c9b162396b209836634cc76e21a04acb4814f17c3dd311d6b11"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "c14dc7187cc43114577d8a995dd67a30abcf7a3bf3642565c40ae0fffdd732ea"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_raw.py",
+      "sha256": "e62aa58f2f0e615d9ac50cc2252eb66f02a158a63a4d37dca9ea775a62c7b778"
+    },
+    {
+      "path": "linux/haos/runtime/probe_discord_transport.py",
+      "sha256": "019623cddaac06c3d16076e2069626436b3dfd4c3ff618f84b152400cbca0f62"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "96b45f24c64975fa6fb3d39e7ea297c2b8e071f3fb55a39d4e1bc2483cee29a3"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "e9f573876da778c5485254a9c4f90dd1cde40186d95bc4b0dfa65f5bdf1d2d94"
+    }
+  ],
+  "contracts_sha256": "d0883af80fe0f5dab406de5c385092e012f48ce3e052199dde53694ca0b663d8",
+  "root_uid_unix_socket_gateway_probes": {
+    "passed": 17,
+    "kernel_mocked": false,
+    "disposable_container_network": "none"
+  }
+}

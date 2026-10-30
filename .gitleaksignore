@@ -5,3 +5,19 @@ cf060c446d79180f748b8aac563b463f54edbcf9:apps/desktop/src/features/office/slides
 # Reviewed 2026-10-17: prose about private GHCR/bot credential handling,
 # not an embedded API key. Exact commit/path/rule/line only.
 c06c495e42b111c6067f3eca4082f96fe26a31a5:docs/GRAPHICAL-OWNER-SETUP.md:generic-api-key:24
+
+# Reviewed 2026-10-19: SHA-256 of probe_cloud_tokens.py, verified against the
+# source at this exact commit. Public code provenance, not a credential.
+bb623a47563f3de364ee5fc5ec46234c7af29e68:docs/evidence/2026-10-19/cloud-tokens-python311-fixture.json:generic-api-key:14
+
+# Reviewed 2026-10-21: native Discord adapter source SHA-256. Verified against
+# freshly downloaded f97608f178d1ffeca59860195ab7da295f7c8e5f source, not a token.
+# Exact historical commit/path/rule/line; future credentials remain scanned.
+18048dc610185f66502d3136e83104a27aacf913:docs/evidence/2026-10-21/native-gateway-durable-ingress-fixture.json:discord-api-token:17
+
+
+# Reviewed 2026-10-29: invented img_v3_fixture resource ID in an offline
+# Feishu native-codec fixture; no real app/account/resource or credential.
+# Exact historical commit/path/rule/line only; future keys remain scanned.
+cc6567b9d42f29ec1cef106ab705a88c96c397cd:linux/haos/runtime/probe_feishu_admission.py:generic-api-key:57
+cc6567b9d42f29ec1cef106ab705a88c96c397cd:linux/haos/runtime/probe_feishu_admission.py:generic-api-key:60

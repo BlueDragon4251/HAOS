@@ -1,0 +1,47 @@
+{
+  "source_commit": "8a12e2c043d3a477318444b1081cf83514fdbbc1",
+  "source_tree": "8dc1574e4d3aba05b4c2f81ecf3c70bad63e35d8",
+  "observed_at": "2026-10-29T23:29:18.271119+00:00",
+  "runs": [
+    {
+      "id": 40970114735,
+      "gate": "graphical initial setup security",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40970114736,
+      "gate": "CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40970114794,
+      "gate": "services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40970114791,
+      "gate": "Arch package",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40970114746,
+      "gate": "pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 40970105586,
+      "gate": "pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "limits": [
+    "These are CI results for exactly source 8a12e2c, before the subsequently committed reply journal and lifetime work.",
+    "No live accounts, external messages, installed acceptance, hardware or release artifacts are implied."
+  ]
+}

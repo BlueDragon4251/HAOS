@@ -1,0 +1,151 @@
+{
+  "parent_commit": "deaf367e35f8d73aaa34521bb84df0f080be86af",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_profile.py",
+      "sha256": "fbf2241d4cded63341abc433d81c9925d1e6114f0ccea332df70fedc8d9ebd67"
+    },
+    {
+      "path": "linux/haos/haos/gateway_irc_transport.py",
+      "sha256": "5ea2375be9204dbd728cb9865a6c1a56fa56eb77e83e84fcc761a4a418724a9d"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_profile.py",
+      "sha256": "33b76b50dc5162b31e0099dc756dc9e216f1f440f38abc43774609af8a8c5559"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_ingress.py",
+      "sha256": "36dc95f1d12d5e2f5acc0a4efa92d9e85fc9c535e069dd555d81435d7d266d55"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "4508c1eba0d1b8eda5cf6ac7718bb73aa6562ac431492d92b472b8cf488a1e99"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "062f1d6604c7a5fea0c0dddedb6482a9e3cca3e781feffc00cbe429c06b0f2a1"
+    }
+  ],
+  "receipts": {
+    "ingress": {
+      "passed": 29,
+      "cases": [
+        "public_owner_policy_still_refuses_unfinished_irc_transport",
+        "actual_pinned_parser_does_not_decode_ircv3_tags_without_reviewed_boundary",
+        "actual_native_codec_after_observable_commit_uses_server_account_not_nickname",
+        "same_server_message_identity_cannot_repeat_mission_admission",
+        "nick_change_does_not_change_authenticated_account_route",
+        "nickname_impersonation_without_account",
+        "client_only_account_tag",
+        "duplicate_account_tag",
+        "missing_server_time",
+        "missing_stable_server_identity",
+        "naive_timestamp",
+        "escaped_account",
+        "wrong_command",
+        "direct_message_not_channel",
+        "unaddressed_channel_text",
+        "ctcp_not_mission",
+        "line_injection",
+        "oversized_frame",
+        "server_prefix_not_person",
+        "unnegotiated_server-time_denied",
+        "unnegotiated_message-tags_denied",
+        "unnegotiated_account-tag_denied",
+        "known_nickname_cannot_authorize_unknown_server_account",
+        "authenticated_account_on_different_server_is_not_same_owner",
+        "before_owner_grant",
+        "future_original_time",
+        "direct_native_callbacks_cannot_bypass_retained_account",
+        "actual_sqlite_reopen_replays_failed_local_admission_without_network",
+        "owner_withdrawal_blocks_retained_native_event"
+      ],
+      "actual_pinned_native_irc_codec_and_sqlite": true,
+      "public_gateway_enabled": false,
+      "network_requested": false,
+      "tls_or_capability_negotiation_accepted": false,
+      "live_account_or_installed_acceptance": false
+    },
+    "transport": {
+      "passed": 44,
+      "cases": [
+        "actual_verified_tls_multiline_cap_negotiation_join_keepalive_and_native_account_admission",
+        "raw_and_native_standalone_send_remain_denied_before_outbox_implementation",
+        "owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input",
+        "real_server_time_tags_on_capabilities_registration_join_and_ping_preserve_native_admission",
+        "actual_tls_server_password_refused_never_admits_messages",
+        "actual_tls_duplicate_control_tags_never_admits_messages",
+        "actual_tls_early_registration_never_admits_messages",
+        "actual_tls_no_account_capability_never_admits_messages",
+        "actual_tls_eof_never_admits_messages",
+        "actual_tls_oversized_never_admits_messages",
+        "actual_tls_bad_utf8_never_admits_messages",
+        "actual_tls_incomplete_frame_never_admits_messages",
+        "actual_tls_timeout_never_admits_messages",
+        "actual_tls_cap_nak_never_admits_messages",
+        "actual_tls_partial_ack_never_admits_messages",
+        "actual_tls_changed_nickname_never_admits_messages",
+        "actual_tls_wrong_join_never_admits_messages",
+        "actual_tls_cap_loss_closes_confirmed_subscription",
+        "actual_tls_live_eof_closes_confirmed_subscription",
+        "actual_tls_kick_closes_confirmed_subscription",
+        "actual_tls_part_closes_confirmed_subscription",
+        "actual_tls_nick_change_closes_confirmed_subscription",
+        "private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log",
+        "live_private_server_mutation_revokes_actual_tls_connection",
+        "live_private_port_mutation_revokes_actual_tls_connection",
+        "live_private_channel_mutation_revokes_actual_tls_connection",
+        "live_private_use_tls_mutation_revokes_actual_tls_connection",
+        "live_private_server_password_mutation_revokes_actual_tls_connection",
+        "live_private_nickserv_password_mutation_revokes_actual_tls_connection",
+        "live_private_nickname_mutation_revokes_actual_tls_connection",
+        "real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames",
+        "real_tls_untrusted_ca_refused_before_irc_credentials_or_frames",
+        "actual_tls_sasl_logout_closes_socket_and_refuses_implicit_reauthentication",
+        "actual_tls_sasl_good_private_account_authenticated_before_registration",
+        "actual_tls_sasl_chunked_private_account_authenticated_before_registration",
+        "actual_tls_sasl_exact_chunk_private_account_authenticated_before_registration",
+        "actual_tls_sasl_refused_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_wrong_account_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_missing_account_confirmation_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_wrong_challenge_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_missing_mechanism_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_no_capability_never_authorizes_registration_or_messages",
+        "actual_tls_sasl_early_registration_never_authorizes_registration_or_messages",
+        "native_plaintext_configuration_refused_before_connection"
+      ],
+      "actual_local_tls_ircv3_and_pinned_native_codec": true,
+      "fixture_only_loopback_destination_and_disposable_ca": true,
+      "public_gateway_enabled": false,
+      "live_server_account_nickserv_sasl_delivery_or_installed_acceptance": false
+    },
+    "profile": {
+      "passed": 14,
+      "cases": [
+        "actual_native_factory_uses_private_home_and_explicit_connection_identity",
+        "actual_kernel_lease_refuses_second_active_identity_before_any_network",
+        "actual_profile_continuous_tls_native_account_input_and_local_relay",
+        "actual_eof_reconnect_preserves_explicit_unrecoverable_remote_gap",
+        "concurrent_close_joins_workers_and_releases_kernel_lease_once",
+        "real_server_authentication_refusal_is_sticky_across_connect_profile_and_actual_database_reopen",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_authentication_refusal",
+        "explicit_credential_rotation_permits_new_real_authentication_and_preserves_old_refusal_rows",
+        "actual_server_throttle_deadline_survives_cancel_close_and_database_reopen_without_early_request",
+        "new_owner_epoch_and_bot_nickname_cannot_bypass_same_account_throttle",
+        "independent_local_replay_reopens_real_failed_admission_while_live_tls_has_no_new_message",
+        "actual_shared_service_supervisor_stop_joins_private_profile_workers",
+        "owner_generation_change_revokes_running_idle_tls_profile_without_inheritance",
+        "close_during_real_tls_handshake_cancels_connect_and_releases_kernel_lease"
+      ],
+      "actual_native_profile_tls_kernel_lease_and_sqlite": true,
+      "fixture_only_loopback_destination_ca_and_short_reconnect_delay": true,
+      "public_gateway_enabled": false,
+      "unseen_remote_events_recovered": false,
+      "external_server_account_delivery_or_installed_acceptance": false
+    }
+  },
+  "full_and_minimal_python311": "1240 passed, 2 existing skips",
+  "local_root_only_backup_exclusion_unchanged": true,
+  "public_gateway_enabled": false,
+  "external_account_installed_or_release_acceptance": false
+}

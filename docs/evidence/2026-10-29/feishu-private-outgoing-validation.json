@@ -1,0 +1,312 @@
+{
+  "parent_commit": "16e576896b8f6a0b4e3a43ed2dc6ff245c9dbdd5",
+  "parent_CI": "all six freshly successful; not inherited by this patch",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "4c701c90d882c9d3c6892897934bb974e5f61530bdc4ed9a00e67a86670cc316"
+    },
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "fe39f104a296f1f858dd5160d622f232c31718805dab1c65ecb3aba4c4155dbd"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "51b48f27f44464c215f6067d8091cd0c908ebbf2ec4770391b0db72484743ebb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_http.py",
+      "sha256": "248838254be2f6c2e806ff7926f479a08db43691cf8f45d24f7a6b54da4d89a6"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_process.py",
+      "sha256": "2f4c4ecfc2e1193bce2cd284e8d71ad927ce4021a8d23048fe7915a6928f6693"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_profile.py",
+      "sha256": "189ccab9a786d0d44a8ef232b180ce3a56a614b9e839536dc2540021e963b0c4"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_worker.py",
+      "sha256": "d30a115c13ea58c21007f7112f653d17751755ef36ae22cf4168bd4f81971c94"
+    },
+    {
+      "path": "linux/haos/haos/gateway_outbound.py",
+      "sha256": "000ae086b367186150f1764994284eb7e9c489c5dd7870beb7792fcbff97a35d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f52e38003e7bd0a13920a12f0bf1c084aeafde5830ea083aabecc920aee14871"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_http.py",
+      "sha256": "32ad56d9d837aa532991955b1ad47466a9446e3d400e19c720adc68c9a820f93"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media_delivery.py",
+      "sha256": "c36727f5d09112564f41f4e0bff16b67cb987dbeb56dcbea5f1f6a57bd6e96c3"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media_reply.py",
+      "sha256": "85d6deb50e22c9807e2a88047aed3836b752d9e835cf32758455c705fa406526"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_media_reply_http.py",
+      "sha256": "095b1137d3631eaff0e5db2dfd4394a170d6b45de223be731097511cef611f0e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_output.py",
+      "sha256": "baf7f1bcf50980130fe09c4a4a48b1ab8697da3b1a149653831fe021859b7360"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload.py",
+      "sha256": "7243d5c373e0945566d0f26d89000533e49dccb03258bf9500da2a346c25fc9f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload_http.py",
+      "sha256": "0a80f2286970a167edc287e08b361f235372ca7c5ddaca80bf93dce06840bc9d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload_journal.py",
+      "sha256": "189ae2f2daed663ee6ed022de0b921edf73d29435c2a15c813d4e9635c010910"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload_process.py",
+      "sha256": "6115b3461bb5eae77ebb6df00b85f844b99c204cdb59b557a0f0709ab761a951"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_upload_worker.py",
+      "sha256": "f90e844d035155a879a946c697c7476de481532d6d7b885ea17de46dfa1f2c7c"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_upload_process.py",
+      "sha256": "8d182e1cc8a18818216b7c64c609d8e8432d384cf20bef726ad38491231d4dd0"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_media_reply_http.py",
+      "sha256": "f8e876329d82ff9a5f6c372a93b3923113fdac5d622a83de7b093b33c4b6cfcf"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_output.py",
+      "sha256": "aee283fe3389610e26bece3a63cfafcd205f53ae2eacfeaa27a0832e38d7cae2"
+    },
+    {
+      "path": "linux/haos/runtime/probe_feishu_upload_http.py",
+      "sha256": "68966724808c1541b3d8a2b3371ff7d3161e99ccd61cadb9cc0df9b409553567"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_media_reply.py",
+      "sha256": "b7ba64ea7cbef9f4859fb9c9262e3e1250b3eb7698961997f4273ce73270cdcb"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_feishu_upload.py",
+      "sha256": "f1f729d2d726901ac5909d33de9148ab4755a9c20b9099fef948981dd086e884"
+    }
+  ],
+  "checks": {
+    "minimal": "2027 passed, 2 existing skips",
+    "full_pinned_runtime": "2027 passed, 2 existing skips",
+    "real_kernel_UID_socket_policy_UI_backup": "143 passed",
+    "native_upload_HTTP": {
+      "passed": 19,
+      "cases": [
+        "actual_native_upload_refused_outside_explicit_private_capability",
+        "actual_native_stream_multipart_builder_SDK_model_and_single_write",
+        "actual_native_pdf_multipart_builder_SDK_model_and_single_write",
+        "actual_native_opus_multipart_builder_SDK_model_and_single_write",
+        "actual_native_mp4_multipart_builder_SDK_model_and_single_write",
+        "actual_native_image_multipart_builder_SDK_model_and_single_write",
+        "actual_native_multipart_changed_artifact_refused_before_API_write",
+        "actual_native_upload_401_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_429_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_500_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_redirect_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_drop_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_malformed_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_oversize_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_duplicate_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_missing_has_no_false_receipt_or_implicit_retry",
+        "actual_native_upload_numeric_has_no_false_receipt_or_implicit_retry",
+        "native_HTTP_200_rate_code_is_not_upload_acceptance",
+        "withdrawal_during_actual_upload_response_prevents_receipt_release"
+      ],
+      "loopback_fixture_only": true,
+      "kernel_upload_worker_durable_journal_reply_delivery_or_public_activation": false
+    },
+    "native_media_reply_HTTP": {
+      "passed": 14,
+      "cases": [
+        "actual_native_image_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_image_caption_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_document_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_voice_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_video_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_native_topic_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_dropped_connection_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_rate_limit_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_redirect_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_missing_source_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_post_fallback_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "actual_native_authentication_uses_at_most_one_exact_reply_and_no_new_topic_or_hidden_retry",
+        "changed_native_UUID_refused_before_any_message_write",
+        "actual_native_send_failure_and_SDK_diagnostics_remain_credential_redacted"
+      ],
+      "actual_native_send_and_SDK_verified_TLS": true,
+      "only_loopback_fixture_replies_no_external_messages": true,
+      "owner_grant_callbacks_are_fixtures": true,
+      "durable_media_worker_upload_journal_and_public_send_connected": false,
+      "public_feishu_enabled": false,
+      "live_account_acceptance": false
+    },
+    "authenticated_backend_artifact_export": {
+      "backend_healthy": true,
+      "backend_version": "0.21.5",
+      "unauthenticated_identity_denied": true,
+      "wrong_token_denied": true,
+      "authenticated_identity_matches_child": true,
+      "passed": 5,
+      "cases": [
+        "actual_authenticated_backend_exports_only_exact_marked_completed_source_session_files_as_private_bytes",
+        "durable_controller_snapshot_does_not_reread_a_changed_agent_file_on_repeated_preparation",
+        "arbitrary_or_unmarked_host_path_cannot_become_a_Feishu_output_export",
+        "owner_withdrawal_refuses_the_old_delivery_before_any_further_private_read",
+        "fresh_route_without_output_consent_strips_paths_and_performs_no_private_file_reads"
+      ],
+      "actual_authenticated_backend_artifact_reader": true,
+      "completed_session_and_connected_Feishu_transport_are_fixtures": true,
+      "public_registry_enabled": false,
+      "upload_or_reply_worker_external_Feishu_or_inference_acceptance": false,
+      "limitations": [
+        "providerless API probe; no model turn",
+        "no installed systemd/sandbox proof"
+      ]
+    },
+    "native_private_upload_reply_journals": {
+      "passed": 17,
+      "cases": [
+        "actual_agent_UID_refused_before_private_upload",
+        "actual_root_UID_refused_before_private_upload",
+        "actual_changed_binary_offer_refused_before_worker_or_network",
+        "actual_private_native_upload_ok_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_401_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_429_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_native-rate_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_500_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_drop_finite_receipt_without_hidden_write_retry",
+        "actual_private_native_upload_missing_finite_receipt_without_hidden_write_retry",
+        "actual_revoke_kills_and_joins_blocked_credential_bearing_upload_worker",
+        "actual_cancel_kills_and_joins_blocked_credential_bearing_upload_worker",
+        "actual_journal_confirmed_or_uncertain_upload_survives_reopen_and_new_attempt_without_second_API_write",
+        "actual_drop-journal_confirmed_or_uncertain_upload_survives_reopen_and_new_attempt_without_second_API_write",
+        "actual_media-journal_native_upload_and_reply_reopen_new_attempt_never_reuploads_or_resends",
+        "actual_media-drop-journal_native_upload_and_reply_reopen_new_attempt_never_reuploads_or_resends",
+        "actual_committed_write_intent_before_withheld_response_and_SIGKILL_restart_quarantine_prevent_second_upload"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "fixed_origin_loopback_fixture_only": true,
+      "durable_upload_journal": true,
+      "connection_and_original_source_authentication_are_fixtures": true,
+      "native_media_reply_delivery_fixture": true,
+      "public_feishu_enabled": false
+    },
+    "native_WS_regression": {
+      "passed": 9,
+      "cases": [
+        "actual_private_uid_native_runner_https_verified_wss",
+        "actual_native_protobuf_ack_after_independent_parent_full_sqlite_commit",
+        "root_publication_withdrawal_terminates_continuous_worker",
+        "no_hidden_sdk_reconnect_or_ticket_disclosure",
+        "private_profile_reconnects_with_fresh_supervised_worker",
+        "remote_duplicate_replay_keeps_one_original_one_native_input_one_relay_mission",
+        "actual_gateway_parent_sigkill_terminates_ws_worker_via_kernel_parent_death_signal",
+        "actual_wss_401_persists_authentication_block_without_automatic_retry",
+        "actual_wss_429_persists_rate_deadline_second_connect_cannot_bypass"
+      ]
+    },
+    "native_private_JSON_HTTP": {
+      "passed": 22,
+      "cases": [
+        "native_SDK_without_private_operation_cannot_authenticate_or_reach_network",
+        "actual_native_SDK_verifies_TLS_obtains_private_token_and_reuses_account_scoped_cache",
+        "actual_native_SDK_identity_encoding_negotiation_preserves_valid_response_and_wire_length",
+        "exact_owner_message_read_uses_actual_native_builder_and_rejects_account_lookup_in_message_scope",
+        "unapproved_message_is_rejected_before_token_or_network_access",
+        "actual_native_SDK_redirect_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_401_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_429_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_500_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_unexpected-encoding_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_oversize_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_duplicate_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_infinite_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_malformed_response_refused_without_retry_or_redirect",
+        "actual_native_SDK_truncated_response_refused_without_retry_or_redirect",
+        "owner_grant_withdrawn_during_actual_HTTP_read_prevents_SDK_response_release",
+        "mutated_client_and_separate_async_SDK_transport_cannot_bypass_private_boundary",
+        "same_app_id_rotated_secret_and_other_brand_cannot_reuse_first_account_token",
+        "actual_native_SDK_JSON_escaped_app_secret_is_redacted_from_debug_authentication_body",
+        "forged_bearer_cookie_and_case_duplicated_authorization_refused_before_network",
+        "actual_native_SDK_debug_logs_redacted_and_raw_records_not_propagated_to_parent_handlers",
+        "untrusted_TLS_issuer_refused_before_HTTP_application_request"
+      ],
+      "actual_native_SDK_and_verified_TLS": true,
+      "all_targets_loopback_fixtures": true,
+      "public_feishu_enabled": false,
+      "kernel_identity_publication_transport_delivery_GUI_or_live_acceptance": false
+    },
+    "native_HTTPS_reply_crash_regression": {
+      "passed": 24,
+      "cases": [
+        "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+        "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+        "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+        "actual_private_worker_wrong-bot_refused_without_false_success",
+        "actual_private_worker_401_refused_without_false_success",
+        "actual_private_worker_429_refused_without_false_success",
+        "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+        "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+        "actual_root_wrong-scope_refused_before_private_SDK_network",
+        "actual_root_own-bot_refused_before_private_SDK_network",
+        "actual_root_writable-policy_refused_before_private_SDK_network",
+        "actual_root_pending-publication_refused_before_private_SDK_network",
+        "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+        "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+        "actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check",
+        "actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate",
+        "actual_private_worker_native_reply_confirmation_is_durable_duplicate_suppressed_and_changed_body_denied",
+        "actual_native_reply_connection_drop_remains_uncertain_across_publisher_reopen_and_new_attempt_without_second_write",
+        "actual_native_HTTP_200_rate_code_persists_account_backoff_across_publisher_reopen_and_other_delivery_without_new_API_write",
+        "actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input",
+        "actual_readonly_journal_observes_committed_write_intent_before_withheld_native_API_response",
+        "actual_SIGKILL_of_gateway_during_native_reply_triggers_kernel_worker_death_and_reaping",
+        "actual_private_gateway_process_restart_quarantines_inflight_reply_and_preserves_confirmed_receipt_without_new_API_write",
+        "actual_root_identity_is_refused_before_worker_reads_or_network"
+      ],
+      "actual_uids": [
+        0,
+        65533,
+        65534
+      ],
+      "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+      "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+      "owner_publication_and_account_are_fixtures": true,
+      "public_feishu_enabled": false,
+      "external_messages_live_account_or_installed_acceptance": false
+    }
+  },
+  "limits": [
+    "Public Feishu remains disabled; public local gateway count 11/22.",
+    "General non-Opus voice conversion, complete owner setup/GUI, multi-part adjudication and source disposal remain open.",
+    "Source/connection/controller declarations in composition probes are fixtures; real UID/TLS/SDK/process tests are separate and not mocked.",
+    "No live tenant, external delivery, LLM inference, installed-system, HP or final artifact acceptance."
+  ],
+  "reproduced_corrections": [
+    "Valid negotiated gzip falsely appeared truncated; request identity and reject unexpected encoding.",
+    "Actual SDK DEBUG body serialized an escaped app secret; register JSON/repr spellings without weakening assertions."
+  ]
+}

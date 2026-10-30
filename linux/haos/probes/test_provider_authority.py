@@ -32,6 +32,108 @@ def policy(provider="openai"):
             "requests_per_day": 20, "requests_per_minute": 10}
 
 
+def test_acp_actual_socket_activation_peer_uids_private_credentials_and_immediate_revocation(location, monkeypatch):
+    """Real kernel IPC/UID boundary; model result is explicitly a fixture."""
+    import socket
+    from types import SimpleNamespace
+    from haos import provider_acp
+    from haos import provider_native  # Import trusted code before dropping UID.
+    location.chmod(0o755)
+    endpoint = location / "control.sock"
+    broker_key, acp_key = location / "broker-secret", location / "acp-secret"
+    for path, uid in ((broker_key, 65534), (acp_key, 65533)):
+        path.write_text(secrets.token_urlsafe(48))
+        path.chmod(0o600)
+        os.chown(path, uid, uid)
+    value = {**policy("copilot-acp"), "api_mode": "chat_completions"}
+    config = location / "provider.json"
+    config.write_text(json.dumps(value))
+    config.chmod(0o644)
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.bind(str(endpoint))
+    os.chown(endpoint, 0, 65534)
+    endpoint.chmod(0o660)
+    listener.listen(4)
+    listener.settimeout(10)
+    monkeypatch.setattr(provider_acp, "SOCKET", str(endpoint))
+    def drop(uid):
+        os.setgroups([])
+        os.setgid(uid)
+        os.setuid(uid)
+    def denied_read(path):
+        try:
+            path.read_text()
+        except PermissionError:
+            return
+        raise AssertionError("another actual UID read private provider credentials")
+    worker = os.fork()
+    if worker == 0:
+        try:
+            drop(65533)
+            denied_read(broker_key)
+            def factory():
+                return SimpleNamespace(close=lambda: None, chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: {
+                    "choices": [{"message": {"content": "fixture-only", "tool_calls": []}, "finish_reason": "stop"}],
+                    "model": "fixture-model"})))
+            for _ in range(3):
+                peer, _ = listener.accept()
+                with peer:
+                    try:
+                        provider_acp.handle(peer, 65534, config=config, factory=factory)
+                    except (PermissionError, ValueError):
+                        pass
+            os._exit(0)
+        except BaseException:
+            os._exit(3)
+    def child(uid, *, allowed=False, kernel_denied=False):
+        pid = os.fork()
+        if pid == 0:
+            try:
+                drop(uid)
+                if uid == 65534:
+                    denied_read(acp_key)
+                client = provider_acp.ACPClient(SimpleNamespace(data=value))
+                try:
+                    result = client.create(model="fixture-model", messages=[{"role": "user", "content": "fixture"}])
+                except PermissionError:
+                    assert kernel_denied
+                except (ValueError, ConnectionError):
+                    assert not allowed and not kernel_denied
+                else:
+                    assert allowed and result["choices"][0]["message"]["content"] == "fixture-only"
+                finally:
+                    client.close()
+                os._exit(0)
+            except BaseException:
+                os._exit(3)
+        _, status = os.waitpid(pid, 0)
+        assert os.waitstatus_to_exitcode(status) == 0
+    worker_done = False
+    try:
+        # A world-unprivileged identity is denied by the actual socket mode.
+        child(65532, kernel_denied=True)
+        # Root can bypass socket mode but cannot pass broker peer admission.
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
+            peer.connect(str(endpoint))
+            peer.settimeout(5)
+            assert peer.recv(1) == b""
+        child(65534, allowed=True)
+        # Same broker capability does not retain a removed route in the worker.
+        config.write_text(json.dumps({**value, "models": ["other"], "default_model": "other"}))
+        child(65534)
+        _, status = os.waitpid(worker, 0)
+        worker_done = True
+        assert os.waitstatus_to_exitcode(status) == 0
+    finally:
+        listener.close()
+        if not worker_done:
+            try:
+                os.kill(worker, 9)
+                os.waitpid(worker, 0)
+            except ProcessLookupError:
+                pass
+
+
 def test_private_real_credentials_are_not_client_configuration_and_rotation_withdraws_old_capability(location):
     key = secrets.token_urlsafe(48)
     provider_setup.publish(policy(), key, config=location)
@@ -110,3 +212,151 @@ def test_service_credential_loader_refuses_unsafe_descriptors(location, kind):
         path.write_text("x" * 32769)
     with pytest.raises((PermissionError, OSError)):
         private_credential(path)
+
+def test_cloud_file_import_checks_real_ownership_permissions_and_local_seat(location, monkeypatch):
+    from haos import initial_setup
+    for name in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "WAYLAND_DISPLAY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HAOS_TRUSTED_SETUP", "1")
+    monkeypatch.setenv("DISPLAY", ":8")
+    path = location / "cloud.json"
+    value = {"bearer_token": secrets.token_urlsafe(40)}
+    path.write_text(json.dumps(value))
+    path.chmod(0o600)
+    original = path.read_bytes()
+    assert path.stat().st_uid == os.geteuid() == 0
+    assert json.loads(initial_setup.import_cloud_credential("bedrock", path)) == value
+    path.chmod(0o644)
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    path.chmod(0o600)
+    owner_uids = {owner["uid"] for owner in initial_setup.owners()}
+    foreign = next(uid for uid in range(65000, 65010) if uid not in owner_uids)
+    os.chown(path, foreign, foreign)
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    os.chown(path, 0, 0)
+    monkeypatch.setenv("HAOS_TRUSTED_SETUP", "0")
+    with pytest.raises(PermissionError):
+        initial_setup.import_cloud_credential("bedrock", path)
+    assert path.read_bytes() == original
+
+
+def test_moa_legacy_migration_preserves_private_credentials_and_rejects_stale_gui_choices(location):
+    from haos.provider_setup import publish, configure_ensemble
+    from haos.provider_routes import ProviderRoutes
+    key = secrets.token_urlsafe(40)
+    original = {**policy("openrouter"), "api_mode": "chat_completions", "models": ["fixture-model", "second-approved"]}
+    publish(original, key, config=location)
+    old_capability = (location / "provider-token").read_bytes()
+    configure_ensemble("team", [{"route": "default", "model": "second-approved"}],
+        {"route": "default", "model": "fixture-model"}, config=location)
+    current = ProviderRoutes(json.loads((location / "provider.json").read_text()))
+    assert current.data["version"] == 2 and current.routes["default"].data == original
+    assert current.default_ensemble == "team"
+    assert json.loads((location / "provider-credentials").read_text()) == {"routes": {"default": {"api_key": key}}}
+    assert (location / "provider-token").read_bytes() != old_capability
+    assert key not in (location / "provider-client.json").read_text()
+    protected = {p: p.read_bytes() for p in location.iterdir() if p.is_file()}
+    with pytest.raises(PermissionError):
+        configure_ensemble("stale", [{"route": "default", "model": "not-approved"}],
+            {"route": "default", "model": "fixture-model"}, config=location)
+    assert all(p.read_bytes() == value for p, value in protected.items())
+    assert (location / "provider-credentials").stat().st_mode & 0o777 == 0o600
+    assert (location / "provider-credentials").stat().st_uid == 0
+
+
+def test_atomic_route_migration_rotation_revocation_and_default_model_change(location):
+    from haos.provider_routes import ProviderRoutes
+    from haos.provider_registry import default_mode
+    import json
+    tmp_path = location
+    def route(provider):
+        return {**policy(provider), "api_mode": default_mode(provider)}
+    from haos.provider_setup import publish, add_route, route_settings
+    first, second = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
+    publish(route("openrouter"), first, config=tmp_path)
+    original = json.loads((tmp_path / "provider-token").read_text())["token"]
+    add_route(route("anthropic"), second, config=tmp_path)
+    configuration = ProviderRoutes(json.loads((tmp_path / "provider.json").read_text()))
+    envelope = json.loads((tmp_path / "provider-credentials").read_text())
+    assert configuration.default == "anthropic" and set(configuration.routes) == {"anthropic", "openrouter"}
+    assert envelope == {"routes": {"openrouter": {"api_key": first}, "anthropic": {"api_key": second}}}
+    assert json.loads((tmp_path / "provider-token").read_text())["token"] != original
+    assert first not in (tmp_path / "provider-client.json").read_text() and second not in (tmp_path / "provider.json").read_text()
+    route_settings("openrouter", make_default=True, config=tmp_path)
+    route_settings("anthropic", remove=True, config=tmp_path)
+    assert second not in (tmp_path / "provider-credentials").read_text()
+    assert (tmp_path / "provider-credentials").stat().st_mode & 0o777 == 0o600
+
+
+def test_account_logout_withdraws_routes_keys_fallbacks_and_dependent_moa_before_remote_logout(location):
+    from haos.provider_setup import publish, add_route, configure_ensemble, revoke_account_routes
+    from haos.provider_registry import default_mode
+    from haos.provider_routes import ProviderRoutes
+    first, second = secrets.token_urlsafe(40), secrets.token_urlsafe(40)
+    publish({**policy("openrouter"), "api_mode": default_mode("openrouter")}, first, config=location)
+    add_route({**policy("anthropic"), "api_mode": default_mode("anthropic")}, second, config=location)
+    configure_ensemble("owner", [{"route": "openrouter", "model": "fixture-model"}],
+                       {"route": "anthropic", "model": "fixture-model"}, config=location)
+    result = revoke_account_routes("anthropic", config=location)
+    current = ProviderRoutes(json.loads((location / "provider.json").read_text()))
+    assert result["withdrawn_routes"] == 1 and set(current.routes) == {"openrouter"}
+    assert not current.ensembles and current.default_ensemble is None
+    assert second not in (location / "provider-credentials").read_text()
+    assert revoke_account_routes("openrouter", config=location)["withdrawn_routes"] == 1
+    assert not (location / "provider.json").exists()
+    assert first not in (location / "provider-credentials").read_text()
+
+
+@pytest.mark.parametrize("variant", ["version-one", "model-collision", "model-collision-no-agent"])
+def test_legacy_owner_model_config_is_derived_read_only_without_changing_authority(location, variant):
+    """Real root files, foreign UID, seals and bubblewrap; no kernel replacement."""
+    import fcntl
+    import subprocess
+    from haos.provider_routes import ProviderRoutes
+    from haos.sandbox import runtime_provider_config, trusted_json
+    data = policy()
+    credential = 'disposable-provider-fixture-credential'
+    if variant != 'version-one':
+        data = {'version': 2, 'default': 'alpha', 'routes': {'alpha': data, 'model': {
+            **data, 'models': ['fixture-secondary'], 'default_model': 'fixture-secondary'}}, 'fallbacks': {}}
+        credential = {key: {'api_key': credential + '-' + key} for key in data['routes']}
+    provider_setup.publish(data, credential, config=location)
+    routes = ProviderRoutes(data)
+    expected = routes.client_config()
+    legacy = routes.client_config(legacy_names=True) if variant != 'version-one' else expected
+    if variant != 'model-collision':
+        legacy = {key: value for key, value in legacy.items() if key != 'agent'}
+    from haos.policy import atomic_json
+    atomic_json(location / 'provider-client.json', legacy, mode=0o644)
+    before = {path.name: path.read_bytes() for path in location.iterdir() if path.is_file()}
+    descriptor = runtime_provider_config(routes, trusted_json(location / 'provider-client.json'))
+    try:
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setgroups([]); os.setgid(65534); os.setuid(65534)
+                assert json.loads(os.pread(descriptor, 65536, 0)) == expected
+                try: os.write(descriptor, b'changed')
+                except OSError: pass
+                else: raise AssertionError('foreign UID changed sealed model configuration')
+                os._exit(0)
+            except BaseException: os._exit(3)
+        _, status = os.waitpid(pid, 0)
+        assert os.waitstatus_to_exitcode(status) == 0
+        assert fcntl.fcntl(descriptor, getattr(fcntl, "F_GET_SEALS", 1034)) & getattr(fcntl, "F_SEAL_WRITE", 8)
+        code = "import json\nassert json.load(open('/client.json')) == " + repr(expected) + "\n" + """try:
+ open('/client.json', 'w')
+except OSError:
+ pass
+else:
+ raise AssertionError('model configuration mount was writable')
+"""
+        result = subprocess.run(['/usr/bin/bwrap', '--unshare-all', '--ro-bind', '/usr', '/usr',
+            '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib64', '/lib64', '--proc', '/proc', '--dev', '/dev',
+            '--perms', '0400', '--ro-bind-data', str(descriptor), '/client.json', '--', '/usr/bin/python3', '-c', code],
+            pass_fds=(descriptor,), capture_output=True, text=True, timeout=20, check=False)
+        assert result.returncode == 0, result.stderr
+    finally: os.close(descriptor)
+    assert {path.name: path.read_bytes() for path in location.iterdir() if path.is_file()} == before

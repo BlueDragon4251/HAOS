@@ -1,0 +1,25 @@
+{
+  "passed": 17,
+  "cases": [
+    "missing_actual_one_time_key_cannot_be_treated_as_completed_distribution",
+    "actual_signed_device_olm_key_distribution_and_megolm_answer",
+    "actual_encrypted_native_thread_kept_and_new_grant_rotates_session",
+    "unapproved_remote_device_cannot_receive_keys_or_results",
+    "owner_fingerprint_mismatch_refuses_before_key_share",
+    "actual_native_signed_key_validation_is_required",
+    "departed_recipient_is_not_sent_keys_or_results",
+    "local_device_blacklist_is_not_overridden_by_cached_owner_fingerprints",
+    "single_encrypted_send_429",
+    "single_encrypted_send_500",
+    "lost_encrypted_receipt_has_one_wire_send",
+    "encrypted_revocation_between_native_chunks_stops_second_send",
+    "forged_owner_generation_cannot_share_or_send",
+    "uncertain_key_share_does_not_send_the_private_result",
+    "next_authorized_obligation_rotates_after_uncertain_key_share",
+    "reopened_guard_does_not_inherit_unproven_outbound_session",
+    "key_distribution_outside_private_owner_context_is_refused"
+  ],
+  "external_connections": false,
+  "live_device_trust_accepted": false,
+  "installed_matrix_gateway_enabled": false
+}

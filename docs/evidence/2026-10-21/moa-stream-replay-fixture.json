@@ -1,0 +1,11 @@
+{
+  "native_accumulator_and_wire_protocols": 2,
+  "model_endpoint_negative_checks": 4,
+  "other_protocol_negative_checks": 2,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_moa_stream_replay.py": "9b29901904817ae55700f44a5a3a79aa1e09ddd8d76adfec9e47e1babf987e97",
+    "provider_moa_streams.py": "5c766efaf4efa9a85dadfa8e556e18c4765c1d63b5a007875c5fb4b0fce2a88b",
+    "provider_profiles.py": "637a8f88c45fcb06b6fb06b3ff88e550fc7332f241eed2d1c422d624b85cd4f2"
+  }
+}

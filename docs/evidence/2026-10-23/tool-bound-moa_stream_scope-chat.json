@@ -1,0 +1,21 @@
+{
+  "native_api_mode": "chat_completions",
+  "actual_sdk_profile_sequence": [
+    "a",
+    "b",
+    "a"
+  ],
+  "negative_checks": [
+    "cross-scope-refused",
+    "cross-scope-refused",
+    "cross-scope-refused",
+    "unscoped-refused",
+    "foreign-endpoint-refused"
+  ],
+  "actual_native_tool_id_and_arguments_preserved": true,
+  "live_provider_tested": false,
+  "source_sha256": {
+    "probe_moa_stream_scope.py": "65dcf31fb7c2db919b1bfb482b8f59cf097412be11e0e5ec6220318cee1b0848",
+    "provider_moa_streams.py": "ca17a9e46e6c1ed1b64841366477ae2d892e0aaa65f79382433597ded8720475"
+  }
+}

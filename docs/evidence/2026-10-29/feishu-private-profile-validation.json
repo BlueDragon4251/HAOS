@@ -1,0 +1,68 @@
+{
+  "parent_commit": "a0a61065fa8cdc4732aeba88c27b3cab7bba6766",
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-FEISHU.md",
+      "sha256": "688201160d6145a5884254d270b864eae53db24f72f6be0ead33e5a81d767ffb"
+    },
+    {
+      "path": "linux/haos/haos/gateway_feishu_profile.py",
+      "sha256": "0827d16c3ef7178ff58eb76f2733c7d6bacebca0c0805809162ae193258c4be1"
+    },
+    {
+      "path": "linux/haos/probes/probe_feishu_process.py",
+      "sha256": "9084b9c233e3aac2f0ffa49bde3134400bc27a9edcb530fdb9ac6c02f0ebd3fa"
+    }
+  ],
+  "checks": {
+    "minimal_without_Hermes_source": "1891 passed, 2 existing skips",
+    "full_frozen_Feishu_runtime": "1891 passed, 2 existing skips",
+    "actual_UID_native_SDK_TLS_process_and_private_HTTPS_profile": "18 passed"
+  },
+  "native_process_report": {
+    "passed": 18,
+    "cases": [
+      "actual_gateway_uid_private_native_SDK_authenticates_verified_TLS_fixed_domain_without_sending",
+      "no_secret_in_worker_result_and_tenant_is_not_falsely_claimed_verified",
+      "actual_agent_uid_cannot_read_private_credentials_owner_data_or_invoke_worker",
+      "actual_private_worker_wrong-bot_refused_without_false_success",
+      "actual_private_worker_401_refused_without_false_success",
+      "actual_private_worker_429_refused_without_false_success",
+      "actual_cancel_kills_and_joins_private_credential_bearing_worker",
+      "actual_revoke_kills_and_joins_private_credential_bearing_worker",
+      "actual_root_wrong-scope_refused_before_private_SDK_network",
+      "actual_root_own-bot_refused_before_private_SDK_network",
+      "actual_root_writable-policy_refused_before_private_SDK_network",
+      "actual_root_pending-publication_refused_before_private_SDK_network",
+      "actual_agent_uid_cannot_read_live_private_worker_input_channel_and_receives_no_credential_payload",
+      "actual_parent_death_kernel_guard_SIGKILLs_credential_worker_and_disposable_init_reaps_it",
+      "actual_gateway_uid_builds_leased_native_profile_and_binds_reviewed_verified_HTTPS_after_no_send_account_check",
+      "actual_gateway_uid_HTTPS_profile_durably_replays_native_message_into_relay_and_suppresses_remote_duplicate",
+      "actual_root_publication_withdrawal_stops_private_HTTPS_listener_and_preserves_one_durable_input",
+      "actual_root_identity_is_refused_before_worker_reads_or_network"
+    ],
+    "actual_uids": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_native_SDK_verified_TLS_private_process_and_kernel_termination": true,
+    "fixed_API_domain_redirected_only_by_disposable_container_hosts": true,
+    "owner_publication_and_account_are_fixtures": true,
+    "public_feishu_enabled": false,
+    "external_messages_live_account_or_installed_acceptance": false
+  },
+  "log_sha256": {
+    "feishu-profile-process-reviewed.log": "1b2d247e5b54db15dab4b2addbd0a7f50afc6c191973cfa4e1b3fad6d2bea613",
+    "feishu-profile-minimal.log": "ae97554646f487edd8d9ab0cc371b9e791dfc60bc6793a46c435fafa13d70e30",
+    "feishu-profile-full.log": "924e74c57623998e4844a08b691698ccc777d77ad441d3138d666f882e6fad96"
+  },
+  "fixture_correction": "After intentional client SIGKILL, the TLS fixture can fail while writing response headers, before body-write handling. Its completion signal now runs in finally for either expected connection outcome; kernel kill/reap and no-send assertions remain unchanged.",
+  "limitations": [
+    "Prepared private HTTPS receive profile only; public factory/root publication/GUI still reject Feishu.",
+    "Separate listener port per profile currently; websocket and shared HTTPS multiplexing open.",
+    "Outgoing delivery, media/voice, owner GUI and complete recovery remain open.",
+    "No real external account, external messages, installed service or hardware acceptance."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "base_commit": "28042b764fde3be40f2f8e50058d32db8900b448",
+  "full_tests": {
+    "passed": 1057,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1057,
+    "existing_skips": 2
+  },
+  "actual_native_http_transport_cases": 16,
+  "public_mattermost_gateway_enabled": false,
+  "owner_setup_ingress_history_pending": true,
+  "live_account_acceptance": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_mattermost.py",
+      "sha256": "d43a1840dfc8ac9a9e30f8a8b2fe82ea6a40198ddb99670c5825fc355117b510"
+    },
+    {
+      "path": "linux/haos/runtime/probe_mattermost_transport.py",
+      "sha256": "cef45b8856f31773d925bfda9ed4f0b18bb1d7f38daa2785c1b08184291a96cb"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_mattermost.py",
+      "sha256": "c11ef5566603bab50acfd394c692cb564456ba1f83f00a94ad32d1ae8196feab"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "6b6a76ca653124320226ebe45391b7eea1033088e4e80bb39c08400d0b8fcebc"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "4c8e8edb8c0931d308b5e31bb379c129318b314b4e00c510599991a81f26dfe5"
+    }
+  ]
+}

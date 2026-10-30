@@ -1,0 +1,30 @@
+{
+  "recorded_UTC": "2026-10-30T18:31:39.167754+00:00",
+  "failed_run": 41106228143,
+  "failed_job": 124236656388,
+  "reported_head": "89fdb0a25a1a34f571bde91fbbfe7eb9f3261bde",
+  "actual_PR_merge_source": "dfda06912eee5d082cee0a95340bbd3d1d43ecb1",
+  "log_access": "GitHub connector fetch_workflow_job_logs; official authenticated job log",
+  "observed_error": {
+    "file": "linux/haos/probes/run_application_unit.py",
+    "line": 194,
+    "exception": "FileNotFoundError",
+    "operation": "read /proc/6225/comm after cgroup PID snapshot"
+  },
+  "change": "Ignore only already-exited PID observations; original three-second positive sleep requirement and entire cgroup stop/descendant-termination assertions retained",
+  "local_verification": {
+    "actual_proc_exit_and_live_sleep_test": 1,
+    "installed_systemd_application_unit": false
+  },
+  "source_files": [
+    {
+      "path": "linux/haos/probes/run_application_unit.py",
+      "sha256": "a594825ff88ba728f63ef8e55e2a7ba732dbb143b393952a981425d479c6a86c"
+    },
+    {
+      "path": "tests/e2e/test_application_process_observation.py",
+      "sha256": "fdceef2aa28e6ce6ae0b1ccfa07ca6c5bb790a682d7069fe5091204e54890aa9"
+    }
+  ],
+  "CI_rerun_pending": true
+}

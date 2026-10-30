@@ -1,0 +1,36 @@
+{
+  "parent_commit": "15bac21ef118ba41547aae3c8f33c8add4861ccf",
+  "source_files": [
+    {
+      "path": "linux/haos/probes/probe_irc_delivery_process.py",
+      "sha256": "daf76d6a607ecd1a087144fce7a5c61988190aa8ceb72b797297f393f27ecaa0"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "30a82eb6cfc55dbf2b98261893b69b1aaa2d0633f4c60de4493f474e07feb80d"
+    }
+  ],
+  "fixture": {
+    "passed": 3,
+    "cases": [
+      "actual_gateway_uid_installed_frozen_sdk_and_system_trusted_tls_write_precedes_real_sigkill",
+      "actual_agent_uid_cannot_read_or_open_the_crashed_gateway_private_journal_or_owner_secret",
+      "new_actual_gateway_process_reacquires_kernel_lease_and_preserves_writing_intent_as_uncertain_without_resend"
+    ],
+    "actual_uid_cases": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_sigkill": true,
+    "tls_verification_disabled": false,
+    "public_gateway_enabled": false,
+    "external_connections_or_recipient_acceptance": false,
+    "installed_haos_accepted": false
+  },
+  "docker_image": "python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89",
+  "public_upstream_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_upstream_inputs": "fresh pinned public archive plus the approved HAOS runtime overlay",
+  "socket_or_uid_functions_mocked": false,
+  "tls_verification_disabled": false
+}

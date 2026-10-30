@@ -1,0 +1,50 @@
+{
+  "actual_pinned_native_account_cases": [
+    "nous:global:success",
+    "nous:global:pending",
+    "nous:global:denied",
+    "nous:global:invalid-device",
+    "nous:global:missing-token",
+    "xai-oauth:global:success",
+    "xai-oauth:global:pending",
+    "xai-oauth:global:denied",
+    "xai-oauth:global:invalid-device",
+    "xai-oauth:global:missing-token",
+    "minimax-oauth:global:success",
+    "minimax-oauth:global:pending",
+    "minimax-oauth:global:denied",
+    "minimax-oauth:global:invalid-device",
+    "minimax-oauth:global:missing-token",
+    "minimax-oauth:global:bad-state",
+    "minimax-oauth:cn:success",
+    "minimax-oauth:cn:pending",
+    "minimax-oauth:cn:denied",
+    "minimax-oauth:cn:invalid-device",
+    "minimax-oauth:cn:missing-token",
+    "minimax-oauth:cn:bad-state"
+  ],
+  "case_count": 22,
+  "http_requests": 55,
+  "native_device_pkce_login_refresh_private_storage_status_logout": true,
+  "native_minimax_global_and_china_regions": true,
+  "broker_uses_refreshed_native_credentials": true,
+  "minimax_status_read_only_and_expired_grant_region_checked_before_refresh": true,
+  "invalid_pending_denied_missing_token_and_csrf_checked": true,
+  "private_tokens_not_rendered": true,
+  "live_account_tested": false,
+  "python": "3.11.16",
+  "source_files": [
+    {
+      "path": "runtime/probe_native_account_flows.py",
+      "sha256": "e27d00075f825f56189aa9b2e59c25c6f146b07a1e38c098130be05af894fdec"
+    },
+    {
+      "path": "haos/provider_proxy.py",
+      "sha256": "de42a47018c66b6840b00b9757681d93f1665a6b1a6a6680cd4c20b89b46ac49"
+    },
+    {
+      "path": "haos/provider_auth.py",
+      "sha256": "25822c9b04e80b73c34e5dfa8cd346fae5ce26084fd647b4aab64e817e049d87"
+    }
+  ]
+}

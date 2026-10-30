@@ -70,6 +70,13 @@ async function assetSizes(dir: string, manifest: CompManifest): Promise<Record<s
       throw new Error(`${name} is too large`)
     }
 
+    // An in-place external save truncates before writing. Neither a PNG nor a
+    // colour table can be empty; keep the previous usable project until a
+    // subsequent watch event or poll observes the completed asset.
+    if (stat.size === 0) {
+      throw new Error(`${name} is empty`)
+    }
+
     assets[name] = stat.size
   }
 
@@ -175,7 +182,6 @@ export class PackageWatcher {
   private poll: NodeJS.Timeout | null = null
   private timer: NodeJS.Timeout | null = null
   private known: string
-  private stamp = ''
   private writing = 0
   private running = false
 
@@ -192,11 +198,13 @@ export class PackageWatcher {
   start(): void {
     this.running = true
     this.watchFolders()
-    void this.manifestStamp().then(stamp => {
-      this.stamp ||= stamp
-    })
-    // Some file systems (network shares, some containers) report no events: the manifest's time and size still move.
-    this.poll = setInterval(() => void this.probe(), this.pollMs)
+    // Watch events can be lost, or remain attached to replaced directory
+    // inodes. An external image replacement need not touch the manifest.
+    this.poll = setInterval(() => {
+      if (!this.timer) {
+        this.schedule()
+      }
+    }, this.pollMs)
     this.poll.unref()
   }
 
@@ -221,21 +229,6 @@ export class PackageWatcher {
       } catch {
         // No images folder yet: it is watched from the check that its creation schedules.
       }
-    }
-  }
-
-  private async manifestStamp(): Promise<string> {
-    const stat = await fs.stat(path.join(this.dir, 'manifest.json')).catch(() => null)
-
-    return stat ? `${stat.mtimeMs}:${stat.size}` : ''
-  }
-
-  private async probe(): Promise<void> {
-    const stamp = await this.manifestStamp()
-
-    if (stamp !== this.stamp) {
-      this.stamp = stamp
-      this.schedule()
     }
   }
 

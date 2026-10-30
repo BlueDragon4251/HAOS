@@ -1,0 +1,41 @@
+{
+  "passed": 21,
+  "cases": [
+    "native_ws_requires_real_auth_ack_before_healthy",
+    "unauthenticated_post_has_no_haos_authority",
+    "actual_ws_decoder_commits_raw_before_relay_with_actual_scope",
+    "native_duplicate_does_not_repeat_durable_admission",
+    "large_escaped_unicode_post_preserves_native_text",
+    "actual_same_adapter_reconnect_keeps_durable_dedup",
+    "unknown_sender_refused_before_native_preparation",
+    "wrong_thread_refused_before_native_preparation",
+    "media_refused_before_native_preparation",
+    "system_refused_before_native_preparation",
+    "missing_mention_refused_before_native_preparation",
+    "edited_refused_before_native_preparation",
+    "malformed_props_refused_before_native_preparation",
+    "actual_server_bot_identity_refused",
+    "actual_server_team_mismatch_refused",
+    "reopened_raw_decoder_recovery",
+    "revoked_generation_cannot_execute_retained_input",
+    "native_session_redirect_rejected_before_forwarding",
+    "real_ws_auth_refusal_is_fatal_and_unhealthy",
+    "owner_receives_safe_persisted_auth_status_without_token",
+    "actual_ws_redirect_refused_before_token_challenge"
+  ],
+  "external_connections": false,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_mattermost.py",
+      "sha256": "278dbcbfbf4d4293029d2c6eccab583005a481dad6bf35c0f852552b3ea4dc66"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ingress.py",
+      "sha256": "82591f5e14d7302b168426229077776df6c17fbee56cbd200d3c170eee673f18"
+    },
+    {
+      "path": "linux/haos/haos/gateway_runtime.py",
+      "sha256": "f8b4bc31bec7dee7bfe8b81a0f98ffccecd6c2bf414976bf541f7ba6665ffaba"
+    }
+  ]
+}

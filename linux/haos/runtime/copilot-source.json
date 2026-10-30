@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/github/copilot-cli",
+  "version": "1.0.98",
+  "url": "https://github.com/github/copilot-cli/releases/download/v1.0.98/copilot-linux-x64.tar.gz",
+  "sha256": "87ddb4b3f98462b7cb13c0a6857c68ee410ec9673e2e5f64ee5bedad45825b05",
+  "platform": "linux-x64"
+}

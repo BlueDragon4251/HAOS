@@ -1,0 +1,198 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "3a00d741ac47bd43087c88fcd9a3996a061f6479",
+  "tested_source_tree_before_this_receipt": "cfda946da260ec2ed1e7ba3fca58b9f640b86f5a",
+  "source_files_sha256": {
+    "docs/GATEWAY-BUZZ.md": "64343889b719d4dfc2046bf65a782574f650e821ddd2650a8b19cc31c5c5af9c",
+    "linux/haos/haos/gateway_buzz_delivery.py": "96d7f8e18391024743f4eeb89494fd5b22d6021e224cea28147bb4c4f2b80a2d",
+    "linux/haos/haos/gateway_buzz_profile.py": "d2a63a69a289645310c2ab94981c470111043b14b3603e42f0059bc99ed95d17",
+    "linux/haos/haos/gateway_buzz_recovery.py": "74405bbfafa4a8eb152b263589d67aaf16474e1985a928455269a7c9ea052b44",
+    "linux/haos/haos/gateway_buzz_send_process.py": "50842b8c53fc4e6a4018fbc8926905b0da1a5ced5796142e5c9ffb9b90732df0",
+    "linux/haos/probes/probe_buzz_socket_process.py": "6d6767e2e885cac6b8657cd2a051b6959d2b5384f7c7b15cc1c230a6eca5059a",
+    "linux/haos/runtime/buzz-source.json": "0503b1c0edb713a4b1f700598a17035c1806aef295fbfa10f96e1cb3730bdf49",
+    "linux/haos/runtime/prepare_buzz.py": "459523670e0513543f26f450d03326df76a8892e4eadd1d0bbb9ca593199c807",
+    "linux/haos/runtime/probe_buzz_cli.py": "1fba98056e53dccffc0382bf3a31e83be850123d38184478bd4de5db3e870b61",
+    "linux/haos/tests/test_gateway_buzz_send.py": "86b7461111742799d7fa81638f3255d36c12b6893281f4e3e95b4811f732a9ae"
+  },
+  "pinned_Hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 14,
+  "buzz_public_activation": false,
+  "program_source": {
+    "repository": "https://github.com/block/buzz",
+    "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+    "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+    "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
+    "builder_image": "rust@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
+    "rust_version": "1.98.1",
+    "nostr_version": "0.44.7",
+    "serde_json_version": "1.0.150",
+    "helper_lock_sha256": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+    "programs": {
+      "buzz": {
+        "package": "buzz-cli",
+        "package_version": "0.1.0",
+        "version_flag_supported": false
+      },
+      "haos-buzz-verify": {
+        "package": "haos-buzz-verify",
+        "package_version": "0.1.0"
+      }
+    },
+    "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1",
+    "messages_original_sha256": "8c5ff2a85a92f1b726fa00d5ee416b4707fccf616394bff7e4bad5c122ee1243",
+    "bounded_query_cursor_extension": "HAOS_BUZZ_BEFORE_ID",
+    "history_parser": "cmd_get_messages rejects invalid response JSON instead of substituting an empty list",
+    "HTTP_response_body_limits": {
+      "success": 8388608,
+      "error": 65536,
+      "encoding": "strict UTF-8",
+      "scope": "actual CLI handle_response header and decoded chunk bounds"
+    },
+    "prepublish_guard": "HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission",
+    "signed_replay": "HAOS_BUZZ_REPLAY_FD-v1: bounded SDK-verified original from inherited descriptor, exact own identity, same prepublication guard, no new signature",
+    "maximum_glibc": "2.36"
+  },
+  "programs": {
+    "buzz": {
+      "sha256": "edc450070dae89944cb8c31894b3d5fed6857cc4744a52fcdb6042b2b8736dcf",
+      "maximum_required_GLIBC": "2.34"
+    },
+    "haos-buzz-verify": {
+      "sha256": "a231bb3e05948082d87dc5854cb11d955de64540c03329f72743237d27418301",
+      "maximum_required_GLIBC": "2.34"
+    }
+  },
+  "results": {
+    "minimal": {
+      "passed": 2551,
+      "existing_skips": 2,
+      "Hermes_source_in_PYTHONPATH": false
+    },
+    "full": {
+      "passed": 2551,
+      "existing_skips": 2,
+      "Hermes_source_in_PYTHONPATH": true
+    },
+    "actual_root_kernel": 172,
+    "actual_UID_and_native_outbox": {
+      "passed": 27,
+      "cases": [
+        "actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory",
+        "actual_private_UID_fixed_official_CLI_rejects_writes_unknown_peers_channels_and_duplicate_flags_before_HTTP_and_filters_native_discovery_to_owner_channels",
+        "actual_official_CLI_auth_refusal_is_sticky_without_retry_or_empty_history_and_reflected_private_material_or_wrong_public_identity_never_reaches_native_adapter",
+        "actual_gateway_UID_fixed_CLI_peer_PID_SDK_verification_and_FULL_signed_original_commit_precede_HTTP_publication_and_exact_native_reply_receipt",
+        "actual_private_signed_original_custody_refusal_never_publishes_and_post_ack_body_disconnect_retries_only_same_event_then_reports_uncertain_without_new_process_or_resigning",
+        "fresh_gateway_UID_process_replays_exact_retained_signed_original_through_sealed_memfd_and_actual_native_SDK_verification_without_new_timestamp_signature_or_event_identity",
+        "actual_installed_private_UID_native_NIP42_signing_and_guarded_verified_WSS_authenticate_exact_identity_relay_and_challenge_without_private_key_on_wire",
+        "actual_native_subscription_and_MessageEvent_path_deliver_only_explicit_signed_peer_and_channel_after_signature_capture_and_native_duplicate_filter",
+        "actual_private_FULL_original_native_inbox_and_parent_relay_reopen_preserve_first_signed_source_and_never_duplicate_local_admission_on_native_replay",
+        "actual_private_original_custody_refuses_invalid_signature_time_mention_thread_private_key_reflection_and_unapproved_voice_before_new_inbox_or_media_use",
+        "Nostr_signature_randomness_replay_keeps_first_valid_original_without_new_semantic_message_or_local_admission",
+        "actual_SQL_receipt_failure_after_native_and_parent_commit_reopens_and_reconciles_without_new_local_delivery_or_fake_mission",
+        "changed_retained_original_bytes_are_refused_without_automatic_restoration_or_discarding_source_tombstone",
+        "actual_UID_official_CLI_signed_query_and_FULL_history_reopen_page_121_same_second_events_without_native_50_event_truncation_or_new_source_on_replayed_page",
+        "actual_SQL_history_cursor_commit_failure_after_50_verified_original_commits_keeps_revision_zero_then_reconciles_exact_page_after_process_reopen",
+        "actual_native_CLI_rejects_malformed_HTTP_history_without_false_empty_list_or_completed_sweep_and_saved_cursor_remains_unchanged",
+        "actual_native_BuzzAdapter_send_runs_only_behind_current_independent_source_and_outbox_authority_and_repeated_confirmed_attempt_returns_same_receipt_without_HTTP",
+        "actual_SQL_acceptance_commit_failure_reopens_uncertain_and_never_automatically_republishes_or_signs_new_id_for_same_outbox_attempt",
+        "stopped_private_profile_owner_inspection_rejects_stale_snapshot_then_idempotent_approved_next_attempt_replays_identical_signed_event_through_actual_native_send_and_new_UID_process",
+        "actual_native_text_MessageEvent_and_independent_parent_relay_admit_strip_public_and_named_mentions_without_exposing_raw_original_or_creating_another_parent_receipt_on_reopen",
+        "actual_SQL_native_commit_and_original_receipt_failures_reconcile_after_fresh_processes_without_duplicate_parent_admission_and_retain_first_command_projection_across_display_name_change",
+        "actual_private_socket_refuses_unapproved_channel_before_any_subscription_frame_reaches_relay",
+        "actual_verified_TLS_WebSocket_302_is_not_followed_and_never_receives_native_authentication",
+        "actual_relay_AUTH_refusal_produces_no_subscription_or_native_message_readiness",
+        "actual_private_profile_fixed_CLI_native_NIP42_WSS_durable_parent_admission_identity_lease_and_root_publication_replacement_stop_live_native_socket_without_waiting_for_new_network_input",
+        "actual_401_private_profile_refusal_persists_across_new_UID_processes_and_same_credential_identity_never_retries_or_reports_readiness_after_restart",
+        "actual_root_owned_policy_replacement_prevents_further_use_of_existing_authenticated_socket"
+      ],
+      "actual_UID_TLS_native_auth_subscription_and_MessageEvent": true,
+      "actual_FULL_original_native_inbox_and_parent_relay_custody": true,
+      "actual_private_profile_lease_lifecycle_native_text_and_revocation": true,
+      "production_runtime_factory_root_controller_mission_media_delivery_GUI_or_public_activation": false
+    },
+    "actual_CLI_TLS": {
+      "passed": 15,
+      "cases": [
+        "actual_pinned_official_Rust_CLI_queries_verified_TLS_relay_with_SDK_verified_NIP98_identity_method_URL_payload_and_nonce_without_private_key_on_wire",
+        "actual_native_CLI_message_builder_signing_and_HTTP_acceptance_receipt_preserve_exact_content_channel_and_event_id",
+        "definite_429_retries_exact_same_signed_event_body_and_identity_with_bounded_native_delay_and_fresh_NIP98_nonce",
+        "actual_401_refuses_authentication_without_automatic_retry_or_false_account_readiness",
+        "reviewed_exact_source_default_HTTP_transport_overlay_refuses_302_without_following_or_forwarding_authentication",
+        "scoped_typed_composite_history_cursor_retains_exact_channel_time_bounds_and_complete_signed_native_message_fields",
+        "invalid_or_unpaired_history_cursor_is_refused_before_HTTP_or_NIP98_request",
+        "malformed_successful_HTTP_history_is_an_explicit_native_CLI_error_not_an_empty_complete_history",
+        "actual_native_HTTP_reader_refuses_over_8MiB_declared_or_chunked_bodies_before_JSON_allocation_and_without_retry_or_empty_history",
+        "actual_native_HTTP_error_body_limit_preserves_status_without_unbounded_body_or_read_retry",
+        "actual_definite_401_refuses_before_opaque_body_parsing_even_when_body_is_invalid_UTF8_without_retry_or_false_network_failure",
+        "actual_native_JSON_query_refuses_invalid_UTF8_without_lossy_replacement_or_fake_empty_history",
+        "actual_native_signed_message_blocks_before_HTTP_until_private_peer_checked_bounded_event_is_fsynced_and_explicitly_approved_then_submits_exact_original_bytes_and_id",
+        "actual_native_prepublication_refusal_and_approval_channel_disconnect_never_submit_signed_message_or_fallback_to_unguarded_send",
+        "post_body_disconnect_retries_only_same_idempotent_native_event_then_reports_delivery_unknown_not_retryable_for_new_CLI_invocation"
+      ],
+      "official_buzz_commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+      "cli_sha256": "edc450070dae89944cb8c31894b3d5fed6857cc4744a52fcdb6042b2b8736dcf",
+      "scope": "actual compiled pinned official CLI plus exact no-redirect constructor overlay and official Rust signature verifier, trusted fixture CA and local TLS relay",
+      "private_UID_HAOS_ingress_mission_live_relay_GUI_or_public_activation": false
+    }
+  },
+  "logs_sha256": {
+    "buzz-outbox-minimal.log": "4d85774bd9c2211d95892c2ee42a3216b02b4eab22f65b9be8f195dc29ec91cb",
+    "buzz-outbox-full.log": "a5ab80ed88abbfe3b53bffc94835b05e135df1b326edba1f67f228f038335580",
+    "buzz-outbox-kernel.log": "414e2be1ded7119fd251ed722b6277bdd17fc0a6094c15742d976624d33f93db",
+    "buzz-native-outbox-process.json": "33bd8960052bc8c403784d63b8e976b2fc2ab5cf137e45984664ef460aa2de63",
+    "buzz-native-outbox-process.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "buzz-replay-version-cli.json": "6ca8acffafca1acf4193a7f756bb5f1ac3730e10655f37f24ab06c8255726c66",
+    "buzz-replay-version-cli.log": "0186c781ed9b206ef2a8830dfd099f7cb4edbbc60ce93749cacd3da3146041d5",
+    "buzz-signed-replay-build.log": "3e2b0258f652478eabc0e052cd4b62dd9e8019770313ae06e695770a9493390a",
+    "buzz-outbox-redaction-gate.log": "8954ee005d1a2e9c7794202c1bfb831ef601f00233436e63b397a548c0bc54f5"
+  },
+  "baseline_CI": {
+    "commit": "8cde97d6855ef227f9d7d0bf3043ddf6e30c1107",
+    "all_six_successful": true,
+    "runs": [
+      {
+        "conclusion": "success",
+        "databaseId": 41016332760,
+        "name": "HAOS Graphical Initial Setup Security",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "databaseId": 41016332598,
+        "name": "CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "databaseId": 41016332628,
+        "name": "HAOS services and kernel boundaries",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "databaseId": 41016332615,
+        "name": "Arch package",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "databaseId": 41016332838,
+        "name": "HAOS pinned provider protocol contracts",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "databaseId": 41016326088,
+        "name": "HAOS pinned provider protocol contracts",
+        "status": "completed"
+      }
+    ]
+  },
+  "limits": [
+    "Actual compiled official SDK/CLI and native adapter with local TLS relay and supplied private owner-decision request; no live external account or message.",
+    "Local parent-relay and outbox receipts, not root controller mission acceptance, real owner UID handoff, GUI or installed OS.",
+    "Private public-factory/registry/media/voice/output-file/owner recovery/packaging/CI activation remains unfinished; count stays14.",
+    "Parent CI evidence is not attributed to this new source."
+  ]
+}

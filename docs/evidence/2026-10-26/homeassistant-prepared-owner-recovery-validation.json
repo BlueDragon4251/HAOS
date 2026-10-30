@@ -1,0 +1,84 @@
+{
+  "baseline_commit": "be08b7530c4645591924fb485537799506908b33",
+  "baseline_all_five_ci_gates_passed": true,
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_homeassistant_profile.py",
+      "sha256": "63fb9478766c880ab0b8e0aeea4dc10d442bc253c459a3f7f32a14386f4cfddc"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "ea37f8b57d1612bdcafe3181d1b3dbe014802cc3361da50e250dc609b8c5fd80"
+    },
+    {
+      "path": "linux/haos/runtime/probe_homeassistant_profile.py",
+      "sha256": "cccbca9f4c48ead67b1e1c8a375bc284dc9173ad86ac2e80487346af185d562b"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "a1a65a1969139153e08d9ffcea0e2270bb46ae98d9a7427ba47a32c416f6f7c7"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_homeassistant_recovery.py",
+      "sha256": "8d655637b9f18d560af0237e2ee95755333d3570b07fcd8a99698b396c31493b"
+    }
+  ],
+  "native_prepared_profile": {
+    "passed": 24,
+    "cases": [
+      "prepared_profile_does_not_enable_public_homeassistant_policy",
+      "private_factory_never_connects_before_explicit_start",
+      "actual_kernel_flock_refuses_parallel_homeassistant_profile",
+      "private_native_imports_leave_unrelated_home_untouched",
+      "disconnected_profile_cannot_publish",
+      "actual_profile_native_auth_stream_durable_capture_and_relay",
+      "profile_send_requires_exact_outbox_identity_and_current_owner_route",
+      "profile_refuses_extra_binding_fields_before_native_post",
+      "profile_refuses_truthy_notification_flag_before_native_post",
+      "profile_refuses_unbounded_reply_identity_before_native_post",
+      "actual_private_profile_send_uses_native_rest_and_separate_authenticated_receipt_witness",
+      "actual_eof_reconnect_preserves_idempotency_and_reports_unrecoverable_gap",
+      "explicit_disconnect_reconnect_retains_raw_journal_and_profile",
+      "owner_regrant_revokes_running_profile_without_automatic_inheritance",
+      "concurrent_profile_close_releases_lease_once_and_closes_sockets",
+      "authentication_refusal_is_sticky_across_connect_close_and_actual_profile_reopen",
+      "prepared_owner_auth_recheck_does_no_network_io_and_next_start_performs_real_native_auth",
+      "owner_metadata_preserves_explicit_unrecoverable_gap_after_successful_reauthentication",
+      "credential_rotation_reuses_private_home_with_new_authenticated_identity",
+      "actual_raw_journal_reopen_replays_retained_input_without_any_new_remote_event",
+      "independent_replay_retries_real_failed_relay_admission_while_live_socket_is_idle",
+      "actual_http429_retry_after_survives_close_and_profile_reopen_without_early_request",
+      "close_during_connect_cancels_and_joins_workers_before_releasing_identity_lease",
+      "plain_http_and_arbitrary_plugin_configuration_are_refused"
+    ],
+    "actual_native_profile_ws_kernel_lease_and_sqlite": true,
+    "loopback_target_replacement_only_in_fixture": true,
+    "public_gateway_enabled": false,
+    "reconnect_delay_shortened_only_in_fixture": true,
+    "unseen_remote_events_recovered": false,
+    "external_account_notification_tls_or_installed_acceptance": false
+  },
+  "full_runtime": {
+    "passed": 1172,
+    "existing_skips": 2
+  },
+  "without_upstream_pythonpath": {
+    "passed": 1172,
+    "existing_skips": 2
+  },
+  "existing_local_excluded_file": "linux/haos/tests/test_backup.py",
+  "actual_root_uid_socket_recovery": {
+    "passed": 49,
+    "new_cases": 2,
+    "actual_uids": [
+      65533,
+      65534
+    ],
+    "network": "none",
+    "audit_rollback_actual_sqlite_trigger": true
+  },
+  "public_runtime_cli_gui_homeassistant_enabled": false,
+  "new_owner_auth_function_exposed_by_helper_main": false,
+  "external_messages_or_live_account_accepted": false,
+  "installed_or_release_acceptance": false
+}

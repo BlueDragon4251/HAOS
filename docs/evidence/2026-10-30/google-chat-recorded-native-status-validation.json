@@ -1,0 +1,199 @@
+{
+  "recorded_UTC": "2026-10-30T17:54:47.272157+00:00",
+  "base_commit": "d273f4881d4f81126f7552035ab255b5ec0cc671",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "2ff342f55f59f565b4d655e95fc932da2aadea39777a94ea9f5b5323bc3f4caa"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "5a9aafd28d0a658f125ac253f97f30a465f303cf2616ca1cd596d2fde4770bed"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_health.py",
+      "sha256": "b3ab7a415c5187167210a7921dcf8118fc8f0f4b0f33b144ff4d43e44c8ee4a7"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_profile.py",
+      "sha256": "eee419ec1d78954d4bccd82d25194febd895203a25190744390bb28342806b35"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "b3b83785947fa664e81b7f546b41568eaae8f684a8c9545f367ba288f1cb4b1b"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_account_gui.py",
+      "sha256": "0cf54544d4d33d55774e9c8ef80e650424ca384ddeb5b9c167727f892061d8af"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_process.py",
+      "sha256": "f2488e5d8d89c60ec5d9497f186313ddca5b56757168ed9c6325dd39b39da167"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_setup.py",
+      "sha256": "abb0754673db39d67653710571e59de69eeb2d28afaf362af69221bb90c1b85f"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_worker.py",
+      "sha256": "e2cc5f577cd1212108c60e59534840213df1176cf0aff5cab451a17578e6a74c"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "36285a5f8eab565ce7c3efd93c7d0f6c1a11cdf00c1953a6ccdee7f1ac6b2b1a"
+    },
+    {
+      "path": "linux/haos/probes/probe_google_chat_health_process.py",
+      "sha256": "6ad58f6559d2ee610500a2017f8d178ad46d879f15abd91661f20123158dd5c0"
+    },
+    {
+      "path": "linux/haos/runtime/google_chat_serve_fixture.py",
+      "sha256": "1ff879a56bff309c10c60bc0917de5a20bcb81d7504299fc6f1613bb06054314"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_account_gui.py",
+      "sha256": "97b84064f218f917bf20bfdca1486a4700125deb6835263498dbb8388f4e9906"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_google_chat_health.py",
+      "sha256": "dc847af5c27907d0b9652a98fec3655d99080615bf5269210a03148292a3dcb5"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_retired_cli.py",
+      "sha256": "1d9c9aa4e7a9fdad079cabcf4958aa71e4078f367c02c2d65d3b5ca818a53745"
+    }
+  ],
+  "minimal_no_Hermes_source": {
+    "passed": 3036,
+    "existing_skips": 2
+  },
+  "frozen_Hermes_source": {
+    "passed": 3036,
+    "existing_skips": 2
+  },
+  "actual_Root_kernel": {
+    "passed": 174,
+    "new_skips_or_kernel_mocks": false
+  },
+  "actual_production_service_with_nonstopping_Root_private_status": {
+    "active": {
+      "passed": 9,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_production_serve_reads_matched_Root_publication_and_read_only_credentials_under_private_UID",
+        "actual_serve_factory_maintain_native_SDK_TLS_original_relay_Unix_controller_and_native_reply_loop",
+        "unknown_sender_retained_as_hash_refusal_without_controller_authority_or_reply",
+        "actual_Root_private_UID_read_only_status_during_live_profile_lease_never_stops_service_requests_network_or_returns_credentials_and_does_not_claim_live_verification",
+        "actual_production_maintain_reconnect_retains_two_unique_sources_and_two_replies_despite_replay",
+        "actual_Root_fixture_completion_event_manifest_Unix_RPC_and_public_policy_output_projection_refuse_unapproved_file_export_without_leaking_agent_path",
+        "actual_Root_atomic_republication_withdrawal_stops_production_service_and_callback_or_pull_without_resend"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": false,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": false,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "actual_local_Google_voice_ASR_controller_execute": false,
+      "actual_local_Google_voice_ASR_revocation": false,
+      "actual_local_Google_video_thumbnail_and_controller_attach": false,
+      "Hermes_WebSocket_service_is_explicit_protocol_fixture_not_inference": false,
+      "actual_shared_production_serve_loop": true,
+      "GUI_live_Google_account_installed_systemd_or_external_delivery": false
+    },
+    "pubsub": {
+      "passed": 9,
+      "cases": [
+        "actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener",
+        "actual_separate_controller_UID_and_Root_bound_Unix_socket_SO_PEERCRED_deny_agent_before_frame_and_gateway_Owner_methods_despite_permissive_fixture_socket",
+        "actual_production_serve_reads_matched_Root_publication_and_read_only_credentials_under_private_UID",
+        "actual_serve_factory_maintain_native_SDK_TLS_original_relay_Unix_controller_and_native_reply_loop",
+        "unknown_sender_retained_as_hash_refusal_without_controller_authority_or_reply",
+        "actual_Root_private_UID_read_only_status_during_live_profile_lease_never_stops_service_requests_network_or_returns_credentials_and_does_not_claim_live_verification",
+        "actual_production_maintain_reconnect_retains_two_unique_sources_and_two_replies_despite_replay",
+        "actual_Root_fixture_completion_event_manifest_Unix_RPC_and_public_policy_output_projection_refuse_unapproved_file_export_without_leaking_agent_path",
+        "actual_Root_atomic_republication_withdrawal_stops_production_service_and_callback_or_pull_without_resend"
+      ],
+      "actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite": true,
+      "Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures": true,
+      "actual_native_controller_component_outbox_and_TLS_replies": true,
+      "actual_full_PubSub_profile_TLS_gRPC": true,
+      "actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer": false,
+      "actual_separate_controller_UID_kernel_Unix_IPC": true,
+      "actual_local_Google_voice_ASR_controller_execute": false,
+      "actual_local_Google_voice_ASR_revocation": false,
+      "actual_local_Google_video_thumbnail_and_controller_attach": false,
+      "Hermes_WebSocket_service_is_explicit_protocol_fixture_not_inference": false,
+      "actual_shared_production_serve_loop": true,
+      "GUI_live_Google_account_installed_systemd_or_external_delivery": false
+    }
+  },
+  "SDK_free_actual_UID_SQLite_WAL_lease_and_filesystem_status_probe": {
+    "passed": 6,
+    "cases": [
+      "actual_private_UID_absent_status_is_explicit_and_never_creates_a_journal",
+      "actual_SQLite_WAL_snapshot_selects_exact_credential_epoch_and_account_budget_without_mutation_reset_or_foreign_status",
+      "actual_kernel_profile_lease_does_not_block_read_only_status_or_require_service_stop",
+      "malformed_private_status_is_refused_without_returning_or_repairing_its_payload",
+      "actual_kernel_database_and_WAL_permissions_are_checked_without_automatic_custody_repair",
+      "actual_hardlink_and_symlink_status_paths_are_refused_and_preserved"
+    ],
+    "actual_UID_SQLite_WAL_kernel_lease_and_filesystem": true,
+    "optional_Google_SDK_or_Hermes_imported": false,
+    "foreign_Root_agent_and_supplementary_Root_group_denied_before_optional_imports": true
+  },
+  "actual_Tk_account_pairing_and_recorded_status_controls": {
+    "desktop": {
+      "passed": 9,
+      "cases": [
+        "actual_Tk_requires_exact_account_and_separate_publisher_consent_and_clears_masked_private_JSON_before_async_Root_call",
+        "actual_Tk_saved_service_identity_reuse_is_explicit_and_does_not_return_or_reenter_its_private_JSON",
+        "actual_async_Tk_edits_invalidate_confirmation_and_late_previous_account_response_without_overwriting_new_input",
+        "actual_Tk_HTTP_requires_bounded_port_and_explicit_listener_choice_then_reads_only_selected_PEM_paths_inside_Root_backend_action",
+        "actual_Tk_pairing_freezes_exact_saved_app_user_space_thread_rights_and_separate_media_consents_without_test_message",
+        "actual_Tk_route_edit_clears_previous_whole_space_and_media_permissions_and_confirmation",
+        "actual_Tk_recorded_native_status_shows_auth_refusal_and_retry_budget_without_claiming_live_connection_or_reusing_private_input",
+        "actual_Tk_status_rejects_unexpected_private_fields_before_rendering",
+        "actual_Wizard_constructs_complete_scrollable_account_pairing_OAuth_file_and_recovery_page_at_current_screen_size"
+      ],
+      "screen": [
+        1440,
+        1000
+      ],
+      "actual_Tk_and_Wizard_async_controls": true,
+      "privileged_backend_and_TLS_file_reads_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_external_delivery_or_public_acceptance": false
+    },
+    "compact": {
+      "passed": 9,
+      "cases": [
+        "actual_Tk_requires_exact_account_and_separate_publisher_consent_and_clears_masked_private_JSON_before_async_Root_call",
+        "actual_Tk_saved_service_identity_reuse_is_explicit_and_does_not_return_or_reenter_its_private_JSON",
+        "actual_async_Tk_edits_invalidate_confirmation_and_late_previous_account_response_without_overwriting_new_input",
+        "actual_Tk_HTTP_requires_bounded_port_and_explicit_listener_choice_then_reads_only_selected_PEM_paths_inside_Root_backend_action",
+        "actual_Tk_pairing_freezes_exact_saved_app_user_space_thread_rights_and_separate_media_consents_without_test_message",
+        "actual_Tk_route_edit_clears_previous_whole_space_and_media_permissions_and_confirmation",
+        "actual_Tk_recorded_native_status_shows_auth_refusal_and_retry_budget_without_claiming_live_connection_or_reusing_private_input",
+        "actual_Tk_status_rejects_unexpected_private_fields_before_rendering",
+        "actual_Wizard_constructs_complete_scrollable_account_pairing_OAuth_file_and_recovery_page_at_current_screen_size"
+      ],
+      "screen": [
+        390,
+        640
+      ],
+      "actual_Tk_and_Wizard_async_controls": true,
+      "privileged_backend_and_TLS_file_reads_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_external_delivery_or_public_acceptance": false
+    }
+  },
+  "status_is_recorded_only_not_live_verification": true,
+  "keys_not_passed_to_status_worker_no_network_or_auth_budget_changes": true,
+  "accepted_complete_gateway_count": 15,
+  "not_claimed": [
+    "live Google account entitlement or external delivery",
+    "installed GUI or systemd/OS acceptance",
+    "full Google CI acceptance: jobs queued at time of checkpoint",
+    "artifact release"
+  ]
+}

@@ -45,7 +45,7 @@ def private_store(path: Path) -> MissionStore:
 def unresolved(store: MissionStore, after: int = 0) -> dict:
     if type(after) is not int or after < 0:
         raise ValueError("after must be a nonnegative cursor")
-    rows = store.db.execute("""SELECT o.rowid AS cursor,o.id,o.state,o.attempt,o.content,r.mission_id
+    rows = store.db.execute("""SELECT o.rowid AS cursor,o.id,o.state,o.attempt,o.content,o.error,r.mission_id
         FROM gateway_outbox o JOIN gateway_routes r ON r.id=o.route_id
         WHERE o.state IN ('sending','uncertain','failed') AND o.rowid>? ORDER BY o.rowid LIMIT 100""", (after,)).fetchall()
     deliveries = []
@@ -59,6 +59,8 @@ def unresolved(store: MissionStore, after: int = 0) -> dict:
         deliveries.append({"cursor": row["cursor"], "delivery_id": row["id"], "mission_id": row["mission_id"],
                            "state": row["state"], "attempt": row["attempt"],
                            "content_sha256": hashlib.sha256(row["content"].encode()).hexdigest()})
+        if row['error'] in {'media-export-unavailable','media-export-or-format-refused','controller-event-context-damaged'}:
+            deliveries[-1]['reason']=row['error']
     return {"deliveries": deliveries, "next_cursor": rows[-1]["cursor"] if rows else after}
 
 
@@ -75,9 +77,8 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             or type(request["confirmed_not_delivered"]) is not bool):
         raise ValueError("invalid owner inspection evidence")
     receipt = request["receipt"]
-    # The supported Telegram/Discord adapters return numeric remote message IDs.
     if decision == "delivered":
-        if not isinstance(receipt, str) or not re.fullmatch(r"[1-9][0-9]{0,31}", receipt):
+        if not isinstance(receipt, str) or not 1<=len(receipt)<=255:
             raise ValueError("delivered requires the inspected remote message ID")
         if request["confirmed_not_delivered"]:
             raise ValueError("contradictory owner evidence")
@@ -100,6 +101,23 @@ def reconcile(store: MissionStore, policy: GatewayPolicy, request: dict) -> dict
             binding = policy.current_binding(dict(row))
             if "read" not in binding["capabilities"]:
                 raise PermissionError("gateway result delivery is no longer authorized")
+        if decision=='delivered':
+            platform=policy.connectors[binding['connector']]['platform']
+            pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if platform=='slack' else
+                r'[1-9][0-9]{0,31}' if platform in {'telegram','discord'} else
+                r'[a-z0-9]{26}' if platform=='mattermost' else
+                r'haos_[0-9a-f]{32}' if platform=='homeassistant' else
+                r'irc_echo_[0-9a-f]{64}' if platform=='irc' else
+                r'line_push_[0-9a-f]{64}' if platform=='line' else
+                r'sms_push_[0-9a-f]{64}' if platform=='sms' else
+                r'smtp_accept_[0-9a-f]{64}' if platform=='email' else
+                r'om_[A-Za-z0-9]{16,64}' if platform=='feishu' else
+                r'haos-dingtalk-[0-9a-f]{64}' if platform=='dingtalk' else
+                r'[A-Za-z0-9_-]{1,64}' if platform=='ntfy' else None)
+            from .gateway_matrix_policy import opaque
+            valid=opaque(receipt,'$') if platform=='matrix' else pattern is not None and re.fullmatch(pattern,receipt)
+            if not valid:
+                raise ValueError('inspected receipt does not match its approved gateway platform')
         if decision == "retry" and attempt >= 5:
             raise Conflict("delivery retry budget exhausted")
         state = {"delivered": "delivered", "retry": "pending", "discard": "revoked"}[decision]
@@ -125,12 +143,28 @@ def main():
     data = json.loads(raw)
     if not isinstance(data, dict) or set(data) != {"action", "policy", "params"} or not isinstance(data["params"], dict):
         raise ValueError("invalid owner recovery request")
-    policy = GatewayPolicy(data["policy"])
+    if any(row.get('platform')=='feishu' for row in data['policy'].get('connectors',[])):
+        from .gateway_feishu import PreparedFeishuPolicy
+        policy=PreparedFeishuPolicy(data['policy'])
+    elif any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
+        from .gateway_email import PreparedEmailPolicy
+        policy=PreparedEmailPolicy(data['policy'])
+    else:policy=GatewayPolicy(data['policy'])
     store = private_store(DATABASE)
     try:
         GatewayEngine(store)
         if data["action"] == "deliveries" and set(data["params"]) == {"after"}:
             result = unresolved(store, data["params"]["after"])
+        elif data['action']=='media-list' and data['params']=={}:
+            result=GatewayEngine(store).media.inventory()
+        elif data['action']=='purge-media':
+            request=data['params']
+            if (set(request)!={'ids','owner_uid','note_sha256','confirmed'} or type(request['owner_uid']) is not int
+                    or request['owner_uid']<0 or not isinstance(request['note_sha256'],str)
+                    or not re.fullmatch('[0-9a-f]{64}',request['note_sha256'])):
+                raise ValueError('exact owner media decision required')
+            result=GatewayEngine(store).media.purge(request['ids'],f"owner:{request['owner_uid']}",
+                'inspection sha256:'+request['note_sha256'],confirmed=request['confirmed'])
         elif data["action"] == "reconcile-delivery":
             result = reconcile(store, policy, data["params"])
         else:

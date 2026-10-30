@@ -1,0 +1,46 @@
+{
+  "base_commit": "253f2d3c843772faa37b86122a8fdd70c6e88591",
+  "actual_loopback_http_native_decoder_and_sqlite_transport_cases": 19,
+  "prepared_native_ingress_regression_cases": 24,
+  "public_ntfy_enabled": false,
+  "reviewed_public_text_gateway_paths": 5,
+  "full_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "minimal_tests": {
+    "passed": 1118,
+    "existing_skips": 2
+  },
+  "root_gateway_regression_cases_passed_at_base": 44,
+  "external_subscription_or_publish_accepted": false,
+  "live_tls_account_accepted": false,
+  "installed_boot_or_release_accepted": false,
+  "local_exclusion": "unchanged root-only test_backup.py; mandatory CI unchanged",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_ntfy.py",
+      "sha256": "d30b00d34e32571a09833203b7cc10d59997feb56d0340515f1fa418922af5e9"
+    },
+    {
+      "path": "linux/haos/haos/gateway_ntfy_transport.py",
+      "sha256": "4b292f90cb6ff2e2195027398f8b4bdd7d9cce8359deefff99a33407175e6213"
+    },
+    {
+      "path": "linux/haos/runtime/probe_ntfy_transport.py",
+      "sha256": "d706afe0c93ddd0321ed5f71c46df75c8cc8458e0277183c608795ea2be112eb"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "203e21b0776241cc3b7171959f870be004784fc7cc0969b3642415dfb3775dd0"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "3c26b20ab5f1ffbc90a6659d250fb62297cdb323aba2dc70a94fe47331b139cf"
+    },
+    {
+      "path": "docs/HERMES-RUNTIME.md",
+      "sha256": "1bdbcaf885edffc5cab48129ef2a200d17b52f74640448146e241985d612ea3c"
+    }
+  ]
+}

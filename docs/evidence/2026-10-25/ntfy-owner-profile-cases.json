@@ -1,0 +1,33 @@
+{
+  "passed": 23,
+  "cases": [
+    "prepared_factory_does_not_connect_or_send_before_explicit_start",
+    "actual_flock_refuses_duplicate_live_topic_profile",
+    "native_identity_home_and_kernel_lease_are_private",
+    "disconnected_profile_has_no_native_send_authority",
+    "actual_private_lifecycle_stream_native_capture_and_relay_commit",
+    "connected_profile_sends_actual_native_reply_only_under_exact_retained_route",
+    "profile_refuses_forged_scope_thread_metadata_and_grant_without_http",
+    "disconnect_closes_real_stream_publisher_and_workers",
+    "same_profile_reconnect_preserves_cursor_and_native_admission_idempotence",
+    "reconnect_replaces_closed_publisher_with_new_guarded_native_send",
+    "concurrent_profile_close_releases_one_kernel_lease_without_deleting_state",
+    "fresh_factory_reuses_profile_and_persisted_cursor_without_duplicate_relay",
+    "real_401_survives_restart_and_stops_automatic_credential_retry",
+    "explicit_owner_auth_recheck_reuses_same_credentials_and_cursor_without_regrant_or_duplicate_input",
+    "explicit_credential_rotation_reuses_private_profile_and_preserves_existing_receipts",
+    "actual_native_basic_auth_ingress_redacts_raw_and_encoded_credentials_before_relay",
+    "owner_revocation_stops_native_profile_health_and_reply_authority",
+    "actual_native_factory_and_status_never_write_unrelated_process_global_home",
+    "private_factory_refuses_unbounded_or_ambiguous_credential_configuration",
+    "symlink_and_hardlinked_profile_leases_are_refused_without_touching_neighbor",
+    "group_readable_private_profile_is_refused",
+    "symlink_parent_is_refused_before_any_native_import_or_network",
+    "private_factory_cannot_bypass_independent_owner_policy"
+  ],
+  "actual_native_factory_http_sqlite_and_flock": true,
+  "loopback_target_replacement_only_in_fixture": true,
+  "public_gateway_enabled": true,
+  "external_subscription_or_delivery_accepted": false,
+  "installed_service_or_boot_accepted": false
+}

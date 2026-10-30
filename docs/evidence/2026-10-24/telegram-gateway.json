@@ -1,0 +1,14 @@
+{
+  "telegram": {
+    "native_adapter_constructed": true,
+    "native_event_contract": true,
+    "connected": false,
+    "external_delivery_tested": false
+  },
+  "discord": {
+    "native_adapter_constructed": true,
+    "native_event_contract": true,
+    "connected": false,
+    "external_delivery_tested": false
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "recorded_UTC": "2026-10-30T17:11:11.434643+00:00",
+  "base_commit": "642e1eadb843f3547382b1c82c185947bff883f2",
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-google-chat-contracts.yml",
+      "sha256": "482560fe6fa5ffeba7939562f33c63648e2aac46a8c2ae95a5f488829fa4c7dd"
+    },
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "a9682bfc6121300d9d36b0491d1ec8869e8e4462a44ebb64aa77997c5e03b08c"
+    },
+    {
+      "path": "linux/haos/haos/gateway_setup.py",
+      "sha256": "a19b6aa4167fc7071fdea0582f143e9cb7a0c7f49d78a8b380cf70561a921b8b"
+    },
+    {
+      "path": "linux/haos/haos/initial_setup_gui.py",
+      "sha256": "490d33a72ffe3f7876764c936c66a44d99e60ce4ffca874468bf2cc7b5dfe0a7"
+    },
+    {
+      "path": "linux/haos/haos/owner.py",
+      "sha256": "e37aa4c3fe903880433d660abeafcb8e7b9f819454852057aa6a09c3245f0317"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_cli.py",
+      "sha256": "e3827289ee5d5a5d5215c8caa9a64ca9913382bfb0117b8730490dc8db5bd43e"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_gui.py",
+      "sha256": "98bf2a78af44208fcd19bd126aa2ac47a346ef03c2afaf99bd9ff279c9c8791b"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_retired_gui.py",
+      "sha256": "673d56d105bcd6166916054e06a7fc707c8476c8cff441d7c5b6cf7b53d20014"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_retired_cli.py",
+      "sha256": "0e4d3ed4f64dd2e4723baf5a4def99d81d1ba614d83db1879fdfd31dc84c420b"
+    }
+  ],
+  "minimal_no_Hermes_source": {
+    "passed": 2958,
+    "existing_skips": 2
+  },
+  "frozen_Hermes_source": {
+    "passed": 2958,
+    "existing_skips": 2
+  },
+  "actual_root_kernel": {
+    "passed": 173,
+    "new_skips_or_kernel_mocks": false
+  },
+  "Owner_CLI_contracts": 11,
+  "actual_Tk_probes": {
+    "desktop": {
+      "passed": 11,
+      "cases": [
+        "actual_Tk_known_and_unknown_app_profiles_are_distinct_and_selection_requires_fresh_metadata",
+        "actual_Tk_tokens_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_quarantines_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_unassociated-outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_active_original_grant_blocks_local_byte_disposal",
+        "actual_Tk_profile_change_clears_old_snapshot_and_consent_before_any_withdrawal",
+        "actual_async_Tk_discards_slow_metadata_after_profile_change",
+        "actual_Tk_closed_metadata_schema_rejects_private_payload_before_rendering",
+        "actual_Tk_rejects_decision_receipt_for_a_different_token",
+        "actual_Wizard_history_page_constructs_real_recovery_controls_and_return_navigation_without_active_connector"
+      ],
+      "screen": [
+        1440,
+        1000
+      ],
+      "actual_Tk_component_async_queue_and_read_only_details": true,
+      "privileged_backend_responses_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_or_public_activation": false
+    },
+    "compact": {
+      "passed": 11,
+      "cases": [
+        "actual_Tk_known_and_unknown_app_profiles_are_distinct_and_selection_requires_fresh_metadata",
+        "actual_Tk_tokens_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_quarantines_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_unassociated-outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_active_original_grant_blocks_local_byte_disposal",
+        "actual_Tk_profile_change_clears_old_snapshot_and_consent_before_any_withdrawal",
+        "actual_async_Tk_discards_slow_metadata_after_profile_change",
+        "actual_Tk_closed_metadata_schema_rejects_private_payload_before_rendering",
+        "actual_Tk_rejects_decision_receipt_for_a_different_token",
+        "actual_Wizard_history_page_constructs_real_recovery_controls_and_return_navigation_without_active_connector"
+      ],
+      "screen": [
+        390,
+        640
+      ],
+      "actual_Tk_component_async_queue_and_read_only_details": true,
+      "privileged_backend_responses_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_or_public_activation": false
+    }
+  },
+  "public_gateway_count": 15,
+  "no_live_Google_external_delivery_installed_GUI_or_public_activation": true,
+  "corrected_before_commit": "Kernel rerun found misplaced CLI dispatch in persist (NameError); moved it into owner_gateway, added dispatch/root-gate regression. Both full environments and actual kernel gates then passed."
+}

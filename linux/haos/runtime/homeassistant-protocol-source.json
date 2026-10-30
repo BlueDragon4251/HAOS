@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/home-assistant/core",
+  "commit": "9eb964b8b95fddc61ec4841277fbce7ce32dc586",
+  "purpose": "Read-only protocol reference for native persistent notification verification; no runtime code vendored",
+  "paths": [
+    "homeassistant/components/persistent_notification/__init__.py",
+    "homeassistant/components/persistent_notification/helpers.py",
+    "homeassistant/components/persistent_notification/services.py",
+    "homeassistant/components/persistent_notification/const.py"
+  ],
+  "create_service": "persistent_notification/create",
+  "witness_command": "persistent_notification/get",
+  "witness_result": "list of notification_id, message, title, created_at objects",
+  "audience": "Shared instance notifications; the read command has no per-recipient filter",
+  "live_server_compatibility_accepted": false
+}

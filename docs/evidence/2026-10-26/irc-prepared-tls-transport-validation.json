@@ -1,0 +1,68 @@
+{
+  "parent_commit": "0a9ff2a397afc63249750051950029a18928fbbc",
+  "source_files": [
+    {
+      "path": "linux/haos/haos/gateway_irc_transport.py",
+      "sha256": "3990679833cdc13077464c2148df61ca2c460678a7262df484c3a75073513eb3"
+    },
+    {
+      "path": "linux/haos/runtime/probe_irc_transport.py",
+      "sha256": "44535c8701b71ba6156de939c9162e40859d588d54bb24f56806c584e36037fc"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_irc_ingress.py",
+      "sha256": "8b16a7255fe1bbc21dfbd47e613ac2cbc981cf41e39803bc882bae54ca24efd2"
+    },
+    {
+      "path": ".github/workflows/haos-provider-contracts.yml",
+      "sha256": "e8cb858a3a2d4fde331f21eaeab6723867eee8fc61ae4f3b7ffc1ea0ef918d4e"
+    },
+    {
+      "path": "linux/haos/build-runtime.sh",
+      "sha256": "6b6e56c0ef69620f1d6639ce2a924eeca0e5715994e88a14f5c18391fbb9d0d9"
+    }
+  ],
+  "fixture": {
+    "passed": 30,
+    "cases": [
+      "actual_verified_tls_multiline_cap_negotiation_join_keepalive_and_native_account_admission",
+      "raw_and_native_standalone_send_remain_denied_before_outbox_implementation",
+      "owner_withdrawal_closes_idle_actual_tls_subscription_without_new_remote_input",
+      "actual_tls_early_registration_never_admits_messages",
+      "actual_tls_no_account_capability_never_admits_messages",
+      "actual_tls_eof_never_admits_messages",
+      "actual_tls_oversized_never_admits_messages",
+      "actual_tls_bad_utf8_never_admits_messages",
+      "actual_tls_incomplete_frame_never_admits_messages",
+      "actual_tls_timeout_never_admits_messages",
+      "actual_tls_cap_nak_never_admits_messages",
+      "actual_tls_partial_ack_never_admits_messages",
+      "actual_tls_changed_nickname_never_admits_messages",
+      "actual_tls_wrong_join_never_admits_messages",
+      "actual_tls_cap_loss_closes_confirmed_subscription",
+      "actual_tls_live_eof_closes_confirmed_subscription",
+      "actual_tls_kick_closes_confirmed_subscription",
+      "actual_tls_part_closes_confirmed_subscription",
+      "actual_tls_nick_change_closes_confirmed_subscription",
+      "private_server_password_crosses_only_verified_tls_and_is_absent_from_fixture_log",
+      "live_private_server_mutation_revokes_actual_tls_connection",
+      "live_private_port_mutation_revokes_actual_tls_connection",
+      "live_private_channel_mutation_revokes_actual_tls_connection",
+      "live_private_use_tls_mutation_revokes_actual_tls_connection",
+      "live_private_server_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickserv_password_mutation_revokes_actual_tls_connection",
+      "live_private_nickname_mutation_revokes_actual_tls_connection",
+      "real_tls_hostname_mismatch_refused_before_irc_credentials_or_frames",
+      "real_tls_untrusted_ca_refused_before_irc_credentials_or_frames",
+      "native_plaintext_configuration_refused_before_connection"
+    ],
+    "actual_local_tls_ircv3_and_pinned_native_codec": true,
+    "fixture_only_loopback_destination_and_disposable_ca": true,
+    "public_gateway_enabled": false,
+    "live_server_account_nickserv_sasl_delivery_or_installed_acceptance": false
+  },
+  "full_and_minimal_python311": "1228 passed, 2 existing skips",
+  "local_root_only_backup_exclusion_unchanged": true,
+  "external_server_or_account_accepted": false,
+  "public_gateway_enabled": false
+}

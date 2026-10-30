@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-30",
+  "source_commit": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+  "source_tree": "4fee2f83e4b8eeb3da7802019ffab39c7d39a9bb",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 41055319036,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055319020,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055319093,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055319062,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "CI",
+      "status": "completed"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41055319076,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "in_progress"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055319037,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "Arch package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055319047,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055308857,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS native Buzz gateway contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41055308884,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS prepared Google Chat contracts",
+      "status": "completed"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 41055308924,
+      "headSha": "9b54bcfa40e4e8d6cbe96d9a2efe15b8c44ea1a8",
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "in_progress"
+    }
+  ],
+  "pending_preserved": true,
+  "scope": "GitHub status API only; exact source; no downloaded job logs or artifacts"
+}
