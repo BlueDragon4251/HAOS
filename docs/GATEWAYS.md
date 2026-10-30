@@ -54,3 +54,5 @@ Its owner GUI provides a no-send app check and one-shot untrusted ID observation
 before explicit pairing. See [DingTalk setup and evidence](GATEWAY-DINGTALK.md).
 Software/fixture completion does not establish a live account, external delivery,
 subscription permissions or installed/hardware acceptance.
+
+The next A2A work remains private/unregistered; see [A2A implementation boundaries](GATEWAY-A2A.md). Its actual native/SQLite/TLS fixtures do not advance the public count.

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 
 def material(value,*,verify=True,webhook_path='/line/webhook'):
-    if webhook_path not in {'/line/webhook','/webhooks/twilio','/feishu/webhook'}:raise ValueError('reviewed webhook TLS path required')
+    if webhook_path not in {'/line/webhook','/webhooks/twilio','/feishu/webhook','/a2a'}:raise ValueError('reviewed webhook TLS path required')
     required={'public_url','certificate','private_key','bind_host','public_listener'}
     if not isinstance(value,dict) or set(value)!=required:raise ValueError('exact LINE HTTPS material and listener consent required')
     if (not isinstance(value['bind_host'],str) or value['bind_host'] not in {'127.0.0.1','0.0.0.0','::'} or type(value['public_listener']) is not bool
