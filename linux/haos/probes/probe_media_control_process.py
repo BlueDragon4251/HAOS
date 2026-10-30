@@ -23,13 +23,19 @@ def main():
         'id':'owner','connector':'line','sender':'U'+'a'*32,'chat':'U'+'a'*32,'scope':'U'+'d'*32,
         'thread':'','identity':'personal','capabilities':['create','read'],'allow_media':True,'generation':'b'*64,'since':1}]}
     platform=os.environ.get('HAOS_MEDIA_CONTROL_PLATFORM','line')
-    if platform not in {'line','email'}:raise ValueError('reviewed private media peer fixture platform required')
+    if platform not in {'line','email','dingtalk'}:raise ValueError('reviewed private media peer fixture platform required')
     if platform=='email':
         sys.path.insert(0,'/usr/lib/haos')
         from haos.gateway_email import scope
         binding=config['bindings'][0];binding.update(connector='email',sender='owner@example.invalid',chat='owner@example.invalid',
             scope=scope({'address':'haos@example.invalid','imap_host':'imap.example.invalid','imap_port':993}))
         config['connectors']=[{'id':'email','platform':'email'}]
+    if platform=='dingtalk':
+        sys.path.insert(0,'/usr/lib/haos')
+        from haos.gateway_dingtalk import scope
+        binding=config['bindings'][0];binding.update(connector='dingtalk',sender='$:LWCP_v1:$opaque-owner',
+            chat='cidExactConversation/+=',scope=scope({'client_id':'ding_fixture_app','corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot'}))
+        config['connectors']=[{'id':'dingtalk','platform':'dingtalk'}]
     def publish():
         tmp=root/'policy.next';tmp.write_text(json.dumps(config));os.chown(tmp,0,65532);tmp.chmod(0o640);tmp.replace(policy)
     publish()
@@ -49,7 +55,8 @@ async def run():
         store=MissionStore(Path(request['database']));controller=Controller(store,'unused-private-origin',set())
         controller.gateway_uids={65534}
         from haos.gateway_email import PreparedEmailPolicy
-        controller.gateway_policy=lambda:(PreparedEmailPolicy if request['platform']=='email' else GatewayPolicy)(trusted_json(Path(request['policy'])))
+        from haos.gateway_dingtalk import PreparedDingTalkPolicy
+        controller.gateway_policy=lambda:(PreparedDingTalkPolicy if request['platform']=='dingtalk' else PreparedEmailPolicy if request['platform']=='email' else GatewayPolicy)(trusted_json(Path(request['policy'])))
         async def incoming(reader,writer):await controller.client(reader,writer,gateway=True)
         stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
         server=await asyncio.start_unix_server(incoming,path=request['socket'],limit=MAX_FRAME)
@@ -148,7 +155,7 @@ asyncio.run(run())
         assert database.stat().st_uid==65532 and database.stat().st_mode&0o077==0
         print(json.dumps({'passed':len(cases),'cases':cases,'actual_uids':[0,65532,65533,65534],
             'actual_kernel_so_peercred':True,'socket_filesystem_permission_is_not_the_negative_gate':True,
-            'gateway_platform':platform,'prepared_email_policy_is_fixture':platform=='email',
+            'gateway_platform':platform,'prepared_email_policy_is_fixture':platform=='email','prepared_dingtalk_policy_is_fixture':platform=='dingtalk',
             'optional_hermes_sdk_imported':False,'external_or_installed_acceptance':False},indent=2))
     finally:
         if server.poll() is None:

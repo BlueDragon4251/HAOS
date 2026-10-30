@@ -58,7 +58,7 @@ def main():
     redactor = Redactor([value['client_secret']]); handler = logging.StreamHandler()
     handler.setFormatter(SafeFormatter(redactor)); logging.basicConfig(level=logging.WARNING, handlers=[handler], force=True)
     result = {'state': 'rejected', 'error': 'authority-or-protocol-refused', 'retry_after': 0}
-    boundary = None
+    boundary = None;robot_started=False
     try:
         from importlib.metadata import version
         if ({name: version(name) for name in ('dingtalk-stream', 'alibabacloud-dingtalk', 'alibabacloud-tea-openapi')}
@@ -80,6 +80,7 @@ def main():
                     def approved_robot():
                         if specification(value,policy(),request['connector'],request['reply'],redactor)!=blueprint:
                             raise PermissionError('DingTalk stable reply intent changed')
+                    robot_started=True
                     result=asyncio.run(invoke(adapter,blueprint,approved_robot,redactor))
                     sys.stdout.write(json.dumps(result)+'\n');sys.stdout.flush();return
                 exact = wire_target(adapter, blueprint)
@@ -98,7 +99,7 @@ def main():
         result = {'state': 'uncertain'} if boundary is not None and boundary.write_started else {
             'state': 'rejected', 'error': 'expired-session', 'retry_after': 0}
     except Exception:
-        if boundary is not None and boundary.write_started:
+        if robot_started or boundary is not None and boundary.write_started:
             result = {'state': 'uncertain'}
     # Never return a native SDK random UUID as a remote message ID, or leak an
     # exception string, bearer URL, app secret, callback body or HTTP response.

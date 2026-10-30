@@ -27,6 +27,8 @@ def main():
     assert hashlib.sha256(audio.read_bytes()).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
     public_audio=Path('/public-audio');public_audio.mkdir(mode=0o755)
     reference=public_audio/'reference.flac';reference.write_bytes(audio.read_bytes());reference.chmod(0o644)
+    fixture_code=public_audio/'video_fixture.py'
+    fixture_code.write_bytes(Path('/repo/linux/haos/runtime/video_fixture.py').read_bytes());fixture_code.chmod(0o644)
     with tempfile.TemporaryDirectory(prefix='haos-speech-process-') as directory:
         root=Path(directory);root.chmod(0o755)
         models=Path('/var/lib/haos-speech-models');models.mkdir(mode=0o755)
@@ -123,10 +125,15 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             with wave.open(source,'wb') as target:
                 target.setnchannels(1);target.setsampwidth(2);target.setframerate(16000);target.writeframes(random.Random(17).randbytes(90*16000*2))
             data=source.getvalue()
+        if request['mode']=='thumbnail':
+            sys.path.insert(0,'/public-audio')
+            from video_fixture import movie
+            data=movie()
         params={'data':base64.b64encode(data).decode(),'sha256':hashlib.sha256(data).hexdigest()}
         if request['mode']=='extra':params['path']='/owner/private'
         if request['mode'] in {'opus','opus-long'}:params['operation']='opus'
         if request['mode'] in {'amr','amr-long'}:params['operation']='amr'
+        if request['mode']=='thumbnail':params['operation']='thumbnail'
         peer.sendall(json.dumps(params).encode()+b'\n')
         if request['mode']=='disconnect':
             import time
@@ -150,11 +157,17 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             assert encoded['samples']==(90*16000 if request['mode']=='amr-long' else 176000)
             assert duration_samples(encoded['data'])==encoded['encoded_samples']
             if request['mode']=='amr-long':assert len(json.dumps(result))>96*1024
+        elif request['mode']=='thumbnail':
+            from haos.media_thumbnail import result as verify
+            assert result['ok'] is True
+            preview=verify(result['result'],params['sha256'])
+            assert preview['width']==320 and preview['height']==180 and preview['duration_ms']==1000
+            assert len(json.dumps(result))>96*1024
         else:
             assert result['ok'] is True and result['result']['source_sha256']==params['sha256']
             assert 'ask not what your country can do for you' in result['result']['transcript'].lower()
 """
-            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal'),(65532,'normal'),(65534,'opus'),(65532,'opus'),(65534,'opus-long'),(65534,'amr'),(65532,'amr'),(65534,'amr-long')]:
+            for uid,mode in [(0,'denied'),(65533,'denied'),(65534,'extra'),(65534,'normal'),(65532,'normal'),(65534,'opus'),(65532,'opus'),(65534,'opus-long'),(65534,'amr'),(65532,'amr'),(65534,'amr-long'),(65534,'thumbnail'),(65532,'thumbnail')]:
                 client=subprocess.run([sys.executable,'-s','-c',client_code],input=json.dumps({'socket':str(endpoint),'mode':mode}),
                     text=True,capture_output=True,timeout=50,user=uid,group=uid,extra_groups=[],env=env)
                 assert client.returncode==0,client.stderr[-2000:]
@@ -197,7 +210,7 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
             checked_client="""
 import asyncio,hashlib,sys
 from pathlib import Path
-from haos.speech_client import transcribe,opus,amr
+from haos.speech_client import transcribe,opus,amr,thumbnail
 async def main():
     data=Path('/public-audio/reference.flac').read_bytes();checks=[]
     def current():checks.append(True)
@@ -207,13 +220,17 @@ async def main():
     encoded=await opus(data,current);assert encoded['source_sha256']==hashlib.sha256(data).hexdigest() and encoded['samples']==176000
     encoded_amr=await amr(data,current)
     assert encoded_amr['source_sha256']==hashlib.sha256(data).hexdigest() and encoded_amr['encoded_samples']==176320
+    sys.path.insert(0,'/public-audio')
+    from video_fixture import movie
+    video=movie();preview=await thumbnail(video,current)
+    assert preview['source_sha256']==hashlib.sha256(video).hexdigest() and preview['duration_ms']==1000
     count=[0]
     def withdrawn():
         count[0]+=1
         if count[0]>3:raise PermissionError('fixture owner grant withdrawn')
-    for operation in (transcribe,opus,amr):
+    for operation,payload in ((transcribe,data),(opus,data),(amr,data),(thumbnail,video)):
         count[0]=0
-        try:await operation(data,withdrawn)
+        try:await operation(payload,withdrawn)
         except PermissionError:pass
         else:raise AssertionError('withdrawn local audio operation returned a result')
 asyncio.run(main())
@@ -234,7 +251,7 @@ asyncio.run(main())
         from speech_owner_fixture import exercise as owner_exercise
         owner_cases=owner_exercise()
         receipt=json.loads(result.stdout)
-        print(json.dumps({'passed':11+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
+        print(json.dumps({'passed':13+len(owner_cases),'cases':['actual_pinned_hermes_whisper_transcription_under_separate_uid',
             'actual_kernel_owner_provider_gateway_canaries_unreadable_to_speech_identity',
             'actual_container_network_disabled_and_reviewed_model_bytes_used_offline',
             'actual_socket_activated_private_rpc_validates_nss_config_fd_and_so_peercred_before_frame_despite_world_connectable_fixture_socket',
@@ -244,8 +261,10 @@ asyncio.run(main())
             'actual_gateway_and_controller_UID_Opus_conversion_uses_separate_credential_free_worker_and_checked_receipt',
             'actual_90_second_Opus_reply_exceeds_text_reply_limit_and_preserves_duration_without_truncation',
             'actual_gateway_and_controller_UID_AMR_NB_conversion_uses_separate_credential_free_worker_checked_duration_and_owner_revocation',
-            'actual_90_second_AMR_reply_exceeds_text_reply_limit_without_truncation_or_unbounded_source']+owner_cases,
-            'native_receipt':receipt,'actual_uid':65530,'owner_service_control_is_fixture':True,'external_stt_account_or_line_voice_acceptance':False},indent=2))
+            'actual_90_second_AMR_reply_exceeds_text_reply_limit_without_truncation_or_unbounded_source',
+            'actual_gateway_and_controller_UID_MP4_preview_runs_in_credential_free_worker_with_source_bound_PNG_dimensions_and_duration',
+            'actual_checked_thumbnail_client_preserves_long_binary_reply_and_revocation_kills_worker']+owner_cases,
+            'native_receipt':receipt,'actual_uid':65530,'owner_service_control_is_fixture':True,'external_stt_account_or_line_voice_acceptance':False,'live_gateway_video_playback_or_installed_acceptance':False},indent=2))
 
 
 if __name__=='__main__':main()

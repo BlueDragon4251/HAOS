@@ -24,14 +24,11 @@ class Reply(Operation):
                 or not isinstance(payload,dict)):
             raise PermissionError('reviewed stable Robot reply endpoint required')
         fields={'msgKey','msgParam','robotCode'}|({'openConversationId'} if address.path.endswith('/groupMessages/send') else {'userIds'})
-        if set(payload)!=fields or payload['robotCode']!=owner.value['robot_code'] or payload['msgKey']!='sampleMarkdown':
+        if set(payload)!=fields or payload['robotCode']!=owner.value['robot_code']:
             raise PermissionError('exact native Robot sender and message format required')
         if not isinstance(payload['msgParam'],str) or not 1<=len(payload['msgParam'].encode())<=64000:
             raise PermissionError('bounded native Robot reply content required')
-        params=json.loads(payload['msgParam'],object_pairs_hook=_object,parse_constant=finite)
-        if (not isinstance(params,dict) or set(params)!={'title','text'} or params['title']!='Hermes'
-                or not isinstance(params['text'],str) or not params['text'].strip()
-                or owner.redactor.clean(params)!=params):raise PermissionError('private credential or unreviewed reply content refused')
+        self.validate_payload(owner,payload)
         from .gateway_dingtalk import identity
         if 'openConversationId' in payload:identity(payload['openConversationId'])
         elif not isinstance(payload['userIds'],list) or len(payload['userIds'])!=1:raise PermissionError('one approved direct-bot recipient required')
@@ -39,6 +36,12 @@ class Reply(Operation):
         self.owner=owner;self.token=token;self.target=deepcopy(target);self.path=address.path;self.current=current
         self.used=False;self.write_started=False;self.state='not-dispatched';self.error='';self.retry_after=0
         self.acceptance_id=None;self.query_key=None;self.client=None;self.check()
+
+    def validate_payload(self,owner,payload):
+        params=json.loads(payload['msgParam'],object_pairs_hook=_object,parse_constant=finite)
+        if (payload['msgKey']!='sampleMarkdown' or not isinstance(params,dict) or set(params)!={'title','text'} or params['title']!='Hermes'
+                or not isinstance(params['text'],str) or not params['text'].strip()
+                or owner.redactor.clean(params)!=params):raise PermissionError('private credential or unreviewed reply content refused')
 
     def check(self):
         self.current();self.owner.current()
@@ -101,7 +104,7 @@ class Reply(Operation):
             self.client.cookies.clear();await self.client.aclose();self.client=None
 
 
-async def invoke(adapter,blueprint,current,redactor):
+async def invoke(adapter,blueprint,current,redactor,*,media=None):
     from .gateway_dingtalk_send import wire_target
     from .gateway_dingtalk_http import sdk_scope,QuietLogger
     from .gateway_dingtalk_tea import sdk_scope as robot_scope
@@ -113,7 +116,11 @@ async def invoke(adapter,blueprint,current,redactor):
         with sdk_scope(),owner.operation('token',adapter._stream_client):token=await native.DingTalkAdapter._get_access_token(adapter)
         if token is None or token not in owner.tokens:
             return {'state':'rejected','error':owner.failure or 'transport-unavailable','retry_after':owner.retry_after}
-        operation=Reply(owner,token,wire_target(adapter,blueprint),current);payload=operation.target['payload']
+        if media is None:operation=Reply(owner,token,wire_target(adapter,blueprint),current)
+        else:
+            from .gateway_dingtalk_media_reply import MediaReply,wire_target as media_target
+            operation=MediaReply(owner,token,media_target(adapter,blueprint,media),current,media)
+        payload=operation.target['payload']
         try:
             with robot_scope(operation):
                 if blueprint['robot_route']=='group':

@@ -58,33 +58,41 @@ def sdk_scope(operation):
         finally:_ACTIVE.reset(context);native.requests=previous
 
 
+def verify_bytes(item,data,redactor):
+    from .redaction import Redactor
+    if not isinstance(redactor,Redactor):raise PermissionError('private sealed-output redaction required')
+    item=target(item)
+    if (not isinstance(data,bytes) or len(data)!=item['size']
+            or hashlib.sha256(data).hexdigest()!=item['sha256']
+            or any(secret.encode() in data for secret in redactor.secrets)):
+        raise PermissionError('immutable sealed output bytes without private credentials required')
+    kind=item['kind']
+    if kind in {'image','video'}:
+        meta=describe(data,kind)
+        if (kind=='image' and item['mime']!='image/'+meta['format']
+                or kind=='video' and meta['format']!='mp4'):
+            raise PermissionError('native upload format differs from original bytes')
+    if kind=='voice':
+        from .audio_amr import duration_samples
+        from .speech import MAX_SAMPLES
+        if duration_samples(data)>MAX_SAMPLES+320:raise PermissionError('bounded native Robot AMR duration required')
+    if kind=='file':
+        extension=item['name'].rsplit('.',1)[1]
+        signatures={'pdf':(b'%PDF-',),'doc':(bytes.fromhex('d0cf11e0a1b11ae1'),),
+            'zip':(b'PK\x03\x04',b'PK\x05\x06'),'docx':(b'PK\x03\x04',),'xlsx':(b'PK\x03\x04',),
+            'rar':(b'Rar!\x1a\x07\x00',b'Rar!\x1a\x07\x01\x00')}
+        if not data.startswith(signatures[extension]):
+            raise PermissionError('native Robot document format differs from sealed bytes')
+    return item
+
+
 class Upload:
     def __init__(self,owner,token,item,data,current):
         if (not isinstance(owner,TokenBoundary) or not isinstance(token,str) or token not in owner.tokens
                 or not callable(current)):
             raise PermissionError('observed private token and current upload authority required')
         self.owner=owner;self.token=token;self.target=target(item);self.data=data;self.current=current
-        if (not isinstance(data,bytes) or len(data)!=self.target['size']
-                or hashlib.sha256(data).hexdigest()!=self.target['sha256']
-                or any(secret.encode() in data for secret in owner.redactor.secrets)):
-            raise PermissionError('immutable sealed output bytes without private credentials required')
-        kind=self.target['kind']
-        if kind in {'image','video'}:
-            meta=describe(data,kind)
-            if (kind=='image' and self.target['mime']!='image/'+meta['format']
-                    or kind=='video' and meta['format']!='mp4'):
-                raise PermissionError('native upload format differs from original bytes')
-        if kind=='voice':
-            from .audio_amr import duration_samples
-            from .speech import MAX_SAMPLES
-            if duration_samples(data)>MAX_SAMPLES+320:raise PermissionError('bounded native Robot AMR duration required')
-        if kind=='file':
-            extension=self.target['name'].rsplit('.',1)[1]
-            signatures={'pdf':(b'%PDF-',),'doc':(bytes.fromhex('d0cf11e0a1b11ae1'),),
-                'zip':(b'PK\x03\x04',b'PK\x05\x06'),'docx':(b'PK\x03\x04',),'xlsx':(b'PK\x03\x04',),
-                'rar':(b'Rar!\x1a\x07\x00',b'Rar!\x1a\x07\x01\x00')}
-            if not data.startswith(signatures[extension]):
-                raise PermissionError('native Robot document format differs from sealed bytes')
+        self.target=verify_bytes(item,data,owner.redactor)
         self.used=False;self.write_started=False;self.state='not-dispatched';self.error='';self.retry_after=0
         self.media_id=None;self.created_at=None;self.session=None;self.check()
 

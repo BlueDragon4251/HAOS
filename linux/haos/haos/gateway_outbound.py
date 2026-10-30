@@ -45,7 +45,7 @@ def marked(content):
 
 def approved(policy,row):
     binding=policy.current_binding(dict(row))
-    if (policy.connectors.get(binding['connector'],{}).get('platform') not in {'line','sms','email','feishu'}
+    if (policy.connectors.get(binding['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk'}
             or binding.get('allow_outbound_media') is not True or 'read' not in binding['capabilities']
             or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('separate current output-file/read approval required')

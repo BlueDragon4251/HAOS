@@ -76,7 +76,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None, dingtalk_context=None):
+    if platform=='dingtalk':
+        if not isinstance(dingtalk_context,dict) or set(dingtalk_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('DingTalk requires a private profile and exact independent owner authority')
+        from .gateway_dingtalk_profile import build
+        return build(credentials,**dingtalk_context)
     if platform=='feishu':
         if not isinstance(feishu_context,dict) or set(feishu_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('Feishu requires a private profile and exact independent owner authority')
@@ -186,10 +191,16 @@ def credential_redactor(credentials, policy):
     """Register private wire aliases before SDK logging or durable admission."""
     import base64
     secrets=[item[key] for item in credentials['connectors'].values()
-        for key in ('token','app_token','recovery_key','server_password','channel_password','nickserv_password','sasl_password','channel_secret','channel_access_token','auth_token','password') if item.get(key)]
+        for key in ('token','app_token','recovery_key','server_password','channel_password','nickserv_password','sasl_password','channel_secret','channel_access_token','auth_token','password','client_secret') if item.get(key)]
     for name,item in credentials['connectors'].items():
         if policy.connectors[name]['platform'] in {'line','sms'} and 'tls' in item:
             secrets.append(item['tls']['private_key'])
+        if policy.connectors[name]['platform']=='dingtalk':
+            values={item['client_secret']}
+            for _ in range(2):
+                values|={json.dumps(value,ensure_ascii=ascii)[1:-1] for value in tuple(values) for ascii in (True,False)}
+                values|={repr(value)[1:-1] for value in tuple(values)}
+            secrets.extend(values)
         if policy.connectors[name]['platform']=='feishu':
             secrets.extend(item.get(key,'') for key in ('app_secret','verification_token','encrypt_key'))
             if 'tls' in item:secrets.append(item['tls']['private_key'])
@@ -215,8 +226,8 @@ def delivery_metadata(delivery,platform):
         'haos_binding':{key:delivery[key] for key in ('binding_id','binding_digest')}}
     if delivery['thread']:metadata['thread_id']=delivery['thread']
     if delivery['scope'] and platform=='slack':metadata['slack_team_id']=delivery['scope']
-    if platform in {'homeassistant','irc','line','sms','email','feishu'}:metadata['haos_delivery_id']=delivery['id']
-    if platform in {'irc','line','sms','email','feishu'}:metadata['haos_delivery_attempt']=delivery['attempt']
+    if platform in {'homeassistant','irc','line','sms','email','feishu','dingtalk'}:metadata['haos_delivery_id']=delivery['id']
+    if platform in {'irc','line','sms','email','feishu','dingtalk'}:metadata['haos_delivery_attempt']=delivery['attempt']
     return metadata
 
 
@@ -248,7 +259,7 @@ async def serve():
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
     media_cache=None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email','feishu'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
         from .gateway_media_relay import MediaCache
@@ -269,12 +280,12 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
-        if connector['platform'] in {'homeassistant','irc','line','sms','email','feishu'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
+        if connector['platform'] in {'homeassistant','irc','line','sms','email','feishu','dingtalk'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
             logging.warning('Gateway connector remains inactive until exact owner pairing')
             continue
         context=None
-        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email','feishu'}:
-            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform'] in {'email','feishu'} else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
+        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk'}:
+            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform'] in {'email','feishu','dingtalk'} else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
         adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})
             if context else build_adapter(connector["platform"], credentials["connectors"][connector["id"]]))
@@ -381,7 +392,7 @@ async def serve():
                         metadata=delivery_metadata(delivery,policy.connectors[delivery['connector']]['platform'])
                         preparing=True
                         try:
-                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms','email','feishu'}:
+                            if policy.connectors[delivery['connector']]['platform'] in {'line','sms','email','feishu','dingtalk'}:
                                 output=await getattr(adapter,'_haos_'+policy.connectors[delivery['connector']]['platform']+'_output').prepare(delivery,call)
                                 if output is not None:metadata['haos_output']=output
                             preparing=False

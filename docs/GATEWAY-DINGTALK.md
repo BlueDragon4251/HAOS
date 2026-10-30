@@ -148,11 +148,10 @@ are assigned only to loopback inside a fresh network-none namespace. There is no
 external interface or Internet delivery. Wave/PDF/video fixtures verify private
 byte transport and consent, not speech recognition, playback or document decoding.
 
-Still required before public activation: shared controller mission acceptance, outgoing media and local voice
-paths, owner configuration of the private stable-reply mode, owner account/per-write
-and resource recovery/management,
-source management and complete owner setup/GUI. These private transport pieces
-must be connected to the independent shared mission and management boundaries.
+Public activation still requires the complete authenticated owner setup/GUI,
+resource/per-part recovery management and final shared-runtime acceptance. The
+private controller artifact, media-message and local codec connections are now
+covered by the additional contracts below.
 
 Local codec, SDK/TLS and private process fixtures have distinct boundaries.
 Loopback API substitutions, temporary fixture CA trust, supplied owner policy
@@ -248,7 +247,51 @@ reference. Gateway/controller Unix peers, socket trust, revocation, disconnect
 cleanup and long binary replies are exercised by the extended real-UID speech
 probe. These codec/RPC checks do not claim DingTalk delivery or device playback.
 
-Uploads and AMR conversion still require their per-part durable parent ledger,
-controller artifact handoff and actual Robot media-message connection before
-outgoing media is complete. Public registry/GUI activation remains gated on that
-work and the remaining owner/controller integration.
+Those standalone upload/AMR contracts preceded their parent batch journal,
+artifact handoff and Robot media-message connection. The following stage now
+connects those pieces; public owner/GUI activation remains gated separately.
+
+The private shared runtime factory now constructs the actual DingTalk profile
+with exact parent/connector/policy/inbox context. Delivery metadata, credential
+redaction and sealed-output preparation are connected without public registry
+activation. The independent controller export gate also admits explicitly
+prepared DingTalk policies; unknown or ordinary unsupported policies remain
+refused.
+
+Prepared output reads only the authenticated Hermes artifact API for exact
+marked files in a completed source session. The controller retains its first
+snapshot even if the agent later changes a file. Gateway preparation verifies
+bounded chunks and hashes, scans private material before conversion, preserves
+PNG/JPEG bytes, retains native AMR voice bytes, and builds a deterministic ZIP
+for formats outside the Robot document templates. No agent host path is opened
+by the gateway. MP4 uses a source-bound PNG preview from the existing separate
+credential-free local service, with duration/dimension/aspect checks and fixed
+native codecs. Voice/video messages require their separate approvals. Codec
+outputs retain their first committed bytes and are not regenerated after a
+purged or damaged cache entry.
+
+Before any caption/upload, the entire ordered batch and caption are committed as
+one immutable FULL-journal manifest. Each upload and media message has its own
+source/grant/account/part-bound intent and hashed private receipt. Confirmed
+parts are reused across attempts; writing/uncertain parts cannot implicitly
+repeat after cancellation, crash, disconnect or restart. Explicit native rate
+waits persist, and an authentication block cannot erase a prior rate deadline.
+SQLite-full while recording acceptance leaves the part uncertain. The original
+batch cannot become ordinary text or lose/add files, change caption, or replace
+bytes during recovery. Native media queue acceptance is recorded only as a local
+proof, never a remote message ID or recipient-read claim.
+
+Explicit disconnect/close now publishes its stop intent before waiting for the
+profile's lifecycle lock, so a pending write cannot delay its own withdrawal.
+Connection epochs and an irreversible closing latch prevent an older queued
+connect from reviving a later stop. Actual UID/TLS process cases test both stop
+operations for session, Robot direct and Robot group replies.
+
+The controller-artifact probe uses a real authenticated pinned Hermes backend,
+but completed sessions and connected transport are fixtures; its speech RPC
+substitution runs the actual native codec. Separate actual-UID socket tests
+exercise the real credential-free codec service. The continuous media process
+probe uses the actual shared factory, WSS pre-ACK custody, native handler, private
+byte upload and Robot media-message workers, FULL batch/part journals, replay,
+revocation and process lifetime guards. Its already-prepared output bytes remain
+fixtures, so it does not claim a real agent result or provider inference.

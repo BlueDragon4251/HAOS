@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 from types import MethodType, SimpleNamespace
 
-from .gateway import GatewayPolicy, digest
+from .gateway import GatewayPolicy, digest, Conflict
 from .gateway_dingtalk import credentials, scope as account_scope, authority
 from .gateway_dingtalk_cache import RawEvents
 from .gateway_dingtalk_ingress import install, capture, dispatch_stored
@@ -66,7 +66,8 @@ def build(value, *, parent, connector, policy, inbox):
         adapter._haos_dingtalk_value = value; adapter._haos_dingtalk_home = home
         adapter._haos_dingtalk_environment = environment; adapter._haos_dingtalk_closed = False
         def current():
-            if adapter._haos_dingtalk_closed:
+            if (adapter._haos_dingtalk_closed or getattr(adapter,'_haos_dingtalk_stop_requested',False)
+                    or getattr(adapter,'_haos_dingtalk_closing',False)):
                 raise PermissionError('private DingTalk profile closed')
             pinned()
             if (adapter._client_id != value['client_id'] or adapter._client_secret != value['client_secret']
@@ -87,12 +88,19 @@ def _lifecycle(adapter, lease, identity):
     current = adapter._haos_dingtalk_check; lifecycle = asyncio.Lock()
     adapter._haos_dingtalk_socket = None; adapter._haos_dingtalk_task = None
     adapter._haos_dingtalk_live = False
+    adapter._haos_dingtalk_stop_requested=False;adapter._haos_dingtalk_stop_epoch=0;adapter._haos_dingtalk_closing=False
     from .gateway_dingtalk_delivery import Publisher
     from .gateway_dingtalk_send import MAX_TEXT
     adapter.MAX_MESSAGE_LENGTH = MAX_TEXT
     adapter._haos_dingtalk_publisher = Publisher(adapter) if any(
         row['connector'] == native.connector and 'read' in row['capabilities']
         for row in native.policy().bindings.values()) else None
+    from .gateway_dingtalk_output import Output
+    adapter._haos_dingtalk_output=Output(adapter) if adapter._haos_dingtalk_publisher is not None else None
+    from .gateway_dingtalk_media_delivery import MediaPublisher
+    adapter._haos_dingtalk_media_publisher=MediaPublisher(adapter) if (adapter._haos_dingtalk_publisher is not None
+        and value.get('reply_mode','session')=='robot' and any(row['connector']==native.connector and row.get('allow_outbound_media') is True
+            for row in native.policy().bindings.values())) else None
     credential_scope = digest([native.connector, value])
     db.execute('''CREATE TABLE IF NOT EXISTS dingtalk_profile_status(
         identity TEXT PRIMARY KEY, connector TEXT NOT NULL, credential_scope TEXT NOT NULL,
@@ -166,14 +174,19 @@ def _lifecycle(adapter, lease, identity):
                         status('storage-unavailable')
                 await asyncio.sleep(.2)
         except PermissionError:
-            status('revoked')
+            status('closed' if adapter._haos_dingtalk_closing else 'disconnected' if adapter._haos_dingtalk_stop_requested else 'revoked')
             async with lifecycle:
                 await stop()
     async def connect(self, **_kwargs):
+        requested_epoch=self._haos_dingtalk_stop_epoch
         async with lifecycle:
-            if self._haos_dingtalk_closed:
+            if self._haos_dingtalk_closed or self._haos_dingtalk_closing:
                 raise PermissionError('private DingTalk profile closed')
-            await stop(); current()
+            if self._haos_dingtalk_stop_epoch!=requested_epoch:return False
+            self._haos_dingtalk_stop_requested=False
+            await stop()
+            if self._haos_dingtalk_stop_epoch!=requested_epoch:return False
+            current()
             if not callable(getattr(self, '_haos_ingress', None)):
                 raise PermissionError('private durable DingTalk handler required before connection')
             row = health(self)
@@ -191,16 +204,21 @@ def _lifecycle(adapter, lease, identity):
                 socket = self._haos_dingtalk_socket; kind = socket.failure if socket is not None else None
                 await stop(); failure(kind); return False
     async def disconnect(self):
+        self._haos_dingtalk_stop_requested=True;self._haos_dingtalk_stop_epoch+=1;self._haos_dingtalk_live=False
         async with lifecycle:
             await stop()
             row = health(self)
             if row['status'] not in BLOCKS | {'revoked', 'rate-limited', 'closed'} and row['next_attempt'] <= time.time():
                 status('disconnected')
     async def close(self):
+        self._haos_dingtalk_closing=True;self._haos_dingtalk_stop_requested=True
+        self._haos_dingtalk_stop_epoch+=1;self._haos_dingtalk_live=False
         async with lifecycle:
             if self._haos_dingtalk_closed:
                 return
             self._haos_dingtalk_closed = True; await stop()
+            if self._haos_dingtalk_media_publisher is not None:
+                await self._haos_dingtalk_media_publisher.close()
             if self._haos_dingtalk_publisher is not None:
                 await self._haos_dingtalk_publisher.close()
             self._haos_dingtalk_raw.close(); os.close(lease)
@@ -216,10 +234,18 @@ def _lifecycle(adapter, lease, identity):
             binding = native.policy().current_binding(metadata['haos_binding'])
             prepared = metadata.get('haos_output')
             if prepared is not None:
-                if (not isinstance(prepared, dict) or set(prepared) != {'items', 'text'}
-                        or prepared['items'] != [] or not isinstance(prepared['text'], str)):
-                    raise PermissionError('DingTalk outbound media has no connected private capability')
-                content = prepared['text']
+                if (not isinstance(prepared,dict) or set(prepared)!={'items','text'}
+                        or not isinstance(prepared['items'],list) or not isinstance(prepared['text'],str)):
+                    raise ValueError('exact private prepared DingTalk output batch required')
+                if prepared['items']:
+                    if self._haos_dingtalk_media_publisher is None:
+                        raise PermissionError('separate Robot-mode output/read approval required')
+                    return await self._haos_dingtalk_media_publisher.send(binding,metadata.get('haos_delivery_id'),
+                        metadata.get('haos_delivery_attempt'),reply_to,prepared,current)
+                content=prepared['text']
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dingtalk_output_manifests'").fetchone():
+                if db.execute('SELECT 1 FROM dingtalk_output_manifests WHERE delivery_id=?',(metadata.get('haos_delivery_id'),)).fetchone():
+                    raise Conflict('replay requires the complete original sealed media batch')
             return await self._haos_dingtalk_publisher.send(binding, metadata.get('haos_delivery_id'),
                 metadata.get('haos_delivery_attempt'), content, reply_to, current)
     adapter.connect = MethodType(connect, adapter); adapter.disconnect = MethodType(disconnect, adapter)

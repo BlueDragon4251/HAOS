@@ -122,6 +122,8 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_dingtalk_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-reply.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_upload.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-upload.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_robot_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_media_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_output.py linux/haos upstream/hermes-agent/.venv/bin/hermes "$RUNNER_TEMP/provider-contracts/dingtalk-output.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-native-admission.json"
@@ -207,6 +209,7 @@ jobs:
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_feishu_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/feishu-voice.json"
           "$PYTHON" linux/haos/runtime/probe_audio_opus.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-opus.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_audio_amr.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-amr.json"
+          "$PYTHON" linux/haos/runtime/probe_media_thumbnail.py linux/haos "$RUNNER_TEMP/provider-contracts/media-thumbnail.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail
@@ -237,6 +240,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
           cat "$RUNNER_TEMP/provider-contracts/email-media-kernel-peers.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 512m -v "$PWD:/repo:ro" \
+            -v "$PWD/linux/haos/probes/probe_media_control_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_MEDIA_CONTROL=1 -e HAOS_MEDIA_CONTROL_PLATFORM=dingtalk \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-kernel-peers.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-kernel-peers.json"
       - name: Verify LINE owner CLI publication private PEM and actual UID denial
         run: |
           set -euo pipefail
@@ -400,6 +410,20 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply-worker-process.json"
           cat "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_media_reply_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_MEDIA_REPLY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_media_delivery_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_MEDIA_DELIVERY_PROCESS=1 -e HAOS_DINGTALK_REPLY_MODE=robot \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-media-delivery-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-media-delivery-worker-process.json"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
             -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \

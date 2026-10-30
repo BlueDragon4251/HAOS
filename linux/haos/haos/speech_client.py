@@ -48,11 +48,16 @@ async def amr(data,current):
     return await _exchange(data,current,operation='amr')
 
 
+async def thumbnail(data,current):
+    return await _exchange(data,current,operation='thumbnail')
+
+
 async def _exchange(data,current,operation=None):
     if not isinstance(data,bytes) or not 1<=len(data)<=MAX_AUDIO_BYTES or not callable(current):
         raise SpeechRefused('bounded approved audio bytes required')
     from .audio_opus import MAX_REPLY as OPUS_REPLY
-    reply_limit=OPUS_REPLY if operation in {'opus','amr'} else 96*1024
+    from .media_thumbnail import MAX_REPLY as THUMBNAIL_REPLY
+    reply_limit=THUMBNAIL_REPLY if operation=='thumbnail' else OPUS_REPLY if operation in {'opus','amr'} else 96*1024
     current();trusted_endpoint()
     checksum=hashlib.sha256(data).hexdigest()
     async def exchange():
@@ -78,6 +83,9 @@ async def _exchange(data,current,operation=None):
             if operation=='amr':
                 from .audio_amr import result as encoded_result
                 return encoded_result(reply['result'],checksum)
+            if operation=='thumbnail':
+                from .media_thumbnail import result as preview_result
+                return preview_result(reply['result'],checksum)
             return result(reply['result'],checksum)
         finally:
             writer.close()

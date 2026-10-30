@@ -1,0 +1,56 @@
+{
+  "source_commit": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+  "source_tree": "ebc32fa01905683be0c8f28724b6c64ea2030a68",
+  "recorded_at": "2026-10-30 01:04:11 UTC",
+  "runs": [
+    {
+      "id": 40979832167,
+      "name": "Arch package",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979832167"
+    },
+    {
+      "id": 40979832193,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979832193"
+    },
+    {
+      "id": 40979832176,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979832176"
+    },
+    {
+      "id": 40979832248,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979832248"
+    },
+    {
+      "id": 40979832199,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979832199"
+    },
+    {
+      "id": 40979827336,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5e37900d194f0e62367dd4c3325885438f57b9c8",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40979827336"
+    }
+  ],
+  "scope": "All six runs successful on this exact earlier source; not CI evidence for subsequent upload/media work or live gateway acceptance."
+}
