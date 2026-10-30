@@ -195,3 +195,26 @@ connection loss and withdrawal after a possible write remain uncertain. The
 existing durable per-write journal prevents implicit resend. Expired or absent
 session URLs do not prevent an explicitly approved Robot-mode write, and do not
 cause any session fallback. No public registry or GUI activation is implied.
+
+Private offline management now exposes finite transport/account/write inventory,
+account-authentication recheck and inspected non-delivery retry decisions through
+the unprivileged recovery worker. Clearing an authentication block preserves rate
+waits, TLS blocks and uncertain writes. Releasing a private write requires its
+exact inspected snapshot, explicit non-delivery confirmation, current read grant
+and an immutable owner/note/policy audit entry. It sends nothing and still
+requires independent controller reconciliation.
+
+Original-source inventory returns hashes and byte counts, never private payloads.
+Explicit disposal requires withdrawal/change of the original grant, a fresh
+snapshot and audited owner confirmation. It retains source proofs/tombstones;
+failed audit insertion rolls back byte removal. Repeated identical decisions are
+idempotent. Existing private path/UID/regular-file/single-link checks refuse
+symlinked or hardlinked stores. Disposal does not claim erasure of WAL remnants,
+other ledgers, controller/agent copies or backups. These low-level functions are
+not yet a completed public GUI or authenticated stopped-service owner flow.
+
+Nine additional actual UID/chroot/SQLite recovery cases exercise real gateway
+account dispatch with and without a ledger, root/agent denial, retained waits,
+uncertain-write release and grant-withdrawn source disposal. They run without
+Hermes source or optional SDK imports. Their policies and retained source bodies
+are fixtures, not live callback authentication or installed-owner acceptance.

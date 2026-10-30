@@ -1,0 +1,78 @@
+{
+  "parent_commit": "334cd88427862f6bbceb33a64d5a1f528e3c530d",
+  "recorded_at": "2026-10-30T00:18:09.547974+00:00",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-DINGTALK.md",
+      "sha256": "b5a74efa9f4c5c24f456c165396b6abef90656cc7aafbd53b79c87f11870d5a8"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_recovery.py",
+      "sha256": "1658425b19d0065b2cf2a8adf5eeaafcb1e8a68fcf00f40c6a2ec0c364fee0d2"
+    },
+    {
+      "path": "linux/haos/haos/gateway_dingtalk_source_recovery.py",
+      "sha256": "33e60c414be8da1de1fa276c0cc89bb505ea6fd8d83e172b00118efe09ed6823"
+    },
+    {
+      "path": "linux/haos/haos/gateway_raw_recovery.py",
+      "sha256": "ff1622daa647b1bb96a0eeec99dab3a04599b083f7713dae9f27750bde305998"
+    },
+    {
+      "path": "linux/haos/probes/test_gateway_recovery_authority.py",
+      "sha256": "48a31c7d81f2bd54a0ce4104cc10bada7e685debda7c14f47e8274ca54d25931"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_recovery.py",
+      "sha256": "c6046ff18dacd167fd03b590983778ded46c9055df2ad1f5cf852fc09d3da07c"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_dingtalk_source_recovery.py",
+      "sha256": "be0fc802d37e938599b36695d5c3e936f316e98414eaf9d3d6039b25add6b3d9"
+    }
+  ],
+  "validation": {
+    "minimal": {
+      "passed": 2272,
+      "existing_skips": 2,
+      "log_sha256": "e615243b398f695d355729adca7125fe5d2dfbe58ae601c0bf40f8a221d3e87a"
+    },
+    "full": {
+      "passed": 2272,
+      "existing_skips": 2,
+      "log_sha256": "d96a3fa62f9363dc0b1e46cbeef4ed0212858dec99a9ee01984fe02c958ddb0d"
+    },
+    "root": {
+      "passed": 159,
+      "existing_skips": 0,
+      "log_sha256": "aed61909004c3bdf624b3bff9989aa49ec34dca19917ecdadf8b220fbb299c1d"
+    },
+    "actual_SQLite_source_and_delivery_contracts": {
+      "passed": 23,
+      "scope": "Synthetic retained approval metadata; real SQLite transactions and audit rollback. No source authentication claim."
+    }
+  },
+  "actual_UID_recovery_cases": {
+    "added": 9,
+    "UIDs": [
+      0,
+      65533,
+      65534
+    ],
+    "actual_kernel_chroot_and_SQLite": true,
+    "optional_Hermes_SDK_imports": false,
+    "policies_sources_and_owner_UID_are_fixtures": true
+  },
+  "implementation": [
+    "Finite private transport/account/write inspection without raw private data.",
+    "Audited snapshot-bound non-delivery retry approval; controller reconciliation remains mandatory.",
+    "Account-auth recheck preserves TLS blocks, rate waits and uncertain writes.",
+    "Original bytes disposal requires grant withdrawal and fresh owner inspection; immutable source proofs remain."
+  ],
+  "limits": [
+    "DingTalk remains private; public gateway count remains 12/22.",
+    "Full owner authentication/quiescence/GUI wiring remains pending.",
+    "No network send, live provider account, installed-system, hardware, mission or release acceptance.",
+    "Local minimal/full runs exclude test_backup.py; actual root suite exercises it."
+  ]
+}

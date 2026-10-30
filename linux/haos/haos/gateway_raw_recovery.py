@@ -158,13 +158,25 @@ def unresolved(inbox, after=0):
                     or any(type(row[k]) not in {int,float} or not math.isfinite(row[k]) or row[k]<0 for k in ['updated_at','next_attempt'])):
                 raise Conflict('damaged Feishu profile status')
             transport.append({**row,'platform':'feishu','external_delivery_verified':False})
+    if inbox.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dingtalk_profile_status'").fetchone():
+        from .gateway_dingtalk_profile import STATES as dingtalk_states
+        import math
+        for record in inbox.db.execute('SELECT connector,status,updated_at,next_attempt FROM dingtalk_profile_status ORDER BY updated_at DESC LIMIT 64'):
+            row=dict(record)
+            if (not isinstance(row['connector'],str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['connector'])
+                    or row['status'] not in dingtalk_states
+                    or any(type(row[k]) not in {int,float} or not math.isfinite(row[k]) or row[k]<0 for k in ['updated_at','next_attempt'])):
+                raise Conflict('damaged DingTalk profile status')
+            transport.append({**row,'platform':'dingtalk','external_delivery_verified':False})
     from .gateway_line_recovery import outgoing as line_outgoing
     from .gateway_email_recovery import outgoing as email_outgoing,transport as email_transport,mailboxes
     transport.extend(email_transport(inbox))
     from .gateway_feishu_recovery import outgoing as feishu_outgoing,accounts as feishu_accounts
     from .gateway_feishu_media_recovery import outgoing as feishu_media_outgoing
+    from .gateway_dingtalk_recovery import outgoing as dingtalk_outgoing,accounts as dingtalk_accounts
+    private_accounts=dingtalk_accounts(inbox)
     accounts=feishu_accounts(inbox)
-    return {**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
+    return {**({'dingtalk_accounts':private_accounts} if private_accounts else {}),**({'feishu_accounts':accounts} if accounts else {}),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox)+dingtalk_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 
@@ -302,13 +314,23 @@ def main():
     data = json.loads(raw)
     if not isinstance(data,dict) or set(data) != {'action','policy','params'} or not isinstance(data['params'],dict):
         raise ValueError('invalid ingress recovery request')
-    if any(row.get('platform')=='feishu' for row in data['policy'].get('connectors',[])):
+    if any(row.get('platform')=='dingtalk' for row in data['policy'].get('connectors',[])):
+        from .gateway_dingtalk import PreparedDingTalkPolicy
+        policy=PreparedDingTalkPolicy(data['policy'])
+    elif any(row.get('platform')=='feishu' for row in data['policy'].get('connectors',[])):
         from .gateway_feishu import PreparedFeishuPolicy
         policy=PreparedFeishuPolicy(data['policy'])
     elif any(row.get('platform')=='email' for row in data['policy'].get('connectors',[])):
         from .gateway_email import PreparedEmailPolicy
         policy=PreparedEmailPolicy(data['policy'])
     else:policy=GatewayPolicy(data['policy'])
+    if data['action']=='dingtalk-sources':
+        if set(data['params'])!={'profile','kind'}:raise ValueError('exact private DingTalk source selectors required')
+        from .gateway_dingtalk_source_recovery import sources
+        print(json.dumps(sources(policy,**data['params'])));return
+    if data['action']=='purge-dingtalk-source':
+        from .gateway_dingtalk_source_recovery import purge
+        print(json.dumps(purge(policy,data['params'])));return
     if data['action']=='feishu-sources':
         if set(data['params'])!={'profile','kind'}:raise ValueError('exact private Feishu source selectors required')
         from .gateway_feishu_source_recovery import sources
@@ -318,12 +340,13 @@ def main():
         print(json.dumps(purge(policy,data['params'])));return
     try:DATABASE.lstat()
     except FileNotFoundError:
-        if data['action']=='retry-feishu-auth':
+        if data['action'] in {'retry-feishu-auth','retry-dingtalk-auth'}:
             params=data['params']
             if set(params)!={'connector','owner_uid','note_sha256','credential_scope','account_scope'} or any(
                     not isinstance(params[k],str) or not re.fullmatch('[0-9a-f]{64}',params[k]) for k in ['credential_scope','account_scope']):
                 raise ValueError('exact current private Feishu account recheck required')
-            connector=_recheck_connector(policy,{k:params[k] for k in ['connector','owner_uid','note_sha256']},'feishu')
+            platform='dingtalk' if data['action']=='retry-dingtalk-auth' else 'feishu'
+            connector=_recheck_connector(policy,{k:params[k] for k in ['connector','owner_uid','note_sha256']},platform)
             print(json.dumps({'connector':connector,'authentication_blocks_cleared':0,'network_requested':False,'native_journal_created':False}));return
         if data['action']=='media-cache' and data['params']=={}:
             print(json.dumps({'uploads':[],'stored_bytes':0,'reserved_bytes':0,'limit_bytes':64*1024*1024,'limit_records':128,'native_journal_created':False}))
@@ -371,6 +394,12 @@ def main():
         elif data['action']=='purge-email-source':
             from .gateway_email_recovery import purge_source
             result=purge_source(inbox,policy,data['params'])
+        elif data['action']=='retry-dingtalk-auth':
+            from .gateway_dingtalk_recovery import retry_auth
+            result=retry_auth(inbox,policy,data['params'])
+        elif data['action']=='approve-dingtalk-retry':
+            from .gateway_dingtalk_recovery import approve_retry
+            result=approve_retry(inbox,policy,data['params'])
         elif data['action']=='retry-feishu-auth':
             from .gateway_feishu_recovery import retry_auth
             result=retry_auth(inbox,policy,data['params'])

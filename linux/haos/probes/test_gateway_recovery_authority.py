@@ -946,3 +946,138 @@ assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
         assert released==([(operation,0)] if uid==65534 else [])
         if uid==65534:assert db.execute('SELECT owner_uid FROM feishu_media_owner_events').fetchone()[0]==1000
     finally:db.close()
+
+
+@pytest.mark.parametrize('journal_exists',[False,True])
+@pytest.mark.parametrize('service_uid',[0,65533,65534])
+def test_dingtalk_recovery_worker_uses_actual_UID_and_stored_account_without_Hermes_imports(uid_fixture_path,journal_exists,service_uid):
+    import sqlite3
+    from types import SimpleNamespace
+    from haos.gateway import digest
+    from haos.gateway_dingtalk import scope
+    from haos.gateway_dingtalk_delivery import Publisher
+    from haos.gateway_dingtalk_recovery import outgoing
+    root=uid_fixture_path;root.chmod(0o755)
+    (root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    state=root/'var/lib/haos-gateway';state.mkdir(parents=True,mode=0o700)
+    database=state/'native-inbox.db'
+    account={'client_id':'ding_fixture_app','client_secret':'private-dingtalk-recovery-fixture',
+        'corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot','reply_mode':'robot'}
+    binding={'id':'owner','connector':'dingtalk','sender':'$:LWCP_v1:$opaque-owner','chat':'cidExactConversation/+=',
+        'scope':scope(account),'thread':'','identity':'personal','capabilities':['create','read'],
+        'generation':'a'*64,'since':123,'require_mention':True}
+    config={'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[binding]}
+    credential_scope=digest(['dingtalk',account])
+    account_scope=digest([account[k] for k in ['client_id','client_secret','corp_id','robot_code']])
+    snapshot=None
+    if journal_exists:
+        inbox=NativeInbox(database,Redactor())
+        Publisher(SimpleNamespace(_haos_native=SimpleNamespace(connector='dingtalk',inbox=inbox),_haos_dingtalk_value=account))
+        inbox.db.execute('CREATE TABLE dingtalk_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)')
+        inbox.db.execute('INSERT INTO dingtalk_profile_status VALUES(?,?,?,?,?,?)',('fixture','dingtalk',credential_scope,'authentication-refused',123,9999999999))
+        inbox.db.execute("UPDATE dingtalk_delivery_backoff SET status='authentication-refused',next_attempt=9999999999")
+        inbox.db.execute('INSERT INTO dingtalk_delivery_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
+            ('a'*64,1,'dingtalk',credential_scope,'b'*64,'uncertain','','',123,123))
+        snapshot=outgoing(inbox)[0]['snapshot_sha256'];inbox.close()
+    os.chown(state,65534,65534)
+    for path in state.iterdir():path.chmod(0o600);os.chown(path,65534,65534)
+    code='''
+import os,pwd,sys
+from haos import gateway_raw_recovery,gateway_dingtalk,gateway_dingtalk_recovery
+pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1',
+        'PYTHONPATH':str(Path(__file__).resolve().parents[1])}
+    def action(name,params):
+        return subprocess.run([sys.executable,'-c',code,str(root),str(service_uid)],
+            input=json.dumps({'action':name,'policy':config,'params':params}),text=True,capture_output=True,timeout=15,env=env)
+    checked=action('retry-dingtalk-auth',{'connector':'dingtalk','credential_scope':credential_scope,
+        'account_scope':account_scope,'owner_uid':1000,'note_sha256':'e'*64})
+    if service_uid!=65534:
+        assert checked.returncode!=0 and not checked.stdout
+    else:
+        assert checked.returncode==0,checked.stderr
+        result=json.loads(checked.stdout)
+        assert result['network_requested'] is False and result['authentication_blocks_cleared']==(2 if journal_exists else 0)
+        if journal_exists:
+            request={'connector':'dingtalk','delivery_id':'a'*64,'attempt':1,'snapshot_sha256':snapshot,
+                'owner_uid':1000,'note_sha256':'f'*64,'confirmed':True,'confirmed_not_delivered':True}
+            released=action('approve-dingtalk-retry',request)
+            assert released.returncode==0,released.stderr
+            assert json.loads(released.stdout)['controller_reconciliation_still_required'] is True
+            assert action('approve-dingtalk-retry',request).stdout==released.stdout
+    if not journal_exists:assert not database.exists()
+    else:
+        with sqlite3.connect(database) as db:
+            assert db.execute('SELECT state FROM dingtalk_delivery_intents').fetchone()[0]==('owner-retry-approved' if service_uid==65534 else 'uncertain')
+            assert db.execute('SELECT status,next_attempt FROM dingtalk_profile_status').fetchone()==('created' if service_uid==65534 else 'authentication-refused',9999999999)
+            assert db.execute('SELECT next_attempt FROM dingtalk_delivery_backoff').fetchone()[0]==9999999999
+
+
+@pytest.mark.parametrize('service_uid',[0,65533,65534])
+def test_dingtalk_source_disposal_actual_gateway_UID_requires_withdrawal_and_fresh_inspection(uid_fixture_path,service_uid):
+    import hashlib,sqlite3
+    from haos.gateway import digest
+    from haos.gateway_dingtalk import scope
+    root=uid_fixture_path;root.chmod(0o755);(root/'etc').mkdir(mode=0o755)
+    (root/'etc/passwd').write_text('root:x:0:0:root:/:/bin/false\nhaos-gateway:x:65534:65534:gateway:/:/bin/false\n')
+    account={'client_id':'ding_fixture_app','client_secret':'private-dingtalk-recovery-fixture',
+        'corp_id':'ding_fixture_corp','robot_code':'ding_fixture_robot'}
+    binding={'id':'owner','connector':'dingtalk','sender':'$:LWCP_v1:$opaque-owner','chat':'cidExactConversation/+=',
+        'scope':scope(account),'thread':'','identity':'personal','capabilities':['create','read'],
+        'generation':'a'*64,'since':123,'require_mention':True}
+    config={'version':1,'connectors':[{'id':'dingtalk','platform':'dingtalk'}],'bindings':[binding]}
+    profile='dingtalk-'+'a'*64
+    state=root/'var/lib/haos-gateway';state.mkdir(parents=True,mode=0o700)
+    parent=state/'profiles';parent.mkdir(mode=0o700);folder=parent/profile;folder.mkdir(mode=0o700)
+    database=folder/'originals.db';store=NativeInbox(database,Redactor())
+    payload=b'private retained original fixture; no authenticated live source claimed'
+    approval={'binding_id':'owner','binding_digest':digest(binding),'credential_scope':'e'*64}
+    meta=json.dumps({'approval':approval,'resources':[],'envelope_sha256':'f'*64})
+    store.db.execute('CREATE TABLE dingtalk_raw_events(id TEXT PRIMARY KEY,source_key TEXT NOT NULL UNIQUE,connector TEXT NOT NULL,binding_id TEXT NOT NULL,binding_digest TEXT NOT NULL,credential_scope TEXT NOT NULL,sha256 TEXT NOT NULL,semantic_sha256 TEXT NOT NULL,metadata TEXT NOT NULL,data BLOB NOT NULL,created_at REAL NOT NULL)')
+    store.db.execute('INSERT INTO dingtalk_raw_events VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+        ('c'*64,'d'*64,'dingtalk','owner',digest(binding),'e'*64,hashlib.sha256(payload).hexdigest(),'f'*64,meta,payload,123))
+    store.close()
+    for path in [state,parent,folder,*folder.iterdir()]:os.chown(path,65534,65534)
+    code='''
+import os,pwd,sys
+from haos import gateway_raw_recovery,gateway_dingtalk,gateway_dingtalk_source_recovery
+pwd.getpwnam('nobody')
+os.chroot(sys.argv[1]);os.chdir('/')
+os.setgroups([]);os.setgid(int(sys.argv[2]));os.setuid(int(sys.argv[2]))
+gateway_raw_recovery.main()
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+'''
+    env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])}
+    def action(name,params,policy=config):
+        return subprocess.run([sys.executable,'-c',code,str(root),str(service_uid)],
+            input=json.dumps({'action':name,'policy':policy,'params':params}),text=True,capture_output=True,timeout=15,env=env)
+    listed=action('dingtalk-sources',{'profile':profile,'kind':'original'})
+    if service_uid!=65534:assert listed.returncode!=0 and not listed.stdout
+    else:
+        assert listed.returncode==0,listed.stderr
+        report=json.loads(listed.stdout);assert report['private_bytes_returned'] is False and payload.decode() not in listed.stdout
+        item=report['sources'][0];assert not item['purge_allowed']
+        request={'profile':profile,'kind':'original','id':item['id'],'snapshot_sha256':item['snapshot_sha256'],
+            'owner_uid':1000,'note_sha256':'b'*64,'confirmed':True}
+        assert action('purge-dingtalk-source',request).returncode!=0
+        revoked={**config,'bindings':[]}
+        current=action('dingtalk-sources',{'profile':profile,'kind':'original'},revoked)
+        assert current.returncode==0,current.stderr
+        assert action('purge-dingtalk-source',request,revoked).returncode!=0
+        request['snapshot_sha256']=json.loads(current.stdout)['sources'][0]['snapshot_sha256']
+        removed=action('purge-dingtalk-source',request,revoked)
+        assert removed.returncode==0,removed.stderr
+        assert json.loads(removed.stdout)['removed_payload_bytes']==len(payload)
+        repeated=action('purge-dingtalk-source',request,revoked)
+        assert repeated.returncode==0,repeated.stderr
+        assert json.loads(repeated.stdout)['removed_payload_bytes']==0
+    with sqlite3.connect(database) as db:
+        assert db.execute('SELECT data FROM dingtalk_raw_events').fetchone()[0]==(b'' if service_uid==65534 else payload)
+        assert db.execute('SELECT COUNT(*) FROM dingtalk_raw_events').fetchone()[0]==1
+        if service_uid==65534:assert db.execute('SELECT owner_uid FROM dingtalk_source_owner_events').fetchone()[0]==1000
