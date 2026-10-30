@@ -212,6 +212,7 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter.send=MethodType(send,adapter);adapter.send_outcome=MethodType(outcome,adapter)
     adapter.connect=MethodType(connect,adapter);adapter.close_profile=MethodType(close,adapter)
     adapter._advertised_skills=MethodType(skills,adapter);adapter._haos_a2a_check=check
+    adapter._haos_a2a_source=source
     adapter._emit_terminal=MethodType(emit,adapter);adapter._sse_write=MethodType(sse,adapter)
     adapter._build_card=MethodType(card,adapter)
     check();return adapter

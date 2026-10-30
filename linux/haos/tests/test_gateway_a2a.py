@@ -34,3 +34,12 @@ def test_account_refuses_shared_or_ambiguous_peer_auth_arbitrary_plugins_and_bad
     {'capabilities':[{}]},{'capabilities':['read','read']}])
 def test_binding_requires_exact_peer_context_server_and_fresh_independent_grant(change):
     with pytest.raises(ValueError):validate_binding({**binding(),**change})
+
+
+@pytest.mark.parametrize('public_name',['agent_name','peer_name'])
+def test_public_agent_and_peer_names_cannot_reflect_private_tokens(public_name):
+    token='private_fixture_token_'+'a'*32
+    value={**account(),'peer_tokens':{'alice':token}}
+    if public_name=='agent_name':value['agent_name']=token
+    else:value['peer_tokens']={token:token}
+    with pytest.raises(ValueError,match='public A2A names'):credentials(value)

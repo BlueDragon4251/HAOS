@@ -2,7 +2,8 @@
 
 A2A remains outside the public HAOS gateway registry and owner GUI. Public
 software paths remain 13/22. These native/local contracts are not a completed
-A2A gateway, live peer, real controller mission or installed acceptance.
+A2A gateway, live peer or installed-system acceptance. Exact controller/UID
+component evidence is distinguished below from direct local parent fixtures.
 
 The pinned Hermes adapter provides a stdlib JSON-RPC HTTP server, bearer-derived
 peer identities, in-memory TaskStore, native MessageEvent dispatch, task Futures,
@@ -60,11 +61,11 @@ No additional Python extra, dependency update or external account is needed.
 
 ## Still required before public activation
 
-Complete the real HAOS runtime/controller/relay connection, structured mission
-status and cancellation/clarification mapping, durable complete-result assembly,
-approved media/voice/video and output-file paths, required callback transport,
-actual installed gateway-UID/filesystem/socket tests, inspected owner recovery,
-secure account/peer management and the full graphical path. A queue receipt must
+Complete public runtime/relay activation, clarification mapping, approved
+media/voice/video and output-file paths, required callback transport, full OS
+service-supervisor acceptance, inspected owner recovery, secure account/peer
+management and the full graphical path. The controller/outcome and real UID/
+socket components now covered are described below. A queue receipt must
 not be mistaken for a completed task result. Every source-bound validation
 receipt distinguishes real native/local work from substituted controller/IPC or
 service supervision. No external messages are sent during development fixtures.
@@ -95,3 +96,41 @@ The component probe uses actual MissionStore/GatewayEngine transactions and the
 actual native MessageEvent/Future/finalizer. Its parent dispatch is a direct local
 fixture, not the installed controller socket or gateway UID. Public activation,
 full mission controls, media, management and GUI remain unfinished.
+
+## Dedicated UID and controller socket (private)
+
+The private A2A factory now requires the actual `haos-gateway` UID/GID before
+SDK imports or credentials. It validates the saved root-owned publication,
+retains separate per-peer HOME/task journals under a real exclusive kernel
+profile lease, and uses the same native task/TLS transport on reconnection.
+The wire client ID is bridged to the generated native task ID only inside a
+verified active parent dispatch. A retained parent receipt survives process
+loss; reconnect/replay never creates a second relay input or mission.
+
+The actual process fixture installs public code as root, drops to the gateway
+UID, creates a verified loopback TLS connection and forwards through the actual
+Controller Unix client with kernel `SO_PEERCRED`. The controller's existing
+policy callback selects the prepared A2A policy in this fixture; production
+public registry/owner activation remains disabled. A foreign UID is denied even
+when it has socket group access. Private accounts, journals and owner canaries
+remain unreadable to that UID, and installed code remains unwritable. A real
+SIGKILL/reopen restores working task state and later accepts an exact complete
+multichunk controller result. TCP `SO_REUSEADDR` allows TIME_WAIT recovery;
+`SO_REUSEPORT` is not enabled and competing processes still fail the kernel
+profile lease.
+
+Cancellation uses an immutable, source-bound local command intent and the
+independent controller's `/cancel` path after receiving the task's exact mission
+receipt. It checks the cancellation capability separately and carries the
+expected binding digest to the controller; a changed owner grant cannot be used
+in the interval between the transport check and root admission. A repeated
+explicit cancel RPC retains the same controller deduplication identity after a
+lost receipt. Its native response reports `haosCancelRequested`; it never
+manufactures a cancelled task while the mission remains running. Only the
+actual controller terminal event group may complete the native task/Future as
+cancelled. Root admission, state collection and ACKs use the real bounded Unix
+client. The fixture does not run model inference or the OS service supervisor.
+
+The 13-case process contract is now mandatory in pinned-runtime CI. No external
+peer, owner GUI, media/artifact/clarification completion, installed HAOS boot or
+release acceptance is claimed from it.

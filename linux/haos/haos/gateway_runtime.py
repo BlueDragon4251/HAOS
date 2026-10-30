@@ -39,10 +39,17 @@ async def call(method: str, params: dict):
         return reply["result"]
     finally:
         writer.close()
-        await writer.wait_closed()
+        # A rejected peer may be closed before its unread request is drained.
+        # Preserve the actual response/refusal rather than replacing it with a
+        # cleanup-only reset; write/read errors above remain visible.
+        try:await asyncio.wait_for(writer.wait_closed(),2)
+        except (OSError,TimeoutError):pass
 
 
 def adapter_envelope(event, platform: str):
+    if platform=='a2a':
+        from .gateway_a2a_ingress import envelope
+        return envelope(event)
     source = event.source
     if source is None or getattr(source.platform, "value", None) != platform or event.internal:
         raise PermissionError("invalid native adapter source")
@@ -76,7 +83,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None, dingtalk_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None, dingtalk_context=None, a2a_context=None):
+    if platform=='a2a':
+        if not isinstance(a2a_context,dict) or set(a2a_context)!={'parent','connector','policy','inbox'}:
+            raise ValueError('A2A requires a private profile and exact independent owner authority')
+        from .gateway_a2a_profile import build
+        return build(credentials,**a2a_context)
     if platform=='dingtalk':
         if not isinstance(dingtalk_context,dict) or set(dingtalk_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('DingTalk requires a private profile and exact independent owner authority')

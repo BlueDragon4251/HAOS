@@ -29,6 +29,8 @@ def credentials(value,*,verify_tls=True):
     name=value['agent_name']
     if not isinstance(name,str) or not 1<=len(name)<=64 or name!=name.strip() or any(ord(c)<32 for c in name):
         raise ValueError('bounded public A2A agent display name required')
+    if any(token in public for token in peers.values() for public in [name,*peers]):
+        raise ValueError('public A2A names must not contain private peer tokens')
     from .gateway_line_tls import material
     try:tls=material(value['tls'],verify=verify_tls,webhook_path='/a2a')
     except ValueError:raise ValueError('A2A HTTPS needs the exact trusted current hostname/certificate/key and explicit listener approval') from None

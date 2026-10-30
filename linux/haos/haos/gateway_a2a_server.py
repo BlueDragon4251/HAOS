@@ -24,6 +24,7 @@ class Server:
         self.value=value;self.connector=connector;self.adapters=adapters;self.current=current;self.policy=policy
         self.capture=capture;self.cancel=cancel;self.loop=asyncio.get_running_loop();self.httpd=None;self.thread=None;self.watcher=None;self.sockets=set();self.socket_lock=threading.Lock();self.workers=set();self.pending=set();self.closing=None;self.closing_owner=None
         self.security=security_context(value);self.closed=False
+        self.redactor=next(iter(adapters.values())).tasks.redactor
         from plugins.platforms.a2a.protocol import RateLimiter
         self.limiter=RateLimiter();self.connections=threading.BoundedSemaphore(16);self.peer_lock=threading.Lock();self.peers=Counter()
 
@@ -88,6 +89,9 @@ class Server:
                 if broker.closed:raise PermissionError('private A2A listener closed')
                 if self.command=='GET' and isinstance(payload,dict) and 'served_agents' in payload:
                     payload={key:part for key,part in payload.items() if key!='served_agents'}
+                encoded=json.dumps(payload,ensure_ascii=False)
+                if broker.redactor.text(encoded)!=encoded:
+                    raise PermissionError('private A2A credential in native JSON response')
                 if len(json.dumps(payload).encode())>1024*1024:
                     code=200;payload=protocol.jsonrpc_error(payload.get('id'),protocol.ERR_INVALID_PARAMS,'response limit; request a smaller task page')
                 return super()._json(code,payload)
@@ -155,7 +159,18 @@ class Server:
                                 return self.adapter._sse_write(self,protocol.sse_done())
                             return self._json(200,protocol.jsonrpc_result(req_id,protocol.send_message_response(task) if method=='SendMessage' else task))
                     else:
-                        broker.control(self.adapter,method,request['params'])
+                        controlled=broker.control(self.adapter,method,request['params'])
+                        if method in {'CancelTask','tasks/cancel'}:
+                            # The native cancel handler immediately manufactures
+                            # a terminal task. HAOS must first await the actual
+                            # controller's terminal event, including interruption
+                            # of any running mission. Keep the native task codec.
+                            if controlled['state'] in protocol.TERMINAL_STATES:
+                                return self._json(200,protocol.jsonrpc_error(req_id,protocol.ERR_TASK_NOT_CANCELABLE,'task already terminal'))
+                            record=self.adapter.tasks.get(controlled['task_id'])
+                            task=protocol.TaskStore.to_task(record)
+                            task['metadata']={'haosCancelRequested':True}
+                            return self._json(200,protocol.jsonrpc_result(req_id,task))
                         if method in {'ListTasks','tasks/list'}:
                             request['params']['pageSize']=min(request['params'].get('pageSize',8),8)
                             raw=json.dumps(request,separators=(',',':')).encode()
@@ -183,7 +198,10 @@ class Server:
         broker=self;self.current()
         if self.httpd is not None or self.closed:raise PermissionError('private A2A listener cannot be reused')
         class Bounded(ThreadingHTTPServer):
-            daemon_threads=True;allow_reuse_address=False;request_queue_size=16
+            # TIME_WAIT must not prevent recovery after a real process crash.
+            # This is SO_REUSEADDR, never SO_REUSEPORT: an active listener still
+            # owns the port, and the private profile has its own kernel flock.
+            daemon_threads=True;allow_reuse_address=True;request_queue_size=16
             address_family=socket.AF_INET6 if broker.value['tls']['bind_host']=='::' else socket.AF_INET
             def process_request(self,request,address):
                 if broker.closed:request.close();return

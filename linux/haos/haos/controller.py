@@ -109,8 +109,13 @@ class Controller:
         if not isinstance(params, dict):
             raise ValueError("params must be an object")
         if request.get("method") == "gateway.receive":
-            if set(params)-{'connector','envelope','media'}:raise ValueError('unsupported gateway admission fields')
+            if set(params)-{'connector','envelope','media','binding'}:raise ValueError('unsupported gateway admission fields')
             if 'media' in params and params['media'] is None:raise ValueError('explicit media IDs must be a list')
+            if policy.connectors.get(params.get('connector'),{}).get('platform')=='a2a' or 'binding' in params:
+                from .gateway import digest
+                binding=policy.authorize(params['connector'],params['envelope'])
+                if params.get('binding')!={'binding_id':binding['id'],'binding_digest':digest(binding)}:
+                    raise PermissionError('exact current controller gateway grant epoch required')
             return await self.gateway.receive(policy, params["connector"], params["envelope"], self,media=params.get('media'))
         if request.get('method')=='gateway.media.begin':
             return self.gateway.media.begin(policy,params)

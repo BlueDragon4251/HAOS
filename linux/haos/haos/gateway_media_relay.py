@@ -201,4 +201,7 @@ async def forward(policy,connector,envelope,ids,cache,call):
     params={'connector':connector,'envelope':envelope}
     if ids:params['media']=ids
     policy()  # Publication/epoch revocation before final mission admission too.
+    if policy().connectors.get(connector,{}).get('platform')=='a2a':
+        binding=policy().authorize(connector,envelope)
+        params['binding']={'binding_id':binding['id'],'binding_digest':digest(binding)}
     return await call('gateway.receive',params)

@@ -109,3 +109,38 @@ def test_runtime_carries_controller_origin_context_and_refuses_missing_or_change
     assert 'haos_event_context' not in delivery_metadata(delivery,'telegram')
     with pytest.raises(Conflict):delivery_metadata({**delivery,'event_context':None},'a2a')
     with pytest.raises(Conflict):delivery_metadata({**delivery,'content':'Mission fake: completed'},'a2a')
+
+
+@pytest.mark.parametrize('epoch',[None,{}, {'binding_id':'owner','binding_digest':'f'*64}])
+def test_root_controller_requires_exact_a2a_grant_epoch_before_any_mission_admission(tmp_path,epoch):
+    from haos.controller import Controller
+    b=binding();policy=PreparedA2APolicy({'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[b]})
+    store=MissionStore(tmp_path/'missions.db');controller=Controller(store,'ws://127.0.0.1:1/not-inferred',{0})
+    controller.gateway_policy=lambda:policy
+    envelope={'platform':'a2a','sender':b['sender'],'chat':b['chat'],'scope':b['scope'],'thread':'',
+        'message_id':'original-source','text':'Explicit goal.','is_bot':False}
+    params={'connector':'a2a','envelope':envelope}
+    if epoch is not None:params['binding']=epoch
+    try:
+        with pytest.raises(PermissionError):asyncio.run(controller.gateway_dispatch({'method':'gateway.receive','params':params}))
+        assert store.list()==[] and store.db.execute('SELECT COUNT(*) FROM gateway_inbox').fetchone()[0]==0
+    finally:store.close()
+
+
+def test_root_controller_refuses_old_a2a_epoch_after_owner_regrant_without_creating_another_mission(tmp_path):
+    from haos.controller import Controller
+    from haos.gateway import digest
+    b=binding();config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[b]}
+    policy=[PreparedA2APolicy(config)];store=MissionStore(tmp_path/'missions.db')
+    controller=Controller(store,'ws://127.0.0.1:1/not-inferred',{0});controller.gateway_policy=lambda:policy[0]
+    envelope={'platform':'a2a','sender':b['sender'],'chat':b['chat'],'scope':b['scope'],'thread':'',
+        'message_id':'original-source','text':'Explicit goal.','is_bot':False}
+    params={'connector':'a2a','envelope':envelope,'binding':{'binding_id':b['id'],'binding_digest':digest(b)}}
+    try:
+        result=asyncio.run(controller.gateway_dispatch({'method':'gateway.receive','params':params}))
+        assert store.get(result['mission_id'])['state']=='queued'
+        policy[0]=PreparedA2APolicy({**config,'bindings':[{**b,'generation':'b'*64}]})
+        with pytest.raises(PermissionError):asyncio.run(controller.gateway_dispatch({'method':'gateway.receive','params':{
+            **params,'envelope':{**envelope,'message_id':'changed-message-after-regrant'}}}))
+        assert len(store.list())==1
+    finally:store.close()
